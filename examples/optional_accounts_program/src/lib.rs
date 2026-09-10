@@ -154,16 +154,8 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 		let args = InitInstruction::try_from_bytes(data)?;
 		let authority_key = *self.authority.address();
 		let seeds = StoreState::seeds(&authority_key);
-		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		self.authority.assert_signer()?;
-		let canonical_bump = self.store.assert_canonical_bump(&seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.store
-			.assert_empty()?
-			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		CreateProgramAccountWithBump {

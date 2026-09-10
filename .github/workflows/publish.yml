@@ -46,22 +46,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The prebuilt lint driver cannot be cross-compiled: `rustc-dev`
+          # ships compiler libraries only for the toolchain's own host, so a
+          # driver can only be produced on a runner whose architecture
+          # matches the release target. Targets without a matching runner
+          # ship CLI-only archives; on those platforms `pina lint` fails with
+          # guidance toward the prebuilt channels or `PINA_LINT_DRIVER_PATH`.
+          # The prebuilt driver loads `librustc_driver` from the project's
+          # own pinned nightly at runtime; nothing beyond the two binaries is
+          # archived.
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
+            lint_driver: target/release/pina_lint_driver
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
           - target: aarch64-apple-darwin
             os: macos-latest
+            lint_driver: target/release/pina_lint_driver
           - target: aarch64-pc-windows-msvc
             os: windows-latest
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            lint_driver: target/release/pina_lint_driver
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            lint_driver: target/release/pina_lint_driver.exe
           - target: x86_64-unknown-freebsd
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
@@ -96,7 +109,14 @@ jobs:
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master
         with:
-          toolchain: stable
+          # Targets without an explicit host toolchain build from the
+          # workspace's `rust-toolchain.toml` pin, which carries `rustc-dev`.
+          toolchain: ${{ matrix.toolchain || 'stable' }}
+          components: ${{ matrix.toolchain && 'rustc-dev' || '' }}
+      - name: pin build toolchain
+        if: matrix.toolchain
+        shell: bash
+        run: echo "RUSTUP_TOOLCHAIN=${{ matrix.toolchain }}" >> "$GITHUB_ENV"
       - name: setup cross toolchain
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
         uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
@@ -111,6 +131,12 @@ jobs:
         if: endsWith(matrix.target, 'windows-msvc')
         shell: bash
         run: echo "RUSTFLAGS=${RUSTFLAGS:-} -C target-feature=+crt-static" >> "$GITHUB_ENV"
+      - name: build prebuilt lint driver
+        if: matrix.lint_driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --package pina_lints --bin pina_lint_driver
       - name: upload binaries
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
@@ -120,6 +146,7 @@ jobs:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
+          include: ${{ matrix.lint_driver }}
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -228,7 +255,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: get crates oidc auth token

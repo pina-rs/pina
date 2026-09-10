@@ -213,6 +213,45 @@ fn benchmark_pda_create_program_address_two_seeds() {
 	});
 }
 
+#[test]
+fn benchmark_pda_creation_validation_paths() {
+	let authority = [42u8; 32];
+	let seeds: &[&[u8]] = &[b"profile", &authority];
+	let (expected_address, bump) =
+		try_find_program_address(seeds, &SYSTEM_ID).unwrap_or_else(|| panic!("expected PDA"));
+	let bump_seed = [bump];
+	let seeds_with_bump: &[&[u8]] = &[b"profile", &authority, &bump_seed];
+
+	bench("PDA creation validation (legacy assertion chain)", || {
+		let canonical = black_box(try_find_program_address(
+			black_box(seeds),
+			black_box(&SYSTEM_ID),
+		));
+		let asserted = black_box(create_program_address(
+			black_box(seeds_with_bump),
+			black_box(&SYSTEM_ID),
+		));
+		let builder = black_box(create_program_address(
+			black_box(seeds_with_bump),
+			black_box(&SYSTEM_ID),
+		));
+
+		let _ = black_box((canonical, asserted, builder));
+	});
+
+	bench("PDA creation validation (checked builder)", || {
+		let canonical = black_box(try_find_program_address(
+			black_box(seeds),
+			black_box(&SYSTEM_ID),
+		));
+		let valid = canonical.is_some_and(|(address, derived_bump)| {
+			address == expected_address && derived_bump == bump
+		});
+
+		black_box(valid);
+	});
+}
+
 // ---------------------------------------------------------------------------
 // Instruction parsing benchmarks
 // ---------------------------------------------------------------------------
@@ -346,7 +385,7 @@ fn benchmark_summary() {
 	eprintln!();
 	eprintln!("  Operations measured:");
 	eprintln!("    - Discriminator matching (u8, u16, u32, enum)");
-	eprintln!("    - PDA derivation (try_find_program_address, create_program_address)");
+	eprintln!("    - PDA derivation and creation-validation paths");
 	eprintln!("    - Instruction parsing (valid, invalid, wrong program)");
 	eprintln!("    - Account deserialization (try_from_bytes)");
 	eprintln!("    - Pod type conversions (PodU64)");

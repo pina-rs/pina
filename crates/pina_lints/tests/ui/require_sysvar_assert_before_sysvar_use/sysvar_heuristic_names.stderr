@@ -1,0 +1,42 @@
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_heuristic_names.rs:47:10
+   |
+LL |     let _ = load_current_index(clock_account);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+   = note: `#[deny(require_sysvar_assert_before_sysvar_use)]` on by default
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_heuristic_names.rs:49:10
+   |
+LL |     let _ = load_instruction_at(0, clock_account);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_heuristic_names.rs:51:10
+   |
+LL |     let _ = epoch_sysvar(clock_account);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_heuristic_names.rs:53:10
+   |
+LL |     let _ = some_instructions(clock_account);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_heuristic_names.rs:55:10
+   |
+LL |     let _ = rent(rent_account);
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: aborting due to 5 previous errors

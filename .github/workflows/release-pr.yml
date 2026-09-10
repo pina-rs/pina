@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -135,7 +135,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -168,7 +168,9 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       # A tag pushed with GITHUB_TOKEN does not trigger another workflow. Use
-      # workflow_dispatch explicitly so publish.yml always receives the release.
+      # workflow_dispatch explicitly so publish.yml always receives the release,
+      # dispatched from the tag itself so the workflow's $/ self-repository
+      # action references resolve from the published tag instead of main.
       - name: dispatch release publishing
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -192,7 +194,7 @@ jobs:
             fi
             gh workflow run publish.yml \
               --repo "$GITHUB_REPOSITORY" \
-              --ref main \
+              --ref "$tag" \
               --field "tag=$tag"
           done
         shell: devenv shell -- bash -e {0}

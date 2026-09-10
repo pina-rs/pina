@@ -1,12 +1,15 @@
-//! Preparation of the `pina_lint_driver` binary used by `pina lint`.
+//! Resolution of the prebuilt `pina_lint_driver` binary used by `pina lint`.
 //!
-//! The driver links against the Rust compiler's unstable `rustc_private`
-//! crates, so it must be built with the exact toolchain that compiles the
-//! project. The CLI installs it from the crates.io release of `pina_lints`
-//! matching its own version and caches it below Cargo home, keyed by the
-//! toolchain fingerprint. The `PINA_LINT_DRIVER_PATH` environment variable
-//! bypasses the cache and points at an already-built driver; the repository's
-//! own tasks and tests use it to run the workspace driver.
+//! The lints are statically linked into the driver, which is an ordinary
+//! release artifact shipped next to the `pina` CLI in every release archive
+//! and npm platform package. The CLI never builds or installs anything: it
+//! runs the driver beside its own executable. Because the driver consumes the
+//! compiler's unstable `rustc_private` crates, its compiler libraries load
+//! from the toolchain the project activates; the CLI therefore points the
+//! platform's library-path variable at the active sysroot and confirms the
+//! driver loads before running cargo. The `PINA_LINT_DRIVER_PATH`
+//! environment variable points at a locally built driver instead; the
+//! repository's own tasks and tests use it.
 
 use std::ffi::OsString;
 use std::fs::File;
@@ -22,111 +25,217 @@ use sha2::Sha256;
 /// Environment variable pointing at an existing driver binary.
 const PINA_LINT_DRIVER_PATH: &str = "PINA_LINT_DRIVER_PATH";
 
+/// The nightly release the prebuilt lint driver targets.
+///
+/// Keep in sync with `rust-toolchain.toml` and the toolchain template that
+/// `pina init` writes: the shipped driver links the compiler libraries of
+/// that nightly, so the project must activate the same release for its
+/// sysroot to supply them.
+pub const LINT_DRIVER_TOOLCHAIN: &str = "nightly-2026-02-20";
+
 /// The prepared driver and how it was resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedDriver {
 	/// Path of the driver executable.
 	pub path: PathBuf,
+
+	/// Sysroot of the toolchain the driver loads its compiler libraries and
+	/// the project's standard library from.
+	pub sysroot: PathBuf,
 }
 
 /// Errors produced while preparing the lint driver.
 #[derive(Debug, thiserror::Error)]
 pub enum DriverError {
-	#[error("Could not resolve Cargo home for Pina's managed lint driver")]
-	MissingCargoHome,
+	#[error("Could not query the Rust compiler sysroot: {source}")]
+	QuerySysroot { source: std::io::Error },
 
-	#[error("Could not resolve relative CARGO_HOME from the current directory: {source}")]
-	CurrentDirectory { source: std::io::Error },
+	#[error("Could not query the Rust compiler sysroot because rustc exited with status {status}")]
+	SysrootFailed { status: String },
 
-	#[error("Could not query the Rust compiler fingerprint: {source}")]
-	QueryRustc { source: std::io::Error },
+	#[error("Could not parse a sysroot from rustc --print sysroot")]
+	MissingSysroot,
 
 	#[error(
-		"Could not query the Rust compiler fingerprint because rustc exited with status {status}"
+		"Could not resolve the running pina executable to locate the bundled lint driver: {source}"
 	)]
-	RustcFailed { status: String },
-
-	#[error("Could not parse a release or host target from rustc -vV")]
-	MissingRustcFingerprint,
+	ResolveExecutable { source: std::io::Error },
 
 	#[error("`PINA_LINT_DRIVER_PATH` does not point at an executable: {path}")]
 	InvalidDriverOverride { path: PathBuf },
 
-	#[error("Could not run cargo to install the lint driver: {source}")]
-	RunCargo { source: std::io::Error },
-
-	#[error("Could not install the lint driver; cargo exited with status {status}")]
-	InstallFailed { status: String },
-
-	#[error("The lint driver install finished without producing {path}")]
+	#[error(
+		"Could not find the prebuilt lint driver {path}. Pina ships the security-lint driver next \
+		 to its CLI in release archives and npm platform packages, and a CLI installed with \
+		 `cargo install pina_cli` does not include it. Install the prebuilt CLI, or set \
+		 `PINA_LINT_DRIVER_PATH` to a `pina_lint_driver` built with the project's toolchain."
+	)]
 	MissingDriver { path: PathBuf },
+
+	#[error("Could not run the lint driver to confirm it loads: {source}")]
+	RunDriver { source: std::io::Error },
+
+	#[error(
+		"Could not load the lint driver {path} (status {status}); the prebuilt driver links the \
+		 compiler libraries of the {LINT_DRIVER_TOOLCHAIN} release it was built with, resolved \
+		 here from sysroot {sysroot}. Pin {LINT_DRIVER_TOOLCHAIN} in the project's \
+		 rust-toolchain.toml so that nightly is active, or set `PINA_LINT_DRIVER_PATH` to a \
+		 driver built with the active toolchain.\n{diagnostics}"
+	)]
+	DriverUnloadable {
+		path: PathBuf,
+		sysroot: PathBuf,
+		status: String,
+		diagnostics: String,
+	},
 }
 
 /// Resolve the driver for the given project root.
 ///
-/// The driver is installed below `cargo_home` at
-/// `pina/lint-driver/<pina-version>/<toolchain>/bin/pina_lint_driver`, where
-/// the toolchain component contains the release, optional commit, host, and a
-/// hash of the complete version report from the compiler that builds the
-/// project.
-pub fn prepare_driver(
-	cargo_home: &Path,
-	project_root: &Path,
-) -> Result<PreparedDriver, DriverError> {
+/// The bundled driver sits next to the CLI executable and is started once to
+/// confirm it loads against the active toolchain. The `PINA_LINT_DRIVER_PATH`
+/// override skips the bundled location and the check because its driver is
+/// built and managed outside the CLI.
+pub fn prepare_driver(project_root: &Path) -> Result<PreparedDriver, DriverError> {
+	let sysroot = rustc_sysroot(project_root)?;
+
 	if let Some(path) = std::env::var_os(PINA_LINT_DRIVER_PATH) {
 		let path = PathBuf::from(path);
 		if is_executable(&path) {
-			return Ok(PreparedDriver { path });
+			return Ok(PreparedDriver { path, sysroot });
 		}
 		return Err(DriverError::InvalidDriverOverride { path });
 	}
 
-	let toolchain = rustc_fingerprint(project_root)?;
-	let root = cargo_home
-		.join("pina")
-		.join("lint-driver")
-		.join(env!("CARGO_PKG_VERSION"))
-		.join(&toolchain);
-	let bin = root.join("bin").join(driver_binary_name());
+	let executable =
+		std::env::current_exe().map_err(|source| DriverError::ResolveExecutable { source })?;
+	let directory = executable.parent().ok_or(DriverError::ResolveExecutable {
+		source: std::io::Error::new(
+			std::io::ErrorKind::NotFound,
+			"the executable has no parent directory",
+		),
+	})?;
+	let bin = directory.join(driver_binary_name());
 
 	if is_executable(&bin) {
-		return Ok(PreparedDriver { path: bin });
-	}
-
-	install_driver(&root, project_root)?;
-
-	if is_executable(&bin) {
-		return Ok(PreparedDriver { path: bin });
+		verify_driver_loads(&bin, &sysroot)?;
+		return Ok(PreparedDriver { path: bin, sysroot });
 	}
 	Err(DriverError::MissingDriver { path: bin })
 }
 
-/// Install the driver from the crates.io release matching this CLI.
-fn install_driver(root: &Path, project_root: &Path) -> Result<(), DriverError> {
-	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+/// Confirm the bundled driver starts under the active toolchain.
+///
+/// Invoked without arguments the driver prints its toolchain and package
+/// version, which exercises the dynamic load of `librustc_driver` without
+/// compiling anything. Checking here turns a toolchain mismatch into an error
+/// that names the required nightly instead of the opaque exit the lint cargo
+/// run would surface later.
+fn verify_driver_loads(bin: &Path, sysroot: &Path) -> Result<(), DriverError> {
+	let output = Command::new(bin)
+		.envs(driver_library_environment(sysroot))
+		.output()
+		.map_err(|source| DriverError::RunDriver { source })?;
 
-	let status = Command::new(&cargo)
-		.current_dir(project_root)
-		.arg("install")
-		.arg("--locked")
-		.arg("--root")
-		.arg(root)
-		.arg("--bin")
-		.arg("pina_lint_driver")
-		.arg("--version")
-		.arg(concat!("=", env!("CARGO_PKG_VERSION")))
-		.arg("pina_lints")
-		.status()
-		.map_err(|source| DriverError::RunCargo { source })?;
-
-	if !status.success() {
-		// Remove the partial installation so a later run retries cleanly.
-		let _ = std::fs::remove_dir_all(root);
-		return Err(DriverError::InstallFailed {
-			status: status.to_string(),
+	if !output.status.success() {
+		return Err(DriverError::DriverUnloadable {
+			path: bin.to_path_buf(),
+			sysroot: sysroot.to_path_buf(),
+			status: output.status.to_string(),
+			diagnostics: format_diagnostics(&output.stderr),
 		});
 	}
 	Ok(())
+}
+
+/// Return loader output suitable for an error message.
+fn format_diagnostics(stderr: &[u8]) -> String {
+	const LIMIT: usize = 2000;
+
+	let diagnostics = String::from_utf8_lossy(stderr).trim().to_owned();
+	if diagnostics.is_empty() {
+		return "(the loader printed no output)".to_owned();
+	}
+
+	// Keep the tail, where the dynamic loader states the paths it tried.
+	let mut start = diagnostics.len().saturating_sub(LIMIT);
+	while !diagnostics.is_char_boundary(start) {
+		start += 1;
+	}
+	if start == 0 {
+		diagnostics
+	} else {
+		format!("...{}", &diagnostics[start..])
+	}
+}
+
+/// Return the environment entries that locate the toolchain's compiler
+/// libraries for the dynamically linked driver.
+///
+/// On macOS only `DYLD_LIBRARY_PATH` contributes to the loader's `@rpath`
+/// search, but `LD_LIBRARY_PATH` is set alongside it because SIP strips
+/// `DYLD_LIBRARY_PATH` at the kernel boundary when the spawned executable is
+/// a system binary such as `/bin/bash`, which is how tests observe the
+/// setting.
+pub fn driver_library_environment(sysroot: &Path) -> Vec<(&'static str, OsString)> {
+	library_path_variables()
+		.iter()
+		.map(|variable| library_environment(sysroot, variable, std::env::var_os(*variable)))
+		.collect()
+}
+
+/// Return the platform's dynamic-library search variables.
+#[cfg(target_os = "macos")]
+fn library_path_variables() -> &'static [&'static str] {
+	&["DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"]
+}
+
+/// Return the platform's dynamic-library search variables.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn library_path_variables() -> &'static [&'static str] {
+	&["LD_LIBRARY_PATH"]
+}
+
+/// Return the platform's dynamic-library search variables.
+#[cfg(windows)]
+fn library_path_variables() -> &'static [&'static str] {
+	&["PATH"]
+}
+
+/// Return the search-variable entry locating the sysroot's compiler
+/// libraries, prepending the directory to the variable's current setting.
+fn library_environment(
+	sysroot: &Path,
+	variable: &'static str,
+	current: Option<OsString>,
+) -> (&'static str, OsString) {
+	(
+		variable,
+		prepend_path(current, &sysroot.join(library_directory())),
+	)
+}
+
+/// Return the sysroot directory holding the compiler's shared libraries.
+#[cfg(unix)]
+fn library_directory() -> &'static str {
+	"lib"
+}
+
+/// Return the sysroot directory holding the compiler's shared libraries.
+#[cfg(windows)]
+fn library_directory() -> &'static str {
+	"bin"
+}
+
+/// Prepend `directory` to a path-list variable's current value.
+fn prepend_path(current: Option<OsString>, directory: &Path) -> OsString {
+	let directory = directory.to_path_buf();
+	let mut entries = vec![directory.clone()];
+	if let Some(current) = current.filter(|current| !current.is_empty()) {
+		entries.extend(std::env::split_paths(&current));
+	}
+
+	std::env::join_paths(entries).unwrap_or_else(|_| directory.into_os_string())
 }
 
 /// Return the platform file name of the driver binary.
@@ -159,7 +268,7 @@ fn is_executable(path: &Path) -> bool {
 /// Return a deterministic content identity for the prepared driver.
 ///
 /// The identity is forwarded into rustc dep-info so Cargo invalidates a prior
-/// lint result when a rebuilt driver occupies the same path.
+/// lint result when an upgraded driver occupies the same path.
 pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
 	let file = File::open(path)?;
 	let mut reader = BufReader::new(file);
@@ -178,61 +287,33 @@ pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
 	Ok(hex(&digest))
 }
 
-/// Return the version-report fingerprint of the Rust compiler used for
-/// `project_root`.
-fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
+/// Resolve the sysroot of the compiler used for `project_root`.
+///
+/// The sysroot holds the `librustc_driver` library the driver loads, so its
+/// library directory anchors the dynamic-library search path handed to every
+/// lint process.
+fn rustc_sysroot(project_root: &Path) -> Result<PathBuf, DriverError> {
 	let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
 	let output = Command::new(rustc)
-		.arg("-vV")
+		.arg("--print")
+		.arg("sysroot")
 		.current_dir(project_root)
 		.output()
-		.map_err(|source| DriverError::QueryRustc { source })?;
+		.map_err(|source| DriverError::QuerySysroot { source })?;
 
 	if !output.status.success() {
-		return Err(DriverError::RustcFailed {
+		return Err(DriverError::SysrootFailed {
 			status: output.status.to_string(),
 		});
 	}
 
-	parse_rustc_fingerprint(&output.stdout).ok_or(DriverError::MissingRustcFingerprint)
+	parse_sysroot(&output.stdout).ok_or(DriverError::MissingSysroot)
 }
 
-/// Parse a stable identity from verbose rustc version output.
-///
-/// Official toolchains expose a commit hash, but source-built compilers may
-/// omit it. Hashing the complete version report keeps every compiler property
-/// that rustc does expose in the cache identity without rejecting those
-/// toolchains or collapsing all of them onto an `unknown` placeholder.
-fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
-	let version_hash = Sha256::digest(output);
-	let version_hash = hex(&version_hash);
-	let output = String::from_utf8_lossy(output);
-	let field = |prefix| {
-		output
-			.lines()
-			.find_map(|line| line.strip_prefix(prefix))?
-			.split_whitespace()
-			.next()
-	};
-	let release = field("release: ")?;
-	let commit_hash = field("commit-hash: ").unwrap_or("no-commit");
-	let host = field("host: ")?;
-
-	let fingerprint = format!("{release}-{commit_hash}-{host}-{version_hash}");
-	// The required fields were parsed above, so the leftover
-	// replacements cannot blank the name out.
-	Some(
-		fingerprint
-			.chars()
-			.map(|character| {
-				if character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-') {
-					character
-				} else {
-					'-'
-				}
-			})
-			.collect::<String>(),
-	)
+/// Parse a sysroot path from `rustc --print sysroot` output.
+fn parse_sysroot(output: &[u8]) -> Option<PathBuf> {
+	let sysroot = String::from_utf8_lossy(output).trim().to_owned();
+	(!sysroot.is_empty()).then(|| PathBuf::from(sysroot))
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -244,53 +325,6 @@ fn hex(bytes: &[u8]) -> String {
 	}
 
 	encoded
-}
-
-/// Resolve the directory Cargo uses for its managed state.
-pub fn resolve_cargo_home(
-	cargo_home: Option<OsString>,
-	current_dir: Result<PathBuf, std::io::Error>,
-	platform_home: Option<PathBuf>,
-) -> Result<PathBuf, DriverError> {
-	if let Some(home) = cargo_home {
-		let home = PathBuf::from(home);
-		if home.is_absolute() {
-			return Ok(home);
-		}
-
-		return current_dir
-			.map(|current_dir| current_dir.join(home))
-			.map_err(|source| DriverError::CurrentDirectory { source });
-	}
-
-	platform_home
-		.map(|home| home.join(".cargo"))
-		.ok_or(DriverError::MissingCargoHome)
-}
-
-#[cfg(not(windows))]
-fn platform_home() -> Option<PathBuf> {
-	std::env::var_os("HOME").map(PathBuf::from)
-}
-
-#[cfg(windows)]
-fn platform_home() -> Option<PathBuf> {
-	std::env::var_os("USERPROFILE")
-		.map(PathBuf::from)
-		.or_else(|| {
-			let drive = std::env::var_os("HOMEDRIVE")?;
-			let path = std::env::var_os("HOMEPATH")?;
-			Some(PathBuf::from(drive).join(path))
-		})
-}
-
-/// Resolve Cargo home using Cargo's environment and platform conventions.
-pub fn cargo_home() -> Result<PathBuf, DriverError> {
-	resolve_cargo_home(
-		std::env::var_os("CARGO_HOME"),
-		std::env::current_dir(),
-		platform_home(),
-	)
 }
 
 /// Format the configured lint levels for the driver's `PINA_LINT_LEVELS`
@@ -313,105 +347,81 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn resolves_absolute_relative_and_default_cargo_homes() {
-		let absolute = std::env::temp_dir().join("managed-cargo");
+	fn parses_sysroot_output_and_rejects_blank_reports() {
 		assert_eq!(
-			resolve_cargo_home(
-				Some(absolute.clone().into_os_string()),
-				Err(io::Error::other("unused")),
-				None,
-			)
-			.expect("absolute Cargo home should resolve"),
-			absolute
+			parse_sysroot(b"/nix/store/2nv9qzwmlnrxa6vh4h0d7c9wkc0ns9hb-rust-default\n"),
+			Some(PathBuf::from(
+				"/nix/store/2nv9qzwmlnrxa6vh4h0d7c9wkc0ns9hb-rust-default"
+			)),
 		);
+		assert_eq!(parse_sysroot(b"  \n"), None);
+		assert_eq!(parse_sysroot(b""), None);
+	}
 
-		let working = std::env::temp_dir().join("working");
+	#[test]
+	fn library_environment_prepends_the_sysroot_library_directory() {
+		let sysroot = PathBuf::from("/toolchain/sysroot");
+		#[cfg(windows)]
+		let inherited = OsString::from("C:\\other\\bin");
+		#[cfg(not(windows))]
+		let inherited = OsString::from("/other/lib");
+
+		let (name, value) = library_environment(
+			&sysroot,
+			library_path_variables()[0],
+			Some(inherited.clone()),
+		);
+		assert_eq!(name, library_path_variables()[0]);
+		let mut entries = std::env::split_paths(&value);
 		assert_eq!(
-			resolve_cargo_home(Some(OsString::from("relative")), Ok(working.clone()), None,)
-				.expect("relative Cargo home should resolve"),
-			working.join("relative")
+			entries.next(),
+			Some(sysroot.join(library_directory())),
+			"the sysroot library directory must come first"
 		);
-
-		let home = std::env::temp_dir().join("home-developer");
 		assert_eq!(
-			resolve_cargo_home(None, Err(io::Error::other("unused")), Some(home.clone()))
-				.expect("default Cargo home should resolve"),
-			home.join(".cargo")
+			entries.next(),
+			Some(PathBuf::from(&inherited)),
+			"an inherited search path must survive the prepend"
 		);
+		assert_eq!(entries.next(), None);
 	}
 
 	#[test]
-	fn reports_unavailable_working_and_home_directories() {
-		let current_directory = resolve_cargo_home(
-			Some(OsString::from("relative")),
-			Err(io::Error::other("missing working directory")),
-			None,
-		)
-		.expect_err("relative Cargo home should require a working directory");
-		assert!(matches!(
-			current_directory,
-			DriverError::CurrentDirectory { .. }
-		));
+	fn library_environment_handles_an_unset_search_variable() {
+		let sysroot = PathBuf::from("/toolchain/sysroot");
 
-		let home = resolve_cargo_home(None, Ok(PathBuf::from("/working")), None)
-			.expect_err("a platform home should be required");
-		assert!(matches!(home, DriverError::MissingCargoHome));
+		let (_, value) = library_environment(&sysroot, library_path_variables()[0], None);
+
+		let mut entries = std::env::split_paths(&value);
+		assert_eq!(entries.next(), Some(sysroot.join(library_directory())));
+		assert_eq!(entries.next(), None);
 	}
 
 	#[test]
-	fn parses_rustc_fingerprint_from_verbose_version_output() {
-		let output = b"rustc 1.95.0-nightly (abc 2026-02-20)\nbinary: rustc\nrelease: \
-		               1.95.0-nightly\ncommit-hash: abc123\nhost: x86_64-unknown-linux-gnu\n";
+	fn diagnostics_keep_the_tail_of_long_loader_reports() {
+		assert_eq!(format_diagnostics(b""), "(the loader printed no output)");
+		assert_eq!(format_diagnostics(b"  dyld: boom  \n"), "dyld: boom");
 
-		let fingerprint = parse_rustc_fingerprint(output).expect("the version report should parse");
-		assert!(fingerprint.starts_with("1.95.0-nightly-abc123-x86_64-unknown-linux-gnu-"));
-		assert_eq!(fingerprint.rsplit('-').next().map(str::len), Some(64));
-		assert!(parse_rustc_fingerprint(b"rustc without fingerprint lines\n").is_none());
-	}
+		let long = "x".repeat(5000);
+		let formatted = format_diagnostics(long.as_bytes());
+		assert_eq!(formatted.len(), 2003);
+		assert!(formatted.starts_with("..."));
 
-	#[test]
-	fn fingerprints_source_built_compilers_without_a_commit_hash() {
-		let first = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 21.0.0\n";
-		let second = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.0.0\n";
-
-		let fingerprint = parse_rustc_fingerprint(first).expect("a commit hash should be optional");
-		assert!(fingerprint.starts_with("1.95.0-dev-no-commit-x86_64-unknown-linux-gnu-"));
-		assert_ne!(
-			parse_rustc_fingerprint(first),
-			parse_rustc_fingerprint(second),
-			"the complete compiler version report must contribute to the identity"
-		);
-	}
-
-	#[test]
-	fn distinguishes_nightly_compiler_revisions() {
-		let first = b"release: 1.95.0-nightly\ncommit-hash: abc123\nhost: aarch64-apple-darwin\n";
-		let second = b"release: 1.95.0-nightly\ncommit-hash: def456\nhost: aarch64-apple-darwin\n";
-
-		assert_ne!(
-			parse_rustc_fingerprint(first),
-			parse_rustc_fingerprint(second)
-		);
-	}
-
-	#[test]
-	fn sanitizes_unexpected_characters_out_of_the_toolchain_fingerprint() {
-		let output = b"rustc 1.95.0 nightly\nbinary: rustc\nrelease: \
-		               1.95.0~rolling\ncommit-hash: abc/123\nhost: aarch64 unknown linux\n";
-
-		// The tilde is not allowed in a cargo target fingerprint, so the
-		// sanitizer must replace it with the safe placeholder. The host token
-		// is the first whitespace-separated word of the host line.
-		let parsed = parse_rustc_fingerprint(output).expect("the crafted output should parse");
-		assert!(parsed.starts_with("1.95.0-rolling-abc-123-aarch64-"));
-		assert_eq!(parsed.rsplit('-').next().map(str::len), Some(64));
+		// A truncation point inside a multibyte character advances to the next
+		// char boundary instead of splitting the character.
+		let multibyte = "€".repeat(834);
+		let formatted = format_diagnostics(multibyte.as_bytes());
+		assert!(formatted.starts_with("...€"));
 	}
 
 	#[test]
 	fn formats_lint_levels_for_the_driver_environment() {
 		assert_eq!(
-			format_lint_levels([("require_empty_before_init", "deny"), ("other", "allow")]),
-			"require_empty_before_init=deny,other=allow"
+			format_lint_levels([
+				("require_writable_before_account_resize", "deny"),
+				("other", "allow")
+			]),
+			"require_writable_before_account_resize=deny,other=allow"
 		);
 		assert_eq!(format_lint_levels(std::iter::empty::<(&str, &str)>()), "");
 	}
@@ -448,5 +458,28 @@ mod tests {
 			driver_build_identity(second.path()).expect("fingerprint second driver")
 		);
 		assert_eq!(first_identity.len(), 64);
+	}
+
+	#[test]
+	#[cfg(unix)]
+	fn unloadable_driver_reports_the_required_toolchain() {
+		let directory = tempfile::tempdir().expect("temp directory");
+		let driver = directory.path().join("stub-driver");
+		std::fs::write(&driver, "#!/bin/sh\nexit 9\n").expect("write stub driver");
+		use std::os::unix::fs::PermissionsExt;
+		std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o755))
+			.expect("permissions");
+
+		let error = verify_driver_loads(&driver, Path::new("/toolchain/sysroot"))
+			.expect_err("a failing driver should not load");
+		let message = error.to_string();
+		assert!(
+			message.contains("Could not load the lint driver"),
+			"unexpected error: {message}",
+		);
+		assert!(
+			message.contains(LINT_DRIVER_TOOLCHAIN) && message.contains("rust-toolchain.toml"),
+			"the error should name the required toolchain and the pin file: {message}",
+		);
 	}
 }

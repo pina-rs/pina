@@ -122,6 +122,22 @@ account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 
 A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
+Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` and `.invoke_signed()` builders encode their program ID. Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`. Neither form needs a preceding account assertion.
+
+If you call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first against a const, immutable static, or an unmodified local alias of one. An expected ID supplied through instruction data is attacker-controlled and does not authenticate the target. Prefer Pina's `assert_program()`, propagate assertion failure, and call the method directly. The lint requires validation on every continuing path. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks, assignments, mutable borrows, `&mut self` method calls, and closures that may replace the validated binding invalidate the proof. The lint also rejects storing an unverified CPI method as a function value because doing so hides the target argument from its local proof.
+
+When you need sysvar data, prefer Pinocchio's checked typed loaders:
+
+```rust
+let clock = Clock::from_account_view(clock_account)?;
+let rent = Rent::from_account_view(rent_account)?;
+let instructions = Instructions::try_from(instructions_account)?;
+```
+
+These loaders validate the sysvar address while parsing. Their results can flow through normal Rust extraction, adapters, tuples, patterns, and control flow without extra assertions. Pina instead rejects constructors that do not validate identity. These include the `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` or `new_unchecked`. Call these constructors directly. Storing one as a function value is also rejected so the unvalidated source remains visible.
+
+Keep `assert_sysvar()` for identity-only checks and deliberate raw data access. A raw-access proof must call Pina's method with the matching `pina_sdk_ids::sysvar::<name>::ID`. For a generic binding such as `epoch_sysvar`, the recognized canonical ID supplies the otherwise missing identity. Enforce its `Result` on every continuing path. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks, assignments, mutable borrows, `&mut self` method calls, and closures that may replace the asserted binding invalidate the proof. Reviewed manual parsing also needs a narrow lint allowance on its constructor.
+
 ## Typed account conversions
 
 Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards. The type aliases `LoadedAccount<'a, T>` and `LoadedAccountMut<'a, T>` are provided for `Ref<'a, T>` and `RefMut<'a, T>` respectively, offering a more descriptive name for guard-backed typed account access.

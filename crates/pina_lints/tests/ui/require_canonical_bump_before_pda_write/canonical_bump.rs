@@ -2,6 +2,17 @@
 
 struct Account;
 
+struct CreateProgramAccountWithBump<'a> {
+	account: &'a Account,
+}
+
+impl CreateProgramAccountWithBump<'_> {
+	fn invoke(&self) -> Result<(), ()> {
+		let _ = self.account;
+		Ok(())
+	}
+}
+
 impl Account {
 	fn assert_canonical_bump(&self, _seeds: &[&[u8]], _program: &[u8]) -> Result<u8, ()> {
 		Ok(255)
@@ -20,6 +31,10 @@ fn process(account: &Account, seeds: &[&[u8]], program: &[u8]) -> Result<(), ()>
 fn process_unchecked(account: &Account, seeds: &[&[u8]], program: &[u8]) -> Result<(), ()> {
 	account.assert_seeds_with_bump(seeds, program)
 	//~^ ERROR: explicit PDA bump used without first proving the canonical address
+}
+
+fn process_checked_builder(account: &Account) -> Result<(), ()> {
+	CreateProgramAccountWithBump { account }.invoke()
 }
 
 fn main() {}

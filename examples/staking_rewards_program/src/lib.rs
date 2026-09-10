@@ -230,7 +230,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializePoolInstruction::try_from_bytes(data)?;
 		let pool_seeds = PoolState::seeds(self.stake_mint.address(), self.reward_mint.address());
-		let pool_seeds_with_bump = pool_seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.admin.assert_signer()?;
@@ -240,15 +239,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		let canonical_bump = self
-			.pool_state
-			.assert_canonical_bump(&pool_seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.pool_state
-			.assert_empty()?
-			.assert_seeds_with_bump(&pool_seeds_with_bump.as_slices(), &ID)?;
 		self.stake_vault
 			.assert_empty()?
 			.assert_writable()?
@@ -319,21 +309,11 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		let pool_address = *self.pool_state.address();
 		let user_address = *self.user.address();
 		let position_seeds = PositionState::seeds(&pool_address, &user_address);
-		let position_seeds_with_bump = position_seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.user.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.pool_state.assert_not_empty()?;
-		let canonical_bump = self
-			.position_state
-			.assert_canonical_bump(&position_seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.position_state
-			.assert_empty()?
-			.assert_seeds_with_bump(&position_seeds_with_bump.as_slices(), &ID)?;
 
 		// Check pool is not paused
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;

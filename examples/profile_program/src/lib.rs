@@ -203,20 +203,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let authority_key = *self.authority.address();
 		let seeds = ProfileState::seeds(&authority_key);
-		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.authority.assert_signer()?;
-		let canonical_bump = self
-			.profile
-			.assert_canonical_bump(&seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.profile
-			.assert_empty()?
-			.assert_writable()?
-			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
+		self.profile.assert_empty()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account

@@ -58,7 +58,9 @@ The unused-borrow-guard lint now classifies each binding's inferred type instead
 
 ## Refresh the managed lint driver
 
-No manual cache cleanup is normally required. The CLI now keys the installed lint driver by the complete `rustc -vV` report: release, host, commit when present, and a SHA-256 digest of the report. It therefore rebuilds when the reported compiler identity changes and still supports source-built toolchains that omit commit metadata. It installs the driver as `RUSTC_WORKSPACE_WRAPPER`, so Cargo can retain an existing outer `RUSTC_WRAPPER` such as `sccache`. If `PINA_LINT_DRIVER_PATH` is set for local lint development, make sure it points to a driver built by the same toolchain as the project.
+No manual cache cleanup is required because there is no cache anymore. The lint driver ships prebuilt next to the `pina` CLI in every release archive and npm platform package, built by the release pipeline from the pinned nightly in `rust-toolchain.toml` — the same release `pina init` scaffolds. The CLI resolves the driver beside its own executable and starts it once before the lint run to confirm it loads; a CLI installed with `cargo install pina_cli` does not bundle a driver, so install the prebuilt CLI or set `PINA_LINT_DRIVER_PATH` for local lint development.
+
+The lint run also prepends the active toolchain's sysroot library directory to the dynamic-library search path (`DYLD_LIBRARY_PATH` and `LD_LIBRARY_PATH` on macOS, `LD_LIBRARY_PATH` on other Unix). Because the compiler internals in `librustc_driver` are keyed to the exact nightly build, the project's active toolchain must be that pinned nightly; a mismatch fails the load check with an error naming the required toolchain instead of failing deep inside cargo with a loader exit. If `PINA_LINT_DRIVER_PATH` is set, make sure it points to a driver built by the same toolchain as the project.
 
 Run the complete catalog after migrating:
 

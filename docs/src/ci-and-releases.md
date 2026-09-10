@@ -124,10 +124,10 @@ The `docs-pages` workflow publishes the mdBook to GitHub Pages:
 The `publish` workflow builds and uploads the `pina` CLI binary for all supported platforms on release tag pushes (`v*`):
 
 - Trigger: tag push `v*` (created by the `release-pr` workflow after a release PR merges)
-- Build scope: `crates/pina_cli` only (`bin = "pina"`)
-- Artifacts: `pina-<target>-<tag>` archives with `sha256`/`sha512` checksums, attested with build provenance
+- Build scope: the `pina` CLI (`crates/pina_cli`), plus the prebuilt `pina_lint_driver` on targets whose runner can host the matching nightly toolchain
+- Artifacts: `pina-<target>-<tag>` archives containing `pina` and, where available, `pina_lint_driver`, with `sha256`/`sha512` checksums, attested with build provenance
 
-The same workflow builds, uploads, and attests the CLI archives, then publishes the crates, including `pina_lints` — the crate whose lints are statically compiled into the `pina_lint_driver` binary. The lint driver is not a release asset: on first use, `pina lint` installs it from the `pina_lints` crates.io release matching the CLI version, so no separate tool or lint-bundle release jobs remain in the workflow.
+The same workflow builds, uploads, and attests the CLI archives — including the prebuilt `pina_lint_driver`, whose lints are statically compiled in from `pina_lints` — then publishes the crates. `pina lint` runs the driver bundled next to the CLI, so no separate tool or lint-bundle release jobs remain in the workflow. The driver cannot be cross-compiled (`rustc-dev` ships compiler libraries only for the toolchain's own host), so targets without a matching runner ship CLI-only archives; on those platforms `pina lint` fails with guidance toward the prebuilt channels or `PINA_LINT_DRIVER_PATH`.
 
 `crates/pina_cli/lints.json` (schema version 3) is the catalog of lint names and default levels used to validate the `[lints]` configuration in `pina.toml`. A test in `pina_lints` keeps the catalog in sync with the registered lints.
 

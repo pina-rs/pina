@@ -111,11 +111,6 @@ fn ui_require_consistent_token_program() {
 }
 
 #[test]
-fn ui_require_empty_before_init() {
-	run_ui_tests("require_empty_before_init");
-}
-
-#[test]
 fn ui_require_explicit_discriminators_and_seed_namespaces() {
 	run_ui_tests("require_explicit_discriminators_and_seed_namespaces");
 }

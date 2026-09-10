@@ -40,6 +40,26 @@ use crate::PinaPodError;
 use crate::PinaPodPatch;
 use crate::ProgramResult;
 
+const MAX_CPI_SIGNERS: usize = 16;
+
+#[inline(always)]
+fn canonical_pda(
+	account: &AccountView,
+	seeds: &[&[u8]],
+	owner: &Address,
+	expected_bump: Option<u8>,
+) -> Result<(Address, u8), ProgramError> {
+	let Some((address, bump)) = crate::try_find_program_address(seeds, owner) else {
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	if account.address() != &address || expected_bump.is_some_and(|expected| expected != bump) {
+		return Err(ProgramError::InvalidSeeds);
+	}
+
+	Ok((address, bump))
+}
+
 /// Creates a rent-exempt system account owned by another program.
 ///
 /// Use this builder when both the funding account and new account are regular
@@ -164,6 +184,18 @@ impl CreateAccount<'_, '_> {
 /// 	seeds,
 /// }
 /// .invoke::<EscrowState>()?;
+///
+/// // Store the derived bump during initialization without deriving twice:
+/// CreateProgramAccount {
+/// 	account: escrow_account,
+/// 	payer,
+/// 	owner: &program_id,
+/// 	seeds,
+/// }
+/// .invoke_with_bump::<EscrowState>(|state, bump| {
+/// 	state.bump = bump;
+/// 	Ok(())
+/// })?;
 /// ```
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateProgramAccount<'account, 'address, 'seeds, 'seed> {
@@ -220,6 +252,31 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<T, _>(signers, None, |state, _bump| initialize(state))
+	}
+
+	/// Creates the account and passes the derived canonical bump to the fixed
+	/// account initializer.
+	///
+	/// Use this method when the account stores its own bump. Pina derives and
+	/// validates the address once, then passes the same bump to the initializer
+	/// and target signer.
+	#[inline(always)]
+	pub fn invoke_with_bump<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_with_bump::<T>(&[], initialize)
+	}
+
+	/// Creates the account with additional PDA signers and passes the derived
+	/// canonical bump to the fixed account initializer.
+	#[inline(always)]
+	pub fn invoke_signed_with_bump<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
 		self.invoke_signed_inner::<T, _>(signers, None, initialize)
 	}
 
@@ -230,7 +287,7 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> Result<(Address, u8), ProgramError> {
-		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_| Ok(()))
+		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_, _bump| Ok(()))
 	}
 
 	#[inline(always)]
@@ -241,11 +298,9 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		initialize: F,
 	) -> Result<(Address, u8), ProgramError>
 	where
-		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+		F: FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
 	{
-		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
-			return Err(ProgramError::InvalidSeeds);
-		};
+		let (address, bump) = canonical_pda(self.account, self.seeds, self.owner, None)?;
 
 		CreateProgramAccountWithBump {
 			account: self.account,
@@ -254,17 +309,18 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump,
 		}
-		.invoke_signed_inner::<T, _>(signers, rent, initialize)?;
+		.invoke_signed_inner_validated::<T, _>(signers, rent, |state| initialize(state, bump))?;
 
 		Ok((address, bump))
 	}
 }
 
-/// Creates a PDA-backed program account using a caller-provided `bump` and
-/// initializes `T`'s discriminator.
+/// Creates a PDA-backed program account using a caller-provided canonical
+/// `bump` and initializes `T`'s discriminator.
 ///
 /// Prefer [`CreateProgramAccount`] when you want canonical bump derivation.
-/// Use this builder when the bump is instruction data and must be validated.
+/// Use this builder when the bump is instruction data. The builder derives the
+/// canonical address once and rejects a supplied bump that does not match it.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
 /// Seed-based APIs require deterministic seed ordering.
@@ -277,8 +333,10 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 ///
 /// # Errors
 ///
-/// Returns any error produced by [`AllocateAccountWithBump`], including
-/// invalid seed layouts and system-program CPI failures.
+/// Returns `InvalidSeeds` when `bump` is not canonical or `account` does not
+/// match the canonical address, and `AccountAlreadyInitialized` when the
+/// target storage is not zeroed. It also returns allocation and system-program
+/// CPI errors from the checked creation path.
 ///
 /// # Examples
 ///
@@ -313,8 +371,8 @@ pub struct CreateProgramAccountWithBump<'account, 'address, 'seeds, 'seed> {
 }
 
 impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
-	/// Creates the account using the all-zero default for every field other than
-	/// the discriminator.
+	/// Creates the account using the supplied canonical bump and the all-zero
+	/// default for every field other than the discriminator.
 	///
 	/// Use [`Self::invoke_with`] when any field requires a nonzero initial value.
 	#[inline(always)]
@@ -372,7 +430,26 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
-		AllocateAccountWithBump {
+		canonical_pda(self.account, self.seeds, self.owner, Some(self.bump))?;
+		self.invoke_signed_inner_validated::<T, _>(signers, rent, initialize)
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner_validated<T: PinaAccount, F>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+		initialize: F,
+	) -> ProgramResult
+	where
+		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
+		AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
 			space: size_of::<T::Zc>() as u64,
@@ -380,7 +457,7 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.invoke_signed_inner(signers, rent)?;
+		.invoke_signed_inner_validated(signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
 		<T as PinaAccount>::initialize(&mut data, initialize)?;
@@ -391,13 +468,18 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 
 /// Creates and initializes a variable-length PDA-backed account.
 ///
-/// Pina accepts the account's generated patch type and clears the new account
-/// data if initialization fails. With the `validation` feature, the generated
-/// account boundary runs application validation and clears the data before
-/// returning its error.
+/// This builder derives the canonical bump. Pass a patch directly to
+/// [`Self::invoke`] when the patch does not need it, or use
+/// [`Self::invoke_with_bump`] to construct a patch that stores the derived bump.
+///
+/// Pina rejects a target whose storage holds any nonzero byte with
+/// `AccountAlreadyInitialized`, and clears the new account data if
+/// initialization fails. With the `validation` feature, the generated account
+/// boundary runs application validation and clears the data before returning
+/// its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
-pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed, P> {
+pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed> {
 	/// PDA account to allocate and initialize.
 	pub account: &'account mut AccountView,
 	/// Funding account that pays the rent-exempt balance.
@@ -406,60 +488,98 @@ pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed, P> {
 	pub owner: &'address Address,
 	/// PDA seeds without the canonical bump.
 	pub seeds: &'seeds [&'seed [u8]],
-	/// Complete initial values for the compact account.
-	pub patch: P,
 	/// Initial byte length, bounded by the compact schema.
 	pub space: usize,
 }
 
 #[cfg(all(feature = "account-resize", feature = "compact"))]
-impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
-	/// Creates the compact account using its canonical PDA bump.
-	pub fn invoke<T>(&mut self) -> Result<(Address, u8), ProgramError>
+impl CreateCompactProgramAccount<'_, '_, '_, '_> {
+	/// Creates the compact account using its canonical PDA bump and the provided
+	/// initialization patch.
+	pub fn invoke<T>(
+		&mut self,
+		patch: impl PinaCompactPatch<T>,
+	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaCompactPatch<T>,
 	{
-		self.invoke_signed::<T>(&[])
+		self.invoke_signed::<T>(&[], patch)
 	}
 
-	/// Creates the compact account with additional payer signer seeds.
+	/// Creates the compact account with additional payer signer seeds and the
+	/// provided initialization patch.
 	pub fn invoke_signed<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
+		patch: impl PinaCompactPatch<T>,
+	) -> Result<(Address, u8), ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.invoke_signed_inner::<T, _>(signers, None, |_bump| patch)
+	}
+
+	/// Creates the compact account and passes the derived canonical bump to the
+	/// patch factory.
+	///
+	/// Use this method when the compact account stores its own bump. Pina
+	/// derives and validates the address once, then passes the same bump to the
+	/// patch and target signer.
+	pub fn invoke_with_bump<T, P>(
+		&mut self,
+		patch: impl FnOnce(u8) -> P,
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
-		self.invoke_signed_inner::<T>(signers, None)
+		self.invoke_signed_with_bump::<T, P>(&[], patch)
+	}
+
+	/// Creates the compact account with additional payer signer seeds and passes
+	/// the derived canonical bump to the patch factory.
+	pub fn invoke_signed_with_bump<T, P>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		patch: impl FnOnce(u8) -> P,
+	) -> Result<(Address, u8), ProgramError>
+	where
+		T: PinaCompactAccount,
+		P: PinaCompactPatch<T>,
+	{
+		self.invoke_signed_inner::<T, _>(signers, None, patch)
 	}
 
 	#[cfg(test)]
-	fn invoke_signed_with_rent<T>(
+	fn invoke_signed_with_rent<T, P>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
+		patch: impl FnOnce(u8) -> P,
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
-		self.invoke_signed_inner::<T>(signers, Some(rent))
+		self.invoke_signed_inner::<T, _>(signers, Some(rent), patch)
 	}
 
-	fn invoke_signed_inner<T>(
+	fn invoke_signed_inner<T, P>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
+		patch: impl FnOnce(u8) -> P,
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
-		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
-			return Err(ProgramError::InvalidSeeds);
-		};
+		self.account.assert_writable()?;
+		self.payer.assert_writable()?;
+		T::validate_size(self.space)?;
+
+		let (address, bump) = canonical_pda(self.account, self.seeds, self.owner, None)?;
+		let patch = patch(bump);
 
 		CreateCompactProgramAccountWithBump {
 			account: self.account,
@@ -467,21 +587,26 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 			owner: self.owner,
 			seeds: self.seeds,
 			bump,
-			patch: &self.patch,
+			patch: &patch,
 			space: self.space,
 		}
-		.invoke_signed_inner::<T>(signers, rent)?;
+		.invoke_signed_inner_validated::<T>(signers, rent)?;
 
 		Ok((address, bump))
 	}
 }
 
-/// Creates a variable-length PDA-backed account using an explicit bump.
+/// Creates a variable-length PDA-backed account using an explicit canonical
+/// bump.
 ///
-/// Pina accepts the account's generated patch type and clears the new account
-/// data if initialization fails. With the `validation` feature, the generated
-/// account boundary runs application validation and clears the data before
-/// returning its error.
+/// The builder derives the canonical PDA once and rejects a supplied bump that
+/// does not match it.
+///
+/// Pina rejects a target whose storage holds any nonzero byte with
+/// `AccountAlreadyInitialized`, and clears the new account data if
+/// initialization fails. With the `validation` feature, the generated account
+/// boundary runs application validation and clears the data before returning
+/// its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed, P> {
@@ -533,7 +658,25 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		self.account.assert_writable()?;
 		self.payer.assert_writable()?;
 		T::validate_size(self.space)?;
-		AllocateAccountWithBump {
+		canonical_pda(self.account, self.seeds, self.owner, Some(self.bump))?;
+		self.invoke_signed_inner_validated::<T>(signers, rent)
+	}
+
+	fn invoke_signed_inner_validated<T>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult
+	where
+		T: PinaCompactAccount,
+		P: PinaCompactPatch<T>,
+	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
+		AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
 			space: self.space as u64,
@@ -541,7 +684,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.invoke_signed_inner(signers, rent)?;
+		.invoke_signed_inner_validated(signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
 		let encoded_len =
@@ -572,7 +715,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 /// # Errors
 ///
 /// Returns `InvalidSeeds` when no canonical PDA can be derived, plus any
-/// allocation errors surfaced by [`AllocateAccountWithBump`].
+/// allocation errors surfaced by [`AllocateAccountWithNonCanonicalBump`].
 ///
 /// # Examples
 ///
@@ -640,11 +783,9 @@ impl AllocateAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
 	) -> Result<(Address, u8), ProgramError> {
-		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
-			return Err(ProgramError::InvalidSeeds);
-		};
+		let (address, bump) = canonical_pda(self.account, self.seeds, self.owner, None)?;
 
-		AllocateAccountWithBump {
+		AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
 			space: self.space,
@@ -652,7 +793,7 @@ impl AllocateAccount<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump,
 		}
-		.invoke_signed_inner(signers, rent)?;
+		.invoke_signed_inner_validated(signers, rent)?;
 
 		Ok((address, bump))
 	}
@@ -767,7 +908,13 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 	}
 }
 
-/// Allocates a PDA account with a caller-provided bump.
+/// Allocates a PDA account with a caller-provided bump that may be
+/// noncanonical.
+///
+/// Prefer [`AllocateAccount`] for new account namespaces. This lower-level
+/// escape hatch exists for protocols that already use a valid noncanonical PDA
+/// address. It verifies the exact address derived from `seeds` and `bump`, but
+/// it does not enforce namespace uniqueness through canonical bump selection.
 ///
 /// Two paths are taken depending on whether the target account already has
 /// lamports:
@@ -798,7 +945,7 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 ///
 /// ```ignore
 /// let seeds: &[&[u8]] = &[b"vault"];
-/// AllocateAccountWithBump {
+/// AllocateAccountWithNonCanonicalBump {
 /// 	account: vault_account,
 /// 	payer,
 /// 	space: 64,
@@ -810,7 +957,7 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 /// ```
 #[derive(Clone, Copy, Debug)]
 #[must_use = "account allocation has no effect until invoke or invoke_signed is called"]
-pub struct AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> {
+pub struct AllocateAccountWithNonCanonicalBump<'account, 'address, 'seeds, 'seed> {
 	/// PDA account to allocate and assign.
 	pub account: &'account AccountView,
 
@@ -830,7 +977,7 @@ pub struct AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> {
 	pub bump: u8,
 }
 
-impl AllocateAccountWithBump<'_, '_, '_, '_> {
+impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	/// Allocates the account with its derived PDA signer.
 	#[inline(always)]
 	pub fn invoke(&self) -> ProgramResult {
@@ -854,22 +1001,40 @@ impl AllocateAccountWithBump<'_, '_, '_, '_> {
 
 	#[inline(always)]
 	fn invoke_signed_inner(&self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
-		const MAX_CPI_SIGNERS: usize = 16;
+		if signers.len() >= MAX_CPI_SIGNERS {
+			return Err(ProgramError::InvalidArgument);
+		}
 
+		if self.seeds.len() >= MAX_SEEDS {
+			return Err(ProgramError::InvalidSeeds);
+		}
+
+		let bump_array = [self.bump];
+		let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
+		derivation_seeds[..self.seeds.len()].copy_from_slice(self.seeds);
+		derivation_seeds[self.seeds.len()] = bump_array.as_slice();
+		let expected_address =
+			crate::create_program_address(&derivation_seeds[..=self.seeds.len()], self.owner)?;
+
+		if self.account.address() != &expected_address {
+			return Err(ProgramError::InvalidSeeds);
+		}
+
+		self.invoke_signed_inner_validated(signers, rent)
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner_validated(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
 		if signers.len() >= MAX_CPI_SIGNERS {
 			return Err(ProgramError::InvalidArgument);
 		}
 
 		let bump_array = [self.bump];
 		let combined_seeds = combine_seeds_with_bump(self.seeds, &bump_array)?;
-		let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
-		derivation_seeds[..self.seeds.len()].copy_from_slice(self.seeds);
-		derivation_seeds[self.seeds.len()] = bump_array.as_slice();
-		let expected_address =
-			crate::create_program_address(&derivation_seeds[..=self.seeds.len()], self.owner)?;
-		if self.account.address() != &expected_address {
-			return Err(ProgramError::InvalidSeeds);
-		}
 
 		let target_signer = Signer::from(&combined_seeds[..=self.seeds.len()]);
 		let empty_seeds: [Seed<'_>; 0] = [];
@@ -927,6 +1092,15 @@ impl AllocateAccountWithBump<'_, '_, '_, '_> {
 		.invoke_signed(all_signers)
 	}
 }
+
+/// Deprecated name for [`AllocateAccountWithNonCanonicalBump`].
+#[deprecated(
+	since = "0.16.0",
+	note = "use `AllocateAccountWithNonCanonicalBump`; explicit-bump allocation accepts any valid \
+	        PDA bump"
+)]
+pub type AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> =
+	AllocateAccountWithNonCanonicalBump<'account, 'address, 'seeds, 'seed>;
 
 /// Maximum number of bytes an account may grow by in a single instruction.
 ///
@@ -1885,6 +2059,7 @@ mod tests {
 	struct RequiredState {
 		discriminator: u8,
 		mode: RequiredMode,
+		bump: u8,
 	}
 
 	impl PinaAccount for RequiredState {
@@ -2097,7 +2272,11 @@ mod tests {
 		}
 		.invoke_signed_with_rent::<RequiredState>(&[], test_rent());
 		assert_eq!(default_result, Err(ProgramError::InvalidAccountData));
-		assert_eq!(&stored_default.data[..state_size], &[0, 0]);
+		assert!(
+			stored_default.data[..state_size]
+				.iter()
+				.all(|byte| *byte == 0)
+		);
 
 		let mut stored_initialized = TestAccount::<32>::new(address, owner, 0, state_size);
 		let mut initialized_state = stored_initialized.view();
@@ -2107,8 +2286,9 @@ mod tests {
 			owner: &owner,
 			seeds,
 		}
-		.invoke_signed_inner::<RequiredState, _>(&[], Some(test_rent()), |state| {
+		.invoke_signed_inner::<RequiredState, _>(&[], Some(test_rent()), |state, derived_bump| {
 			state.mode = RequiredMode::Ready.into();
+			state.bump = derived_bump;
 			Ok(())
 		})
 		.unwrap_or_else(|error| panic!("initialize required state: {error:?}"));
@@ -2118,6 +2298,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("read required state: {error:?}"));
 		assert_eq!(state.discriminator, RequiredState::VALUE);
 		assert!(state.mode.is(RequiredMode::Ready));
+		assert_eq!(state.bump, bump);
 	}
 
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -2138,10 +2319,11 @@ mod tests {
 			payer: &payer,
 			owner: &owner,
 			seeds,
-			patch: TestCompactStatePatch::new(),
 			space: initial_size,
 		}
-		.invoke_signed_with_rent::<TestCompactState>(&[], test_rent())
+		.invoke_signed_with_rent::<TestCompactState, _>(&[], test_rent(), |derived_bump| {
+			TestCompactStatePatch::new().value(derived_bump)
+		})
 		.unwrap_or_else(|error| panic!("create compact PDA: {error:?}"));
 
 		assert_eq!(result, (address, bump));
@@ -2152,7 +2334,7 @@ mod tests {
 		let compact = TestCompactState::try_from_bytes(&data)
 			.unwrap_or_else(|error| panic!("validate compact state: {error:?}"));
 		assert!(TestCompactState::matches_discriminator(&data));
-		assert_eq!(compact.value, 0);
+		assert_eq!(compact.value, bump);
 		assert!(compact.items().is_empty());
 		drop(compact);
 		drop(data);
@@ -2193,10 +2375,11 @@ mod tests {
 			payer: &payer,
 			owner: &owner,
 			seeds,
-			patch: ValidatedTestCompactStatePatch::new().value(7),
 			space: initial_size,
 		}
-		.invoke_signed_with_rent::<ValidatedTestCompactState>(&[], test_rent());
+		.invoke_signed_with_rent::<ValidatedTestCompactState, _>(&[], test_rent(), |_| {
+			ValidatedTestCompactStatePatch::new().value(7)
+		});
 
 		assert_eq!(result, Err(ProgramError::Custom(71)));
 		assert!(
@@ -2204,6 +2387,63 @@ mod tests {
 				.iter()
 				.all(|byte| *byte == 0)
 		);
+	}
+
+	#[test]
+	fn fixed_creation_builder_rejects_non_empty_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"occupied-state"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive occupied-state address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored_state = TestAccount::<32>::new(address, owner, 0, state_size);
+		stored_state.data[0] = TestState::VALUE;
+		let mut state = stored_state.view();
+
+		let result = CreateProgramAccountWithBump {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert_eq!(stored_state.data[0], TestState::VALUE);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_creation_builder_rejects_non_empty_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"occupied-compact"];
+		let (address, _) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive occupied-compact address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = TestCompactState::HEADER_SIZE;
+
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		stored_state.data[0] = 1;
+		let mut state = stored_state.view();
+
+		let result = CreateCompactProgramAccount {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(&[], test_rent(), |_| {
+			TestCompactStatePatch::new().value(7)
+		});
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert_eq!(stored_state.data[0], 1);
 	}
 
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -2540,7 +2780,7 @@ mod tests {
 		let empty_seeds: [Seed<'_>; 0] = [];
 		let extra_signer = Signer::from(&empty_seeds);
 
-		AllocateAccountWithBump {
+		AllocateAccountWithNonCanonicalBump {
 			account: &target,
 			payer: &payer,
 			space: 8,
@@ -2557,7 +2797,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("calculate full funding: {error:?}"));
 		let mut stored_funded = TestAccount::<32>::new(address, owner, fully_funded, 8);
 		let funded = stored_funded.view();
-		AllocateAccountWithBump {
+		AllocateAccountWithNonCanonicalBump {
 			account: &funded,
 			payer: &payer,
 			space: 8,

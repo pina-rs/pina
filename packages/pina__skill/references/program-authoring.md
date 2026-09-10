@@ -246,11 +246,11 @@ Do not introduce wrapper functions around removed helpers such as `create_accoun
 | ------------------------------------------------------ | ------------------------------------- |
 | Create a regular account                               | `CreateAccount`                       |
 | Derive and create a typed canonical PDA                | `CreateProgramAccount`                |
-| Validate an explicit bump and create a typed PDA       | `CreateProgramAccountWithBump`        |
+| Validate a canonical bump and create a typed PDA       | `CreateProgramAccountWithBump`        |
 | Derive and create a compact canonical PDA from a patch | `CreateCompactProgramAccount`         |
-| Create a compact PDA with an explicit bump and patch   | `CreateCompactProgramAccountWithBump` |
+| Create a compact PDA with a canonical supplied bump    | `CreateCompactProgramAccountWithBump` |
 | Derive and allocate an untyped canonical PDA           | `AllocateAccount`                     |
-| Validate an explicit bump and allocate an untyped PDA  | `AllocateAccountWithBump`             |
+| Allocate an untyped PDA with any valid bump            | `AllocateAccountWithNonCanonicalBump` |
 | Reallocate while balancing rent                        | `ReallocAccount`                      |
 | Reallocate with explicit zero-initialization intent    | `ReallocAccountZeroed`                |
 | Apply a checked compact patch and adjust rent          | `UpdateResizableAccount`              |
@@ -274,25 +274,26 @@ Choose the fixed-account invocation method by initialization contract:
 
 - `invoke::<T>()` and `invoke_signed::<T>(signers)` write the discriminator and leave all other bytes at zero. Use them only if final validation accepts that representation.
 - `invoke_with::<T>(initialize)` and `invoke_signed_with::<T>(signers, initialize)` configure `&mut T::Zc` before final validation. The closure returns `Result<(), PinaPodError>`.
+- `invoke_with_bump::<T>(initialize)` and `invoke_signed_with_bump::<T>(signers, initialize)` also pass the derived canonical bump to the initializer. Use these methods when the account stores its bump.
 
 Prefer the closure form when the account has required nonzero initial values. It is mandatory for an advanced manual `PinaAccount` whose storage includes a nonzero-only enum. Do not infer from this escape hatch that Pina's `#[account]` macro accepts arbitrary custom enum fields; the macro grammar remains closed.
 
-Compact creation uses a generated patch instead of an initializer closure. Always supply the required `patch` field, including for a header-only default:
+Compact creation uses a generated patch instead of a fixed initializer closure. Pass the patch to `invoke`, or construct it from the derived canonical bump with `invoke_with_bump`:
 
 ```rust
-CreateCompactProgramAccountWithBump {
+CreateCompactProgramAccount {
 	account: journal,
 	payer,
 	owner: &ID,
 	seeds,
-	bump,
-	patch: JournalPatch::new().bump(bump),
 	space: Journal::MIN_SIZE,
 }
-.invoke::<Journal>()?;
+.invoke_with_bump::<Journal, _>(|bump| JournalPatch::new().bump(bump))?;
 ```
 
-Canonical PDA builders derive and validate the target address and return `(Address, u8)`. Explicit-bump builders verify the supplied bump before moving lamports. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Use `u64` for create/allocation `space`; reallocation `target_size` remains `usize`.
+Canonical PDA builders derive and validate the target address once and return `(Address, u8)`. Explicit-bump creation builders require the supplied bump to equal the canonical bump before moving lamports. Do not precede these builders with `assert_canonical_bump` or `assert_seeds_with_bump`; that repeats the derivation. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Typed creation builders reject a target whose storage holds any nonzero byte with `AccountAlreadyInitialized`, so do not precede them with a manual `assert_empty()` call.
+
+`AllocateAccountWithNonCanonicalBump` is the low-level compatibility path for an existing protocol that deliberately uses a valid noncanonical PDA. It allocates untyped bytes and does not initialize a Pina account. Prefer `AllocateAccount` for new namespaces.
 
 <!-- {=accountReallocationContract} -->
 

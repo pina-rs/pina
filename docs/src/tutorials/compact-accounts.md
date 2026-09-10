@@ -81,22 +81,22 @@ Prefer logical values in instruction data. Let the generated patch calculate byt
 
 ## Create at the needed size
 
-Use `CreateCompactProgramAccount` when Pina should derive the canonical bump, or `CreateCompactProgramAccountWithBump` when a checked instruction argument already carries the bump. Both builders require a generated patch. For a header-only representation, allocate `HEADER_SIZE` and use the patch to set any nonzero fixed fields:
+Use `CreateCompactProgramAccount` when Pina should derive the canonical bump. Pass an ordinary patch to `invoke`, or use `invoke_with_bump` when the patch stores that bump. `CreateCompactProgramAccountWithBump` accepts instruction data only when it matches the canonical bump. The builders perform this validation themselves, so do not call `assert_canonical_bump` or `assert_seeds_with_bump` first.
 
 ```rust
-CreateCompactProgramAccountWithBump {
+CreateCompactProgramAccount {
 	account: journal,
 	payer: authority,
 	owner: &ID,
 	seeds: &Journal::seeds(authority.address()).as_slices(),
-	bump,
-	patch: JournalPatch::new()
-		.bump(bump)
-		.authority(*authority.address())
-		.revision(0),
 	space: Journal::HEADER_SIZE,
 }
-.invoke::<Journal>()?;
+.invoke_with_bump::<Journal, _>(|bump| {
+	JournalPatch::new()
+		.bump(bump)
+		.authority(*authority.address())
+		.revision(0)
+})?;
 ```
 
 The typed create builder applies the patch while it initializes the account. Omitted patch fields use their zero, empty, or absent representation. Use `JournalPatch::new()` when all header fields may remain zero and every tail starts empty. To create nonempty tails, add their replacement methods to the patch and allocate enough `space` for the encoded values. `UpdateResizableAccount` can populate or replace several tails later.
@@ -172,4 +172,4 @@ For a compact account without a stored bump, use `with_compact_account::<T, _>`.
 
 <!-- {/compactAccountUseCaseChecklist} -->
 
-The complete [`compact_accounts`](https://github.com/pina-rs/pina/tree/main/examples/compact_accounts) example includes unit coverage and isolated Surfpool tests for creation, nonempty initialization, growth, same-size mutation, maximum capacity, shrink, clear, rent adjustment, and rejected authorization and bounds cases.
+The complete [`compact_accounts_program`](https://github.com/pina-rs/pina/tree/main/examples/compact_accounts_program) example includes unit coverage and isolated Surfpool tests for creation, nonempty initialization, growth, same-size mutation, maximum capacity, shrink, clear, rent adjustment, and rejected authorization and bounds cases.

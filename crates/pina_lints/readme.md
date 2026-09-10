@@ -65,7 +65,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 
 | Lint                                                    | Level | Primary invariant                                   |
 | ------------------------------------------------------- | ----- | --------------------------------------------------- |
-| `require_empty_before_init`                             | deny  | Program accounts cannot be reinitialized            |
 | `require_program_check_before_cpi`                      | deny  | CPI targets are authenticated                       |
 | `deny_heap_allocations_in_onchain_instruction_handlers` | warn  | On-chain handlers avoid unbounded allocation cost   |
 | `require_writable_before_account_resize`                | deny  | Resize targets are writable                         |
@@ -88,27 +87,22 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 
 ## Security and correctness reference
 
-### `require_empty_before_init`
-
-Detects `CreateProgramAccount`, `CreateProgramAccountWithBump`, and the matching creation functions when the target account has not first passed `assert_empty()`. It recognizes inline builders and builders stored in local variables.
-
-```rust
-state.assert_empty()?;
-CreateProgramAccount { account: state, payer, owner: &ID, seeds }.invoke::<State>()?;
-```
-
-The analysis tracks concrete local/field places and builder bindings within one function. Validation hidden behind a helper is not treated as proof at the call site.
-
 ### `require_program_check_before_cpi`
 
-Detects unchecked `invoke*()` calls. Dynamic CPI program arguments must be dominated by `assert_address()`, `assert_addresses()`, or `assert_program()`. Pina CPI builders whose program identity is fixed by their concrete type are recognized as trusted.
+Detects `invoke_with_unverified_program()` and `invoke_signed_with_unverified_program()` calls without a proof for the exact dynamic program argument. Pina's `assert_program()`, `assert_address()`, or `assert_addresses()` must compare against a const, immutable static, or an unmodified local alias of one and succeed on every continuing path to the invocation. A value supplied through instruction data is not authentication: comparing two attacker-controlled values proves consistency, not identity. Enforce the assertion with `?`, `unwrap()`, or `expect()`. Failure-side `map_err()` and `inspect_err()` adapters are also accepted before extraction. Discarding the `Result` or inspecting failure does not establish a proof. Success-side `map()`, `and_then()`, and `inspect()` adapters do not establish a proof because their callbacks can replace the validated binding before execution continues. Assignments, mutable borrows, `&mut self` method calls, and closures that may replace a captured account or expected-ID alias invalidate the proof. Prefer `assert_program()` for an explicit program account because it checks both the address and the executable flag.
 
 ```rust
-token_program.assert_address(&token::ID)?;
-transfer.invoke_with_program(token_program.address())?;
+token_program.assert_program(&token::ID)?;
+transfer.invoke_with_unverified_program(token_program.address())?;
 ```
 
-The analyzer intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. A check performed on only one branch is therefore insufficient.
+Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods call `Program::verify()` themselves, so they do not need a separate assertion. Prefer those verified methods unless the handler has already validated the program account and deliberately needs the lower-overhead unverified variant. Static `.invoke()` and `.invoke_signed()` builders encode their target program and also need no separate program account assertion. Passing a constant such as `&token::ID` to an unverified invocation is accepted because the caller cannot substitute the value.
+
+The analyzer resolves the validation method to Pina rather than trusting its spelling. It tracks authenticated account places separately from trusted expected-ID provenance, including aliases and the account value returned by a chained Pina assertion, then intersects both states across continuing control-flow paths. An unrelated account, attacker-controlled expected ID, or same-named local method cannot authorize the dynamic target. A check in one branch does not authorize a later call unless every continuing path establishes the same proof.
+
+Call unverified CPI methods directly with method or UFCS syntax. Taking one as a function value is denied at the function item, including casts, assignments, containers, closures, and conditional expressions. This deliberate boundary keeps the exact target argument visible to the lint instead of approximating Rust's full value and closure data flow. If a reviewed abstraction must store one of these functions, use a narrowly scoped lint allowance and document how it authenticates the supplied program.
+
+To migrate existing code, remove assertions that exist only before `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or `.invoke_signed_with_program()`. Keep exact-target validation before the explicitly unverified methods. Propagate assertion failure, and move conditional checks so every continuing path validates the target. Existing code that used a verified method only to satisfy this lint needs no API change.
 
 ### `require_writable_before_account_resize`
 
@@ -134,14 +128,34 @@ This protects against stale bytes remaining observable during the transaction. T
 
 ### `require_sysvar_assert_before_sysvar_use`
 
-Detects reads from accounts whose names identify known sysvars without a matching `assert_sysvar()` and expected sysvar ID.
+Detects raw reads from accounts whose names identify known sysvars without a successful call to Pina's `assert_sysvar()` using the matching canonical `pina_sdk_ids::sysvar::<name>::ID`.
 
 ```rust
 clock.assert_sysvar(&sysvar::clock::ID)?;
 let data = clock.try_borrow()?;
 ```
 
-The lint recognizes standard Solana sysvar names and instruction-sysvar loader functions. Unusually named sysvar wrappers may require an explicit, local code shape for the heuristic to recognize them.
+Prefer Pinocchio's checked typed loaders when you need the sysvar value. They validate the account address while parsing, so a separate `assert_sysvar()` call would repeat the same check:
+
+```rust
+let clock = Clock::from_account_view(clock_account)?;
+let rent = Rent::from_account_view(rent_account)?;
+let instructions = Instructions::try_from(instructions_account)?;
+```
+
+Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. A raw-access proof must call the resolved Pina method with the canonical ID. Known names such as `clock_account` must use the matching ID; generic names such as `epoch_sysvar` can establish proof with any recognized canonical sysvar ID. Enforce its `Result` with `?`, `unwrap()`, or `expect()` on every continuing control-flow path; chaining from the returned account value is supported. Failure-side `map_err()` and `inspect_err()` adapters are also accepted before extraction. Discarded results, failure inspection, same-named methods, look-alike ID constants, and one-branch checks are not proofs. Success-side `map()`, `and_then()`, and `inspect()` adapters are not proofs because their callbacks can replace the asserted account before a later raw read. Assignments, mutable borrows, `&mut self` method calls, and closures that may replace a captured account invalidate the earlier proof.
+
+The lint identifies Pinocchio constructors that do not validate identity by their resolved definition: `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked`. It reports direct calls at their source and rejects storing these constructors as function values. This source boundary catches replacement through adapters, helper calls, mutable borrows, aliases, and destructuring without attempting to reconstruct arbitrary downstream value provenance.
+
+To migrate existing code, replace manual byte parsing with the matching checked typed loader. Checked results and checked constructor function values can use ordinary Rust extraction, adapters, tuples, patterns, and control flow without special lint knowledge. Call an identity-unchecked constructor directly so its source remains visible to the lint. For deliberate raw parsing, call `assert_sysvar()` before borrowing the data, then place a narrow lint allowance directly on the reviewed constructor. No change is needed for identity-only checks or asserted raw account access. The separate raw-read heuristic still uses standard Solana sysvar account names, so unusually named raw accounts may require a direct, local assertion.
+
+```rust,ignore
+rent_account.assert_sysvar(&sysvar::rent::ID)?;
+let data = rent_account.try_borrow()?;
+// Reviewed exception: the preceding assertion fixes the raw data's identity.
+#[allow(require_sysvar_assert_before_sysvar_use)]
+let rent = Rent::from_bytes(&data)?;
+```
 
 ### `require_type_assert_before_zero_copy_cast`
 
@@ -188,6 +202,8 @@ state.assert_seeds_with_bump(&seeds_with_bump, &ID)?;
 ```
 
 Multiple valid bump values can otherwise create multiple addresses for one logical namespace. See Solana's [PDA documentation](https://solana.com/docs/core/pda). The lint tracks lexical receiver identity; it cannot inspect opaque validation helpers.
+
+This lint applies to validation-only assertion chains. `CreateProgramAccountWithBump` and `CreateCompactProgramAccountWithBump` enforce canonicality inside the builder, so creation handlers should not call either assertion first. Prefer the canonical builders when the instruction does not need to carry a bump.
 
 ### `deny_account_borrows_across_cpi`
 
@@ -246,6 +262,8 @@ let mint = mint_account
 ```
 
 Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The analysis pairs a policy with the concrete mint-view binding or with the same direct method chain; a policy asserted on a different mint does not satisfy the rule. Keep each policy adjacent to its mint load so the pairing also remains obvious to reviewers.
+
+The analysis preserves a checked view through resolved `Result` extractors such as `?`, `unwrap()`, and `expect()`. It also handles adapters that cannot replace the successful value, such as `map_err()` and `inspect()`. The lint does not infer that `map()` or `and_then()` is an identity transform, even when a closure appears to return its input. Bind and assert the checked view before a custom success-value transformation. After you review another pattern, use a narrow allowance.
 
 An `as_token_mint_for_program(&token::ID)` call with the canonical legacy SPL Token ID is exempt because Token-2022 extensions cannot be present. Dynamic program identities and the explicit Token-2022 loaders still require a policy.
 

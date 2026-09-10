@@ -28,59 +28,12 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - name: setup
-        uses: ./.github/actions/devenv
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: collect changed files
-        id: changed
-        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+
       - name: run changeset policy
-        env:
-          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
-        run: |
-          set -euo pipefail
-          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(step affected-packages --format json --verify)
-          for path in $CHANGED_FILES; do
-            args+=(--changed-paths "$path")
-          done
-          for label in "${labels[@]}"; do
-            args+=(--label "$label")
-          done
-
-          report="$RUNNER_TEMP/changeset-policy.json"
-          policy_status=0
-          monochange "${args[@]}" > "$report" || policy_status=$?
-          cat "$report"
-
-          if [ "$policy_status" -ne 0 ]; then
-            marker='<!-- monochange:changeset-policy -->'
-            comment="$(jq -r '.comment // empty' "$report" 2>/dev/null || true)"
-            if [ -n "$comment" ]; then
-              printf -v body '%s\n%s' "$marker" "$comment"
-              existing_id="$({
-                gh api --paginate \
-                  "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments" \
-                  --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | contains(\"$marker\")) | .id"
-              } 2>/dev/null | head -n 1 || true)"
-
-              if [ -n "$existing_id" ]; then
-                gh api --method PATCH \
-                  "repos/$GITHUB_REPOSITORY/issues/comments/$existing_id" \
-                  -f "body=$body" >/dev/null || \
-                  echo "::warning::Could not update the changeset-policy comment."
-              else
-                gh api --method POST \
-                  "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments" \
-                  -f "body=$body" >/dev/null || \
-                  echo "::warning::Could not post the changeset-policy comment."
-              fi
-            fi
-          fi
-
-          exit "$policy_status"
-        shell: devenv shell -- bash -e {0}
+        uses: monochange/actions/changeset-policy@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
+        with:
+          from: origin/main
+          labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

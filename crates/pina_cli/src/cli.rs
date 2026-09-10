@@ -101,18 +101,21 @@ pub(crate) enum Commands {
 
 	/// Run Pina's official security lints against the current program.
 	///
-	/// Discovers the nearest pina.toml or Cargo package, prepares the
-	/// `pina_lint_driver` binary for the active toolchain under Cargo home, and
-	/// runs cargo check with the driver as `RUSTC_WORKSPACE_WRAPPER`. Lint levels
+	/// Discovers the nearest pina.toml or Cargo package, resolves the
+	/// `pina_lint_driver` binary shipped next to this CLI on supported
+	/// platforms, and runs cargo check with the driver as
+	/// `RUSTC_WORKSPACE_WRAPPER`. Lint levels
 	/// configured in the [lints] table of pina.toml are honored. Use --fix to apply
 	/// machine-applicable suggestions; review every resulting source change.
 	#[command(
 		after_help = "Examples:\n  pina lint\n  pina lint --fix\n  pina lint --project \
-		              ./programs/counter\n\nTooling:\n  The first run installs the lint driver \
-		              built from the pina_lints release matching this CLI below Cargo home; later \
-		              runs reuse it. --fix applies only machine-applicable suggestions and allows \
-		              Cargo to edit dirty, staged, or not-yet-versioned working trees; inspect \
-		              the diff before committing."
+		              ./programs/counter\n\nTooling:\n  The prebuilt lint driver ships next to \
+		              the CLI for supported platforms; archives and packages without it reject \
+		              `pina lint` with guidance, and local lint development can point \
+		              PINA_LINT_DRIVER_PATH at a driver built with the project's toolchain. --fix \
+		              applies only machine-applicable suggestions and allows Cargo to edit dirty, \
+		              staged, or not-yet-versioned working trees; inspect the diff before \
+		              committing."
 	)]
 	Lint {
 		/// Directory inside the project to discover. Defaults to the current directory.

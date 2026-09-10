@@ -1127,6 +1127,13 @@ in
         export PINA_LINT_DRIVER_BUILD="$(sha256sum "$driver" | cut -d ' ' -f 1)"
         export RUSTC_WORKSPACE_WRAPPER="$driver"
 
+        # The driver loads the toolchain's librustc_driver through its baked
+        # rpath; point the dynamic-library search at the sysroot so the check
+        # still runs when a relocatable toolchain moved underneath that rpath.
+        sysroot="$(rustc --print sysroot)"
+        export DYLD_LIBRARY_PATH="$sysroot/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+        export LD_LIBRARY_PATH="$sysroot/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
         cargo check --locked "''${package_args[@]}"
       '';
       description = "Run Pina's security lints (pina_lint_driver) against the example and security program crates.";

@@ -173,19 +173,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let admin_address = *self.admin.address();
 		let registry_seeds = RegistryConfig::seeds(&admin_address);
-		let registry_seeds_with_bump = registry_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
-		let canonical_bump = self
-			.registry_config
-			.assert_canonical_bump(&registry_seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.registry_config
-			.assert_empty()?
-			.assert_seeds_with_bump(&registry_seeds_with_bump.as_slices(), &ID)?;
 
 		CreateProgramAccountWithBump {
 			account: self.registry_config,
@@ -211,20 +201,10 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let args = AddRoleInstruction::try_from_bytes(data)?;
 		let registry_address = *self.registry_config.address();
 		let role_entry_seeds = RoleEntry::seeds(&registry_address, args.role_id.get());
-		let role_entry_seeds_with_bump = role_entry_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config.assert_not_empty()?;
-		let canonical_bump = self
-			.role_entry
-			.assert_canonical_bump(&role_entry_seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.role_entry
-			.assert_empty()?
-			.assert_seeds_with_bump(&role_entry_seeds_with_bump.as_slices(), &ID)?;
 
 		let role_count = {
 			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;

@@ -1,26 +1,354 @@
-error: sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:55:13
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:49:13
    |
 LL |     let view = clock.try_borrow()?;
    |                ^^^^^^^^^^^^^^^^^^
    |
-   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
    = note: `#[deny(require_sysvar_assert_before_sysvar_use)]` on by default
 
-error: sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:71:13
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:64:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:71:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:80:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:92:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:120:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:127:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:135:13
    |
 LL |     let view = clock.try_borrow()?;
    |                ^^^^^^^^^^^^^^^^^^
    |
-   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
-error: sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:78:13
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:142:13
    |
 LL |     let view = rent.try_borrow()?;
    |                ^^^^^^^^^^^^^^^^^
    |
-   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
-error: aborting due to 3 previous errors
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:149:10
+   |
+LL |     let _ = clock_account.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:190:14
+   |
+LL |     let clock = Clock::from_bytes(data)?;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:197:23
+   |
+LL |     let clock = unsafe { Clock::from_bytes_unchecked(data) };
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: `Clock::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:203:14
+   |
+LL |     let parse = Clock::from_bytes;
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
+error: `Clock::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:208:14
+   |
+LL |     let parse = Clock::from_bytes as fn(&[u8]) -> Result<Clock, ()>;
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
+error: `Rent::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:212:18
+   |
+LL |     let (parse,) = (Rent::from_bytes,);
+   |                     ^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:220:19
+   |
+LL |     let _ = unsafe { Instructions::new_unchecked(data) };
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:222:10
+   |
+LL |     let _ = SlotHashes::new(data)?;
+   |             ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:224:19
+   |
+LL |     let _ = unsafe { SlotHashes::new_unchecked(data) };
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:230:15
+   |
+LL |     let parsed = Rent::from_bytes(data)?;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:237:10
+   |
+LL |     let _ = Rent::from_bytes(data)?.minimum_balance(8);
+   |             ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:250:3
+   |
+LL |         Rent::from_bytes(data)?
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:277:3
+   |
+LL |         Rent::from_bytes(data)?
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:285:11
+   |
+LL |         true => Rent::from_bytes(data)?,
+   |                 ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:294:27
+   |
+LL |     let Clock { slot, .. } = Clock::from_bytes(data)?;
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:307:8
+   |
+LL |     match Clock::from_bytes(data)? {
+   |           ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:357:14
+   |
+LL |     let clock = Clock::from_bytes(data)?;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:365:41
+   |
+LL |     if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:380:15
+   |
+LL |         let clock = Clock::from_bytes(data)?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:393:51
+   |
+LL |         Clock::from_account_view(clock_account).map(|_| Clock::from_bytes(data).unwrap())?;
+   |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:403:67
+   |
+LL |     let clock = Clock::from_account_view(clock_account).and_then(|_| Clock::from_bytes(data))?;
+   |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:433:18
+   |
+LL |     let unchecked = Clock::from_bytes(data)?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:443:10
+   |
+LL |         rent = Rent::from_bytes(data).unwrap();
+   |                ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:450:10
+   |
+LL |         rent = Rent::from_bytes(data)?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:459:2
+   |
+LL |     Rent::from_bytes(&[])
+   |     ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:471:40
+   |
+LL |     let _ = core::mem::replace(&mut rent, Rent::from_bytes(data)?);
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:506:13
+   |
+LL |     let rent = Rent::from_bytes(data)?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:543:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:550:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:558:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:571:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:583:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:591:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:629:10
+   |
+LL |     let _ = epoch_sysvar.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:641:10
+   |
+LL |     let _ = sysvar_instructions.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: aborting due to 44 previous errors
