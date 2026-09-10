@@ -361,11 +361,10 @@ mod tests {
 	#[test]
 	fn library_environment_prepends_the_sysroot_library_directory() {
 		let sysroot = PathBuf::from("/toolchain/sysroot");
-		let inherited = OsString::from(if cfg!(windows) {
-			"C:\\other\\bin"
-		} else {
-			"/other/lib"
-		});
+		#[cfg(windows)]
+		let inherited = OsString::from("C:\\other\\bin");
+		#[cfg(not(windows))]
+		let inherited = OsString::from("/other/lib");
 
 		let (name, value) = library_environment(
 			&sysroot,
@@ -407,6 +406,12 @@ mod tests {
 		let formatted = format_diagnostics(long.as_bytes());
 		assert_eq!(formatted.len(), 2003);
 		assert!(formatted.starts_with("..."));
+
+		// A truncation point inside a multibyte character advances to the next
+		// char boundary instead of splitting the character.
+		let multibyte = "€".repeat(834);
+		let formatted = format_diagnostics(multibyte.as_bytes());
+		assert!(formatted.starts_with("...€"));
 	}
 
 	#[test]
