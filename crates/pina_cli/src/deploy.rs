@@ -2101,6 +2101,52 @@ mod tests {
 	}
 
 	#[test]
+	fn remote_command_plan_exports_facts_and_executes_through_the_runner() {
+		let fixture = Fixture::new();
+		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+		request.remote_command = Some("deploy-wrapper --verbose".to_owned());
+		let plan = prepare_deployment(&request)
+			.unwrap_or_else(|error| panic!("prepare remote deployment: {error}"));
+
+		let commands = plan.commands();
+		assert_eq!(commands.len(), 1);
+		assert_eq!(commands[0].program, "sh");
+		assert_eq!(
+			commands[0].args,
+			vec!["-c".to_owned(), "deploy-wrapper --verbose".to_owned()]
+		);
+		let env = commands[0]
+			.env
+			.iter()
+			.cloned()
+			.collect::<std::collections::BTreeMap<_, _>>();
+		assert_eq!(env["PINA_DEPLOY_PROGRAM"], plan.program());
+		assert_eq!(env["PINA_DEPLOY_PROGRAM_ID"], plan.program_id());
+		assert_eq!(env["PINA_DEPLOY_PROGRAM_KEYPAIR"], plan.program_keypair());
+		assert_eq!(
+			env["PINA_DEPLOY_UPGRADE_AUTHORITY"],
+			plan.upgrade_authority()
+		);
+		assert_eq!(env["PINA_DEPLOY_PAYER"], plan.payer());
+		assert_eq!(env["PINA_DEPLOY_RPC_URL"], plan.rpc_url());
+		assert_eq!(env["PINA_DEPLOY_CLUSTER"], plan.cluster());
+
+		let approved = approve_deployment(&plan, true, false, &mut rejecting_confirmer())
+			.unwrap_or_else(|error| panic!("approve remote deployment: {error}"));
+		let mut runner = FakeRunner::default();
+		approved
+			.execute(&mut runner)
+			.unwrap_or_else(|error| panic!("execute remote deployment: {error}"));
+		assert_eq!(runner.calls.len(), 1);
+		assert_eq!(runner.calls[0].0, "sh");
+		assert_eq!(
+			runner.calls[0].1,
+			vec!["-c".to_owned(), "deploy-wrapper --verbose".to_owned()]
+		);
+		assert_eq!(runner.calls[0].2, PathBuf::from(plan.project_root()));
+	}
+
+	#[test]
 	fn diagnostic_quoting_escapes_control_characters() {
 		assert_eq!(
 			diagnostic_quote("line\nbreak\ttab"),

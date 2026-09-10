@@ -32,13 +32,21 @@ pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Erro
 		match fs::symlink_metadata(&current) {
 			Ok(metadata) if is_link_like(&metadata) => return Ok(true),
 			Ok(metadata) => parent_is_directory = metadata.is_dir(),
-			Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-				if !parent_is_directory {
-					return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
+			// Plain misses below an existing directory are not link-like.
+			// Everything else through this lookup is either a real error or a
+			// traversal into a non-directory (`ENOTDIR` on unix, `NotFound` on
+			// Windows); both normalize to one synthetic error so the reported
+			// kind is identical on every platform.
+			Err(error) => {
+				let not_found = error.kind() == std::io::ErrorKind::NotFound;
+				if not_found && parent_is_directory {
+					return Ok(false);
 				}
-				return Ok(false);
+				if !not_found && error.kind() != std::io::ErrorKind::NotADirectory {
+					return Err(error);
+				}
+				return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
 			}
-			Err(error) => return Err(error),
 		}
 	}
 

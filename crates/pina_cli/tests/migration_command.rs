@@ -116,6 +116,23 @@ fn run(command: &mut Command) -> String {
 		.unwrap_or_else(|error| panic!("migration output was not UTF-8: {error}"))
 }
 
+/// Run a command that must fail, returning its stdout and stderr streams.
+fn run_failure(command: &mut Command) -> (String, String) {
+	let output = command
+		.output()
+		.unwrap_or_else(|error| panic!("run migration command: {error}"));
+	assert!(
+		!output.status.success(),
+		"migration command unexpectedly succeeded: {}",
+		String::from_utf8_lossy(&output.stdout)
+	);
+	let stdout = String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("migration stdout was not UTF-8: {error}"));
+	let stderr = String::from_utf8(output.stderr)
+		.unwrap_or_else(|error| panic!("migration stderr was not UTF-8: {error}"));
+	(stdout, stderr)
+}
+
 #[test]
 fn migration_commands_report_draft_pending_published_and_updated_states() {
 	let fixture = MigrationFixture::new(true);
@@ -155,6 +172,110 @@ fn migration_commands_report_draft_pending_published_and_updated_states() {
 	fixture.write_fields("value: u16");
 	let updated = run(&mut fixture.command("make"));
 	assert!(updated.contains("Updated draft account:1:01@1"));
+}
+
+#[test]
+fn make_reports_answer_and_question_failures_for_agents() {
+	let fixture = MigrationFixture::new(true);
+	let made = run(&mut fixture.command("make"));
+	assert!(made.contains("Created account:1:01@0"));
+
+	// A malformed answer flag fails at parse time before any project work.
+	let malformed = run_failure(fixture.command("make").arg("--rename").arg("no-separator"));
+	assert!(malformed.1.contains("Error"), "stderr: {}", malformed.1);
+
+	// A published version cannot change silently: the ambiguous rename fails
+	// closed, printing questions on stdout under --json for agents.
+	fixture.publish(true);
+	fixture.write_fields("points: u64");
+	let questions = run_failure(
+		fixture
+			.command("make")
+			.arg("--no-interactive")
+			.arg("--json"),
+	);
+	assert!(questions.0.contains("\"from\""), "stdout: {}", questions.0);
+	assert!(questions.0.contains("value"), "stdout: {}", questions.0);
+	assert!(
+		questions.1.contains("--rename value:points"),
+		"stderr: {}",
+		questions.1
+	);
+
+	// Without --json the questions stay on stderr only.
+	let plain = run_failure(fixture.command("make").arg("--no-interactive"));
+	assert!(plain.0.is_empty(), "stdout: {}", plain.0);
+	assert!(
+		plain.1.contains("ambiguous field changes"),
+		"stderr: {}",
+		plain.1
+	);
+
+	// Any other failure goes through the generic error arm.
+	let corrupt = MigrationFixture::new(true);
+	run(&mut corrupt.command("make"));
+	fs::write(corrupt.root.join("migrations/manifest.json"), b"{ corrupt")
+		.unwrap_or_else(|error| panic!("corrupt manifest: {error}"));
+	let broken = run_failure(&mut corrupt.command("make"));
+	assert!(broken.1.contains("Error"), "stderr: {}", broken.1);
+}
+
+#[test]
+fn make_prints_rent_warnings_for_growing_transitions() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("make"));
+	fixture.publish(true);
+	fixture.write_fields("value: u64, enabled: bool");
+	let grown = run(&mut fixture.command("make"));
+	assert!(
+		grown.contains("grows from 10 to 11 bytes"),
+		"stdout: {grown}"
+	);
+	assert!(grown.contains("lamport budget"), "stdout: {grown}");
+}
+
+#[test]
+fn reconcile_reports_clear_pending_and_abandoned_states() {
+	// With a recorded history but no pending publication, reconcile reports
+	// nothing to do.
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("make"));
+	let clear = run(&mut fixture.command("reconcile"));
+	assert!(clear.contains("No pending deployment."), "stdout: {clear}");
+
+	// The JSON variant serializes the same report for tooling.
+	let clear_json = run(fixture.command("reconcile").arg("--json"));
+	let report: serde_json::Value = serde_json::from_str(&clear_json)
+		.unwrap_or_else(|error| panic!("parse reconcile JSON: {error}"));
+	assert_eq!(report["no_pending"], true);
+
+	// A begun-but-unrecorded deployment reports its identity and how to
+	// resolve it.
+	fixture.publish(false);
+	let pending = run(&mut fixture.command("reconcile"));
+	assert!(
+		pending.contains("Pending deployment for"),
+		"stdout: {pending}"
+	);
+	assert!(
+		pending.contains("Planned executable digest:"),
+		"stdout: {pending}"
+	);
+	assert!(
+		pending.contains("Rerun the exact same devnet deployment"),
+		"stdout: {pending}"
+	);
+
+	// Abandoning freezes the shipped versions either way.
+	let abandoned_fixture = MigrationFixture::new(true);
+	run(&mut abandoned_fixture.command("make"));
+	abandoned_fixture.publish(false);
+	let abandoned = run(&mut abandoned_fixture.command("reconcile").arg("--abandon"));
+	assert!(
+		abandoned.contains("recorded as abandoned"),
+		"stdout: {abandoned}"
+	);
+	assert!(abandoned.contains("versions stay frozen"));
 }
 
 #[test]
