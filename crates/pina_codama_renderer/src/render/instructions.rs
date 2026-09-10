@@ -237,6 +237,7 @@ pub(crate) fn render_instruction_page(
 		wire_fields.push(format!("\tpub {argument_name}: {argument_type},"));
 	}
 	lines.push("#[doc(hidden)]".to_string());
+	lines.push("#[allow(clippy::len_without_is_empty)]".to_string());
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
