@@ -377,15 +377,19 @@ jobs:
 
       - name: build base and head CLIs
         run: |
+          # Separate target dirs: sharing one makes cargo reuse the base
+          # build's pina_profile rlib for the head build when only content
+          # (not mtime) differs, and the head CLI then fails with missing
+          # symbols for anything the PR added to pina_profile.
           mkdir -p ./target/performance-build/cli/base-bin ./target/performance-build/cli/head-bin
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/base-target" \
             cargo build --release --locked -p pina_cli \
             --manifest-path "${{ github.workspace }}/../pina-performance-base/Cargo.toml"
-          cp ./target/performance-build/cli/target/release/pina \
+          cp ./target/performance-build/cli/base-target/release/pina \
             ./target/performance-build/cli/base-bin/pina
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/head-target" \
             cargo build --release --locked -p pina_cli
-          cp ./target/performance-build/cli/target/release/pina \
+          cp ./target/performance-build/cli/head-target/release/pina \
             ./target/performance-build/cli/head-bin/pina
         shell: devenv shell -c -- bash -e {0}
 

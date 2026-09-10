@@ -447,3 +447,52 @@ test("run writes markdown and json artifacts without failing on regressions", ()
 	assert.equal(parsed.programs[0]?.comparison?.exceeds_threshold, true);
 	assert.equal(parsed.programs[0]?.comparison?.status, "threshold-regression");
 });
+
+test("planDiffs rejects program names that could escape the report directory", () => {
+	const manifest = {
+		trackedPrograms: ["counter_program", "../evil"],
+		results: {
+			counter_program: { status: "ok" },
+			"../evil": { status: "ok" },
+		},
+	};
+
+	assert.throws(
+		() => planDiffs(manifest, manifest),
+		/invalid program name in profile manifest/,
+	);
+});
+
+test("planDiffs accepts the tracked program name shape", () => {
+	const manifest = {
+		trackedPrograms: ["counter_program", "pina_bpf_program"],
+		results: {
+			counter_program: { status: "ok" },
+			pina_bpf_program: { status: "ok" },
+		},
+	};
+
+	assert.equal(planDiffs(manifest, manifest).length, 2);
+});
+
+test("a baseline/current program name mismatch is reported as unavailable", () => {
+	const manifest = {
+		trackedPrograms: ["counter_program"],
+		results: { counter_program: { status: "ok" } },
+	};
+	const mismatched = document([delta("entry", "unchanged", 20, 20)], {});
+	const overridden = { ...mismatched, baseline_program_name: "other_program" };
+	const report = collectFunctionDiffs(
+		manifest,
+		manifest,
+		"/base",
+		"/head",
+		() => ({ status: 0, stdout: JSON.stringify(overridden), stderr: "" }),
+	);
+
+	assert.equal(report.programs[0].classification, "unavailable");
+	assert.match(
+		report.programs[0].detail ?? "",
+		/differs from current program/,
+	);
+});

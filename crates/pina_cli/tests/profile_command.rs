@@ -686,3 +686,36 @@ fn cli_profile_compare_fails_on_missing_baseline_file() {
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(stderr.contains("failed to read baseline"), "{stderr}");
 }
+
+#[test]
+fn cli_profile_compare_rejects_a_zero_fail_cu_flag() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let baseline = write_baseline(artifact.path());
+
+	let output = run_compare(baseline.path(), artifact.path(), &["--fail-cu", "0"]);
+
+	assert_eq!(output.status.code(), Some(1), "zero --fail-cu must exit 1");
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("--fail-cu must be at least 1"), "{stderr}");
+}
+
+#[test]
+fn cli_profile_compare_rejects_a_negative_fail_percent_flag() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let baseline = write_baseline(artifact.path());
+
+	let output = run_compare(baseline.path(), artifact.path(), &["--fail-percent", "-5"]);
+
+	assert_eq!(
+		output.status.code(),
+		Some(1),
+		"negative --fail-percent must exit 1"
+	);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("--fail-percent must be a finite number of at least 0"),
+		"{stderr}"
+	);
+}

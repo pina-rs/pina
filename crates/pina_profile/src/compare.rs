@@ -88,6 +88,53 @@ pub enum BaselineError {
 		path: std::path::PathBuf,
 		message: String,
 	},
+
+	/// The baseline contains counter values too large for a real SBF profile.
+	#[error("baseline {path:?} contains implausible values: {message}")]
+	Implausible {
+		path: std::path::PathBuf,
+		message: String,
+	},
+}
+
+/// Upper bound for plausible counter values in a profile report. Real SBF
+/// profiles sit orders of magnitude below this; rejecting anything larger
+/// keeps every signed delta exact inside `i64` and stops hand-edited or
+/// corrupt baselines from wrapping the comparison arithmetic.
+const MAX_PLAUSIBLE_COUNT: u64 = 1 << 32;
+
+/// Reject profile reports whose counters could not have come from a real
+/// static profile of an SBF artifact.
+fn validate_profile_sanity(profile: &ProgramProfile) -> Result<(), String> {
+	let totals = [
+		("total_cu", profile.total_cu),
+		("total_instructions", profile.total_instructions),
+		("total_syscalls", profile.total_syscalls),
+		("binary_size", profile.binary_size),
+		("text_size", profile.text_size),
+	];
+	for (name, value) in totals {
+		if value > MAX_PLAUSIBLE_COUNT {
+			return Err(format!(
+				"{name} {value} exceeds the plausible maximum of {MAX_PLAUSIBLE_COUNT}"
+			));
+		}
+	}
+	for function in &profile.functions {
+		for (name, value) in [
+			("estimated_cu", function.estimated_cu),
+			("instruction_count", function.instruction_count),
+		] {
+			if value > MAX_PLAUSIBLE_COUNT {
+				return Err(format!(
+					"function {} {name} {value} exceeds the plausible maximum of \
+					 {MAX_PLAUSIBLE_COUNT}",
+					function.name
+				));
+			}
+		}
+	}
+	Ok(())
 }
 
 /// Read a baseline report from `path`.
@@ -134,6 +181,12 @@ pub fn load_baseline(path: &Path) -> Result<Baseline, BaselineError> {
 				message: source.to_string(),
 			}
 		})?;
+		validate_profile_sanity(&document.profile).map_err(|message| {
+			BaselineError::Implausible {
+				path: path.to_path_buf(),
+				message,
+			}
+		})?;
 
 		return Ok(Baseline {
 			schema_version: Some(document.schema_version),
@@ -145,6 +198,12 @@ pub fn load_baseline(path: &Path) -> Result<Baseline, BaselineError> {
 		BaselineError::NotAProfile {
 			path: path.to_path_buf(),
 			message: source.to_string(),
+		}
+	})?;
+	validate_profile_sanity(&profile).map_err(|message| {
+		BaselineError::Implausible {
+			path: path.to_path_buf(),
+			message,
 		}
 	})?;
 
@@ -433,11 +492,11 @@ fn function_delta(baseline: &FunctionProfile, current: Option<&FunctionProfile>)
 			change: FunctionChange::Removed,
 			baseline_cu: Some(baseline.estimated_cu),
 			current_cu: None,
-			delta_cu: -(baseline.estimated_cu as i64),
+			delta_cu: signed_delta(baseline.estimated_cu, 0),
 			delta_percent: delta_percent(baseline.estimated_cu, 0),
 			baseline_instructions: Some(baseline.instruction_count),
 			current_instructions: None,
-			delta_instructions: -(baseline.instruction_count as i64),
+			delta_instructions: signed_delta(baseline.instruction_count, 0),
 		};
 	};
 
@@ -468,16 +527,22 @@ fn added_function_delta(current: &FunctionProfile) -> FunctionDelta {
 		change: FunctionChange::Added,
 		baseline_cu: None,
 		current_cu: Some(current.estimated_cu),
-		delta_cu: current.estimated_cu as i64,
+		delta_cu: signed_delta(0, current.estimated_cu),
 		delta_percent: delta_percent(0, current.estimated_cu),
 		baseline_instructions: None,
 		current_instructions: Some(current.instruction_count),
-		delta_instructions: current.instruction_count as i64,
+		delta_instructions: signed_delta(0, current.instruction_count),
 	}
 }
 
+/// Signed difference of two counters. Baseline values are validated at load
+/// time, but current-side values come from profiling an arbitrary local ELF,
+/// so the casts saturate instead of wrapping: a delta of a saturated value is
+/// meaningless either way, and `i64::MIN` must stay unreachable for `.abs()`.
 fn signed_delta(base: u64, head: u64) -> i64 {
-	head as i64 - base as i64
+	let base = i64::try_from(base).unwrap_or(i64::MAX);
+	let head = i64::try_from(head).unwrap_or(i64::MAX);
+	head - base
 }
 
 fn change_rank(change: FunctionChange) -> u8 {
@@ -833,6 +898,35 @@ mod tests {
 
 		assert!(matches!(error, BaselineError::NotAProfile { .. }));
 		assert!(error.to_string().contains("is not a pina profile report"));
+	}
+
+	#[test]
+	fn load_baseline_rejects_implausible_counters() {
+		let mut baseline = profile("demo", vec![function("entry", 0, 160, 20, 20)]);
+		baseline.total_cu = (1 << 32) + 1;
+		let json = serde_json::to_string_pretty(&baseline)
+			.unwrap_or_else(|error| panic!("serialize failed: {error}"));
+		let file = write_json_file(json.as_bytes());
+		let error = load_baseline(file.path()).expect_err("implausible totals must fail");
+
+		assert!(matches!(error, BaselineError::Implausible { .. }));
+		assert!(error.to_string().contains("implausible"));
+
+		let mut baseline = profile("demo", vec![function("entry", 0, 160, 20, 20)]);
+		baseline.functions[0].instruction_count = (1 << 32) + 1;
+		let json = serde_json::to_string_pretty(&baseline)
+			.unwrap_or_else(|error| panic!("serialize failed: {error}"));
+		let file = write_json_file(json.as_bytes());
+		let error = load_baseline(file.path()).expect_err("implausible functions must fail");
+
+		assert!(matches!(error, BaselineError::Implausible { .. }));
+	}
+
+	#[test]
+	fn signed_delta_stays_exact_for_plausible_values_and_saturates_extremes() {
+		assert_eq!(signed_delta(10, 40), 30);
+		assert_eq!(signed_delta(u64::MAX, 0), -(i64::MAX));
+		assert_eq!(signed_delta(0, u64::MAX), i64::MAX);
 	}
 
 	#[test]

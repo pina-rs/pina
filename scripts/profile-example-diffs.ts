@@ -12,6 +12,9 @@ const OK_STATUS = "ok";
 /** Exit status `pina profile compare` uses when the total regression reaches the threshold. */
 const COMPARE_THRESHOLD_STATUS = 2;
 
+/** Same program-name shape `profile-tracked-examples.ts` enforces when building. */
+const VALID_PROGRAM_NAME = /^[A-Za-z0-9_-]+$/u;
+
 interface ManifestResult {
 	status?: string;
 	detail?: string;
@@ -180,6 +183,13 @@ export function planDiffs(
 		...Object.keys(baseManifest.results ?? {}),
 		...Object.keys(headManifest.results ?? {}),
 	]);
+	for (const program of names) {
+		if (!VALID_PROGRAM_NAME.test(program)) {
+			throw new Error(
+				`invalid program name in profile manifest: ${JSON.stringify(program)}`,
+			);
+		}
+	}
 	const plans: FunctionDiffPlan[] = [];
 	for (const program of [...names].toSorted()) {
 		const base = manifestState(baseManifest, program);
@@ -307,6 +317,26 @@ export function collectFunctionDiffs(
 				classification: "unavailable",
 				detail: `pina profile compare exited with status ${outcome.status}: ${
 					summarizeStderr(outcome.stderr)
+				}`,
+			});
+			continue;
+		}
+		if (
+			document.baseline_program_name !== document.current_program_name
+		) {
+			// A name mismatch means the pairing is wrong (different programs);
+			// rendering it as a diff would be all-noise additions and removals.
+			programs.push({
+				program: plan.program,
+				classification: "unavailable",
+				detail: `baseline program ${
+					JSON.stringify(
+						document.baseline_program_name,
+					)
+				} differs from current program ${
+					JSON.stringify(
+						document.current_program_name,
+					)
 				}`,
 			});
 			continue;
