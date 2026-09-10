@@ -520,6 +520,17 @@ pub enum TransitionMode {
 	Manual,
 }
 
+/// One field rename carried by an adjacent transition.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct RenameMapping {
+	/// Field name in the source schema whose bytes move to `to`.
+	pub from: String,
+	/// Field name in the destination schema receiving those bytes.
+	pub to: String,
+}
+
 /// Frozen description of an adjacent schema conversion.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -528,6 +539,11 @@ pub struct Transition {
 	pub from: u32,
 	pub to: u32,
 	pub mode: TransitionMode,
+	/// Disambiguated field renames answered through `pina migrations make`.
+	/// Renames record source intent so repeated runs stay stable and the
+	/// generated transition moves bytes instead of dropping them.
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub renames: Vec<RenameMapping>,
 	pub source_schema_sha256: String,
 	pub destination_schema_sha256: String,
 	/// Instruction-only source process hash.
@@ -688,6 +704,37 @@ impl ContractHistory {
 							self.identity.key(),
 							version.version
 						));
+					}
+					let previous_fields = previous
+						.schema
+						.fields
+						.iter()
+						.map(|field| field.name.as_str())
+						.collect::<std::collections::BTreeSet<_>>();
+					let destination_fields = version
+						.schema
+						.fields
+						.iter()
+						.map(|field| field.name.as_str())
+						.collect::<std::collections::BTreeSet<_>>();
+					for rename in &transition.renames {
+						if !previous_fields.contains(rename.from.as_str()) {
+							return Err(format!(
+								"contract `{}` version {} renames unknown source field `{}`",
+								self.identity.key(),
+								version.version,
+								rename.from
+							));
+						}
+						if !destination_fields.contains(rename.to.as_str()) {
+							return Err(format!(
+								"contract `{}` version {} renames into unknown destination field \
+								 `{}`",
+								self.identity.key(),
+								version.version,
+								rename.to
+							));
+						}
 					}
 
 					match self.identity.kind {
@@ -2921,6 +2968,7 @@ mod tests {
 								from: 0,
 								to: 1,
 								mode: TransitionMode::Automatic,
+								renames: Vec::new(),
 								source_schema_sha256: schema_sha256.clone(),
 								destination_schema_sha256: schema_sha256,
 								source_process_sha256: Some(original_process.sha256()),
@@ -3220,6 +3268,7 @@ mod tests {
 								from: u32::MAX,
 								to: 1,
 								mode: TransitionMode::Automatic,
+								renames: Vec::new(),
 								source_schema_sha256: schema_sha256.clone(),
 								destination_schema_sha256: schema_sha256,
 								source_process_sha256: None,

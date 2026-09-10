@@ -117,6 +117,8 @@ pub struct DeploymentRequest {
 	pub payer: PathBuf,
 	/// Explicit cluster or RPC target.
 	pub target: DeploymentTarget,
+	/// Operator-supplied command that replaces `solana program deploy`.
+	pub remote_command: Option<String>,
 }
 
 /// A command that will be executed as part of a deployment.
@@ -126,6 +128,8 @@ pub struct CommandPlan {
 	pub program: String,
 	/// Arguments passed directly to the executable without a shell.
 	pub args: Vec<String>,
+	/// Extra environment variables the executable receives.
+	pub env: Vec<(String, String)>,
 }
 
 /// Complete, immutable deployment plan.
@@ -140,6 +144,7 @@ pub struct DeploymentPlan {
 	payer: String,
 	program_id: String,
 	target: ResolvedTarget,
+	remote_command: Option<String>,
 	input_fingerprint: InputFingerprint,
 }
 
@@ -267,13 +272,29 @@ impl DeploymentPlan {
 	/// Exact modeled command derived from the validated plan state.
 	#[must_use]
 	pub fn commands(&self) -> Vec<CommandPlan> {
-		vec![deploy_command(
-			self.program(),
-			self.program_keypair(),
-			self.upgrade_authority(),
-			self.payer(),
-			self.rpc_url(),
-		)]
+		vec![match &self.remote_command {
+			Some(command) => {
+				override_command(
+					command,
+					self.program(),
+					self.program_id(),
+					self.program_keypair(),
+					self.upgrade_authority(),
+					self.payer(),
+					self.rpc_url(),
+					&self.target.cluster,
+				)
+			}
+			None => {
+				deploy_command(
+					self.program(),
+					self.program_keypair(),
+					self.upgrade_authority(),
+					self.payer(),
+					self.rpc_url(),
+				)
+			}
+		}]
 	}
 
 	/// Recheck every planned deployment input against its captured digest.
@@ -416,11 +437,12 @@ pub struct CommandStatus {
 
 /// Boundary used to execute planned commands without a shell.
 pub trait CommandRunner {
-	/// Run one executable with its exact argument vector.
+	/// Run one executable with its exact argument vector and environment.
 	fn run(
 		&mut self,
 		program: &OsStr,
 		args: &[OsString],
+		env: &[(String, String)],
 		current_dir: &Path,
 	) -> io::Result<CommandStatus>;
 }
@@ -458,10 +480,12 @@ impl CommandRunner for SystemCommandRunner {
 		&mut self,
 		program: &OsStr,
 		args: &[OsString],
+		env: &[(String, String)],
 		current_dir: &Path,
 	) -> io::Result<CommandStatus> {
 		let status = Command::new(program)
 			.args(args)
+			.envs(env.iter().map(|(key, value)| (key, value)))
 			.current_dir(current_dir)
 			.stdin(Stdio::null())
 			.status()?;
@@ -621,6 +645,7 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 	};
 
 	Ok(DeploymentPlan {
+		remote_command: request.remote_command.clone(),
 		project_root,
 		program_dir,
 		library_name: project.library_name,
@@ -673,6 +698,46 @@ fn deploy_command(
 			"--url".to_owned(),
 			rpc_url.to_owned(),
 		],
+		env: Vec::new(),
+	}
+}
+
+/// Build the operator-supplied deployment command with exported facts.
+///
+/// The override runs through the platform shell so simple commands like
+/// `make deploy-remote` or `node scripts/deploy.mjs` work without a wrapper.
+fn override_command(
+	command: &str,
+	program: &str,
+	program_id: &str,
+	program_keypair: &str,
+	upgrade_authority: &str,
+	payer: &str,
+	rpc_url: &str,
+	cluster: &str,
+) -> CommandPlan {
+	#[cfg(unix)]
+	let (shell, flag) = ("sh", "-c");
+	#[cfg(not(unix))]
+	let (shell, flag) = ("cmd", "/C");
+	CommandPlan {
+		program: shell.to_owned(),
+		args: vec![flag.to_owned(), command.to_owned()],
+		env: vec![
+			("PINA_DEPLOY_PROGRAM".to_owned(), program.to_owned()),
+			("PINA_DEPLOY_PROGRAM_ID".to_owned(), program_id.to_owned()),
+			(
+				"PINA_DEPLOY_PROGRAM_KEYPAIR".to_owned(),
+				program_keypair.to_owned(),
+			),
+			(
+				"PINA_DEPLOY_UPGRADE_AUTHORITY".to_owned(),
+				upgrade_authority.to_owned(),
+			),
+			("PINA_DEPLOY_PAYER".to_owned(), payer.to_owned()),
+			("PINA_DEPLOY_RPC_URL".to_owned(), rpc_url.to_owned()),
+			("PINA_DEPLOY_CLUSTER".to_owned(), cluster.to_owned()),
+		],
 	}
 }
 
@@ -689,13 +754,15 @@ impl ApprovedDeployment<'_> {
 	/// Revalidate every planned input and execute the remote command.
 	pub fn execute(self, runner: &mut impl CommandRunner) -> Result<(), DeployError> {
 		self.plan.revalidate()?;
-		let command = deploy_command(
-			self.plan.program(),
-			self.plan.program_keypair(),
-			self.plan.upgrade_authority(),
-			self.plan.payer(),
-			self.plan.rpc_url(),
-		);
+		let command = self.plan.commands().pop().unwrap_or_else(|| {
+			deploy_command(
+				self.plan.program(),
+				self.plan.program_keypair(),
+				self.plan.upgrade_authority(),
+				self.plan.payer(),
+				self.plan.rpc_url(),
+			)
+		});
 		run_command(&command, Path::new(self.plan.project_root()), runner)
 	}
 }
@@ -752,7 +819,12 @@ fn run_command(
 ) -> Result<(), DeployError> {
 	let args = command.args.iter().map(OsString::from).collect::<Vec<_>>();
 	let status = runner
-		.run(OsStr::new(&command.program), &args, current_dir)
+		.run(
+			OsStr::new(&command.program),
+			&args,
+			&command.env,
+			current_dir,
+		)
 		.map_err(|source| {
 			DeployError::CommandStart {
 				program: command.program.clone(),
@@ -1160,6 +1232,7 @@ mod tests {
 
 		fn request(&self, target: DeploymentTarget) -> DeploymentRequest {
 			DeploymentRequest {
+				remote_command: None,
 				project: self.root.clone(),
 				program: None,
 				program_keypair: None,
@@ -1212,6 +1285,7 @@ mod tests {
 			&mut self,
 			program: &OsStr,
 			args: &[OsString],
+			_env: &[(String, String)],
 			current_dir: &Path,
 		) -> io::Result<CommandStatus> {
 			self.calls.push((
@@ -1306,6 +1380,7 @@ mod tests {
 					"--url".to_owned(),
 					DEVNET_URL.to_owned(),
 				],
+				env: Vec::new(),
 			}
 		);
 	}

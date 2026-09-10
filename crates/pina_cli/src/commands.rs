@@ -102,6 +102,8 @@ pub(crate) fn run(cli: Cli) {
 			json,
 			yes,
 			allow_mainnet,
+			record_publication,
+			remote_command,
 		} => {
 			run_deploy(
 				project,
@@ -115,6 +117,8 @@ pub(crate) fn run(cli: Cli) {
 				json,
 				yes,
 				allow_mainnet,
+				record_publication,
+				remote_command,
 			);
 		}
 		Commands::Codama { command } => {
@@ -147,8 +151,48 @@ pub(crate) fn run(cli: Cli) {
 
 fn run_migrations(command: MigrationCommands) {
 	match command {
-		MigrationCommands::Make { project, json } => {
-			let output = unwrap_or_exit(pina_cli::migrations::make_migrations(&project));
+		MigrationCommands::Make {
+			project,
+			renames,
+			assume_removed,
+			no_interactive,
+			json,
+		} => {
+			let answers = match pina_cli::migrations::MigrationAnswers::from_flags(
+				&renames,
+				&assume_removed,
+				no_interactive,
+			) {
+				Ok(answers) => answers,
+				Err(reason) => {
+					eprintln!("{} {reason}", "Error".red().bold());
+					std::process::exit(1);
+				}
+			};
+			let output =
+				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+					Ok(output) => output,
+					Err(
+						error @ pina_cli::migrations::MigrationError::DisambiguationRequired {
+							..
+						},
+					) => {
+						if json {
+							if let pina_cli::migrations::MigrationError::DisambiguationRequired {
+								questions,
+							} = &error
+							{
+								print_json(&questions);
+							}
+						}
+						eprintln!("{} {error}", "Error".red().bold());
+						std::process::exit(1);
+					}
+					Err(error) => {
+						eprintln!("{} {error}", "Error".red().bold());
+						std::process::exit(1);
+					}
+				};
 			if json {
 				print_json(&output);
 				return;
@@ -165,6 +209,9 @@ fn run_migrations(command: MigrationCommands) {
 			}
 			for path in output.manual_transitions {
 				println!("Manual migration required: {}", escaped_path(&path));
+			}
+			for warning in output.data_warnings {
+				println!("{} {warning}", "⚠".yellow().bold());
 			}
 		}
 		MigrationCommands::Check { project, json }
@@ -781,10 +828,13 @@ fn run_deploy(
 	json: bool,
 	yes: bool,
 	allow_mainnet: bool,
+	record_publication: bool,
+	remote_command: Option<String>,
 ) {
 	let target = pina_cli::deploy::DeploymentTarget::from_cluster_arg(cluster);
 	let request = pina_cli::deploy::DeploymentRequest {
 		project,
+		remote_command,
 		program,
 		program_keypair,
 		upgrade_authority,
@@ -832,7 +882,7 @@ fn run_deploy(
 		};
 	unwrap_or_exit(plan.verify_inputs_unchanged());
 
-	let pending_publication = if plan.is_local() {
+	let pending_publication = if plan.is_local() && !record_publication {
 		None
 	} else {
 		match pina_cli::migrations::begin_publication(

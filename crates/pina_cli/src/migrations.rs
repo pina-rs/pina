@@ -1,9 +1,11 @@
 //! Checked-in ABI snapshots and adjacent migration generation.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -60,6 +62,8 @@ pub struct MakeMigrationsOutput {
 	pub updated_drafts: Vec<String>,
 	pub unchanged_contracts: Vec<String>,
 	pub manual_transitions: Vec<PathBuf>,
+	/// Data-loss warnings for removals the developer explicitly accepted.
+	pub data_warnings: Vec<String>,
 }
 
 /// Current status of one migration-aware wire contract.
@@ -224,6 +228,310 @@ pub enum MigrationError {
 
 	#[error("No matching pending deployment exists to complete its publication receipt")]
 	MissingPendingPublication,
+
+	#[error("{}", DisambiguationQuestion::render_all(questions))]
+	DisambiguationRequired {
+		questions: Vec<DisambiguationQuestion>,
+	},
+}
+
+/// One ambiguous field change that only the developer can resolve.
+///
+/// A source field disappeared and a destination field of the same type
+/// appeared: either the field was renamed (its bytes must move) or the old
+/// field was removed and a new one added (old data is discarded and the new
+/// field starts zeroed). `pina migrations make` refuses to guess.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DisambiguationQuestion {
+	/// Contract identity key the question belongs to.
+	pub contract: String,
+	/// Field name in the previous schema.
+	pub from: String,
+	/// Field name in the destination schema.
+	pub to: String,
+	/// Field type shared by both names.
+	pub rust_type: String,
+}
+
+impl DisambiguationQuestion {
+	fn render_all(questions: &[DisambiguationQuestion]) -> String {
+		let mut rendered = String::from(
+			"ambiguous field changes need an explicit answer before this migration can be \
+			 generated",
+		);
+		for question in questions {
+			rendered.push_str(&format!(
+				"\n  - `{}`: was `{}` renamed to `{}` (type `{}`)? Answer with `--rename {}:{}` \
+				 to preserve its data, or `--assume-removed {}` to discard the old field and \
+				 zero-initialize `{}`",
+				question.contract,
+				question.from,
+				question.to,
+				question.rust_type,
+				question.from,
+				question.to,
+				question.from,
+				question.to
+			));
+		}
+		rendered.push_str(
+			"\nRun `pina migrations make` again with those flags, or answer the prompts \
+			 interactively on a terminal",
+		);
+		rendered
+	}
+}
+
+/// Developer answers for ambiguous schema changes.
+#[derive(Clone, Debug, Default)]
+pub struct MigrationAnswers {
+	/// Renames the developer confirmed, keyed by source field name.
+	renames: BTreeMap<String, String>,
+	/// Removals the developer explicitly acknowledged as data-dropping.
+	removed: BTreeSet<String>,
+	/// Disable interactive prompts even when stdin is a terminal.
+	no_interactive: bool,
+}
+
+impl MigrationAnswers {
+	/// Collect answers from repeatable CLI arguments.
+	pub fn from_flags(
+		renames: &[String],
+		removed: &[String],
+		no_interactive: bool,
+	) -> Result<Self, String> {
+		let mut answers = Self {
+			renames: BTreeMap::new(),
+			removed: removed.iter().cloned().collect(),
+			no_interactive,
+		};
+		for rename in renames {
+			let (from, to) = rename.split_once(':').ok_or_else(|| {
+				format!("`--rename {rename}` must be written as `--rename from:to`")
+			})?;
+			if from.is_empty() || to.is_empty() {
+				return Err(format!("`--rename {rename}` must name both fields"));
+			}
+			answers.renames.insert(from.to_owned(), to.to_owned());
+		}
+		Ok(answers)
+	}
+}
+
+/// Resolve every ambiguous field change for one contract against the answers.
+///
+/// Previously recorded transition renames count as answers so repeated `make`
+/// runs over a draft stay stable. Unanswered candidates become interactive
+/// prompts on a terminal, or a structured error that names the exact flags
+/// that answer them.
+fn resolve_field_changes(
+	contract: &str,
+	source: &DataSchema,
+	destination: &DataSchema,
+	previous_renames: &[pina_abi::RenameMapping],
+	answers: &MigrationAnswers,
+	warnings: &mut Vec<String>,
+) -> Result<(Vec<pina_abi::RenameMapping>, BTreeSet<String>), MigrationError> {
+	let mut renames: Vec<pina_abi::RenameMapping> = previous_renames.to_vec();
+	let mut dropped = answers.removed.clone();
+
+	for mapping in &renames {
+		if let Some(to) = answers.renames.get(&mapping.from)
+			&& *to != mapping.to
+		{
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}` previously recorded the rename `{}:{}`; `--rename {}:{}` \
+				 contradicts it",
+				mapping.from, mapping.to, mapping.from, to
+			)));
+		}
+	}
+
+	let source_names = source
+		.fields
+		.iter()
+		.map(|field| field.name.as_str())
+		.collect::<BTreeSet<_>>();
+	let destination_names = destination
+		.fields
+		.iter()
+		.map(|field| field.name.as_str())
+		.collect::<BTreeSet<_>>();
+
+	let removed_fields: Vec<&FieldSchema> = source
+		.fields
+		.iter()
+		.filter(|field| !destination_names.contains(field.name.as_str()))
+		.collect();
+	let added: Vec<&FieldSchema> = destination
+		.fields
+		.iter()
+		.filter(|field| !source_names.contains(field.name.as_str()))
+		.collect();
+
+	let mut questions = Vec::new();
+	for removed_field in &removed_fields {
+		if renames
+			.iter()
+			.any(|mapping| mapping.from == removed_field.name)
+		{
+			continue;
+		}
+		// Pair the removal with the first unused addition of the same type:
+		// that is the rename this change most plausibly represents.
+		let candidate = added.iter().find(|added_field| {
+			added_field.rust_type == removed_field.rust_type
+				&& !renames.iter().any(|mapping| mapping.to == added_field.name)
+		});
+		let has_candidate = candidate.is_some();
+		if dropped.contains(removed_field.name.as_str()) {
+			if has_candidate {
+				// The developer answered the rename question with an explicit
+				// removal: the old data is discarded and the paired new field
+				// starts zeroed.
+				let candidate = candidate.unwrap_or_else(|| {
+					panic!("candidate presence was just checked");
+				});
+				warnings.push(format!(
+					"contract `{contract}`: field `{}` is removed by this migration and its \
+					 stored data is discarded; `{}` starts zeroed",
+					removed_field.name, candidate.name
+				));
+			} else {
+				warnings.push(format!(
+					"contract `{contract}`: field `{}` (type `{}`) is removed by this migration \
+					 and its stored data is discarded",
+					removed_field.name, removed_field.rust_type
+				));
+			}
+			continue;
+		}
+		let Some(candidate) = candidate else {
+			if dropped.contains(removed_field.name.as_str()) {
+				warnings.push(format!(
+					"contract `{contract}`: field `{}` (type `{}`) is removed by this migration \
+					 and its stored data is discarded",
+					removed_field.name, removed_field.rust_type
+				));
+				continue;
+			}
+			// An unpaired removal is a type change or structural change.
+			// Leave the raw diff untouched so the transition stays manual
+			// with a TODO body the developer owns.
+			continue;
+		};
+		let question = DisambiguationQuestion {
+			contract: contract.to_owned(),
+			from: removed_field.name.clone(),
+			to: candidate.name.clone(),
+			rust_type: removed_field.rust_type.clone(),
+		};
+		if answers
+			.renames
+			.get(removed_field.name.as_str())
+			.is_some_and(|to| to == &candidate.name)
+		{
+			renames.push(pina_abi::RenameMapping {
+				from: removed_field.name.clone(),
+				to: candidate.name.clone(),
+			});
+			continue;
+		}
+		if answers.no_interactive || !std::io::stdin().is_terminal() {
+			questions.push(question);
+			continue;
+		}
+		match prompt_rename(&question) {
+			RenameAnswer::Rename => {
+				renames.push(pina_abi::RenameMapping {
+					from: removed_field.name.clone(),
+					to: candidate.name.clone(),
+				})
+			}
+			RenameAnswer::Remove => {
+				dropped.insert(removed_field.name.clone());
+				warnings.push(format!(
+					"contract `{contract}`: field `{}` is removed by this migration and its \
+					 stored data is discarded; `{}` starts zeroed",
+					removed_field.name, candidate.name
+				));
+			}
+			RenameAnswer::Abort => {
+				questions.push(question);
+			}
+		}
+	}
+
+	if !questions.is_empty() {
+		return Err(MigrationError::DisambiguationRequired { questions });
+	}
+
+	renames.sort();
+	Ok((renames, dropped))
+}
+
+enum RenameAnswer {
+	Rename,
+	Remove,
+	Abort,
+}
+
+/// Prompt once on an interactive terminal for one rename question.
+fn prompt_rename(question: &DisambiguationQuestion) -> RenameAnswer {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+
+	for _ in 0..3 {
+		println!(
+			"Field `{}` was removed and `{}` (same type `{}`) was added for `{}`.",
+			question.from, question.to, question.rust_type, question.contract
+		);
+		println!(
+			"Is this a rename? [y] rename and preserve data, [n] remove and zero `{}`",
+			question.to
+		);
+		print!("Answer (y/n): ");
+		if std::io::stdout().flush().is_err() {
+			return RenameAnswer::Abort;
+		}
+		let mut line = String::new();
+		if std::io::stdin().lock().read_line(&mut line).is_err() {
+			return RenameAnswer::Abort;
+		}
+		match line.trim().to_ascii_lowercase().as_str() {
+			"y" | "yes" | "rename" => return RenameAnswer::Rename,
+			"n" | "no" | "remove" => return RenameAnswer::Remove,
+			_ => {
+				println!("Answer `y` or `n`.");
+			}
+		}
+	}
+	RenameAnswer::Abort
+}
+
+/// Apply confirmed renames and acknowledged removals to a copy of the source
+/// schema so the ordinary diff, mode classifier, and generator see the
+/// developer's intent instead of the ambiguous raw diff.
+fn effective_source_schema(
+	source: &SchemaVersion,
+	renames: &[pina_abi::RenameMapping],
+	dropped: &BTreeSet<String>,
+) -> Result<SchemaVersion, MigrationError> {
+	let mut fields = source.schema.fields.clone();
+	for field in &mut fields {
+		if let Some(mapping) = renames.iter().find(|mapping| mapping.from == field.name) {
+			field.name = mapping.to.clone();
+		}
+	}
+	fields.retain(|field| !dropped.contains(field.name.as_str()));
+	let rebuilt = DataSchema::try_new(source.schema.layout, fields).map_err(|reason| {
+		MigrationError::InvalidHistory(format!(
+			"resolved field changes produce an invalid schema: {reason}"
+		))
+	})?;
+	let mut effective = source.clone();
+	effective.schema = rebuilt;
+	Ok(effective)
 }
 
 /// Create the initial ABI database or refresh its latest draft versions.
@@ -231,6 +539,14 @@ pub enum MigrationError {
 /// An unfrozen latest version is mutable. A published or pending latest
 /// version is immutable and a source change appends one adjacent version.
 pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationError> {
+	make_migrations_with_answers(start, &MigrationAnswers::default())
+}
+
+/// [`make_migrations`] with explicit disambiguation answers.
+pub fn make_migrations_with_answers(
+	start: &Path,
+	answers: &MigrationAnswers,
+) -> Result<MakeMigrationsOutput, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
 	let current = scan_current_contracts(&project)?;
@@ -290,12 +606,25 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 				let latest_version = latest.version;
 				if ledger.version_is_frozen(&key, latest_version) {
 					let next = next_migration_version(&key, latest_version, manifest.version_type)?;
+					let (renames, dropped) = resolve_field_changes(
+						&key,
+						&latest.schema,
+						&source.schema,
+						latest
+							.transition
+							.as_ref()
+							.map_or(&[], |transition| &transition.renames),
+						answers,
+						&mut output.data_warnings,
+					)?;
+					let effective = effective_source_schema(latest, &renames, &dropped)?;
 					let transition = create_transition(
 						&project,
 						TransitionRequest {
 							identity: &history.identity,
 							rust_name: &history.rust_name,
-							source: latest,
+							source: &effective,
+							renames,
 							destination_version: next,
 							destination: &source.schema,
 							destination_process: source.process.as_ref(),
@@ -328,12 +657,25 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 							.versions
 							.get((latest_version - 1) as usize)
 							.expect("decoded histories contain every adjacent prior version");
+						let (renames, dropped) = resolve_field_changes(
+							&key,
+							&previous.schema,
+							&source.schema,
+							previous
+								.transition
+								.as_ref()
+								.map_or(&[], |transition| &transition.renames),
+							answers,
+							&mut output.data_warnings,
+						)?;
+						let effective = effective_source_schema(previous, &renames, &dropped)?;
 						let transition = create_transition(
 							&project,
 							TransitionRequest {
 								identity: &history.identity,
 								rust_name: &history.rust_name,
-								source: previous,
+								source: &effective,
+								renames,
 								destination_version: latest_version,
 								destination: &source.schema,
 								destination_process: source.process.as_ref(),
@@ -1260,11 +1602,12 @@ fn hex_digest(digest: [u8; 32]) -> String {
 	output
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct TransitionRequest<'a> {
 	identity: &'a ContractIdentity,
 	rust_name: &'a str,
 	source: &'a SchemaVersion,
+	renames: Vec<pina_abi::RenameMapping>,
 	destination_version: u32,
 	destination: &'a DataSchema,
 	destination_process: Option<&'a ProcessContract>,
@@ -1280,6 +1623,7 @@ fn create_transition(
 		identity,
 		rust_name,
 		source,
+		renames,
 		destination_version,
 		destination,
 		destination_process,
@@ -1333,6 +1677,7 @@ fn create_transition(
 		from: source.version,
 		to: destination_version,
 		mode,
+		renames,
 		source_schema_sha256: source.schema_sha256.clone(),
 		destination_schema_sha256: destination.sha256(),
 		source_process_sha256: source.process_sha256.clone(),
@@ -1923,6 +2268,7 @@ mod tests {
 					identity: &identity,
 					rust_name: "Update",
 					source: &source,
+					renames: Vec::new(),
 					destination_version: 1,
 					destination: &source_schema,
 					destination_process: Some(&escalated),
@@ -1956,6 +2302,7 @@ mod tests {
 					identity: &account,
 					rust_name: "State",
 					source: &account_source,
+					renames: Vec::new(),
 					destination_version: 1,
 					destination: &destination,
 					destination_process: None,
@@ -2745,6 +3092,7 @@ mod tests {
 			from: 0,
 			to: 1,
 			mode: TransitionMode::Automatic,
+			renames: Vec::new(),
 			source_schema_sha256: base.sha256(),
 			destination_schema_sha256: advanced_schema.sha256(),
 			source_process_sha256: None,
@@ -2869,6 +3217,7 @@ mod tests {
 		assert!(empty.no_pending);
 	}
 
+	#[test]
 	fn receipts_pin_published_schema_hashes() {
 		let fixture = publication_fixture();
 		publish_current(&fixture);
@@ -2930,6 +3279,7 @@ mod tests {
 		assert!(validate_ledger_for_manifest(&ledger, &manifest).is_ok());
 	}
 
+	#[test]
 	fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
 		let fixture = publication_fixture();
 		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
@@ -3202,6 +3552,101 @@ mod tests {
 			),
 		)
 		.unwrap_or_else(|error| panic!("write State source: {error}"));
+	}
+
+	#[test]
+	fn ambiguous_renames_require_answers_and_generate_copies() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+		write_state_source(&fixture, "points: u64");
+
+		// Non-interactive runs fail with the exact command that answers the
+		// question instead of guessing between rename and remove+add.
+		let rejection = make_migrations_with_answers(
+			&fixture.root,
+			&MigrationAnswers {
+				no_interactive: true,
+				..MigrationAnswers::default()
+			},
+		)
+		.expect_err("ambiguous renames must require an answer");
+		let rendered = format!("{rejection}");
+		assert!(
+			rendered.contains("was `value` renamed to `points`"),
+			"{rendered}"
+		);
+		assert!(rendered.contains("--rename value:points"), "{rendered}");
+		assert!(rendered.contains("--assume-removed value"), "{rendered}");
+
+		// The answered rename preserves the field's bytes and records the
+		// disambiguation in the manifest.
+		let answers = MigrationAnswers::from_flags(&["value:points".to_owned()], &[], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let output = make_migrations_with_answers(&fixture.root, &answers)
+			.unwrap_or_else(|error| panic!("make with rename: {error:?}"));
+		assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+		assert!(output.data_warnings.is_empty());
+		let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+			.expect("fixture manifest");
+		let transition = manifest.contracts["account:1:01"].versions[1]
+			.transition
+			.as_ref()
+			.expect("advanced version carries a transition");
+		assert_eq!(transition.mode, TransitionMode::Automatic);
+		assert_eq!(
+			transition.renames,
+			vec![pina_abi::RenameMapping {
+				from: "value".to_owned(),
+				to: "points".to_owned()
+			}]
+		);
+		let generated = std::fs::read_to_string(
+			fixture
+				.root
+				.join("migrations/transitions/account_1_01/v0_to_v1.rs"),
+		)
+		.unwrap_or_else(|error| panic!("read transition: {error}"));
+		assert!(
+			generated.contains("data.copy_within(2..10, 2)"),
+			"the rename must move the stored bytes: {generated}"
+		);
+
+		// Re-running make without answers stays stable: the recorded rename
+		// already answers the question, so nothing re-asks or rewrites.
+		let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+			.unwrap_or_else(|error| panic!("re-run make: {error:?}"));
+		assert_eq!(output.unchanged_contracts, ["account:1:01".to_owned()]);
+	}
+
+	#[test]
+	fn assumed_removals_drop_data_with_a_warning() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+		write_state_source(&fixture, "points: u64");
+
+		let answers = MigrationAnswers::from_flags(&[], &["value".to_owned()], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let output = make_migrations_with_answers(&fixture.root, &answers)
+			.unwrap_or_else(|error| panic!("make with removal: {error:?}"));
+		assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+		assert!(
+			output
+				.data_warnings
+				.iter()
+				.any(|warning| warning.contains("field `value`")),
+			"data-dropping removals must warn: {:?}",
+			output.data_warnings
+		);
+		let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+			.expect("fixture manifest");
+		let transition = manifest.contracts["account:1:01"].versions[1]
+			.transition
+			.as_ref()
+			.expect("advanced version carries a transition");
+		assert_eq!(transition.mode, TransitionMode::Automatic);
+		assert!(transition.renames.is_empty());
 	}
 
 	#[test]

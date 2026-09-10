@@ -34,6 +34,20 @@ If the current version has never been deployed to a non-local cluster, `make` re
 
 Commit the manifest, publication ledger, and transition files. Do not generate them during a build.
 
+## Disambiguate renames
+
+A field that disappears while another field of the same type appears is ambiguous: a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations make` refuses to guess:
+
+- On a terminal it prompts field by field and records the answer.
+- With `--no-interactive`, or when no terminal is attached, it fails with one line per question naming the exact flags that answer it:
+
+```bash
+pina migrations make --rename score:points          # preserve the renamed data
+pina migrations make --assume-removed score         # discard it; `points` starts zeroed
+```
+
+`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. Answered renames are recorded in the manifest transition, so repeated `make` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
+
 ## Resolve a manual transition
 
 Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, or ambiguous field move creates a manual Rust file with `TODO(pina-manual-migration)`.

@@ -599,6 +599,20 @@ Safety:
 		/// Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets.
 		#[arg(long, conflicts_with = "dry_run")]
 		allow_mainnet: bool,
+
+		/// Record migration publication receipts even for loopback targets.
+		/// Useful for exercising the full publication lifecycle against a
+		/// local network such as Surfpool.
+		#[arg(long)]
+		record_publication: bool,
+
+		/// Run this command instead of `solana program deploy`. The deployment
+		/// facts are exported as PINA_DEPLOY_RPC_URL, PINA_DEPLOY_PROGRAM,
+		/// PINA_DEPLOY_PROGRAM_ID, PINA_DEPLOY_PROGRAM_KEYPAIR,
+		/// PINA_DEPLOY_UPGRADE_AUTHORITY, PINA_DEPLOY_PAYER, and
+		/// PINA_DEPLOY_CLUSTER environment variables.
+		#[arg(long, value_name = "COMMAND")]
+		remote_command: Option<String>,
 	},
 
 	/// Run Codama IDL and client-generation workflows.
@@ -902,6 +916,17 @@ pub(crate) enum MigrationCommands {
 		/// Directory inside the project to discover.
 		#[arg(short, long, default_value = ".", hide_default_value = true)]
 		project: PathBuf,
+		/// Answer an ambiguous rename with `--rename from:to` to preserve the
+		/// field's stored data. Repeatable.
+		#[arg(long = "rename", value_name = "FROM:TO")]
+		renames: Vec<String>,
+		/// Acknowledge that a removed field's stored data is discarded.
+		/// Repeatable.
+		#[arg(long = "assume-removed", value_name = "FIELD")]
+		assume_removed: Vec<String>,
+		/// Never prompt for disambiguation, even on a terminal.
+		#[arg(long)]
+		no_interactive: bool,
 		/// Emit a machine-readable result.
 		#[arg(long)]
 		json: bool,
