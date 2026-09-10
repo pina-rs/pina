@@ -1,6 +1,6 @@
 ---
 pina_cli_renderer: feat
-pina_cli: feat
+pina_cli: breaking
 pina_codama_renderer: fix
 pina_codama_renderer_cli: feat
 ---
