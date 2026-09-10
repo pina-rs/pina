@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const TRANSFER_SOL_PROGRAM_ID: Address =
-	pina::address!("BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG");
+pub const TRANSFER_SOL_PROGRAM_ID: Address = pina::address!("BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG");
 
 /// Marker for the `transferSolProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

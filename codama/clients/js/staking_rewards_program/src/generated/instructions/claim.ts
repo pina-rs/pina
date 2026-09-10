@@ -6,291 +6,88 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-	type WritableAccount,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const CLAIM_DISCRIMINATOR = 4;
 
-export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
+export function getClaimDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CLAIM_DISCRIMINATOR); }
+
+export type ClaimInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountUser extends string | AccountMeta<string> = string, TAccountRewardMint extends string | AccountMeta<string> = string, TAccountPoolState extends string | AccountMeta<string> = string, TAccountPositionState extends string | AccountMeta<string> = string, TAccountUserRewardAta extends string | AccountMeta<string> = string, TAccountAssociatedTokenProgram extends string | AccountMeta<string> = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", TAccountTokenProgram extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountUser extends string ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser> : TAccountUser, TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint> : TAccountRewardMint, TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState> : TAccountPoolState, TAccountPositionState extends string ? WritableAccount<TAccountPositionState> : TAccountPositionState, TAccountUserRewardAta extends string ? WritableAccount<TAccountUserRewardAta> : TAccountUserRewardAta, TAccountAssociatedTokenProgram extends string ? ReadonlyAccount<TAccountAssociatedTokenProgram> : TAccountAssociatedTokenProgram, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type ClaimInstructionData = { discriminator: number;  };
+
+export type ClaimInstructionDataArgs = {  };
+
+export function getClaimInstructionDataEncoder(): FixedSizeEncoder<ClaimInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 4 }));
 }
 
-export type ClaimInstruction<
-	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountUser extends string | AccountMeta<string> = string,
-	TAccountRewardMint extends string | AccountMeta<string> = string,
-	TAccountPoolState extends string | AccountMeta<string> = string,
-	TAccountPositionState extends string | AccountMeta<string> = string,
-	TAccountUserRewardAta extends string | AccountMeta<string> = string,
-	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
-		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-	TAccountTokenProgram extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> =
-		"11111111111111111111111111111111",
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountUser extends string
-				? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
-				: TAccountUser,
-			TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint>
-				: TAccountRewardMint,
-			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
-				: TAccountPoolState,
-			TAccountPositionState extends string
-				? WritableAccount<TAccountPositionState>
-				: TAccountPositionState,
-			TAccountUserRewardAta extends string
-				? WritableAccount<TAccountUserRewardAta>
-				: TAccountUserRewardAta,
-			TAccountAssociatedTokenProgram extends string
-				? ReadonlyAccount<TAccountAssociatedTokenProgram>
-				: TAccountAssociatedTokenProgram,
-			TAccountTokenProgram extends string
-				? ReadonlyAccount<TAccountTokenProgram>
-				: TAccountTokenProgram,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type ClaimInstructionData = { discriminator: number };
-
-export type ClaimInstructionDataArgs = {};
-
-export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
-	ClaimInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 4 }),
-	);
+export function getClaimInstructionDataDecoder(): FixedSizeDecoder<ClaimInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
-	ClaimInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getClaimInstructionDataCodec(): FixedSizeCodec<ClaimInstructionDataArgs, ClaimInstructionData> {
+    return combineCodec(getClaimInstructionDataEncoder(), getClaimInstructionDataDecoder());
 }
 
-export function getClaimInstructionDataCodec(): FixedSizeCodec<
-	ClaimInstructionDataArgs,
-	ClaimInstructionData
-> {
-	return combineCodec(
-		getClaimInstructionDataEncoder(),
-		getClaimInstructionDataDecoder(),
-	);
+export type ClaimInput<TAccountUser extends string = string, TAccountRewardMint extends string = string, TAccountPoolState extends string = string, TAccountPositionState extends string = string, TAccountUserRewardAta extends string = string, TAccountAssociatedTokenProgram extends string = string, TAccountTokenProgram extends string = string, TAccountSystemProgram extends string = string> =  {
+  user: TransactionSigner<TAccountUser>;
+rewardMint: Address<TAccountRewardMint>;
+poolState: Address<TAccountPoolState>;
+positionState: Address<TAccountPositionState>;
+userRewardAta: Address<TAccountUserRewardAta>;
+associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+tokenProgram: Address<TAccountTokenProgram>;
+systemProgram?: Address<TAccountSystemProgram>;
 }
 
-export type ClaimInput<
-	TAccountUser extends string = string,
-	TAccountRewardMint extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountPositionState extends string = string,
-	TAccountUserRewardAta extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	user: TransactionSigner<TAccountUser>;
-	rewardMint: Address<TAccountRewardMint>;
-	poolState: Address<TAccountPoolState>;
-	positionState: Address<TAccountPositionState>;
-	userRewardAta: Address<TAccountUserRewardAta>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
+export function getClaimInstruction<TAccountUser extends string, TAccountRewardMint extends string, TAccountPoolState extends string, TAccountPositionState extends string, TAccountUserRewardAta extends string, TAccountAssociatedTokenProgram extends string, TAccountTokenProgram extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS>(input: ClaimInput<TAccountUser, TAccountRewardMint, TAccountPoolState, TAccountPositionState, TAccountUserRewardAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): ClaimInstruction<TProgramAddress, TAccountUser, TAccountRewardMint, TAccountPoolState, TAccountPositionState, TAccountUserRewardAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram> {
+  // Program address.
+const programAddress = config?.programAddress ?? STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { user: { value: input.user ?? null, isWritable: true }, rewardMint: { value: input.rewardMint ?? null, isWritable: false }, poolState: { value: input.poolState ?? null, isWritable: false }, positionState: { value: input.positionState ?? null, isWritable: true }, userRewardAta: { value: input.userRewardAta ?? null, isWritable: true }, associatedTokenProgram: { value: input.associatedTokenProgram ?? null, isWritable: false }, tokenProgram: { value: input.tokenProgram ?? null, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Resolve default values.
+if (!accounts.associatedTokenProgram.value) {
+accounts.associatedTokenProgram.value = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+}
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("user", accounts.user), getAccountMeta("rewardMint", accounts.rewardMint), getAccountMeta("poolState", accounts.poolState), getAccountMeta("positionState", accounts.positionState), getAccountMeta("userRewardAta", accounts.userRewardAta), getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram), getAccountMeta("tokenProgram", accounts.tokenProgram), getAccountMeta("systemProgram", accounts.systemProgram)], data: getClaimInstructionDataEncoder().encode({}), programAddress } as ClaimInstruction<TProgramAddress, TAccountUser, TAccountRewardMint, TAccountPoolState, TAccountPositionState, TAccountUserRewardAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram>);
+}
+
+export type ParsedClaimInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+user: TAccountMetas[0];
+rewardMint: TAccountMetas[1];
+poolState: TAccountMetas[2];
+positionState: TAccountMetas[3];
+userRewardAta: TAccountMetas[4];
+associatedTokenProgram: TAccountMetas[5];
+tokenProgram: TAccountMetas[6];
+systemProgram: TAccountMetas[7];
 };
+data: ClaimInstructionData; };
 
-export function getClaimInstruction<
-	TAccountUser extends string,
-	TAccountRewardMint extends string,
-	TAccountPoolState extends string,
-	TAccountPositionState extends string,
-	TAccountUserRewardAta extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address =
-		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: ClaimInput<
-		TAccountUser,
-		TAccountRewardMint,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountUserRewardAta,
-		TAccountAssociatedTokenProgram,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): ClaimInstruction<
-	TProgramAddress,
-	TAccountUser,
-	TAccountRewardMint,
-	TAccountPoolState,
-	TAccountPositionState,
-	TAccountUserRewardAta,
-	TAccountAssociatedTokenProgram,
-	TAccountTokenProgram,
-	TAccountSystemProgram
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: true },
-		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: false },
-		positionState: { value: input.positionState ?? null, isWritable: true },
-		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
-		associatedTokenProgram: {
-			value: input.associatedTokenProgram ?? null,
-			isWritable: false,
-		},
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Resolve default values.
-	if (!accounts.associatedTokenProgram.value) {
-		accounts.associatedTokenProgram.value =
-			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			>;
-	}
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("user", accounts.user),
-			getAccountMeta("rewardMint", accounts.rewardMint),
-			getAccountMeta("poolState", accounts.poolState),
-			getAccountMeta("positionState", accounts.positionState),
-			getAccountMeta("userRewardAta", accounts.userRewardAta),
-			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
-			getAccountMeta("tokenProgram", accounts.tokenProgram),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getClaimInstructionDataEncoder().encode({}),
-		programAddress,
-	} as ClaimInstruction<
-		TProgramAddress,
-		TAccountUser,
-		TAccountRewardMint,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountUserRewardAta,
-		TAccountAssociatedTokenProgram,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>);
+export function parseClaimInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedClaimInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 8) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 8 });
 }
-
-export type ParsedClaimInstruction<
-	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		user: TAccountMetas[0];
-		rewardMint: TAccountMetas[1];
-		poolState: TAccountMetas[2];
-		positionState: TAccountMetas[3];
-		userRewardAta: TAccountMetas[4];
-		associatedTokenProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
-		systemProgram: TAccountMetas[7];
-	};
-	data: ClaimInstructionData;
-};
-
-export function parseClaimInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedClaimInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			user: getNextAccount(),
-			rewardMint: getNextAccount(),
-			poolState: getNextAccount(),
-			positionState: getNextAccount(),
-			userRewardAta: getNextAccount(),
-			associatedTokenProgram: getNextAccount(),
-			tokenProgram: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-		data: getClaimInstructionDataDecoder().decode(instruction.data),
-	};
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { user: getNextAccount(), rewardMint: getNextAccount(), poolState: getNextAccount(), positionState: getNextAccount(), userRewardAta: getNextAccount(), associatedTokenProgram: getNextAccount(), tokenProgram: getNextAccount(), systemProgram: getNextAccount() }, data: getClaimInstructionDataDecoder().decode(instruction.data) };
 }

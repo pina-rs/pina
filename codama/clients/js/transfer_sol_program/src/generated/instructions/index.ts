@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./cpiTransfer";
-export * from "./directTransfer";
+export * from './cpiTransfer';
+export * from './directTransfer';

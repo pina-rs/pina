@@ -1,0 +1,19 @@
+[package]
+name = "staking_rewards_program_cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Generated CLI for stakingRewardsProgram"
+
+[[bin]]
+name = "staking-rewards-program-cli"
+path = "src/main.rs"
+
+[dependencies]
+bs58 = { workspace = true, default-features = true }
+clap = { workspace = true, default-features = true, features = ["derive", "std", "env"] }
+serde_json = { workspace = true, default-features = true }
+solana-rpc-client = { workspace = true, default-features = true }
+solana-sdk = { workspace = true, default-features = true }
+staking-rewards-program-client = { path = "../../../rust/staking_rewards_program" }
+thiserror = { workspace = true, default-features = true }

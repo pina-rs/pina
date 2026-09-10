@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,10 +12,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the CustomErrorsProgram program.
-const customErrorsProgramProgramAddress = Address(
-  'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
-);
+const customErrorsProgramProgramAddress = Address('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS');
 
 /// Known instructions for the CustomErrorsProgram program.
 enum CustomErrorsProgramInstruction {
@@ -53,10 +53,13 @@ CustomErrorsProgramInstruction identifyCustomErrorsProgramInstruction(
     return CustomErrorsProgramInstruction.requireGte;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'customErrorsProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'customErrorsProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the CustomErrorsProgram program.
@@ -69,7 +72,7 @@ sealed class ParsedCustomErrorsProgramInstruction {
 /// A parsed Hello instruction.
 final class ParsedHello extends ParsedCustomErrorsProgramInstruction {
   const ParsedHello({required this.data})
-    : super(CustomErrorsProgramInstruction.hello);
+      : super(CustomErrorsProgramInstruction.hello);
 
   final HelloInstructionData data;
 }
@@ -77,7 +80,7 @@ final class ParsedHello extends ParsedCustomErrorsProgramInstruction {
 /// A parsed HelloNoMsg instruction.
 final class ParsedHelloNoMsg extends ParsedCustomErrorsProgramInstruction {
   const ParsedHelloNoMsg({required this.data})
-    : super(CustomErrorsProgramInstruction.helloNoMsg);
+      : super(CustomErrorsProgramInstruction.helloNoMsg);
 
   final HelloNoMsgInstructionData data;
 }
@@ -85,7 +88,7 @@ final class ParsedHelloNoMsg extends ParsedCustomErrorsProgramInstruction {
 /// A parsed HelloNext instruction.
 final class ParsedHelloNext extends ParsedCustomErrorsProgramInstruction {
   const ParsedHelloNext({required this.data})
-    : super(CustomErrorsProgramInstruction.helloNext);
+      : super(CustomErrorsProgramInstruction.helloNext);
 
   final HelloNextInstructionData data;
 }
@@ -93,7 +96,7 @@ final class ParsedHelloNext extends ParsedCustomErrorsProgramInstruction {
 /// A parsed RequireEq instruction.
 final class ParsedRequireEq extends ParsedCustomErrorsProgramInstruction {
   const ParsedRequireEq({required this.data})
-    : super(CustomErrorsProgramInstruction.requireEq);
+      : super(CustomErrorsProgramInstruction.requireEq);
 
   final RequireEqInstructionData data;
 }
@@ -101,7 +104,7 @@ final class ParsedRequireEq extends ParsedCustomErrorsProgramInstruction {
 /// A parsed RequireNeq instruction.
 final class ParsedRequireNeq extends ParsedCustomErrorsProgramInstruction {
   const ParsedRequireNeq({required this.data})
-    : super(CustomErrorsProgramInstruction.requireNeq);
+      : super(CustomErrorsProgramInstruction.requireNeq);
 
   final RequireNeqInstructionData data;
 }
@@ -109,7 +112,7 @@ final class ParsedRequireNeq extends ParsedCustomErrorsProgramInstruction {
 /// A parsed RequireGt instruction.
 final class ParsedRequireGt extends ParsedCustomErrorsProgramInstruction {
   const ParsedRequireGt({required this.data})
-    : super(CustomErrorsProgramInstruction.requireGt);
+      : super(CustomErrorsProgramInstruction.requireGt);
 
   final RequireGtInstructionData data;
 }
@@ -117,7 +120,7 @@ final class ParsedRequireGt extends ParsedCustomErrorsProgramInstruction {
 /// A parsed RequireGte instruction.
 final class ParsedRequireGte extends ParsedCustomErrorsProgramInstruction {
   const ParsedRequireGte({required this.data})
-    : super(CustomErrorsProgramInstruction.requireGte);
+      : super(CustomErrorsProgramInstruction.requireGte);
 
   final RequireGteInstructionData data;
 }

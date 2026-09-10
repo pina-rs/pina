@@ -19,13 +19,13 @@ pub struct AllowsDuplicateReadonly {
 
 impl AllowsDuplicateReadonly {
 	pub fn new(account1: solana_pubkey::Pubkey, account2: solana_pubkey::Pubkey) -> Self {
-		Self { account1, account2 }
+		Self {
+			account1,
+			account2,
+		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: AllowsDuplicateReadonlyInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: AllowsDuplicateReadonlyInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -36,14 +36,8 @@ impl AllowsDuplicateReadonly {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.account1,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.account2,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.account1, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.account2, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ID,
@@ -59,19 +53,14 @@ pub struct AllowsDuplicateReadonlyInstructionData {
 }
 
 impl AllowsDuplicateReadonlyInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut AllowsDuplicateReadonlyInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut AllowsDuplicateReadonlyInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<AllowsDuplicateReadonlyInstructionWireZc>()];
-		<AllowsDuplicateReadonlyInstructionWire as pina::PinaPodFixed>::initialize(
-			&mut bytes,
-			|data| {
-				configure(data);
-				data.discriminator = ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR;
-				Ok(())
-			},
-		)
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		<AllowsDuplicateReadonlyInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
+			configure(data);
+			data.discriminator = ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR;
+			Ok(())
+		})
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

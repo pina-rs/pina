@@ -6,207 +6,72 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlySignerAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-	type WritableAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const DEACTIVATE_ROLE_DISCRIMINATOR = 3;
 
-export function getDeactivateRoleDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DEACTIVATE_ROLE_DISCRIMINATOR);
+export function getDeactivateRoleDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(DEACTIVATE_ROLE_DISCRIMINATOR); }
+
+export type DeactivateRoleInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountRegistryConfig extends string | AccountMeta<string> = string, TAccountRoleEntry extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? ReadonlySignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountRegistryConfig extends string ? ReadonlyAccount<TAccountRegistryConfig> : TAccountRegistryConfig, TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry> : TAccountRoleEntry, ...TRemainingAccounts]>;
+
+export type DeactivateRoleInstructionData = { discriminator: number;  };
+
+export type DeactivateRoleInstructionDataArgs = {  };
+
+export function getDeactivateRoleInstructionDataEncoder(): FixedSizeEncoder<DeactivateRoleInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 3 }));
 }
 
-export type DeactivateRoleInstruction<
-	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
-	TAccountAdmin extends string | AccountMeta<string> = string,
-	TAccountRegistryConfig extends string | AccountMeta<string> = string,
-	TAccountRoleEntry extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
-					& AccountSignerMeta<TAccountAdmin>
-				: TAccountAdmin,
-			TAccountRegistryConfig extends string
-				? ReadonlyAccount<TAccountRegistryConfig>
-				: TAccountRegistryConfig,
-			TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry>
-				: TAccountRoleEntry,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type DeactivateRoleInstructionData = { discriminator: number };
-
-export type DeactivateRoleInstructionDataArgs = {};
-
-export function getDeactivateRoleInstructionDataEncoder(): FixedSizeEncoder<
-	DeactivateRoleInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 3 }),
-	);
+export function getDeactivateRoleInstructionDataDecoder(): FixedSizeDecoder<DeactivateRoleInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(DEACTIVATE_ROLE_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getDeactivateRoleInstructionDataDecoder(): FixedSizeDecoder<
-	DeactivateRoleInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(
-			DEACTIVATE_ROLE_DISCRIMINATOR,
-			getU8Decoder(),
-		),
-	]]);
+export function getDeactivateRoleInstructionDataCodec(): FixedSizeCodec<DeactivateRoleInstructionDataArgs, DeactivateRoleInstructionData> {
+    return combineCodec(getDeactivateRoleInstructionDataEncoder(), getDeactivateRoleInstructionDataDecoder());
 }
 
-export function getDeactivateRoleInstructionDataCodec(): FixedSizeCodec<
-	DeactivateRoleInstructionDataArgs,
-	DeactivateRoleInstructionData
-> {
-	return combineCodec(
-		getDeactivateRoleInstructionDataEncoder(),
-		getDeactivateRoleInstructionDataDecoder(),
-	);
+export type DeactivateRoleInput<TAccountAdmin extends string = string, TAccountRegistryConfig extends string = string, TAccountRoleEntry extends string = string> =  {
+  admin: TransactionSigner<TAccountAdmin>;
+registryConfig: Address<TAccountRegistryConfig>;
+roleEntry: Address<TAccountRoleEntry>;
 }
 
-export type DeactivateRoleInput<
-	TAccountAdmin extends string = string,
-	TAccountRegistryConfig extends string = string,
-	TAccountRoleEntry extends string = string,
-> = {
-	admin: TransactionSigner<TAccountAdmin>;
-	registryConfig: Address<TAccountRegistryConfig>;
-	roleEntry: Address<TAccountRoleEntry>;
+export function getDeactivateRoleInstruction<TAccountAdmin extends string, TAccountRegistryConfig extends string, TAccountRoleEntry extends string, TProgramAddress extends Address = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS>(input: DeactivateRoleInput<TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry>, config?: { programAddress?: TProgramAddress } ): DeactivateRoleInstruction<TProgramAddress, TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry> {
+  // Program address.
+const programAddress = config?.programAddress ?? ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { admin: { value: input.admin ?? null, isWritable: false }, registryConfig: { value: input.registryConfig ?? null, isWritable: false }, roleEntry: { value: input.roleEntry ?? null, isWritable: true } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("registryConfig", accounts.registryConfig), getAccountMeta("roleEntry", accounts.roleEntry)], data: getDeactivateRoleInstructionDataEncoder().encode({}), programAddress } as DeactivateRoleInstruction<TProgramAddress, TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry>);
+}
+
+export type ParsedDeactivateRoleInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+admin: TAccountMetas[0];
+registryConfig: TAccountMetas[1];
+roleEntry: TAccountMetas[2];
 };
+data: DeactivateRoleInstructionData; };
 
-export function getDeactivateRoleInstruction<
-	TAccountAdmin extends string,
-	TAccountRegistryConfig extends string,
-	TAccountRoleEntry extends string,
-	TProgramAddress extends Address =
-		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: DeactivateRoleInput<
-		TAccountAdmin,
-		TAccountRegistryConfig,
-		TAccountRoleEntry
-	>,
-	config?: { programAddress?: TProgramAddress },
-): DeactivateRoleInstruction<
-	TProgramAddress,
-	TAccountAdmin,
-	TAccountRegistryConfig,
-	TAccountRoleEntry
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: false },
-		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("admin", accounts.admin),
-			getAccountMeta("registryConfig", accounts.registryConfig),
-			getAccountMeta("roleEntry", accounts.roleEntry),
-		],
-		data: getDeactivateRoleInstructionDataEncoder().encode({}),
-		programAddress,
-	} as DeactivateRoleInstruction<
-		TProgramAddress,
-		TAccountAdmin,
-		TAccountRegistryConfig,
-		TAccountRoleEntry
-	>);
+export function parseDeactivateRoleInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedDeactivateRoleInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 3) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
 }
-
-export type ParsedDeactivateRoleInstruction<
-	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		admin: TAccountMetas[0];
-		registryConfig: TAccountMetas[1];
-		roleEntry: TAccountMetas[2];
-	};
-	data: DeactivateRoleInstructionData;
-};
-
-export function parseDeactivateRoleInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedDeactivateRoleInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			admin: getNextAccount(),
-			registryConfig: getNextAccount(),
-			roleEntry: getNextAccount(),
-		},
-		data: getDeactivateRoleInstructionDataDecoder().decode(instruction.data),
-	};
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), registryConfig: getNextAccount(), roleEntry: getNextAccount() }, data: getDeactivateRoleInstructionDataDecoder().decode(instruction.data) };
 }

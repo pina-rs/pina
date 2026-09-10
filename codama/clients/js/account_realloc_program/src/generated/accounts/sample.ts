@@ -6,185 +6,106 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	type Codec,
-	combineCodec,
-	decodeAccount,
-	type Decoder,
-	type EncodedAccount,
-	type Encoder,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	getAddressDecoder,
-	getAddressEncoder,
-	getArrayDecoder,
-	getArrayEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU16Decoder,
-	getU16Encoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findSamplePda, type SampleSeeds } from "../pdas";
-import {
-	getPinaPodBoundedArrayDecoder,
-	getPinaPodBoundedArrayEncoder,
-	getPinaPodBoundedCountDecoder,
-	getPinaPodDiscriminatorDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodBoundedArrayDecoder, getPinaPodBoundedArrayEncoder, getPinaPodBoundedCountDecoder, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getArrayDecoder, getArrayEncoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type Codec, type Decoder, type EncodedAccount, type Encoder, type FetchAccountConfig, type FetchAccountsConfig, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findSamplePda, type SampleSeeds } from '../pdas';
 
 export const SAMPLE_DISCRIMINATOR = 1;
 
-export function getSampleDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SAMPLE_DISCRIMINATOR);
-}
+export function getSampleDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(SAMPLE_DISCRIMINATOR); }
 
 /** A compact account whose active values occupy only the bytes they need. */
-export type Sample = {
-	discriminator: number;
-	/** Canonical PDA bump, persisted for inexpensive validation on resize. */
-	bump: number;
-	/** The only signer permitted to resize this sample. */
-	authority: Address;
-	/** Dynamically encoded values; unused capacity occupies no account bytes. */
-	values: Array<bigint>;
-};
+export type Sample = { discriminator: number; 
+/** Canonical PDA bump, persisted for inexpensive validation on resize. */
+bump: number; 
+/** The only signer permitted to resize this sample. */
+authority: Address; 
+/** Dynamically encoded values; unused capacity occupies no account bytes. */
+values: Array<bigint>;  };
 
-export type SampleArgs = {
-	/** Canonical PDA bump, persisted for inexpensive validation on resize. */
-	bump: number;
-	/** The only signer permitted to resize this sample. */
-	authority: Address;
-	/** Dynamically encoded values; unused capacity occupies no account bytes. */
-	values: Array<number | bigint>;
-};
+export type SampleArgs = { 
+/** Canonical PDA bump, persisted for inexpensive validation on resize. */
+bump: number; 
+/** The only signer permitted to resize this sample. */
+authority: Address; 
+/** Dynamically encoded values; unused capacity occupies no account bytes. */
+values: Array<number | bigint>;  };
 
 /** Gets the encoder for {@link SampleArgs} account data. */
 export function getSampleEncoder(): Encoder<SampleArgs> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["authority", getAddressEncoder()],
-			[
-				"values",
-				getPinaPodBoundedArrayEncoder(
-					getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
-					64,
-				),
-			],
-		]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['authority', getAddressEncoder()], ['values', getPinaPodBoundedArrayEncoder(getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }), 64)]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link Sample} account data. */
 export function getSampleDecoder(): Decoder<Sample> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(SAMPLE_DISCRIMINATOR, getU8Decoder()),
-		],
-		["bump", getU8Decoder()],
-		["authority", getAddressDecoder()],
-		[
-			"values",
-			getPinaPodBoundedArrayDecoder(
-				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
-				getPinaPodBoundedCountDecoder(getU16Decoder(), 64),
-				64,
-			),
-		],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(SAMPLE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['authority', getAddressDecoder()], ['values', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }), getPinaPodBoundedCountDecoder(getU16Decoder() , 64), 64)]]);
 }
 
 /** Gets the codec for {@link Sample} account data. */
 export function getSampleCodec(): Codec<SampleArgs, Sample> {
-	return combineCodec(getSampleEncoder(), getSampleDecoder());
+    return combineCodec(getSampleEncoder(), getSampleDecoder());
 }
 
-export function decodeSample<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<Sample, TAddress>;
-export function decodeSample<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<Sample, TAddress>;
-export function decodeSample<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<Sample, TAddress> | MaybeAccount<Sample, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getSampleDecoder(),
-	);
+export function decodeSample<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<Sample, TAddress>;
+export function decodeSample<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<Sample, TAddress>;
+export function decodeSample<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<Sample, TAddress> | MaybeAccount<Sample, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getSampleDecoder());
 }
 
 export async function fetchSample<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<Sample, TAddress>> {
-	const maybeAccount = await fetchMaybeSample(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeSample(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeSample<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Sample, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeSample(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeSample(maybeAccount);
 }
 
 export async function fetchAllSample(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<Sample>[]> {
-	const maybeAccounts = await fetchAllMaybeSample(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeSample(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeSample(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Sample>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodeSample(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeSample(maybeAccount));
 }
 
 export async function fetchSampleFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: SampleSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: SampleSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<Sample>> {
-	const maybeAccount = await fetchMaybeSampleFromSeeds(rpc, seeds, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeSampleFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeSampleFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: SampleSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: SampleSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<Sample>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findSamplePda(seeds, { programAddress });
-	return await fetchMaybeSample(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findSamplePda(seeds, { programAddress });
+  return await fetchMaybeSample(rpc, address, fetchConfig);
 }

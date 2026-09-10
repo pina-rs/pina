@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `DirectTransfer`.
-///
+/// 
 /// Same layout as `CpiTransferInstruction` but with a different discriminator
 /// byte.
 pub const DIRECT_TRANSFER_DISCRIMINATOR: u8 = 1u8;
@@ -25,13 +25,13 @@ pub struct DirectTransfer {
 
 impl DirectTransfer {
 	pub fn new(sender: solana_pubkey::Pubkey, recipient: solana_pubkey::Pubkey) -> Self {
-		Self { sender, recipient }
+		Self {
+			sender,
+			recipient,
+		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: DirectTransferInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: DirectTransferInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -59,16 +59,14 @@ pub struct DirectTransferInstructionData {
 }
 
 impl DirectTransferInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut DirectTransferInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut DirectTransferInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<DirectTransferInstructionWireZc>()];
 		<DirectTransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DIRECT_TRANSFER_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

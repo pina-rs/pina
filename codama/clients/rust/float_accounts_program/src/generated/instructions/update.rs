@@ -19,7 +19,10 @@ pub struct Update {
 
 impl Update {
 	pub fn new(account: solana_pubkey::Pubkey, authority: solana_pubkey::Pubkey) -> Self {
-		Self { account, authority }
+		Self {
+			account,
+			authority,
+		}
 	}
 
 	pub fn instruction(&self, data: UpdateInstructionData) -> solana_instruction::Instruction {
@@ -34,10 +37,7 @@ impl Update {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::FLOAT_ACCOUNTS_PROGRAM_ID,
@@ -53,16 +53,14 @@ pub struct UpdateInstructionData {
 }
 
 impl UpdateInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut UpdateInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut UpdateInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<UpdateInstructionWireZc>()];
 		<UpdateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

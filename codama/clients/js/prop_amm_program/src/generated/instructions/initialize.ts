@@ -6,209 +6,75 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR); }
+
+export type InitializeInstruction<TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS, TAccountPayer extends string | AccountMeta<string> = string, TAccountOracle extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountPayer extends string ? WritableSignerAccount<TAccountPayer> & AccountSignerMeta<TAccountPayer> : TAccountPayer, TAccountOracle extends string ? WritableSignerAccount<TAccountOracle> & AccountSignerMeta<TAccountOracle> : TAccountOracle, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type InitializeInstructionData = { discriminator: number;  };
+
+export type InitializeInstructionDataArgs = {  };
+
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
 }
 
-export type InitializeInstruction<
-	TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
-	TAccountPayer extends string | AccountMeta<string> = string,
-	TAccountOracle extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> =
-		"11111111111111111111111111111111",
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountPayer extends string ?
-					& WritableSignerAccount<TAccountPayer>
-					& AccountSignerMeta<TAccountPayer>
-				: TAccountPayer,
-			TAccountOracle extends string ?
-					& WritableSignerAccount<TAccountOracle>
-					& AccountSignerMeta<TAccountOracle>
-				: TAccountOracle,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type InitializeInstructionData = { discriminator: number };
-
-export type InitializeInstructionDataArgs = {};
-
-export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
-	InitializeInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
-	);
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
-	InitializeInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<InitializeInstructionDataArgs, InitializeInstructionData> {
+    return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
 }
 
-export function getInitializeInstructionDataCodec(): FixedSizeCodec<
-	InitializeInstructionDataArgs,
-	InitializeInstructionData
-> {
-	return combineCodec(
-		getInitializeInstructionDataEncoder(),
-		getInitializeInstructionDataDecoder(),
-	);
+export type InitializeInput<TAccountPayer extends string = string, TAccountOracle extends string = string, TAccountSystemProgram extends string = string> =  {
+  payer: TransactionSigner<TAccountPayer>;
+oracle: TransactionSigner<TAccountOracle>;
+systemProgram?: Address<TAccountSystemProgram>;
 }
 
-export type InitializeInput<
-	TAccountPayer extends string = string,
-	TAccountOracle extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	payer: TransactionSigner<TAccountPayer>;
-	oracle: TransactionSigner<TAccountOracle>;
-	systemProgram?: Address<TAccountSystemProgram>;
+export function getInitializeInstruction<TAccountPayer extends string, TAccountOracle extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS>(input: InitializeInput<TAccountPayer, TAccountOracle, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): InitializeInstruction<TProgramAddress, TAccountPayer, TAccountOracle, TAccountSystemProgram> {
+  // Program address.
+const programAddress = config?.programAddress ?? PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { payer: { value: input.payer ?? null, isWritable: true }, oracle: { value: input.oracle ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Resolve default values.
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("payer", accounts.payer), getAccountMeta("oracle", accounts.oracle), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeInstructionDataEncoder().encode({}), programAddress } as InitializeInstruction<TProgramAddress, TAccountPayer, TAccountOracle, TAccountSystemProgram>);
+}
+
+export type ParsedInitializeInstruction<TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+payer: TAccountMetas[0];
+oracle: TAccountMetas[1];
+systemProgram: TAccountMetas[2];
 };
+data: InitializeInstructionData; };
 
-export function getInitializeInstruction<
-	TAccountPayer extends string,
-	TAccountOracle extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: InitializeInput<TAccountPayer, TAccountOracle, TAccountSystemProgram>,
-	config?: { programAddress?: TProgramAddress },
-): InitializeInstruction<
-	TProgramAddress,
-	TAccountPayer,
-	TAccountOracle,
-	TAccountSystemProgram
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		payer: { value: input.payer ?? null, isWritable: true },
-		oracle: { value: input.oracle ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Resolve default values.
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("payer", accounts.payer),
-			getAccountMeta("oracle", accounts.oracle),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getInitializeInstructionDataEncoder().encode({}),
-		programAddress,
-	} as InitializeInstruction<
-		TProgramAddress,
-		TAccountPayer,
-		TAccountOracle,
-		TAccountSystemProgram
-	>);
+export function parseInitializeInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializeInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 3) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
 }
-
-export type ParsedInitializeInstruction<
-	TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		payer: TAccountMetas[0];
-		oracle: TAccountMetas[1];
-		systemProgram: TAccountMetas[2];
-	};
-	data: InitializeInstructionData;
-};
-
-export function parseInitializeInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			payer: getNextAccount(),
-			oracle: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-		data: getInitializeInstructionDataDecoder().decode(instruction.data),
-	};
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { payer: getNextAccount(), oracle: getNextAccount(), systemProgram: getNextAccount() }, data: getInitializeInstructionDataDecoder().decode(instruction.data) };
 }

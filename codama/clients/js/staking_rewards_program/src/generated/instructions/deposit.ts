@@ -6,302 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-	type WritableAccount,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const DEPOSIT_DISCRIMINATOR = 2;
 
-export function getDepositDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR);
+export function getDepositDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR); }
+
+export type DepositInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountUser extends string | AccountMeta<string> = string, TAccountStakeMint extends string | AccountMeta<string> = string, TAccountPoolState extends string | AccountMeta<string> = string, TAccountPositionState extends string | AccountMeta<string> = string, TAccountUserStakeAta extends string | AccountMeta<string> = string, TAccountAssociatedTokenProgram extends string | AccountMeta<string> = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", TAccountTokenProgram extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountUser extends string ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser> : TAccountUser, TAccountStakeMint extends string ? ReadonlyAccount<TAccountStakeMint> : TAccountStakeMint, TAccountPoolState extends string ? WritableAccount<TAccountPoolState> : TAccountPoolState, TAccountPositionState extends string ? WritableAccount<TAccountPositionState> : TAccountPositionState, TAccountUserStakeAta extends string ? WritableAccount<TAccountUserStakeAta> : TAccountUserStakeAta, TAccountAssociatedTokenProgram extends string ? ReadonlyAccount<TAccountAssociatedTokenProgram> : TAccountAssociatedTokenProgram, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type DepositInstructionData = { discriminator: number; amount: bigint;  };
+
+export type DepositInstructionDataArgs = { amount: number | bigint;  };
+
+export function getDepositInstructionDataEncoder(): FixedSizeEncoder<DepositInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['amount', getU64Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
 }
 
-export type DepositInstruction<
-	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountUser extends string | AccountMeta<string> = string,
-	TAccountStakeMint extends string | AccountMeta<string> = string,
-	TAccountPoolState extends string | AccountMeta<string> = string,
-	TAccountPositionState extends string | AccountMeta<string> = string,
-	TAccountUserStakeAta extends string | AccountMeta<string> = string,
-	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
-		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-	TAccountTokenProgram extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> =
-		"11111111111111111111111111111111",
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountUser extends string
-				? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
-				: TAccountUser,
-			TAccountStakeMint extends string ? ReadonlyAccount<TAccountStakeMint>
-				: TAccountStakeMint,
-			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
-				: TAccountPoolState,
-			TAccountPositionState extends string
-				? WritableAccount<TAccountPositionState>
-				: TAccountPositionState,
-			TAccountUserStakeAta extends string
-				? WritableAccount<TAccountUserStakeAta>
-				: TAccountUserStakeAta,
-			TAccountAssociatedTokenProgram extends string
-				? ReadonlyAccount<TAccountAssociatedTokenProgram>
-				: TAccountAssociatedTokenProgram,
-			TAccountTokenProgram extends string
-				? ReadonlyAccount<TAccountTokenProgram>
-				: TAccountTokenProgram,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type DepositInstructionData = { discriminator: number; amount: bigint };
-
-export type DepositInstructionDataArgs = { amount: number | bigint };
-
-export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
-	DepositInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"amount",
-			getU64Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 2 }),
-	);
+export function getDepositInstructionDataDecoder(): FixedSizeDecoder<DepositInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder())], ['amount', getU64Decoder()]]);
 }
 
-export function getDepositInstructionDataDecoder(): FixedSizeDecoder<
-	DepositInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
-	], ["amount", getU64Decoder()]]);
+export function getDepositInstructionDataCodec(): FixedSizeCodec<DepositInstructionDataArgs, DepositInstructionData> {
+    return combineCodec(getDepositInstructionDataEncoder(), getDepositInstructionDataDecoder());
 }
 
-export function getDepositInstructionDataCodec(): FixedSizeCodec<
-	DepositInstructionDataArgs,
-	DepositInstructionData
-> {
-	return combineCodec(
-		getDepositInstructionDataEncoder(),
-		getDepositInstructionDataDecoder(),
-	);
+export type DepositInput<TAccountUser extends string = string, TAccountStakeMint extends string = string, TAccountPoolState extends string = string, TAccountPositionState extends string = string, TAccountUserStakeAta extends string = string, TAccountAssociatedTokenProgram extends string = string, TAccountTokenProgram extends string = string, TAccountSystemProgram extends string = string> =  {
+  user: TransactionSigner<TAccountUser>;
+stakeMint: Address<TAccountStakeMint>;
+poolState: Address<TAccountPoolState>;
+positionState: Address<TAccountPositionState>;
+userStakeAta: Address<TAccountUserStakeAta>;
+associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+tokenProgram: Address<TAccountTokenProgram>;
+systemProgram?: Address<TAccountSystemProgram>;
+amount: DepositInstructionDataArgs["amount"];
 }
 
-export type DepositInput<
-	TAccountUser extends string = string,
-	TAccountStakeMint extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountPositionState extends string = string,
-	TAccountUserStakeAta extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	user: TransactionSigner<TAccountUser>;
-	stakeMint: Address<TAccountStakeMint>;
-	poolState: Address<TAccountPoolState>;
-	positionState: Address<TAccountPositionState>;
-	userStakeAta: Address<TAccountUserStakeAta>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	amount: DepositInstructionDataArgs["amount"];
+export function getDepositInstruction<TAccountUser extends string, TAccountStakeMint extends string, TAccountPoolState extends string, TAccountPositionState extends string, TAccountUserStakeAta extends string, TAccountAssociatedTokenProgram extends string, TAccountTokenProgram extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS>(input: DepositInput<TAccountUser, TAccountStakeMint, TAccountPoolState, TAccountPositionState, TAccountUserStakeAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): DepositInstruction<TProgramAddress, TAccountUser, TAccountStakeMint, TAccountPoolState, TAccountPositionState, TAccountUserStakeAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram> {
+  // Program address.
+const programAddress = config?.programAddress ?? STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { user: { value: input.user ?? null, isWritable: true }, stakeMint: { value: input.stakeMint ?? null, isWritable: false }, poolState: { value: input.poolState ?? null, isWritable: true }, positionState: { value: input.positionState ?? null, isWritable: true }, userStakeAta: { value: input.userStakeAta ?? null, isWritable: true }, associatedTokenProgram: { value: input.associatedTokenProgram ?? null, isWritable: false }, tokenProgram: { value: input.tokenProgram ?? null, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+// Resolve default values.
+if (!accounts.associatedTokenProgram.value) {
+accounts.associatedTokenProgram.value = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+}
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("user", accounts.user), getAccountMeta("stakeMint", accounts.stakeMint), getAccountMeta("poolState", accounts.poolState), getAccountMeta("positionState", accounts.positionState), getAccountMeta("userStakeAta", accounts.userStakeAta), getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram), getAccountMeta("tokenProgram", accounts.tokenProgram), getAccountMeta("systemProgram", accounts.systemProgram)], data: getDepositInstructionDataEncoder().encode(args as DepositInstructionDataArgs), programAddress } as DepositInstruction<TProgramAddress, TAccountUser, TAccountStakeMint, TAccountPoolState, TAccountPositionState, TAccountUserStakeAta, TAccountAssociatedTokenProgram, TAccountTokenProgram, TAccountSystemProgram>);
+}
+
+export type ParsedDepositInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+user: TAccountMetas[0];
+stakeMint: TAccountMetas[1];
+poolState: TAccountMetas[2];
+positionState: TAccountMetas[3];
+userStakeAta: TAccountMetas[4];
+associatedTokenProgram: TAccountMetas[5];
+tokenProgram: TAccountMetas[6];
+systemProgram: TAccountMetas[7];
 };
+data: DepositInstructionData; };
 
-export function getDepositInstruction<
-	TAccountUser extends string,
-	TAccountStakeMint extends string,
-	TAccountPoolState extends string,
-	TAccountPositionState extends string,
-	TAccountUserStakeAta extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address =
-		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: DepositInput<
-		TAccountUser,
-		TAccountStakeMint,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountUserStakeAta,
-		TAccountAssociatedTokenProgram,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): DepositInstruction<
-	TProgramAddress,
-	TAccountUser,
-	TAccountStakeMint,
-	TAccountPoolState,
-	TAccountPositionState,
-	TAccountUserStakeAta,
-	TAccountAssociatedTokenProgram,
-	TAccountTokenProgram,
-	TAccountSystemProgram
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: true },
-		stakeMint: { value: input.stakeMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
-		positionState: { value: input.positionState ?? null, isWritable: true },
-		userStakeAta: { value: input.userStakeAta ?? null, isWritable: true },
-		associatedTokenProgram: {
-			value: input.associatedTokenProgram ?? null,
-			isWritable: false,
-		},
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.associatedTokenProgram.value) {
-		accounts.associatedTokenProgram.value =
-			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			>;
-	}
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("user", accounts.user),
-			getAccountMeta("stakeMint", accounts.stakeMint),
-			getAccountMeta("poolState", accounts.poolState),
-			getAccountMeta("positionState", accounts.positionState),
-			getAccountMeta("userStakeAta", accounts.userStakeAta),
-			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
-			getAccountMeta("tokenProgram", accounts.tokenProgram),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getDepositInstructionDataEncoder().encode(
-			args as DepositInstructionDataArgs,
-		),
-		programAddress,
-	} as DepositInstruction<
-		TProgramAddress,
-		TAccountUser,
-		TAccountStakeMint,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountUserStakeAta,
-		TAccountAssociatedTokenProgram,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>);
+export function parseDepositInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedDepositInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 8) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 8 });
 }
-
-export type ParsedDepositInstruction<
-	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		user: TAccountMetas[0];
-		stakeMint: TAccountMetas[1];
-		poolState: TAccountMetas[2];
-		positionState: TAccountMetas[3];
-		userStakeAta: TAccountMetas[4];
-		associatedTokenProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
-		systemProgram: TAccountMetas[7];
-	};
-	data: DepositInstructionData;
-};
-
-export function parseDepositInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedDepositInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			user: getNextAccount(),
-			stakeMint: getNextAccount(),
-			poolState: getNextAccount(),
-			positionState: getNextAccount(),
-			userStakeAta: getNextAccount(),
-			associatedTokenProgram: getNextAccount(),
-			tokenProgram: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-		data: getDepositInstructionDataDecoder().decode(instruction.data),
-	};
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { user: getNextAccount(), stakeMint: getNextAccount(), poolState: getNextAccount(), positionState: getNextAccount(), userStakeAta: getNextAccount(), associatedTokenProgram: getNextAccount(), tokenProgram: getNextAccount(), systemProgram: getNextAccount() }, data: getDepositInstructionDataDecoder().decode(instruction.data) };
 }

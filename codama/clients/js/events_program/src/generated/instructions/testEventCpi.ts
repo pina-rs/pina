@@ -6,103 +6,51 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { EVENTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { EVENTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const TEST_EVENT_CPI_DISCRIMINATOR = 2;
 
-export function getTestEventCpiDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(TEST_EVENT_CPI_DISCRIMINATOR);
+export function getTestEventCpiDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(TEST_EVENT_CPI_DISCRIMINATOR); }
+
+export type TestEventCpiInstruction<TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
+
+export type TestEventCpiInstructionData = { discriminator: number;  };
+
+export type TestEventCpiInstructionDataArgs = {  };
+
+export function getTestEventCpiInstructionDataEncoder(): FixedSizeEncoder<TestEventCpiInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
 }
 
-export type TestEventCpiInstruction<
-	TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<TRemainingAccounts>;
-
-export type TestEventCpiInstructionData = { discriminator: number };
-
-export type TestEventCpiInstructionDataArgs = {};
-
-export function getTestEventCpiInstructionDataEncoder(): FixedSizeEncoder<
-	TestEventCpiInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 2 }),
-	);
+export function getTestEventCpiInstructionDataDecoder(): FixedSizeDecoder<TestEventCpiInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(TEST_EVENT_CPI_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getTestEventCpiInstructionDataDecoder(): FixedSizeDecoder<
-	TestEventCpiInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(
-			TEST_EVENT_CPI_DISCRIMINATOR,
-			getU8Decoder(),
-		),
-	]]);
+export function getTestEventCpiInstructionDataCodec(): FixedSizeCodec<TestEventCpiInstructionDataArgs, TestEventCpiInstructionData> {
+    return combineCodec(getTestEventCpiInstructionDataEncoder(), getTestEventCpiInstructionDataDecoder());
 }
 
-export function getTestEventCpiInstructionDataCodec(): FixedSizeCodec<
-	TestEventCpiInstructionDataArgs,
-	TestEventCpiInstructionData
-> {
-	return combineCodec(
-		getTestEventCpiInstructionDataEncoder(),
-		getTestEventCpiInstructionDataDecoder(),
-	);
+export type TestEventCpiInput =  {
+  
 }
 
-export type TestEventCpiInput = {};
+export function getTestEventCpiInstruction<TProgramAddress extends Address = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS>(config?: { programAddress?: TProgramAddress } ): TestEventCpiInstruction<TProgramAddress> {
+  // Program address.
+const programAddress = config?.programAddress ?? EVENTS_PROGRAM_PROGRAM_ADDRESS;
 
-export function getTestEventCpiInstruction<
-	TProgramAddress extends Address = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
->(
-	config?: { programAddress?: TProgramAddress },
-): TestEventCpiInstruction<TProgramAddress> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		EVENTS_PROGRAM_PROGRAM_ADDRESS;
 
-	return Object.freeze(
-		{
-			data: getTestEventCpiInstructionDataEncoder().encode({}),
-			programAddress,
-		} as TestEventCpiInstruction<TProgramAddress>,
-	);
+
+
+return Object.freeze({ data: getTestEventCpiInstructionDataEncoder().encode({}), programAddress } as TestEventCpiInstruction<TProgramAddress>);
 }
 
-export type ParsedTestEventCpiInstruction<
-	TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram>; data: TestEventCpiInstructionData };
+export type ParsedTestEventCpiInstruction<TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS> = { programAddress: Address<TProgram>;
+data: TestEventCpiInstructionData; };
 
-export function parseTestEventCpiInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
-): ParsedTestEventCpiInstruction<TProgram> {
-	return {
-		programAddress: instruction.programAddress,
-		data: getTestEventCpiInstructionDataDecoder().decode(instruction.data),
-	};
+export function parseTestEventCpiInstruction<TProgram extends string>(instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>): ParsedTestEventCpiInstruction<TProgram> {
+  
+  return { programAddress: instruction.programAddress, data: getTestEventCpiInstructionDataDecoder().decode(instruction.data) };
 }

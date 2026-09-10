@@ -6,19 +6,20 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
 
 /// Instruction data for `Initialize`.
-///
+/// 
 /// Contains the PDA bump seed so the client can pass a pre-computed bump
 /// (avoids the cost of `find_program_address` on-chain).
 /// CPI call for the `initialize` instruction.

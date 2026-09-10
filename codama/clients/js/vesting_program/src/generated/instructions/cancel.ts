@@ -6,230 +6,76 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlySignerAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-	type WritableAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { VESTING_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const CANCEL_DISCRIMINATOR = 2;
 
-export function getCancelDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CANCEL_DISCRIMINATOR);
+export function getCancelDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CANCEL_DISCRIMINATOR); }
+
+export type CancelInstruction<TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountMint extends string | AccountMeta<string> = string, TAccountVestingState extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountTokenProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? ReadonlySignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountMint extends string ? ReadonlyAccount<TAccountMint> : TAccountMint, TAccountVestingState extends string ? WritableAccount<TAccountVestingState> : TAccountVestingState, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, ...TRemainingAccounts]>;
+
+export type CancelInstructionData = { discriminator: number;  };
+
+export type CancelInstructionDataArgs = {  };
+
+export function getCancelInstructionDataEncoder(): FixedSizeEncoder<CancelInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
 }
 
-export type CancelInstruction<
-	TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
-	TAccountAdmin extends string | AccountMeta<string> = string,
-	TAccountMint extends string | AccountMeta<string> = string,
-	TAccountVestingState extends string | AccountMeta<string> = string,
-	TAccountVault extends string | AccountMeta<string> = string,
-	TAccountTokenProgram extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
-					& AccountSignerMeta<TAccountAdmin>
-				: TAccountAdmin,
-			TAccountMint extends string ? ReadonlyAccount<TAccountMint>
-				: TAccountMint,
-			TAccountVestingState extends string
-				? WritableAccount<TAccountVestingState>
-				: TAccountVestingState,
-			TAccountVault extends string ? WritableAccount<TAccountVault>
-				: TAccountVault,
-			TAccountTokenProgram extends string
-				? ReadonlyAccount<TAccountTokenProgram>
-				: TAccountTokenProgram,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type CancelInstructionData = { discriminator: number };
-
-export type CancelInstructionDataArgs = {};
-
-export function getCancelInstructionDataEncoder(): FixedSizeEncoder<
-	CancelInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 2 }),
-	);
+export function getCancelInstructionDataDecoder(): FixedSizeDecoder<CancelInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CANCEL_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getCancelInstructionDataDecoder(): FixedSizeDecoder<
-	CancelInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(CANCEL_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getCancelInstructionDataCodec(): FixedSizeCodec<CancelInstructionDataArgs, CancelInstructionData> {
+    return combineCodec(getCancelInstructionDataEncoder(), getCancelInstructionDataDecoder());
 }
 
-export function getCancelInstructionDataCodec(): FixedSizeCodec<
-	CancelInstructionDataArgs,
-	CancelInstructionData
-> {
-	return combineCodec(
-		getCancelInstructionDataEncoder(),
-		getCancelInstructionDataDecoder(),
-	);
+export type CancelInput<TAccountAdmin extends string = string, TAccountMint extends string = string, TAccountVestingState extends string = string, TAccountVault extends string = string, TAccountTokenProgram extends string = string> =  {
+  admin: TransactionSigner<TAccountAdmin>;
+mint: Address<TAccountMint>;
+vestingState: Address<TAccountVestingState>;
+vault: Address<TAccountVault>;
+tokenProgram: Address<TAccountTokenProgram>;
 }
 
-export type CancelInput<
-	TAccountAdmin extends string = string,
-	TAccountMint extends string = string,
-	TAccountVestingState extends string = string,
-	TAccountVault extends string = string,
-	TAccountTokenProgram extends string = string,
-> = {
-	admin: TransactionSigner<TAccountAdmin>;
-	mint: Address<TAccountMint>;
-	vestingState: Address<TAccountVestingState>;
-	vault: Address<TAccountVault>;
-	tokenProgram: Address<TAccountTokenProgram>;
+export function getCancelInstruction<TAccountAdmin extends string, TAccountMint extends string, TAccountVestingState extends string, TAccountVault extends string, TAccountTokenProgram extends string, TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS>(input: CancelInput<TAccountAdmin, TAccountMint, TAccountVestingState, TAccountVault, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): CancelInstruction<TProgramAddress, TAccountAdmin, TAccountMint, TAccountVestingState, TAccountVault, TAccountTokenProgram> {
+  // Program address.
+const programAddress = config?.programAddress ?? VESTING_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { admin: { value: input.admin ?? null, isWritable: false }, mint: { value: input.mint ?? null, isWritable: false }, vestingState: { value: input.vestingState ?? null, isWritable: true }, vault: { value: input.vault ?? null, isWritable: true }, tokenProgram: { value: input.tokenProgram ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("mint", accounts.mint), getAccountMeta("vestingState", accounts.vestingState), getAccountMeta("vault", accounts.vault), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getCancelInstructionDataEncoder().encode({}), programAddress } as CancelInstruction<TProgramAddress, TAccountAdmin, TAccountMint, TAccountVestingState, TAccountVault, TAccountTokenProgram>);
+}
+
+export type ParsedCancelInstruction<TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+admin: TAccountMetas[0];
+mint: TAccountMetas[1];
+vestingState: TAccountMetas[2];
+vault: TAccountMetas[3];
+tokenProgram: TAccountMetas[4];
 };
+data: CancelInstructionData; };
 
-export function getCancelInstruction<
-	TAccountAdmin extends string,
-	TAccountMint extends string,
-	TAccountVestingState extends string,
-	TAccountVault extends string,
-	TAccountTokenProgram extends string,
-	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: CancelInput<
-		TAccountAdmin,
-		TAccountMint,
-		TAccountVestingState,
-		TAccountVault,
-		TAccountTokenProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): CancelInstruction<
-	TProgramAddress,
-	TAccountAdmin,
-	TAccountMint,
-	TAccountVestingState,
-	TAccountVault,
-	TAccountTokenProgram
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		VESTING_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
-		mint: { value: input.mint ?? null, isWritable: false },
-		vestingState: { value: input.vestingState ?? null, isWritable: true },
-		vault: { value: input.vault ?? null, isWritable: true },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("admin", accounts.admin),
-			getAccountMeta("mint", accounts.mint),
-			getAccountMeta("vestingState", accounts.vestingState),
-			getAccountMeta("vault", accounts.vault),
-			getAccountMeta("tokenProgram", accounts.tokenProgram),
-		],
-		data: getCancelInstructionDataEncoder().encode({}),
-		programAddress,
-	} as CancelInstruction<
-		TProgramAddress,
-		TAccountAdmin,
-		TAccountMint,
-		TAccountVestingState,
-		TAccountVault,
-		TAccountTokenProgram
-	>);
+export function parseCancelInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedCancelInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 5) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 5 });
 }
-
-export type ParsedCancelInstruction<
-	TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		admin: TAccountMetas[0];
-		mint: TAccountMetas[1];
-		vestingState: TAccountMetas[2];
-		vault: TAccountMetas[3];
-		tokenProgram: TAccountMetas[4];
-	};
-	data: CancelInstructionData;
-};
-
-export function parseCancelInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedCancelInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 5) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 5,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			admin: getNextAccount(),
-			mint: getNextAccount(),
-			vestingState: getNextAccount(),
-			vault: getNextAccount(),
-			tokenProgram: getNextAccount(),
-		},
-		data: getCancelInstructionDataDecoder().decode(instruction.data),
-	};
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), mint: getNextAccount(), vestingState: getNextAccount(), vault: getNextAccount(), tokenProgram: getNextAccount() }, data: getCancelInstructionDataDecoder().decode(instruction.data) };
 }

@@ -27,15 +27,11 @@ impl UpdateProfile {
 			profile: solana_pubkey::Pubkey::find_program_address(
 				&["profile".as_bytes(), authority.as_ref()],
 				&crate::PROFILE_PROGRAM_ID,
-			)
-			.0,
+			).0,
 		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: UpdateProfileInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: UpdateProfileInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -46,10 +42,7 @@ impl UpdateProfile {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
@@ -66,16 +59,14 @@ pub struct UpdateProfileInstructionData {
 }
 
 impl UpdateProfileInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut UpdateProfileInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut UpdateProfileInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<UpdateProfileInstructionWireZc>()];
 		<UpdateProfileInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_PROFILE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

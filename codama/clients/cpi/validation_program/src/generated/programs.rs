@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const VALIDATION_PROGRAM_ID: Address =
-	pina::address!("GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn");
+pub const VALIDATION_PROGRAM_ID: Address = pina::address!("GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn");
 
 /// Marker for the `validationProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

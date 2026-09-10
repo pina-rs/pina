@@ -6,32 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
 export type StoreSeeds = {
-	authority: Address;
+authority: Address;
 };
 
-export async function findStorePda(
-	seeds: StoreSeeds,
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci" as Address<
-			"ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("store"),
-			getAddressEncoder().encode(seeds.authority),
-		],
-	});
+export async function findStorePda(seeds: StoreSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = 'ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci' as Address<'ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("store"), getAddressEncoder().encode(seeds.authority)]});
 }

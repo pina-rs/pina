@@ -27,8 +27,7 @@ impl CheckPolicy {
 			policy: solana_pubkey::Pubkey::find_program_address(
 				&["validation-policy".as_bytes(), authority.as_ref()],
 				&crate::VALIDATION_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			audit,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
@@ -45,19 +44,10 @@ impl CheckPolicy {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.policy,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.policy, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.audit, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::VALIDATION_PROGRAM_ID,
@@ -73,16 +63,14 @@ pub struct CheckPolicyInstructionData {
 }
 
 impl CheckPolicyInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut CheckPolicyInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut CheckPolicyInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<CheckPolicyInstructionWireZc>()];
 		<CheckPolicyInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CHECK_POLICY_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

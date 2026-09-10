@@ -6,115 +6,44 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	extendClient,
-	type ExtendedClient,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfPlanAndSendFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getSysvarsInstruction,
-	type ParsedSysvarsInstruction,
-	parseSysvarsInstruction,
-	type SysvarsInput,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getSysvarsInstruction, parseSysvarsInstruction, type ParsedSysvarsInstruction, type SysvarsInput } from '../instructions';
 
-export const SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS =
-	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
-		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-	>;
+export const SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
 
-export enum SysvarChecksProgramInstruction {
-	Sysvars,
+export enum SysvarChecksProgramInstruction { Sysvars }
+
+export function identifySysvarChecksProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): SysvarChecksProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return SysvarChecksProgramInstruction.Sysvars; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "sysvarChecksProgram" });
 }
 
-export function identifySysvarChecksProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): SysvarChecksProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return SysvarChecksProgramInstruction.Sysvars;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "sysvarChecksProgram" },
-	);
-}
+export type ParsedSysvarChecksProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
+| { instructionType: SysvarChecksProgramInstruction.Sysvars } & ParsedSysvarsInstruction<TProgram>
 
-export type ParsedSysvarChecksProgramInstruction<
-	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-> =
-	& { instructionType: SysvarChecksProgramInstruction.Sysvars }
-	& ParsedSysvarsInstruction<TProgram>;
 
-export function parseSysvarChecksProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedSysvarChecksProgramInstruction<TProgram> {
-	const instructionType = identifySysvarChecksProgramInstruction(instruction);
-	switch (instructionType) {
-		case SysvarChecksProgramInstruction.Sysvars: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: SysvarChecksProgramInstruction.Sysvars,
-				...parseSysvarsInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "sysvarChecksProgram",
-				},
-			);
-	}
-}
+        export function parseSysvarChecksProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedSysvarChecksProgramInstruction<TProgram> {
+            const instructionType = identifySysvarChecksProgramInstruction(instruction);
+            switch (instructionType) {
+                case SysvarChecksProgramInstruction.Sysvars: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: SysvarChecksProgramInstruction.Sysvars, ...parseSysvarsInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "sysvarChecksProgram" });
+            }
+        }
 
-export type SysvarChecksProgramPlugin = {
-	instructions: SysvarChecksProgramPluginInstructions;
-	identifyInstruction: typeof identifySysvarChecksProgramInstruction;
-	parseInstruction: typeof parseSysvarChecksProgramInstruction;
-};
+export type SysvarChecksProgramPlugin = { instructions: SysvarChecksProgramPluginInstructions; identifyInstruction: typeof identifySysvarChecksProgramInstruction; parseInstruction: typeof parseSysvarChecksProgramInstruction; }
 
-export type SysvarChecksProgramPluginInstructions = {
-	sysvars: (
-		input: SysvarsInput,
-	) => ReturnType<typeof getSysvarsInstruction> & SelfPlanAndSendFunctions;
-};
+export type SysvarChecksProgramPluginInstructions = { sysvars: (input: SysvarsInput) => ReturnType<typeof getSysvarsInstruction> & SelfPlanAndSendFunctions; }
 
-export type SysvarChecksProgramPluginRequirements =
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type SysvarChecksProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function sysvarChecksProgramProgram() {
-	return <T extends SysvarChecksProgramPluginRequirements>(
-		client: T,
-	): ExtendedClient<T, { sysvarChecksProgram: SysvarChecksProgramPlugin }> => {
-		return extendClient(client, {
-			sysvarChecksProgram: <SysvarChecksProgramPlugin> {
-				instructions: {
-					sysvars: (input) =>
-						addSelfPlanAndSendFunctions(client, getSysvarsInstruction(input)),
-				},
-				identifyInstruction: identifySysvarChecksProgramInstruction,
-				parseInstruction: parseSysvarChecksProgramInstruction,
-			},
-		});
-	};
+    return <T extends SysvarChecksProgramPluginRequirements>(client: T): ExtendedClient<T, { sysvarChecksProgram: SysvarChecksProgramPlugin }> => {
+        return extendClient(client, { sysvarChecksProgram: <SysvarChecksProgramPlugin>{ instructions: { sysvars: input => addSelfPlanAndSendFunctions(client, getSysvarsInstruction(input)) }, identifyInstruction: identifySysvarChecksProgramInstruction, parseInstruction: parseSysvarChecksProgramInstruction } });
+    };
 }

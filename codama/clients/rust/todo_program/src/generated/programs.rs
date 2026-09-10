@@ -8,7 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::Pubkey;
-use solana_pubkey::pubkey;
+use solana_pubkey::{pubkey, Pubkey};
 
 pub const TODO_PROGRAM_ID: Pubkey = pubkey!("Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd");

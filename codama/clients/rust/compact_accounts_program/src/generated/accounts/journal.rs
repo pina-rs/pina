@@ -12,11 +12,11 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 #[pinapod(compact)]
 pub struct Journal {
-	/// A compact account with four independently encoded dynamic fields.
-	///
-	/// The fixed header includes a semantic `Option<u64>` encoded as
-	/// `PodOption<PodU64>`. The title and optional note use compact strings, while
-	/// entries and markers use vectors; only their active bytes are allocated.
+/// A compact account with four independently encoded dynamic fields.
+/// 
+/// The fixed header includes a semantic `Option<u64>` encoded as
+/// `PodOption<PodU64>`. The title and optional note use compact strings, while
+/// entries and markers use vectors; only their active bytes are allocated.
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
@@ -41,13 +41,8 @@ pub const JOURNAL_DISCRIMINATOR: u8 = 1u8;
 impl Journal {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
-	pub fn initialize(
-		data: &mut [u8],
-		patch: JournalPatch<'_>,
-	) -> Result<usize, solana_program_error::ProgramError> {
-		patch
-			.discriminator(JOURNAL_DISCRIMINATOR)
-			.initialize(data)
+	pub fn initialize(data: &mut [u8], patch: JournalPatch<'_>) -> Result<usize, solana_program_error::ProgramError> {
+		patch.discriminator(JOURNAL_DISCRIMINATOR).initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
@@ -64,17 +59,21 @@ impl Journal {
 impl Journal {
 	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["compact-journal".as_bytes(), authority.as_ref()],
+			&[
+				"compact-journal".as_bytes(),
+				authority.as_ref(),
+			],
 			&crate::COMPACT_ACCOUNTS_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		authority: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(authority: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["compact-journal".as_bytes(), authority.as_ref(), &[bump]],
+			&[
+				"compact-journal".as_bytes(),
+				authority.as_ref(),
+				&[bump],
+			],
 			&crate::COMPACT_ACCOUNTS_PROGRAM_ID,
 		)
 	}

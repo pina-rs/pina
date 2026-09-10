@@ -6,19 +6,20 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
 
 /// Exercises Anchor's duplicate-reallocation guard.
-///
+/// 
 /// Both sample accounts must be the same canonical PDA for the signer, so the
 /// instruction always rejects with `AccountDuplicateReallocs` before any
 /// account is resized. It is intentionally not a two-target mutation API.

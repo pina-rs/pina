@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const SYSTEM_ACCOUNTS_PROGRAM_ID: Address =
-	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+pub const SYSTEM_ACCOUNTS_PROGRAM_ID: Address = pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 /// Marker for the `systemAccountsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

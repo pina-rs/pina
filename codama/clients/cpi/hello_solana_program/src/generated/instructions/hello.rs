@@ -6,25 +6,26 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
 
 /// The `#[instruction]` attribute macro generates:
-///
+/// 
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 /// `HelloInstruction::Hello`.
 /// - A generated `PinaPod` view plus checked `initialize` and `try_from_bytes`
 /// helpers.
-///
+/// 
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.
 /// CPI call for the `hello` instruction.
@@ -73,7 +74,9 @@ impl<'account> Hello<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 1] = [CpiHandle::readonly_signer(self.user)];
+		let accounts: [CpiHandle<'_>; 1] = [
+			CpiHandle::readonly_signer(self.user),
+		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 

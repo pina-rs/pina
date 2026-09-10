@@ -6,100 +6,51 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { EVENTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { EVENTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR); }
+
+export type InitializeInstruction<TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
+
+export type InitializeInstructionData = { discriminator: number;  };
+
+export type InitializeInstructionDataArgs = {  };
+
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
 }
 
-export type InitializeInstruction<
-	TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<TRemainingAccounts>;
-
-export type InitializeInstructionData = { discriminator: number };
-
-export type InitializeInstructionDataArgs = {};
-
-export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
-	InitializeInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
-	);
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
-	InitializeInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<InitializeInstructionDataArgs, InitializeInstructionData> {
+    return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
 }
 
-export function getInitializeInstructionDataCodec(): FixedSizeCodec<
-	InitializeInstructionDataArgs,
-	InitializeInstructionData
-> {
-	return combineCodec(
-		getInitializeInstructionDataEncoder(),
-		getInitializeInstructionDataDecoder(),
-	);
+export type InitializeInput =  {
+  
 }
 
-export type InitializeInput = {};
+export function getInitializeInstruction<TProgramAddress extends Address = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS>(config?: { programAddress?: TProgramAddress } ): InitializeInstruction<TProgramAddress> {
+  // Program address.
+const programAddress = config?.programAddress ?? EVENTS_PROGRAM_PROGRAM_ADDRESS;
 
-export function getInitializeInstruction<
-	TProgramAddress extends Address = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
->(
-	config?: { programAddress?: TProgramAddress },
-): InitializeInstruction<TProgramAddress> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		EVENTS_PROGRAM_PROGRAM_ADDRESS;
 
-	return Object.freeze(
-		{
-			data: getInitializeInstructionDataEncoder().encode({}),
-			programAddress,
-		} as InitializeInstruction<TProgramAddress>,
-	);
+
+
+return Object.freeze({ data: getInitializeInstructionDataEncoder().encode({}), programAddress } as InitializeInstruction<TProgramAddress>);
 }
 
-export type ParsedInitializeInstruction<
-	TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram>; data: InitializeInstructionData };
+export type ParsedInitializeInstruction<TProgram extends string = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS> = { programAddress: Address<TProgram>;
+data: InitializeInstructionData; };
 
-export function parseInitializeInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
-): ParsedInitializeInstruction<TProgram> {
-	return {
-		programAddress: instruction.programAddress,
-		data: getInitializeInstructionDataDecoder().decode(instruction.data),
-	};
+export function parseInitializeInstruction<TProgram extends string>(instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializeInstruction<TProgram> {
+  
+  return { programAddress: instruction.programAddress, data: getInitializeInstructionDataDecoder().decode(instruction.data) };
 }

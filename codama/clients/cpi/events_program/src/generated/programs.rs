@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const EVENTS_PROGRAM_ID: Address =
-	pina::address!("2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy");
+pub const EVENTS_PROGRAM_ID: Address = pina::address!("2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy");
 
 /// Marker for the `eventsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

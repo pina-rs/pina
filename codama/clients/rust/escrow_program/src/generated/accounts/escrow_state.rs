@@ -52,9 +52,7 @@ impl EscrowState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut EscrowStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut EscrowStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {
@@ -67,16 +65,16 @@ impl EscrowState {
 impl EscrowState {
 	pub fn find_pda(maker: &solana_pubkey::Pubkey, seed: u64) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["escrow".as_bytes(), maker.as_ref(), &seed.to_le_bytes()],
+			&[
+				"escrow".as_bytes(),
+				maker.as_ref(),
+				&seed.to_le_bytes(),
+			],
 			&crate::ESCROW_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		maker: &solana_pubkey::Pubkey,
-		seed: u64,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(maker: &solana_pubkey::Pubkey, seed: u64, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
 			&[
 				"escrow".as_bytes(),

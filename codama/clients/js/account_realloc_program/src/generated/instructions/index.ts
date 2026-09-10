@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./initialize";
-export * from "./realloc";
-export * from "./realloc2";
+export * from './initialize';
+export * from './realloc';
+export * from './realloc2';

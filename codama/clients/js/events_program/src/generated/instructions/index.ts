@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./initialize";
-export * from "./testEvent";
-export * from "./testEventCpi";
+export * from './initialize';
+export * from './testEvent';
+export * from './testEventCpi';

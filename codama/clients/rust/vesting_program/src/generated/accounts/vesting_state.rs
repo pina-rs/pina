@@ -53,9 +53,7 @@ impl VestingState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut VestingStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut VestingStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != VESTING_STATE_DISCRIMINATOR {
@@ -66,11 +64,7 @@ impl VestingState {
 }
 
 impl VestingState {
-	pub fn find_pda(
-		admin: &solana_pubkey::Pubkey,
-		beneficiary: &solana_pubkey::Pubkey,
-		mint: &solana_pubkey::Pubkey,
-	) -> (solana_pubkey::Pubkey, u8) {
+	pub fn find_pda(admin: &solana_pubkey::Pubkey, beneficiary: &solana_pubkey::Pubkey, mint: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
 			&[
 				"vesting".as_bytes(),
@@ -82,12 +76,7 @@ impl VestingState {
 		)
 	}
 
-	pub fn create_pda(
-		admin: &solana_pubkey::Pubkey,
-		beneficiary: &solana_pubkey::Pubkey,
-		mint: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(admin: &solana_pubkey::Pubkey, beneficiary: &solana_pubkey::Pubkey, mint: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
 			&[
 				"vesting".as_bytes(),

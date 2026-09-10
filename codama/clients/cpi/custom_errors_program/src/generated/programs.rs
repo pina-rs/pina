@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const CUSTOM_ERRORS_PROGRAM_ID: Address =
-	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+pub const CUSTOM_ERRORS_PROGRAM_ID: Address = pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 /// Marker for the `customErrorsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

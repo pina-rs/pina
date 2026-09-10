@@ -176,7 +176,7 @@ for ((index = 0; index < ${#arguments[@]}; index++)); do
 
 	renderer="${arguments[$index]}"
 	output="${arguments[$((index + 1))]}"
-	idl="${arguments[$((index + 4))]}"
+	idl="${arguments[$((index + 5))]}"
 	name="$(basename "$idl" .json)"
 	if [[ "$renderer" == "typescript" ]]; then
 		mkdir -p "$output/$name/src/generated"

@@ -142,6 +142,12 @@ pub enum CodamaError {
 		source: pina_codama_renderer::RenderError,
 	},
 
+	#[error("Rust CLI rendering failed for {path}: {source}")]
+	RenderCli {
+		path: PathBuf,
+		source: pina_cli_renderer::RenderError,
+	},
+
 	#[error("CPI client rendering failed for {path}: {source}")]
 	RenderCpi {
 		path: PathBuf,

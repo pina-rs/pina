@@ -6,32 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
 export type TodoSeeds = {
-	owner: Address;
+owner: Address;
 };
 
-export async function findTodoPda(
-	seeds: TodoSeeds,
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd" as Address<
-			"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("todo"),
-			getAddressEncoder().encode(seeds.owner),
-		],
-	});
+export async function findTodoPda(seeds: TodoSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = 'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd' as Address<'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("todo"), getAddressEncoder().encode(seeds.owner)]});
 }

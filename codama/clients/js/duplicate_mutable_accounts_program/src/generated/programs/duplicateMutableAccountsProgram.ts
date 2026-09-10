@@ -6,190 +6,51 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	extendClient,
-	type ExtendedClient,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfPlanAndSendFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	type AllowsDuplicateMutableInput,
-	type AllowsDuplicateReadonlyInput,
-	type FailsDuplicateMutableInput,
-	getAllowsDuplicateMutableInstruction,
-	getAllowsDuplicateReadonlyInstruction,
-	getFailsDuplicateMutableInstruction,
-	parseAllowsDuplicateMutableInstruction,
-	parseAllowsDuplicateReadonlyInstruction,
-	type ParsedAllowsDuplicateMutableInstruction,
-	type ParsedAllowsDuplicateReadonlyInstruction,
-	type ParsedFailsDuplicateMutableInstruction,
-	parseFailsDuplicateMutableInstruction,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getAllowsDuplicateMutableInstruction, getAllowsDuplicateReadonlyInstruction, getFailsDuplicateMutableInstruction, parseAllowsDuplicateMutableInstruction, parseAllowsDuplicateReadonlyInstruction, parseFailsDuplicateMutableInstruction, type AllowsDuplicateMutableInput, type AllowsDuplicateReadonlyInput, type FailsDuplicateMutableInput, type ParsedAllowsDuplicateMutableInstruction, type ParsedAllowsDuplicateReadonlyInstruction, type ParsedFailsDuplicateMutableInstruction } from '../instructions';
 
-export const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
-	"4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH" as Address<
-		"4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH"
-	>;
+export const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS = '4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH' as Address<'4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH'>;
 
-export enum DuplicateMutableAccountsProgramInstruction {
-	FailsDuplicateMutable,
-	AllowsDuplicateMutable,
-	AllowsDuplicateReadonly,
+export enum DuplicateMutableAccountsProgramInstruction { FailsDuplicateMutable, AllowsDuplicateMutable, AllowsDuplicateReadonly }
+
+export function identifyDuplicateMutableAccountsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): DuplicateMutableAccountsProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable; }
+if (containsBytes(data, getU8Encoder().encode(1), 0)) { return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable; }
+if (containsBytes(data, getU8Encoder().encode(2), 0)) { return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "duplicateMutableAccountsProgram" });
 }
 
-export function identifyDuplicateMutableAccountsProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): DuplicateMutableAccountsProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "duplicateMutableAccountsProgram" },
-	);
-}
+export type ParsedDuplicateMutableAccountsProgramInstruction<TProgram extends string = '4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH'> =
+| { instructionType: DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable } & ParsedFailsDuplicateMutableInstruction<TProgram>
+| { instructionType: DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable } & ParsedAllowsDuplicateMutableInstruction<TProgram>
+| { instructionType: DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly } & ParsedAllowsDuplicateReadonlyInstruction<TProgram>
 
-export type ParsedDuplicateMutableAccountsProgramInstruction<
-	TProgram extends string = "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
-> =
-	| {
-		instructionType:
-			DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable;
-	} & ParsedFailsDuplicateMutableInstruction<TProgram>
-	| {
-		instructionType:
-			DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable;
-	} & ParsedAllowsDuplicateMutableInstruction<TProgram>
-	| {
-		instructionType:
-			DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly;
-	} & ParsedAllowsDuplicateReadonlyInstruction<TProgram>;
 
-export function parseDuplicateMutableAccountsProgramInstruction<
-	TProgram extends string,
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedDuplicateMutableAccountsProgramInstruction<TProgram> {
-	const instructionType = identifyDuplicateMutableAccountsProgramInstruction(
-		instruction,
-	);
-	switch (instructionType) {
-		case DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType:
-					DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable,
-				...parseFailsDuplicateMutableInstruction(instruction),
-			};
-		}
-		case DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable: {
-			return {
-				instructionType:
-					DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable,
-				...parseAllowsDuplicateMutableInstruction(instruction),
-			};
-		}
-		case DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType:
-					DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly,
-				...parseAllowsDuplicateReadonlyInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "duplicateMutableAccountsProgram",
-				},
-			);
-	}
-}
+        export function parseDuplicateMutableAccountsProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedDuplicateMutableAccountsProgramInstruction<TProgram> {
+            const instructionType = identifyDuplicateMutableAccountsProgramInstruction(instruction);
+            switch (instructionType) {
+                case DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable, ...parseFailsDuplicateMutableInstruction(instruction) }; }
+case DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable: { return { instructionType: DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable, ...parseAllowsDuplicateMutableInstruction(instruction) }; }
+case DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly, ...parseAllowsDuplicateReadonlyInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "duplicateMutableAccountsProgram" });
+            }
+        }
 
-export type DuplicateMutableAccountsProgramPlugin = {
-	instructions: DuplicateMutableAccountsProgramPluginInstructions;
-	identifyInstruction:
-		typeof identifyDuplicateMutableAccountsProgramInstruction;
-	parseInstruction: typeof parseDuplicateMutableAccountsProgramInstruction;
-};
+export type DuplicateMutableAccountsProgramPlugin = { instructions: DuplicateMutableAccountsProgramPluginInstructions; identifyInstruction: typeof identifyDuplicateMutableAccountsProgramInstruction; parseInstruction: typeof parseDuplicateMutableAccountsProgramInstruction; }
 
-export type DuplicateMutableAccountsProgramPluginInstructions = {
-	failsDuplicateMutable: (
-		input: FailsDuplicateMutableInput,
-	) =>
-		& ReturnType<typeof getFailsDuplicateMutableInstruction>
-		& SelfPlanAndSendFunctions;
-	allowsDuplicateMutable: (
-		input: AllowsDuplicateMutableInput,
-	) =>
-		& ReturnType<typeof getAllowsDuplicateMutableInstruction>
-		& SelfPlanAndSendFunctions;
-	allowsDuplicateReadonly: (
-		input: AllowsDuplicateReadonlyInput,
-	) =>
-		& ReturnType<typeof getAllowsDuplicateReadonlyInstruction>
-		& SelfPlanAndSendFunctions;
-};
+export type DuplicateMutableAccountsProgramPluginInstructions = { failsDuplicateMutable: (input: FailsDuplicateMutableInput) => ReturnType<typeof getFailsDuplicateMutableInstruction> & SelfPlanAndSendFunctions; allowsDuplicateMutable: (input: AllowsDuplicateMutableInput) => ReturnType<typeof getAllowsDuplicateMutableInstruction> & SelfPlanAndSendFunctions; allowsDuplicateReadonly: (input: AllowsDuplicateReadonlyInput) => ReturnType<typeof getAllowsDuplicateReadonlyInstruction> & SelfPlanAndSendFunctions; }
 
-export type DuplicateMutableAccountsProgramPluginRequirements =
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type DuplicateMutableAccountsProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function duplicateMutableAccountsProgramProgram() {
-	return <T extends DuplicateMutableAccountsProgramPluginRequirements>(
-		client: T,
-	): ExtendedClient<
-		T,
-		{ duplicateMutableAccountsProgram: DuplicateMutableAccountsProgramPlugin }
-	> => {
-		return extendClient(client, {
-			duplicateMutableAccountsProgram: <DuplicateMutableAccountsProgramPlugin> {
-				instructions: {
-					failsDuplicateMutable: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getFailsDuplicateMutableInstruction(input),
-						),
-					allowsDuplicateMutable: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getAllowsDuplicateMutableInstruction(input),
-						),
-					allowsDuplicateReadonly: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getAllowsDuplicateReadonlyInstruction(input),
-						),
-				},
-				identifyInstruction: identifyDuplicateMutableAccountsProgramInstruction,
-				parseInstruction: parseDuplicateMutableAccountsProgramInstruction,
-			},
-		});
-	};
+    return <T extends DuplicateMutableAccountsProgramPluginRequirements>(client: T): ExtendedClient<T, { duplicateMutableAccountsProgram: DuplicateMutableAccountsProgramPlugin }> => {
+        return extendClient(client, { duplicateMutableAccountsProgram: <DuplicateMutableAccountsProgramPlugin>{ instructions: { failsDuplicateMutable: input => addSelfPlanAndSendFunctions(client, getFailsDuplicateMutableInstruction(input)), allowsDuplicateMutable: input => addSelfPlanAndSendFunctions(client, getAllowsDuplicateMutableInstruction(input)), allowsDuplicateReadonly: input => addSelfPlanAndSendFunctions(client, getAllowsDuplicateReadonlyInstruction(input)) }, identifyInstruction: identifyDuplicateMutableAccountsProgramInstruction, parseInstruction: parseDuplicateMutableAccountsProgramInstruction } });
+    };
 }

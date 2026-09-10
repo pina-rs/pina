@@ -6,134 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findStatePda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findStatePda } from '../pdas';
 
 export const STATE_DISCRIMINATOR = 1;
 
-export function getStateDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(STATE_DISCRIMINATOR);
-}
+export function getStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(STATE_DISCRIMINATOR); }
 
-export type State = { discriminator: number; bump: number };
+export type State = { discriminator: number; bump: number;  };
 
-export type StateArgs = { bump: number };
+export type StateArgs = { bump: number;  };
 
 /** Gets the encoder for {@link StateArgs} account data. */
 export function getStateEncoder(): FixedSizeEncoder<StateArgs> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link State} account data. */
 export function getStateDecoder(): FixedSizeDecoder<State> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder()),
-	], ["bump", getU8Decoder()]]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()]]);
 }
 
 /** Gets the codec for {@link State} account data. */
 export function getStateCodec(): FixedSizeCodec<StateArgs, State> {
-	return combineCodec(getStateEncoder(), getStateDecoder());
+    return combineCodec(getStateEncoder(), getStateDecoder());
 }
 
-export function decodeState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<State, TAddress>;
-export function decodeState<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<State, TAddress>;
-export function decodeState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<State, TAddress> | MaybeAccount<State, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getStateDecoder(),
-	);
+export function decodeState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<State, TAddress>;
+export function decodeState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<State, TAddress>;
+export function decodeState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<State, TAddress> | MaybeAccount<State, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getStateDecoder());
 }
 
 export async function fetchState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<State, TAddress>> {
-	const maybeAccount = await fetchMaybeState(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeState(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<State, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeState(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeState(maybeAccount);
 }
 
 export async function fetchAllState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<State>[]> {
-	const maybeAccounts = await fetchAllMaybeState(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeState(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<State>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodeState(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeState(maybeAccount));
 }
 
 export async function fetchStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<State>> {
-	const maybeAccount = await fetchMaybeStateFromSeeds(rpc, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeStateFromSeeds(rpc, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<State>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findStatePda({ programAddress });
-	return await fetchMaybeState(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findStatePda({ programAddress });
+  return await fetchMaybeState(rpc, address, fetchConfig);
 }

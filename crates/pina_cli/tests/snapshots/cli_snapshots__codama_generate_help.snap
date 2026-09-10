@@ -35,6 +35,21 @@ Options:
       --dart-out <DIR>
           Directory for the generated Dart client package. Defaults to `codama/clients/dart`
 
+      --cli-rust-out <DIR>
+          Output directory for generated Rust CLI crates
+          
+          [default: codama/clients/cli/rust]
+
+      --cli-ts-out <DIR>
+          Output directory for generated TypeScript CLI applications
+          
+          [default: codama/clients/cli/ts]
+
+      --cli-dart-out <DIR>
+          Output directory for the generated Dart CLI package
+          
+          [default: codama/clients/cli/dart]
+
       --example <NAME>
           Program name to generate. Repeat to select multiple programs. When omitted, every program below --examples-dir is generated
 

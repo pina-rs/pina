@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./initialize";
-export * from "./toggleCompleted";
-export * from "./updateDigest";
+export * from './initialize';
+export * from './toggleCompleted';
+export * from './updateDigest';

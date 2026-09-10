@@ -2,6 +2,29 @@
 resolver = "2"
 members = [
 	".",
+	"codama/clients/cli/rust/account_realloc_program",
+	"codama/clients/cli/rust/compact_accounts_program",
+	"codama/clients/cli/rust/counter_program",
+	"codama/clients/cli/rust/custom_errors_program",
+	"codama/clients/cli/rust/declare_id_program",
+	"codama/clients/cli/rust/declare_program",
+	"codama/clients/cli/rust/duplicate_mutable_accounts_program",
+	"codama/clients/cli/rust/escrow_program",
+	"codama/clients/cli/rust/events_program",
+	"codama/clients/cli/rust/float_accounts_program",
+	"codama/clients/cli/rust/hello_solana_program",
+	"codama/clients/cli/rust/optional_accounts_program",
+	"codama/clients/cli/rust/pina_bpf_program",
+	"codama/clients/cli/rust/profile_program",
+	"codama/clients/cli/rust/prop_amm_program",
+	"codama/clients/cli/rust/role_registry_program",
+	"codama/clients/cli/rust/staking_rewards_program",
+	"codama/clients/cli/rust/system_accounts_program",
+	"codama/clients/cli/rust/sysvar_checks_program",
+	"codama/clients/cli/rust/todo_program",
+	"codama/clients/cli/rust/transfer_sol_program",
+	"codama/clients/cli/rust/validation_program",
+	"codama/clients/cli/rust/vesting_program",
 	"codama/clients/cpi/account_realloc_program",
 	"codama/clients/cpi/compact_accounts_program",
 	"codama/clients/cpi/counter_program",
@@ -53,6 +76,7 @@ members = [
 	"crates/pina",
 	"crates/pina_abi",
 	"crates/pina_cli",
+	"crates/pina_cli_renderer",
 	"crates/pina_codama_renderer",
 	"crates/pina_cpi_renderer",
 	"crates/pina_lints",
@@ -230,6 +254,8 @@ solana-instruction = { version = "^3", default-features = false }
 solana-program-error = { version = "^3", default-features = false }
 solana-program-log = { default-features = false, version = "^1.1" }
 solana-pubkey = { version = "^4", features = ["bytemuck"], default-features = false }
+solana-rpc-client = { version = "^4", default-features = false }
+solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
 syn = { default-features = false, version = "^3", features = ["full"] }
@@ -248,6 +274,7 @@ walkdir = { default-features = false, version = "^2" }
 pina = { default-features = false, path = "crates/pina", version = "0.15.0" }
 pina_abi = { default-features = false, path = "crates/pina_abi", version = "0.15.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.15.0" }
+pina_cli_renderer = { default-features = false, path = "crates/pina_cli_renderer", version = "0.15.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.15.0" }
 pina_cpi_renderer = { default-features = false, path = "crates/pina_cpi_renderer", version = "0.15.0" }
 pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.15.0" }

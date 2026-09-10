@@ -1,450 +1,450 @@
 {
-	"kind": "rootNode",
-	"standard": "codama",
-	"version": "1.8.0",
-	"program": {
-		"kind": "programNode",
-		"name": "validationProgram",
-		"publicKey": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
-		"version": "0.0.0",
-		"accounts": [
-			{
-				"kind": "accountNode",
-				"name": "policyState",
-				"data": {
-					"kind": "structTypeNode",
-					"fields": [
-						{
-							"kind": "structFieldTypeNode",
-							"name": "discriminator",
-							"defaultValueStrategy": "omitted",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"defaultValue": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
-							"name": "bump",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
-							"name": "minimum",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u64",
-								"endian": "le"
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
-							"name": "maximum",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u64",
-								"endian": "le"
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
-							"name": "requiredApprovals",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							}
-						}
-					]
-				},
-				"pda": {
-					"kind": "pdaLinkNode",
-					"name": "policy"
-				},
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						}
-					}
-				]
-			}
-		],
-		"instructions": [
-			{
-				"kind": "instructionNode",
-				"name": "initializePolicy",
-				"accounts": [
-					{
-						"kind": "instructionAccountNode",
-						"name": "authority",
-						"isWritable": true,
-						"isSigner": true,
-						"isOptional": false
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "policy",
-						"isWritable": true,
-						"isSigner": false,
-						"isOptional": false,
-						"defaultValue": {
-							"kind": "pdaValueNode",
-							"pda": {
-								"kind": "pdaLinkNode",
-								"name": "policy"
-							},
-							"seeds": [
-								{
-									"kind": "pdaSeedValueNode",
-									"name": "authority",
-									"value": {
-										"kind": "accountValueNode",
-										"name": "authority"
-									}
-								}
-							]
-						}
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "systemProgram",
-						"isWritable": false,
-						"isSigner": false,
-						"isOptional": false,
-						"defaultValue": {
-							"kind": "publicKeyValueNode",
-							"publicKey": "11111111111111111111111111111111"
-						}
-					}
-				],
-				"arguments": [
-					{
-						"kind": "instructionArgumentNode",
-						"name": "discriminator",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "bump",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "minimum",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u64",
-							"endian": "le"
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "maximum",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u64",
-							"endian": "le"
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "requiredApprovals",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						}
-					}
-				],
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "checkPolicy",
-				"accounts": [
-					{
-						"kind": "instructionAccountNode",
-						"name": "authority",
-						"isWritable": false,
-						"isSigner": true,
-						"isOptional": false
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "policy",
-						"isWritable": false,
-						"isSigner": false,
-						"isOptional": false,
-						"defaultValue": {
-							"kind": "pdaValueNode",
-							"pda": {
-								"kind": "pdaLinkNode",
-								"name": "policy"
-							},
-							"seeds": [
-								{
-									"kind": "pdaSeedValueNode",
-									"name": "authority",
-									"value": {
-										"kind": "accountValueNode",
-										"name": "authority"
-									}
-								}
-							]
-						}
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "audit",
-						"isWritable": true,
-						"isSigner": false,
-						"isOptional": false,
-						"docs": [
-							"A shared account may still require the transaction's writable flag."
-						]
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "systemProgram",
-						"isWritable": false,
-						"isSigner": false,
-						"isOptional": false,
-						"defaultValue": {
-							"kind": "publicKeyValueNode",
-							"publicKey": "11111111111111111111111111111111"
-						}
-					}
-				],
-				"arguments": [
-					{
-						"kind": "instructionArgumentNode",
-						"name": "discriminator",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 1
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "amount",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u64",
-							"endian": "le"
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "memo",
-						"type": {
-							"kind": "fixedSizeTypeNode",
-							"size": 65,
-							"type": {
-								"kind": "sizePrefixTypeNode",
-								"type": {
-									"kind": "stringTypeNode",
-									"encoding": "utf8"
-								},
-								"prefix": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								}
-							}
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "approvals",
-						"type": {
-							"kind": "fixedSizeTypeNode",
-							"size": 6,
-							"type": {
-								"kind": "arrayTypeNode",
-								"item": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								},
-								"count": {
-									"kind": "prefixedCountNode",
-									"prefix": {
-										"kind": "numberTypeNode",
-										"format": "u16",
-										"endian": "le"
-									}
-								}
-							}
-						}
-					}
-				],
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						}
-					}
-				]
-			}
-		],
-		"pdas": [
-			{
-				"kind": "pdaNode",
-				"name": "policy",
-				"seeds": [
-					{
-						"kind": "constantPdaSeedNode",
-						"type": {
-							"kind": "stringTypeNode",
-							"encoding": "utf8"
-						},
-						"value": {
-							"kind": "stringValueNode",
-							"string": "validation-policy"
-						}
-					},
-					{
-						"kind": "variablePdaSeedNode",
-						"name": "authority",
-						"type": {
-							"kind": "publicKeyTypeNode"
-						}
-					}
-				]
-			}
-		],
-		"errors": [
-			{
-				"kind": "errorNode",
-				"name": "invalidPolicyRange",
-				"code": 1,
-				"message": "The lower policy bound must not exceed the upper bound.",
-				"docs": [
-					"The lower policy bound must not exceed the upper bound."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "invalidAmount",
-				"code": 2,
-				"message": "An instruction amount is outside the absolute limits of this program.",
-				"docs": [
-					"An instruction amount is outside the absolute limits of this program."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "invalidMemo",
-				"code": 3,
-				"message": "A human-readable memo is too short or too long.",
-				"docs": [
-					"A human-readable memo is too short or too long."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "invalidApprovals",
-				"code": 4,
-				"message": "A check must contain exactly two different approval codes.",
-				"docs": [
-					"A check must contain exactly two different approval codes."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "invalidAccounts",
-				"code": 5,
-				"message": "The validated account list violates a relationship between accounts.",
-				"docs": [
-					"The validated account list violates a relationship between accounts."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "amountOutsidePolicy",
-				"code": 6,
-				"message": "The amount does not fall inside the bounds stored in the policy account.",
-				"docs": [
-					"The amount does not fall inside the bounds stored in the policy account."
-				]
-			},
-			{
-				"kind": "errorNode",
-				"name": "invalidEvent",
-				"code": 7,
-				"message": "The event would describe an invalid policy check.",
-				"docs": [
-					"The event would describe an invalid policy check."
-				]
-			}
-		]
-	}
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "validationProgram",
+    "publicKey": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+    "version": "0.0.0",
+    "accounts": [
+      {
+        "kind": "accountNode",
+        "name": "policyState",
+        "data": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "discriminator",
+              "defaultValueStrategy": "omitted",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "defaultValue": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "bump",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "minimum",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "maximum",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "requiredApprovals",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              }
+            }
+          ]
+        },
+        "pda": {
+          "kind": "pdaLinkNode",
+          "name": "policy"
+        },
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "initializePolicy",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": true,
+            "isSigner": true,
+            "isOptional": false
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "policy",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "policy"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "authority",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "authority"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "systemProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "bump",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "minimum",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "maximum",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "requiredApprovals",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "checkPolicy",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": false
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "policy",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "policy"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "authority",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "authority"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "audit",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": [
+              "A shared account may still require the transaction's writable flag."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "systemProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "amount",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "memo",
+            "type": {
+              "kind": "fixedSizeTypeNode",
+              "size": 65,
+              "type": {
+                "kind": "sizePrefixTypeNode",
+                "type": {
+                  "kind": "stringTypeNode",
+                  "encoding": "utf8"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              }
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "approvals",
+            "type": {
+              "kind": "fixedSizeTypeNode",
+              "size": 6,
+              "type": {
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                },
+                "count": {
+                  "kind": "prefixedCountNode",
+                  "prefix": {
+                    "kind": "numberTypeNode",
+                    "format": "u16",
+                    "endian": "le"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "pdas": [
+      {
+        "kind": "pdaNode",
+        "name": "policy",
+        "seeds": [
+          {
+            "kind": "constantPdaSeedNode",
+            "type": {
+              "kind": "stringTypeNode",
+              "encoding": "utf8"
+            },
+            "value": {
+              "kind": "stringValueNode",
+              "string": "validation-policy"
+            }
+          },
+          {
+            "kind": "variablePdaSeedNode",
+            "name": "authority",
+            "type": {
+              "kind": "publicKeyTypeNode"
+            }
+          }
+        ]
+      }
+    ],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "invalidPolicyRange",
+        "code": 1,
+        "message": "The lower policy bound must not exceed the upper bound.",
+        "docs": [
+          "The lower policy bound must not exceed the upper bound."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidAmount",
+        "code": 2,
+        "message": "An instruction amount is outside the absolute limits of this program.",
+        "docs": [
+          "An instruction amount is outside the absolute limits of this program."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidMemo",
+        "code": 3,
+        "message": "A human-readable memo is too short or too long.",
+        "docs": [
+          "A human-readable memo is too short or too long."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidApprovals",
+        "code": 4,
+        "message": "A check must contain exactly two different approval codes.",
+        "docs": [
+          "A check must contain exactly two different approval codes."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidAccounts",
+        "code": 5,
+        "message": "The validated account list violates a relationship between accounts.",
+        "docs": [
+          "The validated account list violates a relationship between accounts."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "amountOutsidePolicy",
+        "code": 6,
+        "message": "The amount does not fall inside the bounds stored in the policy account.",
+        "docs": [
+          "The amount does not fall inside the bounds stored in the policy account."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidEvent",
+        "code": 7,
+        "message": "The event would describe an invalid policy check.",
+        "docs": [
+          "The event would describe an invalid policy check."
+        ]
+      }
+    ]
+  }
 }

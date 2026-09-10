@@ -37,9 +37,7 @@ impl RegistryConfig {
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(
-		data: &[u8],
-	) -> Result<&RegistryConfigZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(data: &[u8]) -> Result<&RegistryConfigZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
@@ -48,9 +46,7 @@ impl RegistryConfig {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut RegistryConfigZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut RegistryConfigZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
@@ -63,17 +59,21 @@ impl RegistryConfig {
 impl RegistryConfig {
 	pub fn find_pda(admin: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["registry".as_bytes(), admin.as_ref()],
+			&[
+				"registry".as_bytes(),
+				admin.as_ref(),
+			],
 			&crate::ROLE_REGISTRY_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		admin: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(admin: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["registry".as_bytes(), admin.as_ref(), &[bump]],
+			&[
+				"registry".as_bytes(),
+				admin.as_ref(),
+				&[bump],
+			],
 			&crate::ROLE_REGISTRY_PROGRAM_ID,
 		)
 	}

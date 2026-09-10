@@ -32,6 +32,7 @@ heck = { workspace = true, default-features = true }
 http = { workspace = true, default-features = true }
 owo-colors = { workspace = true, default-features = true }
 pina_abi = { workspace = true }
+pina_cli_renderer = { workspace = true, default-features = true }
 pina_codama_renderer = { workspace = true }
 pina_cpi_renderer = { workspace = true }
 pina_profile = { workspace = true }

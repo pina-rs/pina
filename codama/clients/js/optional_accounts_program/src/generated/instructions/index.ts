@@ -6,7 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./init";
-export * from "./inspect";
-export * from "./note";
-export * from "./touch";
+export * from './init';
+export * from './inspect';
+export * from './note';
+export * from './touch';

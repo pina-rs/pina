@@ -1,0 +1,19 @@
+[package]
+name = "profile_program_cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Generated CLI for profileProgram"
+
+[[bin]]
+name = "profile-program-cli"
+path = "src/main.rs"
+
+[dependencies]
+bs58 = { workspace = true, default-features = true }
+clap = { workspace = true, default-features = true, features = ["derive", "std", "env"] }
+profile-program-client = { path = "../../../rust/profile_program" }
+serde_json = { workspace = true, default-features = true }
+solana-rpc-client = { workspace = true, default-features = true }
+solana-sdk = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }

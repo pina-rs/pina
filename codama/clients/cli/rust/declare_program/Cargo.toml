@@ -1,0 +1,19 @@
+[package]
+name = "declare_program_cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Generated CLI for declareProgram"
+
+[[bin]]
+name = "declare-program-cli"
+path = "src/main.rs"
+
+[dependencies]
+bs58 = { workspace = true, default-features = true }
+clap = { workspace = true, default-features = true, features = ["derive", "std", "env"] }
+declare_program-client = { path = "../../../rust/declare_program" }
+serde_json = { workspace = true, default-features = true }
+solana-rpc-client = { workspace = true, default-features = true }
+solana-sdk = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }

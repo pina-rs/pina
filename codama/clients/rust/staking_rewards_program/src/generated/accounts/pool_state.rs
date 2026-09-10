@@ -50,9 +50,7 @@ impl PoolState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut PoolStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut PoolStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POOL_STATE_DISCRIMINATOR {
@@ -63,21 +61,18 @@ impl PoolState {
 }
 
 impl PoolState {
-	pub fn find_pda(
-		stake_mint: &solana_pubkey::Pubkey,
-		reward_mint: &solana_pubkey::Pubkey,
-	) -> (solana_pubkey::Pubkey, u8) {
+	pub fn find_pda(stake_mint: &solana_pubkey::Pubkey, reward_mint: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["pool".as_bytes(), stake_mint.as_ref(), reward_mint.as_ref()],
+			&[
+				"pool".as_bytes(),
+				stake_mint.as_ref(),
+				reward_mint.as_ref(),
+			],
 			&crate::STAKING_REWARDS_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		stake_mint: &solana_pubkey::Pubkey,
-		reward_mint: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(stake_mint: &solana_pubkey::Pubkey, reward_mint: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
 			&[
 				"pool".as_bytes(),

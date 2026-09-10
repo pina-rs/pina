@@ -6,212 +6,82 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlySignerAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	transformEncoder,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const INSPECT_DISCRIMINATOR = 2;
 
-export function getInspectDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INSPECT_DISCRIMINATOR);
+export function getInspectDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INSPECT_DISCRIMINATOR); }
+
+export type InspectInstruction<TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountStore extends string | AccountMeta<string> = string, TAccountWitness extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountStore extends string ? ReadonlyAccount<TAccountStore> : TAccountStore, TAccountWitness extends string ? ReadonlySignerAccount<TAccountWitness> & AccountSignerMeta<TAccountWitness> : TAccountWitness, ...TRemainingAccounts]>;
+
+export type InspectInstructionData = { discriminator: number;  };
+
+export type InspectInstructionDataArgs = {  };
+
+export function getInspectInstructionDataEncoder(): FixedSizeEncoder<InspectInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
 }
 
-export type InspectInstruction<
-	TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountAuthority extends string | AccountMeta<string> = string,
-	TAccountStore extends string | AccountMeta<string> = string,
-	TAccountWitness extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountAuthority extends string ?
-					& ReadonlySignerAccount<TAccountAuthority>
-					& AccountSignerMeta<TAccountAuthority>
-				: TAccountAuthority,
-			TAccountStore extends string ? ReadonlyAccount<TAccountStore>
-				: TAccountStore,
-			TAccountWitness extends string ?
-					& ReadonlySignerAccount<TAccountWitness>
-					& AccountSignerMeta<TAccountWitness>
-				: TAccountWitness,
-			...TRemainingAccounts,
-		]
-	>;
-
-export type InspectInstructionData = { discriminator: number };
-
-export type InspectInstructionDataArgs = {};
-
-export function getInspectInstructionDataEncoder(): FixedSizeEncoder<
-	InspectInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 2 }),
-	);
+export function getInspectInstructionDataDecoder(): FixedSizeDecoder<InspectInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INSPECT_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getInspectInstructionDataDecoder(): FixedSizeDecoder<
-	InspectInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(INSPECT_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getInspectInstructionDataCodec(): FixedSizeCodec<InspectInstructionDataArgs, InspectInstructionData> {
+    return combineCodec(getInspectInstructionDataEncoder(), getInspectInstructionDataDecoder());
 }
 
-export function getInspectInstructionDataCodec(): FixedSizeCodec<
-	InspectInstructionDataArgs,
-	InspectInstructionData
-> {
-	return combineCodec(
-		getInspectInstructionDataEncoder(),
-		getInspectInstructionDataDecoder(),
-	);
+export type InspectInput<TAccountAuthority extends string = string, TAccountStore extends string = string, TAccountWitness extends string = string> =  {
+  /** The transaction fee payer; always required. */
+authority: TransactionSigner<TAccountAuthority>;
+/** When present, must be the caller's store PDA. */
+store?: Address<TAccountStore>;
+/** When present, must have signed the transaction. */
+witness?: TransactionSigner<TAccountWitness>;
 }
 
-export type InspectInput<
-	TAccountAuthority extends string = string,
-	TAccountStore extends string = string,
-	TAccountWitness extends string = string,
-> = {
-	/** The transaction fee payer; always required. */
-	authority: TransactionSigner<TAccountAuthority>;
-	/** When present, must be the caller's store PDA. */
-	store?: Address<TAccountStore>;
-	/** When present, must have signed the transaction. */
-	witness?: TransactionSigner<TAccountWitness>;
+export function getInspectInstruction<TAccountAuthority extends string, TAccountStore extends string, TAccountWitness extends string, TProgramAddress extends Address = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: InspectInput<TAccountAuthority, TAccountStore, TAccountWitness>, config?: { programAddress?: TProgramAddress } ): InspectInstruction<TProgramAddress, TAccountAuthority, TAccountStore, TAccountWitness> {
+  // Program address.
+const programAddress = config?.programAddress ?? OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+ // Original accounts.
+const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, store: { value: input.store ?? null, isWritable: false }, witness: { value: input.witness ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("store", accounts.store), getAccountMeta("witness", accounts.witness)], data: getInspectInstructionDataEncoder().encode({}), programAddress } as InspectInstruction<TProgramAddress, TAccountAuthority, TAccountStore, TAccountWitness>);
+}
+
+export type ParsedInspectInstruction<TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+/** The transaction fee payer; always required. */
+authority: TAccountMetas[0];
+/** When present, must be the caller's store PDA. */
+store?: TAccountMetas[1] | undefined;
+/** When present, must have signed the transaction. */
+witness?: TAccountMetas[2] | undefined;
 };
+data: InspectInstructionData; };
 
-export function getInspectInstruction<
-	TAccountAuthority extends string,
-	TAccountStore extends string,
-	TAccountWitness extends string,
-	TProgramAddress extends Address =
-		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: InspectInput<TAccountAuthority, TAccountStore, TAccountWitness>,
-	config?: { programAddress?: TProgramAddress },
-): InspectInstruction<
-	TProgramAddress,
-	TAccountAuthority,
-	TAccountStore,
-	TAccountWitness
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		store: { value: input.store ?? null, isWritable: false },
-		witness: { value: input.witness ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("authority", accounts.authority),
-			getAccountMeta("store", accounts.store),
-			getAccountMeta("witness", accounts.witness),
-		],
-		data: getInspectInstructionDataEncoder().encode({}),
-		programAddress,
-	} as InspectInstruction<
-		TProgramAddress,
-		TAccountAuthority,
-		TAccountStore,
-		TAccountWitness
-	>);
+export function parseInspectInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInspectInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 3) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
 }
-
-export type ParsedInspectInstruction<
-	TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		/** The transaction fee payer; always required. */
-		authority: TAccountMetas[0];
-		/** When present, must be the caller's store PDA. */
-		store?: TAccountMetas[1] | undefined;
-		/** When present, must have signed the transaction. */
-		witness?: TAccountMetas[2] | undefined;
-	};
-	data: InspectInstructionData;
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+const getNextOptionalAccount = () => {
+  const accountMeta = getNextAccount();
+  return accountMeta.address === instruction.programAddress ? undefined : accountMeta;
 };
-
-export function parseInspectInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedInspectInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	const getNextOptionalAccount = () => {
-		const accountMeta = getNextAccount();
-		return accountMeta.address === instruction.programAddress
-			? undefined
-			: accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			authority: getNextAccount(),
-			store: getNextOptionalAccount(),
-			witness: getNextOptionalAccount(),
-		},
-		data: getInspectInstructionDataDecoder().decode(instruction.data),
-	};
+  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), store: getNextOptionalAccount(), witness: getNextOptionalAccount() }, data: getInspectInstructionDataDecoder().decode(instruction.data) };
 }

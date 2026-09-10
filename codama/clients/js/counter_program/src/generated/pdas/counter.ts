@@ -6,32 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
 export type CounterSeeds = {
-	authority: Address;
+authority: Address;
 };
 
-export async function findCounterPda(
-	seeds: CounterSeeds,
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS" as Address<
-			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("counter"),
-			getAddressEncoder().encode(seeds.authority),
-		],
-	});
+export async function findCounterPda(seeds: CounterSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = 'GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS' as Address<'GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("counter"), getAddressEncoder().encode(seeds.authority)]});
 }

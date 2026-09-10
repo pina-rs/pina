@@ -21,12 +21,7 @@ pub struct AddRole {
 }
 
 impl AddRole {
-	pub fn new(
-		admin: solana_pubkey::Pubkey,
-		grantee: solana_pubkey::Pubkey,
-		registry_config: solana_pubkey::Pubkey,
-		role_entry: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(admin: solana_pubkey::Pubkey, grantee: solana_pubkey::Pubkey, registry_config: solana_pubkey::Pubkey, role_entry: solana_pubkey::Pubkey) -> Self {
 		Self {
 			admin,
 			grantee,
@@ -48,19 +43,10 @@ impl AddRole {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.grantee,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.registry_config,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.grantee, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.registry_config, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.role_entry, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ROLE_REGISTRY_PROGRAM_ID,
@@ -76,16 +62,14 @@ pub struct AddRoleInstructionData {
 }
 
 impl AddRoleInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut AddRoleInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut AddRoleInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<AddRoleInstructionWireZc>()];
 		<AddRoleInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ADD_ROLE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

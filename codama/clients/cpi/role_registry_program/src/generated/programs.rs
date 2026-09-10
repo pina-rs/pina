@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const ROLE_REGISTRY_PROGRAM_ID: Address =
-	pina::address!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");
+pub const ROLE_REGISTRY_PROGRAM_ID: Address = pina::address!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");
 
 /// Marker for the `roleRegistryProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

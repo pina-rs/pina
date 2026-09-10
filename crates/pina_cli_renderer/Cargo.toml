@@ -1,0 +1,25 @@
+[package]
+name = "pina_cli_renderer"
+version = { workspace = true }
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish = true
+repository.workspace = true
+description = "Codama Rust renderer that generates clap-based CLI applications from program IDLs"
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "std"], default-features = true }
+codama-nodes = { workspace = true, default-features = true }
+heck = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

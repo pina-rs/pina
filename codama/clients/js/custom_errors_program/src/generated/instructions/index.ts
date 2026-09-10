@@ -6,10 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./hello";
-export * from "./helloNext";
-export * from "./helloNoMsg";
-export * from "./requireEq";
-export * from "./requireGt";
-export * from "./requireGte";
-export * from "./requireNeq";
+export * from './hello';
+export * from './helloNext';
+export * from './helloNoMsg';
+export * from './requireEq';
+export * from './requireGt';
+export * from './requireGte';
+export * from './requireNeq';

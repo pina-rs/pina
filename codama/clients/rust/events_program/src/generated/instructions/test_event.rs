@@ -12,11 +12,13 @@ pub const TEST_EVENT_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct TestEvent {}
+pub struct TestEvent {
+}
 
 impl TestEvent {
 	pub fn new() -> Self {
-		Self {}
+		Self {
+		}
 	}
 
 	pub fn instruction(&self, data: TestEventInstructionData) -> solana_instruction::Instruction {
@@ -45,16 +47,14 @@ pub struct TestEventInstructionData {
 }
 
 impl TestEventInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut TestEventInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut TestEventInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<TestEventInstructionWireZc>()];
 		<TestEventInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TEST_EVENT_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

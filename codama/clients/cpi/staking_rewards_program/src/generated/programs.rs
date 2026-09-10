@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const STAKING_REWARDS_PROGRAM_ID: Address =
-	pina::address!("9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr");
+pub const STAKING_REWARDS_PROGRAM_ID: Address = pina::address!("9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr");
 
 /// Marker for the `stakingRewardsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

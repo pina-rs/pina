@@ -6,164 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findPolicyPda, type PolicySeeds } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findPolicyPda, type PolicySeeds } from '../pdas';
 
 export const POLICY_STATE_DISCRIMINATOR = 1;
 
-export function getPolicyStateDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(POLICY_STATE_DISCRIMINATOR);
-}
+export function getPolicyStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(POLICY_STATE_DISCRIMINATOR); }
 
-export type PolicyState = {
-	discriminator: number;
-	bump: number;
-	minimum: bigint;
-	maximum: bigint;
-	requiredApprovals: number;
-};
+export type PolicyState = { discriminator: number; bump: number; minimum: bigint; maximum: bigint; requiredApprovals: number;  };
 
-export type PolicyStateArgs = {
-	bump: number;
-	minimum: number | bigint;
-	maximum: number | bigint;
-	requiredApprovals: number;
-};
+export type PolicyStateArgs = { bump: number; minimum: number | bigint; maximum: number | bigint; requiredApprovals: number;  };
 
 /** Gets the encoder for {@link PolicyStateArgs} account data. */
 export function getPolicyStateEncoder(): FixedSizeEncoder<PolicyStateArgs> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["minimum", getU64Encoder()],
-			["maximum", getU64Encoder()],
-			["requiredApprovals", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['minimum', getU64Encoder()], ['maximum', getU64Encoder()], ['requiredApprovals', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link PolicyState} account data. */
 export function getPolicyStateDecoder(): FixedSizeDecoder<PolicyState> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				POLICY_STATE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["bump", getU8Decoder()],
-		["minimum", getU64Decoder()],
-		["maximum", getU64Decoder()],
-		["requiredApprovals", getU8Decoder()],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(POLICY_STATE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['minimum', getU64Decoder()], ['maximum', getU64Decoder()], ['requiredApprovals', getU8Decoder()]]);
 }
 
 /** Gets the codec for {@link PolicyState} account data. */
-export function getPolicyStateCodec(): FixedSizeCodec<
-	PolicyStateArgs,
-	PolicyState
-> {
-	return combineCodec(getPolicyStateEncoder(), getPolicyStateDecoder());
+export function getPolicyStateCodec(): FixedSizeCodec<PolicyStateArgs, PolicyState> {
+    return combineCodec(getPolicyStateEncoder(), getPolicyStateDecoder());
 }
 
-export function decodePolicyState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<PolicyState, TAddress>;
-export function decodePolicyState<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<PolicyState, TAddress>;
-export function decodePolicyState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<PolicyState, TAddress> | MaybeAccount<PolicyState, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getPolicyStateDecoder(),
-	);
+export function decodePolicyState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<PolicyState, TAddress>;
+export function decodePolicyState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<PolicyState, TAddress>;
+export function decodePolicyState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<PolicyState, TAddress> | MaybeAccount<PolicyState, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getPolicyStateDecoder());
 }
 
 export async function fetchPolicyState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<PolicyState, TAddress>> {
-	const maybeAccount = await fetchMaybePolicyState(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybePolicyState(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybePolicyState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<PolicyState, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodePolicyState(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodePolicyState(maybeAccount);
 }
 
 export async function fetchAllPolicyState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<PolicyState>[]> {
-	const maybeAccounts = await fetchAllMaybePolicyState(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybePolicyState(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybePolicyState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<PolicyState>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodePolicyState(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodePolicyState(maybeAccount));
 }
 
 export async function fetchPolicyStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: PolicySeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: PolicySeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<PolicyState>> {
-	const maybeAccount = await fetchMaybePolicyStateFromSeeds(rpc, seeds, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybePolicyStateFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybePolicyStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: PolicySeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: PolicySeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<PolicyState>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findPolicyPda(seeds, { programAddress });
-	return await fetchMaybePolicyState(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findPolicyPda(seeds, { programAddress });
+  return await fetchMaybePolicyState(rpc, address, fetchConfig);
 }

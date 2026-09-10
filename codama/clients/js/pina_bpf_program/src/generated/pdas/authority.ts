@@ -6,23 +6,9 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
-export async function findAuthorityPda(
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
-			"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [getUtf8Encoder().encode("cpi-authority")],
-	});
+export async function findAuthorityPda(config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = '2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe' as Address<'2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("cpi-authority")]});
 }

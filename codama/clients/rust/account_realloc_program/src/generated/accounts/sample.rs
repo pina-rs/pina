@@ -12,7 +12,7 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 #[pinapod(compact)]
 pub struct Sample {
-	/// A compact account whose active values occupy only the bytes they need.
+/// A compact account whose active values occupy only the bytes they need.
 	pub discriminator: u8,
 	/// Canonical PDA bump, persisted for inexpensive validation on resize.
 	pub bump: u8,
@@ -27,13 +27,8 @@ pub const SAMPLE_DISCRIMINATOR: u8 = 1u8;
 impl Sample {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
-	pub fn initialize(
-		data: &mut [u8],
-		patch: SamplePatch<'_>,
-	) -> Result<usize, solana_program_error::ProgramError> {
-		patch
-			.discriminator(SAMPLE_DISCRIMINATOR)
-			.initialize(data)
+	pub fn initialize(data: &mut [u8], patch: SamplePatch<'_>) -> Result<usize, solana_program_error::ProgramError> {
+		patch.discriminator(SAMPLE_DISCRIMINATOR).initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
@@ -50,17 +45,21 @@ impl Sample {
 impl Sample {
 	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["sample".as_bytes(), authority.as_ref()],
+			&[
+				"sample".as_bytes(),
+				authority.as_ref(),
+			],
 			&crate::ACCOUNT_REALLOC_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		authority: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(authority: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["sample".as_bytes(), authority.as_ref(), &[bump]],
+			&[
+				"sample".as_bytes(),
+				authority.as_ref(),
+				&[bump],
+			],
 			&crate::ACCOUNT_REALLOC_PROGRAM_ID,
 		)
 	}

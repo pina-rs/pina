@@ -6,32 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
 export type SampleSeeds = {
-	authority: Address;
+authority: Address;
 };
 
-export async function findSamplePda(
-	seeds: SampleSeeds,
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
-			"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("sample"),
-			getAddressEncoder().encode(seeds.authority),
-		],
-	});
+export async function findSamplePda(seeds: SampleSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("sample"), getAddressEncoder().encode(seeds.authority)]});
 }

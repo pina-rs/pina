@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const OPTIONAL_ACCOUNTS_PROGRAM_ID: Address =
-	pina::address!("ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci");
+pub const OPTIONAL_ACCOUNTS_PROGRAM_ID: Address = pina::address!("ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci");
 
 /// Marker for the `optionalAccountsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

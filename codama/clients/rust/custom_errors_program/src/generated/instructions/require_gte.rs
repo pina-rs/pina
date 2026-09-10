@@ -12,11 +12,13 @@ pub const REQUIRE_GTE_DISCRIMINATOR: u8 = 6u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct RequireGte {}
+pub struct RequireGte {
+}
 
 impl RequireGte {
 	pub fn new() -> Self {
-		Self {}
+		Self {
+		}
 	}
 
 	pub fn instruction(&self, data: RequireGteInstructionData) -> solana_instruction::Instruction {
@@ -45,16 +47,14 @@ pub struct RequireGteInstructionData {
 }
 
 impl RequireGteInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut RequireGteInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut RequireGteInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<RequireGteInstructionWireZc>()];
 		<RequireGteInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_GTE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

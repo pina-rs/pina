@@ -6,121 +6,44 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	extendClient,
-	type ExtendedClient,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfPlanAndSendFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getInitializeInstruction,
-	type InitializeInput,
-	type ParsedInitializeInstruction,
-	parseInitializeInstruction,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getInitializeInstruction, parseInitializeInstruction, type InitializeInput, type ParsedInitializeInstruction } from '../instructions';
 
-export const SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
-	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
-		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-	>;
+export const SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
 
-export enum SystemAccountsProgramInstruction {
-	Initialize,
+export enum SystemAccountsProgramInstruction { Initialize }
+
+export function identifySystemAccountsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): SystemAccountsProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return SystemAccountsProgramInstruction.Initialize; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "systemAccountsProgram" });
 }
 
-export function identifySystemAccountsProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): SystemAccountsProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return SystemAccountsProgramInstruction.Initialize;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "systemAccountsProgram" },
-	);
-}
+export type ParsedSystemAccountsProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
+| { instructionType: SystemAccountsProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
 
-export type ParsedSystemAccountsProgramInstruction<
-	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-> =
-	& { instructionType: SystemAccountsProgramInstruction.Initialize }
-	& ParsedInitializeInstruction<TProgram>;
 
-export function parseSystemAccountsProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedSystemAccountsProgramInstruction<TProgram> {
-	const instructionType = identifySystemAccountsProgramInstruction(instruction);
-	switch (instructionType) {
-		case SystemAccountsProgramInstruction.Initialize: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: SystemAccountsProgramInstruction.Initialize,
-				...parseInitializeInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "systemAccountsProgram",
-				},
-			);
-	}
-}
+        export function parseSystemAccountsProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedSystemAccountsProgramInstruction<TProgram> {
+            const instructionType = identifySystemAccountsProgramInstruction(instruction);
+            switch (instructionType) {
+                case SystemAccountsProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: SystemAccountsProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "systemAccountsProgram" });
+            }
+        }
 
-export type SystemAccountsProgramPlugin = {
-	instructions: SystemAccountsProgramPluginInstructions;
-	identifyInstruction: typeof identifySystemAccountsProgramInstruction;
-	parseInstruction: typeof parseSystemAccountsProgramInstruction;
-};
+export type SystemAccountsProgramPlugin = { instructions: SystemAccountsProgramPluginInstructions; identifyInstruction: typeof identifySystemAccountsProgramInstruction; parseInstruction: typeof parseSystemAccountsProgramInstruction; }
 
-export type SystemAccountsProgramPluginInstructions = {
-	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
-};
+export type SystemAccountsProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; }
 
-export type SystemAccountsProgramPluginRequirements =
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type SystemAccountsProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function systemAccountsProgramProgram() {
-	return <T extends SystemAccountsProgramPluginRequirements>(
-		client: T,
-	): ExtendedClient<
-		T,
-		{ systemAccountsProgram: SystemAccountsProgramPlugin }
-	> => {
-		return extendClient(client, {
-			systemAccountsProgram: <SystemAccountsProgramPlugin> {
-				instructions: {
-					initialize: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getInitializeInstruction(input),
-						),
-				},
-				identifyInstruction: identifySystemAccountsProgramInstruction,
-				parseInstruction: parseSystemAccountsProgramInstruction,
-			},
-		});
-	};
+    return <T extends SystemAccountsProgramPluginRequirements>(client: T): ExtendedClient<T, { systemAccountsProgram: SystemAccountsProgramPlugin }> => {
+        return extendClient(client, { systemAccountsProgram: <SystemAccountsProgramPlugin>{ instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) }, identifyInstruction: identifySystemAccountsProgramInstruction, parseInstruction: parseSystemAccountsProgramInstruction } });
+    };
 }

@@ -6,13 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	isProgramError,
-	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
-	type SolanaError,
-} from "@solana/kit";
-import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
+import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO = 0x1770; // 6000
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG = 0x17eb; // 6123
@@ -23,60 +18,25 @@ export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH = 0x17ef; // 6127
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS = 0x17f0; // 6128
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL = 0x17f1; // 6129
 
-export type CustomErrorsProgramError =
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH
-	| typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH;
+export type CustomErrorsProgramError = typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO | typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM | typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT | typeof CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG | typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS | typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL | typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH | typeof CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH;
 
-let customErrorsProgramErrorMessages:
-	| Record<CustomErrorsProgramError, string>
-	| undefined;
-if (process.env["NODE_ENV"] !== "production") {
-	customErrorsProgramErrorMessages = {
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH]: ``,
-	};
+let customErrorsProgramErrorMessages: Record<CustomErrorsProgramError, string> | undefined;
+if (process.env['NODE_ENV'] !== 'production') {
+  customErrorsProgramErrorMessages = { [CUSTOM_ERRORS_PROGRAM_ERROR__HELLO]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH]: ``, [CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH]: `` };
 }
 
-export function getCustomErrorsProgramErrorMessage(
-	code: CustomErrorsProgramError,
-): string {
-	if (process.env["NODE_ENV"] !== "production") {
-		return (customErrorsProgramErrorMessages as Record<
-			CustomErrorsProgramError,
-			string
-		>)[code];
-	}
+export function getCustomErrorsProgramErrorMessage(code: CustomErrorsProgramError): string {
+  if (process.env['NODE_ENV'] !== 'production') {
+    return (customErrorsProgramErrorMessages as Record<CustomErrorsProgramError, string>)[code];
+  }
 
-	return "Error message not available in production bundles.";
+  return 'Error message not available in production bundles.';
 }
 
-export function isCustomErrorsProgramError<
-	TProgramErrorCode extends CustomErrorsProgramError,
->(
-	error: unknown,
-	transactionMessage: {
-		instructions: Record<number, { programAddress: Address }>;
-	},
-	code?: TProgramErrorCode,
-): error is
-	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
-	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-	return isProgramError<TProgramErrorCode>(
-		error,
-		transactionMessage,
-		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
-		code,
-	);
+export function isCustomErrorsProgramError<TProgramErrorCode extends CustomErrorsProgramError>(
+    error: unknown,
+    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
+    code?: TProgramErrorCode,
+): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+  return isProgramError<TProgramErrorCode>(error, transactionMessage, CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS, code);
 }

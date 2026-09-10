@@ -6,101 +6,51 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const HELLO_DISCRIMINATOR = 0;
 
-export function getHelloDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(HELLO_DISCRIMINATOR);
+export function getHelloDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(HELLO_DISCRIMINATOR); }
+
+export type HelloInstruction<TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
+
+export type HelloInstructionData = { discriminator: number;  };
+
+export type HelloInstructionDataArgs = {  };
+
+export function getHelloInstructionDataEncoder(): FixedSizeEncoder<HelloInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
 }
 
-export type HelloInstruction<
-	TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<TRemainingAccounts>;
-
-export type HelloInstructionData = { discriminator: number };
-
-export type HelloInstructionDataArgs = {};
-
-export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
-	HelloInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
-	);
+export function getHelloInstructionDataDecoder(): FixedSizeDecoder<HelloInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder())]]);
 }
 
-export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
-	HelloInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
-	]]);
+export function getHelloInstructionDataCodec(): FixedSizeCodec<HelloInstructionDataArgs, HelloInstructionData> {
+    return combineCodec(getHelloInstructionDataEncoder(), getHelloInstructionDataDecoder());
 }
 
-export function getHelloInstructionDataCodec(): FixedSizeCodec<
-	HelloInstructionDataArgs,
-	HelloInstructionData
-> {
-	return combineCodec(
-		getHelloInstructionDataEncoder(),
-		getHelloInstructionDataDecoder(),
-	);
+export type HelloInput =  {
+  
 }
 
-export type HelloInput = {};
+export function getHelloInstruction<TProgramAddress extends Address = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS>(config?: { programAddress?: TProgramAddress } ): HelloInstruction<TProgramAddress> {
+  // Program address.
+const programAddress = config?.programAddress ?? CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
 
-export function getHelloInstruction<
-	TProgramAddress extends Address =
-		typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
->(
-	config?: { programAddress?: TProgramAddress },
-): HelloInstruction<TProgramAddress> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
 
-	return Object.freeze(
-		{
-			data: getHelloInstructionDataEncoder().encode({}),
-			programAddress,
-		} as HelloInstruction<TProgramAddress>,
-	);
+
+
+return Object.freeze({ data: getHelloInstructionDataEncoder().encode({}), programAddress } as HelloInstruction<TProgramAddress>);
 }
 
-export type ParsedHelloInstruction<
-	TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram>; data: HelloInstructionData };
+export type ParsedHelloInstruction<TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS> = { programAddress: Address<TProgram>;
+data: HelloInstructionData; };
 
-export function parseHelloInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
-): ParsedHelloInstruction<TProgram> {
-	return {
-		programAddress: instruction.programAddress,
-		data: getHelloInstructionDataDecoder().decode(instruction.data),
-	};
+export function parseHelloInstruction<TProgram extends string>(instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>): ParsedHelloInstruction<TProgram> {
+  
+  return { programAddress: instruction.programAddress, data: getHelloInstructionDataDecoder().decode(instruction.data) };
 }

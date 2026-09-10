@@ -35,6 +35,30 @@ dependencies = [
 [[package]]
 name = "account_realloc_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "account_realloc_program_cli"
+version = "0.1.0"
+dependencies = [
+ "account_realloc_program-client",
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "account_realloc_program_cpi"
@@ -238,7 +262,7 @@ checksum = "2f809b8332d13fbe3f4f1529a9806ff21c966447d2415bb55881983f0f35459d"
 dependencies = [
  "solana-hash 4.5.0",
  "solana-message 4.4.1",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-program-runtime",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
@@ -1664,6 +1688,30 @@ dependencies = [
 [[package]]
 name = "compact_accounts_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "compact_accounts_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "compact_accounts_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "compact_accounts_program_cpi"
@@ -1888,6 +1936,19 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-system-interface 3.2.0",
+]
+
+[[package]]
+name = "counter_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "counter-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2175,6 +2236,30 @@ dependencies = [
 [[package]]
 name = "custom_errors_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "custom_errors_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "custom_errors_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "custom_errors_program_cpi"
@@ -2330,6 +2415,30 @@ dependencies = [
 [[package]]
 name = "declare_id_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "declare_id_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "declare_id_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "declare_id_program_cpi"
@@ -2345,6 +2454,30 @@ dependencies = [
 [[package]]
 name = "declare_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "declare_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "declare_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "declare_program_cpi"
@@ -2685,6 +2818,30 @@ dependencies = [
 [[package]]
 name = "duplicate_mutable_accounts_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "duplicate_mutable_accounts_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "duplicate_mutable_accounts_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "duplicate_mutable_accounts_program_cpi"
@@ -2962,6 +3119,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "escrow_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "escrow-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "escrow_program_cpi"
 version = "0.0.0"
 dependencies = [
@@ -2998,6 +3168,17 @@ dependencies = [
 [[package]]
 name = "events_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "events_program-surfpool-tests"
@@ -3005,6 +3186,19 @@ version = "0.0.0"
 dependencies = [
  "events_program",
  "pina_test",
+]
+
+[[package]]
+name = "events_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "events_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -3175,6 +3369,30 @@ dependencies = [
 [[package]]
 name = "float_accounts_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "float_accounts_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "float_accounts_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "float_accounts_program_cpi"
@@ -3604,6 +3822,30 @@ dependencies = [
 [[package]]
 name = "hello_solana_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "hello_solana_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "hello_solana_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "hello_solana_program_cpi"
@@ -5563,6 +5805,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "optional_accounts_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "optional-accounts-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "optional_accounts_program_cpi"
 version = "0.0.0"
 dependencies = [
@@ -5836,6 +6091,30 @@ dependencies = [
 [[package]]
 name = "pina_bpf_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "pina_bpf_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "pina_bpf_program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "pina_bpf_program_cpi"
@@ -5864,6 +6143,7 @@ dependencies = [
  "object 0.40.0",
  "owo-colors",
  "pina_abi",
+ "pina_cli_renderer",
  "pina_codama_renderer",
  "pina_cpi_renderer",
  "pina_profile",
@@ -5884,6 +6164,20 @@ dependencies = [
  "toml 1.1.4+spec-1.1.0",
  "ureq",
  "url 2.5.8",
+ "walkdir",
+]
+
+[[package]]
+name = "pina_cli_renderer"
+version = "0.15.0"
+dependencies = [
+ "clap",
+ "codama-nodes",
+ "heck 0.5.0",
+ "insta",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
  "walkdir",
 ]
 
@@ -6332,6 +6626,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "profile-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "profile_program_cpi"
 version = "0.0.0"
 dependencies = [
@@ -6371,6 +6678,19 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "prop_amm_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "prop-amm-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -6934,6 +7254,19 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "role_registry_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "role-registry-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -7843,6 +8176,8 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9cf16495d9eb53e3d04e72366a33bb1c20c24e78c171d8b8f5978357b63ae95"
 dependencies = [
+ "bincode",
+ "serde_core",
  "solana-address 2.6.1",
  "solana-program-error 3.0.1",
  "solana-program-memory 3.1.0",
@@ -8148,7 +8483,7 @@ dependencies = [
  "solana-clock 3.1.1",
  "solana-instruction 3.4.1",
  "solana-loader-v3-interface 7.0.0",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-program-runtime",
  "solana-pubkey 4.2.1",
  "solana-sbpf",
@@ -8342,7 +8677,7 @@ dependencies = [
  "solana-compute-budget",
  "solana-compute-budget-interface",
  "solana-instruction 3.4.1",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-svm-transaction",
@@ -8420,7 +8755,7 @@ dependencies = [
  "solana-compute-budget-instruction",
  "solana-compute-budget-interface",
  "solana-metrics",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-pubkey 4.2.1",
  "solana-runtime-transaction",
  "solana-sdk-ids 3.1.0",
@@ -8562,7 +8897,7 @@ dependencies = [
  "solana-measure",
  "solana-merkle-tree",
  "solana-message 4.4.1",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-perf",
  "solana-runtime-transaction",
  "solana-sha256-hasher 3.1.0",
@@ -8654,6 +8989,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-epoch-stake"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "027e6d0b9e7daac5b2ac7c3f9ca1b727861121d9ef05084cf435ff736051e7c2"
+dependencies = [
+ "solana-define-syscall 5.2.0",
+ "solana-pubkey 4.2.1",
+]
+
+[[package]]
 name = "solana-example-mocks"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8671,6 +9016,23 @@ dependencies = [
  "solana-pubkey 2.4.0",
  "solana-sdk-ids 2.2.1",
  "solana-system-interface 1.0.0",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "solana-example-mocks"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eb265ff95e28eceda117e2e3d2d2a611ecbbfe911dfeeeecd1521814540ffab"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "solana-hash 4.5.0",
+ "solana-instruction 3.4.1",
+ "solana-nonce 3.2.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
+ "solana-system-interface 3.2.0",
  "thiserror 2.0.20",
 ]
 
@@ -8850,6 +9212,7 @@ version = "4.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f4c847893a2ea50b4ae3ca723b124e07cd0544fecea3598f785168f9b78333f"
 dependencies = [
+ "borsh 1.8.1",
  "bytemuck",
  "bytemuck_derive",
  "five8 1.0.0",
@@ -8923,6 +9286,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3957ca1d31107efd9a6bb88b25c348ca5e3b4b6683e3d08adb86d3d17aa01f1"
 dependencies = [
  "bincode",
+ "borsh 1.8.1",
  "serde",
  "serde_derive",
  "solana-define-syscall 5.2.0",
@@ -9433,6 +9797,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-offchain-message"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6e2a1141a673f72a05cf406b99e4b2b8a457792b7c01afa07b3f00d4e2de393"
+dependencies = [
+ "num_enum",
+ "solana-hash 3.1.0",
+ "solana-packet 3.0.0",
+ "solana-pubkey 3.0.0",
+ "solana-sanitize 3.0.1",
+ "solana-sha256-hasher 3.1.0",
+ "solana-signature",
+ "solana-signer",
+]
+
+[[package]]
+name = "solana-packet"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6edf2f25743c95229ac0fdc32f8f5893ef738dbf332c669e9861d33ddb0f469d"
+dependencies = [
+ "bitflags 2.13.1",
+]
+
+[[package]]
 name = "solana-packet"
 version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9468,7 +9857,7 @@ dependencies = [
  "solana-hash 4.5.0",
  "solana-message 4.4.1",
  "solana-metrics",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-short-vec 3.2.2",
@@ -9511,6 +9900,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-presigner"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f704eaf825be3180832445b9e4983b875340696e8e7239bf2d535b0f86c14a2"
+dependencies = [
+ "solana-pubkey 3.0.0",
+ "solana-signature",
+ "solana-signer",
+]
+
+[[package]]
 name = "solana-program"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9548,7 +9948,7 @@ dependencies = [
  "solana-define-syscall 2.3.0",
  "solana-epoch-rewards 2.2.1",
  "solana-epoch-schedule 2.2.1",
- "solana-example-mocks",
+ "solana-example-mocks 2.2.1",
  "solana-feature-gate-interface 2.2.2",
  "solana-fee-calculator 2.2.1",
  "solana-hash 2.3.0",
@@ -9588,6 +9988,53 @@ dependencies = [
  "solana-vote-interface 2.2.6",
  "thiserror 2.0.20",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "solana-program"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "778f08fb0eaf52c9a3bef2978247f7fab0ccfddc44cfddb936d5ad9f98ede886"
+dependencies = [
+ "memoffset",
+ "solana-account-info 3.1.1",
+ "solana-big-mod-exp 3.0.0",
+ "solana-blake3-hasher 3.1.0",
+ "solana-borsh 3.0.2",
+ "solana-clock 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-define-syscall 5.2.0",
+ "solana-epoch-rewards 3.1.0",
+ "solana-epoch-schedule 3.2.0",
+ "solana-epoch-stake",
+ "solana-example-mocks 4.0.0",
+ "solana-fee-calculator 3.2.2",
+ "solana-hash 4.5.0",
+ "solana-instruction 3.4.1",
+ "solana-instruction-error",
+ "solana-instructions-sysvar 3.0.1",
+ "solana-keccak-hasher 3.1.0",
+ "solana-last-restart-slot 3.1.0",
+ "solana-msg 3.1.0",
+ "solana-native-token 3.0.0",
+ "solana-program-entrypoint 3.1.1",
+ "solana-program-error 3.0.1",
+ "solana-program-memory 3.1.0",
+ "solana-program-option 3.1.0",
+ "solana-program-pack 3.1.0",
+ "solana-pubkey 4.2.1",
+ "solana-rent 4.3.0",
+ "solana-sdk-ids 3.1.0",
+ "solana-secp256k1-recover 3.3.0",
+ "solana-serde-varint 3.0.1",
+ "solana-serialize-utils 3.1.2",
+ "solana-sha256-hasher 3.1.0",
+ "solana-short-vec 3.2.2",
+ "solana-slot-hashes 3.1.0",
+ "solana-slot-history 3.1.0",
+ "solana-stable-layout 3.0.1",
+ "solana-sysvar 4.1.0",
+ "solana-sysvar-id 3.1.0",
 ]
 
 [[package]]
@@ -9637,6 +10084,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f04fa578707b3612b095f0c8e19b66a1233f7c42ca8082fcb3b745afcc0add6"
 dependencies = [
  "borsh 1.8.1",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -9867,7 +10316,7 @@ checksum = "ccf8d878040f2ed9ca3dc78781fc902f6d1b2af6d7d917cc7979c9b37ccff3e6"
 dependencies = [
  "borsh 0.10.4",
  "kaigan 0.5.0",
- "solana-program",
+ "solana-program 2.3.0",
 ]
 
 [[package]]
@@ -10092,7 +10541,7 @@ dependencies = [
  "solana-native-token 3.0.0",
  "solana-nonce 3.2.1",
  "solana-nonce-account",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-perf",
  "solana-poh-config",
  "solana-precompile-error",
@@ -10192,6 +10641,44 @@ dependencies = [
  "rustc-demangle",
  "thiserror 2.0.20",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "solana-sdk"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "657e20ea41ba32cad0c493bec60b6d55cc6c30d2c1073b94cfee96dda0d764dd"
+dependencies = [
+ "bincode",
+ "bs58",
+ "serde",
+ "solana-account 4.3.2",
+ "solana-epoch-info",
+ "solana-epoch-rewards-hasher",
+ "solana-fee-structure",
+ "solana-inflation",
+ "solana-keypair",
+ "solana-message 4.4.1",
+ "solana-offchain-message",
+ "solana-presigner",
+ "solana-program 4.0.0",
+ "solana-program-memory 3.1.0",
+ "solana-pubkey 4.2.1",
+ "solana-sanitize 3.0.1",
+ "solana-sdk-ids 3.1.0",
+ "solana-sdk-macro 3.0.1",
+ "solana-seed-derivable",
+ "solana-seed-phrase",
+ "solana-serde",
+ "solana-serde-varint 3.0.1",
+ "solana-short-vec 3.2.2",
+ "solana-shred-version",
+ "solana-signature",
+ "solana-signer",
+ "solana-time-utils",
+ "solana-transaction 4.1.5",
+ "solana-transaction-error 3.3.2",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -10611,7 +11098,7 @@ dependencies = [
  "solana-keypair",
  "solana-metrics",
  "solana-net-utils",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-perf",
  "solana-pubkey 4.2.1",
  "solana-signer",
@@ -10835,7 +11322,7 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-nonce 3.2.1",
  "solana-nonce-account",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-program-runtime",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
@@ -10905,6 +11392,8 @@ checksum = "ada7045bbfdd802af08fbc9c7e2b56ddabb20599d22e4c3840fcef5e7afb8324"
 dependencies = [
  "base64 0.22.1",
  "bincode",
+ "bytemuck",
+ "bytemuck_derive",
  "lazy_static",
  "serde",
  "serde_derive",
@@ -11209,7 +11698,7 @@ dependencies = [
  "solana-hash 4.5.0",
  "solana-instruction 3.4.1",
  "solana-keypair",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-serialize-utils 3.1.2",
@@ -11287,7 +11776,7 @@ dependencies = [
  "solana-epoch-schedule 3.2.0",
  "solana-hash 4.5.0",
  "solana-instruction 3.4.1",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-program-runtime",
  "solana-pubkey 4.2.1",
  "solana-rent 4.3.0",
@@ -11709,6 +12198,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "staking_rewards_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "staking-rewards-program-client",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "staking_rewards_program_cpi"
 version = "0.0.0"
 dependencies = [
@@ -11842,7 +12344,7 @@ dependencies = [
  "solana-loader-v3-interface 6.1.1",
  "solana-message 4.4.1",
  "solana-nonce 3.2.1",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-program-option 3.1.0",
  "solana-program-pack 3.1.0",
  "solana-pubkey 3.0.0",
@@ -12061,6 +12563,30 @@ dependencies = [
 [[package]]
 name = "system_accounts_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "system_accounts_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "system_accounts_program-client",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "system_accounts_program_cpi"
@@ -12084,6 +12610,30 @@ dependencies = [
 [[package]]
 name = "sysvar_checks_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "sysvar_checks_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "sysvar_checks_program-client",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "sysvar_checks_program_cpi"
@@ -12316,6 +12866,19 @@ name = "todo_program"
 version = "0.0.0"
 dependencies = [
  "pina",
+]
+
+[[package]]
+name = "todo_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+ "todo-program-client",
 ]
 
 [[package]]
@@ -12618,6 +13181,30 @@ dependencies = [
 [[package]]
 name = "transfer_sol_program-client"
 version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "transfer_sol_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+ "transfer_sol_program-client",
+]
 
 [[package]]
 name = "transfer_sol_program_cpi"
@@ -12728,7 +13315,7 @@ dependencies = [
  "solana-keypair",
  "solana-loader-v3-interface 6.1.1",
  "solana-message 3.1.0",
- "solana-packet",
+ "solana-packet 4.2.0",
  "solana-pubkey 3.0.0",
  "solana-record-service-client",
  "solana-sdk-ids 3.1.0",
@@ -13019,6 +13606,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "validation_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+ "validation-program-client",
+]
+
+[[package]]
 name = "validation_program_cpi"
 version = "0.0.0"
 dependencies = [
@@ -13077,6 +13677,19 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-system-interface 3.2.0",
+]
+
+[[package]]
+name = "vesting_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+ "vesting-program-client",
 ]
 
 [[package]]

@@ -25,16 +25,12 @@ impl ForwardRotateWithPda {
 			authority: solana_pubkey::Pubkey::find_program_address(
 				&["cpi-authority".as_bytes()],
 				&crate::PINA_BPF_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			prop_amm_program,
 		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: ForwardRotateWithPdaInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: ForwardRotateWithPdaInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -46,14 +42,8 @@ impl ForwardRotateWithPda {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.oracle, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.prop_amm_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.prop_amm_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PINA_BPF_PROGRAM_ID,
@@ -69,19 +59,14 @@ pub struct ForwardRotateWithPdaInstructionData {
 }
 
 impl ForwardRotateWithPdaInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut ForwardRotateWithPdaInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut ForwardRotateWithPdaInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<ForwardRotateWithPdaInstructionWireZc>()];
-		<ForwardRotateWithPdaInstructionWire as pina::PinaPodFixed>::initialize(
-			&mut bytes,
-			|data| {
-				configure(data);
-				data.discriminator = FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR;
-				Ok(())
-			},
-		)
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		<ForwardRotateWithPdaInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
+			configure(data);
+			data.discriminator = FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR;
+			Ok(())
+		})
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

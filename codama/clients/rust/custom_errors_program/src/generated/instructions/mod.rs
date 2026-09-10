@@ -9,17 +9,17 @@
 )]
 
 pub(crate) mod r#hello;
-pub(crate) mod r#hello_next;
 pub(crate) mod r#hello_no_msg;
+pub(crate) mod r#hello_next;
 pub(crate) mod r#require_eq;
+pub(crate) mod r#require_neq;
 pub(crate) mod r#require_gt;
 pub(crate) mod r#require_gte;
-pub(crate) mod r#require_neq;
 
 pub use self::r#hello::*;
-pub use self::r#hello_next::*;
 pub use self::r#hello_no_msg::*;
+pub use self::r#hello_next::*;
 pub use self::r#require_eq::*;
+pub use self::r#require_neq::*;
 pub use self::r#require_gt::*;
 pub use self::r#require_gte::*;
-pub use self::r#require_neq::*;

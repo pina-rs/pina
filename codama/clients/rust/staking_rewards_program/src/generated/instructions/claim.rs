@@ -24,23 +24,14 @@ pub struct Claim {
 }
 
 impl Claim {
-	pub fn new(
-		user: solana_pubkey::Pubkey,
-		reward_mint: solana_pubkey::Pubkey,
-		pool_state: solana_pubkey::Pubkey,
-		position_state: solana_pubkey::Pubkey,
-		user_reward_ata: solana_pubkey::Pubkey,
-		token_program: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(user: solana_pubkey::Pubkey, reward_mint: solana_pubkey::Pubkey, pool_state: solana_pubkey::Pubkey, position_state: solana_pubkey::Pubkey, user_reward_ata: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			user,
 			reward_mint,
 			pool_state,
 			position_state,
 			user_reward_ata,
-			associated_token_program: solana_pubkey::pubkey!(
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			),
+			associated_token_program: solana_pubkey::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
 			token_program,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
@@ -58,34 +49,13 @@ impl Claim {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.user, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.reward_mint,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.pool_state,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.position_state,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.user_reward_ata,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.associated_token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.reward_mint, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_state, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.position_state, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.user_reward_ata, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.associated_token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
@@ -101,16 +71,14 @@ pub struct ClaimInstructionData {
 }
 
 impl ClaimInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut ClaimInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut ClaimInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<ClaimInstructionWireZc>()];
 		<ClaimInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CLAIM_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

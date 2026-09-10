@@ -9,13 +9,13 @@
 )]
 
 /// The `#[instruction]` attribute macro generates:
-///
+/// 
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 /// `HelloInstruction::Hello`.
 /// - A generated `PinaPod` view plus checked `initialize` and `try_from_bytes`
 /// helpers.
-///
+/// 
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.
 pub const HELLO_DISCRIMINATOR: u8 = 0u8;
@@ -30,7 +30,9 @@ pub struct Hello {
 
 impl Hello {
 	pub fn new(user: solana_pubkey::Pubkey) -> Self {
-		Self { user }
+		Self {
+			user,
+		}
 	}
 
 	pub fn instruction(&self, data: HelloInstructionData) -> solana_instruction::Instruction {
@@ -44,9 +46,7 @@ impl Hello {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(1 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.user, true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.user, true));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::HELLO_SOLANA_PROGRAM_ID,
@@ -62,16 +62,14 @@ pub struct HelloInstructionData {
 }
 
 impl HelloInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut HelloInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut HelloInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<HelloInstructionWireZc>()];
 		<HelloInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

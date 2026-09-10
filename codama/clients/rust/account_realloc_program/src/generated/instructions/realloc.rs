@@ -9,7 +9,7 @@
 )]
 
 /// Resizes the complete account-data buffer to `len` bytes.
-///
+/// 
 /// `len` must equal `Sample::projected_bytes` for an active value count.
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
 
@@ -45,10 +45,7 @@ impl Realloc {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.sample, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ACCOUNT_REALLOC_PROGRAM_ID,
@@ -64,16 +61,14 @@ pub struct ReallocInstructionData {
 }
 
 impl ReallocInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut ReallocInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut ReallocInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<ReallocInstructionWireZc>()];
 		<ReallocInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

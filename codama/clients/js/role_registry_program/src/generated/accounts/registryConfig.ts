@@ -6,176 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getAddressDecoder,
-	getAddressEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findRegistryConfigPda, type RegistryConfigSeeds } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findRegistryConfigPda, type RegistryConfigSeeds } from '../pdas';
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;
 
-export function getRegistryConfigDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REGISTRY_CONFIG_DISCRIMINATOR);
-}
+export function getRegistryConfigDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(REGISTRY_CONFIG_DISCRIMINATOR); }
 
-export type RegistryConfig = {
-	discriminator: number;
-	admin: Address;
-	roleCount: bigint;
-	bump: number;
-};
+export type RegistryConfig = { discriminator: number; admin: Address; roleCount: bigint; bump: number;  };
 
-export type RegistryConfigArgs = {
-	admin: Address;
-	roleCount: number | bigint;
-	bump: number;
-};
+export type RegistryConfigArgs = { admin: Address; roleCount: number | bigint; bump: number;  };
 
 /** Gets the encoder for {@link RegistryConfigArgs} account data. */
-export function getRegistryConfigEncoder(): FixedSizeEncoder<
-	RegistryConfigArgs
-> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["admin", getAddressEncoder()],
-			["roleCount", getU64Encoder()],
-			["bump", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+export function getRegistryConfigEncoder(): FixedSizeEncoder<RegistryConfigArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['admin', getAddressEncoder()], ['roleCount', getU64Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link RegistryConfig} account data. */
 export function getRegistryConfigDecoder(): FixedSizeDecoder<RegistryConfig> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				REGISTRY_CONFIG_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["admin", getAddressDecoder()],
-		["roleCount", getU64Decoder()],
-		["bump", getU8Decoder()],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(REGISTRY_CONFIG_DISCRIMINATOR, getU8Decoder())], ['admin', getAddressDecoder()], ['roleCount', getU64Decoder()], ['bump', getU8Decoder()]]);
 }
 
 /** Gets the codec for {@link RegistryConfig} account data. */
-export function getRegistryConfigCodec(): FixedSizeCodec<
-	RegistryConfigArgs,
-	RegistryConfig
-> {
-	return combineCodec(getRegistryConfigEncoder(), getRegistryConfigDecoder());
+export function getRegistryConfigCodec(): FixedSizeCodec<RegistryConfigArgs, RegistryConfig> {
+    return combineCodec(getRegistryConfigEncoder(), getRegistryConfigDecoder());
 }
 
-export function decodeRegistryConfig<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<RegistryConfig, TAddress>;
-export function decodeRegistryConfig<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<RegistryConfig, TAddress>;
-export function decodeRegistryConfig<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<RegistryConfig, TAddress> | MaybeAccount<RegistryConfig, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getRegistryConfigDecoder(),
-	);
+export function decodeRegistryConfig<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<RegistryConfig, TAddress>;
+export function decodeRegistryConfig<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<RegistryConfig, TAddress>;
+export function decodeRegistryConfig<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<RegistryConfig, TAddress> | MaybeAccount<RegistryConfig, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getRegistryConfigDecoder());
 }
 
 export async function fetchRegistryConfig<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<RegistryConfig, TAddress>> {
-	const maybeAccount = await fetchMaybeRegistryConfig(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRegistryConfig(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
-export async function fetchMaybeRegistryConfig<
-	TAddress extends string = string,
->(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+export async function fetchMaybeRegistryConfig<TAddress extends string = string>(
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<RegistryConfig, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeRegistryConfig(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeRegistryConfig(maybeAccount);
 }
 
 export async function fetchAllRegistryConfig(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<RegistryConfig>[]> {
-	const maybeAccounts = await fetchAllMaybeRegistryConfig(
-		rpc,
-		addresses,
-		config,
-	);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeRegistryConfig(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeRegistryConfig(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<RegistryConfig>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) =>
-		decodeRegistryConfig(maybeAccount)
-	);
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeRegistryConfig(maybeAccount));
 }
 
 export async function fetchRegistryConfigFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: RegistryConfigSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: RegistryConfigSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<RegistryConfig>> {
-	const maybeAccount = await fetchMaybeRegistryConfigFromSeeds(
-		rpc,
-		seeds,
-		config,
-	);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRegistryConfigFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeRegistryConfigFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: RegistryConfigSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: RegistryConfigSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<RegistryConfig>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findRegistryConfigPda(seeds, { programAddress });
-	return await fetchMaybeRegistryConfig(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findRegistryConfigPda(seeds, { programAddress });
+  return await fetchMaybeRegistryConfig(rpc, address, fetchConfig);
 }

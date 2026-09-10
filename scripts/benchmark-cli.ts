@@ -12,7 +12,23 @@ const COMMANDS = [
 	{ id: "profile help", args: ["profile", "--help"] },
 	{ id: "IDL help", args: ["idl", "--help"] },
 	{ id: "client generation help", args: ["generate", "--help"] },
+	{
+		id: "cli-rust generation help",
+		args: ["generate", "--client", "cli-rust", "--help"],
+	},
 	{ id: "render bundled docs", args: ["docs", "pina-overview"] },
+	{
+		id: "cli-rust project generation",
+		args: [
+			"generate",
+			"--client",
+			"cli-rust",
+			"--project",
+			"examples/counter_program",
+			"--output",
+			"target/benchmark/clients/cli-rust",
+		],
+	},
 ] as const;
 
 interface HyperfineResult {

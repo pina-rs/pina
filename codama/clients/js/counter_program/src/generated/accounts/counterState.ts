@@ -6,40 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { type CounterSeeds, findCounterPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findCounterPda, type CounterSeeds } from '../pdas';
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;
 
-export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(COUNTER_STATE_DISCRIMINATOR);
-}
+export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(COUNTER_STATE_DISCRIMINATOR); }
 
 /**
  * On-chain counter state.
@@ -61,134 +34,99 @@ export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
  * | 2      | 8    | count (little-endian u64) |
  * ```
  */
-export type CounterState = {
-	discriminator: number;
-	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
-	bump: number;
-	/**
-	 * The current counter value. The `PinaPod` view stores it using its
-	 * alignment-one, little-endian representation.
-	 */
-	count: bigint;
-};
+export type CounterState = { discriminator: number; 
+/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+bump: number; 
+/**
+ * The current counter value. The `PinaPod` view stores it using its
+ * alignment-one, little-endian representation.
+ */
+count: bigint;  };
 
-export type CounterStateArgs = {
-	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
-	bump: number;
-	/**
-	 * The current counter value. The `PinaPod` view stores it using its
-	 * alignment-one, little-endian representation.
-	 */
-	count: number | bigint;
-};
+export type CounterStateArgs = { 
+/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+bump: number; 
+/**
+ * The current counter value. The `PinaPod` view stores it using its
+ * alignment-one, little-endian representation.
+ */
+count: number | bigint;  };
 
 /** Gets the encoder for {@link CounterStateArgs} account data. */
 export function getCounterStateEncoder(): FixedSizeEncoder<CounterStateArgs> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], ["count", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['count', getU64Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link CounterState} account data. */
 export function getCounterStateDecoder(): FixedSizeDecoder<CounterState> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				COUNTER_STATE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["bump", getU8Decoder()],
-		["count", getU64Decoder()],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(COUNTER_STATE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['count', getU64Decoder()]]);
 }
 
 /** Gets the codec for {@link CounterState} account data. */
-export function getCounterStateCodec(): FixedSizeCodec<
-	CounterStateArgs,
-	CounterState
-> {
-	return combineCodec(getCounterStateEncoder(), getCounterStateDecoder());
+export function getCounterStateCodec(): FixedSizeCodec<CounterStateArgs, CounterState> {
+    return combineCodec(getCounterStateEncoder(), getCounterStateDecoder());
 }
 
-export function decodeCounterState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<CounterState, TAddress>;
-export function decodeCounterState<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<CounterState, TAddress>;
-export function decodeCounterState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<CounterState, TAddress> | MaybeAccount<CounterState, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getCounterStateDecoder(),
-	);
+export function decodeCounterState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<CounterState, TAddress>;
+export function decodeCounterState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<CounterState, TAddress>;
+export function decodeCounterState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<CounterState, TAddress> | MaybeAccount<CounterState, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getCounterStateDecoder());
 }
 
 export async function fetchCounterState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<CounterState, TAddress>> {
-	const maybeAccount = await fetchMaybeCounterState(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeCounterState(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeCounterState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<CounterState, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeCounterState(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeCounterState(maybeAccount);
 }
 
 export async function fetchAllCounterState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<CounterState>[]> {
-	const maybeAccounts = await fetchAllMaybeCounterState(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeCounterState(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeCounterState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<CounterState>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodeCounterState(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeCounterState(maybeAccount));
 }
 
 export async function fetchCounterStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: CounterSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: CounterSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<CounterState>> {
-	const maybeAccount = await fetchMaybeCounterStateFromSeeds(
-		rpc,
-		seeds,
-		config,
-	);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeCounterStateFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeCounterStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: CounterSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: CounterSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<CounterState>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findCounterPda(seeds, { programAddress });
-	return await fetchMaybeCounterState(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findCounterPda(seeds, { programAddress });
+  return await fetchMaybeCounterState(rpc, address, fetchConfig);
 }

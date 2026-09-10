@@ -6,168 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	getAddressDecoder,
-	getAddressEncoder,
-	getBooleanDecoder,
-	getBooleanEncoder,
-	getBytesDecoder,
-	getBytesEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findTodoPda, type TodoSeeds } from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodBooleanDecoder,
-	getPinaPodDiscriminatorDecoder,
-} from "../pinaPodCodecs";
+import { fixPinaPodEncoderSize, getPinaPodBooleanDecoder, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getAddressDecoder, getAddressEncoder, getBooleanDecoder, getBooleanEncoder, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findTodoPda, type TodoSeeds } from '../pdas';
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
-export function getTodoStateDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(TODO_STATE_DISCRIMINATOR);
-}
+export function getTodoStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(TODO_STATE_DISCRIMINATOR); }
 
-export type TodoState = {
-	discriminator: number;
-	owner: Address;
-	bump: number;
-	completed: boolean;
-	digest: ReadonlyUint8Array;
-};
+export type TodoState = { discriminator: number; owner: Address; bump: number; completed: boolean; digest: ReadonlyUint8Array;  };
 
-export type TodoStateArgs = {
-	owner: Address;
-	bump: number;
-	completed: boolean;
-	digest: ReadonlyUint8Array;
-};
+export type TodoStateArgs = { owner: Address; bump: number; completed: boolean; digest: ReadonlyUint8Array;  };
 
 /** Gets the encoder for {@link TodoStateArgs} account data. */
 export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["owner", getAddressEncoder()],
-			["bump", getU8Encoder()],
-			["completed", getBooleanEncoder()],
-			["digest", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-		]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['owner', getAddressEncoder()], ['bump', getU8Encoder()], ['completed', getBooleanEncoder()], ['digest', fixPinaPodEncoderSize(getBytesEncoder(), 32)]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
 /** Gets the decoder for {@link TodoState} account data. */
 export function getTodoStateDecoder(): FixedSizeDecoder<TodoState> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
-		],
-		["owner", getAddressDecoder()],
-		["bump", getU8Decoder()],
-		["completed", getPinaPodBooleanDecoder()],
-		["digest", fixDecoderSize(getBytesDecoder(), 32)],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder())], ['owner', getAddressDecoder()], ['bump', getU8Decoder()], ['completed', getPinaPodBooleanDecoder()], ['digest', fixDecoderSize(getBytesDecoder(), 32)]]);
 }
 
 /** Gets the codec for {@link TodoState} account data. */
 export function getTodoStateCodec(): FixedSizeCodec<TodoStateArgs, TodoState> {
-	return combineCodec(getTodoStateEncoder(), getTodoStateDecoder());
+    return combineCodec(getTodoStateEncoder(), getTodoStateDecoder());
 }
 
-export function decodeTodoState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<TodoState, TAddress>;
-export function decodeTodoState<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<TodoState, TAddress>;
-export function decodeTodoState<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<TodoState, TAddress> | MaybeAccount<TodoState, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getTodoStateDecoder(),
-	);
+export function decodeTodoState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<TodoState, TAddress>;
+export function decodeTodoState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<TodoState, TAddress>;
+export function decodeTodoState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<TodoState, TAddress> | MaybeAccount<TodoState, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getTodoStateDecoder());
 }
 
 export async function fetchTodoState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<TodoState, TAddress>> {
-	const maybeAccount = await fetchMaybeTodoState(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeTodoState(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeTodoState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<TodoState, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeTodoState(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeTodoState(maybeAccount);
 }
 
 export async function fetchAllTodoState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<TodoState>[]> {
-	const maybeAccounts = await fetchAllMaybeTodoState(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeTodoState(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeTodoState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<TodoState>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodeTodoState(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeTodoState(maybeAccount));
 }
 
 export async function fetchTodoStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: TodoSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: TodoSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<TodoState>> {
-	const maybeAccount = await fetchMaybeTodoStateFromSeeds(rpc, seeds, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeTodoStateFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeTodoStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: TodoSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: TodoSeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<TodoState>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findTodoPda(seeds, { programAddress });
-	return await fetchMaybeTodoState(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findTodoPda(seeds, { programAddress });
+  return await fetchMaybeTodoState(rpc, address, fetchConfig);
 }

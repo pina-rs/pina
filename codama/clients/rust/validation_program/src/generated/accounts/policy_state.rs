@@ -47,9 +47,7 @@ impl PolicyState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut PolicyStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut PolicyStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POLICY_STATE_DISCRIMINATOR {
@@ -62,17 +60,21 @@ impl PolicyState {
 impl PolicyState {
 	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["validation-policy".as_bytes(), authority.as_ref()],
+			&[
+				"validation-policy".as_bytes(),
+				authority.as_ref(),
+			],
 			&crate::VALIDATION_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		authority: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(authority: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["validation-policy".as_bytes(), authority.as_ref(), &[bump]],
+			&[
+				"validation-policy".as_bytes(),
+				authority.as_ref(),
+				&[bump],
+			],
 			&crate::VALIDATION_PROGRAM_ID,
 		)
 	}

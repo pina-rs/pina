@@ -28,18 +28,7 @@ pub struct Take {
 }
 
 impl Take {
-	pub fn new(
-		taker: solana_pubkey::Pubkey,
-		mint_a: solana_pubkey::Pubkey,
-		mint_b: solana_pubkey::Pubkey,
-		taker_ata_a: solana_pubkey::Pubkey,
-		taker_ata_b: solana_pubkey::Pubkey,
-		maker: solana_pubkey::Pubkey,
-		maker_ata_b: solana_pubkey::Pubkey,
-		escrow: solana_pubkey::Pubkey,
-		vault: solana_pubkey::Pubkey,
-		token_program: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(taker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, taker_ata_a: solana_pubkey::Pubkey, taker_ata_b: solana_pubkey::Pubkey, maker: solana_pubkey::Pubkey, maker_ata_b: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			taker,
 			mint_a,
@@ -51,9 +40,7 @@ impl Take {
 			escrow,
 			vault,
 			token_program,
-			associated_token_program: solana_pubkey::pubkey!(
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			),
+			associated_token_program: solana_pubkey::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -70,41 +57,17 @@ impl Take {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(12 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.taker, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.mint_a,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.mint_b,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.taker_ata_a,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.taker_ata_b,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_a, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_b, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.taker_ata_a, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.taker_ata_b, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.maker, false));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.maker_ata_b,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.maker_ata_b, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.associated_token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.associated_token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
@@ -120,16 +83,14 @@ pub struct TakeInstructionData {
 }
 
 impl TakeInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut TakeInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut TakeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<TakeInstructionWireZc>()];
 		<TakeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TAKE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

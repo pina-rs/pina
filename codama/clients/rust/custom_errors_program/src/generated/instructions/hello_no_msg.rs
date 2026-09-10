@@ -12,11 +12,13 @@ pub const HELLO_NO_MSG_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct HelloNoMsg {}
+pub struct HelloNoMsg {
+}
 
 impl HelloNoMsg {
 	pub fn new() -> Self {
-		Self {}
+		Self {
+		}
 	}
 
 	pub fn instruction(&self, data: HelloNoMsgInstructionData) -> solana_instruction::Instruction {
@@ -45,16 +47,14 @@ pub struct HelloNoMsgInstructionData {
 }
 
 impl HelloNoMsgInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut HelloNoMsgInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut HelloNoMsgInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<HelloNoMsgInstructionWireZc>()];
 		<HelloNoMsgInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_NO_MSG_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

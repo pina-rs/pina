@@ -24,23 +24,14 @@ pub struct Claim {
 }
 
 impl Claim {
-	pub fn new(
-		beneficiary: solana_pubkey::Pubkey,
-		mint: solana_pubkey::Pubkey,
-		vesting_state: solana_pubkey::Pubkey,
-		beneficiary_ata: solana_pubkey::Pubkey,
-		vault: solana_pubkey::Pubkey,
-		token_program: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(beneficiary: solana_pubkey::Pubkey, mint: solana_pubkey::Pubkey, vesting_state: solana_pubkey::Pubkey, beneficiary_ata: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			beneficiary,
 			mint,
 			vesting_state,
 			beneficiary_ata,
 			vault,
-			associated_token_program: solana_pubkey::pubkey!(
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			),
+			associated_token_program: solana_pubkey::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
@@ -58,30 +49,13 @@ impl Claim {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.beneficiary, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.mint, false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.vesting_state,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.beneficiary_ata,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.vesting_state, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.beneficiary_ata, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.associated_token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.token_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.associated_token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::VESTING_PROGRAM_ID,
@@ -97,16 +71,14 @@ pub struct ClaimInstructionData {
 }
 
 impl ClaimInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut ClaimInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut ClaimInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<ClaimInstructionWireZc>()];
 		<ClaimInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CLAIM_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

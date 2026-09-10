@@ -6,193 +6,62 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithRpc,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	extendClient,
-	type ExtendedClient,
-	type GetAccountInfoApi,
-	type GetMultipleAccountsApi,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfFetchFunctions,
-	addSelfPlanAndSendFunctions,
-	type SelfFetchFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getPolicyStateCodec,
-	type PolicyState,
-	type PolicyStateArgs,
-} from "../accounts";
-import {
-	type CheckPolicyAsyncInput,
-	getCheckPolicyInstructionAsync,
-	getInitializePolicyInstructionAsync,
-	type InitializePolicyAsyncInput,
-	parseCheckPolicyInstruction,
-	type ParsedCheckPolicyInstruction,
-	type ParsedInitializePolicyInstruction,
-	parseInitializePolicyInstruction,
-} from "../instructions";
-import { findPolicyPda } from "../pdas";
+import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getPolicyStateCodec, type PolicyState, type PolicyStateArgs } from '../accounts';
+import { getCheckPolicyInstructionAsync, getInitializePolicyInstructionAsync, parseCheckPolicyInstruction, parseInitializePolicyInstruction, type CheckPolicyAsyncInput, type InitializePolicyAsyncInput, type ParsedCheckPolicyInstruction, type ParsedInitializePolicyInstruction } from '../instructions';
+import { findPolicyPda } from '../pdas';
 
-export const VALIDATION_PROGRAM_PROGRAM_ADDRESS =
-	"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn" as Address<
-		"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
-	>;
+export const VALIDATION_PROGRAM_PROGRAM_ADDRESS = 'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn' as Address<'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn'>;
 
-export enum ValidationProgramAccount {
-	PolicyState,
+export enum ValidationProgramAccount { PolicyState }
+
+export function identifyValidationProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): ValidationProgramAccount {
+    const data = 'data' in account ? account.data : account;
+    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return ValidationProgramAccount.PolicyState; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "validationProgram" });
 }
 
-export function identifyValidationProgramAccount(
-	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): ValidationProgramAccount {
-	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ValidationProgramAccount.PolicyState;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-		{ accountData: data, programName: "validationProgram" },
-	);
+export enum ValidationProgramInstruction { InitializePolicy, CheckPolicy }
+
+export function identifyValidationProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): ValidationProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return ValidationProgramInstruction.InitializePolicy; }
+if (containsBytes(data, getU8Encoder().encode(1), 0)) { return ValidationProgramInstruction.CheckPolicy; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "validationProgram" });
 }
 
-export enum ValidationProgramInstruction {
-	InitializePolicy,
-	CheckPolicy,
-}
+export type ParsedValidationProgramInstruction<TProgram extends string = 'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn'> =
+| { instructionType: ValidationProgramInstruction.InitializePolicy } & ParsedInitializePolicyInstruction<TProgram>
+| { instructionType: ValidationProgramInstruction.CheckPolicy } & ParsedCheckPolicyInstruction<TProgram>
 
-export function identifyValidationProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): ValidationProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return ValidationProgramInstruction.InitializePolicy;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ValidationProgramInstruction.CheckPolicy;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "validationProgram" },
-	);
-}
 
-export type ParsedValidationProgramInstruction<
-	TProgram extends string = "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
-> =
-	| { instructionType: ValidationProgramInstruction.InitializePolicy }
-		& ParsedInitializePolicyInstruction<TProgram>
-	| { instructionType: ValidationProgramInstruction.CheckPolicy }
-		& ParsedCheckPolicyInstruction<TProgram>;
+        export function parseValidationProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedValidationProgramInstruction<TProgram> {
+            const instructionType = identifyValidationProgramInstruction(instruction);
+            switch (instructionType) {
+                case ValidationProgramInstruction.InitializePolicy: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: ValidationProgramInstruction.InitializePolicy, ...parseInitializePolicyInstruction(instruction) }; }
+case ValidationProgramInstruction.CheckPolicy: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: ValidationProgramInstruction.CheckPolicy, ...parseCheckPolicyInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "validationProgram" });
+            }
+        }
 
-export function parseValidationProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedValidationProgramInstruction<TProgram> {
-	const instructionType = identifyValidationProgramInstruction(instruction);
-	switch (instructionType) {
-		case ValidationProgramInstruction.InitializePolicy: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: ValidationProgramInstruction.InitializePolicy,
-				...parseInitializePolicyInstruction(instruction),
-			};
-		}
-		case ValidationProgramInstruction.CheckPolicy: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: ValidationProgramInstruction.CheckPolicy,
-				...parseCheckPolicyInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "validationProgram",
-				},
-			);
-	}
-}
+export type ValidationProgramPlugin = { accounts: ValidationProgramPluginAccounts; instructions: ValidationProgramPluginInstructions; pdas: ValidationProgramPluginPdas; identifyAccount: typeof identifyValidationProgramAccount; identifyInstruction: typeof identifyValidationProgramInstruction; parseInstruction: typeof parseValidationProgramInstruction; }
 
-export type ValidationProgramPlugin = {
-	accounts: ValidationProgramPluginAccounts;
-	instructions: ValidationProgramPluginInstructions;
-	pdas: ValidationProgramPluginPdas;
-	identifyAccount: typeof identifyValidationProgramAccount;
-	identifyInstruction: typeof identifyValidationProgramInstruction;
-	parseInstruction: typeof parseValidationProgramInstruction;
-};
+export type ValidationProgramPluginAccounts = { policyState: ReturnType<typeof getPolicyStateCodec> & SelfFetchFunctions<PolicyStateArgs, PolicyState>; }
 
-export type ValidationProgramPluginAccounts = {
-	policyState:
-		& ReturnType<typeof getPolicyStateCodec>
-		& SelfFetchFunctions<PolicyStateArgs, PolicyState>;
-};
+export type ValidationProgramPluginInstructions = { initializePolicy: (input: InitializePolicyAsyncInput) => ReturnType<typeof getInitializePolicyInstructionAsync> & SelfPlanAndSendFunctions; checkPolicy: (input: CheckPolicyAsyncInput) => ReturnType<typeof getCheckPolicyInstructionAsync> & SelfPlanAndSendFunctions; }
 
-export type ValidationProgramPluginInstructions = {
-	initializePolicy: (
-		input: InitializePolicyAsyncInput,
-	) =>
-		& ReturnType<typeof getInitializePolicyInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	checkPolicy: (
-		input: CheckPolicyAsyncInput,
-	) =>
-		& ReturnType<typeof getCheckPolicyInstructionAsync>
-		& SelfPlanAndSendFunctions;
-};
+export type ValidationProgramPluginPdas = { policy: typeof findPolicyPda; }
 
-export type ValidationProgramPluginPdas = { policy: typeof findPolicyPda };
-
-export type ValidationProgramPluginRequirements =
-	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type ValidationProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function validationProgramProgram() {
-	return <T extends ValidationProgramPluginRequirements>(
-		client: T,
-	): ExtendedClient<T, { validationProgram: ValidationProgramPlugin }> => {
-		return extendClient(client, {
-			validationProgram: <ValidationProgramPlugin> {
-				accounts: {
-					policyState: addSelfFetchFunctions(client, getPolicyStateCodec()),
-				},
-				instructions: {
-					initializePolicy: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getInitializePolicyInstructionAsync(input),
-						),
-					checkPolicy: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getCheckPolicyInstructionAsync(input),
-						),
-				},
-				pdas: { policy: findPolicyPda },
-				identifyAccount: identifyValidationProgramAccount,
-				identifyInstruction: identifyValidationProgramInstruction,
-				parseInstruction: parseValidationProgramInstruction,
-			},
-		});
-	};
+    return <T extends ValidationProgramPluginRequirements>(client: T): ExtendedClient<T, { validationProgram: ValidationProgramPlugin }> => {
+        return extendClient(client, { validationProgram: <ValidationProgramPlugin>{ accounts: { policyState: addSelfFetchFunctions(client, getPolicyStateCodec()) }, instructions: { initializePolicy: input => addSelfPlanAndSendFunctions(client, getInitializePolicyInstructionAsync(input)), checkPolicy: input => addSelfPlanAndSendFunctions(client, getCheckPolicyInstructionAsync(input)) }, pdas: { policy: findPolicyPda }, identifyAccount: identifyValidationProgramAccount, identifyInstruction: identifyValidationProgramInstruction, parseInstruction: parseValidationProgramInstruction } });
+    };
 }

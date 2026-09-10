@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const HELLO_SOLANA_PROGRAM_ID: Address =
-	pina::address!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A");
+pub const HELLO_SOLANA_PROGRAM_ID: Address = pina::address!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A");
 
 /// Marker for the `helloSolanaProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

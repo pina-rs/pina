@@ -25,15 +25,7 @@ pub struct Make {
 }
 
 impl Make {
-	pub fn new(
-		maker: solana_pubkey::Pubkey,
-		mint_a: solana_pubkey::Pubkey,
-		mint_b: solana_pubkey::Pubkey,
-		maker_ata_a: solana_pubkey::Pubkey,
-		escrow: solana_pubkey::Pubkey,
-		vault: solana_pubkey::Pubkey,
-		token_program: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, maker_ata_a: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			maker,
 			mint_a,
@@ -41,9 +33,7 @@ impl Make {
 			maker_ata_a,
 			escrow,
 			vault,
-			associated_token_program: solana_pubkey::pubkey!(
-				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-			),
+			associated_token_program: solana_pubkey::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
@@ -61,32 +51,14 @@ impl Make {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.maker, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.mint_a,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.mint_b,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.maker_ata_a,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_a, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_b, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.maker_ata_a, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.associated_token_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.token_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.associated_token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
@@ -102,16 +74,14 @@ pub struct MakeInstructionData {
 }
 
 impl MakeInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut MakeInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut MakeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<MakeInstructionWireZc>()];
 		<MakeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = MAKE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

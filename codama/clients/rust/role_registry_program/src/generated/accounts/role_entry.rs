@@ -49,9 +49,7 @@ impl RoleEntry {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut RoleEntryZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut RoleEntryZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ROLE_ENTRY_DISCRIMINATOR {
@@ -73,11 +71,7 @@ impl RoleEntry {
 		)
 	}
 
-	pub fn create_pda(
-		registry: &solana_pubkey::Pubkey,
-		role_id: u64,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(registry: &solana_pubkey::Pubkey, role_id: u64, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
 			&[
 				"role-entry".as_bytes(),

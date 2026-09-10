@@ -34,6 +34,9 @@ pub enum ClientLanguage {
 	Typescript,
 	Dart,
 	Cpi,
+	CliRust,
+	CliTs,
+	CliDart,
 }
 
 impl ClientLanguage {
@@ -45,6 +48,20 @@ impl ClientLanguage {
 			Self::Rust => "rust",
 			Self::Typescript => "typescript",
 			Self::Dart => "dart",
+			Self::CliRust => "cli-rust",
+			Self::CliTs => "cli-ts",
+			Self::CliDart => "cli-dart",
+		}
+	}
+
+	/// The client ecosystem a generated CLI application depends on.
+	#[must_use]
+	pub const fn base_client(self) -> Option<Self> {
+		match self {
+			Self::CliRust => Some(Self::Rust),
+			Self::CliTs => Some(Self::Typescript),
+			Self::CliDart => Some(Self::Dart),
+			Self::Cpi | Self::Rust | Self::Typescript | Self::Dart => None,
 		}
 	}
 }
@@ -163,6 +180,9 @@ struct ClientsConfig {
 	rust: ClientGenerationOverride,
 	typescript: ClientGenerationOverride,
 	dart: ClientGenerationOverride,
+	cli_rust: ClientGenerationOverride,
+	cli_ts: ClientGenerationOverride,
+	cli_dart: ClientGenerationOverride,
 }
 
 impl Default for ClientsConfig {
@@ -176,6 +196,9 @@ impl Default for ClientsConfig {
 			rust: ClientGenerationOverride::default(),
 			typescript: ClientGenerationOverride::default(),
 			dart: ClientGenerationOverride::default(),
+			cli_rust: ClientGenerationOverride::default(),
+			cli_ts: ClientGenerationOverride::default(),
+			cli_dart: ClientGenerationOverride::default(),
 		}
 	}
 }
@@ -195,6 +218,9 @@ impl ClientsConfig {
 			ClientLanguage::Rust => &self.rust,
 			ClientLanguage::Typescript => &self.typescript,
 			ClientLanguage::Dart => &self.dart,
+			ClientLanguage::CliRust => &self.cli_rust,
+			ClientLanguage::CliTs => &self.cli_ts,
+			ClientLanguage::CliDart => &self.cli_dart,
 		};
 
 		ClientGenerationConfig {
@@ -218,6 +244,9 @@ impl ClientsConfig {
 			ClientLanguage::Rust,
 			ClientLanguage::Typescript,
 			ClientLanguage::Dart,
+			ClientLanguage::CliRust,
+			ClientLanguage::CliTs,
+			ClientLanguage::CliDart,
 		] {
 			let generation = self.generation_for(language);
 			let field = match language {
@@ -225,6 +254,9 @@ impl ClientsConfig {
 				ClientLanguage::Rust => "clients.rust.output",
 				ClientLanguage::Typescript => "clients.typescript.output",
 				ClientLanguage::Dart => "clients.dart.output",
+				ClientLanguage::CliRust => "clients.cli-rust.output",
+				ClientLanguage::CliTs => "clients.cli-ts.output",
+				ClientLanguage::CliDart => "clients.cli-dart.output",
 			};
 			resolve_output_config_path(clients_dir, field, &generation.output)?;
 			resolved.insert(language, generation);

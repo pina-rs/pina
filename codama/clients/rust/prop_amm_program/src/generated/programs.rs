@@ -8,7 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::Pubkey;
-use solana_pubkey::pubkey;
+use solana_pubkey::{pubkey, Pubkey};
 
 pub const PROP_AMM_PROGRAM_ID: Pubkey = pubkey!("55555555555555555555555555555555555555555555");

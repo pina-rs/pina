@@ -11,9 +11,9 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct StoreState {
-	/// On-chain store state touched through the optional mutable slot.
-	///
-	/// Layout (10 bytes): 1 discriminator + 1 bump + 8 count.
+/// On-chain store state touched through the optional mutable slot.
+/// 
+/// Layout (10 bytes): 1 discriminator + 1 bump + 8 count.
 	pub discriminator: u8,
 	pub bump: u8,
 	pub count: u64,
@@ -48,9 +48,7 @@ impl StoreState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut StoreStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut StoreStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != STORE_STATE_DISCRIMINATOR {
@@ -63,17 +61,21 @@ impl StoreState {
 impl StoreState {
 	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["store".as_bytes(), authority.as_ref()],
+			&[
+				"store".as_bytes(),
+				authority.as_ref(),
+			],
 			&crate::OPTIONAL_ACCOUNTS_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		authority: &solana_pubkey::Pubkey,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(authority: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["store".as_bytes(), authority.as_ref(), &[bump]],
+			&[
+				"store".as_bytes(),
+				authority.as_ref(),
+				&[bump],
+			],
 			&crate::OPTIONAL_ACCOUNTS_PROGRAM_ID,
 		)
 	}

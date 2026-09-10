@@ -12,11 +12,13 @@ pub const REQUIRE_GT_DISCRIMINATOR: u8 = 5u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct RequireGt {}
+pub struct RequireGt {
+}
 
 impl RequireGt {
 	pub fn new() -> Self {
-		Self {}
+		Self {
+		}
 	}
 
 	pub fn instruction(&self, data: RequireGtInstructionData) -> solana_instruction::Instruction {
@@ -45,16 +47,14 @@ pub struct RequireGtInstructionData {
 }
 
 impl RequireGtInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut RequireGtInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut RequireGtInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<RequireGtInstructionWireZc>()];
 		<RequireGtInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_GT_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

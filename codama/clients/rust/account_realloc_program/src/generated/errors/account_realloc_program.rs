@@ -13,16 +13,16 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AccountReallocProgramError {
-	/// 3016 -
+	/// 3016 - 
 	#[error("")]
 	AccountReallocExceedsLimit = 0xBC8,
-	/// 3017 -
+	/// 3017 - 
 	#[error("")]
 	AccountDuplicateReallocs = 0xBC9,
-	/// 3018 -
+	/// 3018 - 
 	#[error("")]
 	AccountDataTooSmall = 0xBCA,
-	/// 3019 -
+	/// 3019 - 
 	#[error("")]
 	AuthorityMismatch = 0xBCB,
 }

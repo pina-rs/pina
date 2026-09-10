@@ -29,24 +29,24 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 
 ## Command map
 
-| Command                                        | Purpose                                                      | Primary output                            |
-| ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
-| [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
-| [`pina lint`](./lint.md)                       | Run the official security lints via the lint driver          | Compiler diagnostics and optional fixes   |
-| [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
-| [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
-| [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
-| [`pina cpi`](./cpi.md)                         | Generate a standalone Pina CPI crate from an IDL             | Rust crate                                |
-| [`pina test`](./test.md)                       | Run native/Mollusk or SBF/Surfpool tests                     | Test runner output                        |
-| [`pina dev`](./dev.md)                         | Start an offline Surfpool watch/redeploy loop                | Surfpool UI and logs                      |
-| [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
-| [`pina docs`](./docs.md)                       | List or render bundled terminal docs                         | Terminal text                             |
-| [`pina keys`](./keys.md)                       | Inspect or explicitly change program identity                | Text or JSON                              |
-| [`pina doctor`](./doctor.md)                   | Diagnose project and toolchain readiness                     | Text or JSON                              |
-| [`pina completions`](./completions.md)         | Generate a shell completion script                           | Shell script                              |
-| [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                       | Text or JSON                              |
-| [`pina deploy`](./deploy.md)                   | Plan and execute an explicit cluster deployment              | Plan or JSON                              |
-| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, CPI, JavaScript, and Dart clients    | Generated directories                     |
+| Command                                        | Purpose                                                        | Primary output                            |
+| ---------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------- |
+| [`pina init`](./init.md)                       | Create a project-aware program scaffold                        | Files plus next steps                     |
+| [`pina lint`](./lint.md)                       | Run the official security lints via the lint driver            | Compiler diagnostics and optional fixes   |
+| [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs   | SBF, IDL, and optional build-record files |
+| [`pina verify`](./verify.md)                   | Compare deployments and record verified source                 | Status or transaction                     |
+| [`pina generate`](./generate.md)               | Generate configured client ecosystems                          | Generated clients                         |
+| [`pina cpi`](./cpi.md)                         | Generate a standalone Pina CPI crate from an IDL               | Rust crate                                |
+| [`pina test`](./test.md)                       | Run native/Mollusk or SBF/Surfpool tests                       | Test runner output                        |
+| [`pina dev`](./dev.md)                         | Start an offline Surfpool watch/redeploy loop                  | Surfpool UI and logs                      |
+| [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                                 | JSON                                      |
+| [`pina docs`](./docs.md)                       | List or render bundled terminal docs                           | Terminal text                             |
+| [`pina keys`](./keys.md)                       | Inspect or explicitly change program identity                  | Text or JSON                              |
+| [`pina doctor`](./doctor.md)                   | Diagnose project and toolchain readiness                       | Text or JSON                              |
+| [`pina completions`](./completions.md)         | Generate a shell completion script                             | Shell script                              |
+| [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                         | Text or JSON                              |
+| [`pina deploy`](./deploy.md)                   | Plan and execute an explicit cluster deployment                | Plan or JSON                              |
+| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, CPI, JavaScript, Dart, and CLI clients | Generated directories                     |
 
 ## Discover the interface
 

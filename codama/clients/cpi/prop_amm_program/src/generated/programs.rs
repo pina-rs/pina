@@ -11,8 +11,7 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const PROP_AMM_PROGRAM_ID: Address =
-	pina::address!("55555555555555555555555555555555555555555555");
+pub const PROP_AMM_PROGRAM_ID: Address = pina::address!("55555555555555555555555555555555555555555555");
 
 /// Marker for the `propAmmProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

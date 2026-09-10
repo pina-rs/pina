@@ -6,173 +6,93 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getAddressDecoder,
-	getAddressEncoder,
-	getBooleanDecoder,
-	getBooleanEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findRoleEntryPda, type RoleEntrySeeds } from "../pdas";
-import {
-	getPinaPodBooleanDecoder,
-	getPinaPodDiscriminatorDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodBooleanDecoder, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getBooleanDecoder, getBooleanEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findRoleEntryPda, type RoleEntrySeeds } from '../pdas';
 
 export const ROLE_ENTRY_DISCRIMINATOR = 2;
 
-export function getRoleEntryDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ROLE_ENTRY_DISCRIMINATOR);
-}
+export function getRoleEntryDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ROLE_ENTRY_DISCRIMINATOR); }
 
-export type RoleEntry = {
-	discriminator: number;
-	registry: Address;
-	roleId: bigint;
-	grantee: Address;
-	permissions: bigint;
-	active: boolean;
-	bump: number;
-};
+export type RoleEntry = { discriminator: number; registry: Address; roleId: bigint; grantee: Address; permissions: bigint; active: boolean; bump: number;  };
 
-export type RoleEntryArgs = {
-	registry: Address;
-	roleId: number | bigint;
-	grantee: Address;
-	permissions: number | bigint;
-	active: boolean;
-	bump: number;
-};
+export type RoleEntryArgs = { registry: Address; roleId: number | bigint; grantee: Address; permissions: number | bigint; active: boolean; bump: number;  };
 
 /** Gets the encoder for {@link RoleEntryArgs} account data. */
 export function getRoleEntryEncoder(): FixedSizeEncoder<RoleEntryArgs> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["registry", getAddressEncoder()],
-			["roleId", getU64Encoder()],
-			["grantee", getAddressEncoder()],
-			["permissions", getU64Encoder()],
-			["active", getBooleanEncoder()],
-			["bump", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 2 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['registry', getAddressEncoder()], ['roleId', getU64Encoder()], ['grantee', getAddressEncoder()], ['permissions', getU64Encoder()], ['active', getBooleanEncoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
 }
 
 /** Gets the decoder for {@link RoleEntry} account data. */
 export function getRoleEntryDecoder(): FixedSizeDecoder<RoleEntry> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder()),
-		],
-		["registry", getAddressDecoder()],
-		["roleId", getU64Decoder()],
-		["grantee", getAddressDecoder()],
-		["permissions", getU64Decoder()],
-		["active", getPinaPodBooleanDecoder()],
-		["bump", getU8Decoder()],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder())], ['registry', getAddressDecoder()], ['roleId', getU64Decoder()], ['grantee', getAddressDecoder()], ['permissions', getU64Decoder()], ['active', getPinaPodBooleanDecoder()], ['bump', getU8Decoder()]]);
 }
 
 /** Gets the codec for {@link RoleEntry} account data. */
 export function getRoleEntryCodec(): FixedSizeCodec<RoleEntryArgs, RoleEntry> {
-	return combineCodec(getRoleEntryEncoder(), getRoleEntryDecoder());
+    return combineCodec(getRoleEntryEncoder(), getRoleEntryDecoder());
 }
 
-export function decodeRoleEntry<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<RoleEntry, TAddress>;
-export function decodeRoleEntry<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<RoleEntry, TAddress>;
-export function decodeRoleEntry<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<RoleEntry, TAddress> | MaybeAccount<RoleEntry, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getRoleEntryDecoder(),
-	);
+export function decodeRoleEntry<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<RoleEntry, TAddress>;
+export function decodeRoleEntry<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<RoleEntry, TAddress>;
+export function decodeRoleEntry<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<RoleEntry, TAddress> | MaybeAccount<RoleEntry, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getRoleEntryDecoder());
 }
 
 export async function fetchRoleEntry<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<RoleEntry, TAddress>> {
-	const maybeAccount = await fetchMaybeRoleEntry(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRoleEntry(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeRoleEntry<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  address: Address<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<RoleEntry, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-	return decodeRoleEntry(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+  return decodeRoleEntry(maybeAccount);
 }
 
 export async function fetchAllRoleEntry(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<RoleEntry>[]> {
-	const maybeAccounts = await fetchAllMaybeRoleEntry(rpc, addresses, config);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeRoleEntry(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeRoleEntry(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0],
+  addresses: Array<Address>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<RoleEntry>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-	return maybeAccounts.map((maybeAccount) => decodeRoleEntry(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+  return maybeAccounts.map((maybeAccount) => decodeRoleEntry(maybeAccount));
 }
 
 export async function fetchRoleEntryFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: RoleEntrySeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: RoleEntrySeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<RoleEntry>> {
-	const maybeAccount = await fetchMaybeRoleEntryFromSeeds(rpc, seeds, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRoleEntryFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeRoleEntryFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	seeds: RoleEntrySeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0],
+  seeds: RoleEntrySeeds,
+  config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<RoleEntry>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findRoleEntryPda(seeds, { programAddress });
-	return await fetchMaybeRoleEntry(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findRoleEntryPda(seeds, { programAddress });
+  return await fetchMaybeRoleEntry(rpc, address, fetchConfig);
 }

@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `CpiTransfer`.
-///
+/// 
 /// Layout:
 /// ```text
 /// | offset | size | field         |
@@ -52,10 +52,7 @@ impl CpiTransfer {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.sender, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::TRANSFER_SOL_PROGRAM_ID,
@@ -71,16 +68,14 @@ pub struct CpiTransferInstructionData {
 }
 
 impl CpiTransferInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut CpiTransferInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut CpiTransferInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<CpiTransferInstructionWireZc>()];
 		<CpiTransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CPI_TRANSFER_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
