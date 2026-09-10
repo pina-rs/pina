@@ -2,6 +2,8 @@
 
 This page is the map of the whole migration system: what happens when a developer changes a contract, what the program does at runtime, and exactly what is expected from clients. Everything described here is the implemented behavior — [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md) collects the parts that are designed but not built yet.
 
+An interactive version of this page is at [flow-interactive.html](./flow-interactive.html).
+
 ## The one-paragraph answer
 
 **Migration happens on-chain, inside the program, on demand.** A client never migrates account data and never needs to know a migration exists. Every wire carrier — account, instruction payload, event — carries a version envelope right after its discriminator, every client writes the version it was generated with, and the program normalizes whatever arrives into its current representation inside the transaction that touched it. If the transaction fails, Solana rolls the migration back with everything else.

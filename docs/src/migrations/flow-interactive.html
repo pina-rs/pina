@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Pina Migrations Work</title>
+<style>
+	:root {
+		--bg: #fafaf9;
+		--panel: #ffffff;
+		--ink: #1c1917;
+		--muted: #78716c;
+		--line: #e7e5e4;
+		--accent: #0f766e;
+		--accent-soft: #ccfbf1;
+		--amber: #b45309;
+		--amber-soft: #fef3c7;
+		--red: #b91c1c;
+		--red-soft: #fee2e2;
+		--blue: #1d4ed8;
+		--blue-soft: #dbeafe;
+		--violet: #6d28d9;
+		--violet-soft: #ede9fe;
+		--code-bg: #1c1917;
+		--code-ink: #fafaf9;
+	}
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	body {
+		font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+		background: var(--bg);
+		color: var(--ink);
+		line-height: 1.6;
+		font-size: 16px;
+	}
+	.wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 120px; }
+	header {
+		padding: 56px 0 32px;
+		border-bottom: 1px solid var(--line);
+		margin-bottom: 40px;
+	}
+	header h1 { font-size: 34px; letter-spacing: -0.02em; margin-bottom: 10px; }
+	header p.sub { color: var(--muted); font-size: 17px; max-width: 720px; }
+	.tldr {
+		margin-top: 24px;
+		background: var(--accent-soft);
+		border-left: 4px solid var(--accent);
+		padding: 16px 20px;
+		border-radius: 0 10px 10px 0;
+		font-size: 16px;
+	}
+	.tldr strong { color: var(--accent); }
+	h2 {
+		font-size: 24px;
+		letter-spacing: -0.01em;
+		margin: 56px 0 8px;
+		padding-top: 24px;
+		border-top: 1px solid var(--line);
+	}
+	h2:first-of-type { border-top: none; }
+	p.lead { color: var(--muted); margin-bottom: 20px; max-width: 760px; }
+	code.inline {
+		background: #f0fdfa;
+		border: 1px solid #99f6e4;
+		color: #0f766e;
+		padding: 1px 6px;
+		border-radius: 5px;
+		font-family: ui-monospace, "SF Mono", Menlo, monospace;
+		font-size: 0.88em;
+		white-space: nowrap;
+	}
+	.cmd {
+		display: block;
+		background: var(--code-bg);
+		color: var(--code-ink);
+		font-family: ui-monospace, "SF Mono", Menlo, monospace;
+		font-size: 13.5px;
+		padding: 12px 16px;
+		border-radius: 8px;
+		margin: 10px 0;
+		overflow-x: auto;
+		white-space: pre;
+	}
+	.cmd .prompt { color: #5eead4; user-select: none; }
+	.cmd .flag { color: #fcd34d; }
+	.cmd .comment { color: #a8a29e; }
+
+	/* Stepper */
+	.step {
+		background: var(--panel);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		margin-bottom: 14px;
+		overflow: hidden;
+	}
+	.step-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+		padding: 18px 20px;
+		cursor: pointer;
+		user-select: none;
+	}
+	.step-head:hover { background: #fafaf9; }
+	.step-num {
+		flex: 0 0 34px;
+		height: 34px;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-weight: 700;
+		font-size: 15px;
+	}
+	.step-title { font-weight: 650; font-size: 16.5px; }
+	.step-what { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+	.step-caret {
+		margin-left: auto;
+		color: var(--muted);
+		transition: transform 0.2s;
+		flex: 0 0 auto;
+		padding-top: 6px;
+	}
+	.step.open .step-caret { transform: rotate(90deg); }
+	.step-body { display: none; padding: 0 20px 20px 70px; }
+	.step.open .step-body { display: block; }
+
+	.under {
+		margin-top: 12px;
+		border: 1px dashed #5eead4;
+		border-radius: 10px;
+		background: #f0fdfa;
+	}
+	.under > summary {
+		cursor: pointer;
+		padding: 10px 14px;
+		font-size: 13.5px;
+		font-weight: 650;
+		color: var(--accent);
+		list-style: none;
+	}
+	.under > summary::before { content: "⚙ "; }
+	.under > summary::marker { content: none; }
+	.under[open] > summary { border-bottom: 1px dashed #5eead4; }
+	.under .under-body { padding: 12px 14px; font-size: 14px; color: #134e4a; }
+	.under .under-body p { margin-bottom: 8px; }
+	.under .under-body p:last-child { margin-bottom: 0; }
+	.under .under-body code {
+		font-family: ui-monospace, Menlo, monospace;
+		font-size: 12.5px;
+		background: #ccfbf1;
+		padding: 0 4px;
+		border-radius: 4px;
+	}
+
+	/* Files tree */
+	.tree {
+		background: #f5f5f4;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		padding: 12px 16px;
+		font-family: ui-monospace, Menlo, monospace;
+		font-size: 13px;
+		line-height: 1.7;
+		margin: 10px 0;
+		white-space: pre;
+		overflow-x: auto;
+	}
+	.tree .f { color: var(--ink); }
+	.tree .d { color: var(--violet); font-weight: 600; }
+	.tree .c { color: var(--muted); }
+
+	/* Diagrams */
+	.diagram {
+		background: var(--panel);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		padding: 20px;
+		margin: 18px 0;
+		overflow-x: auto;
+	}
+	.diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+	/* Scenario cards */
+	.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 18px 0; }
+	.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+	.card h3 { font-size: 15px; margin-bottom: 8px; }
+	.card .vs { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+	.card p { font-size: 14px; }
+	.card .verdict {
+		display: inline-block;
+		margin-top: 12px;
+		font-size: 12.5px;
+		font-weight: 700;
+		padding: 3px 10px;
+		border-radius: 999px;
+	}
+	.v-fast { background: var(--accent-soft); color: var(--accent); }
+	.v-magic { background: var(--blue-soft); color: var(--blue); }
+	.v-stop { background: var(--red-soft); color: var(--red); }
+	.v-classic { background: #f5f5f4; color: var(--muted); }
+
+	/* Tables */
+	table { border-collapse: collapse; width: 100%; margin: 14px 0; background: var(--panel); border-radius: 12px; overflow: hidden; font-size: 14px; }
+	th { background: #f5f5f4; text-align: left; padding: 10px 14px; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+	td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+	tr:last-child td { border-bottom: none; }
+	td code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: #f5f5f4; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+	.yes { color: var(--accent); font-weight: 650; }
+	.no { color: var(--red); font-weight: 650; }
+	.part { color: var(--amber); font-weight: 650; }
+
+	/* Warning and info boxes */
+	.box { border-radius: 10px; padding: 14px 18px; font-size: 14.5px; margin: 14px 0; }
+	.box.warn { background: var(--amber-soft); border-left: 4px solid var(--amber); }
+	.box.info { background: var(--blue-soft); border-left: 4px solid var(--blue); }
+	.box b { display: block; margin-bottom: 4px; }
+
+	/* Future list */
+	.future { display: grid; gap: 10px; margin-top: 14px; }
+	.future-item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; display: flex; gap: 14px; align-items: flex-start; }
+	.future-item .tag { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 8px; border-radius: 6px; margin-top: 2px; }
+	.t-soon { background: var(--accent-soft); color: var(--accent); }
+	.t-later { background: var(--violet-soft); color: var(--violet); }
+	.future-item p { font-size: 14px; }
+	.future-item p b { font-size: 14.5px; }
+
+	.footnote { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }
+	@media (max-width: 640px) {
+		.step-body { padding-left: 20px; }
+		header h1 { font-size: 26px; }
+	}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+	<h1>How Pina Migrations Work</h1>
+	<p class="sub">A step-by-step guide to versioned, automatic ABI migrations: what you run, what the framework does for you, and what happens on-chain when old data meets a new program.</p>
+	<div class="tldr">
+		<strong>The short version:</strong> you never write a migration by hand for ordinary changes. You change your structs like always and run one CLI command when the build asks. If a field was renamed or removed, you answer one question. The program then carries every old account, instruction, and event forward to the current shape inside whichever transaction touches it. Clients keep working unchanged.
+	</div>
+</header>
+
+<!-- ============ PART 1: DEVELOPER ============ -->
+<h2>Part 1: the developer journey</h2>
+<p class="lead">Seven steps from turning migrations on to shipping a new version. Click each step to expand it. The under-the-hood panels explain the machinery for anyone curious.</p>
+
+<div class="step open" id="s1">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">1</div>
+		<div>
+			<div class="step-title">Turn migrations on once</div>
+			<div class="step-what">One line in <code class="inline">pina.toml</code>, then you can stop thinking about it.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<p>Add a <code class="inline">[migrations]</code> section to your program's <code class="inline">pina.toml</code> and pick how wide the version counter should be. <code class="inline">u8</code> is fine for almost every program, and gives 255 versions per contract.</p>
+		<div class="cmd"><span class="prompt">$ </span>cat pina.toml
+<span class="comment">[project]
+program = "."
+
+[migrations]
+version-type = "u8"</span></div>
+		<details class="under">
+			<summary>What happens under the hood</summary>
+			<div class="under-body">
+				<p>Accounts, instruction payloads, and events all gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
+				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you.</p>
+			</div>
+		</details>
+	</div>
+</div>
+
+<div class="step" id="s2">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">2</div>
+		<div>
+			<div class="step-title">Change your code like you always do</div>
+			<div class="step-what">Add a field, add an instruction argument, change whatever the product needs.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<p>Nothing special here, and that is the point. Say your <code class="inline">State</code> account needs a new <code class="inline">revision</code> counter:</p>
+		<div class="cmd"><span class="comment">// v1: authority + value
+// v2: authority + value + revision   ← your change</span></div>
+		<p>You do not write a conversion function, bump a constant, or touch stored data. Just edit the struct.</p>
+	</div>
+</div>
+
+<div class="step" id="s3">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">3</div>
+		<div>
+			<div class="step-title">The build catches the change</div>
+			<div class="step-what">Compilation fails with one instruction: run <code class="inline">pina migrations make</code>.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<div class="cmd"><span class="prompt">$ </span>pina build
+<span class="comment">error: State changed since the recorded schema (v1).
+       Its data schema or instruction process ABI changed.
+       Run `pina migrations make` and review the transition.</span></div>
+		<p>You cannot ship a wire-format change without a migration. The build refuses until the change is recorded, and CI runs the same gate through <code class="inline">pina migrations check</code>.</p>
+		<details class="under">
+			<summary>What happens under the hood</summary>
+			<div class="under-body">
+				<p>The derive macros snapshot each contract's <em>schema</em> (field names, types, order, layout) at compile time and compare it against a checked-in manifest. When the code and the manifest disagree, you get the compile error you just saw.</p>
+			</div>
+		</details>
+	</div>
+</div>
+
+<div class="step" id="s4">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">4</div>
+		<div>
+			<div class="step-title">Record the migration</div>
+			<div class="step-what"><code class="inline">pina migrations make</code> handles most changes on its own. Renames and removals ask one question.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<div class="cmd"><span class="prompt">$ </span>pina migrations make
+<span class="comment">contract `state`: appended field `revision: u8`
+  → automatic transition generated (zero-fill new field)
+✓ recorded version 2 for state</span></div>
+		<p><strong>Most changes need nothing from you.</strong> Appending fields, growing fixed buffers, and widening numbers produce a generated transition with no input.</p>
+		<p><strong>Two kinds of change ask a question:</strong></p>
+		<div class="cmd"><span class="comment">? field `value` (type `u64`) is removed for `state`.
+  was `value` renamed to `balance` (type `u64`)?
+  [y] rename, preserve the stored data
+  [n] remove, discard the stored data and zero-fill `balance`</span></div>
+		<p>On a terminal you answer interactively. In CI or an agent, the same questions arrive as JSON, or as a failure that names the flag to run:</p>
+		<div class="cmd"><span class="prompt">$ </span>pina migrations make <span class="flag">--json</span>
+<span class="comment">error: ambiguous field changes need an explicit answer
+  - `state`: was `value` renamed to `balance` (type `u64`)?
+    answer with --rename value:balance, or --assume-removed value</span>
+<span class="prompt">$ </span>pina migrations make <span class="flag">--rename value:balance</span>   <span class="comment"># non-interactive answer</span></div>
+		<div class="box warn"><b>Removing a field always needs an explicit yes.</b> You confirm interactively, or pass <code class="inline">--assume-removed</code>. Every dropped field also prints a warning naming what was discarded.</div>
+		<details class="under">
+			<summary>What happens under the hood</summary>
+			<div class="under-body">
+				<p>Two files change. <code>migrations/manifest.json</code> records the new version and its full schema snapshot. <code>migrations/transitions/account_1_03/…</code> holds a generated Rust transition that copies overlapping bytes field by field and zero-fills anything new.</p>
+				<div class="tree"><span class="d">migrations/</span>
+├── <span class="f">manifest.json</span>        <span class="c">← every version's schema, per contract</span>
+├── <span class="f">publications.json</span>    <span class="c">← hash-chained release ledger (step 6)</span>
+└── <span class="d">transitions/</span>
+    ├── <span class="d">account_1_02/</span>   <span class="c">← v1 → v2 for the State account</span>
+    ├── <span class="d">instruction_1_00/</span>
+    └── <span class="d">event_1_04/</span></div>
+				<p>Renames are recorded as byte-preserving moves. If a new answer ever contradicts recorded history, the CLI rejects it instead of guessing.</p>
+			</div>
+		</details>
+	</div>
+</div>
+
+<div class="step" id="s5">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">5</div>
+		<div>
+			<div class="step-title">Fill the rare manual transition</div>
+			<div class="step-what">Type changes and layout switches leave a marked TODO. You write the conversion; the framework keeps the plumbing.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<p>Some changes have no safe automatic answer, like changing a field's type or moving an account from fixed to compact layout. The CLI still records the migration, but generates the transition with a failing <code class="inline">todo!()</code> body so the build will not let you forget it:</p>
+		<div class="cmd"><span class="comment">// TODO: convert the stored representation (runs on-chain, must be infallible)
+fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
+    // read v1 field → convert → write v2 field
+}</span></div>
+		<p><code class="inline">pina migrations check</code> fails while any TODO remains, so CI can enforce completion. Everything around your body stays framework-owned: validating the old bytes, validating the result, the version bump, the rent math.</p>
+	</div>
+</div>
+
+<div class="step" id="s6">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">6</div>
+		<div>
+			<div class="step-title">Ship it, and freeze history</div>
+			<div class="step-what"><code class="inline">pina deploy --record-publication</code> publishes the program and pins every version you just shipped.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<div class="cmd"><span class="prompt">$ </span>pina build
+<span class="prompt">$ </span>pina deploy <span class="flag">--record-publication</span> --program-id &lt;ID&gt; ...</div>
+		<details class="under">
+			<summary>What happens under the hood</summary>
+			<div class="under-body">
+				<p>Deploy appends a receipt to <code>publications.json</code> recording which ELF bytes went on-chain, which manifest versions they carried, and the hash of the previous receipt. Each receipt is hash-chained to the last, so the history cannot be edited or reordered later.</p>
+				<p>Once a version is published it becomes <strong>immutable</strong>. Its schema snapshot and transition files are frozen, and any later edit to them fails <code>pina migrations check</code>. Shipped migrations are history, not drafts. If a deploy dies halfway, <code>pina migrations reconcile</code> inspects the pending receipt and either completes it or abandons it explicitly. An abandoned receipt still freezes whatever shipped.</p>
+			</div>
+		</details>
+	</div>
+</div>
+
+<div class="step" id="s7">
+	<div class="step-head" onclick="toggle(this)">
+		<div class="step-num">7</div>
+		<div>
+			<div class="step-title">Regenerate clients</div>
+			<div class="step-what">TypeScript, Dart, and Rust clients come out with the new shape, and they embed the current version for you.</div>
+		</div>
+		<div class="step-caret">▶</div>
+	</div>
+	<div class="step-body">
+		<div class="cmd"><span class="prompt">$ </span>pina generate
+<span class="comment">✓ typescript → clients/typescript
+✓ rust       → clients/rust
+✓ cpi        → clients/cpi</span></div>
+		<p>Every generated encoder stamps the current version into the envelope automatically. Your client code constructs instructions and decodes accounts exactly as before.</p>
+		<div class="box info"><b>Old clients keep working.</b> A client built before the migration still writes version 1. The program accepts it and normalizes it on-chain (Part 2). You upgrade clients on your own schedule, not in lockstep with deploys.</div>
+	</div>
+</div>
+
+<!-- ============ PART 2: RUNTIME ============ -->
+<h2>Part 2: what happens on-chain</h2>
+<p class="lead">Every wire format carries the framework-owned envelope. When a transaction arrives, the program routes on the version byte. This diagram is the entire decision tree.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 900 430" width="900" height="430" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif, system-ui, sans-serif">
+	<defs>
+		<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="#78716c"/>
+		</marker>
+		<marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+		</marker>
+		<marker id="arrr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="#b91c1c"/>
+		</marker>
+	</defs>
+
+	<!-- envelope -->
+	<text x="60" y="34" font-size="13" fill="#78716c">incoming bytes (instruction, account, or event)</text>
+	<rect x="60" y="46" width="130" height="40" rx="7" fill="#6d28d9"/>
+	<text x="125" y="71" font-size="13.5" fill="#fff" text-anchor="middle" font-weight="600">discriminator</text>
+	<rect x="190" y="46" width="90" height="40" rx="0" fill="#0f766e"/>
+	<text x="235" y="65" font-size="13.5" fill="#fff" text-anchor="middle" font-weight="600">version</text>
+	<text x="235" y="80" font-size="10" fill="#ccfbf1" text-anchor="middle">framework-owned</text>
+	<rect x="280" y="46" width="200" height="40" rx="7" fill="#44403c"/>
+	<text x="380" y="71" font-size="13.5" fill="#fff" text-anchor="middle" font-weight="600">your payload</text>
+
+	<!-- trunk -->
+	<line x1="235" y1="86" x2="235" y2="130" stroke="#78716c" stroke-width="1.5" marker-end="url(#arr)"/>
+
+	<!-- decision -->
+	<rect x="120" y="132" width="230" height="46" rx="10" fill="#fff" stroke="#e7e5e4"/>
+	<text x="235" y="160" font-size="14" text-anchor="middle" font-weight="650" fill="#1c1917">read version, compare to current</text>
+
+	<!-- three branches -->
+	<line x1="160" y1="178" x2="105" y2="240" stroke="#0f766e" stroke-width="1.5" marker-end="url(#arrg)"/>
+	<line x1="235" y1="178" x2="390" y2="240" stroke="#1d4ed8" stroke-width="1.5" marker-end="url(#arr)"/>
+	<line x1="310" y1="178" x2="700" y2="240" stroke="#b91c1c" stroke-width="1.5" marker-end="url(#arrr)"/>
+	<text x="95" y="212" font-size="12.5" fill="#0f766e" font-weight="600">== current</text>
+	<text x="285" y="212" font-size="12.5" fill="#1d4ed8" font-weight="600">&lt; current (stale)</text>
+	<text x="580" y="212" font-size="12.5" fill="#b91c1c" font-weight="600">&gt; current (from the future)</text>
+
+	<!-- hot path -->
+	<rect x="30" y="244" width="200" height="110" rx="12" fill="#f0fdfa" stroke="#5eead4"/>
+	<text x="130" y="270" font-size="14" text-anchor="middle" font-weight="700" fill="#0f766e">HOT PATH</text>
+	<text x="130" y="292" font-size="12.5" text-anchor="middle" fill="#134e4a">validate → run your handler</text>
+	<text x="130" y="312" font-size="12.5" text-anchor="middle" fill="#134e4a">zero migration cost,</text>
+	<text x="130" y="330" font-size="12.5" text-anchor="middle" fill="#134e4a">zero copies, same speed</text>
+	<text x="130" y="348" font-size="12.5" text-anchor="middle" fill="#134e4a">as a program without migrations</text>
+
+	<!-- stale path -->
+	<rect x="300" y="244" width="230" height="160" rx="12" fill="#eff6ff" stroke="#93c5fd"/>
+	<text x="415" y="270" font-size="14" text-anchor="middle" font-weight="700" fill="#1d4ed8">NORMALIZE INLINE</text>
+	<text x="415" y="292" font-size="12.5" text-anchor="middle" fill="#1e3a8a">rewrite v(n) → v(n+1) in a stack</text>
+	<text x="415" y="310" font-size="12.5" text-anchor="middle" fill="#1e3a8a">workspace, one adjacent step at</text>
+	<text x="415" y="328" font-size="12.5" text-anchor="middle" fill="#1e3a8a">a time, until current, then run</text>
+	<text x="415" y="348" font-size="12.5" text-anchor="middle" fill="#1e3a8a">the handler on the fresh bytes.</text>
+	<text x="415" y="370" font-size="12.5" text-anchor="middle" fill="#1e3a8a" font-weight="650">Same transaction, atomic.</text>
+	<text x="415" y="390" font-size="12.5" text-anchor="middle" fill="#1e3a8a">Fail anywhere → full rollback.</text>
+
+	<!-- future path -->
+	<rect x="610" y="244" width="230" height="110" rx="12" fill="#fef2f2" stroke="#fca5a5"/>
+	<text x="725" y="270" font-size="14" text-anchor="middle" font-weight="700" fill="#b91c1c">FAIL CLOSED</text>
+	<text x="725" y="292" font-size="12.5" text-anchor="middle" fill="#7f1d1d">reject with InvalidMigrationVersion</text>
+	<text x="725" y="312" font-size="12.5" text-anchor="middle" fill="#7f1d1d">never guesses, never downgrades.</text>
+	<text x="725" y="330" font-size="12.5" text-anchor="middle" fill="#7f1d1d">Upgrade the program first</text>
+
+	<!-- wrong discriminator note -->
+	<rect x="30" y="380" width="810" height="34" rx="8" fill="#fafaf9" stroke="#e7e5e4"/>
+	<text x="435" y="402" font-size="12.5" text-anchor="middle" fill="#78716c">Wrong discriminator? Rejected before the version is even read, so one contract can never be misread as another.</text>
+</svg>
+</div>
+
+<h3 style="font-size:18px; margin-top: 32px;">An old account meeting a new program, step by step</h3>
+<p class="lead">Account migrations are the interesting case because they can change the account's size, and size changes rent. This is what one instruction does when the account is two versions behind.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 900 560" width="900" height="560" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif, system-ui, sans-serif">
+	<defs>
+		<marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="#78716c"/>
+		</marker>
+	</defs>
+
+	<!-- lanes -->
+	<text x="150" y="28" font-size="13.5" font-weight="700" fill="#6d28d9" text-anchor="middle">user's transaction</text>
+	<text x="450" y="28" font-size="13.5" font-weight="700" fill="#0f766e" text-anchor="middle">your program</text>
+	<text x="750" y="28" font-size="13.5" font-weight="700" fill="#b45309" text-anchor="middle">the stale account (v0)</text>
+	<line x1="150" y1="40" x2="150" y2="540" stroke="#e7e5e4" stroke-width="1.5"/>
+	<line x1="450" y1="40" x2="450" y2="540" stroke="#e7e5e4" stroke-width="1.5"/>
+	<line x1="750" y1="40" x2="750" y2="540" stroke="#e7e5e4" stroke-width="1.5"/>
+
+	<line x1="150" y1="70" x2="446" y2="70" stroke="#78716c" stroke-width="1.5" marker-end="url(#arr2)"/>
+	<text x="300" y="62" font-size="12.5" text-anchor="middle" fill="#44403c">"update", written by an old v0 client</text>
+
+	<line x1="450" y1="95" x2="746" y2="95" stroke="#78716c" stroke-width="1.5" marker-end="url(#arr2)"/>
+	<text x="600" y="87" font-size="12.5" text-anchor="middle" fill="#44403c">read envelope: v0, program knows v2 → stale</text>
+
+	<!-- loop box -->
+	<rect x="480" y="120" width="400" height="180" rx="12" fill="#f0fdfa" stroke="#5eead4"/>
+	<text x="680" y="146" font-size="13.5" text-anchor="middle" font-weight="700" fill="#0f766e">ladder, one adjacent step at a time</text>
+	<text x="500" y="172" font-size="12.5" fill="#134e4a">1. validate the exact old bytes (still untouched)</text>
+	<text x="500" y="192" font-size="12.5" fill="#134e4a">2. build a detached plan: v0→v1</text>
+	<text x="500" y="212" font-size="12.5" fill="#134e4a">3. growing? rent top-up from payer (capped), resize</text>
+	<text x="500" y="232" font-size="12.5" fill="#134e4a">4. apply the rewrite (infallible), validate result,</text>
+	<text x="500" y="252" font-size="12.5" fill="#134e4a">    commit the v1 marker</text>
+	<text x="500" y="272" font-size="12.5" fill="#134e4a">5. repeat for v1→v2</text>
+	<text x="500" y="290" font-size="12.5" fill="#0f766e" font-weight="650">each loop turn is one version; the plan is re-derived</text>
+
+	<line x1="450" y1="330" x2="746" y2="330" stroke="#78716c" stroke-width="1.5" marker-end="url(#arr2)"/>
+	<text x="600" y="322" font-size="12.5" text-anchor="middle" fill="#44403c">account is now byte-for-byte v2, size adjusted</text>
+
+	<rect x="330" y="378" width="240" height="60" rx="10" fill="#ccfbf1"/>
+	<text x="450" y="403" font-size="13.5" text-anchor="middle" font-weight="700" fill="#0f766e">run the actual instruction</text>
+	<text x="450" y="423" font-size="12.5" text-anchor="middle" fill="#134e4a">the handler only ever sees current bytes</text>
+
+	<line x1="450" y1="460" x2="154" y2="460" stroke="#0f766e" stroke-width="1.5" marker-end="url(#arr2)"/>
+	<text x="300" y="452" font-size="12.5" text-anchor="middle" fill="#0f766e" font-weight="650">success, transaction confirms</text>
+
+	<!-- rollback note -->
+	<rect x="30" y="490" width="840" height="52" rx="10" fill="#fef3c7"/>
+	<text x="450" y="512" font-size="12.5" text-anchor="middle" fill="#92400e" font-weight="650">Anything fails mid-ladder? The whole transaction rolls back. The account, the rent, and every completed step revert together.</text>
+	<text x="450" y="530" font-size="12" text-anchor="middle" fill="#92400e">After the first mutation, invariant failures abort instead of returning a catchable error, so a partial migration can never be committed.</text>
+</svg>
+</div>
+
+<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent, never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
+
+<!-- ============ PART 3: CLIENTS ============ -->
+<h2>Part 3: old clients, new clients, who does what</h2>
+<p class="lead">The division of labor is intentional. Clients write versions. Programs migrate data. A client never rewrites an account and never needs to know a migration exists.</p>
+
+<div class="cards">
+	<div class="card">
+		<h3>New client → new program</h3>
+		<div class="vs">client writes v2 · program knows v2</div>
+		<p>The everyday case. Bytes already match, so the program validates and runs. Costs exactly what a program without migrations would cost.</p>
+		<span class="verdict v-fast">FAST PATH</span>
+	</div>
+	<div class="card">
+		<h3>Old client → new program</h3>
+		<div class="vs">client writes v0 · program knows v2</div>
+		<p>The program normalizes the request, and any accounts it touches, inline in the same transaction. The old client just sees the transaction succeed.</p>
+		<span class="verdict v-magic">JUST WORKS</span>
+	</div>
+	<div class="card">
+		<h3>New client → old program</h3>
+		<div class="vs">client writes v2 · program knows v0</div>
+		<p>The version is from the program's future, so it fails with a clear version error instead of misreading bytes. Deploy the new program first. A client ahead of its program always fails loudly, never with a silent misread.</p>
+		<span class="verdict v-stop">FAILS LOUDLY</span>
+	</div>
+	<div class="card">
+		<h3>Old client → old program</h3>
+		<div class="vs">client writes v0 · program knows v0</div>
+		<p>Classic behavior, untouched. Migrations only change things when the program is ahead of the data.</p>
+		<span class="verdict v-classic">UNCHANGED</span>
+	</div>
+</div>
+
+<h3 style="font-size:18px; margin-top: 32px;">Client responsibilities</h3>
+<table>
+	<tr><th>Responsibility</th><th>Client</th><th>Program</th></tr>
+	<tr><td>Stamp the current version into anything it sends</td><td class="yes">Yes, automatic in generated encoders</td><td>n/a</td></tr>
+	<tr><td>Rewrite stale accounts, instructions, or events</td><td class="no">Never</td><td class="yes">Always, inline in the touching transaction</td></tr>
+	<tr><td>Know the migration history</td><td class="no">Never. It lives in <code>migrations/</code> and in the program</td><td class="yes">Owns it</td></tr>
+	<tr><td>Fund a rent deficit when an account grows</td><td class="part">Passes the payer account (old clients omit it)</td><td class="yes">Charges within a developer-set cap</td></tr>
+	<tr><td>Reject data from the future</td><td class="part">Generated decoders enforce the envelope in TypeScript, Dart, and Rust, with an error that names the version it found and what to do</td><td class="yes">Always fails closed</td></tr>
+</table>
+
+<!-- ============ SWEEP INSTRUCTION ============ -->
+<h2>Migrating read-only accounts: the sweep instruction</h2>
+<p class="lead">Migration needs a writable account, since it rewrites bytes and may resize. So a stale account that your program only reads will fail its load with a "migration required" error until one transaction touches it as writable. The clean fix is a small instruction whose only job is migrating.</p>
+
+<p>You can write this instruction by hand today, and it takes one of two shapes. Either one migration instruction per account, or <strong>one catch-all instruction where every migratable account appears as an optional, writable view</strong>, plus a payer. The catch-all is usually the better deal: optional views already give you per-account granularity, because the client simply omits the accounts it does not need. A typical program ends up with:</p>
+
+<div class="cmd"><span class="comment">// one instruction, every migratable account optional and writable
+instruction migrate_accounts {
+    payer        AccountMeta  // writable + signer, usually the transaction fee payer
+    escrow       Option&lt;AccountMeta&gt;  // writable
+    user_profile Option&lt;AccountMeta&gt;  // writable
+    stake        Option&lt;AccountMeta&gt;  // writable
+}</span></div>
+
+<div class="cmd"><span class="comment">// the handler is a straight line of independent sweeps
+if let Some(view) = accounts.escrow {
+    MigrateAccount {
+        account: view,
+        payer: Some(accounts.payer),
+        program_id,
+        max_lamports,
+    }
+    .invoke::&lt;Escrow&gt;()?;
+}
+// ...same for each account. Absent accounts are skipped.
+// Already-current accounts return early and write nothing.</span></div>
+
+<p>The client sends this instruction first, then the real one, in the same transaction:</p>
+<div class="cmd"><span class="prompt">$ </span>transaction: [ migrate_accounts(escrow, user_profile, payer) , swap(...) ]</div>
+
+<div class="box info"><b>Why this is safe to expose.</b> The sweep only moves accounts forward through published transitions, and each account is checked to be owned by your program before anything happens. It is idempotent: current accounts cost one envelope read and write nothing, so the client can send it speculatively without wasting budget. The payer only ever adds lamports to an account, never removes any, and only up to the <code class="inline">max_lamports</code> cap the developer sets. And since each caller supplies its own payer, nobody can be made to fund someone else's migration.</div>
+
+<table>
+	<tr><th>Case</th><th>What the sweep does</th></tr>
+	<tr><td>Account absent (client omitted it)</td><td>Skipped entirely</td></tr>
+	<tr><td>Already current</td><td>One envelope read, no writes, no rent, near-zero compute</td></tr>
+	<tr><td>Stale, same size</td><td>Rewritten in place, version committed</td></tr>
+	<tr><td>Stale, growing</td><td>Payer tops up the rent deficit (capped by <code>max_lamports</code>), account resized, then rewritten</td></tr>
+	<tr><td>Stale, shrinking</td><td>Rewritten and shrunk. Lamports stay in the account; there is no refund today</td></tr>
+	<tr><td>Any step fails</td><td>Whole transaction rolls back, including every earlier sweep in the same instruction</td></tr>
+</table>
+
+<p>Two details are worth calling out. On refunds: shrinking keeps every lamport in the account by design. Refunding would mean picking a recipient when the funder and the owner differ, and it would add a transfer per step. A refund-to-payer variant could exist later, but the current rule is simple and safe: money only ever moves inward. And on surplus bytes: they stay on the account, exactly as stored.</p>
+
+<div class="box warn"><b>What the framework would add to this pattern.</b> Nothing blocks hand-rolling it today. What a framework-level version adds is a reserved discriminator so the instruction can never collide with a user instruction, a generated handler and client helper so no instruction is hand-written at all, and a client-side staleness check so the helper is only sent when an account is actually behind. That is the planned Migrate instruction in ADR 0008, and this sweep is its hand-rolled form.</div>
+
+<!-- ============ CLI REFERENCE ============ -->
+<h2>CLI cheat sheet</h2>
+<p class="lead">Everything a developer or an agent needs, in one table.</p>
+<table>
+	<tr><th>Command</th><th>When</th><th>What it does</th></tr>
+	<tr><td><code>pina migrations make</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
+	<tr><td><code>pina migrations check</code></td><td>CI, pre-commit</td><td>Non-mutating gate. Catches drift, unfinished TODO transitions, and any edit to frozen published files. Exits 1 with a readable reason.</td></tr>
+	<tr><td><code>pina migrations status</code></td><td>Curiosity, support</td><td>Reports each contract's local version and publication state. <code>--json</code> for tooling.</td></tr>
+	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>
+	<tr><td><code>pina build</code></td><td>Always</td><td>The drift gate. Fails until every schema change is recorded and every TODO transition is filled.</td></tr>
+	<tr><td><code>pina deploy --record-publication</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions.</td></tr>
+	<tr><td><code>pina generate</code></td><td>After <code>make</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
+</table>
+
+<!-- ============ GUARANTEES ============ -->
+<h2>Limits and guarantees</h2>
+<div class="box warn"><b>Hard limits, and all of them fail cleanly.</b> At most <code>MAX_INLINE_STEPS</code> adjacent versions are walked in one instruction. The normalization workspace is capped at 1 KiB of stack, and generated code does not compile past that. Growth is capped by <code>MAX_PERMITTED_DATA_INCREASE</code> per step and by the payer's <code>max_lamports</code> budget overall. Exceeding any of these fails the transaction. It never silently skips a migration.</div>
+<div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> is SHA-256-chained and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can regenerate it. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
+
+<h3 style="font-size:18px; margin-top: 28px;">Planned but not built (ADR 0008 and follow-ups)</h3>
+<div class="future">
+	<div class="future-item"><span class="tag t-soon">Next</span><p><b>A dedicated Migrate instruction</b> (<a href="https://github.com/pina-rs/pina/issues/338">#338</a>). A framework-reserved, generated version of the sweep instruction documented above, with its own payer. It exists as a hand-rolled pattern today; the framework version adds the reserved discriminator, the generated handler, and the client helper so nothing needs writing by hand.</p></div>
+	<div class="future-item"><span class="tag t-soon">Next</span><p><b>On-chain state inspection</b> (<a href="https://github.com/pina-rs/pina/issues/337">#337</a>). A command to read an account's version envelope over RPC and report "stored v0, current v2, about two steps, roughly this many CU, needs this many lamports". There is currently no way to see on-chain migration state from the CLI.</p></div>
+	<div class="future-item"><span class="tag t-later">Later</span><p><b>Client helpers</b> (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>). Generated <code>needsMigration()</code> and <code>migrateInstruction()</code> so "check, then migrate, then act" is one call. Decode-time version enforcement already ships in all three clients.</p></div>
+	<div class="future-item"><span class="tag t-later">Later</span><p><b>Persisted answers</b> (<a href="https://github.com/pina-rs/pina/issues/340">#340</a>). Disambiguation decisions saved next to the manifest, so fresh clones and CI can answer rename questions without replaying flags.</p></div>
+	<div class="future-item"><span class="tag t-later">Later</span><p><b>Cost preview</b> (<a href="https://github.com/pina-rs/pina/issues/341">#341</a>). Reuse the static SBF profiler to show the rent and compute cost of a migration before you ship it.</p></div>
+</div>
+
+<p class="footnote">Also see <code>docs/src/migrations/flow.md</code> and ADRs 0007 and 0008 in <code>docs/src/adrs/</code>.</p>
+
+</div>
+
+<script>
+	function toggle(head) {
+		head.parentElement.classList.toggle('open');
+	}
+	document.getElementById('s1').classList.add('open');
+</script>
+</body>
+</html>
