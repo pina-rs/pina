@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -42,7 +42,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -104,7 +104,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -142,7 +142,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -160,7 +160,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -186,7 +186,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -205,7 +205,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -224,7 +224,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -271,7 +271,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -300,7 +300,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -318,7 +318,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -346,7 +346,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -373,7 +373,7 @@ jobs:
           persist-credentials: false
 
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -490,7 +490,12 @@ jobs:
           jq -s -e '
             (.[0].packages | map(.package) | sort) ==
               (.[1].package_publish.packages | map(.package) | sort) and
-              .[1].package_publish.summary.expected > 0 and
+              ([.[1].package_publish.summary.planned,
+                .[1].package_publish.summary.published,
+                .[1].package_publish.summary.already_exists,
+                .[1].package_publish.summary.blocked,
+                .[1].package_publish.summary.failed,
+                .[1].package_publish.summary.not_attempted] | add) > 0 and
               .[1].package_publish.summary.failed == 0
           ' "$RUNNER_TEMP/publish-readiness.json" "$report" >/dev/null
         shell: devenv shell -- bash -e {0}
