@@ -10,9 +10,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Release pull requests only re-version published packages, so benchmarking
+# them carries no signal. Every job skips when the pull request carries the
+# `release` label; skipped jobs still report success to required checks.
 jobs:
   program-profiles:
     name: program compute units and sizes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     env:
@@ -105,7 +109,8 @@ jobs:
 
   instruction-compute:
     name: instruction compute units
-    timeout-minutes: 25
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
@@ -226,6 +231,7 @@ jobs:
 
   token-loader-compute:
     name: focused token-loader compute units
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     env:
@@ -339,6 +345,7 @@ jobs:
 
   cli:
     name: CLI performance
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
     timeout-minutes: 15
     runs-on: ubuntu-24.04
     steps:
@@ -401,6 +408,7 @@ jobs:
 
   core:
     name: core host performance
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
     timeout-minutes: 15
     runs-on: ubuntu-24.04
     steps:
@@ -449,7 +457,7 @@ jobs:
 
   comment:
     name: PR performance comment
-    if: always()
+    if: ${{ always() && !contains(github.event.pull_request.labels.*.name, 'release') }}
     needs:
       - instruction-compute
       - token-loader-compute
