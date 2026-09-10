@@ -38,7 +38,9 @@ Commit the manifest, publication ledger, and transition files. Do not generate t
 
 Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, or ambiguous field move creates a manual Rust file with `TODO(pina-manual-migration)`.
 
-Replace the generated body. Pina preflights the exact historical shape for every account. Fixed transitions have generated size constants. A transition involving compact data also has `target_size` and `working_size` functions. They inspect already-validated historical bytes and must return a valid destination allocation without mutating the account. The `migrate` function is then total for that accepted source and must fully initialize every active destination byte.
+Replace the generated body. Pina preflights the exact historical shape for every account. Fixed transitions have generated size constants and their generated `migrate` stub starts with a length guard; keep it. A transition involving compact data also has `target_size` and `working_size` functions. They inspect already-validated historical bytes and must return a valid destination allocation without mutating the account. The `migrate` function is then total for that accepted source and must fully initialize every active destination byte.
+
+A manual account transition cannot reject a value it cannot interpret: by the time `migrate` runs, rent funding and resizing may already have taken effect, so a `migrate` that cannot produce a valid destination aborts the whole instruction instead of returning a catchable error. Validate unambiguous value constraints inside `target_size` and `working_size` (they run before any mutation) and reserve genuinely rejectable conversions for instruction or event transitions, which run in scratch space before any account is touched.
 
 Pina runs adjacent account transitions one at a time inside one invocation. It validates and commits each intermediate version before planning the next, which lets a later compact allocation depend on the prior compact result without allocating a copy of the account on the SBF stack. If any later step fails, Pina aborts the instruction so Solana rolls back all earlier resizes, lamport transfers, and byte writes. A manual instruction conversion instead runs in scratch space and may reject invalid semantic values before dispatch. Then run:
 
@@ -52,6 +54,8 @@ pina test --compatibility
 IDL generation runs the same check. The current IDL contains one omitted `migrationVersion` constant for each migration-aware account or instruction, so generated clients serialize the current envelope without asking the application developer for a version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
 
 ## Change an instruction process
+
+Trailing optional accounts may be omitted entirely from the end of an account list; every earlier slot must still be present, using the program address as a filler where a middle optional account is absent. Omitting a middle optional account without a filler shifts every later account into an earlier slot, which only surfaces as a confusing missing-account error or a privilege check failure. Treat a trailing `Option` account as fully untrusted: it can be absent from any request, not only from old ones.
 
 Pina snapshots the instruction payload and its positional account list under the same instruction version. An old request remains compatible only when:
 

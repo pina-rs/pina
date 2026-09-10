@@ -1561,11 +1561,19 @@ fn manual_transition_source(
 					 WORKING_SIZE: usize = {working_size};\n"
 				)
 			};
+			let migrate = if dynamic {
+				// Variable-length migrations size the destination through the
+				// functions above; the executor resizes before calling.
+				"pub(crate) fn migrate(data: &mut [u8]) {\n\tlet _ = data;\n}\n"
+			} else {
+				"pub(crate) fn migrate(data: &mut [u8]) {\n\tif data.len() < WORKING_SIZE \
+				 {\n\t\treturn;\n\t}\n\tlet _ = data;\n}\n"
+			};
 			(
 				"the source shape is preflighted; this conversion must be total and fully \
 				 initialize destination",
 				sizing,
-				"pub(crate) fn migrate(data: &mut [u8]) {\n\tlet _ = data;\n}\n",
+				migrate,
 			)
 		}
 		ContractKind::Instruction | ContractKind::Event => {
