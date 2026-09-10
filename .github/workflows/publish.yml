@@ -228,7 +228,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: setup
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: get crates oidc auth token
