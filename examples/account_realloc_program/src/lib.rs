@@ -116,6 +116,17 @@ pub struct Realloc2Accounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
+/// Rejects growth beyond Solana's per-instruction reallocation cap.
+///
+/// The cap is `MAX_PERMITTED_DATA_INCREASE` (`1_024 * 10` = 10_240 bytes per
+/// top-level instruction), re-exported by pina from pinocchio; there has never
+/// been a 1 KiB cap (see issue #277). The runtime itself rejects larger growth
+/// with `InvalidRealloc` when it deserializes the account, and pinocchio's
+/// `resize` rejects it up front using the original serialized length it cached
+/// in the account's padding field. This guard mirrors the runtime limit for
+/// Anchor parity and is defense in depth: the compact codec below already
+/// bounds `Realloc` targets to `Sample::MAX_SIZE` (548 bytes), so a request
+/// this guard could reject cannot reach it through this instruction.
 fn validate_realloc_delta(current_len: usize, target_len: usize) -> ProgramResult {
 	if target_len > current_len {
 		let delta = target_len - current_len;
@@ -329,6 +340,16 @@ mod tests {
 			result,
 			Err(ProgramError::Custom(code)) if code == ReallocError::AccountReallocExceedsLimit as u32
 		));
+	}
+
+	/// Pins the growth limit this example documents to Solana's actual 10 KiB
+	/// runtime cap. If pinocchio ever changes the constant, the readme's
+	/// security invariant #5 and this guard must be re-reviewed against the
+	/// runtime instead of silently drifting (issue #277 reported a phantom
+	/// 1 KiB cap caused by misreading `1_024 * 10`).
+	#[test]
+	fn growth_limit_is_the_runtime_ten_kib_cap() {
+		assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10 * 1024);
 	}
 
 	#[test]
