@@ -1,4 +1,4 @@
-name: changeset-policy
+name: change-classification
 
 on:
   pull_request:
@@ -6,18 +6,16 @@ on:
       - opened
       - synchronize
       - reopened
-      - labeled
-      - unlabeled
 
 permissions:
   contents: read
 
 concurrency:
-  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
+  group: change-classification-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
+  classify:
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     permissions:
@@ -29,11 +27,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
-      - name: run changeset policy
-        uses: monochange/actions/changeset-policy@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
+      - name: classify changes
+        id: classify
+        uses: monochange/actions/change-classification@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
         with:
-          from: origin/main
-          labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          detection-level: signature
+          dependency-propagation: public
           github-token: ${{ secrets.GITHUB_TOKEN }}
