@@ -1,6 +1,6 @@
 ---
-"pina_cli_renderer": minor
-"@pina-rs/codama-renderer-cli": minor
+"pina_cli_renderer": feat
+"@pina-rs/codama-renderer-cli": feat
 "pina_cli": feat
 ---
 

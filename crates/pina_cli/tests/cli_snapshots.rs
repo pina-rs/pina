@@ -13,7 +13,9 @@ fn workspace_root() -> &'static Path {
 }
 
 fn reset_snapshot_dir(name: &str) -> PathBuf {
-	let path = workspace_root().join("target/cli-snapshot-temp").join(name);
+	let path = std::env::temp_dir()
+		.join("pina-cli-snapshot-temp")
+		.join(name);
 	let _ = fs::remove_dir_all(&path);
 	fs::create_dir_all(&path).unwrap_or_else(|error| {
 		panic!(

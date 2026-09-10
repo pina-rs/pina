@@ -28,4 +28,3 @@ exit_code: 0
 [32m✔[39m Generated Codama IDLs and Rust/CPI/JavaScript/Dart clients for 1 example(s): counter_program
 
 ----- stderr -----
-warning: projects normally need one CLI; generating cli-rust, cli-ts, cli-dart anyway
