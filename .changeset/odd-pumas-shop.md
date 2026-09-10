@@ -2,7 +2,7 @@
 pina_cli_renderer: feat
 pina_cli: feat
 pina_codama_renderer: fix
-"@pina-rs/codama-renderer-cli": feat
+pina_codama_renderer_cli: feat
 ---
 
 Add CLI client generation for Codama IDLs in three languages: `pina generate --client cli-rust`, `--client cli-ts`, and `--client cli-dart`.

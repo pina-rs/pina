@@ -136,6 +136,10 @@ type = "npm"
 path = "packages/codama-renderer-cpi"
 type = "npm"
 
+[package.pina_codama_renderer_cli]
+path = "packages/codama-renderer-cli"
+type = "npm"
+
 [package.pina_cli_npm]
 path = "packages/pina__cli"
 type = "npm"
