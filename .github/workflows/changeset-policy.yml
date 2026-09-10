@@ -31,9 +31,35 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: setup devenv
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: add devenv monochange to PATH
+        run: |
+          set -euo pipefail
+          profile="$(devenv shell -- bash -c 'printf %s "${DEVENV_PROFILE:-}"')"
+          if [[ -z "$profile" ]]; then
+            echo "devenv profile was not resolved." >&2
+            exit 1
+          fi
+          echo "$profile/bin" >> "$GITHUB_PATH"
+          "$profile/bin/monochange" --version
+        shell: bash
+
+      - name: collect changed files
+        id: changed
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
       - name: run changeset policy
         uses: monochange/actions/changeset-policy@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
         with:
-          from: origin/main
+          # Coverage-based verification: every changed package must be covered
+          # by a changeset. Passing explicit changed paths instead of `from`
+          # deliberately skips the API-impact classifier, which misclassifies
+          # rustdoc-only and additive changes as major on this workspace
+          # (monochange 0.11.1 flagged a docs-only PR as needing a major bump).
+          changed-paths: ${{ steps.changed.outputs.all_changed_files }}
+          setup-monochange: false
           labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
