@@ -706,7 +706,7 @@ fn cli_profile_compare_rejects_a_negative_fail_percent_flag() {
 	let artifact = write_temp_elf(&elf_data);
 	let baseline = write_baseline(artifact.path());
 
-	let output = run_compare(baseline.path(), artifact.path(), &["--fail-percent", "-5"]);
+	let output = run_compare(baseline.path(), artifact.path(), &["--fail-percent=-5"]);
 
 	assert_eq!(
 		output.status.code(),
