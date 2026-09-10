@@ -39,6 +39,7 @@ import {
 	getPinaPodBoundedStringDecoder,
 	getPinaPodBoundedStringEncoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 	getPinaPodUtf8Decoder,
 } from "../pinaPodCodecs";
 
@@ -89,7 +90,7 @@ export function getManualStateDecoder(): Decoder<ManualState> {
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getU8Decoder()],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
 		[
 			"code",
 			getPinaPodBoundedStringDecoder(

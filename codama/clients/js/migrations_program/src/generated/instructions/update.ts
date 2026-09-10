@@ -39,7 +39,10 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { MIGRATIONS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DISCRIMINATOR = 0;
@@ -127,7 +130,7 @@ export function getUpdateInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(UPDATE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getU8Decoder()],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
 		["value", getU64Decoder()],
 		["memo", getU16Decoder()],
 	]);

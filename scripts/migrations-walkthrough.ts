@@ -40,6 +40,7 @@ import {
 	getBase64EncodedWireTransaction,
 	getSignatureFromTransaction,
 	type Instruction,
+	type ReadonlyUint8Array,
 	sendTransactionWithoutConfirmingFactory,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
@@ -688,6 +689,25 @@ async function step2_add_field(context: StepContext): Promise<void> {
 	await deploy(context, artifact);
 	recordDeployment(artifact, context.network.rpcUrl);
 	generateClients(2);
+
+	// The account still holds v0 bytes: the current client must refuse to
+	// decode them through the v1 layout instead of silently misparsing.
+	const currentClient = await loadClient(
+		resolve(CLIENT_HISTORY, "step-2", "js", PROGRAM_NAME),
+	);
+	const staleBytes = await context.network.accountData(context.profileAddress);
+	let staleRejection: string | undefined;
+	try {
+		currentClient.profile
+			.getProfileDecoder()
+			.read(staleBytes as ReadonlyUint8Array, 0);
+	} catch (error) {
+		staleRejection = String(error);
+	}
+	expect(
+		staleRejection?.includes("stale migration version") === true,
+		`the current client rejects a stale account with an actionable error (got: ${staleRejection})`,
+	);
 
 	const oldClient = await loadClient(
 		resolve(CLIENT_HISTORY, "step-1", "js", PROGRAM_NAME),

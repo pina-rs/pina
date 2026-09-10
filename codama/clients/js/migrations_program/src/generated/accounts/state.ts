@@ -39,6 +39,7 @@ import {
 import {
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const STATE_DISCRIMINATOR = 1;
@@ -91,7 +92,7 @@ export function getStateDecoder(): FixedSizeDecoder<State> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getU8Decoder()],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
 		["authority", getAddressDecoder()],
 		["value", getU64Decoder()],
 		["enabled", getPinaPodBooleanDecoder()],
