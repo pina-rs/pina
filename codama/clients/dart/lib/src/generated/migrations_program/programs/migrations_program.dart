@@ -27,7 +27,7 @@ MigrationsProgramInstruction identifyMigrationsProgramInstruction(
   Uint8List data,
 ) {
   if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(1), 1)) {
+      containsBytes(data, getU8Encoder().encode(2), 1)) {
     return MigrationsProgramInstruction.update;
   }
   if (containsBytes(data, getU8Encoder().encode(1), 0)) {

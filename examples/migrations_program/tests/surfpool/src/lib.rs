@@ -11,7 +11,7 @@ use program_under_test::ID;
 const STATE_DISCRIMINATOR: u8 = 1;
 const UPDATE_DISCRIMINATOR: u8 = 0;
 const RELAY_DISCRIMINATOR: u8 = 1;
-const CURRENT_STATE_SIZE: usize = 43;
+const CURRENT_STATE_SIZE: usize = 44;
 
 fn historical_update_data(value: u64) -> Vec<u8> {
 	let mut data = vec![UPDATE_DISCRIMINATOR, 0];
@@ -73,7 +73,7 @@ fn generated_current_update_writes_the_current_version() {
 		.expect("encode current Update data");
 		let instruction = generated_client::instructions::Update::new(authority).instruction(data);
 
-		assert_eq!(&instruction.data[0..2], &[UPDATE_DISCRIMINATOR, 1]);
+		assert_eq!(&instruction.data[0..2], &[UPDATE_DISCRIMINATOR, 2]);
 		program
 			.send_instruction(instruction)
 			.expect("execute generated current Update");
@@ -129,10 +129,11 @@ fn relay_migrates_historical_state_through_self_cpi() {
 
 		let account = program.account(&state).expect("fetch migrated state");
 		assert_eq!(account.data.len(), CURRENT_STATE_SIZE);
-		assert_eq!(&account.data[0..2], &[STATE_DISCRIMINATOR, 1]);
+		assert_eq!(&account.data[0..2], &[STATE_DISCRIMINATOR, 2]);
 		assert_eq!(&account.data[2..34], authority.as_ref());
 		assert_eq!(&account.data[34..42], &144_u64.to_le_bytes());
 		assert_eq!(account.data[42], 1);
+		assert_eq!(account.data[43], 1);
 
 		program.stop().expect("stop isolated program test");
 	});

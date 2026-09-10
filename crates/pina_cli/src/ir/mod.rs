@@ -79,6 +79,10 @@ impl AccountIr {
 #[derive(Debug, Clone)]
 pub struct InstructionIr {
 	pub name: String,
+	/// Rust struct ident behind the instruction. The IDL `name` is the
+	/// snake-cased discriminator variant, but the migration manifest keys
+	/// source lookups by the struct ident the macro expands.
+	pub rust_name: String,
 	pub accounts: Vec<InstructionAccountIr>,
 	pub arguments: Vec<FieldIr>,
 	pub discriminator: DiscriminatorIr,

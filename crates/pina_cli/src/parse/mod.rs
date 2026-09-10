@@ -289,6 +289,7 @@ fn build_accountless_instructions_from_structs(
 				}
 				InstructionIr {
 					name: ix_struct.variant.to_snake_case(),
+					rust_name: ix_struct.name.clone(),
 					accounts: Vec::new(),
 					arguments: ix_struct.fields.clone(),
 					discriminator,
@@ -466,6 +467,7 @@ fn build_instructions_from_dispatch(
 		}
 		instructions.push(InstructionIr {
 			name: entry.variant.to_snake_case(),
+			rust_name: ix_struct.name.clone(),
 			accounts: instruction_accounts,
 			arguments: ix_struct.fields.clone(),
 			discriminator,

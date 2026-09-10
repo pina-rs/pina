@@ -926,6 +926,7 @@ mod tests {
 			}],
 			instructions: vec![InstructionIr {
 				name: "update".to_string(),
+				rust_name: "UpdateInstruction".to_string(),
 				accounts: vec![],
 				arguments: vec![],
 				discriminator,
@@ -983,6 +984,7 @@ mod tests {
 			}],
 			instructions: vec![InstructionIr {
 				name: "update".to_owned(),
+				rust_name: "update".to_owned(),
 				accounts: vec![],
 				arguments: vec![],
 				discriminator: instruction_discriminator.clone(),
@@ -1078,6 +1080,7 @@ mod tests {
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "touch".to_string(),
+				rust_name: "touch".to_string(),
 				accounts: vec![
 					InstructionAccountIr {
 						name: "authority".to_string(),
@@ -1175,6 +1178,7 @@ mod tests {
 				accounts: vec![],
 				instructions: vec![InstructionIr {
 					name: "do_it".to_string(),
+					rust_name: "do_it".to_string(),
 					accounts,
 					arguments: vec![],
 					discriminator: discriminator.clone(),
@@ -1311,6 +1315,7 @@ mod tests {
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),
+				rust_name: "initialize".to_string(),
 				accounts: vec![
 					InstructionAccountIr {
 						name: "authority".to_string(),

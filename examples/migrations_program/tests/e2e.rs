@@ -128,6 +128,53 @@ fn update_instruction(
 	)
 }
 
+/// Update instruction that also carries the appended optional migratable
+/// accounts expected by the v2 process contract.
+fn update_instruction_with_optional(
+	authority: Pubkey,
+	referrer: Pubkey,
+	state: Pubkey,
+	payer: Pubkey,
+	manual_state: Option<Pubkey>,
+	compact_state: Option<Pubkey>,
+	data: &[u8],
+) -> Instruction {
+	let mut metas = vec![
+		AccountMeta::new_readonly(authority, true),
+		AccountMeta::new_readonly(referrer, false),
+		AccountMeta::new(state, false),
+		AccountMeta::new(payer, true),
+		AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+	];
+	if let Some(manual_state) = manual_state {
+		metas.push(AccountMeta::new(manual_state, false));
+	}
+	if let Some(compact_state) = compact_state {
+		metas.push(AccountMeta::new(compact_state, false));
+	}
+	Instruction::new_with_bytes(program_id(), data, metas)
+}
+
+/// Historical v1 ManualState bytes: fixed layout with a u16 amount.
+fn historical_manual_state_v1(amount: u16) -> Vec<u8> {
+	let mut data = vec![MigrationAccount::ManualState as u8, 1];
+	data.extend_from_slice(&amount.to_le_bytes());
+	data
+}
+
+/// Historical v0 CompactState bytes with a full-capacity name.
+fn historical_compact_state_v0() -> Vec<u8> {
+	vec![
+		MigrationAccount::CompactState as u8,
+		0,
+		4,
+		b'L',
+		b'o',
+		b'g',
+		b'z',
+	]
+}
+
 fn migration_accounts(
 	mollusk: &Mollusk,
 	authority: Pubkey,
@@ -159,6 +206,7 @@ fn assert_current_state(result: &InstructionResult, state: &Pubkey, value: u64) 
 		.unwrap_or_else(|error| panic!("migrated state decoding failed: {error:?}"));
 	assert_eq!(current.value.get(), value);
 	assert!(bool::from(current.enabled));
+	assert_eq!(u8::from(current.revision), 1);
 }
 
 #[test]
@@ -428,7 +476,7 @@ fn future_account_version_is_rejected_without_trial_decoding() {
 		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
 	let mut future_data = vec![0_u8; State::SIZE];
 	future_data[0] = MigrationAccount::State as u8;
-	future_data[1] = 2;
+	future_data[1] = 3;
 	future_data[2..34].copy_from_slice(authority.as_ref());
 	accounts[2].1.data = future_data.clone();
 	let instruction = update_instruction(
@@ -456,12 +504,13 @@ fn future_account_version_is_rejected_without_trial_decoding() {
 const CURRENT_UPDATE_CU_BUDGET: u64 = 1_000;
 
 /// Compute-unit ceiling for the full on-demand migration path: historical
-/// payload normalization, rent inspection, funded growth, resize, rewrite,
-/// destination validation, and the business handler.
-const MIGRATING_UPDATE_CU_BUDGET: u64 = 4_000;
+/// payload normalization, the complete two-step account ladder, rent
+/// inspection, funded growth, resize, rewrite, destination validation, and
+/// the business handler.
+const MIGRATING_UPDATE_CU_BUDGET: u64 = 5_000;
 
 /// Compute-unit ceiling for migration overhead alone.
-const MIGRATION_OVERHEAD_CU_BUDGET: u64 = 3_000;
+const MIGRATION_OVERHEAD_CU_BUDGET: u64 = 4_000;
 
 #[test]
 #[ignore = "requires the migrations_program SBF binary"]
@@ -474,8 +523,9 @@ fn migration_paths_stay_within_compute_budgets() {
 
 	let current_data = {
 		let mut data = historical_state_data(&authority, 7);
-		data[1] = 1;
 		data.push(1);
+		data.push(0);
+		data[1] = 2;
 		data
 	};
 	let mut current_accounts = vec![
@@ -495,7 +545,7 @@ fn migration_paths_stay_within_compute_budgets() {
 	let current_instruction_data = {
 		let mut data = [0_u8; 12];
 		data[0] = MigrationInstruction::Update as u8;
-		data[1] = 1;
+		data[1] = 2;
 		data[2..10].copy_from_slice(&88_u64.to_le_bytes());
 		data
 	};
@@ -535,4 +585,149 @@ fn migration_paths_stay_within_compute_budgets() {
 		 {MIGRATION_OVERHEAD_CU_BUDGET}",
 		migrating_cu.saturating_sub(current_cu),
 	);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn mixed_version_sets_migrate_every_contract_independently() {
+	use migrations_program::CompactState;
+	use migrations_program::ManualState;
+
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let manual_state = Pubkey::new_unique();
+	let compact_state = Pubkey::new_unique();
+
+	// One instruction carries three migratable accounts at three different
+	// historical versions: State@v0, ManualState@v1 (fixed, converting to
+	// compact), and CompactState@v0 (compact relayout).
+	let (accounts, ..) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let mut accounts = accounts;
+	accounts.extend_from_slice(&[
+		(
+			manual_state,
+			Account {
+				lamports: mollusk.sysvars.rent.minimum_balance(4),
+				data: historical_manual_state_v1(255),
+				owner: program_id(),
+				executable: false,
+				rent_epoch: 0,
+			},
+		),
+		(
+			compact_state,
+			Account {
+				lamports: mollusk.sysvars.rent.minimum_balance(7),
+				data: historical_compact_state_v0(),
+				owner: program_id(),
+				executable: false,
+				rent_epoch: 0,
+			},
+		),
+	]);
+	let instruction = update_instruction_with_optional(
+		authority,
+		referrer,
+		state,
+		payer,
+		Some(manual_state),
+		Some(compact_state),
+		&historical_update_data(88),
+	);
+
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 88);
+
+	// ManualState reached its compact v2 shape with the decimal code.
+	let manual = account(&result, &manual_state);
+	ManualState::validate_current_migration(&manual.data)
+		.unwrap_or_else(|error| panic!("manual state validation failed: {error:?}"));
+	assert_eq!(
+		&manual.data[..6],
+		&[MigrationAccount::ManualState as u8, 2, 3, b'2', b'5', b'5']
+	);
+
+	// CompactState relaid out to its v1 shape without spare bytes.
+	let compact = account(&result, &compact_state);
+	CompactState::validate_current_migration(&compact.data)
+		.unwrap_or_else(|error| panic!("compact state validation failed: {error:?}"));
+	assert_eq!(compact.data.len(), 9);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn mid_chain_funding_failure_rolls_back_every_earlier_step() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, old_data, old_lamports, _) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+
+	// The payer funds exactly the first growth step (42 -> 43 bytes) but not
+	// the second (43 -> 44). The first step mutates lamports, length, and
+	// bytes before the second step's transfer fails, so the instruction must
+	// abort and the transaction rolls every effect back.
+	let first_step_only = mollusk.sysvars.rent.minimum_balance(43)
+		- mollusk.sysvars.rent.minimum_balance(HISTORICAL_STATE_SIZE);
+	let mut accounts = accounts;
+	for (address, stored) in &mut accounts {
+		if *address == payer {
+			stored.lamports = first_step_only;
+		}
+	}
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	// The system program surfaces the failed transfer as custom error 1;
+	// Pina aborts the instruction after the first step's mutation so the
+	// transaction rolls every effect back.
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::Custom(1))],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, first_step_only);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn full_ladder_reaches_current_in_one_instruction() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, _, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	// A v0 account walks v0 -> v1 -> v2 inside one invocation.
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 88);
+
+	let required_lamports = mollusk.sysvars.rent.minimum_balance(State::SIZE);
+	let transfer = required_lamports - old_lamports;
+	assert_eq!(account(&result, &state).lamports, required_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports - transfer);
 }

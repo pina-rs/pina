@@ -869,6 +869,18 @@ in
           -- \
           --ignored \
           --nocapture
+        cargo test \
+          --locked \
+          -p migrations-surfpool-tests \
+          -- \
+          --ignored \
+          --nocapture
+        PINA_COMPATIBILITY=1 cargo test \
+          --locked \
+          -p migrations-surfpool-tests \
+          -- \
+          --ignored \
+          --nocapture
       '';
       description = "Build, deploy, and adversarially exercise every SBF example through the Surfpool SDK.";
       binary = "bash";

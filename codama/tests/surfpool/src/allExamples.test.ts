@@ -673,9 +673,10 @@ async function runSpecificGuards(
 			return;
 		}
 		case "migrations_program": {
-			// Version 0 predates both the `memo` argument and four optional
-			// account slots. The current program must migrate its shorter payload
-			// and accept the original one-account process without client changes.
+			// Version 0 predates the `memo` argument, the appended migratable
+			// account slots, and both schema growth steps. The current program
+			// must migrate its shorter payload and accept the original
+			// one-account process without client changes.
 			const historical = new Uint8Array(10);
 			historical[0] = 0;
 			historical[1] = 0;
@@ -687,7 +688,7 @@ async function runSpecificGuards(
 			));
 
 			const future = historical.slice();
-			future[1] = 2;
+			future[1] = 3;
 			await assertRejected(
 				() =>
 					submit(rawInstruction(

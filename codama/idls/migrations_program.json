@@ -39,7 +39,7 @@
 							},
 							"defaultValue": {
 								"kind": "numberValueNode",
-								"number": 1
+								"number": 2
 							}
 						},
 						{
@@ -68,6 +68,15 @@
 									"format": "u8",
 									"endian": "le"
 								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "revision",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
 							}
 						}
 					]
@@ -101,7 +110,7 @@
 							},
 							"value": {
 								"kind": "numberValueNode",
-								"number": 1
+								"number": 2
 							}
 						}
 					}
@@ -138,16 +147,23 @@
 							},
 							"defaultValue": {
 								"kind": "numberValueNode",
-								"number": 1
+								"number": 2
 							}
 						},
 						{
 							"kind": "structFieldTypeNode",
-							"name": "amount",
+							"name": "code",
 							"type": {
-								"kind": "numberTypeNode",
-								"format": "u16",
-								"endian": "le"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					]
@@ -181,7 +197,7 @@
 							},
 							"value": {
 								"kind": "numberValueNode",
-								"number": 1
+								"number": 2
 							}
 						}
 					}
@@ -360,6 +376,20 @@
 						"isWritable": false,
 						"isSigner": false,
 						"isOptional": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "manualState",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "compactState",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true
 					}
 				],
 				"arguments": [
@@ -388,7 +418,7 @@
 						},
 						"defaultValue": {
 							"kind": "numberValueNode",
-							"number": 1
+							"number": 2
 						}
 					},
 					{
@@ -439,7 +469,7 @@
 							},
 							"value": {
 								"kind": "numberValueNode",
-								"number": 1
+								"number": 2
 							}
 						}
 					}
@@ -542,6 +572,17 @@
 			}
 		],
 		"definedTypes": [
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA11ManualStateF4Code",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 5,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
 			{
 				"kind": "definedTypeNode",
 				"name": "pinaPodV1CompactCapacityA12CompactStateF4Name",

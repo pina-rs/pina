@@ -9,7 +9,7 @@
 )]
 
 pub const UPDATE_DISCRIMINATOR: u8 = 0u8;
-pub const UPDATE_MIGRATION_VERSION: u8 = 1u8;
+pub const UPDATE_MIGRATION_VERSION: u8 = 2u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -19,6 +19,8 @@ pub struct Update {
 	pub state: Option<solana_pubkey::Pubkey>,
 	pub migration_payer: Option<solana_pubkey::Pubkey>,
 	pub system_program: Option<solana_pubkey::Pubkey>,
+	pub manual_state: Option<solana_pubkey::Pubkey>,
+	pub compact_state: Option<solana_pubkey::Pubkey>,
 }
 
 impl Update {
@@ -29,6 +31,8 @@ impl Update {
 			state: None,
 			migration_payer: None,
 			system_program: None,
+			manual_state: None,
+			compact_state: None,
 		}
 	}
 
@@ -42,7 +46,7 @@ impl Update {
 		data: UpdateInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.authority,
 			true,
@@ -78,6 +82,22 @@ impl Update {
 				system_program,
 				false,
 			));
+		} else {
+			accounts.push(solana_instruction::AccountMeta::new_readonly(
+				crate::MIGRATIONS_PROGRAM_ID,
+				false,
+			));
+		}
+		if let Some(manual_state) = self.manual_state {
+			accounts.push(solana_instruction::AccountMeta::new(manual_state, false));
+		} else {
+			accounts.push(solana_instruction::AccountMeta::new_readonly(
+				crate::MIGRATIONS_PROGRAM_ID,
+				false,
+			));
+		}
+		if let Some(compact_state) = self.compact_state {
+			accounts.push(solana_instruction::AccountMeta::new(compact_state, false));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::MIGRATIONS_PROGRAM_ID,

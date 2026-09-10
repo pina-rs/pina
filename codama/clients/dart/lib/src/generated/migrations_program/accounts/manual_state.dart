@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -8,17 +9,18 @@ import 'package:solana_kit_accounts/solana_kit_accounts.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
+import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
 @immutable
 class ManualState {
-  const ManualState({required this.amount})
+  const ManualState({required this.code})
     : discriminator = 2,
-      migrationVersion = 1;
+      migrationVersion = 2;
 
   final int discriminator;
   final int migrationVersion;
-  final int amount;
+  final String code;
 
   @override
   bool operator ==(Object other) =>
@@ -27,29 +29,35 @@ class ManualState {
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
           migrationVersion == other.migrationVersion &&
-          amount == other.amount;
+          code == other.code;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, amount);
+  int get hashCode => Object.hash(discriminator, migrationVersion, code);
 
   @override
   String toString() =>
-      'ManualState(discriminator: $discriminator, migrationVersion: $migrationVersion, amount: $amount)';
+      'ManualState(discriminator: $discriminator, migrationVersion: $migrationVersion, code: $code)';
 }
 
 Encoder<ManualState> getManualStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
-    ('amount', getU16Encoder()),
+    (
+      'code',
+      getPinaPodBoundedStringEncoder(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        5,
+      ),
+    ),
   ]);
 
   return transformEncoder(
     structEncoder,
     (ManualState value) => <String, Object?>{
       'discriminator': 2,
-      'migrationVersion': 1,
-      'amount': value.amount,
+      'migrationVersion': 2,
+      'code': value.code,
     },
   );
 }
@@ -58,7 +66,16 @@ Decoder<ManualState> getManualStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
-    ('amount', getU16Decoder()),
+    (
+      'code',
+      getPinaPodBoundedStringDecoder(
+        addDecoderSizePrefix(
+          getUtf8Decoder(),
+          getPinaPodBoundedCountDecoder(getU8Decoder(), 5),
+        ),
+        5,
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -71,10 +88,10 @@ Decoder<ManualState> getManualStateDecoder() {
 
   (ManualState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
-    return (ManualState(amount: map['amount']! as int), newOffset);
+    return (ManualState(code: map['code']! as String), newOffset);
   }
 
   return switch (structDecoder) {

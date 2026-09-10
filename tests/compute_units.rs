@@ -585,13 +585,13 @@ fn migration_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 
 	let mut current_state = vec![0_u8; migrations_program::State::SIZE];
 	current_state[0] = MigrationAccount::State as u8;
-	current_state[1] = 1;
+	current_state[1] = 2;
 	current_state[2..34].copy_from_slice(authority.as_ref());
 	current_state[34..42].copy_from_slice(&7_u64.to_le_bytes());
 	current_state[42] = 1;
 	let mut current_data = [0_u8; 12];
 	current_data[0] = MigrationInstruction::Update as u8;
-	current_data[1] = 1;
+	current_data[1] = 2;
 	current_data[2..10].copy_from_slice(&42_u64.to_le_bytes());
 	let update_metas = |state: Pubkey, payer: Pubkey| {
 		vec![

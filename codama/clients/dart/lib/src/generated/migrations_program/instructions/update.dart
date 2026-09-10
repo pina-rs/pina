@@ -15,7 +15,7 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 class UpdateInstructionData {
   const UpdateInstructionData({required this.value, required this.memo})
     : discriminator = 0,
-      migrationVersion = 1;
+      migrationVersion = 2;
 
   final int discriminator;
   final int migrationVersion;
@@ -35,7 +35,7 @@ Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
     structEncoder,
     (UpdateInstructionData value) => <String, Object?>{
       'discriminator': 0,
-      'migrationVersion': 1,
+      'migrationVersion': 2,
       'value': value.value,
       'memo': value.memo,
     },
@@ -60,7 +60,7 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
 
   (UpdateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -111,6 +111,8 @@ Instruction getUpdateInstruction({
   Address? state,
   Address? migrationPayer,
   Address? systemProgram,
+  Address? manualState,
+  Address? compactState,
   required BigInt value,
   required int memo,
 }) {
@@ -134,6 +136,14 @@ Instruction getUpdateInstruction({
         AccountMeta(address: programAddress, role: AccountRole.readonly),
       if (systemProgram != null)
         AccountMeta(address: systemProgram, role: AccountRole.readonly)
+      else
+        AccountMeta(address: programAddress, role: AccountRole.readonly),
+      if (manualState != null)
+        AccountMeta(address: manualState, role: AccountRole.writable)
+      else
+        AccountMeta(address: programAddress, role: AccountRole.readonly),
+      if (compactState != null)
+        AccountMeta(address: compactState, role: AccountRole.writable)
       else
         AccountMeta(address: programAddress, role: AccountRole.readonly),
     ],

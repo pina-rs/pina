@@ -8,31 +8,39 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type Codec,
 	combineCodec,
 	decodeAccount,
+	type Decoder,
 	type EncodedAccount,
+	type Encoder,
 	type FetchAccountConfig,
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
 	getStructDecoder,
 	getStructEncoder,
-	getU16Decoder,
-	getU16Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodBoundedCountDecoder,
+	getPinaPodBoundedStringDecoder,
+	getPinaPodBoundedStringEncoder,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodUtf8Decoder,
+} from "../pinaPodCodecs";
 
 export const MANUAL_STATE_DISCRIMINATOR = 2;
 
@@ -40,7 +48,7 @@ export function getManualStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MANUAL_STATE_DISCRIMINATOR);
 }
 
-export const MANUAL_STATE_DISCRIMINATOR2 = 1;
+export const MANUAL_STATE_DISCRIMINATOR2 = 2;
 
 export function getManualStateDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MANUAL_STATE_DISCRIMINATOR2);
@@ -49,24 +57,30 @@ export function getManualStateDiscriminator2Bytes(): ReadonlyUint8Array {
 export type ManualState = {
 	discriminator: number;
 	migrationVersion: number;
-	amount: number;
+	code: string;
 };
 
-export type ManualStateArgs = { amount: number };
+export type ManualStateArgs = { code: string };
 
 /** Gets the encoder for {@link ManualStateArgs} account data. */
-export function getManualStateEncoder(): FixedSizeEncoder<ManualStateArgs> {
+export function getManualStateEncoder(): Encoder<ManualStateArgs> {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"migrationVersion",
 			getU8Encoder(),
-		], ["amount", getU16Encoder()]]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 1 }),
+		], [
+			"code",
+			getPinaPodBoundedStringEncoder(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				5,
+			),
+		]]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 2 }),
 	);
 }
 
 /** Gets the decoder for {@link ManualState} account data. */
-export function getManualStateDecoder(): FixedSizeDecoder<ManualState> {
+export function getManualStateDecoder(): Decoder<ManualState> {
 	return getStructDecoder([
 		[
 			"discriminator",
@@ -76,15 +90,21 @@ export function getManualStateDecoder(): FixedSizeDecoder<ManualState> {
 			),
 		],
 		["migrationVersion", getU8Decoder()],
-		["amount", getU16Decoder()],
+		[
+			"code",
+			getPinaPodBoundedStringDecoder(
+				addDecoderSizePrefix(
+					getPinaPodUtf8Decoder(),
+					getPinaPodBoundedCountDecoder(getU8Decoder(), 5),
+				),
+				5,
+			),
+		],
 	]);
 }
 
 /** Gets the codec for {@link ManualState} account data. */
-export function getManualStateCodec(): FixedSizeCodec<
-	ManualStateArgs,
-	ManualState
-> {
+export function getManualStateCodec(): Codec<ManualStateArgs, ManualState> {
 	return combineCodec(getManualStateEncoder(), getManualStateDecoder());
 }
 

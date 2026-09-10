@@ -48,7 +48,7 @@ export function getUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR);
 }
 
-export const UPDATE_DISCRIMINATOR2 = 1;
+export const UPDATE_DISCRIMINATOR2 = 2;
 
 export function getUpdateDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR2);
@@ -61,6 +61,8 @@ export type UpdateInstruction<
 	TAccountState extends string | AccountMeta<string> = string,
 	TAccountMigrationPayer extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> = string,
+	TAccountManualState extends string | AccountMeta<string> = string,
+	TAccountCompactState extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -82,6 +84,11 @@ export type UpdateInstruction<
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
+			TAccountManualState extends string ? WritableAccount<TAccountManualState>
+				: TAccountManualState,
+			TAccountCompactState extends string
+				? WritableAccount<TAccountCompactState>
+				: TAccountCompactState,
 			...TRemainingAccounts,
 		]
 	>;
@@ -108,7 +115,7 @@ export function getUpdateInstructionDataEncoder(): FixedSizeEncoder<
 			["value", getU64Encoder()],
 			["memo", getU16Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 1 }),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 2 }),
 	);
 }
 
@@ -142,12 +149,16 @@ export type UpdateInput<
 	TAccountState extends string = string,
 	TAccountMigrationPayer extends string = string,
 	TAccountSystemProgram extends string = string,
+	TAccountManualState extends string = string,
+	TAccountCompactState extends string = string,
 > = {
 	authority: TransactionSigner<TAccountAuthority>;
 	referrer?: Address<TAccountReferrer>;
 	state?: Address<TAccountState>;
 	migrationPayer?: TransactionSigner<TAccountMigrationPayer>;
 	systemProgram?: Address<TAccountSystemProgram>;
+	manualState?: Address<TAccountManualState>;
+	compactState?: Address<TAccountCompactState>;
 	value: UpdateInstructionDataArgs["value"];
 	memo: UpdateInstructionDataArgs["memo"];
 };
@@ -158,6 +169,8 @@ export function getUpdateInstruction<
 	TAccountState extends string,
 	TAccountMigrationPayer extends string,
 	TAccountSystemProgram extends string,
+	TAccountManualState extends string,
+	TAccountCompactState extends string,
 	TProgramAddress extends Address = typeof MIGRATIONS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateInput<
@@ -165,7 +178,9 @@ export function getUpdateInstruction<
 		TAccountReferrer,
 		TAccountState,
 		TAccountMigrationPayer,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountManualState,
+		TAccountCompactState
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): UpdateInstruction<
@@ -174,7 +189,9 @@ export function getUpdateInstruction<
 	TAccountReferrer,
 	TAccountState,
 	TAccountMigrationPayer,
-	TAccountSystemProgram
+	TAccountSystemProgram,
+	TAccountManualState,
+	TAccountCompactState
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
@@ -187,6 +204,8 @@ export function getUpdateInstruction<
 		state: { value: input.state ?? null, isWritable: true },
 		migrationPayer: { value: input.migrationPayer ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		manualState: { value: input.manualState ?? null, isWritable: true },
+		compactState: { value: input.compactState ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -204,6 +223,8 @@ export function getUpdateInstruction<
 			getAccountMeta("state", accounts.state),
 			getAccountMeta("migrationPayer", accounts.migrationPayer),
 			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("manualState", accounts.manualState),
+			getAccountMeta("compactState", accounts.compactState),
 		],
 		data: getUpdateInstructionDataEncoder().encode(
 			args as UpdateInstructionDataArgs,
@@ -215,7 +236,9 @@ export function getUpdateInstruction<
 		TAccountReferrer,
 		TAccountState,
 		TAccountMigrationPayer,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountManualState,
+		TAccountCompactState
 	>);
 }
 
@@ -230,6 +253,8 @@ export type ParsedUpdateInstruction<
 		state?: TAccountMetas[2] | undefined;
 		migrationPayer?: TAccountMetas[3] | undefined;
 		systemProgram?: TAccountMetas[4] | undefined;
+		manualState?: TAccountMetas[5] | undefined;
+		compactState?: TAccountMetas[6] | undefined;
 	};
 	data: UpdateInstructionData;
 };
@@ -243,12 +268,12 @@ export function parseUpdateInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedUpdateInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 5) {
+	if (instruction.accounts.length < 7) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 5,
+				expectedAccountMetas: 7,
 			},
 		);
 	}
@@ -272,6 +297,8 @@ export function parseUpdateInstruction<
 			state: getNextOptionalAccount(),
 			migrationPayer: getNextOptionalAccount(),
 			systemProgram: getNextOptionalAccount(),
+			manualState: getNextOptionalAccount(),
+			compactState: getNextOptionalAccount(),
 		},
 		data: getUpdateInstructionDataDecoder().decode(instruction.data),
 	};

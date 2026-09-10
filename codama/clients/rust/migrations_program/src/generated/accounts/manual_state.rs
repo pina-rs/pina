@@ -10,51 +10,35 @@
 
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
+#[pinapod(compact)]
 pub struct ManualState {
 	pub discriminator: u8,
 	pub migration_version: u8,
-	pub amount: u16,
+	pub code: pina::String<5>,
 }
 
 pub const MANUAL_STATE_DISCRIMINATOR: u8 = 2u8;
 
-pub const MANUAL_STATE_MIGRATION_VERSION: u8 = 1u8;
+pub const MANUAL_STATE_MIGRATION_VERSION: u8 = 2u8;
 
 impl ManualState {
-	pub const LEN: usize = core::mem::size_of::<ManualStateZc>();
+	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
-	/// Initialize and validate account storage in one pass.
-	///
-	/// The destination is cleared again if configuration or validation fails.
 	pub fn initialize(
 		data: &mut [u8],
-		configure: impl FnOnce(&mut ManualStateZc),
-	) -> Result<&mut ManualStateZc, solana_program_error::ProgramError> {
-		<Self as pina::PinaPodFixed>::initialize(data, |account| {
-			configure(account);
-			account.discriminator = MANUAL_STATE_DISCRIMINATOR;
-			account.migration_version = MANUAL_STATE_MIGRATION_VERSION;
-			Ok(())
-		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
+		patch: ManualStatePatch<'_>,
+	) -> Result<usize, solana_program_error::ProgramError> {
+		patch
+			.discriminator(MANUAL_STATE_DISCRIMINATOR)
+			.migration_version(MANUAL_STATE_MIGRATION_VERSION)
+			.initialize(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&ManualStateZc, solana_program_error::ProgramError> {
-		let account = <Self as pina::PinaPodFixed>::read_exact(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != MANUAL_STATE_DISCRIMINATOR {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		if account.migration_version != MANUAL_STATE_MIGRATION_VERSION {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		Ok(account)
-	}
-
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut ManualStateZc, solana_program_error::ProgramError> {
-		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
+	pub fn from_bytes(
+		data: &[u8],
+	) -> Result<ManualStateRef<'_>, solana_program_error::ProgramError> {
+		let account = ManualStateRef::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != MANUAL_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

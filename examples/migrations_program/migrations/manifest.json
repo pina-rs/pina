@@ -96,6 +96,66 @@
 						"destinationSchemaSha256": "bf8dae233939b31f09aac16b19688192caf2a1103934d71ea053d93b5996a8fd",
 						"implementationSha256": "6bda773f65d18948730da72fd92083f2b309b0ba1ce35d714e952e5508a5fda0"
 					}
+				},
+				{
+					"version": 2,
+					"schemaSha256": "c7cd477970937d99f446fc4d609f6ce39db44da9361f8bed56e8f5c71e7c2ff6",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "value",
+								"rustType": "u64"
+							},
+							{
+								"name": "enabled",
+								"rustType": "bool"
+							},
+							{
+								"name": "revision",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 42,
+							"fields": [
+								{
+									"name": "authority",
+									"offset": 0,
+									"size": 32
+								},
+								{
+									"name": "value",
+									"offset": 32,
+									"size": 8
+								},
+								{
+									"name": "enabled",
+									"offset": 40,
+									"size": 1
+								},
+								{
+									"name": "revision",
+									"offset": 41,
+									"size": 1
+								}
+							]
+						}
+					},
+					"transition": {
+						"from": 1,
+						"to": 2,
+						"mode": "automatic",
+						"sourceSchemaSha256": "bf8dae233939b31f09aac16b19688192caf2a1103934d71ea053d93b5996a8fd",
+						"destinationSchemaSha256": "c7cd477970937d99f446fc4d609f6ce39db44da9361f8bed56e8f5c71e7c2ff6",
+						"implementationSha256": "605e6f9128c692c79b1bbe586ffdc0060306d12cb0cf3e484aca24131e4f4934"
+					}
 				}
 			]
 		},
@@ -164,6 +224,50 @@
 						"sourceSchemaSha256": "62446cee3971ee19dce3b3476bbbd56966e01c71ed67d96a0e23945a8caacaae",
 						"destinationSchemaSha256": "4138df043c52fbf476ba3b845bf76ce6a56183cf595df4f61da7fea2ed7ee1b5",
 						"implementationSha256": "f191f13303cf51ca540056ebbda747f0844a1279b8e0bdf125d909546e1d5b54"
+					}
+				},
+				{
+					"version": 2,
+					"schemaSha256": "3e5075d65fde6bbb1f0815e13df7f399afc138b6fc84f2faa061366828b9b0e3",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "code",
+								"rustType": "String<5>"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "compact",
+							"headerSize": 1,
+							"maximumSize": 6,
+							"tailAlignment": 1,
+							"fields": [
+								{
+									"name": "code",
+									"headerOffset": 0,
+									"headerSize": 1,
+									"tail": {
+										"index": 0,
+										"kind": "string",
+										"optional": false,
+										"prefixBytes": 1,
+										"capacity": 5,
+										"elementSize": 1,
+										"maximumBytes": 5
+									}
+								}
+							]
+						}
+					},
+					"transition": {
+						"from": 1,
+						"to": 2,
+						"mode": "manual",
+						"sourceSchemaSha256": "4138df043c52fbf476ba3b845bf76ce6a56183cf595df4f61da7fea2ed7ee1b5",
+						"destinationSchemaSha256": "3e5075d65fde6bbb1f0815e13df7f399afc138b6fc84f2faa061366828b9b0e3",
+						"implementationSha256": "d738dcea12bcfac88a5c8c16b791e72c40785cd70e340bd3850b5a4d125bad9c"
 					}
 				}
 			]
@@ -503,6 +607,122 @@
 							"destinationAccounts": 5
 						},
 						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+					}
+				},
+				{
+					"version": 2,
+					"schemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "value",
+								"rustType": "u64"
+							},
+							{
+								"name": "memo",
+								"rustType": "u16"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 10,
+							"fields": [
+								{
+									"name": "value",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "memo",
+									"offset": 8,
+									"size": 2
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "referrer",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "state",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "migration_payer",
+								"writable": true,
+								"signer": true,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "manual_state",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "compact_state",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "c1c5628a75925955a63cfc63664248ac6ec3e01bce7cf39fe5c878a6bdbcc8bf",
+					"transition": {
+						"from": 1,
+						"to": 2,
+						"mode": "automatic",
+						"sourceSchemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
+						"destinationSchemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
+						"sourceProcessSha256": "5736416a1dad9647c9d266e461c8f12af3210ef62b3326b5770ec94ce90ef7d4",
+						"destinationProcessSha256": "c1c5628a75925955a63cfc63664248ac6ec3e01bce7cf39fe5c878a6bdbcc8bf",
+						"process": {
+							"kind": "appendOptional",
+							"sourceAccounts": 5,
+							"destinationAccounts": 7
+						},
+						"implementationSha256": "06a928eefce81d6785af85376d33fc0d513db8e1cb2c15a4679cc879fc88f754"
 					}
 				}
 			]

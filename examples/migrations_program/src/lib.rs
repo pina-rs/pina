@@ -29,11 +29,12 @@ pub struct State {
 	pub authority: Address,
 	pub value: u64,
 	pub enabled: bool,
+	pub revision: u8,
 }
 
-#[account(discriminator = MigrationAccount::ManualState, migrations)]
+#[account(discriminator = MigrationAccount::ManualState, compact, migrations)]
 pub struct ManualState {
-	pub amount: u16,
+	pub code: String<5>,
 }
 
 #[account(discriminator = MigrationAccount::CompactState, compact, migrations)]
@@ -74,6 +75,8 @@ pub struct UpdateAccounts<'a> {
 	#[pina(validate(signer))]
 	pub migration_payer: Option<&'a mut AccountView>,
 	pub system_program: Option<&'a AccountView>,
+	pub manual_state: Option<&'a mut AccountView>,
+	pub compact_state: Option<&'a mut AccountView>,
 }
 
 #[derive(Accounts)]
@@ -94,28 +97,64 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			let instruction = UpdateInstruction::try_from_bytes(current)?;
 			let _ = self.referrer;
 
-			match (self.state, self.migration_payer, self.system_program) {
-				(None, None, None) => {}
-				(Some(state), payer, Some(system_program)) => {
-					system_program.assert_address(&system::ID)?;
-					let payer = payer.map(|account| &*account);
-					MigrateAccount {
-						account: state,
-						payer,
-						program_id: &ID,
-						max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
-					}
-					.invoke::<State>()?;
+			if self.state.is_none()
+				&& self.migration_payer.is_none()
+				&& self.system_program.is_none()
+				&& self.manual_state.is_none()
+				&& self.compact_state.is_none()
+			{
+				let _ = instruction.memo.get();
+				return Ok(());
+			}
+			let (Some(state), payer, Some(system_program)) =
+				(self.state, self.migration_payer, self.system_program)
+			else {
+				return Err(ProgramError::NotEnoughAccountKeys);
+			};
+			system_program.assert_address(&system::ID)?;
+			let payer = payer.map(|account| &*account);
+			MigrateAccount {
+				account: state,
+				payer,
+				program_id: &ID,
+				max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+			}
+			.invoke::<State>()?;
 
-					let mut state = state.as_account_mut::<State>(&ID)?;
-					if state.authority != *self.authority.address() {
+			// Mixed-version sets: each migratable account advances
+			// independently inside the same instruction.
+			if let Some(manual_state) = self.manual_state {
+				MigrateAccount {
+					account: manual_state,
+					payer,
+					program_id: &ID,
+					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+				}
+				.invoke::<ManualState>()?;
+				manual_state.with_compact_account::<ManualState, _>(&ID, |manual| {
+					if manual.code().is_empty() {
 						return Err(ProgramError::InvalidAccountData);
 					}
-					state.value.set(instruction.value.get());
-					state.enabled = true.into();
-				}
-				_ => return Err(ProgramError::NotEnoughAccountKeys),
+					Ok(())
+				})?;
 			}
+			if let Some(compact_state) = self.compact_state {
+				MigrateAccount {
+					account: compact_state,
+					payer,
+					program_id: &ID,
+					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+				}
+				.invoke::<CompactState>()?;
+			}
+
+			let mut state = state.as_account_mut::<State>(&ID)?;
+			if state.authority != *self.authority.address() {
+				return Err(ProgramError::InvalidAccountData);
+			}
+			state.value.set(instruction.value.get());
+			state.enabled = true.into();
+			state.revision = state.revision.wrapping_add(1);
 
 			let _ = instruction.memo.get();
 			Ok(())
@@ -196,7 +235,9 @@ mod tests {
 		let current = normalize_instruction_data::<UpdateInstruction>(&old, &mut workspace)
 			.unwrap_or_else(|error| panic!("normalize instruction: {error:?}"));
 		assert!(current.was_migrated());
-		assert_eq!(current.as_bytes()[0..2], [0, 1]);
+		// The historical v0 request walks both adjacent instruction
+		// transitions and lands on the current v2 envelope.
+		assert_eq!(current.as_bytes()[0..2], [0, 2]);
 		assert_eq!(&current.as_bytes()[2..10], &42_u64.to_le_bytes());
 		assert_eq!(&current.as_bytes()[10..12], &[0, 0]);
 	}
@@ -254,7 +295,7 @@ mod tests {
 	}
 
 	#[test]
-	fn generated_account_migration_preserves_old_fields_and_zeros_new_fields() {
+	fn generated_account_migration_walks_every_adjacent_step() {
 		let authority = Address::new_from_array([9; 32]);
 		let mut old = [0_u8; 42];
 		old[0] = MigrationAccount::State as u8;
@@ -262,26 +303,44 @@ mod tests {
 		old[2..34].copy_from_slice(authority.as_ref());
 		old[34..42].copy_from_slice(&42_u64.to_le_bytes());
 
+		// Step one: v0 -> v1 appends the enabled byte.
 		let plan = State::plan_migration(&old)
 			.unwrap_or_else(|error| panic!("plan account migration: {error:?}"));
+		assert_eq!((plan.from_version(), plan.to_version()), (0, 1));
 		assert_eq!(plan.target_size(), 43);
 		let mut destination = [0xaa; 43];
 		destination[..old.len()].copy_from_slice(&old);
 		State::apply_migration(plan.into_payload(), &mut destination);
 		State::validate_migration_destination(1, &destination)
 			.unwrap_or_else(|error| panic!("validate destination: {error:?}"));
-		State::write_current_migration_version(&mut destination)
+		destination[1] = 1;
+
+		// Step two: v1 -> v2 appends the revision byte, planned from the
+		// representation produced by step one.
+		let plan = State::plan_migration(&destination)
+			.unwrap_or_else(|error| panic!("replan account migration: {error:?}"));
+		assert_eq!((plan.from_version(), plan.to_version()), (1, 2));
+		assert_eq!(plan.target_size(), 44);
+		let mut current = [0xaa; 44];
+		current[..destination.len()].copy_from_slice(&destination);
+		State::apply_migration(plan.into_payload(), &mut current);
+		State::validate_migration_destination(2, &current)
+			.unwrap_or_else(|error| panic!("validate current destination: {error:?}"));
+		State::write_current_migration_version(&mut current)
 			.unwrap_or_else(|error| panic!("write version: {error:?}"));
 
-		assert_eq!(destination[0..2], [1, 1]);
-		assert_eq!(&destination[2..34], authority.as_ref());
-		assert_eq!(&destination[34..42], &42_u64.to_le_bytes());
-		assert_eq!(destination[42], 0);
+		assert_eq!(current[0..2], [1, 2]);
+		assert_eq!(&current[2..34], authority.as_ref());
+		assert_eq!(&current[34..42], &42_u64.to_le_bytes());
+		assert_eq!(current[42], 0);
+		assert_eq!(current[43], 0);
 	}
 
 	#[test]
-	fn manual_account_migration_widens_a_historical_value() {
+	fn manual_account_migration_widens_then_converts_to_compact() {
 		let old = [MigrationAccount::ManualState as u8, 0, u8::MAX];
+
+		// Step one: v0 -> v1 widens the amount to u16.
 		let plan = ManualState::plan_migration(&old)
 			.unwrap_or_else(|error| panic!("plan manual account migration: {error:?}"));
 		assert_eq!(plan.target_size(), 4);
@@ -290,11 +349,26 @@ mod tests {
 		ManualState::apply_migration(plan.into_payload(), &mut destination);
 		ManualState::validate_migration_destination(1, &destination)
 			.unwrap_or_else(|error| panic!("validate manual destination: {error:?}"));
-		ManualState::write_current_migration_version(&mut destination)
+		destination[1] = 1;
+		assert_eq!(u16::from_le_bytes([destination[2], destination[3]]), 255);
+
+		// Step two: v1 -> v2 converts the fixed amount into a compact
+		// decimal code through the manual fixed-to-compact transition.
+		let plan = ManualState::plan_migration(&destination)
+			.unwrap_or_else(|error| panic!("replan manual migration: {error:?}"));
+		assert_eq!((plan.from_version(), plan.to_version()), (1, 2));
+		assert_eq!(plan.target_size(), 6);
+		let mut current = [0xaa; 6];
+		current[..destination.len()].copy_from_slice(&destination);
+		ManualState::apply_migration(plan.into_payload(), &mut current);
+		ManualState::validate_migration_destination(2, &current)
+			.unwrap_or_else(|error| panic!("validate compact destination: {error:?}"));
+		ManualState::write_current_migration_version(&mut current)
 			.unwrap_or_else(|error| panic!("write manual version: {error:?}"));
 
-		assert_eq!(destination[..2], [MigrationAccount::ManualState as u8, 1]);
-		assert_eq!(u16::from_le_bytes([destination[2], destination[3]]), 255);
+		assert_eq!(current[..2], [MigrationAccount::ManualState as u8, 2]);
+		assert_eq!(current[2], 3);
+		assert_eq!(&current[3..6], b"255");
 	}
 
 	#[test]
@@ -355,12 +429,13 @@ mod tests {
 		// layout (the shape produced by every same-size migration: reorders,
 		// semantic changes, field-type splits). The bytes carry a stale
 		// version envelope but otherwise validate as the current layout.
-		let mut stale = [0_u8; 43];
+		let mut stale = [0_u8; State::SIZE];
 		stale[0] = MigrationAccount::State as u8;
-		stale[1] = 0;
+		stale[1] = 1;
 		stale[2..34].copy_from_slice(&[7; 32]);
 		stale[34..42].copy_from_slice(&42_u64.to_le_bytes());
 		stale[42] = 1;
+		stale[43] = 0;
 
 		// The generated inherent reader already refuses the stale envelope.
 		assert_eq!(

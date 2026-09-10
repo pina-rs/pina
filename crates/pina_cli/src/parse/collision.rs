@@ -186,6 +186,7 @@ mod tests {
 	) -> InstructionIr {
 		InstructionIr {
 			name: name.to_owned(),
+			rust_name: name.to_owned(),
 			accounts: account_names
 				.iter()
 				.map(|n| {

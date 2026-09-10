@@ -47,7 +47,7 @@ export function getStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(STATE_DISCRIMINATOR);
 }
 
-export const STATE_DISCRIMINATOR2 = 1;
+export const STATE_DISCRIMINATOR2 = 2;
 
 export function getStateDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(STATE_DISCRIMINATOR2);
@@ -59,12 +59,14 @@ export type State = {
 	authority: Address;
 	value: bigint;
 	enabled: boolean;
+	revision: number;
 };
 
 export type StateArgs = {
 	authority: Address;
 	value: number | bigint;
 	enabled: boolean;
+	revision: number;
 };
 
 /** Gets the encoder for {@link StateArgs} account data. */
@@ -76,8 +78,9 @@ export function getStateEncoder(): FixedSizeEncoder<StateArgs> {
 			["authority", getAddressEncoder()],
 			["value", getU64Encoder()],
 			["enabled", getBooleanEncoder()],
+			["revision", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 2 }),
 	);
 }
 
@@ -92,6 +95,7 @@ export function getStateDecoder(): FixedSizeDecoder<State> {
 		["authority", getAddressDecoder()],
 		["value", getU64Decoder()],
 		["enabled", getPinaPodBooleanDecoder()],
+		["revision", getU8Decoder()],
 	]);
 }
 

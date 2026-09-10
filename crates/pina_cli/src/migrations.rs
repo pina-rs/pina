@@ -934,7 +934,7 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 			&mut contracts,
 			CurrentContract {
 				identity,
-				rust_name: instruction.name.clone(),
+				rust_name: instruction.rust_name.clone(),
 				schema,
 				process: Some(process_contract(instruction)),
 			},
@@ -2289,7 +2289,7 @@ mod tests {
 				.expect("process")
 				.accounts
 				.len(),
-			5
+			7
 		);
 
 		let output = make_migrations(&fixture.root)
@@ -2437,6 +2437,7 @@ mod tests {
 
 		let instruction = InstructionIr {
 			name: "update".to_owned(),
+			rust_name: "UpdateInstruction".to_owned(),
 			accounts: vec![
 				crate::ir::InstructionAccountIr {
 					name: "program".to_owned(),

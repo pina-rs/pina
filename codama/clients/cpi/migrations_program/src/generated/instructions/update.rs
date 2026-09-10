@@ -45,6 +45,16 @@ pub struct Update<'account> {
 	/// Pass `None` to use the target program ID as the account placeholder.
 	pub system_program: Option<&'account AccountView>,
 
+	/// CPI account `manualState`.
+	/// Required privileges: writable.
+	/// Pass `None` to use the target program ID as the account placeholder.
+	pub manual_state: Option<&'account AccountView>,
+
+	/// CPI account `compactState`.
+	/// Required privileges: writable.
+	/// Pass `None` to use the target program ID as the account placeholder.
+	pub compact_state: Option<&'account AccountView>,
+
 	/// Instruction arguments encoded and sent as CPI data for `update`.
 	pub ix: UpdateIx,
 }
@@ -89,7 +99,7 @@ impl<'account> Update<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 5] = [
+		let accounts: [CpiHandle<'_>; 7] = [
 			CpiHandle::readonly_signer(self.authority),
 			match self.referrer {
 				Some(account) => CpiHandle::readonly(account),
@@ -107,6 +117,14 @@ impl<'account> Update<'account> {
 				Some(account) => CpiHandle::readonly(account),
 				None => CpiHandle::readonly(program.account()),
 			},
+			match self.manual_state {
+				Some(account) => CpiHandle::writable(account)?,
+				None => CpiHandle::readonly(program.account()),
+			},
+			match self.compact_state {
+				Some(account) => CpiHandle::writable(account)?,
+				None => CpiHandle::readonly(program.account()),
+			},
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
@@ -115,4 +133,4 @@ impl<'account> Update<'account> {
 	}
 }
 
-const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 1];
+const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 2];

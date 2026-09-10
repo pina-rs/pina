@@ -71,11 +71,11 @@ export function identifyMigrationsProgramAccount(
 	const data = "data" in account ? account.data : account;
 	if (
 		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(1), 1)
+		containsBytes(data, getU8Encoder().encode(2), 1)
 	) return MigrationsProgramAccount.State;
 	if (
 		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(1), 1)
+		containsBytes(data, getU8Encoder().encode(2), 1)
 	) return MigrationsProgramAccount.ManualState;
 	if (
 		containsBytes(data, getU8Encoder().encode(3), 0) &&
@@ -98,7 +98,7 @@ export function identifyMigrationsProgramInstruction(
 	const data = "data" in instruction ? instruction.data : instruction;
 	if (
 		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(1), 1)
+		containsBytes(data, getU8Encoder().encode(2), 1)
 	) return MigrationsProgramInstruction.Update;
 	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
 		return MigrationsProgramInstruction.Relay;

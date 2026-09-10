@@ -16,11 +16,12 @@ pub struct State {
 	pub authority: solana_pubkey::Pubkey,
 	pub value: u64,
 	pub enabled: bool,
+	pub revision: u8,
 }
 
 pub const STATE_DISCRIMINATOR: u8 = 1u8;
 
-pub const STATE_MIGRATION_VERSION: u8 = 1u8;
+pub const STATE_MIGRATION_VERSION: u8 = 2u8;
 
 impl State {
 	pub const LEN: usize = core::mem::size_of::<StateZc>();
