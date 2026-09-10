@@ -86,7 +86,7 @@ Developers do not mark versions as published. Before a non-local deployment star
 - the cluster label and credential-free RPC URL;
 - the program identity;
 - the SHA-256 digest of the exact planned executable;
-- the ABI manifest digest and every current contract version;
+- the ABI manifest digest and every current contract version, together with the pinned schema and transition-implementation hashes of every published version;
 - the preceding receipt digest.
 
 The checked-in, hash-chained publication ledger is the current source of truth for version allocation. Both receipts and a pending deployment freeze versions. Loopback local deployments do not add publication state.

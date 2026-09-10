@@ -24,6 +24,8 @@ use pina_abi::ProcessContract;
 use pina_abi::ProcessTransition;
 use pina_abi::PublicationLedger;
 use pina_abi::PublicationReceipt;
+use pina_abi::PublishedContract;
+use pina_abi::PublishedSchema;
 use pina_abi::SchemaVersion;
 use pina_abi::Transition;
 use pina_abi::TransitionMode;
@@ -456,7 +458,7 @@ pub(crate) fn check_project_migrations(
 				pending
 					.versions
 					.get(&key)
-					.is_some_and(|version| *version >= latest.version)
+					.is_some_and(|published| published.version >= latest.version)
 			}),
 			schema_sha256: latest.schema_sha256.clone(),
 		});
@@ -563,7 +565,32 @@ pub fn begin_publication(
 	}
 	let versions = statuses
 		.into_iter()
-		.map(|status| (status.identity, status.current_version))
+		.map(|status| {
+			let history = manifest
+				.contracts
+				.get(&status.identity)
+				.unwrap_or_else(|| panic!("migration status must name a manifest contract"));
+			let pinned = history
+				.versions
+				.iter()
+				.map(|version| {
+					PublishedSchema {
+						schema_sha256: version.schema_sha256.clone(),
+						transition_sha256: version
+							.transition
+							.as_ref()
+							.and_then(|transition| transition.implementation_sha256.clone()),
+					}
+				})
+				.collect();
+			(
+				status.identity,
+				PublishedContract {
+					version: status.current_version,
+					history: pinned,
+				},
+			)
+		})
 		.collect();
 	let pending = PendingPublication {
 		cluster: cluster.to_owned(),
@@ -658,21 +685,12 @@ fn validate_ledger_for_manifest(
 			)));
 		}
 		for (key, published) in &receipt.versions {
-			let history = manifest.contracts.get(key).ok_or_else(|| {
-				MigrationError::InvalidHistory(format!(
-					"publication receipt {} names unknown contract `{key}`",
-					receipt.sequence
-				))
-			})?;
-			let current = history
-				.current()
-				.expect("decoded manifests always contain a current contract version");
-			if *published > current.version {
-				return Err(MigrationError::InvalidHistory(format!(
-					"publication receipt {} claims future version {} for `{key}`",
-					receipt.sequence, published
-				)));
-			}
+			validate_published_contract(
+				&format!("publication receipt {}", receipt.sequence),
+				key,
+				published,
+				manifest,
+			)?;
 		}
 	}
 	if let Some(pending) = &ledger.pending {
@@ -683,19 +701,57 @@ fn validate_ledger_for_manifest(
 			)));
 		}
 		for (key, candidate) in &pending.versions {
-			let history = manifest.contracts.get(key).ok_or_else(|| {
-				MigrationError::InvalidHistory(format!(
-					"pending publication names unknown contract `{key}`"
-				))
-			})?;
-			let current = history.current().ok_or_else(|| {
-				MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
-			})?;
-			if *candidate > current.version {
-				return Err(MigrationError::InvalidHistory(format!(
-					"pending publication claims future version {candidate} for `{key}`"
-				)));
-			}
+			validate_published_contract("pending publication", key, candidate, manifest)?;
+		}
+	}
+	Ok(())
+}
+
+/// Verify one receipt or pending record against the checked-in manifest.
+///
+/// Every pinned schema and transition must still be present with exactly the
+/// recorded hash. A published schema rewritten with consistently recomputed
+/// internal hashes therefore still fails the check instead of silently
+/// changing how historical account bytes are interpreted.
+fn validate_published_contract(
+	source: &str,
+	key: &str,
+	published: &PublishedContract,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	let history = manifest.contracts.get(key).ok_or_else(|| {
+		MigrationError::InvalidHistory(format!("{source} names unknown contract `{key}`"))
+	})?;
+	let current = history.current().ok_or_else(|| {
+		MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
+	})?;
+	if published.version > current.version {
+		return Err(MigrationError::InvalidHistory(format!(
+			"{source} claims future version {} for `{key}`",
+			published.version
+		)));
+	}
+	if published.history.is_empty() {
+		return Ok(());
+	}
+	for (index, pin) in published.history.iter().enumerate() {
+		let version = &history.versions[index];
+		if pin.schema_sha256 != version.schema_sha256 {
+			return Err(MigrationError::InvalidHistory(format!(
+				"{source} pinned schema {} for `{key}` version {index}, but the manifest now 				 \
+				 records {}",
+				pin.schema_sha256, version.schema_sha256
+			)));
+		}
+		let implementation = version
+			.transition
+			.as_ref()
+			.and_then(|transition| transition.implementation_sha256.as_deref());
+		if pin.transition_sha256.as_deref() != implementation {
+			return Err(MigrationError::InvalidHistory(format!(
+				"{source} pinned a different transition implementation for `{key}` version 				 \
+				 {index}"
+			)));
 		}
 	}
 	Ok(())
@@ -2328,7 +2384,10 @@ mod tests {
 		)
 		.unwrap_or_else(|error| panic!("begin publication: {error}"))
 		.expect("migration-aware fixture has a pending publication");
-		assert_eq!(pending.versions.get("account:1:01"), Some(&0));
+		assert_eq!(
+			pending.versions.get("account:1:01").map(|c| c.version),
+			Some(0)
+		);
 		let repeated = begin_publication(
 			&fixture.root,
 			"devnet",
@@ -2409,7 +2468,10 @@ mod tests {
 
 		assert_eq!(receipt.sequence, 0);
 		assert_eq!(receipt.executable_sha256, hex_digest(digest));
-		assert_eq!(receipt.versions.get("account:1:01"), Some(&0));
+		assert_eq!(
+			receipt.versions.get("account:1:01").map(|c| c.version),
+			Some(0)
+		);
 		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
 			.unwrap_or_else(|error| panic!("reload publication: {error}"));
 		assert!(ledger.pending.is_none());
@@ -2542,6 +2604,67 @@ mod tests {
 	}
 
 	#[test]
+	fn receipts_pin_published_schema_hashes() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("load ledger: {error:?}"));
+
+		// Rewrite the published version zero with a different schema and
+		// recompute every internal hash, so contract validation alone accepts
+		// the document. Only the receipt's pinned history can detect it.
+		let tampered_schema = schema(LayoutKind::Fixed, &[("value", "u32")]);
+		let mut tampered =
+			MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		tampered.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "State".to_owned(),
+				versions: vec![SchemaVersion {
+					version: 0,
+					schema_sha256: tampered_schema.sha256(),
+					schema: tampered_schema,
+					process: None,
+					process_sha256: None,
+					transition: None,
+				}],
+			},
+		);
+		tampered.validate().unwrap_or_else(|error| {
+			panic!("coherent tamper must pass manifest validation: {error}")
+		});
+
+		// A legacy receipt upgraded from an older ledger format carries no
+		// pins and still accepts the rewrite.
+		let mut legacy = ledger.clone();
+		for receipt in &mut legacy.receipts {
+			for published in receipt.versions.values_mut() {
+				published.history.clear();
+			}
+		}
+		assert!(
+			validate_ledger_for_manifest(&legacy, &tampered).is_ok(),
+			"legacy receipts cannot verify rewritten published schemas"
+		);
+
+		// The pinned receipt records the schema that actually shipped and
+		// rejects the coherent rewrite.
+		let rejection = validate_ledger_for_manifest(&ledger, &tampered)
+			.expect_err("pinned receipts must reject rewritten published schemas");
+		assert!(
+			format!("{rejection:?}").contains("pinned schema"),
+			"unexpected rejection: {rejection:?}"
+		);
+
+		// The untouched manifest still validates against its own receipt.
+		let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+			.expect("fixture manifest");
+		assert!(validate_ledger_for_manifest(&ledger, &manifest).is_ok());
+	}
+
 	fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
 		let fixture = publication_fixture();
 		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
@@ -2567,7 +2690,7 @@ mod tests {
 
 		let mut unknown = pending_ledger.clone();
 		unknown.pending.as_mut().expect("pending").versions =
-			BTreeMap::from([("account:1:ff".to_owned(), 0)]);
+			BTreeMap::from([("account:1:ff".to_owned(), PublishedContract::legacy(0))]);
 		assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
 
 		let mut future = pending_ledger.clone();
@@ -2576,7 +2699,7 @@ mod tests {
 			.as_mut()
 			.expect("pending")
 			.versions
-			.insert("account:1:01".to_owned(), 1);
+			.insert("account:1:01".to_owned(), PublishedContract::legacy(1));
 		assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
 
 		record_publication(
@@ -2596,13 +2719,14 @@ mod tests {
 		assert!(validate_ledger_for_manifest(&wrong_program, &manifest).is_err());
 
 		let mut unknown = receipt_ledger.clone();
-		unknown.receipts[0].versions = BTreeMap::from([("account:1:ff".to_owned(), 0)]);
+		unknown.receipts[0].versions =
+			BTreeMap::from([("account:1:ff".to_owned(), PublishedContract::legacy(0))]);
 		assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
 
 		let mut future = receipt_ledger;
 		future.receipts[0]
 			.versions
-			.insert("account:1:01".to_owned(), 1);
+			.insert("account:1:01".to_owned(), PublishedContract::legacy(1));
 		assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
 	}
 

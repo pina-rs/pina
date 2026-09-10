@@ -70,7 +70,7 @@ Events are immutable, so Pina projects rather than rewrites them. A migratable e
 
 ## Publish a version
 
-Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the exact program ID, RPC target, executable digest, manifest digest, and current contract versions as pending. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and converts that record into a hash-chained receipt.
+Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the exact program ID, RPC target, executable digest, manifest digest, and current contract versions as pending. Receipts and pending records also pin the schema hash and transition-implementation hash of every published version, so rewriting published history — even with consistently recomputed hashes — fails every later check. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and converts that record into a hash-chained receipt.
 
 Local deployments do not publish versions. A published version is immutable even if a later deployment replaces it.
 

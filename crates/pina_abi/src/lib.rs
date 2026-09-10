@@ -987,12 +987,33 @@ struct PublicationLedgerV1 {
 	receipts: Vec<PublicationReceiptV1>,
 }
 
+/// Format 2 receipts recorded only the published version number.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+struct PublicationReceiptV2 {
+	sequence: u64,
+	cluster: String,
+	rpc_url: String,
+	program_id: String,
+	executable_sha256: String,
+	manifest_sha256: String,
+	versions: BTreeMap<String, u32>,
+	previous_receipt_sha256: Option<String>,
+}
+
+impl PublicationReceiptV2 {
+	fn sha256(&self) -> String {
+		hash_json(self)
+	}
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 struct PublicationLedgerV2 {
 	format_version: u32,
-	receipts: Vec<PublicationReceipt>,
+	receipts: Vec<PublicationReceiptV2>,
 }
 
 impl PublicationLedgerV2 {
@@ -1003,12 +1024,41 @@ impl PublicationLedgerV2 {
 				self.format_version
 			));
 		}
-		PublicationLedger {
-			format_version: PUBLICATION_FORMAT_VERSION,
-			receipts: self.receipts.clone(),
-			pending: None,
+		let mut previous = None;
+		for (index, receipt) in self.receipts.iter().enumerate() {
+			if receipt.sequence != index as u64 {
+				return Err(format!(
+					"publication receipt sequence expected {index}, found {}",
+					receipt.sequence
+				));
+			}
+			if receipt.previous_receipt_sha256 != previous {
+				return Err(format!(
+					"publication receipt {} does not extend the previous hash",
+					receipt.sequence
+				));
+			}
+			let empty_history =
+				BTreeMap::from_iter(receipt.versions.iter().map(|(contract, version)| {
+					(contract.clone(), PublishedContract::legacy(*version))
+				}));
+			validate_publication_identity(
+				receipt.sequence,
+				&receipt.cluster,
+				&receipt.program_id,
+				&receipt.executable_sha256,
+				&receipt.manifest_sha256,
+				&empty_history,
+			)?;
+			if receipt.rpc_url.is_empty() || receipt.rpc_url.chars().any(char::is_control) {
+				return Err(format!(
+					"publication receipt {} contains an invalid RPC URL",
+					receipt.sequence
+				));
+			}
+			previous = Some(receipt.sha256());
 		}
-		.validate()
+		Ok(())
 	}
 }
 
@@ -1035,17 +1085,21 @@ impl PublicationLedgerV1 {
 					receipt.sequence
 				));
 			}
+			let legacy_versions =
+				BTreeMap::from_iter(receipt.versions.iter().map(|(contract, version)| {
+					(contract.clone(), PublishedContract::legacy(*version))
+				}));
 			validate_publication_identity(
 				receipt.sequence,
 				&receipt.cluster,
 				&receipt.program_id,
 				&receipt.executable_sha256,
 				&receipt.manifest_sha256,
-				&receipt.versions,
+				&legacy_versions,
 			)?;
 			validate_publication_versions(
 				receipt.sequence,
-				&receipt.versions,
+				&legacy_versions,
 				&mut published_versions,
 			)?;
 			previous = Some(receipt.sha256());
@@ -1063,7 +1117,7 @@ fn migrate_publication_v1_to_v2(value: serde_json::Value) -> Result<serde_json::
 		.receipts
 		.into_iter()
 		.map(|receipt| {
-			let migrated = PublicationReceipt {
+			let migrated = PublicationReceiptV2 {
 				sequence: receipt.sequence,
 				rpc_url: receipt.cluster.clone(),
 				cluster: receipt.cluster,
@@ -1124,9 +1178,32 @@ fn migrate_publication_v2_to_v3(value: serde_json::Value) -> Result<serde_json::
 	let legacy: PublicationLedgerV2 = serde_json::from_value(value)
 		.map_err(|error| format!("invalid publication ledger format 2: {error}"))?;
 	legacy.validate()?;
+	let mut previous = None;
+	let receipts = legacy
+		.receipts
+		.into_iter()
+		.map(|receipt| {
+			let migrated = PublicationReceipt {
+				sequence: receipt.sequence,
+				rpc_url: receipt.rpc_url,
+				cluster: receipt.cluster,
+				program_id: receipt.program_id,
+				executable_sha256: receipt.executable_sha256,
+				manifest_sha256: receipt.manifest_sha256,
+				versions: receipt
+					.versions
+					.into_iter()
+					.map(|(contract, version)| (contract, PublishedContract::legacy(version)))
+					.collect(),
+				previous_receipt_sha256: previous.clone(),
+			};
+			previous = Some(migrated.sha256());
+			migrated
+		})
+		.collect();
 	serde_json::to_value(PublicationLedger {
 		format_version: PUBLICATION_FORMAT_VERSION,
-		receipts: legacy.receipts,
+		receipts,
 		pending: None,
 	})
 	.map_err(|error| format!("could not encode publication ledger format 3: {error}"))
@@ -1141,9 +1218,44 @@ fn migrate_publication_v3_to_v2(value: serde_json::Value) -> Result<serde_json::
 			"publication ledger format 3 cannot downgrade while a deployment is pending".to_owned(),
 		);
 	}
+	if ledger.receipts.iter().any(|receipt| {
+		receipt
+			.versions
+			.values()
+			.any(|published| !published.history.is_empty())
+	}) {
+		return Err(
+			"publication ledger format 3 cannot downgrade because its receipts pin schema 			 \
+			 history that format 2 cannot represent"
+				.to_owned(),
+		);
+	}
+	let mut previous = None;
+	let receipts = ledger
+		.receipts
+		.into_iter()
+		.map(|receipt| {
+			let migrated = PublicationReceiptV2 {
+				sequence: receipt.sequence,
+				rpc_url: receipt.rpc_url,
+				cluster: receipt.cluster,
+				program_id: receipt.program_id,
+				executable_sha256: receipt.executable_sha256,
+				manifest_sha256: receipt.manifest_sha256,
+				versions: receipt
+					.versions
+					.into_iter()
+					.map(|(contract, published)| (contract, published.version))
+					.collect(),
+				previous_receipt_sha256: previous.clone(),
+			};
+			previous = Some(migrated.sha256());
+			migrated
+		})
+		.collect();
 	serde_json::to_value(PublicationLedgerV2 {
 		format_version: 2,
-		receipts: ledger.receipts,
+		receipts,
 	})
 	.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
 }
@@ -1539,6 +1651,54 @@ fn migrate_manifest_v3_to_v2(mut value: serde_json::Value) -> Result<serde_json:
 	Ok(value)
 }
 
+/// One published schema pinned by a receipt.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PublishedSchema {
+	/// Content hash of the published schema.
+	pub schema_sha256: String,
+	/// Hash of the adjacent transition implementation entering this schema.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub transition_sha256: Option<String>,
+}
+
+/// One contract's published state as frozen by a receipt.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PublishedContract {
+	/// Highest version made live for the contract.
+	pub version: u32,
+	/// Schema and transition pins for every version up to and including
+	/// `version`. Empty for receipts upgraded from older ledger formats whose
+	/// history cannot be reconstructed.
+	pub history: Vec<PublishedSchema>,
+}
+
+impl PublishedContract {
+	/// Construct an unpinned legacy entry from an older ledger format.
+	#[must_use]
+	pub fn legacy(version: u32) -> Self {
+		Self {
+			version,
+			history: Vec::new(),
+		}
+	}
+
+	/// Return the pinned highest published version.
+	#[must_use]
+	pub const fn version(&self) -> u32 {
+		self.version
+	}
+
+	/// Return the pinned history, empty for legacy receipts.
+	#[must_use]
+	pub fn history(&self) -> &[PublishedSchema] {
+		&self.history
+	}
+}
+
 /// One successful persistent deployment receipt.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1551,8 +1711,9 @@ pub struct PublicationReceipt {
 	pub program_id: String,
 	pub executable_sha256: String,
 	pub manifest_sha256: String,
-	/// Highest version made live for every contract identity.
-	pub versions: BTreeMap<String, u32>,
+	/// Highest version made live for every contract identity, with the schema
+	/// history those deployments froze.
+	pub versions: BTreeMap<String, PublishedContract>,
 	pub previous_receipt_sha256: Option<String>,
 }
 
@@ -1578,8 +1739,9 @@ pub struct PendingPublication {
 	pub program_id: String,
 	pub executable_sha256: String,
 	pub manifest_sha256: String,
-	/// Highest version that the in-flight deployment may make live.
-	pub versions: BTreeMap<String, u32>,
+	/// Highest version that the in-flight deployment may make live, with the
+	/// schema history the deployment freezes.
+	pub versions: BTreeMap<String, PublishedContract>,
 	pub previous_receipt_sha256: Option<String>,
 }
 
@@ -1612,7 +1774,7 @@ impl PublicationLedger {
 			receipt
 				.versions
 				.get(contract)
-				.is_some_and(|published| *published >= version)
+				.is_some_and(|published| published.version >= version)
 		})
 	}
 
@@ -1624,7 +1786,7 @@ impl PublicationLedger {
 				pending
 					.versions
 					.get(contract)
-					.is_some_and(|candidate| *candidate >= version)
+					.is_some_and(|candidate| candidate.version >= version)
 			})
 	}
 
@@ -1702,7 +1864,7 @@ fn validate_publication_identity(
 	program_id: &str,
 	executable_sha256: &str,
 	manifest_sha256: &str,
-	versions: &BTreeMap<String, u32>,
+	versions: &BTreeMap<String, PublishedContract>,
 ) -> Result<(), String> {
 	if cluster.is_empty()
 		|| cluster.chars().any(char::is_control)
@@ -1720,24 +1882,75 @@ fn validate_publication_identity(
 
 fn validate_publication_versions(
 	sequence: u64,
-	versions: &BTreeMap<String, u32>,
+	versions: &BTreeMap<String, PublishedContract>,
 	published_versions: &mut BTreeMap<String, u32>,
 ) -> Result<(), String> {
-	for (contract, version) in versions {
+	for (contract, published) in versions {
 		if contract.is_empty() || contract.chars().any(char::is_control) {
 			return Err(format!(
 				"publication receipt {sequence} contains an invalid contract identity"
 			));
 		}
+		validate_published_history(sequence, contract, published)?;
 		if published_versions
 			.get(contract)
-			.is_some_and(|published| version < published)
+			.is_some_and(|previous| published.version < *previous)
 		{
 			return Err(format!(
-				"publication receipt {sequence} regresses `{contract}` to version {version}"
+				"publication receipt {sequence} regresses `{contract}` to version {}",
+				published.version
 			));
 		}
-		published_versions.insert(contract.clone(), *version);
+		published_versions.insert(contract.clone(), published.version);
+	}
+	Ok(())
+}
+
+/// Validate one receipt's pinned schema history.
+///
+/// A pinned history covers every version up to and including the published
+/// version. The first entry never has an entering transition. Empty histories
+/// are legacy receipts upgraded from older ledger formats and stay unpinned.
+fn validate_published_history(
+	sequence: u64,
+	contract: &str,
+	published: &PublishedContract,
+) -> Result<(), String> {
+	let expected = usize::try_from(published.version)
+		.ok()
+		.and_then(|version| version.checked_add(1));
+	if !published.history.is_empty() && Some(published.history.len()) != expected {
+		return Err(format!(
+			"publication receipt {sequence} pins {} history entries for `{contract}` at version {}",
+			published.history.len(),
+			published.version
+		));
+	}
+	for (index, pin) in published.history.iter().enumerate() {
+		if !is_sha256(&pin.schema_sha256) {
+			return Err(format!(
+				"publication receipt {sequence} pins an invalid schema hash for `{contract}` \
+				 version {index}"
+			));
+		}
+		if let Some(transition) = &pin.transition_sha256
+			&& !is_sha256(transition)
+		{
+			return Err(format!(
+				"publication receipt {sequence} pins an invalid transition hash for `{contract}` \
+				 version {index}"
+			));
+		}
+	}
+	if published
+		.history
+		.first()
+		.is_some_and(|pin| pin.transition_sha256.is_some())
+	{
+		return Err(format!(
+			"publication receipt {sequence} pins a transition entering version zero of \
+			 `{contract}`"
+		));
 	}
 	Ok(())
 }
@@ -2494,7 +2707,7 @@ mod tests {
 			program_id: "program".to_owned(),
 			executable_sha256: "a".repeat(64),
 			manifest_sha256: "b".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), 0)]),
+			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
 			previous_receipt_sha256: None,
 		};
 		let second = PublicationReceipt {
@@ -2504,7 +2717,7 @@ mod tests {
 			program_id: "program".to_owned(),
 			executable_sha256: "c".repeat(64),
 			manifest_sha256: "d".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), 1)]),
+			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
 			previous_receipt_sha256: Some(first.sha256()),
 		};
 		let ledger = PublicationLedger {
@@ -2530,7 +2743,7 @@ mod tests {
 			program_id: "program".to_owned(),
 			executable_sha256: "e".repeat(64),
 			manifest_sha256: "f".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), 2)]),
+			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(2))]),
 			previous_receipt_sha256: pending.receipts.last().map(PublicationReceipt::sha256),
 		});
 		assert_eq!(pending.validate(), Ok(()));
@@ -2790,7 +3003,7 @@ mod tests {
 			program_id: "program".to_owned(),
 			executable_sha256: "a".repeat(64),
 			manifest_sha256: "b".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), 1)]),
+			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
 			previous_receipt_sha256: None,
 		};
 		let second = PublicationReceipt {
@@ -2800,7 +3013,7 @@ mod tests {
 			program_id: "program".to_owned(),
 			executable_sha256: "c".repeat(64),
 			manifest_sha256: "d".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), 0)]),
+			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
 			previous_receipt_sha256: Some(first.sha256()),
 		};
 		let ledger = PublicationLedger {
