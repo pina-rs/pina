@@ -5,9 +5,15 @@ pub struct ProgramAccount<Address> {
 }
 
 impl<Address> ProgramAccount<Address> {
+	pub fn new(address: Address) -> Self {
+		Self { address }
+	}
+
 	pub fn address(&self) -> &Address {
 		&self.address
 	}
+
+	pub fn refresh(&mut self) {}
 }
 
 pub trait AccountInfoValidation<Address>: Sized {

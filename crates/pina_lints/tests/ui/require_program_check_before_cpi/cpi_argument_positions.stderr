@@ -1,0 +1,18 @@
+error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_argument_positions.rs:39:2
+   |
+LL |     instruction.invoke_signed_with_unverified_program(&[], program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = note: `#[deny(require_program_check_before_cpi)]` on by default
+
+error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_argument_positions.rs:49:2
+   |
+LL |     legacy.invoke_signed_with_unverified_program(&[])
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: aborting due to 2 previous errors
