@@ -13,8 +13,8 @@ const int profileProgramErrorTagNotFound = 0x2; // 2
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _profileProgramErrorMessages = {
-  profileProgramErrorTagOverflow: 'The tag list is full (capacity 8).',
-  profileProgramErrorTagNotFound: 'The tag index is out of range.',
+    profileProgramErrorTagOverflow: 'The tag list is full (capacity 8).',
+    profileProgramErrorTagNotFound: 'The tag index is out of range.',
 };
 
 /// Get the error message for a ProfileProgram program error code.

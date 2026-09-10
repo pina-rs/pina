@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class CreatePdaInstructionData {
-  const CreatePdaInstructionData({required this.bump}) : discriminator = 3;
+  const CreatePdaInstructionData({
+    required this.bump,
+  }) :
+      discriminator = 3;
 
   final int discriminator;
   final int bump;
@@ -41,21 +46,31 @@ Decoder<CreatePdaInstructionData> getCreatePdaInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'createPda instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'createPda instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (CreatePdaInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(3),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (CreatePdaInstructionData(bump: map['bump']! as int), newOffset);
+    return (
+      CreatePdaInstructionData(
+      bump: map['bump']! as int,
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -78,12 +93,8 @@ Decoder<CreatePdaInstructionData> getCreatePdaInstructionDataDecoder() {
   };
 }
 
-Codec<CreatePdaInstructionData, CreatePdaInstructionData>
-getCreatePdaInstructionDataCodec() {
-  return combineCodec(
-    getCreatePdaInstructionDataEncoder(),
-    getCreatePdaInstructionDataDecoder(),
-  );
+Codec<CreatePdaInstructionData, CreatePdaInstructionData> getCreatePdaInstructionDataCodec() {
+  return combineCodec(getCreatePdaInstructionDataEncoder(), getCreatePdaInstructionDataDecoder());
 }
 
 /// Creates a [CreatePda] instruction.
@@ -94,14 +105,16 @@ Instruction getCreatePdaInstruction({
   required Address systemProgram,
   required int bump,
 }) {
-  final instructionData = CreatePdaInstructionData(bump: bump);
+  final instructionData = CreatePdaInstructionData(
+      bump: bump,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: payer, role: AccountRole.writableSigner),
-      AccountMeta(address: state, role: AccountRole.writable),
-      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+    AccountMeta(address: payer, role: AccountRole.writableSigner),
+    AccountMeta(address: state, role: AccountRole.writable),
+    AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getCreatePdaInstructionDataEncoder().encode(instructionData),
   );

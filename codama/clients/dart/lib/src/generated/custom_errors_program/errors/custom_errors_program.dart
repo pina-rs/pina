@@ -21,14 +21,14 @@ const int customErrorsProgramErrorValueLessOrEqual = 0x17f1; // 6129
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _customErrorsProgramErrorMessages = {
-  customErrorsProgramErrorHello: '',
-  customErrorsProgramErrorHelloNoMsg: '',
-  customErrorsProgramErrorHelloNext: '',
-  customErrorsProgramErrorHelloCustom: '',
-  customErrorsProgramErrorValueMismatch: '',
-  customErrorsProgramErrorValueMatch: '',
-  customErrorsProgramErrorValueLess: '',
-  customErrorsProgramErrorValueLessOrEqual: '',
+    customErrorsProgramErrorHello: '',
+    customErrorsProgramErrorHelloNoMsg: '',
+    customErrorsProgramErrorHelloNext: '',
+    customErrorsProgramErrorHelloCustom: '',
+    customErrorsProgramErrorValueMismatch: '',
+    customErrorsProgramErrorValueMatch: '',
+    customErrorsProgramErrorValueLess: '',
+    customErrorsProgramErrorValueLessOrEqual: '',
 };
 
 /// Get the error message for a CustomErrorsProgram program error code.
