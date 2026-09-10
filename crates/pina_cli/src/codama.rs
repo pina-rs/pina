@@ -289,12 +289,15 @@ pub struct CodamaGenerateOptions {
 	pub js_out: PathBuf,
 	/// Output directory for generated Dart clients.
 	pub dart_out: PathBuf,
-	/// Output directory for generated Rust CLI crates.
-	pub cli_rust_out: PathBuf,
-	/// Output directory for generated TypeScript CLI applications.
-	pub cli_ts_out: PathBuf,
-	/// Output directory for the generated Dart CLI package.
-	pub cli_dart_out: PathBuf,
+	/// Output directory for generated Rust CLI crates. CLI generation is
+	/// skipped when unset.
+	pub cli_rust_out: Option<PathBuf>,
+	/// Output directory for generated TypeScript CLI applications. CLI
+	/// generation is skipped when unset.
+	pub cli_ts_out: Option<PathBuf>,
+	/// Output directory for the generated Dart CLI package. CLI generation
+	/// is skipped when unset.
+	pub cli_dart_out: Option<PathBuf>,
 	/// Example names to generate; empty selects every example.
 	pub examples: Vec<String>,
 	/// Command used to invoke Node-based Codama tooling.
@@ -374,20 +377,35 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		cpi_out: options.cpi_out.clone(),
 		typescript_out: options.js_out.clone(),
 		dart_out: options.dart_out.clone(),
-		cli_rust_out: options.cli_rust_out.clone(),
-		cli_ts_out: options.cli_ts_out.clone(),
-		cli_dart_out: options.cli_dart_out.clone(),
+		cli_rust_out: options.cli_rust_out.clone().unwrap_or_default(),
+		cli_ts_out: options.cli_ts_out.clone().unwrap_or_default(),
+		cli_dart_out: options.cli_dart_out.clone().unwrap_or_default(),
 		clients: expand_cli_clients(
 			[
 				ClientLanguage::Cpi,
 				ClientLanguage::Rust,
 				ClientLanguage::Typescript,
 				ClientLanguage::Dart,
-				ClientLanguage::CliRust,
-				ClientLanguage::CliTs,
-				ClientLanguage::CliDart,
 			]
 			.into_iter()
+			.chain(
+				options
+					.cli_rust_out
+					.is_some()
+					.then_some(ClientLanguage::CliRust),
+			)
+			.chain(
+				options
+					.cli_ts_out
+					.is_some()
+					.then_some(ClientLanguage::CliTs),
+			)
+			.chain(
+				options
+					.cli_dart_out
+					.is_some()
+					.then_some(ClientLanguage::CliDart),
+			)
 			.collect(),
 		),
 		generation: default_generation_settings(),

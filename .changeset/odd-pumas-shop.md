@@ -1,7 +1,7 @@
 ---
 "pina_cli_renderer": minor
 "@pina-rs/codama-renderer-cli": minor
-"pina_cli": minor
+"pina_cli": feat
 ---
 
 Add CLI client generation for Codama IDLs in three languages: `pina generate --client cli-rust`, `--client cli-ts`, and `--client cli-dart`.

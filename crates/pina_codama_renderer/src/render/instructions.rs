@@ -161,9 +161,12 @@ pub(crate) fn render_instruction_page(
 	lines.push(format!("\t\tdata: {data_name},"));
 	lines.push("\t\tremaining_accounts: &[solana_instruction::AccountMeta],".to_string());
 	lines.push("\t) -> solana_instruction::Instruction {".to_string());
+	let capacity = match instruction.accounts.len() {
+		0 => "remaining_accounts.len()".to_string(),
+		count => format!("{count} + remaining_accounts.len()"),
+	};
 	lines.push(format!(
-		"\t\tlet mut accounts = Vec::with_capacity({} + remaining_accounts.len());",
-		instruction.accounts.len()
+		"\t\tlet mut accounts = Vec::with_capacity({capacity});"
 	));
 	lines.extend(render_instruction_account_metas(
 		instruction,

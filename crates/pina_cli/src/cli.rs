@@ -1286,17 +1286,20 @@ pub(crate) enum CodamaCommands {
 		)]
 		dart_out: PathBuf,
 
-		/// Output directory for generated Rust CLI crates.
-		#[arg(long, default_value = "codama/clients/cli/rust", value_name = "DIR")]
-		cli_rust_out: PathBuf,
+		/// Output directory for generated Rust CLI crates. Omit to skip
+		/// CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_rust_out: Option<PathBuf>,
 
 		/// Output directory for generated TypeScript CLI applications.
-		#[arg(long, default_value = "codama/clients/cli/ts", value_name = "DIR")]
-		cli_ts_out: PathBuf,
+		/// Omit to skip CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_ts_out: Option<PathBuf>,
 
-		/// Output directory for the generated Dart CLI package.
-		#[arg(long, default_value = "codama/clients/cli/dart", value_name = "DIR")]
-		cli_dart_out: PathBuf,
+		/// Output directory for the generated Dart CLI package. Omit to
+		/// skip CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_dart_out: Option<PathBuf>,
 
 		/// Program name to generate. Repeat to select multiple programs.
 		/// When omitted, every program below --examples-dir is generated.
