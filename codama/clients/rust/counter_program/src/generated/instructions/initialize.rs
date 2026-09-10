@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `Initialize`.
-/// 
+///
 /// Contains the PDA bump seed so the client can pass a pre-computed bump
 /// (avoids the cost of `find_program_address` on-chain).
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
@@ -33,7 +33,8 @@ impl Initialize {
 			counter: solana_pubkey::Pubkey::find_program_address(
 				&["counter".as_bytes(), authority.as_ref()],
 				&crate::COUNTER_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -49,9 +50,15 @@ impl Initialize {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.counter, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::COUNTER_PROGRAM_ID,
@@ -67,14 +74,16 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InitializeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

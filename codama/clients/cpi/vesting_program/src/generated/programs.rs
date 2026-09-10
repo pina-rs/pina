@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const VESTING_PROGRAM_ID: Address = pina::address!("FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh");
+pub const VESTING_PROGRAM_ID: Address =
+	pina::address!("FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh");
 
 /// Marker for the `vestingProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

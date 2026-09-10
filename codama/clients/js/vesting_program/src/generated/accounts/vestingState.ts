@@ -6,93 +6,199 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodBooleanDecoder, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getBooleanDecoder, getBooleanEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findVestingPda, type VestingSeeds } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
+	getBooleanDecoder,
+	getBooleanEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findVestingPda, type VestingSeeds } from "../pdas";
+import {
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const VESTING_STATE_DISCRIMINATOR = 1;
 
-export function getVestingStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(VESTING_STATE_DISCRIMINATOR); }
+export function getVestingStateDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(VESTING_STATE_DISCRIMINATOR);
+}
 
-export type VestingState = { discriminator: number; admin: Address; beneficiary: Address; mint: Address; totalAmount: bigint; claimedAmount: bigint; startTs: bigint; cliffTs: bigint; endTs: bigint; cancelled: boolean; bump: number;  };
+export type VestingState = {
+	discriminator: number;
+	admin: Address;
+	beneficiary: Address;
+	mint: Address;
+	totalAmount: bigint;
+	claimedAmount: bigint;
+	startTs: bigint;
+	cliffTs: bigint;
+	endTs: bigint;
+	cancelled: boolean;
+	bump: number;
+};
 
-export type VestingStateArgs = { admin: Address; beneficiary: Address; mint: Address; totalAmount: number | bigint; claimedAmount: number | bigint; startTs: number | bigint; cliffTs: number | bigint; endTs: number | bigint; cancelled: boolean; bump: number;  };
+export type VestingStateArgs = {
+	admin: Address;
+	beneficiary: Address;
+	mint: Address;
+	totalAmount: number | bigint;
+	claimedAmount: number | bigint;
+	startTs: number | bigint;
+	cliffTs: number | bigint;
+	endTs: number | bigint;
+	cancelled: boolean;
+	bump: number;
+};
 
 /** Gets the encoder for {@link VestingStateArgs} account data. */
 export function getVestingStateEncoder(): FixedSizeEncoder<VestingStateArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['admin', getAddressEncoder()], ['beneficiary', getAddressEncoder()], ['mint', getAddressEncoder()], ['totalAmount', getU64Encoder()], ['claimedAmount', getU64Encoder()], ['startTs', getU64Encoder()], ['cliffTs', getU64Encoder()], ['endTs', getU64Encoder()], ['cancelled', getBooleanEncoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["admin", getAddressEncoder()],
+			["beneficiary", getAddressEncoder()],
+			["mint", getAddressEncoder()],
+			["totalAmount", getU64Encoder()],
+			["claimedAmount", getU64Encoder()],
+			["startTs", getU64Encoder()],
+			["cliffTs", getU64Encoder()],
+			["endTs", getU64Encoder()],
+			["cancelled", getBooleanEncoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link VestingState} account data. */
 export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(VESTING_STATE_DISCRIMINATOR, getU8Decoder())], ['admin', getAddressDecoder()], ['beneficiary', getAddressDecoder()], ['mint', getAddressDecoder()], ['totalAmount', getU64Decoder()], ['claimedAmount', getU64Decoder()], ['startTs', getU64Decoder()], ['cliffTs', getU64Decoder()], ['endTs', getU64Decoder()], ['cancelled', getPinaPodBooleanDecoder()], ['bump', getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				VESTING_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["admin", getAddressDecoder()],
+		["beneficiary", getAddressDecoder()],
+		["mint", getAddressDecoder()],
+		["totalAmount", getU64Decoder()],
+		["claimedAmount", getU64Decoder()],
+		["startTs", getU64Decoder()],
+		["cliffTs", getU64Decoder()],
+		["endTs", getU64Decoder()],
+		["cancelled", getPinaPodBooleanDecoder()],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link VestingState} account data. */
-export function getVestingStateCodec(): FixedSizeCodec<VestingStateArgs, VestingState> {
-    return combineCodec(getVestingStateEncoder(), getVestingStateDecoder());
+export function getVestingStateCodec(): FixedSizeCodec<
+	VestingStateArgs,
+	VestingState
+> {
+	return combineCodec(getVestingStateEncoder(), getVestingStateDecoder());
 }
 
-export function decodeVestingState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<VestingState, TAddress>;
-export function decodeVestingState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<VestingState, TAddress>;
-export function decodeVestingState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<VestingState, TAddress> | MaybeAccount<VestingState, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getVestingStateDecoder());
+export function decodeVestingState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<VestingState, TAddress>;
+export function decodeVestingState<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<VestingState, TAddress>;
+export function decodeVestingState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<VestingState, TAddress> | MaybeAccount<VestingState, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getVestingStateDecoder(),
+	);
 }
 
 export async function fetchVestingState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<VestingState, TAddress>> {
-  const maybeAccount = await fetchMaybeVestingState(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeVestingState(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeVestingState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<VestingState, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeVestingState(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodeVestingState(maybeAccount);
 }
 
 export async function fetchAllVestingState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<VestingState>[]> {
-  const maybeAccounts = await fetchAllMaybeVestingState(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeVestingState(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeVestingState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<VestingState>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeVestingState(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodeVestingState(maybeAccount));
 }
 
 export async function fetchVestingStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: VestingSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: VestingSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<VestingState>> {
-  const maybeAccount = await fetchMaybeVestingStateFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeVestingStateFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeVestingStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: VestingSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: VestingSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<VestingState>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findVestingPda(seeds, { programAddress });
-  return await fetchMaybeVestingState(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findVestingPda(seeds, { programAddress });
+	return await fetchMaybeVestingState(rpc, address, fetchConfig);
 }

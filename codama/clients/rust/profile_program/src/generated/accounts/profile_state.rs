@@ -11,28 +11,28 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ProfileState {
-/// On-chain profile state.
-/// 
-/// The `#[account]` macro generates:
-/// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
-/// byte.
-/// - `PinaAccount` and `PinaPod` validation for checked zero-copy access.
-/// - `HasDiscriminator` linking this account to
-/// `ProfileAccountType::ProfileState`.
-/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
-/// 
-/// Layout (240 bytes total):
-/// ```text
-/// | offset | size | field          |
-/// |--------|------|----------------|
-/// | 0      | 1    | discriminator  |
-/// | 1      | 1    | bump           |
-/// | 2      | 33   | name (`String<32>`)  |
-/// | 35     | 129  | bio (`String<128>`)  |
-/// | 164    | 66   | tags (`Vec<u64, 8>`) |
-/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
-/// | 239    | 1    | active (PodBool) |
-/// ```
+	/// On-chain profile state.
+	///
+	/// The `#[account]` macro generates:
+	/// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
+	/// byte.
+	/// - `PinaAccount` and `PinaPod` validation for checked zero-copy access.
+	/// - `HasDiscriminator` linking this account to
+	/// `ProfileAccountType::ProfileState`.
+	/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
+	///
+	/// Layout (240 bytes total):
+	/// ```text
+	/// | offset | size | field          |
+	/// |--------|------|----------------|
+	/// | 0      | 1    | discriminator  |
+	/// | 1      | 1    | bump           |
+	/// | 2      | 33   | name (`String<32>`)  |
+	/// | 35     | 129  | bio (`String<128>`)  |
+	/// | 164    | 66   | tags (`Vec<u64, 8>`) |
+	/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+	/// | 239    | 1    | active (PodBool) |
+	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -78,7 +78,9 @@ impl ProfileState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
@@ -91,21 +93,17 @@ impl ProfileState {
 impl ProfileState {
 	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&[
-				"profile".as_bytes(),
-				authority.as_ref(),
-			],
+			&["profile".as_bytes(), authority.as_ref()],
 			&crate::PROFILE_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(authority: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(
+		authority: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&[
-				"profile".as_bytes(),
-				authority.as_ref(),
-				&[bump],
-			],
+			&["profile".as_bytes(), authority.as_ref(), &[bump]],
 			&crate::PROFILE_PROGRAM_ID,
 		)
 	}

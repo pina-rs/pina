@@ -3,11 +3,13 @@
 
 /// Error codes for the DuplicateMutableAccountsProgram program.
 
-const int duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount = 0x7f8; // 2040
+const int
+duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount =
+    0x7f8; // 2040
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _duplicateMutableAccountsProgramErrorMessages = {
-    duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount: '',
+  duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount: '',
 };
 
 /// Get the error message for a DuplicateMutableAccountsProgram program error code.

@@ -6,78 +6,185 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TOUCH_DISCRIMINATOR = 1;
 
-export function getTouchDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(TOUCH_DISCRIMINATOR); }
-
-export type TouchInstruction<TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountStore extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountStore extends string ? WritableAccount<TAccountStore> : TAccountStore, ...TRemainingAccounts]>;
-
-export type TouchInstructionData = { discriminator: number;  };
-
-export type TouchInstructionDataArgs = {  };
-
-export function getTouchInstructionDataEncoder(): FixedSizeEncoder<TouchInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+export function getTouchDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(TOUCH_DISCRIMINATOR);
 }
 
-export function getTouchInstructionDataDecoder(): FixedSizeDecoder<TouchInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(TOUCH_DISCRIMINATOR, getU8Decoder())]]);
+export type TouchInstruction<
+	TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountStore extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountStore extends string ? WritableAccount<TAccountStore>
+				: TAccountStore,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type TouchInstructionData = { discriminator: number };
+
+export type TouchInstructionDataArgs = {};
+
+export function getTouchInstructionDataEncoder(): FixedSizeEncoder<
+	TouchInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
-export function getTouchInstructionDataCodec(): FixedSizeCodec<TouchInstructionDataArgs, TouchInstructionData> {
-    return combineCodec(getTouchInstructionDataEncoder(), getTouchInstructionDataDecoder());
+export function getTouchInstructionDataDecoder(): FixedSizeDecoder<
+	TouchInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(TOUCH_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type TouchInput<TAccountAuthority extends string = string, TAccountStore extends string = string> =  {
-  /** The store's authority. Must sign. */
-authority: TransactionSigner<TAccountAuthority>;
-/** When present, the counter inside is incremented by one. */
-store?: Address<TAccountStore>;
+export function getTouchInstructionDataCodec(): FixedSizeCodec<
+	TouchInstructionDataArgs,
+	TouchInstructionData
+> {
+	return combineCodec(
+		getTouchInstructionDataEncoder(),
+		getTouchInstructionDataDecoder(),
+	);
 }
 
-export function getTouchInstruction<TAccountAuthority extends string, TAccountStore extends string, TProgramAddress extends Address = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: TouchInput<TAccountAuthority, TAccountStore>, config?: { programAddress?: TProgramAddress } ): TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore> {
-  // Program address.
-const programAddress = config?.programAddress ?? OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, store: { value: input.store ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("store", accounts.store)], data: getTouchInstructionDataEncoder().encode({}), programAddress } as TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore>);
-}
-
-export type ParsedTouchInstruction<TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/** The store's authority. Must sign. */
-authority: TAccountMetas[0];
-/** When present, the counter inside is incremented by one. */
-store?: TAccountMetas[1] | undefined;
+export type TouchInput<
+	TAccountAuthority extends string = string,
+	TAccountStore extends string = string,
+> = {
+	/** The store's authority. Must sign. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** When present, the counter inside is incremented by one. */
+	store?: Address<TAccountStore>;
 };
-data: TouchInstructionData; };
 
-export function parseTouchInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedTouchInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export function getTouchInstruction<
+	TAccountAuthority extends string,
+	TAccountStore extends string,
+	TProgramAddress extends Address =
+		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: TouchInput<TAccountAuthority, TAccountStore>,
+	config?: { programAddress?: TProgramAddress },
+): TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		store: { value: input.store ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("store", accounts.store),
+		],
+		data: getTouchInstructionDataEncoder().encode({}),
+		programAddress,
+	} as TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-const getNextOptionalAccount = () => {
-  const accountMeta = getNextAccount();
-  return accountMeta.address === instruction.programAddress ? undefined : accountMeta;
+
+export type ParsedTouchInstruction<
+	TProgram extends string = typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/** The store's authority. Must sign. */
+		authority: TAccountMetas[0];
+		/** When present, the counter inside is incremented by one. */
+		store?: TAccountMetas[1] | undefined;
+	};
+	data: TouchInstructionData;
 };
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), store: getNextOptionalAccount() }, data: getTouchInstructionDataDecoder().decode(instruction.data) };
+
+export function parseTouchInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedTouchInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	const getNextOptionalAccount = () => {
+		const accountMeta = getNextAccount();
+		return accountMeta.address === instruction.programAddress
+			? undefined
+			: accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { authority: getNextAccount(), store: getNextOptionalAccount() },
+		data: getTouchInstructionDataDecoder().decode(instruction.data),
+	};
 }

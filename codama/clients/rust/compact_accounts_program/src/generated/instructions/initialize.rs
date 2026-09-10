@@ -27,7 +27,8 @@ impl Initialize {
 			journal: solana_pubkey::Pubkey::find_program_address(
 				&["compact-journal".as_bytes(), authority.as_ref()],
 				&crate::COMPACT_ACCOUNTS_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -45,7 +46,10 @@ impl Initialize {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.journal, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::COMPACT_ACCOUNTS_PROGRAM_ID,
@@ -61,14 +65,16 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InitializeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

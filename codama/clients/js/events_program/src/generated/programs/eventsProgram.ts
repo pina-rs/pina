@@ -6,49 +6,161 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getInitializeInstruction, getTestEventCpiInstruction, getTestEventInstruction, parseInitializeInstruction, parseTestEventCpiInstruction, parseTestEventInstruction, type InitializeInput, type ParsedInitializeInstruction, type ParsedTestEventCpiInstruction, type ParsedTestEventInstruction, type TestEventCpiInput, type TestEventInput } from '../instructions';
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getInitializeInstruction,
+	getTestEventCpiInstruction,
+	getTestEventInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	type ParsedTestEventCpiInstruction,
+	type ParsedTestEventInstruction,
+	parseInitializeInstruction,
+	parseTestEventCpiInstruction,
+	parseTestEventInstruction,
+	type TestEventCpiInput,
+	type TestEventInput,
+} from "../instructions";
 
-export const EVENTS_PROGRAM_PROGRAM_ADDRESS = '2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy' as Address<'2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy'>;
+export const EVENTS_PROGRAM_PROGRAM_ADDRESS =
+	"2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy" as Address<
+		"2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy"
+	>;
 
-export enum EventsProgramInstruction { Initialize, TestEvent, TestEventCpi }
-
-export function identifyEventsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): EventsProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return EventsProgramInstruction.Initialize; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return EventsProgramInstruction.TestEvent; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return EventsProgramInstruction.TestEventCpi; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "eventsProgram" });
+export enum EventsProgramInstruction {
+	Initialize,
+	TestEvent,
+	TestEventCpi,
 }
 
-export type ParsedEventsProgramInstruction<TProgram extends string = '2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy'> =
-| { instructionType: EventsProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
-| { instructionType: EventsProgramInstruction.TestEvent } & ParsedTestEventInstruction<TProgram>
-| { instructionType: EventsProgramInstruction.TestEventCpi } & ParsedTestEventCpiInstruction<TProgram>
+export function identifyEventsProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): EventsProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return EventsProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return EventsProgramInstruction.TestEvent;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return EventsProgramInstruction.TestEventCpi;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "eventsProgram" },
+	);
+}
 
+export type ParsedEventsProgramInstruction<
+	TProgram extends string = "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
+> =
+	| { instructionType: EventsProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: EventsProgramInstruction.TestEvent }
+		& ParsedTestEventInstruction<TProgram>
+	| { instructionType: EventsProgramInstruction.TestEventCpi }
+		& ParsedTestEventCpiInstruction<TProgram>;
 
-        export function parseEventsProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedEventsProgramInstruction<TProgram> {
-            const instructionType = identifyEventsProgramInstruction(instruction);
-            switch (instructionType) {
-                case EventsProgramInstruction.Initialize: { return { instructionType: EventsProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-case EventsProgramInstruction.TestEvent: { return { instructionType: EventsProgramInstruction.TestEvent, ...parseTestEventInstruction(instruction) }; }
-case EventsProgramInstruction.TestEventCpi: { return { instructionType: EventsProgramInstruction.TestEventCpi, ...parseTestEventCpiInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "eventsProgram" });
-            }
-        }
+export function parseEventsProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedEventsProgramInstruction<TProgram> {
+	const instructionType = identifyEventsProgramInstruction(instruction);
+	switch (instructionType) {
+		case EventsProgramInstruction.Initialize: {
+			return {
+				instructionType: EventsProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case EventsProgramInstruction.TestEvent: {
+			return {
+				instructionType: EventsProgramInstruction.TestEvent,
+				...parseTestEventInstruction(instruction),
+			};
+		}
+		case EventsProgramInstruction.TestEventCpi: {
+			return {
+				instructionType: EventsProgramInstruction.TestEventCpi,
+				...parseTestEventCpiInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "eventsProgram",
+				},
+			);
+	}
+}
 
-export type EventsProgramPlugin = { instructions: EventsProgramPluginInstructions; identifyInstruction: typeof identifyEventsProgramInstruction; parseInstruction: typeof parseEventsProgramInstruction; }
+export type EventsProgramPlugin = {
+	instructions: EventsProgramPluginInstructions;
+	identifyInstruction: typeof identifyEventsProgramInstruction;
+	parseInstruction: typeof parseEventsProgramInstruction;
+};
 
-export type EventsProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; testEvent: (input: TestEventInput) => ReturnType<typeof getTestEventInstruction> & SelfPlanAndSendFunctions; testEventCpi: (input: TestEventCpiInput) => ReturnType<typeof getTestEventCpiInstruction> & SelfPlanAndSendFunctions; }
+export type EventsProgramPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	testEvent: (
+		input: TestEventInput,
+	) => ReturnType<typeof getTestEventInstruction> & SelfPlanAndSendFunctions;
+	testEventCpi: (
+		input: TestEventCpiInput,
+	) => ReturnType<typeof getTestEventCpiInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type EventsProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
+export type EventsProgramPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function eventsProgramProgram() {
-    return <T extends EventsProgramPluginRequirements>(client: T): ExtendedClient<T, { eventsProgram: EventsProgramPlugin }> => {
-        return extendClient(client, { eventsProgram: <EventsProgramPlugin>{ instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), testEvent: input => addSelfPlanAndSendFunctions(client, getTestEventInstruction(input)), testEventCpi: input => addSelfPlanAndSendFunctions(client, getTestEventCpiInstruction(input)) }, identifyInstruction: identifyEventsProgramInstruction, parseInstruction: parseEventsProgramInstruction } });
-    };
+	return <T extends EventsProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { eventsProgram: EventsProgramPlugin }> => {
+		return extendClient(client, {
+			eventsProgram: <EventsProgramPlugin> {
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+					testEvent: (input) =>
+						addSelfPlanAndSendFunctions(client, getTestEventInstruction(input)),
+					testEventCpi: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getTestEventCpiInstruction(input),
+						),
+				},
+				identifyInstruction: identifyEventsProgramInstruction,
+				parseInstruction: parseEventsProgramInstruction,
+			},
+		});
+	};
 }

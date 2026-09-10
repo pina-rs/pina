@@ -6,13 +6,32 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getUtf8Encoder,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type RegistryConfigSeeds = {
-admin: Address;
+	admin: Address;
 };
 
-export async function findRegistryConfigPda(seeds: RegistryConfigSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress = '3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX' as Address<'3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX'> } = config;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("registry"), getAddressEncoder().encode(seeds.admin)]});
+export async function findRegistryConfigPda(
+	seeds: RegistryConfigSeeds,
+	config: { programAddress?: Address | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress = "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX" as Address<
+			"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX"
+		>,
+	} = config;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("registry"),
+			getAddressEncoder().encode(seeds.admin),
+		],
+	});
 }

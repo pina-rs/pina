@@ -6,8 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 /** The lower policy bound must not exceed the upper bound. */
 export const VALIDATION_PROGRAM_ERROR__INVALID_POLICY_RANGE = 0x1; // 1
@@ -24,25 +29,65 @@ export const VALIDATION_PROGRAM_ERROR__AMOUNT_OUTSIDE_POLICY = 0x6; // 6
 /** The event would describe an invalid policy check. */
 export const VALIDATION_PROGRAM_ERROR__INVALID_EVENT = 0x7; // 7
 
-export type ValidationProgramError = typeof VALIDATION_PROGRAM_ERROR__AMOUNT_OUTSIDE_POLICY | typeof VALIDATION_PROGRAM_ERROR__INVALID_ACCOUNTS | typeof VALIDATION_PROGRAM_ERROR__INVALID_AMOUNT | typeof VALIDATION_PROGRAM_ERROR__INVALID_APPROVALS | typeof VALIDATION_PROGRAM_ERROR__INVALID_EVENT | typeof VALIDATION_PROGRAM_ERROR__INVALID_MEMO | typeof VALIDATION_PROGRAM_ERROR__INVALID_POLICY_RANGE;
+export type ValidationProgramError =
+	| typeof VALIDATION_PROGRAM_ERROR__AMOUNT_OUTSIDE_POLICY
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_ACCOUNTS
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_AMOUNT
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_APPROVALS
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_EVENT
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_MEMO
+	| typeof VALIDATION_PROGRAM_ERROR__INVALID_POLICY_RANGE;
 
-let validationProgramErrorMessages: Record<ValidationProgramError, string> | undefined;
-if (process.env['NODE_ENV'] !== 'production') {
-  validationProgramErrorMessages = { [VALIDATION_PROGRAM_ERROR__AMOUNT_OUTSIDE_POLICY]: `The amount does not fall inside the bounds stored in the policy account.`, [VALIDATION_PROGRAM_ERROR__INVALID_ACCOUNTS]: `The validated account list violates a relationship between accounts.`, [VALIDATION_PROGRAM_ERROR__INVALID_AMOUNT]: `An instruction amount is outside the absolute limits of this program.`, [VALIDATION_PROGRAM_ERROR__INVALID_APPROVALS]: `A check must contain exactly two different approval codes.`, [VALIDATION_PROGRAM_ERROR__INVALID_EVENT]: `The event would describe an invalid policy check.`, [VALIDATION_PROGRAM_ERROR__INVALID_MEMO]: `A human-readable memo is too short or too long.`, [VALIDATION_PROGRAM_ERROR__INVALID_POLICY_RANGE]: `The lower policy bound must not exceed the upper bound.` };
+let validationProgramErrorMessages:
+	| Record<ValidationProgramError, string>
+	| undefined;
+if (process.env["NODE_ENV"] !== "production") {
+	validationProgramErrorMessages = {
+		[VALIDATION_PROGRAM_ERROR__AMOUNT_OUTSIDE_POLICY]:
+			`The amount does not fall inside the bounds stored in the policy account.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_ACCOUNTS]:
+			`The validated account list violates a relationship between accounts.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_AMOUNT]:
+			`An instruction amount is outside the absolute limits of this program.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_APPROVALS]:
+			`A check must contain exactly two different approval codes.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_EVENT]:
+			`The event would describe an invalid policy check.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_MEMO]:
+			`A human-readable memo is too short or too long.`,
+		[VALIDATION_PROGRAM_ERROR__INVALID_POLICY_RANGE]:
+			`The lower policy bound must not exceed the upper bound.`,
+	};
 }
 
-export function getValidationProgramErrorMessage(code: ValidationProgramError): string {
-  if (process.env['NODE_ENV'] !== 'production') {
-    return (validationProgramErrorMessages as Record<ValidationProgramError, string>)[code];
-  }
+export function getValidationProgramErrorMessage(
+	code: ValidationProgramError,
+): string {
+	if (process.env["NODE_ENV"] !== "production") {
+		return (validationProgramErrorMessages as Record<
+			ValidationProgramError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isValidationProgramError<TProgramErrorCode extends ValidationProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, VALIDATION_PROGRAM_PROGRAM_ADDRESS, code);
+export function isValidationProgramError<
+	TProgramErrorCode extends ValidationProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

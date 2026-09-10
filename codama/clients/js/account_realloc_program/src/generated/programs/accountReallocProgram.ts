@@ -6,66 +6,207 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getSampleCodec, type Sample, type SampleArgs } from '../accounts';
-import { getInitializeInstructionAsync, getRealloc2Instruction, getReallocInstruction, parseInitializeInstruction, parseRealloc2Instruction, parseReallocInstruction, type InitializeAsyncInput, type ParsedInitializeInstruction, type ParsedRealloc2Instruction, type ParsedReallocInstruction, type Realloc2Input, type ReallocInput } from '../instructions';
-import { findSamplePda } from '../pdas';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import { getSampleCodec, type Sample, type SampleArgs } from "../accounts";
+import {
+	getInitializeInstructionAsync,
+	getRealloc2Instruction,
+	getReallocInstruction,
+	type InitializeAsyncInput,
+	type ParsedInitializeInstruction,
+	type ParsedRealloc2Instruction,
+	type ParsedReallocInstruction,
+	parseInitializeInstruction,
+	parseRealloc2Instruction,
+	parseReallocInstruction,
+	type Realloc2Input,
+	type ReallocInput,
+} from "../instructions";
+import { findSamplePda } from "../pdas";
 
-export const ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;
 
-export enum AccountReallocProgramAccount { Sample }
-
-export function identifyAccountReallocProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): AccountReallocProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return AccountReallocProgramAccount.Sample; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "accountReallocProgram" });
+export enum AccountReallocProgramAccount {
+	Sample,
 }
 
-export enum AccountReallocProgramInstruction { Initialize, Realloc, Realloc2 }
-
-export function identifyAccountReallocProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): AccountReallocProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(2), 0)) { return AccountReallocProgramInstruction.Initialize; }
-if (containsBytes(data, getU8Encoder().encode(0), 0)) { return AccountReallocProgramInstruction.Realloc; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return AccountReallocProgramInstruction.Realloc2; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "accountReallocProgram" });
+export function identifyAccountReallocProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AccountReallocProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AccountReallocProgramAccount.Sample;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "accountReallocProgram" },
+	);
 }
 
-export type ParsedAccountReallocProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
-| { instructionType: AccountReallocProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
-| { instructionType: AccountReallocProgramInstruction.Realloc } & ParsedReallocInstruction<TProgram>
-| { instructionType: AccountReallocProgramInstruction.Realloc2 } & ParsedRealloc2Instruction<TProgram>
+export enum AccountReallocProgramInstruction {
+	Initialize,
+	Realloc,
+	Realloc2,
+}
 
+export function identifyAccountReallocProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AccountReallocProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return AccountReallocProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return AccountReallocProgramInstruction.Realloc;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AccountReallocProgramInstruction.Realloc2;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "accountReallocProgram" },
+	);
+}
 
-        export function parseAccountReallocProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedAccountReallocProgramInstruction<TProgram> {
-            const instructionType = identifyAccountReallocProgramInstruction(instruction);
-            switch (instructionType) {
-                case AccountReallocProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: AccountReallocProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-case AccountReallocProgramInstruction.Realloc: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: AccountReallocProgramInstruction.Realloc, ...parseReallocInstruction(instruction) }; }
-case AccountReallocProgramInstruction.Realloc2: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: AccountReallocProgramInstruction.Realloc2, ...parseRealloc2Instruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "accountReallocProgram" });
-            }
-        }
+export type ParsedAccountReallocProgramInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	| { instructionType: AccountReallocProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: AccountReallocProgramInstruction.Realloc }
+		& ParsedReallocInstruction<TProgram>
+	| { instructionType: AccountReallocProgramInstruction.Realloc2 }
+		& ParsedRealloc2Instruction<TProgram>;
 
-export type AccountReallocProgramPlugin = { accounts: AccountReallocProgramPluginAccounts; instructions: AccountReallocProgramPluginInstructions; pdas: AccountReallocProgramPluginPdas; identifyAccount: typeof identifyAccountReallocProgramAccount; identifyInstruction: typeof identifyAccountReallocProgramInstruction; parseInstruction: typeof parseAccountReallocProgramInstruction; }
+export function parseAccountReallocProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAccountReallocProgramInstruction<TProgram> {
+	const instructionType = identifyAccountReallocProgramInstruction(instruction);
+	switch (instructionType) {
+		case AccountReallocProgramInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: AccountReallocProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case AccountReallocProgramInstruction.Realloc: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: AccountReallocProgramInstruction.Realloc,
+				...parseReallocInstruction(instruction),
+			};
+		}
+		case AccountReallocProgramInstruction.Realloc2: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: AccountReallocProgramInstruction.Realloc2,
+				...parseRealloc2Instruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "accountReallocProgram",
+				},
+			);
+	}
+}
 
-export type AccountReallocProgramPluginAccounts = { sample: ReturnType<typeof getSampleCodec> & SelfFetchFunctions<SampleArgs, Sample>; }
+export type AccountReallocProgramPlugin = {
+	accounts: AccountReallocProgramPluginAccounts;
+	instructions: AccountReallocProgramPluginInstructions;
+	pdas: AccountReallocProgramPluginPdas;
+	identifyAccount: typeof identifyAccountReallocProgramAccount;
+	identifyInstruction: typeof identifyAccountReallocProgramInstruction;
+	parseInstruction: typeof parseAccountReallocProgramInstruction;
+};
 
-export type AccountReallocProgramPluginInstructions = { initialize: (input: InitializeAsyncInput) => ReturnType<typeof getInitializeInstructionAsync> & SelfPlanAndSendFunctions; realloc: (input: ReallocInput) => ReturnType<typeof getReallocInstruction> & SelfPlanAndSendFunctions; realloc2: (input: Realloc2Input) => ReturnType<typeof getRealloc2Instruction> & SelfPlanAndSendFunctions; }
+export type AccountReallocProgramPluginAccounts = {
+	sample:
+		& ReturnType<typeof getSampleCodec>
+		& SelfFetchFunctions<SampleArgs, Sample>;
+};
 
-export type AccountReallocProgramPluginPdas = { sample: typeof findSamplePda; }
+export type AccountReallocProgramPluginInstructions = {
+	initialize: (
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
+	realloc: (
+		input: ReallocInput,
+	) => ReturnType<typeof getReallocInstruction> & SelfPlanAndSendFunctions;
+	realloc2: (
+		input: Realloc2Input,
+	) => ReturnType<typeof getRealloc2Instruction> & SelfPlanAndSendFunctions;
+};
 
-export type AccountReallocProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type AccountReallocProgramPluginPdas = { sample: typeof findSamplePda };
+
+export type AccountReallocProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function accountReallocProgramProgram() {
-    return <T extends AccountReallocProgramPluginRequirements>(client: T): ExtendedClient<T, { accountReallocProgram: AccountReallocProgramPlugin }> => {
-        return extendClient(client, { accountReallocProgram: <AccountReallocProgramPlugin>{ accounts: { sample: addSelfFetchFunctions(client, getSampleCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstructionAsync(input)), realloc: input => addSelfPlanAndSendFunctions(client, getReallocInstruction(input)), realloc2: input => addSelfPlanAndSendFunctions(client, getRealloc2Instruction(input)) }, pdas: { sample: findSamplePda }, identifyAccount: identifyAccountReallocProgramAccount, identifyInstruction: identifyAccountReallocProgramInstruction, parseInstruction: parseAccountReallocProgramInstruction } });
-    };
+	return <T extends AccountReallocProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<
+		T,
+		{ accountReallocProgram: AccountReallocProgramPlugin }
+	> => {
+		return extendClient(client, {
+			accountReallocProgram: <AccountReallocProgramPlugin> {
+				accounts: { sample: addSelfFetchFunctions(client, getSampleCodec()) },
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstructionAsync(input),
+						),
+					realloc: (input) =>
+						addSelfPlanAndSendFunctions(client, getReallocInstruction(input)),
+					realloc2: (input) =>
+						addSelfPlanAndSendFunctions(client, getRealloc2Instruction(input)),
+				},
+				pdas: { sample: findSamplePda },
+				identifyAccount: identifyAccountReallocProgramAccount,
+				identifyInstruction: identifyAccountReallocProgramInstruction,
+				parseInstruction: parseAccountReallocProgramInstruction,
+			},
+		});
+	};
 }

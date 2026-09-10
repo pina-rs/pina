@@ -6,93 +6,177 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodBooleanDecoder, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getBooleanDecoder, getBooleanEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findPoolPda, type PoolSeeds } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
+	getBooleanDecoder,
+	getBooleanEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findPoolPda, type PoolSeeds } from "../pdas";
+import {
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
 
-export function getPoolStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(POOL_STATE_DISCRIMINATOR); }
+export function getPoolStateDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_STATE_DISCRIMINATOR);
+}
 
-export type PoolState = { discriminator: number; admin: Address; stakeMint: Address; rewardMint: Address; totalStaked: bigint; rewardIndex: bigint; paused: boolean; bump: number;  };
+export type PoolState = {
+	discriminator: number;
+	admin: Address;
+	stakeMint: Address;
+	rewardMint: Address;
+	totalStaked: bigint;
+	rewardIndex: bigint;
+	paused: boolean;
+	bump: number;
+};
 
-export type PoolStateArgs = { admin: Address; stakeMint: Address; rewardMint: Address; totalStaked: number | bigint; rewardIndex: number | bigint; paused: boolean; bump: number;  };
+export type PoolStateArgs = {
+	admin: Address;
+	stakeMint: Address;
+	rewardMint: Address;
+	totalStaked: number | bigint;
+	rewardIndex: number | bigint;
+	paused: boolean;
+	bump: number;
+};
 
 /** Gets the encoder for {@link PoolStateArgs} account data. */
 export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['admin', getAddressEncoder()], ['stakeMint', getAddressEncoder()], ['rewardMint', getAddressEncoder()], ['totalStaked', getU64Encoder()], ['rewardIndex', getU64Encoder()], ['paused', getBooleanEncoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["admin", getAddressEncoder()],
+			["stakeMint", getAddressEncoder()],
+			["rewardMint", getAddressEncoder()],
+			["totalStaked", getU64Encoder()],
+			["rewardIndex", getU64Encoder()],
+			["paused", getBooleanEncoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link PoolState} account data. */
 export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder())], ['admin', getAddressDecoder()], ['stakeMint', getAddressDecoder()], ['rewardMint', getAddressDecoder()], ['totalStaked', getU64Decoder()], ['rewardIndex', getU64Decoder()], ['paused', getPinaPodBooleanDecoder()], ['bump', getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["admin", getAddressDecoder()],
+		["stakeMint", getAddressDecoder()],
+		["rewardMint", getAddressDecoder()],
+		["totalStaked", getU64Decoder()],
+		["rewardIndex", getU64Decoder()],
+		["paused", getPinaPodBooleanDecoder()],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link PoolState} account data. */
 export function getPoolStateCodec(): FixedSizeCodec<PoolStateArgs, PoolState> {
-    return combineCodec(getPoolStateEncoder(), getPoolStateDecoder());
+	return combineCodec(getPoolStateEncoder(), getPoolStateDecoder());
 }
 
-export function decodePoolState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<PoolState, TAddress>;
-export function decodePoolState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<PoolState, TAddress>;
-export function decodePoolState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<PoolState, TAddress> | MaybeAccount<PoolState, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getPoolStateDecoder());
+export function decodePoolState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<PoolState, TAddress>;
+export function decodePoolState<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<PoolState, TAddress>;
+export function decodePoolState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<PoolState, TAddress> | MaybeAccount<PoolState, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getPoolStateDecoder(),
+	);
 }
 
 export async function fetchPoolState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<PoolState, TAddress>> {
-  const maybeAccount = await fetchMaybePoolState(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolState(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<PoolState, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodePoolState(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodePoolState(maybeAccount);
 }
 
 export async function fetchAllPoolState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<PoolState>[]> {
-  const maybeAccounts = await fetchAllMaybePoolState(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybePoolState(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybePoolState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<PoolState>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodePoolState(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodePoolState(maybeAccount));
 }
 
 export async function fetchPoolStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: PoolSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PoolSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<PoolState>> {
-  const maybeAccount = await fetchMaybePoolStateFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: PoolSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PoolSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<PoolState>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findPoolPda(seeds, { programAddress });
-  return await fetchMaybePoolState(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findPoolPda(seeds, { programAddress });
+	return await fetchMaybePoolState(rpc, address, fetchConfig);
 }

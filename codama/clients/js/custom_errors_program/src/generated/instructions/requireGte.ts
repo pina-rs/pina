@@ -6,51 +6,101 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUIRE_GTE_DISCRIMINATOR = 6;
 
-export function getRequireGteDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(REQUIRE_GTE_DISCRIMINATOR); }
-
-export type RequireGteInstruction<TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
-
-export type RequireGteInstructionData = { discriminator: number;  };
-
-export type RequireGteInstructionDataArgs = {  };
-
-export function getRequireGteInstructionDataEncoder(): FixedSizeEncoder<RequireGteInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 6 }));
+export function getRequireGteDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(REQUIRE_GTE_DISCRIMINATOR);
 }
 
-export function getRequireGteInstructionDataDecoder(): FixedSizeDecoder<RequireGteInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder())]]);
+export type RequireGteInstruction<
+	TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type RequireGteInstructionData = { discriminator: number };
+
+export type RequireGteInstructionDataArgs = {};
+
+export function getRequireGteInstructionDataEncoder(): FixedSizeEncoder<
+	RequireGteInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 6 }),
+	);
 }
 
-export function getRequireGteInstructionDataCodec(): FixedSizeCodec<RequireGteInstructionDataArgs, RequireGteInstructionData> {
-    return combineCodec(getRequireGteInstructionDataEncoder(), getRequireGteInstructionDataDecoder());
+export function getRequireGteInstructionDataDecoder(): FixedSizeDecoder<
+	RequireGteInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type RequireGteInput =  {
-  
+export function getRequireGteInstructionDataCodec(): FixedSizeCodec<
+	RequireGteInstructionDataArgs,
+	RequireGteInstructionData
+> {
+	return combineCodec(
+		getRequireGteInstructionDataEncoder(),
+		getRequireGteInstructionDataDecoder(),
+	);
 }
 
-export function getRequireGteInstruction<TProgramAddress extends Address = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS>(config?: { programAddress?: TProgramAddress } ): RequireGteInstruction<TProgramAddress> {
-  // Program address.
-const programAddress = config?.programAddress ?? CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
+export type RequireGteInput = {};
 
+export function getRequireGteInstruction<
+	TProgramAddress extends Address =
+		typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	config?: { programAddress?: TProgramAddress },
+): RequireGteInstruction<TProgramAddress> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
 
-
-
-return Object.freeze({ data: getRequireGteInstructionDataEncoder().encode({}), programAddress } as RequireGteInstruction<TProgramAddress>);
+	return Object.freeze(
+		{
+			data: getRequireGteInstructionDataEncoder().encode({}),
+			programAddress,
+		} as RequireGteInstruction<TProgramAddress>,
+	);
 }
 
-export type ParsedRequireGteInstruction<TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS> = { programAddress: Address<TProgram>;
-data: RequireGteInstructionData; };
+export type ParsedRequireGteInstruction<
+	TProgram extends string = typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
+> = { programAddress: Address<TProgram>; data: RequireGteInstructionData };
 
-export function parseRequireGteInstruction<TProgram extends string>(instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>): ParsedRequireGteInstruction<TProgram> {
-  
-  return { programAddress: instruction.programAddress, data: getRequireGteInstructionDataDecoder().decode(instruction.data) };
+export function parseRequireGteInstruction<TProgram extends string>(
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
+): ParsedRequireGteInstruction<TProgram> {
+	return {
+		programAddress: instruction.programAddress,
+		data: getRequireGteInstructionDataDecoder().decode(instruction.data),
+	};
 }

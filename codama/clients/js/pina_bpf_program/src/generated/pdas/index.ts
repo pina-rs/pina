@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './authority';
-export * from './state';
+export * from "./authority";
+export * from "./state";

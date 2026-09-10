@@ -6,98 +6,150 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findStorePda, type StoreSeeds } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findStorePda, type StoreSeeds } from '../pdas';
 
 export const STORE_STATE_DISCRIMINATOR = 1;
 
-export function getStoreStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(STORE_STATE_DISCRIMINATOR); }
+export function getStoreStateDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(STORE_STATE_DISCRIMINATOR);
+}
 
 /**
  * On-chain store state touched through the optional mutable slot.
  *
  * Layout (10 bytes): 1 discriminator + 1 bump + 8 count.
  */
-export type StoreState = { discriminator: number; bump: number; count: bigint;  };
+export type StoreState = { discriminator: number; bump: number; count: bigint };
 
-export type StoreStateArgs = { bump: number; count: number | bigint;  };
+export type StoreStateArgs = { bump: number; count: number | bigint };
 
 /** Gets the encoder for {@link StoreStateArgs} account data. */
 export function getStoreStateEncoder(): FixedSizeEncoder<StoreStateArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['count', getU64Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], ["count", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link StoreState} account data. */
 export function getStoreStateDecoder(): FixedSizeDecoder<StoreState> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(STORE_STATE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['count', getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(STORE_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["bump", getU8Decoder()],
+		["count", getU64Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link StoreState} account data. */
-export function getStoreStateCodec(): FixedSizeCodec<StoreStateArgs, StoreState> {
-    return combineCodec(getStoreStateEncoder(), getStoreStateDecoder());
+export function getStoreStateCodec(): FixedSizeCodec<
+	StoreStateArgs,
+	StoreState
+> {
+	return combineCodec(getStoreStateEncoder(), getStoreStateDecoder());
 }
 
-export function decodeStoreState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<StoreState, TAddress>;
-export function decodeStoreState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<StoreState, TAddress>;
-export function decodeStoreState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<StoreState, TAddress> | MaybeAccount<StoreState, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getStoreStateDecoder());
+export function decodeStoreState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<StoreState, TAddress>;
+export function decodeStoreState<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<StoreState, TAddress>;
+export function decodeStoreState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<StoreState, TAddress> | MaybeAccount<StoreState, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getStoreStateDecoder(),
+	);
 }
 
 export async function fetchStoreState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<StoreState, TAddress>> {
-  const maybeAccount = await fetchMaybeStoreState(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeStoreState(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeStoreState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<StoreState, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeStoreState(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodeStoreState(maybeAccount);
 }
 
 export async function fetchAllStoreState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<StoreState>[]> {
-  const maybeAccounts = await fetchAllMaybeStoreState(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeStoreState(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeStoreState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<StoreState>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeStoreState(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodeStoreState(maybeAccount));
 }
 
 export async function fetchStoreStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: StoreSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: StoreSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<StoreState>> {
-  const maybeAccount = await fetchMaybeStoreStateFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeStoreStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeStoreStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: StoreSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: StoreSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<StoreState>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findStorePda(seeds, { programAddress });
-  return await fetchMaybeStoreState(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findStorePda(seeds, { programAddress });
+	return await fetchMaybeStoreState(rpc, address, fetchConfig);
 }

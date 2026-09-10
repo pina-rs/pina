@@ -9,7 +9,7 @@
 )]
 
 /// Exercises Anchor's duplicate-reallocation guard.
-/// 
+///
 /// Both sample accounts must be the same canonical PDA for the signer, so the
 /// instruction always rejects with `AccountDuplicateReallocs` before any
 /// account is resized. It is intentionally not a two-target mutation API.
@@ -25,7 +25,11 @@ pub struct Realloc2 {
 }
 
 impl Realloc2 {
-	pub fn new(authority: solana_pubkey::Pubkey, sample1: solana_pubkey::Pubkey, sample2: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		authority: solana_pubkey::Pubkey,
+		sample1: solana_pubkey::Pubkey,
+		sample2: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			authority,
 			sample1,
@@ -48,7 +52,10 @@ impl Realloc2 {
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.sample1, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.sample2, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ACCOUNT_REALLOC_PROGRAM_ID,
@@ -64,14 +71,16 @@ pub struct Realloc2InstructionData {
 }
 
 impl Realloc2InstructionData {
-	pub fn new(configure: impl FnOnce(&mut Realloc2InstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut Realloc2InstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<Realloc2InstructionWireZc>()];
 		<Realloc2InstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC2_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

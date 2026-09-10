@@ -7,13 +7,13 @@
  */
 
 import {
-	type Decoder,
-	type Encoder,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
 	addDecoderSizePrefix,
 	createDecoder,
+	type Decoder,
+	type Encoder,
 	fixDecoderSize,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
 	fixEncoderSize,
 	getBytesDecoder,
 	getU8Decoder,
@@ -32,7 +32,9 @@ function assertPinaPodString(value: string, capacity: number): void {
 		);
 	}
 	if (new TextDecoder("utf-8", { fatal: true }).decode(bytes) !== value) {
-		throw new TypeError("PinaPod strings must contain valid Unicode scalar values");
+		throw new TypeError(
+			"PinaPod strings must contain valid Unicode scalar values",
+		);
 	}
 }
 
@@ -117,8 +119,9 @@ export function getPinaPodBoundedStringDecoder(
 
 /** Decodes variable-size UTF-8 strictly instead of replacing malformed input. */
 export function getPinaPodUtf8Decoder(): Decoder<string> {
-	return transformDecoder(getBytesDecoder(), (value) =>
-		new TextDecoder("utf-8", { fatal: true }).decode(value)
+	return transformDecoder(
+		getBytesDecoder(),
+		(value) => new TextDecoder("utf-8", { fatal: true }).decode(value),
 	);
 }
 
@@ -148,8 +151,9 @@ export function getPinaPodStringDecoder<TSize extends number>(
 	fixedBytes: TSize,
 ): FixedSizeDecoder<string, TSize> {
 	const bytes = addDecoderSizePrefix(getBytesDecoder(), prefix);
-	return transformDecoder(fixDecoderSize(bytes, fixedBytes), (value) =>
-		new TextDecoder("utf-8", { fatal: true }).decode(value)
+	return transformDecoder(
+		fixDecoderSize(bytes, fixedBytes),
+		(value) => new TextDecoder("utf-8", { fatal: true }).decode(value),
 	);
 }
 
@@ -218,7 +222,10 @@ export function getPinaPodMigrationVersionDecoder<
 }
 
 /** Rejects numeric enum representations not declared by the native schema. */
-export function getPinaPodEnumDecoder<TValue extends number, TSize extends number>(
+export function getPinaPodEnumDecoder<
+	TValue extends number,
+	TSize extends number,
+>(
 	decoder: FixedSizeDecoder<TValue, TSize>,
 	validValues: readonly TValue[],
 ): FixedSizeDecoder<TValue, TSize> {

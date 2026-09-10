@@ -23,7 +23,14 @@ pub struct Withdraw {
 }
 
 impl Withdraw {
-	pub fn new(user: solana_pubkey::Pubkey, stake_mint: solana_pubkey::Pubkey, pool_state: solana_pubkey::Pubkey, position_state: solana_pubkey::Pubkey, user_stake_ata: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		user: solana_pubkey::Pubkey,
+		stake_mint: solana_pubkey::Pubkey,
+		pool_state: solana_pubkey::Pubkey,
+		position_state: solana_pubkey::Pubkey,
+		user_stake_ata: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			user,
 			stake_mint,
@@ -46,13 +53,30 @@ impl Withdraw {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.user, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.stake_mint, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.user, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.stake_mint,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.position_state, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.user_stake_ata, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.position_state,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.user_stake_ata,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
@@ -68,14 +92,16 @@ pub struct WithdrawInstructionData {
 }
 
 impl WithdrawInstructionData {
-	pub fn new(configure: impl FnOnce(&mut WithdrawInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut WithdrawInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<WithdrawInstructionWireZc>()];
 		<WithdrawInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = WITHDRAW_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

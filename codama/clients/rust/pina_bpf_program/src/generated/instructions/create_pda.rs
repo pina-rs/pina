@@ -25,7 +25,8 @@ impl CreatePda {
 			state: solana_pubkey::Pubkey::find_program_address(
 				&["state".as_bytes()],
 				&crate::PINA_BPF_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -43,7 +44,10 @@ impl CreatePda {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.state, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PINA_BPF_PROGRAM_ID,
@@ -59,14 +63,16 @@ pub struct CreatePdaInstructionData {
 }
 
 impl CreatePdaInstructionData {
-	pub fn new(configure: impl FnOnce(&mut CreatePdaInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut CreatePdaInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<CreatePdaInstructionWireZc>()];
 		<CreatePdaInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CREATE_PDA_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

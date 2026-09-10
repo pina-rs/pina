@@ -6,48 +6,145 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getCpiTransferInstruction, getDirectTransferInstruction, parseCpiTransferInstruction, parseDirectTransferInstruction, type CpiTransferInput, type DirectTransferInput, type ParsedCpiTransferInstruction, type ParsedDirectTransferInstruction } from '../instructions';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	type CpiTransferInput,
+	type DirectTransferInput,
+	getCpiTransferInstruction,
+	getDirectTransferInstruction,
+	parseCpiTransferInstruction,
+	type ParsedCpiTransferInstruction,
+	type ParsedDirectTransferInstruction,
+	parseDirectTransferInstruction,
+} from "../instructions";
 
-export const TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS = 'BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG' as Address<'BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG'>;
+export const TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS =
+	"BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG" as Address<
+		"BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG"
+	>;
 
-export enum TransferSolProgramInstruction { CpiTransfer, DirectTransfer }
-
-export function identifyTransferSolProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): TransferSolProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return TransferSolProgramInstruction.CpiTransfer; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return TransferSolProgramInstruction.DirectTransfer; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "transferSolProgram" });
+export enum TransferSolProgramInstruction {
+	CpiTransfer,
+	DirectTransfer,
 }
 
-export type ParsedTransferSolProgramInstruction<TProgram extends string = 'BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG'> =
-| { instructionType: TransferSolProgramInstruction.CpiTransfer } & ParsedCpiTransferInstruction<TProgram>
-| { instructionType: TransferSolProgramInstruction.DirectTransfer } & ParsedDirectTransferInstruction<TProgram>
+export function identifyTransferSolProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): TransferSolProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return TransferSolProgramInstruction.CpiTransfer;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return TransferSolProgramInstruction.DirectTransfer;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "transferSolProgram" },
+	);
+}
 
+export type ParsedTransferSolProgramInstruction<
+	TProgram extends string = "BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG",
+> =
+	| { instructionType: TransferSolProgramInstruction.CpiTransfer }
+		& ParsedCpiTransferInstruction<TProgram>
+	| { instructionType: TransferSolProgramInstruction.DirectTransfer }
+		& ParsedDirectTransferInstruction<TProgram>;
 
-        export function parseTransferSolProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedTransferSolProgramInstruction<TProgram> {
-            const instructionType = identifyTransferSolProgramInstruction(instruction);
-            switch (instructionType) {
-                case TransferSolProgramInstruction.CpiTransfer: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: TransferSolProgramInstruction.CpiTransfer, ...parseCpiTransferInstruction(instruction) }; }
-case TransferSolProgramInstruction.DirectTransfer: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: TransferSolProgramInstruction.DirectTransfer, ...parseDirectTransferInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "transferSolProgram" });
-            }
-        }
+export function parseTransferSolProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedTransferSolProgramInstruction<TProgram> {
+	const instructionType = identifyTransferSolProgramInstruction(instruction);
+	switch (instructionType) {
+		case TransferSolProgramInstruction.CpiTransfer: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: TransferSolProgramInstruction.CpiTransfer,
+				...parseCpiTransferInstruction(instruction),
+			};
+		}
+		case TransferSolProgramInstruction.DirectTransfer: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: TransferSolProgramInstruction.DirectTransfer,
+				...parseDirectTransferInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "transferSolProgram",
+				},
+			);
+	}
+}
 
-export type TransferSolProgramPlugin = { instructions: TransferSolProgramPluginInstructions; identifyInstruction: typeof identifyTransferSolProgramInstruction; parseInstruction: typeof parseTransferSolProgramInstruction; }
+export type TransferSolProgramPlugin = {
+	instructions: TransferSolProgramPluginInstructions;
+	identifyInstruction: typeof identifyTransferSolProgramInstruction;
+	parseInstruction: typeof parseTransferSolProgramInstruction;
+};
 
-export type TransferSolProgramPluginInstructions = { cpiTransfer: (input: CpiTransferInput) => ReturnType<typeof getCpiTransferInstruction> & SelfPlanAndSendFunctions; directTransfer: (input: DirectTransferInput) => ReturnType<typeof getDirectTransferInstruction> & SelfPlanAndSendFunctions; }
+export type TransferSolProgramPluginInstructions = {
+	cpiTransfer: (
+		input: CpiTransferInput,
+	) => ReturnType<typeof getCpiTransferInstruction> & SelfPlanAndSendFunctions;
+	directTransfer: (
+		input: DirectTransferInput,
+	) =>
+		& ReturnType<typeof getDirectTransferInstruction>
+		& SelfPlanAndSendFunctions;
+};
 
-export type TransferSolProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
+export type TransferSolProgramPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function transferSolProgramProgram() {
-    return <T extends TransferSolProgramPluginRequirements>(client: T): ExtendedClient<T, { transferSolProgram: TransferSolProgramPlugin }> => {
-        return extendClient(client, { transferSolProgram: <TransferSolProgramPlugin>{ instructions: { cpiTransfer: input => addSelfPlanAndSendFunctions(client, getCpiTransferInstruction(input)), directTransfer: input => addSelfPlanAndSendFunctions(client, getDirectTransferInstruction(input)) }, identifyInstruction: identifyTransferSolProgramInstruction, parseInstruction: parseTransferSolProgramInstruction } });
-    };
+	return <T extends TransferSolProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { transferSolProgram: TransferSolProgramPlugin }> => {
+		return extendClient(client, {
+			transferSolProgram: <TransferSolProgramPlugin> {
+				instructions: {
+					cpiTransfer: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getCpiTransferInstruction(input),
+						),
+					directTransfer: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getDirectTransferInstruction(input),
+						),
+				},
+				identifyInstruction: identifyTransferSolProgramInstruction,
+				parseInstruction: parseTransferSolProgramInstruction,
+			},
+		});
+	};
 }

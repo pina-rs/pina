@@ -6,123 +6,386 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder, getPinaPodStringDecoder } from "../pinaPodCodecs";
-import { addDecoderSizePrefix, addEncoderSizePrefix, combineCodec, fixDecoderSize, fixEncoderSize, getArrayDecoder, getArrayEncoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, getUtf8Decoder, getUtf8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findPolicyPda } from '../pdas';
-import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getArrayDecoder,
+	getArrayEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findPolicyPda } from "../pdas";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodStringDecoder,
+} from "../pinaPodCodecs";
+import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CHECK_POLICY_DISCRIMINATOR = 1;
 
-export function getCheckPolicyDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CHECK_POLICY_DISCRIMINATOR); }
-
-export type CheckPolicyInstruction<TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountPolicy extends string | AccountMeta<string> = string, TAccountAudit extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountPolicy extends string ? ReadonlyAccount<TAccountPolicy> : TAccountPolicy, TAccountAudit extends string ? WritableAccount<TAccountAudit> : TAccountAudit, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
-
-export type CheckPolicyInstructionData = { discriminator: number; amount: bigint; memo: string; approvals: Array<number>;  };
-
-export type CheckPolicyInstructionDataArgs = { amount: number | bigint; memo: string; approvals: Array<number>;  };
-
-export function getCheckPolicyInstructionDataEncoder(): FixedSizeEncoder<CheckPolicyInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['amount', getU64Encoder()], ['memo', fixPinaPodEncoderSize(addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()), 65)], ['approvals', fixPinaPodEncoderSize(getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }), 6)]]), (value) => ({ ...value, discriminator: 1 }));
+export function getCheckPolicyDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CHECK_POLICY_DISCRIMINATOR);
 }
 
-export function getCheckPolicyInstructionDataDecoder(): FixedSizeDecoder<CheckPolicyInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CHECK_POLICY_DISCRIMINATOR, getU8Decoder())], ['amount', getU64Decoder()], ['memo', getPinaPodStringDecoder(getU8Decoder(), 65)], ['approvals', fixDecoderSize(getArrayDecoder(getU8Decoder(), { size: getU16Decoder() }), 6)]]);
-}
+export type CheckPolicyInstruction<
+	TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountPolicy extends string | AccountMeta<string> = string,
+	TAccountAudit extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountPolicy extends string ? ReadonlyAccount<TAccountPolicy>
+				: TAccountPolicy,
+			TAccountAudit extends string ? WritableAccount<TAccountAudit>
+				: TAccountAudit,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getCheckPolicyInstructionDataCodec(): FixedSizeCodec<CheckPolicyInstructionDataArgs, CheckPolicyInstructionData> {
-    return combineCodec(getCheckPolicyInstructionDataEncoder(), getCheckPolicyInstructionDataDecoder());
-}
-
-export type CheckPolicyAsyncInput<TAccountAuthority extends string = string, TAccountPolicy extends string = string, TAccountAudit extends string = string, TAccountSystemProgram extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-policy?: Address<TAccountPolicy>;
-/** A shared account may still require the transaction's writable flag. */
-audit: Address<TAccountAudit>;
-systemProgram?: Address<TAccountSystemProgram>;
-amount: CheckPolicyInstructionDataArgs["amount"];
-memo: CheckPolicyInstructionDataArgs["memo"];
-approvals: CheckPolicyInstructionDataArgs["approvals"];
-}
-
-export async function getCheckPolicyInstructionAsync<TAccountAuthority extends string, TAccountPolicy extends string, TAccountAudit extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS>(input: CheckPolicyAsyncInput<TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<CheckPolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram>> {
-  // Program address.
-const programAddress = config?.programAddress ?? VALIDATION_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, policy: { value: input.policy ?? null, isWritable: false }, audit: { value: input.audit ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.policy.value) {
-accounts.policy.value = await findPolicyPda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) }, { programAddress });
-}
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("policy", accounts.policy), getAccountMeta("audit", accounts.audit), getAccountMeta("systemProgram", accounts.systemProgram)], data: getCheckPolicyInstructionDataEncoder().encode(args as CheckPolicyInstructionDataArgs), programAddress } as CheckPolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram>);
-}
-
-export type CheckPolicyInput<TAccountAuthority extends string = string, TAccountPolicy extends string = string, TAccountAudit extends string = string, TAccountSystemProgram extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-policy: Address<TAccountPolicy>;
-/** A shared account may still require the transaction's writable flag. */
-audit: Address<TAccountAudit>;
-systemProgram?: Address<TAccountSystemProgram>;
-amount: CheckPolicyInstructionDataArgs["amount"];
-memo: CheckPolicyInstructionDataArgs["memo"];
-approvals: CheckPolicyInstructionDataArgs["approvals"];
-}
-
-export function getCheckPolicyInstruction<TAccountAuthority extends string, TAccountPolicy extends string, TAccountAudit extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS>(input: CheckPolicyInput<TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): CheckPolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? VALIDATION_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, policy: { value: input.policy ?? null, isWritable: false }, audit: { value: input.audit ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("policy", accounts.policy), getAccountMeta("audit", accounts.audit), getAccountMeta("systemProgram", accounts.systemProgram)], data: getCheckPolicyInstructionDataEncoder().encode(args as CheckPolicyInstructionDataArgs), programAddress } as CheckPolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountAudit, TAccountSystemProgram>);
-}
-
-export type ParsedCheckPolicyInstruction<TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-authority: TAccountMetas[0];
-policy: TAccountMetas[1];
-/** A shared account may still require the transaction's writable flag. */
-audit: TAccountMetas[2];
-systemProgram: TAccountMetas[3];
+export type CheckPolicyInstructionData = {
+	discriminator: number;
+	amount: bigint;
+	memo: string;
+	approvals: Array<number>;
 };
-data: CheckPolicyInstructionData; };
 
-export function parseCheckPolicyInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedCheckPolicyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 4 });
+export type CheckPolicyInstructionDataArgs = {
+	amount: number | bigint;
+	memo: string;
+	approvals: Array<number>;
+};
+
+export function getCheckPolicyInstructionDataEncoder(): FixedSizeEncoder<
+	CheckPolicyInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		], [
+			"memo",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				65,
+			),
+		], [
+			"approvals",
+			fixPinaPodEncoderSize(
+				getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
+				6,
+			),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getCheckPolicyInstructionDataDecoder(): FixedSizeDecoder<
+	CheckPolicyInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				CHECK_POLICY_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["amount", getU64Decoder()],
+		["memo", getPinaPodStringDecoder(getU8Decoder(), 65)],
+		[
+			"approvals",
+			fixDecoderSize(
+				getArrayDecoder(getU8Decoder(), { size: getU16Decoder() }),
+				6,
+			),
+		],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), policy: getNextAccount(), audit: getNextAccount(), systemProgram: getNextAccount() }, data: getCheckPolicyInstructionDataDecoder().decode(instruction.data) };
+
+export function getCheckPolicyInstructionDataCodec(): FixedSizeCodec<
+	CheckPolicyInstructionDataArgs,
+	CheckPolicyInstructionData
+> {
+	return combineCodec(
+		getCheckPolicyInstructionDataEncoder(),
+		getCheckPolicyInstructionDataDecoder(),
+	);
+}
+
+export type CheckPolicyAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountPolicy extends string = string,
+	TAccountAudit extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	policy?: Address<TAccountPolicy>;
+	/** A shared account may still require the transaction's writable flag. */
+	audit: Address<TAccountAudit>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	amount: CheckPolicyInstructionDataArgs["amount"];
+	memo: CheckPolicyInstructionDataArgs["memo"];
+	approvals: CheckPolicyInstructionDataArgs["approvals"];
+};
+
+export async function getCheckPolicyInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountPolicy extends string,
+	TAccountAudit extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: CheckPolicyAsyncInput<
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountAudit,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	CheckPolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountAudit,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		policy: { value: input.policy ?? null, isWritable: false },
+		audit: { value: input.audit ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.policy.value) {
+		accounts.policy.value = await findPolicyPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("policy", accounts.policy),
+			getAccountMeta("audit", accounts.audit),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getCheckPolicyInstructionDataEncoder().encode(
+			args as CheckPolicyInstructionDataArgs,
+		),
+		programAddress,
+	} as CheckPolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountAudit,
+		TAccountSystemProgram
+	>);
+}
+
+export type CheckPolicyInput<
+	TAccountAuthority extends string = string,
+	TAccountPolicy extends string = string,
+	TAccountAudit extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	policy: Address<TAccountPolicy>;
+	/** A shared account may still require the transaction's writable flag. */
+	audit: Address<TAccountAudit>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	amount: CheckPolicyInstructionDataArgs["amount"];
+	memo: CheckPolicyInstructionDataArgs["memo"];
+	approvals: CheckPolicyInstructionDataArgs["approvals"];
+};
+
+export function getCheckPolicyInstruction<
+	TAccountAuthority extends string,
+	TAccountPolicy extends string,
+	TAccountAudit extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: CheckPolicyInput<
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountAudit,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): CheckPolicyInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountPolicy,
+	TAccountAudit,
+	TAccountSystemProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		policy: { value: input.policy ?? null, isWritable: false },
+		audit: { value: input.audit ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("policy", accounts.policy),
+			getAccountMeta("audit", accounts.audit),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getCheckPolicyInstructionDataEncoder().encode(
+			args as CheckPolicyInstructionDataArgs,
+		),
+		programAddress,
+	} as CheckPolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountAudit,
+		TAccountSystemProgram
+	>);
+}
+
+export type ParsedCheckPolicyInstruction<
+	TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		authority: TAccountMetas[0];
+		policy: TAccountMetas[1];
+		/** A shared account may still require the transaction's writable flag. */
+		audit: TAccountMetas[2];
+		systemProgram: TAccountMetas[3];
+	};
+	data: CheckPolicyInstructionData;
+};
+
+export function parseCheckPolicyInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedCheckPolicyInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 4) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 4,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			policy: getNextAccount(),
+			audit: getNextAccount(),
+			systemProgram: getNextAccount(),
+		},
+		data: getCheckPolicyInstructionDataDecoder().decode(instruction.data),
+	};
 }

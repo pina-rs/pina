@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -12,20 +11,16 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
-
 /// The address of the ValidationProgram program.
-const validationProgramProgramAddress = Address('GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn');
+const validationProgramProgramAddress = Address(
+  'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn',
+);
 
 /// Known accounts for the ValidationProgram program.
-enum ValidationProgramAccount {
-  policyState,
-}
+enum ValidationProgramAccount { policyState }
 
 /// Known instructions for the ValidationProgram program.
-enum ValidationProgramInstruction {
-  initializePolicy,
-  checkPolicy,
-}
+enum ValidationProgramInstruction { initializePolicy, checkPolicy }
 
 /// Identifies the type of a ValidationProgram instruction.
 ValidationProgramInstruction identifyValidationProgramInstruction(
@@ -38,13 +33,10 @@ ValidationProgramInstruction identifyValidationProgramInstruction(
     return ValidationProgramInstruction.checkPolicy;
   }
 
-  throw SolanaError(
-    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
-    {
-      'instructionData': data,
-      'programName': 'validationProgram',
-    },
-  );
+  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
+    'instructionData': data,
+    'programName': 'validationProgram',
+  });
 }
 
 /// A parsed instruction from the ValidationProgram program.
@@ -57,7 +49,7 @@ sealed class ParsedValidationProgramInstruction {
 /// A parsed InitializePolicy instruction.
 final class ParsedInitializePolicy extends ParsedValidationProgramInstruction {
   const ParsedInitializePolicy({required this.data})
-      : super(ValidationProgramInstruction.initializePolicy);
+    : super(ValidationProgramInstruction.initializePolicy);
 
   final InitializePolicyInstructionData data;
 }
@@ -65,7 +57,7 @@ final class ParsedInitializePolicy extends ParsedValidationProgramInstruction {
 /// A parsed CheckPolicy instruction.
 final class ParsedCheckPolicy extends ParsedValidationProgramInstruction {
   const ParsedCheckPolicy({required this.data})
-      : super(ValidationProgramInstruction.checkPolicy);
+    : super(ValidationProgramInstruction.checkPolicy);
 
   final CheckPolicyInstructionData data;
 }

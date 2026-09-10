@@ -7,8 +7,8 @@
 	clippy::too_many_arguments
 )]
 
-pub(crate) mod r#initialize;
 pub(crate) mod r#increment;
+pub(crate) mod r#initialize;
 
-pub use self::r#initialize::*;
 pub use self::r#increment::*;
+pub use self::r#initialize::*;

@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const ESCROW_PROGRAM_ID: Address = pina::address!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
+pub const ESCROW_PROGRAM_ID: Address =
+	pina::address!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
 
 /// Marker for the `escrowProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

@@ -6,51 +6,111 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR = 1;
 
-export function getAllowsDuplicateMutableDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR); }
-
-export type AllowsDuplicateMutableInstruction<TProgram extends string = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
-
-export type AllowsDuplicateMutableInstructionData = { discriminator: number;  };
-
-export type AllowsDuplicateMutableInstructionDataArgs = {  };
-
-export function getAllowsDuplicateMutableInstructionDataEncoder(): FixedSizeEncoder<AllowsDuplicateMutableInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+export function getAllowsDuplicateMutableDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR);
 }
 
-export function getAllowsDuplicateMutableInstructionDataDecoder(): FixedSizeDecoder<AllowsDuplicateMutableInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR, getU8Decoder())]]);
+export type AllowsDuplicateMutableInstruction<
+	TProgram extends string =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type AllowsDuplicateMutableInstructionData = { discriminator: number };
+
+export type AllowsDuplicateMutableInstructionDataArgs = {};
+
+export function getAllowsDuplicateMutableInstructionDataEncoder(): FixedSizeEncoder<
+	AllowsDuplicateMutableInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
-export function getAllowsDuplicateMutableInstructionDataCodec(): FixedSizeCodec<AllowsDuplicateMutableInstructionDataArgs, AllowsDuplicateMutableInstructionData> {
-    return combineCodec(getAllowsDuplicateMutableInstructionDataEncoder(), getAllowsDuplicateMutableInstructionDataDecoder());
+export function getAllowsDuplicateMutableInstructionDataDecoder(): FixedSizeDecoder<
+	AllowsDuplicateMutableInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
-export type AllowsDuplicateMutableInput =  {
-  
+export function getAllowsDuplicateMutableInstructionDataCodec(): FixedSizeCodec<
+	AllowsDuplicateMutableInstructionDataArgs,
+	AllowsDuplicateMutableInstructionData
+> {
+	return combineCodec(
+		getAllowsDuplicateMutableInstructionDataEncoder(),
+		getAllowsDuplicateMutableInstructionDataDecoder(),
+	);
 }
 
-export function getAllowsDuplicateMutableInstruction<TProgramAddress extends Address = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(config?: { programAddress?: TProgramAddress } ): AllowsDuplicateMutableInstruction<TProgramAddress> {
-  // Program address.
-const programAddress = config?.programAddress ?? DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+export type AllowsDuplicateMutableInput = {};
 
+export function getAllowsDuplicateMutableInstruction<
+	TProgramAddress extends Address =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	config?: { programAddress?: TProgramAddress },
+): AllowsDuplicateMutableInstruction<TProgramAddress> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
-
-
-return Object.freeze({ data: getAllowsDuplicateMutableInstructionDataEncoder().encode({}), programAddress } as AllowsDuplicateMutableInstruction<TProgramAddress>);
+	return Object.freeze(
+		{
+			data: getAllowsDuplicateMutableInstructionDataEncoder().encode({}),
+			programAddress,
+		} as AllowsDuplicateMutableInstruction<TProgramAddress>,
+	);
 }
 
-export type ParsedAllowsDuplicateMutableInstruction<TProgram extends string = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS> = { programAddress: Address<TProgram>;
-data: AllowsDuplicateMutableInstructionData; };
+export type ParsedAllowsDuplicateMutableInstruction<
+	TProgram extends string =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+> = {
+	programAddress: Address<TProgram>;
+	data: AllowsDuplicateMutableInstructionData;
+};
 
-export function parseAllowsDuplicateMutableInstruction<TProgram extends string>(instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>): ParsedAllowsDuplicateMutableInstruction<TProgram> {
-  
-  return { programAddress: instruction.programAddress, data: getAllowsDuplicateMutableInstructionDataDecoder().decode(instruction.data) };
+export function parseAllowsDuplicateMutableInstruction<TProgram extends string>(
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
+): ParsedAllowsDuplicateMutableInstruction<TProgram> {
+	return {
+		programAddress: instruction.programAddress,
+		data: getAllowsDuplicateMutableInstructionDataDecoder().decode(
+			instruction.data,
+		),
+	};
 }

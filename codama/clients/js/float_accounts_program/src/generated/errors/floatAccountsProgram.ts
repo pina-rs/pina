@@ -6,30 +6,56 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0x0; // 0
 
-export type FloatAccountsProgramError = typeof FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH;
+export type FloatAccountsProgramError =
+	typeof FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH;
 
-let floatAccountsProgramErrorMessages: Record<FloatAccountsProgramError, string> | undefined;
-if (process.env['NODE_ENV'] !== 'production') {
-  floatAccountsProgramErrorMessages = { [FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: `` };
+let floatAccountsProgramErrorMessages:
+	| Record<FloatAccountsProgramError, string>
+	| undefined;
+if (process.env["NODE_ENV"] !== "production") {
+	floatAccountsProgramErrorMessages = {
+		[FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``,
+	};
 }
 
-export function getFloatAccountsProgramErrorMessage(code: FloatAccountsProgramError): string {
-  if (process.env['NODE_ENV'] !== 'production') {
-    return (floatAccountsProgramErrorMessages as Record<FloatAccountsProgramError, string>)[code];
-  }
+export function getFloatAccountsProgramErrorMessage(
+	code: FloatAccountsProgramError,
+): string {
+	if (process.env["NODE_ENV"] !== "production") {
+		return (floatAccountsProgramErrorMessages as Record<
+			FloatAccountsProgramError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isFloatAccountsProgramError<TProgramErrorCode extends FloatAccountsProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, code);
+export function isFloatAccountsProgramError<
+	TProgramErrorCode extends FloatAccountsProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

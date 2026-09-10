@@ -8,6 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
 pub const DECLARE_PROGRAM_ID: Pubkey = pubkey!("Dec1areProgram11111111111111111111111111111");

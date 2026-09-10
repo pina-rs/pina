@@ -6,59 +6,184 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getFloatDataAccountCodec, type FloatDataAccount, type FloatDataAccountArgs } from '../accounts';
-import { getCreateInstruction, getUpdateInstruction, parseCreateInstruction, parseUpdateInstruction, type CreateInput, type ParsedCreateInstruction, type ParsedUpdateInstruction, type UpdateInput } from '../instructions';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	type FloatDataAccount,
+	type FloatDataAccountArgs,
+	getFloatDataAccountCodec,
+} from "../accounts";
+import {
+	type CreateInput,
+	getCreateInstruction,
+	getUpdateInstruction,
+	parseCreateInstruction,
+	type ParsedCreateInstruction,
+	type ParsedUpdateInstruction,
+	parseUpdateInstruction,
+	type UpdateInput,
+} from "../instructions";
 
-export const FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;
 
-export enum FloatAccountsProgramAccount { FloatDataAccount }
-
-export function identifyFloatAccountsProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): FloatAccountsProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return FloatAccountsProgramAccount.FloatDataAccount; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "floatAccountsProgram" });
+export enum FloatAccountsProgramAccount {
+	FloatDataAccount,
 }
 
-export enum FloatAccountsProgramInstruction { Create, Update }
-
-export function identifyFloatAccountsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): FloatAccountsProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return FloatAccountsProgramInstruction.Create; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return FloatAccountsProgramInstruction.Update; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "floatAccountsProgram" });
+export function identifyFloatAccountsProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): FloatAccountsProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return FloatAccountsProgramAccount.FloatDataAccount;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "floatAccountsProgram" },
+	);
 }
 
-export type ParsedFloatAccountsProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
-| { instructionType: FloatAccountsProgramInstruction.Create } & ParsedCreateInstruction<TProgram>
-| { instructionType: FloatAccountsProgramInstruction.Update } & ParsedUpdateInstruction<TProgram>
+export enum FloatAccountsProgramInstruction {
+	Create,
+	Update,
+}
 
+export function identifyFloatAccountsProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): FloatAccountsProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return FloatAccountsProgramInstruction.Create;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return FloatAccountsProgramInstruction.Update;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "floatAccountsProgram" },
+	);
+}
 
-        export function parseFloatAccountsProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedFloatAccountsProgramInstruction<TProgram> {
-            const instructionType = identifyFloatAccountsProgramInstruction(instruction);
-            switch (instructionType) {
-                case FloatAccountsProgramInstruction.Create: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: FloatAccountsProgramInstruction.Create, ...parseCreateInstruction(instruction) }; }
-case FloatAccountsProgramInstruction.Update: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: FloatAccountsProgramInstruction.Update, ...parseUpdateInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "floatAccountsProgram" });
-            }
-        }
+export type ParsedFloatAccountsProgramInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	| { instructionType: FloatAccountsProgramInstruction.Create }
+		& ParsedCreateInstruction<TProgram>
+	| { instructionType: FloatAccountsProgramInstruction.Update }
+		& ParsedUpdateInstruction<TProgram>;
 
-export type FloatAccountsProgramPlugin = { accounts: FloatAccountsProgramPluginAccounts; instructions: FloatAccountsProgramPluginInstructions; identifyAccount: typeof identifyFloatAccountsProgramAccount; identifyInstruction: typeof identifyFloatAccountsProgramInstruction; parseInstruction: typeof parseFloatAccountsProgramInstruction; }
+export function parseFloatAccountsProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedFloatAccountsProgramInstruction<TProgram> {
+	const instructionType = identifyFloatAccountsProgramInstruction(instruction);
+	switch (instructionType) {
+		case FloatAccountsProgramInstruction.Create: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: FloatAccountsProgramInstruction.Create,
+				...parseCreateInstruction(instruction),
+			};
+		}
+		case FloatAccountsProgramInstruction.Update: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: FloatAccountsProgramInstruction.Update,
+				...parseUpdateInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "floatAccountsProgram",
+				},
+			);
+	}
+}
 
-export type FloatAccountsProgramPluginAccounts = { floatDataAccount: ReturnType<typeof getFloatDataAccountCodec> & SelfFetchFunctions<FloatDataAccountArgs, FloatDataAccount>; }
+export type FloatAccountsProgramPlugin = {
+	accounts: FloatAccountsProgramPluginAccounts;
+	instructions: FloatAccountsProgramPluginInstructions;
+	identifyAccount: typeof identifyFloatAccountsProgramAccount;
+	identifyInstruction: typeof identifyFloatAccountsProgramInstruction;
+	parseInstruction: typeof parseFloatAccountsProgramInstruction;
+};
 
-export type FloatAccountsProgramPluginInstructions = { create: (input: CreateInput) => ReturnType<typeof getCreateInstruction> & SelfPlanAndSendFunctions; update: (input: UpdateInput) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions; }
+export type FloatAccountsProgramPluginAccounts = {
+	floatDataAccount:
+		& ReturnType<typeof getFloatDataAccountCodec>
+		& SelfFetchFunctions<FloatDataAccountArgs, FloatDataAccount>;
+};
 
-export type FloatAccountsProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type FloatAccountsProgramPluginInstructions = {
+	create: (
+		input: CreateInput,
+	) => ReturnType<typeof getCreateInstruction> & SelfPlanAndSendFunctions;
+	update: (
+		input: UpdateInput,
+	) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type FloatAccountsProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function floatAccountsProgramProgram() {
-    return <T extends FloatAccountsProgramPluginRequirements>(client: T): ExtendedClient<T, { floatAccountsProgram: FloatAccountsProgramPlugin }> => {
-        return extendClient(client, { floatAccountsProgram: <FloatAccountsProgramPlugin>{ accounts: { floatDataAccount: addSelfFetchFunctions(client, getFloatDataAccountCodec()) }, instructions: { create: input => addSelfPlanAndSendFunctions(client, getCreateInstruction(input)), update: input => addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)) }, identifyAccount: identifyFloatAccountsProgramAccount, identifyInstruction: identifyFloatAccountsProgramInstruction, parseInstruction: parseFloatAccountsProgramInstruction } });
-    };
+	return <T extends FloatAccountsProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<
+		T,
+		{ floatAccountsProgram: FloatAccountsProgramPlugin }
+	> => {
+		return extendClient(client, {
+			floatAccountsProgram: <FloatAccountsProgramPlugin> {
+				accounts: {
+					floatDataAccount: addSelfFetchFunctions(
+						client,
+						getFloatDataAccountCodec(),
+					),
+				},
+				instructions: {
+					create: (input) =>
+						addSelfPlanAndSendFunctions(client, getCreateInstruction(input)),
+					update: (input) =>
+						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
+				},
+				identifyAccount: identifyFloatAccountsProgramAccount,
+				identifyInstruction: identifyFloatAccountsProgramInstruction,
+				parseInstruction: parseFloatAccountsProgramInstruction,
+			},
+		});
+	};
 }

@@ -13,10 +13,10 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum PropAmmProgramError {
-	/// 0 - 
+	/// 0 -
 	#[error("")]
 	UnauthorizedUpdateAuthority = 0x0,
-	/// 1 - 
+	/// 1 -
 	#[error("")]
 	UnauthorizedOracleAuthority = 0x1,
 }

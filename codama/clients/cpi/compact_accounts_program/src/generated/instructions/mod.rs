@@ -8,11 +8,11 @@
 )]
 
 pub(crate) mod r#initialize;
+pub(crate) mod r#rename;
 pub(crate) mod r#resize;
 pub(crate) mod r#write;
-pub(crate) mod r#rename;
 
 pub use self::r#initialize::*;
+pub use self::r#rename::*;
 pub use self::r#resize::*;
 pub use self::r#write::*;
-pub use self::r#rename::*;

@@ -6,100 +6,243 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findCounterPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findCounterPda } from '../pdas';
-import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INCREMENT_DISCRIMINATOR = 1;
 
-export function getIncrementDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INCREMENT_DISCRIMINATOR); }
-
-export type IncrementInstruction<TProgram extends string = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountCounter extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountCounter extends string ? WritableAccount<TAccountCounter> : TAccountCounter, ...TRemainingAccounts]>;
-
-export type IncrementInstructionData = { discriminator: number;  };
-
-export type IncrementInstructionDataArgs = {  };
-
-export function getIncrementInstructionDataEncoder(): FixedSizeEncoder<IncrementInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+export function getIncrementDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INCREMENT_DISCRIMINATOR);
 }
 
-export function getIncrementInstructionDataDecoder(): FixedSizeDecoder<IncrementInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INCREMENT_DISCRIMINATOR, getU8Decoder())]]);
+export type IncrementInstruction<
+	TProgram extends string = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountCounter extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountCounter extends string ? WritableAccount<TAccountCounter>
+				: TAccountCounter,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type IncrementInstructionData = { discriminator: number };
+
+export type IncrementInstructionDataArgs = {};
+
+export function getIncrementInstructionDataEncoder(): FixedSizeEncoder<
+	IncrementInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
-export function getIncrementInstructionDataCodec(): FixedSizeCodec<IncrementInstructionDataArgs, IncrementInstructionData> {
-    return combineCodec(getIncrementInstructionDataEncoder(), getIncrementInstructionDataDecoder());
+export function getIncrementInstructionDataDecoder(): FixedSizeDecoder<
+	IncrementInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(INCREMENT_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type IncrementAsyncInput<TAccountAuthority extends string = string, TAccountCounter extends string = string> =  {
-  /** The counter's authority. Must sign to prove ownership. */
-authority: TransactionSigner<TAccountAuthority>;
-/** The counter PDA account (must already exist and be writable). */
-counter?: Address<TAccountCounter>;
+export function getIncrementInstructionDataCodec(): FixedSizeCodec<
+	IncrementInstructionDataArgs,
+	IncrementInstructionData
+> {
+	return combineCodec(
+		getIncrementInstructionDataEncoder(),
+		getIncrementInstructionDataDecoder(),
+	);
 }
 
-export async function getIncrementInstructionAsync<TAccountAuthority extends string, TAccountCounter extends string, TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS>(input: IncrementAsyncInput<TAccountAuthority, TAccountCounter>, config?: { programAddress?: TProgramAddress } ): Promise<IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>> {
-  // Program address.
-const programAddress = config?.programAddress ?? COUNTER_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, counter: { value: input.counter ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Resolve default values.
-if (!accounts.counter.value) {
-accounts.counter.value = await findCounterPda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) }, { programAddress });
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("counter", accounts.counter)], data: getIncrementInstructionDataEncoder().encode({}), programAddress } as IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>);
-}
-
-export type IncrementInput<TAccountAuthority extends string = string, TAccountCounter extends string = string> =  {
-  /** The counter's authority. Must sign to prove ownership. */
-authority: TransactionSigner<TAccountAuthority>;
-/** The counter PDA account (must already exist and be writable). */
-counter: Address<TAccountCounter>;
-}
-
-export function getIncrementInstruction<TAccountAuthority extends string, TAccountCounter extends string, TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS>(input: IncrementInput<TAccountAuthority, TAccountCounter>, config?: { programAddress?: TProgramAddress } ): IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter> {
-  // Program address.
-const programAddress = config?.programAddress ?? COUNTER_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, counter: { value: input.counter ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("counter", accounts.counter)], data: getIncrementInstructionDataEncoder().encode({}), programAddress } as IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>);
-}
-
-export type ParsedIncrementInstruction<TProgram extends string = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/** The counter's authority. Must sign to prove ownership. */
-authority: TAccountMetas[0];
-/** The counter PDA account (must already exist and be writable). */
-counter: TAccountMetas[1];
+export type IncrementAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountCounter extends string = string,
+> = {
+	/** The counter's authority. Must sign to prove ownership. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The counter PDA account (must already exist and be writable). */
+	counter?: Address<TAccountCounter>;
 };
-data: IncrementInstructionData; };
 
-export function parseIncrementInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedIncrementInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export async function getIncrementInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountCounter extends string,
+	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: IncrementAsyncInput<TAccountAuthority, TAccountCounter>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		counter: { value: input.counter ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Resolve default values.
+	if (!accounts.counter.value) {
+		accounts.counter.value = await findCounterPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("counter", accounts.counter),
+		],
+		data: getIncrementInstructionDataEncoder().encode({}),
+		programAddress,
+	} as IncrementInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export type IncrementInput<
+	TAccountAuthority extends string = string,
+	TAccountCounter extends string = string,
+> = {
+	/** The counter's authority. Must sign to prove ownership. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The counter PDA account (must already exist and be writable). */
+	counter: Address<TAccountCounter>;
+};
+
+export function getIncrementInstruction<
+	TAccountAuthority extends string,
+	TAccountCounter extends string,
+	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: IncrementInput<TAccountAuthority, TAccountCounter>,
+	config?: { programAddress?: TProgramAddress },
+): IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		counter: { value: input.counter ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("counter", accounts.counter),
+		],
+		data: getIncrementInstructionDataEncoder().encode({}),
+		programAddress,
+	} as IncrementInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter
+	>);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), counter: getNextAccount() }, data: getIncrementInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedIncrementInstruction<
+	TProgram extends string = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/** The counter's authority. Must sign to prove ownership. */
+		authority: TAccountMetas[0];
+		/** The counter PDA account (must already exist and be writable). */
+		counter: TAccountMetas[1];
+	};
+	data: IncrementInstructionData;
+};
+
+export function parseIncrementInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedIncrementInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { authority: getNextAccount(), counter: getNextAccount() },
+		data: getIncrementInstructionDataDecoder().decode(instruction.data),
+	};
 }

@@ -44,7 +44,9 @@ impl State {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut StateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut StateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != STATE_DISCRIMINATOR {
@@ -57,19 +59,14 @@ impl State {
 impl State {
 	pub fn find_pda() -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&[
-				"state".as_bytes(),
-			],
+			&["state".as_bytes()],
 			&crate::PINA_BPF_PROGRAM_ID,
 		)
 	}
 
 	pub fn create_pda(bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&[
-				"state".as_bytes(),
-				&[bump],
-			],
+			&["state".as_bytes(), &[bump]],
 			&crate::PINA_BPF_PROGRAM_ID,
 		)
 	}

@@ -8,6 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
 pub const VALIDATION_PROGRAM_ID: Pubkey = pubkey!("GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn");

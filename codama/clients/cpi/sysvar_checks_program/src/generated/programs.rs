@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const SYSVAR_CHECKS_PROGRAM_ID: Address = pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+pub const SYSVAR_CHECKS_PROGRAM_ID: Address =
+	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 /// Marker for the `sysvarChecksProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

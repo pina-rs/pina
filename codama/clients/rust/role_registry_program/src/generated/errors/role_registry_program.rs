@@ -13,13 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum RoleRegistryProgramError {
-	/// 0 - 
+	/// 0 -
 	#[error("")]
 	InvalidPermissions = 0x0,
-	/// 1 - 
+	/// 1 -
 	#[error("")]
 	RoleAlreadyExists = 0x1,
-	/// 2 - 
+	/// 2 -
 	#[error("")]
 	RoleInactive = 0x2,
 }

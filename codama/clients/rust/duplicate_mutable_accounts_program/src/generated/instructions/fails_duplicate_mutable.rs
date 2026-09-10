@@ -19,13 +19,13 @@ pub struct FailsDuplicateMutable {
 
 impl FailsDuplicateMutable {
 	pub fn new(account1: solana_pubkey::Pubkey, account2: solana_pubkey::Pubkey) -> Self {
-		Self {
-			account1,
-			account2,
-		}
+		Self { account1, account2 }
 	}
 
-	pub fn instruction(&self, data: FailsDuplicateMutableInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: FailsDuplicateMutableInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -53,14 +53,19 @@ pub struct FailsDuplicateMutableInstructionData {
 }
 
 impl FailsDuplicateMutableInstructionData {
-	pub fn new(configure: impl FnOnce(&mut FailsDuplicateMutableInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut FailsDuplicateMutableInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<FailsDuplicateMutableInstructionWireZc>()];
-		<FailsDuplicateMutableInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
-			configure(data);
-			data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
-			Ok(())
-		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		<FailsDuplicateMutableInstructionWire as pina::PinaPodFixed>::initialize(
+			&mut bytes,
+			|data| {
+				configure(data);
+				data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
+				Ok(())
+			},
+		)
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

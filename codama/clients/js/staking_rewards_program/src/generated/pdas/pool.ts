@@ -6,14 +6,34 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getUtf8Encoder,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type PoolSeeds = {
-stakeMint: Address;
-rewardMint: Address;
+	stakeMint: Address;
+	rewardMint: Address;
 };
 
-export async function findPoolPda(seeds: PoolSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress = '9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr' as Address<'9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr'> } = config;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("pool"), getAddressEncoder().encode(seeds.stakeMint), getAddressEncoder().encode(seeds.rewardMint)]});
+export async function findPoolPda(
+	seeds: PoolSeeds,
+	config: { programAddress?: Address | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress = "9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr" as Address<
+			"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr"
+		>,
+	} = config;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("pool"),
+			getAddressEncoder().encode(seeds.stakeMint),
+			getAddressEncoder().encode(seeds.rewardMint),
+		],
+	});
 }

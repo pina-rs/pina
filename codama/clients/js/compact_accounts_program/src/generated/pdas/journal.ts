@@ -6,13 +6,32 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getUtf8Encoder,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type JournalSeeds = {
-authority: Address;
+	authority: Address;
 };
 
-export async function findJournalPda(seeds: JournalSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress = '85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn' as Address<'85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn'> } = config;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("compact-journal"), getAddressEncoder().encode(seeds.authority)]});
+export async function findJournalPda(
+	seeds: JournalSeeds,
+	config: { programAddress?: Address | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress = "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn" as Address<
+			"85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn"
+		>,
+	} = config;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("compact-journal"),
+			getAddressEncoder().encode(seeds.authority),
+		],
+	});
 }

@@ -6,101 +6,182 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { type EscrowSeeds, findEscrowPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findEscrowPda, type EscrowSeeds } from '../pdas';
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
-export function getEscrowStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ESCROW_STATE_DISCRIMINATOR); }
+export function getEscrowStateDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ESCROW_STATE_DISCRIMINATOR);
+}
 
-export type EscrowState = { discriminator: number; maker: Address; mintA: Address; mintB: Address; 
-/** The amount of token A that was sent by sender. */
-amountA: bigint; 
-/** The amount of token B to be received by the recipient. */
-amountB: bigint; seed: bigint; bump: number;  };
+export type EscrowState = {
+	discriminator: number;
+	maker: Address;
+	mintA: Address;
+	mintB: Address;
+	/** The amount of token A that was sent by sender. */
+	amountA: bigint;
+	/** The amount of token B to be received by the recipient. */
+	amountB: bigint;
+	seed: bigint;
+	bump: number;
+};
 
-export type EscrowStateArgs = { maker: Address; mintA: Address; mintB: Address; 
-/** The amount of token A that was sent by sender. */
-amountA: number | bigint; 
-/** The amount of token B to be received by the recipient. */
-amountB: number | bigint; seed: number | bigint; bump: number;  };
+export type EscrowStateArgs = {
+	maker: Address;
+	mintA: Address;
+	mintB: Address;
+	/** The amount of token A that was sent by sender. */
+	amountA: number | bigint;
+	/** The amount of token B to be received by the recipient. */
+	amountB: number | bigint;
+	seed: number | bigint;
+	bump: number;
+};
 
 /** Gets the encoder for {@link EscrowStateArgs} account data. */
 export function getEscrowStateEncoder(): FixedSizeEncoder<EscrowStateArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['maker', getAddressEncoder()], ['mintA', getAddressEncoder()], ['mintB', getAddressEncoder()], ['amountA', getU64Encoder()], ['amountB', getU64Encoder()], ['seed', getU64Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["maker", getAddressEncoder()],
+			["mintA", getAddressEncoder()],
+			["mintB", getAddressEncoder()],
+			["amountA", getU64Encoder()],
+			["amountB", getU64Encoder()],
+			["seed", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link EscrowState} account data. */
 export function getEscrowStateDecoder(): FixedSizeDecoder<EscrowState> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ESCROW_STATE_DISCRIMINATOR, getU8Decoder())], ['maker', getAddressDecoder()], ['mintA', getAddressDecoder()], ['mintB', getAddressDecoder()], ['amountA', getU64Decoder()], ['amountB', getU64Decoder()], ['seed', getU64Decoder()], ['bump', getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				ESCROW_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["maker", getAddressDecoder()],
+		["mintA", getAddressDecoder()],
+		["mintB", getAddressDecoder()],
+		["amountA", getU64Decoder()],
+		["amountB", getU64Decoder()],
+		["seed", getU64Decoder()],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link EscrowState} account data. */
-export function getEscrowStateCodec(): FixedSizeCodec<EscrowStateArgs, EscrowState> {
-    return combineCodec(getEscrowStateEncoder(), getEscrowStateDecoder());
+export function getEscrowStateCodec(): FixedSizeCodec<
+	EscrowStateArgs,
+	EscrowState
+> {
+	return combineCodec(getEscrowStateEncoder(), getEscrowStateDecoder());
 }
 
-export function decodeEscrowState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<EscrowState, TAddress>;
-export function decodeEscrowState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<EscrowState, TAddress>;
-export function decodeEscrowState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<EscrowState, TAddress> | MaybeAccount<EscrowState, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getEscrowStateDecoder());
+export function decodeEscrowState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<EscrowState, TAddress>;
+export function decodeEscrowState<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<EscrowState, TAddress>;
+export function decodeEscrowState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<EscrowState, TAddress> | MaybeAccount<EscrowState, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getEscrowStateDecoder(),
+	);
 }
 
 export async function fetchEscrowState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<EscrowState, TAddress>> {
-  const maybeAccount = await fetchMaybeEscrowState(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeEscrowState(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeEscrowState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<EscrowState, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeEscrowState(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodeEscrowState(maybeAccount);
 }
 
 export async function fetchAllEscrowState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<EscrowState>[]> {
-  const maybeAccounts = await fetchAllMaybeEscrowState(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeEscrowState(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeEscrowState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<EscrowState>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeEscrowState(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodeEscrowState(maybeAccount));
 }
 
 export async function fetchEscrowStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: EscrowSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: EscrowSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<EscrowState>> {
-  const maybeAccount = await fetchMaybeEscrowStateFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeEscrowStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeEscrowStateFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: EscrowSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: EscrowSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<EscrowState>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findEscrowPda(seeds, { programAddress });
-  return await fetchMaybeEscrowState(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findEscrowPda(seeds, { programAddress });
+	return await fetchMaybeEscrowState(rpc, address, fetchConfig);
 }

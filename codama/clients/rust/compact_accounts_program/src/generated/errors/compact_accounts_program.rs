@@ -13,13 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum CompactAccountsProgramError {
-	/// 7000 - 
+	/// 7000 -
 	#[error("")]
 	CapacityExceeded = 0x1B58,
-	/// 7001 - 
+	/// 7001 -
 	#[error("")]
 	IndexOutOfBounds = 0x1B59,
-	/// 7002 - 
+	/// 7002 -
 	#[error("")]
 	AuthorityMismatch = 0x1B5A,
 }

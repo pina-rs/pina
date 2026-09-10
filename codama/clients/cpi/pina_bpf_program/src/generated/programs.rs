@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const PINA_BPF_PROGRAM_ID: Address = pina::address!("2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe");
+pub const PINA_BPF_PROGRAM_ID: Address =
+	pina::address!("2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe");
 
 /// Marker for the `pinaBpfProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

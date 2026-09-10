@@ -25,12 +25,16 @@ impl InitializePolicy {
 			policy: solana_pubkey::Pubkey::find_program_address(
 				&["validation-policy".as_bytes(), authority.as_ref()],
 				&crate::VALIDATION_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
 
-	pub fn instruction(&self, data: InitializePolicyInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: InitializePolicyInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -43,7 +47,10 @@ impl InitializePolicy {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.policy, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::VALIDATION_PROGRAM_ID,
@@ -59,14 +66,16 @@ pub struct InitializePolicyInstructionData {
 }
 
 impl InitializePolicyInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InitializePolicyInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InitializePolicyInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializePolicyInstructionWireZc>()];
 		<InitializePolicyInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_POLICY_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

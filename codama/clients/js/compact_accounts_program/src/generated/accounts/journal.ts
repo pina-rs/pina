@@ -6,13 +6,67 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodBoundedArrayDecoder, getPinaPodBoundedArrayEncoder, getPinaPodBoundedStringDecoder, getPinaPodBoundedStringEncoder, getPinaPodBoundedCountDecoder, getPinaPodDiscriminatorDecoder, getPinaPodOptionTagDecoder, getPinaPodUtf8Decoder } from "../pinaPodCodecs";
-import { addDecoderSizePrefix, addEncoderSizePrefix, assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getArrayDecoder, getArrayEncoder, getOptionDecoder, getOptionEncoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU32Decoder, getU32Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, getUtf8Decoder, getUtf8Encoder, offsetDecoder, offsetEncoder, transformEncoder, type Account, type Address, type Codec, type Decoder, type EncodedAccount, type Encoder, type FetchAccountConfig, type FetchAccountsConfig, type MaybeAccount, type MaybeEncodedAccount, type Option, type OptionOrNullable, type ReadonlyUint8Array } from '@solana/kit';
-import { findJournalPda, type JournalSeeds } from '../pdas';
+import {
+	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type Codec,
+	combineCodec,
+	decodeAccount,
+	type Decoder,
+	type EncodedAccount,
+	type Encoder,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	getAddressDecoder,
+	getAddressEncoder,
+	getArrayDecoder,
+	getArrayEncoder,
+	getOptionDecoder,
+	getOptionEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU32Decoder,
+	getU32Encoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	offsetDecoder,
+	offsetEncoder,
+	type Option,
+	type OptionOrNullable,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findJournalPda, type JournalSeeds } from "../pdas";
+import {
+	getPinaPodBoundedArrayDecoder,
+	getPinaPodBoundedArrayEncoder,
+	getPinaPodBoundedCountDecoder,
+	getPinaPodBoundedStringDecoder,
+	getPinaPodBoundedStringEncoder,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodOptionTagDecoder,
+	getPinaPodUtf8Decoder,
+} from "../pinaPodCodecs";
 
 export const JOURNAL_DISCRIMINATOR = 1;
 
-export function getJournalDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(JOURNAL_DISCRIMINATOR); }
+export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(JOURNAL_DISCRIMINATOR);
+}
 
 /**
  * A compact account with four independently encoded dynamic fields.
@@ -21,117 +75,288 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array { return getU
  * `PodOption<PodU64>`. The title and optional note use compact strings, while
  * entries and markers use vectors; only their active bytes are allocated.
  */
-export type Journal = { discriminator: number; 
-/** Canonical PDA bump. */
-bump: number; 
-/** Signer permitted to mutate and fund this journal. */
-authority: Address; 
-/** Number of successful resize or write operations. */
-revision: number; 
-/** Most recently written entry value, stored as `PodOption<PodU64>`. */
-featuredEntry: Option<bigint>; 
-/** Human-readable title stored as active UTF-8 bytes. */
-title: string; 
-/** Active entries. Unused capacity consumes no account bytes. */
-entries: Array<bigint>; 
-/** Independently sized markers stored as a second compact tail. */
-markers: Array<number>; 
-/** Optional human-readable status attached to the latest resize. */
-note: Option<string>;  };
+export type Journal = {
+	discriminator: number;
+	/** Canonical PDA bump. */
+	bump: number;
+	/** Signer permitted to mutate and fund this journal. */
+	authority: Address;
+	/** Number of successful resize or write operations. */
+	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: Option<bigint>;
+	/** Human-readable title stored as active UTF-8 bytes. */
+	title: string;
+	/** Active entries. Unused capacity consumes no account bytes. */
+	entries: Array<bigint>;
+	/** Independently sized markers stored as a second compact tail. */
+	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: Option<string>;
+};
 
-export type JournalArgs = { 
-/** Canonical PDA bump. */
-bump: number; 
-/** Signer permitted to mutate and fund this journal. */
-authority: Address; 
-/** Number of successful resize or write operations. */
-revision: number; 
-/** Most recently written entry value, stored as `PodOption<PodU64>`. */
-featuredEntry: OptionOrNullable<number | bigint>; 
-/** Human-readable title stored as active UTF-8 bytes. */
-title: string; 
-/** Active entries. Unused capacity consumes no account bytes. */
-entries: Array<number | bigint>; 
-/** Independently sized markers stored as a second compact tail. */
-markers: Array<number>; 
-/** Optional human-readable status attached to the latest resize. */
-note: OptionOrNullable<string>;  };
+export type JournalArgs = {
+	/** Canonical PDA bump. */
+	bump: number;
+	/** Signer permitted to mutate and fund this journal. */
+	authority: Address;
+	/** Number of successful resize or write operations. */
+	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: OptionOrNullable<number | bigint>;
+	/** Human-readable title stored as active UTF-8 bytes. */
+	title: string;
+	/** Active entries. Unused capacity consumes no account bytes. */
+	entries: Array<number | bigint>;
+	/** Independently sized markers stored as a second compact tail. */
+	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: OptionOrNullable<string>;
+};
 
 /** Gets the encoder for {@link JournalArgs} account data. */
 export function getJournalEncoder(): Encoder<JournalArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['authority', getAddressEncoder()], ['revision', getU32Encoder()], ['featuredEntry', getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" })], ['title', offsetEncoder(getPinaPodBoundedStringEncoder(addEncoderSizePrefix(getUtf8Encoder(), offsetEncoder(offsetEncoder(getU8Encoder(), { preOffset: () => 47 }), { postOffset: ({ preOffset }) => preOffset + 0 })), 24), { preOffset: ({ preOffset }) => preOffset + 12 })], ['entries', getPinaPodBoundedArrayEncoder(getArrayEncoder(getU64Encoder(), { size: offsetEncoder(offsetEncoder(getU16Encoder(), { preOffset: () => 48 }), { postOffset: ({ preOffset }) => preOffset + 0 }) }), 8)], ['markers', getPinaPodBoundedArrayEncoder(getArrayEncoder(getU8Encoder(), { size: offsetEncoder(offsetEncoder(getU64Encoder(), { preOffset: () => 50 }), { postOffset: ({ preOffset }) => preOffset + 0 }) }), 8)], ['note', getOptionEncoder(getPinaPodBoundedStringEncoder(addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()), 64), { prefix: offsetEncoder(offsetEncoder(getU8Encoder(), { preOffset: () => 58 }), { postOffset: ({ preOffset }) => preOffset }) })]]), (value) => ({ ...value, discriminator: 1 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["authority", getAddressEncoder()],
+			["revision", getU32Encoder()],
+			[
+				"featuredEntry",
+				getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+			],
+			[
+				"title",
+				offsetEncoder(
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(
+							getUtf8Encoder(),
+							offsetEncoder(
+								offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
+						),
+						24,
+					),
+					{ preOffset: ({ preOffset }) => preOffset + 12 },
+				),
+			],
+			[
+				"entries",
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU64Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
+				),
+			],
+			[
+				"markers",
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU8Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
+				),
+			],
+			[
+				"note",
+				getOptionEncoder(
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+						64,
+					),
+					{
+						prefix: offsetEncoder(
+							offsetEncoder(getU8Encoder(), { preOffset: () => 58 }),
+							{ postOffset: ({ preOffset }) => preOffset },
+						),
+					},
+				),
+			],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link Journal} account data. */
 export function getJournalDecoder(): Decoder<Journal> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['authority', getAddressDecoder()], ['revision', getU32Decoder()], ['featuredEntry', getOptionDecoder(getU64Decoder(), { prefix: getPinaPodOptionTagDecoder(getU8Decoder()), noneValue: "zeroes" })], ['title', offsetDecoder(getPinaPodBoundedStringDecoder(addDecoderSizePrefix(getPinaPodUtf8Decoder(), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU8Decoder(), { preOffset: () => 47 }), { postOffset: ({ preOffset }) => preOffset + 0 }), 24)), 24), { preOffset: ({ preOffset }) => preOffset + 12 })], ['entries', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU64Decoder(), { size: offsetDecoder(offsetDecoder(getU16Decoder(), { preOffset: () => 48 }), { postOffset: ({ preOffset }) => preOffset + 0 }) }), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), { preOffset: () => 48 }), { postOffset: ({ preOffset }) => preOffset + 0 }) , 8), 8)], ['markers', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), { size: offsetDecoder(offsetDecoder(getU64Decoder(), { preOffset: () => 50 }), { postOffset: ({ preOffset }) => preOffset + 0 }) }), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU64Decoder(), { preOffset: () => 50 }), { postOffset: ({ preOffset }) => preOffset + 0 }) , 8), 8)], ['note', getOptionDecoder(getPinaPodBoundedStringDecoder(addDecoderSizePrefix(getPinaPodUtf8Decoder(), getPinaPodBoundedCountDecoder(getU8Decoder(), 64)), 64), { prefix: offsetDecoder(offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), { preOffset: () => 58 }), { postOffset: ({ preOffset }) => preOffset }) })]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
+		],
+		["bump", getU8Decoder()],
+		["authority", getAddressDecoder()],
+		["revision", getU32Decoder()],
+		[
+			"featuredEntry",
+			getOptionDecoder(getU64Decoder(), {
+				prefix: getPinaPodOptionTagDecoder(getU8Decoder()),
+				noneValue: "zeroes",
+			}),
+		],
+		[
+			"title",
+			offsetDecoder(
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(
+							offsetDecoder(
+								offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
+							24,
+						),
+					),
+					24,
+				),
+				{ preOffset: ({ preOffset }) => preOffset + 12 },
+			),
+		],
+		[
+			"entries",
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU64Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					8,
+				),
+				8,
+			),
+		],
+		[
+			"markers",
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU8Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					8,
+				),
+				8,
+			),
+		],
+		[
+			"note",
+			getOptionDecoder(
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(getU8Decoder(), 64),
+					),
+					64,
+				),
+				{
+					prefix: offsetDecoder(
+						offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), {
+							preOffset: () => 58,
+						}),
+						{ postOffset: ({ preOffset }) => preOffset },
+					),
+				},
+			),
+		],
+	]);
 }
 
 /** Gets the codec for {@link Journal} account data. */
 export function getJournalCodec(): Codec<JournalArgs, Journal> {
-    return combineCodec(getJournalEncoder(), getJournalDecoder());
+	return combineCodec(getJournalEncoder(), getJournalDecoder());
 }
 
-export function decodeJournal<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<Journal, TAddress>;
-export function decodeJournal<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<Journal, TAddress>;
-export function decodeJournal<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<Journal, TAddress> | MaybeAccount<Journal, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getJournalDecoder());
+export function decodeJournal<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<Journal, TAddress>;
+export function decodeJournal<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<Journal, TAddress>;
+export function decodeJournal<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<Journal, TAddress> | MaybeAccount<Journal, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getJournalDecoder(),
+	);
 }
 
 export async function fetchJournal<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<Journal, TAddress>> {
-  const maybeAccount = await fetchMaybeJournal(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeJournal(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeJournal<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Journal, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeJournal(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodeJournal(maybeAccount);
 }
 
 export async function fetchAllJournal(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<Journal>[]> {
-  const maybeAccounts = await fetchAllMaybeJournal(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeJournal(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeJournal(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Journal>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeJournal(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodeJournal(maybeAccount));
 }
 
 export async function fetchJournalFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: JournalSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: JournalSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<Account<Journal>> {
-  const maybeAccount = await fetchMaybeJournalFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeJournalFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeJournalFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  seeds: JournalSeeds,
-  config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: JournalSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
 ): Promise<MaybeAccount<Journal>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findJournalPda(seeds, { programAddress });
-  return await fetchMaybeJournal(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findJournalPda(seeds, { programAddress });
+	return await fetchMaybeJournal(rpc, address, fetchConfig);
 }

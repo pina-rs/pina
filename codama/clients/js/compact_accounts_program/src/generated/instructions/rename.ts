@@ -6,118 +6,328 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findJournalPda } from '../pdas';
-import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+	type WritableSignerAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findJournalPda } from "../pdas";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
+import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const RENAME_DISCRIMINATOR = 3;
 
-export function getRenameDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(RENAME_DISCRIMINATOR); }
-
-export type RenameInstruction<TProgram extends string = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountJournal extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? WritableSignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountJournal extends string ? WritableAccount<TAccountJournal> : TAccountJournal, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
-
-export type RenameInstructionData = { discriminator: number; titleLen: number; title: ReadonlyUint8Array;  };
-
-export type RenameInstructionDataArgs = { titleLen: number; title: ReadonlyUint8Array;  };
-
-export function getRenameInstructionDataEncoder(): FixedSizeEncoder<RenameInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['titleLen', getU8Encoder()], ['title', fixPinaPodEncoderSize(getBytesEncoder(), 24)]]), (value) => ({ ...value, discriminator: 3 }));
+export function getRenameDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(RENAME_DISCRIMINATOR);
 }
 
-export function getRenameInstructionDataDecoder(): FixedSizeDecoder<RenameInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(RENAME_DISCRIMINATOR, getU8Decoder())], ['titleLen', getU8Decoder()], ['title', fixDecoderSize(getBytesDecoder(), 24)]]);
-}
+export type RenameInstruction<
+	TProgram extends string = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountJournal extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& WritableSignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountJournal extends string ? WritableAccount<TAccountJournal>
+				: TAccountJournal,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getRenameInstructionDataCodec(): FixedSizeCodec<RenameInstructionDataArgs, RenameInstructionData> {
-    return combineCodec(getRenameInstructionDataEncoder(), getRenameInstructionDataDecoder());
-}
-
-export type RenameAsyncInput<TAccountAuthority extends string = string, TAccountJournal extends string = string, TAccountSystemProgram extends string = string> =  {
-  /** Funds title growth and receives rent refunded by title shrinkage. */
-authority: TransactionSigner<TAccountAuthority>;
-journal?: Address<TAccountJournal>;
-systemProgram?: Address<TAccountSystemProgram>;
-titleLen: RenameInstructionDataArgs["titleLen"];
-title: RenameInstructionDataArgs["title"];
-}
-
-export async function getRenameInstructionAsync<TAccountAuthority extends string, TAccountJournal extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: RenameAsyncInput<TAccountAuthority, TAccountJournal, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<RenameInstruction<TProgramAddress, TAccountAuthority, TAccountJournal, TAccountSystemProgram>> {
-  // Program address.
-const programAddress = config?.programAddress ?? COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, journal: { value: input.journal ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.journal.value) {
-accounts.journal.value = await findJournalPda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) }, { programAddress });
-}
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("journal", accounts.journal), getAccountMeta("systemProgram", accounts.systemProgram)], data: getRenameInstructionDataEncoder().encode(args as RenameInstructionDataArgs), programAddress } as RenameInstruction<TProgramAddress, TAccountAuthority, TAccountJournal, TAccountSystemProgram>);
-}
-
-export type RenameInput<TAccountAuthority extends string = string, TAccountJournal extends string = string, TAccountSystemProgram extends string = string> =  {
-  /** Funds title growth and receives rent refunded by title shrinkage. */
-authority: TransactionSigner<TAccountAuthority>;
-journal: Address<TAccountJournal>;
-systemProgram?: Address<TAccountSystemProgram>;
-titleLen: RenameInstructionDataArgs["titleLen"];
-title: RenameInstructionDataArgs["title"];
-}
-
-export function getRenameInstruction<TAccountAuthority extends string, TAccountJournal extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: RenameInput<TAccountAuthority, TAccountJournal, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): RenameInstruction<TProgramAddress, TAccountAuthority, TAccountJournal, TAccountSystemProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, journal: { value: input.journal ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("journal", accounts.journal), getAccountMeta("systemProgram", accounts.systemProgram)], data: getRenameInstructionDataEncoder().encode(args as RenameInstructionDataArgs), programAddress } as RenameInstruction<TProgramAddress, TAccountAuthority, TAccountJournal, TAccountSystemProgram>);
-}
-
-export type ParsedRenameInstruction<TProgram extends string = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/** Funds title growth and receives rent refunded by title shrinkage. */
-authority: TAccountMetas[0];
-journal: TAccountMetas[1];
-systemProgram: TAccountMetas[2];
+export type RenameInstructionData = {
+	discriminator: number;
+	titleLen: number;
+	title: ReadonlyUint8Array;
 };
-data: RenameInstructionData; };
 
-export function parseRenameInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedRenameInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export type RenameInstructionDataArgs = {
+	titleLen: number;
+	title: ReadonlyUint8Array;
+};
+
+export function getRenameInstructionDataEncoder(): FixedSizeEncoder<
+	RenameInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"titleLen",
+			getU8Encoder(),
+		], ["title", fixPinaPodEncoderSize(getBytesEncoder(), 24)]]),
+		(value) => ({ ...value, discriminator: 3 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getRenameInstructionDataDecoder(): FixedSizeDecoder<
+	RenameInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(RENAME_DISCRIMINATOR, getU8Decoder()),
+		],
+		["titleLen", getU8Decoder()],
+		["title", fixDecoderSize(getBytesDecoder(), 24)],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), journal: getNextAccount(), systemProgram: getNextAccount() }, data: getRenameInstructionDataDecoder().decode(instruction.data) };
+
+export function getRenameInstructionDataCodec(): FixedSizeCodec<
+	RenameInstructionDataArgs,
+	RenameInstructionData
+> {
+	return combineCodec(
+		getRenameInstructionDataEncoder(),
+		getRenameInstructionDataDecoder(),
+	);
+}
+
+export type RenameAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountJournal extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/** Funds title growth and receives rent refunded by title shrinkage. */
+	authority: TransactionSigner<TAccountAuthority>;
+	journal?: Address<TAccountJournal>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	titleLen: RenameInstructionDataArgs["titleLen"];
+	title: RenameInstructionDataArgs["title"];
+};
+
+export async function getRenameInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountJournal extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address =
+		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RenameAsyncInput<
+		TAccountAuthority,
+		TAccountJournal,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	RenameInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountJournal,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		journal: { value: input.journal ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.journal.value) {
+		accounts.journal.value = await findJournalPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("journal", accounts.journal),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getRenameInstructionDataEncoder().encode(
+			args as RenameInstructionDataArgs,
+		),
+		programAddress,
+	} as RenameInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountJournal,
+		TAccountSystemProgram
+	>);
+}
+
+export type RenameInput<
+	TAccountAuthority extends string = string,
+	TAccountJournal extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/** Funds title growth and receives rent refunded by title shrinkage. */
+	authority: TransactionSigner<TAccountAuthority>;
+	journal: Address<TAccountJournal>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	titleLen: RenameInstructionDataArgs["titleLen"];
+	title: RenameInstructionDataArgs["title"];
+};
+
+export function getRenameInstruction<
+	TAccountAuthority extends string,
+	TAccountJournal extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address =
+		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RenameInput<TAccountAuthority, TAccountJournal, TAccountSystemProgram>,
+	config?: { programAddress?: TProgramAddress },
+): RenameInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountJournal,
+	TAccountSystemProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		journal: { value: input.journal ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("journal", accounts.journal),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getRenameInstructionDataEncoder().encode(
+			args as RenameInstructionDataArgs,
+		),
+		programAddress,
+	} as RenameInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountJournal,
+		TAccountSystemProgram
+	>);
+}
+
+export type ParsedRenameInstruction<
+	TProgram extends string = typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/** Funds title growth and receives rent refunded by title shrinkage. */
+		authority: TAccountMetas[0];
+		journal: TAccountMetas[1];
+		systemProgram: TAccountMetas[2];
+	};
+	data: RenameInstructionData;
+};
+
+export function parseRenameInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRenameInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			journal: getNextAccount(),
+			systemProgram: getNextAccount(),
+		},
+		data: getRenameInstructionDataDecoder().decode(instruction.data),
+	};
 }

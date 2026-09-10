@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const PROFILE_PROGRAM_ID: Address = pina::address!("6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL");
+pub const PROFILE_PROGRAM_ID: Address =
+	pina::address!("6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL");
 
 /// Marker for the `profileProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const COMPACT_ACCOUNTS_PROGRAM_ID: Address = pina::address!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
+pub const COMPACT_ACCOUNTS_PROGRAM_ID: Address =
+	pina::address!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
 
 /// Marker for the `compactAccountsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

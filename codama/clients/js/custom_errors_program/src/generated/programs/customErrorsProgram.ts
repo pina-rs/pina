@@ -6,61 +6,248 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getHelloInstruction, getHelloNextInstruction, getHelloNoMsgInstruction, getRequireEqInstruction, getRequireGteInstruction, getRequireGtInstruction, getRequireNeqInstruction, parseHelloInstruction, parseHelloNextInstruction, parseHelloNoMsgInstruction, parseRequireEqInstruction, parseRequireGteInstruction, parseRequireGtInstruction, parseRequireNeqInstruction, type HelloInput, type HelloNextInput, type HelloNoMsgInput, type ParsedHelloInstruction, type ParsedHelloNextInstruction, type ParsedHelloNoMsgInstruction, type ParsedRequireEqInstruction, type ParsedRequireGteInstruction, type ParsedRequireGtInstruction, type ParsedRequireNeqInstruction, type RequireEqInput, type RequireGteInput, type RequireGtInput, type RequireNeqInput } from '../instructions';
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getHelloInstruction,
+	getHelloNextInstruction,
+	getHelloNoMsgInstruction,
+	getRequireEqInstruction,
+	getRequireGteInstruction,
+	getRequireGtInstruction,
+	getRequireNeqInstruction,
+	type HelloInput,
+	type HelloNextInput,
+	type HelloNoMsgInput,
+	type ParsedHelloInstruction,
+	type ParsedHelloNextInstruction,
+	type ParsedHelloNoMsgInstruction,
+	type ParsedRequireEqInstruction,
+	type ParsedRequireGteInstruction,
+	type ParsedRequireGtInstruction,
+	type ParsedRequireNeqInstruction,
+	parseHelloInstruction,
+	parseHelloNextInstruction,
+	parseHelloNoMsgInstruction,
+	parseRequireEqInstruction,
+	parseRequireGteInstruction,
+	parseRequireGtInstruction,
+	parseRequireNeqInstruction,
+	type RequireEqInput,
+	type RequireGteInput,
+	type RequireGtInput,
+	type RequireNeqInput,
+} from "../instructions";
 
-export const CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;
 
-export enum CustomErrorsProgramInstruction { Hello, HelloNoMsg, HelloNext, RequireEq, RequireNeq, RequireGt, RequireGte }
-
-export function identifyCustomErrorsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): CustomErrorsProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return CustomErrorsProgramInstruction.Hello; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return CustomErrorsProgramInstruction.HelloNoMsg; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return CustomErrorsProgramInstruction.HelloNext; }
-if (containsBytes(data, getU8Encoder().encode(3), 0)) { return CustomErrorsProgramInstruction.RequireEq; }
-if (containsBytes(data, getU8Encoder().encode(4), 0)) { return CustomErrorsProgramInstruction.RequireNeq; }
-if (containsBytes(data, getU8Encoder().encode(5), 0)) { return CustomErrorsProgramInstruction.RequireGt; }
-if (containsBytes(data, getU8Encoder().encode(6), 0)) { return CustomErrorsProgramInstruction.RequireGte; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "customErrorsProgram" });
+export enum CustomErrorsProgramInstruction {
+	Hello,
+	HelloNoMsg,
+	HelloNext,
+	RequireEq,
+	RequireNeq,
+	RequireGt,
+	RequireGte,
 }
 
-export type ParsedCustomErrorsProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
-| { instructionType: CustomErrorsProgramInstruction.Hello } & ParsedHelloInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.HelloNoMsg } & ParsedHelloNoMsgInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.HelloNext } & ParsedHelloNextInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.RequireEq } & ParsedRequireEqInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.RequireNeq } & ParsedRequireNeqInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.RequireGt } & ParsedRequireGtInstruction<TProgram>
-| { instructionType: CustomErrorsProgramInstruction.RequireGte } & ParsedRequireGteInstruction<TProgram>
+export function identifyCustomErrorsProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): CustomErrorsProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return CustomErrorsProgramInstruction.Hello;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return CustomErrorsProgramInstruction.HelloNoMsg;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return CustomErrorsProgramInstruction.HelloNext;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return CustomErrorsProgramInstruction.RequireEq;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return CustomErrorsProgramInstruction.RequireNeq;
+	}
+	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+		return CustomErrorsProgramInstruction.RequireGt;
+	}
+	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+		return CustomErrorsProgramInstruction.RequireGte;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "customErrorsProgram" },
+	);
+}
 
+export type ParsedCustomErrorsProgramInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	| { instructionType: CustomErrorsProgramInstruction.Hello }
+		& ParsedHelloInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.HelloNoMsg }
+		& ParsedHelloNoMsgInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.HelloNext }
+		& ParsedHelloNextInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.RequireEq }
+		& ParsedRequireEqInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.RequireNeq }
+		& ParsedRequireNeqInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.RequireGt }
+		& ParsedRequireGtInstruction<TProgram>
+	| { instructionType: CustomErrorsProgramInstruction.RequireGte }
+		& ParsedRequireGteInstruction<TProgram>;
 
-        export function parseCustomErrorsProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedCustomErrorsProgramInstruction<TProgram> {
-            const instructionType = identifyCustomErrorsProgramInstruction(instruction);
-            switch (instructionType) {
-                case CustomErrorsProgramInstruction.Hello: { return { instructionType: CustomErrorsProgramInstruction.Hello, ...parseHelloInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.HelloNoMsg: { return { instructionType: CustomErrorsProgramInstruction.HelloNoMsg, ...parseHelloNoMsgInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.HelloNext: { return { instructionType: CustomErrorsProgramInstruction.HelloNext, ...parseHelloNextInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.RequireEq: { return { instructionType: CustomErrorsProgramInstruction.RequireEq, ...parseRequireEqInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.RequireNeq: { return { instructionType: CustomErrorsProgramInstruction.RequireNeq, ...parseRequireNeqInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.RequireGt: { return { instructionType: CustomErrorsProgramInstruction.RequireGt, ...parseRequireGtInstruction(instruction) }; }
-case CustomErrorsProgramInstruction.RequireGte: { return { instructionType: CustomErrorsProgramInstruction.RequireGte, ...parseRequireGteInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "customErrorsProgram" });
-            }
-        }
+export function parseCustomErrorsProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedCustomErrorsProgramInstruction<TProgram> {
+	const instructionType = identifyCustomErrorsProgramInstruction(instruction);
+	switch (instructionType) {
+		case CustomErrorsProgramInstruction.Hello: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.Hello,
+				...parseHelloInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.HelloNoMsg: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.HelloNoMsg,
+				...parseHelloNoMsgInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.HelloNext: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.HelloNext,
+				...parseHelloNextInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.RequireEq: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.RequireEq,
+				...parseRequireEqInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.RequireNeq: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.RequireNeq,
+				...parseRequireNeqInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.RequireGt: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.RequireGt,
+				...parseRequireGtInstruction(instruction),
+			};
+		}
+		case CustomErrorsProgramInstruction.RequireGte: {
+			return {
+				instructionType: CustomErrorsProgramInstruction.RequireGte,
+				...parseRequireGteInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "customErrorsProgram",
+				},
+			);
+	}
+}
 
-export type CustomErrorsProgramPlugin = { instructions: CustomErrorsProgramPluginInstructions; identifyInstruction: typeof identifyCustomErrorsProgramInstruction; parseInstruction: typeof parseCustomErrorsProgramInstruction; }
+export type CustomErrorsProgramPlugin = {
+	instructions: CustomErrorsProgramPluginInstructions;
+	identifyInstruction: typeof identifyCustomErrorsProgramInstruction;
+	parseInstruction: typeof parseCustomErrorsProgramInstruction;
+};
 
-export type CustomErrorsProgramPluginInstructions = { hello: (input: HelloInput) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions; helloNoMsg: (input: HelloNoMsgInput) => ReturnType<typeof getHelloNoMsgInstruction> & SelfPlanAndSendFunctions; helloNext: (input: HelloNextInput) => ReturnType<typeof getHelloNextInstruction> & SelfPlanAndSendFunctions; requireEq: (input: RequireEqInput) => ReturnType<typeof getRequireEqInstruction> & SelfPlanAndSendFunctions; requireNeq: (input: RequireNeqInput) => ReturnType<typeof getRequireNeqInstruction> & SelfPlanAndSendFunctions; requireGt: (input: RequireGtInput) => ReturnType<typeof getRequireGtInstruction> & SelfPlanAndSendFunctions; requireGte: (input: RequireGteInput) => ReturnType<typeof getRequireGteInstruction> & SelfPlanAndSendFunctions; }
+export type CustomErrorsProgramPluginInstructions = {
+	hello: (
+		input: HelloInput,
+	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
+	helloNoMsg: (
+		input: HelloNoMsgInput,
+	) => ReturnType<typeof getHelloNoMsgInstruction> & SelfPlanAndSendFunctions;
+	helloNext: (
+		input: HelloNextInput,
+	) => ReturnType<typeof getHelloNextInstruction> & SelfPlanAndSendFunctions;
+	requireEq: (
+		input: RequireEqInput,
+	) => ReturnType<typeof getRequireEqInstruction> & SelfPlanAndSendFunctions;
+	requireNeq: (
+		input: RequireNeqInput,
+	) => ReturnType<typeof getRequireNeqInstruction> & SelfPlanAndSendFunctions;
+	requireGt: (
+		input: RequireGtInput,
+	) => ReturnType<typeof getRequireGtInstruction> & SelfPlanAndSendFunctions;
+	requireGte: (
+		input: RequireGteInput,
+	) => ReturnType<typeof getRequireGteInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type CustomErrorsProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
+export type CustomErrorsProgramPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function customErrorsProgramProgram() {
-    return <T extends CustomErrorsProgramPluginRequirements>(client: T): ExtendedClient<T, { customErrorsProgram: CustomErrorsProgramPlugin }> => {
-        return extendClient(client, { customErrorsProgram: <CustomErrorsProgramPlugin>{ instructions: { hello: input => addSelfPlanAndSendFunctions(client, getHelloInstruction(input)), helloNoMsg: input => addSelfPlanAndSendFunctions(client, getHelloNoMsgInstruction(input)), helloNext: input => addSelfPlanAndSendFunctions(client, getHelloNextInstruction(input)), requireEq: input => addSelfPlanAndSendFunctions(client, getRequireEqInstruction(input)), requireNeq: input => addSelfPlanAndSendFunctions(client, getRequireNeqInstruction(input)), requireGt: input => addSelfPlanAndSendFunctions(client, getRequireGtInstruction(input)), requireGte: input => addSelfPlanAndSendFunctions(client, getRequireGteInstruction(input)) }, identifyInstruction: identifyCustomErrorsProgramInstruction, parseInstruction: parseCustomErrorsProgramInstruction } });
-    };
+	return <T extends CustomErrorsProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { customErrorsProgram: CustomErrorsProgramPlugin }> => {
+		return extendClient(client, {
+			customErrorsProgram: <CustomErrorsProgramPlugin> {
+				instructions: {
+					hello: (input) =>
+						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
+					helloNoMsg: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getHelloNoMsgInstruction(input),
+						),
+					helloNext: (input) =>
+						addSelfPlanAndSendFunctions(client, getHelloNextInstruction(input)),
+					requireEq: (input) =>
+						addSelfPlanAndSendFunctions(client, getRequireEqInstruction(input)),
+					requireNeq: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireNeqInstruction(input),
+						),
+					requireGt: (input) =>
+						addSelfPlanAndSendFunctions(client, getRequireGtInstruction(input)),
+					requireGte: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireGteInstruction(input),
+						),
+				},
+				identifyInstruction: identifyCustomErrorsProgramInstruction,
+				parseInstruction: parseCustomErrorsProgramInstruction,
+			},
+		});
+	};
 }

@@ -11,9 +11,9 @@ const int roleRegistryProgramErrorRoleInactive = 0x2; // 2
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _roleRegistryProgramErrorMessages = {
-    roleRegistryProgramErrorInvalidPermissions: '',
-    roleRegistryProgramErrorRoleAlreadyExists: '',
-    roleRegistryProgramErrorRoleInactive: '',
+  roleRegistryProgramErrorInvalidPermissions: '',
+  roleRegistryProgramErrorRoleAlreadyExists: '',
+  roleRegistryProgramErrorRoleInactive: '',
 };
 
 /// Get the error message for a RoleRegistryProgram program error code.

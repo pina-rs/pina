@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const COUNTER_PROGRAM_ID: Address = pina::address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+pub const COUNTER_PROGRAM_ID: Address =
+	pina::address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
 /// Marker for the `counterProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

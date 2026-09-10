@@ -47,7 +47,9 @@ impl TodoState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut TodoStateZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut TodoStateZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {
@@ -60,21 +62,17 @@ impl TodoState {
 impl TodoState {
 	pub fn find_pda(owner: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&[
-				"todo".as_bytes(),
-				owner.as_ref(),
-			],
+			&["todo".as_bytes(), owner.as_ref()],
 			&crate::TODO_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(owner: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(
+		owner: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&[
-				"todo".as_bytes(),
-				owner.as_ref(),
-				&[bump],
-			],
+			&["todo".as_bytes(), owner.as_ref(), &[bump]],
 			&crate::TODO_PROGRAM_ID,
 		)
 	}

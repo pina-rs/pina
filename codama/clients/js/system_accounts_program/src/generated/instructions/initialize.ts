@@ -6,70 +6,179 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR); }
-
-export type InitializeInstruction<TProgram extends string = typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountWallet extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountWallet extends string ? ReadonlyAccount<TAccountWallet> : TAccountWallet, ...TRemainingAccounts]>;
-
-export type InitializeInstructionData = { discriminator: number;  };
-
-export type InitializeInstructionDataArgs = {  };
-
-export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 
-export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder())]]);
+export type InitializeInstruction<
+	TProgram extends string = typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountWallet extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountWallet extends string ? ReadonlyAccount<TAccountWallet>
+				: TAccountWallet,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type InitializeInstructionData = { discriminator: number };
+
+export type InitializeInstructionDataArgs = {};
+
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
+	InitializeInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
-export function getInitializeInstructionDataCodec(): FixedSizeCodec<InitializeInstructionDataArgs, InitializeInstructionData> {
-    return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
+	InitializeInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type InitializeInput<TAccountAuthority extends string = string, TAccountWallet extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-wallet: Address<TAccountWallet>;
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<
+	InitializeInstructionDataArgs,
+	InitializeInstructionData
+> {
+	return combineCodec(
+		getInitializeInstructionDataEncoder(),
+		getInitializeInstructionDataDecoder(),
+	);
 }
 
-export function getInitializeInstruction<TAccountAuthority extends string, TAccountWallet extends string, TProgramAddress extends Address = typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: InitializeInput<TAccountAuthority, TAccountWallet>, config?: { programAddress?: TProgramAddress } ): InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountWallet> {
-  // Program address.
-const programAddress = config?.programAddress ?? SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, wallet: { value: input.wallet ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("wallet", accounts.wallet)], data: getInitializeInstructionDataEncoder().encode({}), programAddress } as InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountWallet>);
-}
-
-export type ParsedInitializeInstruction<TProgram extends string = typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-authority: TAccountMetas[0];
-wallet: TAccountMetas[1];
+export type InitializeInput<
+	TAccountAuthority extends string = string,
+	TAccountWallet extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	wallet: Address<TAccountWallet>;
 };
-data: InitializeInstructionData; };
 
-export function parseInitializeInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export function getInitializeInstruction<
+	TAccountAuthority extends string,
+	TAccountWallet extends string,
+	TProgramAddress extends Address =
+		typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeInput<TAccountAuthority, TAccountWallet>,
+	config?: { programAddress?: TProgramAddress },
+): InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountWallet> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		wallet: { value: input.wallet ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("wallet", accounts.wallet),
+		],
+		data: getInitializeInstructionDataEncoder().encode({}),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountWallet
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), wallet: getNextAccount() }, data: getInitializeInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedInitializeInstruction<
+	TProgram extends string = typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		authority: TAccountMetas[0];
+		wallet: TAccountMetas[1];
+	};
+	data: InitializeInstructionData;
+};
+
+export function parseInitializeInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedInitializeInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { authority: getNextAccount(), wallet: getNextAccount() },
+		data: getInitializeInstructionDataDecoder().decode(instruction.data),
+	};
 }

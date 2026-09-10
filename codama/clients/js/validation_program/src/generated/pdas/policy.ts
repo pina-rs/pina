@@ -6,13 +6,32 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getUtf8Encoder,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type PolicySeeds = {
-authority: Address;
+	authority: Address;
 };
 
-export async function findPolicyPda(seeds: PolicySeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress = 'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn' as Address<'GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn'> } = config;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("validation-policy"), getAddressEncoder().encode(seeds.authority)]});
+export async function findPolicyPda(
+	seeds: PolicySeeds,
+	config: { programAddress?: Address | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress = "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn" as Address<
+			"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+		>,
+	} = config;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("validation-policy"),
+			getAddressEncoder().encode(seeds.authority),
+		],
+	});
 }

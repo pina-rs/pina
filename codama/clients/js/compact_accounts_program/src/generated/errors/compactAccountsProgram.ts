@@ -6,32 +6,62 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED = 0x1b58; // 7000
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS = 0x1b59; // 7001
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0x1b5a; // 7002
 
-export type CompactAccountsProgramError = typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH | typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED | typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS;
+export type CompactAccountsProgramError =
+	| typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH
+	| typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED
+	| typeof COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS;
 
-let compactAccountsProgramErrorMessages: Record<CompactAccountsProgramError, string> | undefined;
-if (process.env['NODE_ENV'] !== 'production') {
-  compactAccountsProgramErrorMessages = { [COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``, [COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED]: ``, [COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS]: `` };
+let compactAccountsProgramErrorMessages:
+	| Record<CompactAccountsProgramError, string>
+	| undefined;
+if (process.env["NODE_ENV"] !== "production") {
+	compactAccountsProgramErrorMessages = {
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``,
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED]: ``,
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS]: ``,
+	};
 }
 
-export function getCompactAccountsProgramErrorMessage(code: CompactAccountsProgramError): string {
-  if (process.env['NODE_ENV'] !== 'production') {
-    return (compactAccountsProgramErrorMessages as Record<CompactAccountsProgramError, string>)[code];
-  }
+export function getCompactAccountsProgramErrorMessage(
+	code: CompactAccountsProgramError,
+): string {
+	if (process.env["NODE_ENV"] !== "production") {
+		return (compactAccountsProgramErrorMessages as Record<
+			CompactAccountsProgramError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isCompactAccountsProgramError<TProgramErrorCode extends CompactAccountsProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, code);
+export function isCompactAccountsProgramError<
+	TProgramErrorCode extends CompactAccountsProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

@@ -6,119 +6,338 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+	type WritableSignerAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findPolicyPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findPolicyPda } from '../pdas';
-import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_POLICY_DISCRIMINATOR = 0;
 
-export function getInitializePolicyDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INITIALIZE_POLICY_DISCRIMINATOR); }
-
-export type InitializePolicyInstruction<TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountPolicy extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? WritableSignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountPolicy extends string ? WritableAccount<TAccountPolicy> : TAccountPolicy, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
-
-export type InitializePolicyInstructionData = { discriminator: number; bump: number; minimum: bigint; maximum: bigint; requiredApprovals: number;  };
-
-export type InitializePolicyInstructionDataArgs = { bump: number; minimum: number | bigint; maximum: number | bigint; requiredApprovals: number;  };
-
-export function getInitializePolicyInstructionDataEncoder(): FixedSizeEncoder<InitializePolicyInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['minimum', getU64Encoder()], ['maximum', getU64Encoder()], ['requiredApprovals', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
+export function getInitializePolicyDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INITIALIZE_POLICY_DISCRIMINATOR);
 }
 
-export function getInitializePolicyInstructionDataDecoder(): FixedSizeDecoder<InitializePolicyInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(INITIALIZE_POLICY_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['minimum', getU64Decoder()], ['maximum', getU64Decoder()], ['requiredApprovals', getU8Decoder()]]);
-}
+export type InitializePolicyInstruction<
+	TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountPolicy extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& WritableSignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountPolicy extends string ? WritableAccount<TAccountPolicy>
+				: TAccountPolicy,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getInitializePolicyInstructionDataCodec(): FixedSizeCodec<InitializePolicyInstructionDataArgs, InitializePolicyInstructionData> {
-    return combineCodec(getInitializePolicyInstructionDataEncoder(), getInitializePolicyInstructionDataDecoder());
-}
-
-export type InitializePolicyAsyncInput<TAccountAuthority extends string = string, TAccountPolicy extends string = string, TAccountSystemProgram extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-policy?: Address<TAccountPolicy>;
-systemProgram?: Address<TAccountSystemProgram>;
-bump: InitializePolicyInstructionDataArgs["bump"];
-minimum: InitializePolicyInstructionDataArgs["minimum"];
-maximum: InitializePolicyInstructionDataArgs["maximum"];
-requiredApprovals: InitializePolicyInstructionDataArgs["requiredApprovals"];
-}
-
-export async function getInitializePolicyInstructionAsync<TAccountAuthority extends string, TAccountPolicy extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS>(input: InitializePolicyAsyncInput<TAccountAuthority, TAccountPolicy, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<InitializePolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountSystemProgram>> {
-  // Program address.
-const programAddress = config?.programAddress ?? VALIDATION_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, policy: { value: input.policy ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.policy.value) {
-accounts.policy.value = await findPolicyPda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) }, { programAddress });
-}
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("policy", accounts.policy), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializePolicyInstructionDataEncoder().encode(args as InitializePolicyInstructionDataArgs), programAddress } as InitializePolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountSystemProgram>);
-}
-
-export type InitializePolicyInput<TAccountAuthority extends string = string, TAccountPolicy extends string = string, TAccountSystemProgram extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-policy: Address<TAccountPolicy>;
-systemProgram?: Address<TAccountSystemProgram>;
-bump: InitializePolicyInstructionDataArgs["bump"];
-minimum: InitializePolicyInstructionDataArgs["minimum"];
-maximum: InitializePolicyInstructionDataArgs["maximum"];
-requiredApprovals: InitializePolicyInstructionDataArgs["requiredApprovals"];
-}
-
-export function getInitializePolicyInstruction<TAccountAuthority extends string, TAccountPolicy extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS>(input: InitializePolicyInput<TAccountAuthority, TAccountPolicy, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): InitializePolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountSystemProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? VALIDATION_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, policy: { value: input.policy ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("policy", accounts.policy), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializePolicyInstructionDataEncoder().encode(args as InitializePolicyInstructionDataArgs), programAddress } as InitializePolicyInstruction<TProgramAddress, TAccountAuthority, TAccountPolicy, TAccountSystemProgram>);
-}
-
-export type ParsedInitializePolicyInstruction<TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-authority: TAccountMetas[0];
-policy: TAccountMetas[1];
-systemProgram: TAccountMetas[2];
+export type InitializePolicyInstructionData = {
+	discriminator: number;
+	bump: number;
+	minimum: bigint;
+	maximum: bigint;
+	requiredApprovals: number;
 };
-data: InitializePolicyInstructionData; };
 
-export function parseInitializePolicyInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializePolicyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export type InitializePolicyInstructionDataArgs = {
+	bump: number;
+	minimum: number | bigint;
+	maximum: number | bigint;
+	requiredApprovals: number;
+};
+
+export function getInitializePolicyInstructionDataEncoder(): FixedSizeEncoder<
+	InitializePolicyInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["minimum", getU64Encoder()],
+			["maximum", getU64Encoder()],
+			["requiredApprovals", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getInitializePolicyInstructionDataDecoder(): FixedSizeDecoder<
+	InitializePolicyInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				INITIALIZE_POLICY_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["bump", getU8Decoder()],
+		["minimum", getU64Decoder()],
+		["maximum", getU64Decoder()],
+		["requiredApprovals", getU8Decoder()],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), policy: getNextAccount(), systemProgram: getNextAccount() }, data: getInitializePolicyInstructionDataDecoder().decode(instruction.data) };
+
+export function getInitializePolicyInstructionDataCodec(): FixedSizeCodec<
+	InitializePolicyInstructionDataArgs,
+	InitializePolicyInstructionData
+> {
+	return combineCodec(
+		getInitializePolicyInstructionDataEncoder(),
+		getInitializePolicyInstructionDataDecoder(),
+	);
+}
+
+export type InitializePolicyAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountPolicy extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	policy?: Address<TAccountPolicy>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializePolicyInstructionDataArgs["bump"];
+	minimum: InitializePolicyInstructionDataArgs["minimum"];
+	maximum: InitializePolicyInstructionDataArgs["maximum"];
+	requiredApprovals: InitializePolicyInstructionDataArgs["requiredApprovals"];
+};
+
+export async function getInitializePolicyInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountPolicy extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializePolicyAsyncInput<
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializePolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		policy: { value: input.policy ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.policy.value) {
+		accounts.policy.value = await findPolicyPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("policy", accounts.policy),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializePolicyInstructionDataEncoder().encode(
+			args as InitializePolicyInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializePolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountSystemProgram
+	>);
+}
+
+export type InitializePolicyInput<
+	TAccountAuthority extends string = string,
+	TAccountPolicy extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	policy: Address<TAccountPolicy>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializePolicyInstructionDataArgs["bump"];
+	minimum: InitializePolicyInstructionDataArgs["minimum"];
+	maximum: InitializePolicyInstructionDataArgs["maximum"];
+	requiredApprovals: InitializePolicyInstructionDataArgs["requiredApprovals"];
+};
+
+export function getInitializePolicyInstruction<
+	TAccountAuthority extends string,
+	TAccountPolicy extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializePolicyInput<
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): InitializePolicyInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountPolicy,
+	TAccountSystemProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		policy: { value: input.policy ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("policy", accounts.policy),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializePolicyInstructionDataEncoder().encode(
+			args as InitializePolicyInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializePolicyInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountPolicy,
+		TAccountSystemProgram
+	>);
+}
+
+export type ParsedInitializePolicyInstruction<
+	TProgram extends string = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		authority: TAccountMetas[0];
+		policy: TAccountMetas[1];
+		systemProgram: TAccountMetas[2];
+	};
+	data: InitializePolicyInstructionData;
+};
+
+export function parseInitializePolicyInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedInitializePolicyInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			policy: getNextAccount(),
+			systemProgram: getNextAccount(),
+		},
+		data: getInitializePolicyInstructionDataDecoder().decode(instruction.data),
+	};
 }

@@ -6,20 +6,19 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramResult;
 use pina::ProgramError;
+use pina::ProgramResult;
 use pina::Signer;
 
 use crate::ProgramAccount;
 
 /// Instruction data for `CpiTransfer`.
-/// 
+///
 /// Layout:
 /// ```text
 /// | offset | size | field         |

@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
-pub const ACCOUNT_REALLOC_PROGRAM_ID: Pubkey = pubkey!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+pub const ACCOUNT_REALLOC_PROGRAM_ID: Pubkey =
+	pubkey!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");

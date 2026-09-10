@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ID: Address = pina::address!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");
+pub const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ID: Address =
+	pina::address!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");
 
 /// Marker for the `duplicateMutableAccountsProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

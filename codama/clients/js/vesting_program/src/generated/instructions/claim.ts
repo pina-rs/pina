@@ -6,93 +6,302 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+	type WritableSignerAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { VESTING_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CLAIM_DISCRIMINATOR = 1;
 
-export function getClaimDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CLAIM_DISCRIMINATOR); }
-
-export type ClaimInstruction<TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS, TAccountBeneficiary extends string | AccountMeta<string> = string, TAccountMint extends string | AccountMeta<string> = string, TAccountVestingState extends string | AccountMeta<string> = string, TAccountBeneficiaryAta extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountAssociatedTokenProgram extends string | AccountMeta<string> = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TAccountTokenProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountBeneficiary extends string ? WritableSignerAccount<TAccountBeneficiary> & AccountSignerMeta<TAccountBeneficiary> : TAccountBeneficiary, TAccountMint extends string ? ReadonlyAccount<TAccountMint> : TAccountMint, TAccountVestingState extends string ? WritableAccount<TAccountVestingState> : TAccountVestingState, TAccountBeneficiaryAta extends string ? WritableAccount<TAccountBeneficiaryAta> : TAccountBeneficiaryAta, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountAssociatedTokenProgram extends string ? ReadonlyAccount<TAccountAssociatedTokenProgram> : TAccountAssociatedTokenProgram, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, ...TRemainingAccounts]>;
-
-export type ClaimInstructionData = { discriminator: number; amount: bigint;  };
-
-export type ClaimInstructionDataArgs = { amount: number | bigint;  };
-
-export function getClaimInstructionDataEncoder(): FixedSizeEncoder<ClaimInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['amount', getU64Encoder()]]), (value) => ({ ...value, discriminator: 1 }));
+export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
 }
 
-export function getClaimInstructionDataDecoder(): FixedSizeDecoder<ClaimInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder())], ['amount', getU64Decoder()]]);
+export type ClaimInstruction<
+	TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
+	TAccountBeneficiary extends string | AccountMeta<string> = string,
+	TAccountMint extends string | AccountMeta<string> = string,
+	TAccountVestingState extends string | AccountMeta<string> = string,
+	TAccountBeneficiaryAta extends string | AccountMeta<string> = string,
+	TAccountVault extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TAccountTokenProgram extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountBeneficiary extends string ?
+					& WritableSignerAccount<TAccountBeneficiary>
+					& AccountSignerMeta<TAccountBeneficiary>
+				: TAccountBeneficiary,
+			TAccountMint extends string ? ReadonlyAccount<TAccountMint>
+				: TAccountMint,
+			TAccountVestingState extends string
+				? WritableAccount<TAccountVestingState>
+				: TAccountVestingState,
+			TAccountBeneficiaryAta extends string
+				? WritableAccount<TAccountBeneficiaryAta>
+				: TAccountBeneficiaryAta,
+			TAccountVault extends string ? WritableAccount<TAccountVault>
+				: TAccountVault,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			TAccountTokenProgram extends string
+				? ReadonlyAccount<TAccountTokenProgram>
+				: TAccountTokenProgram,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type ClaimInstructionData = { discriminator: number; amount: bigint };
+
+export type ClaimInstructionDataArgs = { amount: number | bigint };
+
+export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
+	ClaimInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
-export function getClaimInstructionDataCodec(): FixedSizeCodec<ClaimInstructionDataArgs, ClaimInstructionData> {
-    return combineCodec(getClaimInstructionDataEncoder(), getClaimInstructionDataDecoder());
+export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
+	ClaimInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+	], ["amount", getU64Decoder()]]);
 }
 
-export type ClaimInput<TAccountBeneficiary extends string = string, TAccountMint extends string = string, TAccountVestingState extends string = string, TAccountBeneficiaryAta extends string = string, TAccountVault extends string = string, TAccountAssociatedTokenProgram extends string = string, TAccountSystemProgram extends string = string, TAccountTokenProgram extends string = string> =  {
-  beneficiary: TransactionSigner<TAccountBeneficiary>;
-mint: Address<TAccountMint>;
-vestingState: Address<TAccountVestingState>;
-beneficiaryAta: Address<TAccountBeneficiaryAta>;
-vault: Address<TAccountVault>;
-associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-systemProgram?: Address<TAccountSystemProgram>;
-tokenProgram: Address<TAccountTokenProgram>;
-amount: ClaimInstructionDataArgs["amount"];
+export function getClaimInstructionDataCodec(): FixedSizeCodec<
+	ClaimInstructionDataArgs,
+	ClaimInstructionData
+> {
+	return combineCodec(
+		getClaimInstructionDataEncoder(),
+		getClaimInstructionDataDecoder(),
+	);
 }
 
-export function getClaimInstruction<TAccountBeneficiary extends string, TAccountMint extends string, TAccountVestingState extends string, TAccountBeneficiaryAta extends string, TAccountVault extends string, TAccountAssociatedTokenProgram extends string, TAccountSystemProgram extends string, TAccountTokenProgram extends string, TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS>(input: ClaimInput<TAccountBeneficiary, TAccountMint, TAccountVestingState, TAccountBeneficiaryAta, TAccountVault, TAccountAssociatedTokenProgram, TAccountSystemProgram, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): ClaimInstruction<TProgramAddress, TAccountBeneficiary, TAccountMint, TAccountVestingState, TAccountBeneficiaryAta, TAccountVault, TAccountAssociatedTokenProgram, TAccountSystemProgram, TAccountTokenProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? VESTING_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { beneficiary: { value: input.beneficiary ?? null, isWritable: true }, mint: { value: input.mint ?? null, isWritable: false }, vestingState: { value: input.vestingState ?? null, isWritable: true }, beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true }, vault: { value: input.vault ?? null, isWritable: true }, associatedTokenProgram: { value: input.associatedTokenProgram ?? null, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isWritable: false }, tokenProgram: { value: input.tokenProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.associatedTokenProgram.value) {
-accounts.associatedTokenProgram.value = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
-}
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("beneficiary", accounts.beneficiary), getAccountMeta("mint", accounts.mint), getAccountMeta("vestingState", accounts.vestingState), getAccountMeta("beneficiaryAta", accounts.beneficiaryAta), getAccountMeta("vault", accounts.vault), getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram), getAccountMeta("systemProgram", accounts.systemProgram), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getClaimInstructionDataEncoder().encode(args as ClaimInstructionDataArgs), programAddress } as ClaimInstruction<TProgramAddress, TAccountBeneficiary, TAccountMint, TAccountVestingState, TAccountBeneficiaryAta, TAccountVault, TAccountAssociatedTokenProgram, TAccountSystemProgram, TAccountTokenProgram>);
-}
-
-export type ParsedClaimInstruction<TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-beneficiary: TAccountMetas[0];
-mint: TAccountMetas[1];
-vestingState: TAccountMetas[2];
-beneficiaryAta: TAccountMetas[3];
-vault: TAccountMetas[4];
-associatedTokenProgram: TAccountMetas[5];
-systemProgram: TAccountMetas[6];
-tokenProgram: TAccountMetas[7];
+export type ClaimInput<
+	TAccountBeneficiary extends string = string,
+	TAccountMint extends string = string,
+	TAccountVestingState extends string = string,
+	TAccountBeneficiaryAta extends string = string,
+	TAccountVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
+	TAccountSystemProgram extends string = string,
+	TAccountTokenProgram extends string = string,
+> = {
+	beneficiary: TransactionSigner<TAccountBeneficiary>;
+	mint: Address<TAccountMint>;
+	vestingState: Address<TAccountVestingState>;
+	beneficiaryAta: Address<TAccountBeneficiaryAta>;
+	vault: Address<TAccountVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	tokenProgram: Address<TAccountTokenProgram>;
+	amount: ClaimInstructionDataArgs["amount"];
 };
-data: ClaimInstructionData; };
 
-export function parseClaimInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedClaimInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 8 });
+export function getClaimInstruction<
+	TAccountBeneficiary extends string,
+	TAccountMint extends string,
+	TAccountVestingState extends string,
+	TAccountBeneficiaryAta extends string,
+	TAccountVault extends string,
+	TAccountAssociatedTokenProgram extends string,
+	TAccountSystemProgram extends string,
+	TAccountTokenProgram extends string,
+	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ClaimInput<
+		TAccountBeneficiary,
+		TAccountMint,
+		TAccountVestingState,
+		TAccountBeneficiaryAta,
+		TAccountVault,
+		TAccountAssociatedTokenProgram,
+		TAccountSystemProgram,
+		TAccountTokenProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): ClaimInstruction<
+	TProgramAddress,
+	TAccountBeneficiary,
+	TAccountMint,
+	TAccountVestingState,
+	TAccountBeneficiaryAta,
+	TAccountVault,
+	TAccountAssociatedTokenProgram,
+	TAccountSystemProgram,
+	TAccountTokenProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VESTING_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		beneficiary: { value: input.beneficiary ?? null, isWritable: true },
+		mint: { value: input.mint ?? null, isWritable: false },
+		vestingState: { value: input.vestingState ?? null, isWritable: true },
+		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true },
+		vault: { value: input.vault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("beneficiary", accounts.beneficiary),
+			getAccountMeta("mint", accounts.mint),
+			getAccountMeta("vestingState", accounts.vestingState),
+			getAccountMeta("beneficiaryAta", accounts.beneficiaryAta),
+			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("tokenProgram", accounts.tokenProgram),
+		],
+		data: getClaimInstructionDataEncoder().encode(
+			args as ClaimInstructionDataArgs,
+		),
+		programAddress,
+	} as ClaimInstruction<
+		TProgramAddress,
+		TAccountBeneficiary,
+		TAccountMint,
+		TAccountVestingState,
+		TAccountBeneficiaryAta,
+		TAccountVault,
+		TAccountAssociatedTokenProgram,
+		TAccountSystemProgram,
+		TAccountTokenProgram
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { beneficiary: getNextAccount(), mint: getNextAccount(), vestingState: getNextAccount(), beneficiaryAta: getNextAccount(), vault: getNextAccount(), associatedTokenProgram: getNextAccount(), systemProgram: getNextAccount(), tokenProgram: getNextAccount() }, data: getClaimInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedClaimInstruction<
+	TProgram extends string = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		beneficiary: TAccountMetas[0];
+		mint: TAccountMetas[1];
+		vestingState: TAccountMetas[2];
+		beneficiaryAta: TAccountMetas[3];
+		vault: TAccountMetas[4];
+		associatedTokenProgram: TAccountMetas[5];
+		systemProgram: TAccountMetas[6];
+		tokenProgram: TAccountMetas[7];
+	};
+	data: ClaimInstructionData;
+};
+
+export function parseClaimInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedClaimInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 8) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 8,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			beneficiary: getNextAccount(),
+			mint: getNextAccount(),
+			vestingState: getNextAccount(),
+			beneficiaryAta: getNextAccount(),
+			vault: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
+			systemProgram: getNextAccount(),
+			tokenProgram: getNextAccount(),
+		},
+		data: getClaimInstructionDataDecoder().decode(instruction.data),
+	};
 }

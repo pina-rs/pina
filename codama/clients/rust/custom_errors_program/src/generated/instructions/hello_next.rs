@@ -12,13 +12,11 @@ pub const HELLO_NEXT_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct HelloNext {
-}
+pub struct HelloNext {}
 
 impl HelloNext {
 	pub fn new() -> Self {
-		Self {
-		}
+		Self {}
 	}
 
 	pub fn instruction(&self, data: HelloNextInstructionData) -> solana_instruction::Instruction {
@@ -31,7 +29,7 @@ impl HelloNext {
 		data: HelloNextInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::CUSTOM_ERRORS_PROGRAM_ID,
@@ -47,14 +45,16 @@ pub struct HelloNextInstructionData {
 }
 
 impl HelloNextInstructionData {
-	pub fn new(configure: impl FnOnce(&mut HelloNextInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut HelloNextInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<HelloNextInstructionWireZc>()];
 		<HelloNextInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_NEXT_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

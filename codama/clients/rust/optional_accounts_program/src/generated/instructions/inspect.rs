@@ -41,18 +41,25 @@ impl Inspect {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		if let Some(store) = self.store {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(store, false));
-		}
-		else {
-			accounts.push(solana_instruction::AccountMeta::new_readonly(crate::OPTIONAL_ACCOUNTS_PROGRAM_ID, false));
+		} else {
+			accounts.push(solana_instruction::AccountMeta::new_readonly(
+				crate::OPTIONAL_ACCOUNTS_PROGRAM_ID,
+				false,
+			));
 		}
 		if let Some(witness) = self.witness {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(witness, true));
-		}
-		else {
-			accounts.push(solana_instruction::AccountMeta::new_readonly(crate::OPTIONAL_ACCOUNTS_PROGRAM_ID, false));
+		} else {
+			accounts.push(solana_instruction::AccountMeta::new_readonly(
+				crate::OPTIONAL_ACCOUNTS_PROGRAM_ID,
+				false,
+			));
 		}
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
@@ -69,14 +76,16 @@ pub struct InspectInstructionData {
 }
 
 impl InspectInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InspectInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InspectInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InspectInstructionWireZc>()];
 		<InspectInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INSPECT_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

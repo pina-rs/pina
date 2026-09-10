@@ -6,75 +6,199 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROTATE_AUTHORITY_DISCRIMINATOR = 2;
 
-export function getRotateAuthorityDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ROTATE_AUTHORITY_DISCRIMINATOR); }
-
-export type RotateAuthorityInstruction<TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS, TAccountOracle extends string | AccountMeta<string> = string, TAccountAuthority extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountOracle extends string ? WritableAccount<TAccountOracle> : TAccountOracle, TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, ...TRemainingAccounts]>;
-
-export type RotateAuthorityInstructionData = { discriminator: number; newAuthority: Address;  };
-
-export type RotateAuthorityInstructionDataArgs = { newAuthority: Address;  };
-
-export function getRotateAuthorityInstructionDataEncoder(): FixedSizeEncoder<RotateAuthorityInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['newAuthority', getAddressEncoder()]]), (value) => ({ ...value, discriminator: 2 }));
+export function getRotateAuthorityDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ROTATE_AUTHORITY_DISCRIMINATOR);
 }
 
-export function getRotateAuthorityInstructionDataDecoder(): FixedSizeDecoder<RotateAuthorityInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ROTATE_AUTHORITY_DISCRIMINATOR, getU8Decoder())], ['newAuthority', getAddressDecoder()]]);
-}
+export type RotateAuthorityInstruction<
+	TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
+	TAccountOracle extends string | AccountMeta<string> = string,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountOracle extends string ? WritableAccount<TAccountOracle>
+				: TAccountOracle,
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getRotateAuthorityInstructionDataCodec(): FixedSizeCodec<RotateAuthorityInstructionDataArgs, RotateAuthorityInstructionData> {
-    return combineCodec(getRotateAuthorityInstructionDataEncoder(), getRotateAuthorityInstructionDataDecoder());
-}
-
-export type RotateAuthorityInput<TAccountOracle extends string = string, TAccountAuthority extends string = string> =  {
-  oracle: Address<TAccountOracle>;
-authority: TransactionSigner<TAccountAuthority>;
-newAuthority: RotateAuthorityInstructionDataArgs["newAuthority"];
-}
-
-export function getRotateAuthorityInstruction<TAccountOracle extends string, TAccountAuthority extends string, TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS>(input: RotateAuthorityInput<TAccountOracle, TAccountAuthority>, config?: { programAddress?: TProgramAddress } ): RotateAuthorityInstruction<TProgramAddress, TAccountOracle, TAccountAuthority> {
-  // Program address.
-const programAddress = config?.programAddress ?? PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { oracle: { value: input.oracle ?? null, isWritable: true }, authority: { value: input.authority ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("oracle", accounts.oracle), getAccountMeta("authority", accounts.authority)], data: getRotateAuthorityInstructionDataEncoder().encode(args as RotateAuthorityInstructionDataArgs), programAddress } as RotateAuthorityInstruction<TProgramAddress, TAccountOracle, TAccountAuthority>);
-}
-
-export type ParsedRotateAuthorityInstruction<TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-oracle: TAccountMetas[0];
-authority: TAccountMetas[1];
+export type RotateAuthorityInstructionData = {
+	discriminator: number;
+	newAuthority: Address;
 };
-data: RotateAuthorityInstructionData; };
 
-export function parseRotateAuthorityInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedRotateAuthorityInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export type RotateAuthorityInstructionDataArgs = { newAuthority: Address };
+
+export function getRotateAuthorityInstructionDataEncoder(): FixedSizeEncoder<
+	RotateAuthorityInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"newAuthority",
+			getAddressEncoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getRotateAuthorityInstructionDataDecoder(): FixedSizeDecoder<
+	RotateAuthorityInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			ROTATE_AUTHORITY_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["newAuthority", getAddressDecoder()]]);
 }
-  return { programAddress: instruction.programAddress, accounts: { oracle: getNextAccount(), authority: getNextAccount() }, data: getRotateAuthorityInstructionDataDecoder().decode(instruction.data) };
+
+export function getRotateAuthorityInstructionDataCodec(): FixedSizeCodec<
+	RotateAuthorityInstructionDataArgs,
+	RotateAuthorityInstructionData
+> {
+	return combineCodec(
+		getRotateAuthorityInstructionDataEncoder(),
+		getRotateAuthorityInstructionDataDecoder(),
+	);
+}
+
+export type RotateAuthorityInput<
+	TAccountOracle extends string = string,
+	TAccountAuthority extends string = string,
+> = {
+	oracle: Address<TAccountOracle>;
+	authority: TransactionSigner<TAccountAuthority>;
+	newAuthority: RotateAuthorityInstructionDataArgs["newAuthority"];
+};
+
+export function getRotateAuthorityInstruction<
+	TAccountOracle extends string,
+	TAccountAuthority extends string,
+	TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RotateAuthorityInput<TAccountOracle, TAccountAuthority>,
+	config?: { programAddress?: TProgramAddress },
+): RotateAuthorityInstruction<
+	TProgramAddress,
+	TAccountOracle,
+	TAccountAuthority
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		oracle: { value: input.oracle ?? null, isWritable: true },
+		authority: { value: input.authority ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("oracle", accounts.oracle),
+			getAccountMeta("authority", accounts.authority),
+		],
+		data: getRotateAuthorityInstructionDataEncoder().encode(
+			args as RotateAuthorityInstructionDataArgs,
+		),
+		programAddress,
+	} as RotateAuthorityInstruction<
+		TProgramAddress,
+		TAccountOracle,
+		TAccountAuthority
+	>);
+}
+
+export type ParsedRotateAuthorityInstruction<
+	TProgram extends string = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		oracle: TAccountMetas[0];
+		authority: TAccountMetas[1];
+	};
+	data: RotateAuthorityInstructionData;
+};
+
+export function parseRotateAuthorityInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRotateAuthorityInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { oracle: getNextAccount(), authority: getNextAccount() },
+		data: getRotateAuthorityInstructionDataDecoder().decode(instruction.data),
+	};
 }

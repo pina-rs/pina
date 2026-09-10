@@ -6,70 +6,185 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR = 2;
 
-export function getAllowsDuplicateReadonlyDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR); }
-
-export type AllowsDuplicateReadonlyInstruction<TProgram extends string = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountAccount1 extends string | AccountMeta<string> = string, TAccountAccount2 extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAccount1 extends string ? ReadonlyAccount<TAccountAccount1> : TAccountAccount1, TAccountAccount2 extends string ? ReadonlyAccount<TAccountAccount2> : TAccountAccount2, ...TRemainingAccounts]>;
-
-export type AllowsDuplicateReadonlyInstructionData = { discriminator: number;  };
-
-export type AllowsDuplicateReadonlyInstructionDataArgs = {  };
-
-export function getAllowsDuplicateReadonlyInstructionDataEncoder(): FixedSizeEncoder<AllowsDuplicateReadonlyInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2 }));
+export function getAllowsDuplicateReadonlyDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR);
 }
 
-export function getAllowsDuplicateReadonlyInstructionDataDecoder(): FixedSizeDecoder<AllowsDuplicateReadonlyInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR, getU8Decoder())]]);
+export type AllowsDuplicateReadonlyInstruction<
+	TProgram extends string =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAccount1 extends string | AccountMeta<string> = string,
+	TAccountAccount2 extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAccount1 extends string ? ReadonlyAccount<TAccountAccount1>
+				: TAccountAccount1,
+			TAccountAccount2 extends string ? ReadonlyAccount<TAccountAccount2>
+				: TAccountAccount2,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type AllowsDuplicateReadonlyInstructionData = { discriminator: number };
+
+export type AllowsDuplicateReadonlyInstructionDataArgs = {};
+
+export function getAllowsDuplicateReadonlyInstructionDataEncoder(): FixedSizeEncoder<
+	AllowsDuplicateReadonlyInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
 
-export function getAllowsDuplicateReadonlyInstructionDataCodec(): FixedSizeCodec<AllowsDuplicateReadonlyInstructionDataArgs, AllowsDuplicateReadonlyInstructionData> {
-    return combineCodec(getAllowsDuplicateReadonlyInstructionDataEncoder(), getAllowsDuplicateReadonlyInstructionDataDecoder());
+export function getAllowsDuplicateReadonlyInstructionDataDecoder(): FixedSizeDecoder<
+	AllowsDuplicateReadonlyInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
-export type AllowsDuplicateReadonlyInput<TAccountAccount1 extends string = string, TAccountAccount2 extends string = string> =  {
-  account1: Address<TAccountAccount1>;
-account2: Address<TAccountAccount2>;
+export function getAllowsDuplicateReadonlyInstructionDataCodec(): FixedSizeCodec<
+	AllowsDuplicateReadonlyInstructionDataArgs,
+	AllowsDuplicateReadonlyInstructionData
+> {
+	return combineCodec(
+		getAllowsDuplicateReadonlyInstructionDataEncoder(),
+		getAllowsDuplicateReadonlyInstructionDataDecoder(),
+	);
 }
 
-export function getAllowsDuplicateReadonlyInstruction<TAccountAccount1 extends string, TAccountAccount2 extends string, TProgramAddress extends Address = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS>(input: AllowsDuplicateReadonlyInput<TAccountAccount1, TAccountAccount2>, config?: { programAddress?: TProgramAddress } ): AllowsDuplicateReadonlyInstruction<TProgramAddress, TAccountAccount1, TAccountAccount2> {
-  // Program address.
-const programAddress = config?.programAddress ?? DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { account1: { value: input.account1 ?? null, isWritable: false }, account2: { value: input.account2 ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("account1", accounts.account1), getAccountMeta("account2", accounts.account2)], data: getAllowsDuplicateReadonlyInstructionDataEncoder().encode({}), programAddress } as AllowsDuplicateReadonlyInstruction<TProgramAddress, TAccountAccount1, TAccountAccount2>);
-}
-
-export type ParsedAllowsDuplicateReadonlyInstruction<TProgram extends string = typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-account1: TAccountMetas[0];
-account2: TAccountMetas[1];
+export type AllowsDuplicateReadonlyInput<
+	TAccountAccount1 extends string = string,
+	TAccountAccount2 extends string = string,
+> = {
+	account1: Address<TAccountAccount1>;
+	account2: Address<TAccountAccount2>;
 };
-data: AllowsDuplicateReadonlyInstructionData; };
 
-export function parseAllowsDuplicateReadonlyInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedAllowsDuplicateReadonlyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export function getAllowsDuplicateReadonlyInstruction<
+	TAccountAccount1 extends string,
+	TAccountAccount2 extends string,
+	TProgramAddress extends Address =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: AllowsDuplicateReadonlyInput<TAccountAccount1, TAccountAccount2>,
+	config?: { programAddress?: TProgramAddress },
+): AllowsDuplicateReadonlyInstruction<
+	TProgramAddress,
+	TAccountAccount1,
+	TAccountAccount2
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		account1: { value: input.account1 ?? null, isWritable: false },
+		account2: { value: input.account2 ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("account1", accounts.account1),
+			getAccountMeta("account2", accounts.account2),
+		],
+		data: getAllowsDuplicateReadonlyInstructionDataEncoder().encode({}),
+		programAddress,
+	} as AllowsDuplicateReadonlyInstruction<
+		TProgramAddress,
+		TAccountAccount1,
+		TAccountAccount2
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { account1: getNextAccount(), account2: getNextAccount() }, data: getAllowsDuplicateReadonlyInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedAllowsDuplicateReadonlyInstruction<
+	TProgram extends string =
+		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		account1: TAccountMetas[0];
+		account2: TAccountMetas[1];
+	};
+	data: AllowsDuplicateReadonlyInstructionData;
+};
+
+export function parseAllowsDuplicateReadonlyInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAllowsDuplicateReadonlyInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { account1: getNextAccount(), account2: getNextAccount() },
+		data: getAllowsDuplicateReadonlyInstructionDataDecoder().decode(
+			instruction.data,
+		),
+	};
 }

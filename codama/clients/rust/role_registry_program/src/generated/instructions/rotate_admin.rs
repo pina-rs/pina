@@ -19,7 +19,11 @@ pub struct RotateAdmin {
 }
 
 impl RotateAdmin {
-	pub fn new(admin: solana_pubkey::Pubkey, new_admin: solana_pubkey::Pubkey, registry_config: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		new_admin: solana_pubkey::Pubkey,
+		registry_config: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			admin,
 			new_admin,
@@ -38,9 +42,17 @@ impl RotateAdmin {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.new_admin, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.registry_config, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.new_admin,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.registry_config,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::ROLE_REGISTRY_PROGRAM_ID,
@@ -56,14 +68,16 @@ pub struct RotateAdminInstructionData {
 }
 
 impl RotateAdminInstructionData {
-	pub fn new(configure: impl FnOnce(&mut RotateAdminInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut RotateAdminInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<RotateAdminInstructionWireZc>()];
 		<RotateAdminInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ROTATE_ADMIN_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

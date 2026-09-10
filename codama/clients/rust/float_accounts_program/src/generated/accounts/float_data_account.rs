@@ -37,7 +37,9 @@ impl FloatDataAccount {
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&FloatDataAccountZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(
+		data: &[u8],
+	) -> Result<&FloatDataAccountZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {
@@ -46,7 +48,9 @@ impl FloatDataAccount {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut FloatDataAccountZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut FloatDataAccountZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {

@@ -6,8 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT = 0x0; // 0
 export const STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED = 0x1; // 1
@@ -15,25 +20,54 @@ export const STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE = 0x2; // 2
 export const STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED = 0x3; // 3
 export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL = 0x4; // 4
 
-export type StakingRewardsProgramError = typeof STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE | typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT | typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL | typeof STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED | typeof STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED;
+export type StakingRewardsProgramError =
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED;
 
-let stakingRewardsProgramErrorMessages: Record<StakingRewardsProgramError, string> | undefined;
-if (process.env['NODE_ENV'] !== 'production') {
-  stakingRewardsProgramErrorMessages = { [STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE]: ``, [STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT]: ``, [STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL]: ``, [STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]: ``, [STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]: `` };
+let stakingRewardsProgramErrorMessages:
+	| Record<StakingRewardsProgramError, string>
+	| undefined;
+if (process.env["NODE_ENV"] !== "production") {
+	stakingRewardsProgramErrorMessages = {
+		[STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE]: ``,
+		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT]: ``,
+		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL]: ``,
+		[STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]: ``,
+		[STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]: ``,
+	};
 }
 
-export function getStakingRewardsProgramErrorMessage(code: StakingRewardsProgramError): string {
-  if (process.env['NODE_ENV'] !== 'production') {
-    return (stakingRewardsProgramErrorMessages as Record<StakingRewardsProgramError, string>)[code];
-  }
+export function getStakingRewardsProgramErrorMessage(
+	code: StakingRewardsProgramError,
+): string {
+	if (process.env["NODE_ENV"] !== "production") {
+		return (stakingRewardsProgramErrorMessages as Record<
+			StakingRewardsProgramError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isStakingRewardsProgramError<TProgramErrorCode extends StakingRewardsProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, code);
+export function isStakingRewardsProgramError<
+	TProgramErrorCode extends StakingRewardsProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

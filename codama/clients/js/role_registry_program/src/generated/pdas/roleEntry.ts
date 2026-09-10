@@ -6,14 +6,35 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getU64Encoder, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getU64Encoder,
+	getUtf8Encoder,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type RoleEntrySeeds = {
-registry: Address;
-roleId: number | bigint;
+	registry: Address;
+	roleId: number | bigint;
 };
 
-export async function findRoleEntryPda(seeds: RoleEntrySeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress = '3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX' as Address<'3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX'> } = config;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("role-entry"), getAddressEncoder().encode(seeds.registry), getU64Encoder().encode(seeds.roleId)]});
+export async function findRoleEntryPda(
+	seeds: RoleEntrySeeds,
+	config: { programAddress?: Address | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress = "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX" as Address<
+			"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX"
+		>,
+	} = config;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("role-entry"),
+			getAddressEncoder().encode(seeds.registry),
+			getU64Encoder().encode(seeds.roleId),
+		],
+	});
 }

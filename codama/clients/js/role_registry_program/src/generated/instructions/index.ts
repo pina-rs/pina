@@ -6,8 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './addRole';
-export * from './deactivateRole';
-export * from './initialize';
-export * from './rotateAdmin';
-export * from './updateRole';
+export * from "./addRole";
+export * from "./deactivateRole";
+export * from "./initialize";
+export * from "./rotateAdmin";
+export * from "./updateRole";

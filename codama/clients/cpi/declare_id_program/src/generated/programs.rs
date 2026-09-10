@@ -11,7 +11,8 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
-pub const DECLARE_ID_PROGRAM_ID: Address = pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+pub const DECLARE_ID_PROGRAM_ID: Address =
+	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 /// Marker for the `declareIdProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]

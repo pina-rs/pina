@@ -6,72 +6,204 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROTATE_ADMIN_DISCRIMINATOR = 4;
 
-export function getRotateAdminDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ROTATE_ADMIN_DISCRIMINATOR); }
-
-export type RotateAdminInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountNewAdmin extends string | AccountMeta<string> = string, TAccountRegistryConfig extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? ReadonlySignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountNewAdmin extends string ? ReadonlyAccount<TAccountNewAdmin> : TAccountNewAdmin, TAccountRegistryConfig extends string ? WritableAccount<TAccountRegistryConfig> : TAccountRegistryConfig, ...TRemainingAccounts]>;
-
-export type RotateAdminInstructionData = { discriminator: number;  };
-
-export type RotateAdminInstructionDataArgs = {  };
-
-export function getRotateAdminInstructionDataEncoder(): FixedSizeEncoder<RotateAdminInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 4 }));
+export function getRotateAdminDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ROTATE_ADMIN_DISCRIMINATOR);
 }
 
-export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<RotateAdminInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder())]]);
+export type RotateAdminInstruction<
+	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAdmin extends string | AccountMeta<string> = string,
+	TAccountNewAdmin extends string | AccountMeta<string> = string,
+	TAccountRegistryConfig extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAdmin extends string ?
+					& ReadonlySignerAccount<TAccountAdmin>
+					& AccountSignerMeta<TAccountAdmin>
+				: TAccountAdmin,
+			TAccountNewAdmin extends string ? ReadonlyAccount<TAccountNewAdmin>
+				: TAccountNewAdmin,
+			TAccountRegistryConfig extends string
+				? WritableAccount<TAccountRegistryConfig>
+				: TAccountRegistryConfig,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type RotateAdminInstructionData = { discriminator: number };
+
+export type RotateAdminInstructionDataArgs = {};
+
+export function getRotateAdminInstructionDataEncoder(): FixedSizeEncoder<
+	RotateAdminInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4 }),
+	);
 }
 
-export function getRotateAdminInstructionDataCodec(): FixedSizeCodec<RotateAdminInstructionDataArgs, RotateAdminInstructionData> {
-    return combineCodec(getRotateAdminInstructionDataEncoder(), getRotateAdminInstructionDataDecoder());
+export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<
+	RotateAdminInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type RotateAdminInput<TAccountAdmin extends string = string, TAccountNewAdmin extends string = string, TAccountRegistryConfig extends string = string> =  {
-  admin: TransactionSigner<TAccountAdmin>;
-newAdmin: Address<TAccountNewAdmin>;
-registryConfig: Address<TAccountRegistryConfig>;
+export function getRotateAdminInstructionDataCodec(): FixedSizeCodec<
+	RotateAdminInstructionDataArgs,
+	RotateAdminInstructionData
+> {
+	return combineCodec(
+		getRotateAdminInstructionDataEncoder(),
+		getRotateAdminInstructionDataDecoder(),
+	);
 }
 
-export function getRotateAdminInstruction<TAccountAdmin extends string, TAccountNewAdmin extends string, TAccountRegistryConfig extends string, TProgramAddress extends Address = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS>(input: RotateAdminInput<TAccountAdmin, TAccountNewAdmin, TAccountRegistryConfig>, config?: { programAddress?: TProgramAddress } ): RotateAdminInstruction<TProgramAddress, TAccountAdmin, TAccountNewAdmin, TAccountRegistryConfig> {
-  // Program address.
-const programAddress = config?.programAddress ?? ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isWritable: false }, newAdmin: { value: input.newAdmin ?? null, isWritable: false }, registryConfig: { value: input.registryConfig ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("newAdmin", accounts.newAdmin), getAccountMeta("registryConfig", accounts.registryConfig)], data: getRotateAdminInstructionDataEncoder().encode({}), programAddress } as RotateAdminInstruction<TProgramAddress, TAccountAdmin, TAccountNewAdmin, TAccountRegistryConfig>);
-}
-
-export type ParsedRotateAdminInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-admin: TAccountMetas[0];
-newAdmin: TAccountMetas[1];
-registryConfig: TAccountMetas[2];
+export type RotateAdminInput<
+	TAccountAdmin extends string = string,
+	TAccountNewAdmin extends string = string,
+	TAccountRegistryConfig extends string = string,
+> = {
+	admin: TransactionSigner<TAccountAdmin>;
+	newAdmin: Address<TAccountNewAdmin>;
+	registryConfig: Address<TAccountRegistryConfig>;
 };
-data: RotateAdminInstructionData; };
 
-export function parseRotateAdminInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedRotateAdminInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export function getRotateAdminInstruction<
+	TAccountAdmin extends string,
+	TAccountNewAdmin extends string,
+	TAccountRegistryConfig extends string,
+	TProgramAddress extends Address =
+		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RotateAdminInput<
+		TAccountAdmin,
+		TAccountNewAdmin,
+		TAccountRegistryConfig
+	>,
+	config?: { programAddress?: TProgramAddress },
+): RotateAdminInstruction<
+	TProgramAddress,
+	TAccountAdmin,
+	TAccountNewAdmin,
+	TAccountRegistryConfig
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		admin: { value: input.admin ?? null, isWritable: false },
+		newAdmin: { value: input.newAdmin ?? null, isWritable: false },
+		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("admin", accounts.admin),
+			getAccountMeta("newAdmin", accounts.newAdmin),
+			getAccountMeta("registryConfig", accounts.registryConfig),
+		],
+		data: getRotateAdminInstructionDataEncoder().encode({}),
+		programAddress,
+	} as RotateAdminInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountNewAdmin,
+		TAccountRegistryConfig
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), newAdmin: getNextAccount(), registryConfig: getNextAccount() }, data: getRotateAdminInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedRotateAdminInstruction<
+	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		admin: TAccountMetas[0];
+		newAdmin: TAccountMetas[1];
+		registryConfig: TAccountMetas[2];
+	};
+	data: RotateAdminInstructionData;
+};
+
+export function parseRotateAdminInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRotateAdminInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			admin: getNextAccount(),
+			newAdmin: getNextAccount(),
+			registryConfig: getNextAccount(),
+		},
+		data: getRotateAdminInstructionDataDecoder().decode(instruction.data),
+	};
 }

@@ -6,7 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './initialize';
-export * from './rename';
-export * from './resize';
-export * from './write';
+export * from "./initialize";
+export * from "./rename";
+export * from "./resize";
+export * from "./write";

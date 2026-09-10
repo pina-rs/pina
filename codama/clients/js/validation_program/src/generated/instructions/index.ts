@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './checkPolicy';
-export * from './initializePolicy';
+export * from "./checkPolicy";
+export * from "./initializePolicy";

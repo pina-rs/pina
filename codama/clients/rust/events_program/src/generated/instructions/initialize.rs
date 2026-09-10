@@ -12,13 +12,11 @@ pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct Initialize {
-}
+pub struct Initialize {}
 
 impl Initialize {
 	pub fn new() -> Self {
-		Self {
-		}
+		Self {}
 	}
 
 	pub fn instruction(&self, data: InitializeInstructionData) -> solana_instruction::Instruction {
@@ -31,7 +29,7 @@ impl Initialize {
 		data: InitializeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::EVENTS_PROGRAM_ID,
@@ -47,14 +45,16 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InitializeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

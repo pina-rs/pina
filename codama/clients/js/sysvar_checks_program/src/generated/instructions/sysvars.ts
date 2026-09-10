@@ -6,72 +6,194 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const SYSVARS_DISCRIMINATOR = 0;
 
-export function getSysvarsDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(SYSVARS_DISCRIMINATOR); }
-
-export type SysvarsInstruction<TProgram extends string = typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS, TAccountClock extends string | AccountMeta<string> = string, TAccountRent extends string | AccountMeta<string> = string, TAccountStakeHistory extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountClock extends string ? ReadonlyAccount<TAccountClock> : TAccountClock, TAccountRent extends string ? ReadonlyAccount<TAccountRent> : TAccountRent, TAccountStakeHistory extends string ? ReadonlyAccount<TAccountStakeHistory> : TAccountStakeHistory, ...TRemainingAccounts]>;
-
-export type SysvarsInstructionData = { discriminator: number;  };
-
-export type SysvarsInstructionDataArgs = {  };
-
-export function getSysvarsInstructionDataEncoder(): FixedSizeEncoder<SysvarsInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
+export function getSysvarsDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(SYSVARS_DISCRIMINATOR);
 }
 
-export function getSysvarsInstructionDataDecoder(): FixedSizeDecoder<SysvarsInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(SYSVARS_DISCRIMINATOR, getU8Decoder())]]);
+export type SysvarsInstruction<
+	TProgram extends string = typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountClock extends string | AccountMeta<string> = string,
+	TAccountRent extends string | AccountMeta<string> = string,
+	TAccountStakeHistory extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
+			TAccountRent extends string ? ReadonlyAccount<TAccountRent>
+				: TAccountRent,
+			TAccountStakeHistory extends string
+				? ReadonlyAccount<TAccountStakeHistory>
+				: TAccountStakeHistory,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type SysvarsInstructionData = { discriminator: number };
+
+export type SysvarsInstructionDataArgs = {};
+
+export function getSysvarsInstructionDataEncoder(): FixedSizeEncoder<
+	SysvarsInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
-export function getSysvarsInstructionDataCodec(): FixedSizeCodec<SysvarsInstructionDataArgs, SysvarsInstructionData> {
-    return combineCodec(getSysvarsInstructionDataEncoder(), getSysvarsInstructionDataDecoder());
+export function getSysvarsInstructionDataDecoder(): FixedSizeDecoder<
+	SysvarsInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(SYSVARS_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type SysvarsInput<TAccountClock extends string = string, TAccountRent extends string = string, TAccountStakeHistory extends string = string> =  {
-  clock: Address<TAccountClock>;
-rent: Address<TAccountRent>;
-stakeHistory: Address<TAccountStakeHistory>;
+export function getSysvarsInstructionDataCodec(): FixedSizeCodec<
+	SysvarsInstructionDataArgs,
+	SysvarsInstructionData
+> {
+	return combineCodec(
+		getSysvarsInstructionDataEncoder(),
+		getSysvarsInstructionDataDecoder(),
+	);
 }
 
-export function getSysvarsInstruction<TAccountClock extends string, TAccountRent extends string, TAccountStakeHistory extends string, TProgramAddress extends Address = typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS>(input: SysvarsInput<TAccountClock, TAccountRent, TAccountStakeHistory>, config?: { programAddress?: TProgramAddress } ): SysvarsInstruction<TProgramAddress, TAccountClock, TAccountRent, TAccountStakeHistory> {
-  // Program address.
-const programAddress = config?.programAddress ?? SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { clock: { value: input.clock ?? null, isWritable: false }, rent: { value: input.rent ?? null, isWritable: false }, stakeHistory: { value: input.stakeHistory ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("clock", accounts.clock), getAccountMeta("rent", accounts.rent), getAccountMeta("stakeHistory", accounts.stakeHistory)], data: getSysvarsInstructionDataEncoder().encode({}), programAddress } as SysvarsInstruction<TProgramAddress, TAccountClock, TAccountRent, TAccountStakeHistory>);
-}
-
-export type ParsedSysvarsInstruction<TProgram extends string = typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-clock: TAccountMetas[0];
-rent: TAccountMetas[1];
-stakeHistory: TAccountMetas[2];
+export type SysvarsInput<
+	TAccountClock extends string = string,
+	TAccountRent extends string = string,
+	TAccountStakeHistory extends string = string,
+> = {
+	clock: Address<TAccountClock>;
+	rent: Address<TAccountRent>;
+	stakeHistory: Address<TAccountStakeHistory>;
 };
-data: SysvarsInstructionData; };
 
-export function parseSysvarsInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedSysvarsInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export function getSysvarsInstruction<
+	TAccountClock extends string,
+	TAccountRent extends string,
+	TAccountStakeHistory extends string,
+	TProgramAddress extends Address =
+		typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: SysvarsInput<TAccountClock, TAccountRent, TAccountStakeHistory>,
+	config?: { programAddress?: TProgramAddress },
+): SysvarsInstruction<
+	TProgramAddress,
+	TAccountClock,
+	TAccountRent,
+	TAccountStakeHistory
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		clock: { value: input.clock ?? null, isWritable: false },
+		rent: { value: input.rent ?? null, isWritable: false },
+		stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("clock", accounts.clock),
+			getAccountMeta("rent", accounts.rent),
+			getAccountMeta("stakeHistory", accounts.stakeHistory),
+		],
+		data: getSysvarsInstructionDataEncoder().encode({}),
+		programAddress,
+	} as SysvarsInstruction<
+		TProgramAddress,
+		TAccountClock,
+		TAccountRent,
+		TAccountStakeHistory
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { clock: getNextAccount(), rent: getNextAccount(), stakeHistory: getNextAccount() }, data: getSysvarsInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedSysvarsInstruction<
+	TProgram extends string = typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		clock: TAccountMetas[0];
+		rent: TAccountMetas[1];
+		stakeHistory: TAccountMetas[2];
+	};
+	data: SysvarsInstructionData;
+};
+
+export function parseSysvarsInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedSysvarsInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			clock: getNextAccount(),
+			rent: getNextAccount(),
+			stakeHistory: getNextAccount(),
+		},
+		data: getSysvarsInstructionDataDecoder().decode(instruction.data),
+	};
 }

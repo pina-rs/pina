@@ -7,8 +7,8 @@
 	clippy::too_many_arguments
 )]
 
-pub(crate) mod r#initialize_policy;
 pub(crate) mod r#check_policy;
+pub(crate) mod r#initialize_policy;
 
-pub use self::r#initialize_policy::*;
 pub use self::r#check_policy::*;
+pub use self::r#initialize_policy::*;

@@ -19,7 +19,11 @@ pub struct Sysvars {
 }
 
 impl Sysvars {
-	pub fn new(clock: solana_pubkey::Pubkey, rent: solana_pubkey::Pubkey, stake_history: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		clock: solana_pubkey::Pubkey,
+		rent: solana_pubkey::Pubkey,
+		stake_history: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			clock,
 			rent,
@@ -38,9 +42,16 @@ impl Sysvars {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.clock, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.rent, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.stake_history, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.clock, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.rent, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.stake_history,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::SYSVAR_CHECKS_PROGRAM_ID,
@@ -56,14 +67,16 @@ pub struct SysvarsInstructionData {
 }
 
 impl SysvarsInstructionData {
-	pub fn new(configure: impl FnOnce(&mut SysvarsInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut SysvarsInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<SysvarsInstructionWireZc>()];
 		<SysvarsInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = SYSVARS_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

@@ -6,104 +6,252 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findTodoPda } from '../pdas';
-import { TODO_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findTodoPda } from "../pdas";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
+import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DIGEST_DISCRIMINATOR = 2;
 
-export function getUpdateDigestDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(UPDATE_DIGEST_DISCRIMINATOR); }
-
-export type UpdateDigestInstruction<TProgram extends string = typeof TODO_PROGRAM_PROGRAM_ADDRESS, TAccountOwner extends string | AccountMeta<string> = string, TAccountTodo extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountOwner extends string ? ReadonlySignerAccount<TAccountOwner> & AccountSignerMeta<TAccountOwner> : TAccountOwner, TAccountTodo extends string ? WritableAccount<TAccountTodo> : TAccountTodo, ...TRemainingAccounts]>;
-
-export type UpdateDigestInstructionData = { discriminator: number; digest: ReadonlyUint8Array;  };
-
-export type UpdateDigestInstructionDataArgs = { digest: ReadonlyUint8Array;  };
-
-export function getUpdateDigestInstructionDataEncoder(): FixedSizeEncoder<UpdateDigestInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['digest', fixPinaPodEncoderSize(getBytesEncoder(), 32)]]), (value) => ({ ...value, discriminator: 2 }));
+export function getUpdateDigestDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(UPDATE_DIGEST_DISCRIMINATOR);
 }
 
-export function getUpdateDigestInstructionDataDecoder(): FixedSizeDecoder<UpdateDigestInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(UPDATE_DIGEST_DISCRIMINATOR, getU8Decoder())], ['digest', fixDecoderSize(getBytesDecoder(), 32)]]);
-}
+export type UpdateDigestInstruction<
+	TProgram extends string = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+	TAccountOwner extends string | AccountMeta<string> = string,
+	TAccountTodo extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountOwner extends string ?
+					& ReadonlySignerAccount<TAccountOwner>
+					& AccountSignerMeta<TAccountOwner>
+				: TAccountOwner,
+			TAccountTodo extends string ? WritableAccount<TAccountTodo>
+				: TAccountTodo,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<UpdateDigestInstructionDataArgs, UpdateDigestInstructionData> {
-    return combineCodec(getUpdateDigestInstructionDataEncoder(), getUpdateDigestInstructionDataDecoder());
-}
-
-export type UpdateDigestAsyncInput<TAccountOwner extends string = string, TAccountTodo extends string = string> =  {
-  owner: TransactionSigner<TAccountOwner>;
-todo?: Address<TAccountTodo>;
-digest: UpdateDigestInstructionDataArgs["digest"];
-}
-
-export async function getUpdateDigestInstructionAsync<TAccountOwner extends string, TAccountTodo extends string, TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS>(input: UpdateDigestAsyncInput<TAccountOwner, TAccountTodo>, config?: { programAddress?: TProgramAddress } ): Promise<UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>> {
-  // Program address.
-const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { owner: { value: input.owner ?? null, isWritable: false }, todo: { value: input.todo ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.todo.value) {
-accounts.todo.value = await findTodoPda({ owner: getAddressFromResolvedInstructionAccount("owner", accounts.owner.value) }, { programAddress });
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("owner", accounts.owner), getAccountMeta("todo", accounts.todo)], data: getUpdateDigestInstructionDataEncoder().encode(args as UpdateDigestInstructionDataArgs), programAddress } as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
-}
-
-export type UpdateDigestInput<TAccountOwner extends string = string, TAccountTodo extends string = string> =  {
-  owner: TransactionSigner<TAccountOwner>;
-todo: Address<TAccountTodo>;
-digest: UpdateDigestInstructionDataArgs["digest"];
-}
-
-export function getUpdateDigestInstruction<TAccountOwner extends string, TAccountTodo extends string, TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS>(input: UpdateDigestInput<TAccountOwner, TAccountTodo>, config?: { programAddress?: TProgramAddress } ): UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo> {
-  // Program address.
-const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { owner: { value: input.owner ?? null, isWritable: false }, todo: { value: input.todo ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("owner", accounts.owner), getAccountMeta("todo", accounts.todo)], data: getUpdateDigestInstructionDataEncoder().encode(args as UpdateDigestInstructionDataArgs), programAddress } as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
-}
-
-export type ParsedUpdateDigestInstruction<TProgram extends string = typeof TODO_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-owner: TAccountMetas[0];
-todo: TAccountMetas[1];
+export type UpdateDigestInstructionData = {
+	discriminator: number;
+	digest: ReadonlyUint8Array;
 };
-data: UpdateDigestInstructionData; };
 
-export function parseUpdateDigestInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedUpdateDigestInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export type UpdateDigestInstructionDataArgs = { digest: ReadonlyUint8Array };
+
+export function getUpdateDigestInstructionDataEncoder(): FixedSizeEncoder<
+	UpdateDigestInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"digest",
+			fixPinaPodEncoderSize(getBytesEncoder(), 32),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getUpdateDigestInstructionDataDecoder(): FixedSizeDecoder<
+	UpdateDigestInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(UPDATE_DIGEST_DISCRIMINATOR, getU8Decoder()),
+	], ["digest", fixDecoderSize(getBytesDecoder(), 32)]]);
 }
-  return { programAddress: instruction.programAddress, accounts: { owner: getNextAccount(), todo: getNextAccount() }, data: getUpdateDigestInstructionDataDecoder().decode(instruction.data) };
+
+export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<
+	UpdateDigestInstructionDataArgs,
+	UpdateDigestInstructionData
+> {
+	return combineCodec(
+		getUpdateDigestInstructionDataEncoder(),
+		getUpdateDigestInstructionDataDecoder(),
+	);
+}
+
+export type UpdateDigestAsyncInput<
+	TAccountOwner extends string = string,
+	TAccountTodo extends string = string,
+> = {
+	owner: TransactionSigner<TAccountOwner>;
+	todo?: Address<TAccountTodo>;
+	digest: UpdateDigestInstructionDataArgs["digest"];
+};
+
+export async function getUpdateDigestInstructionAsync<
+	TAccountOwner extends string,
+	TAccountTodo extends string,
+	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateDigestAsyncInput<TAccountOwner, TAccountTodo>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		owner: { value: input.owner ?? null, isWritable: false },
+		todo: { value: input.todo ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.todo.value) {
+		accounts.todo.value = await findTodoPda({
+			owner: getAddressFromResolvedInstructionAccount(
+				"owner",
+				accounts.owner.value,
+			),
+		}, { programAddress });
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+		],
+		data: getUpdateDigestInstructionDataEncoder().encode(
+			args as UpdateDigestInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
+}
+
+export type UpdateDigestInput<
+	TAccountOwner extends string = string,
+	TAccountTodo extends string = string,
+> = {
+	owner: TransactionSigner<TAccountOwner>;
+	todo: Address<TAccountTodo>;
+	digest: UpdateDigestInstructionDataArgs["digest"];
+};
+
+export function getUpdateDigestInstruction<
+	TAccountOwner extends string,
+	TAccountTodo extends string,
+	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateDigestInput<TAccountOwner, TAccountTodo>,
+	config?: { programAddress?: TProgramAddress },
+): UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo> {
+	// Program address.
+	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		owner: { value: input.owner ?? null, isWritable: false },
+		todo: { value: input.todo ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+		],
+		data: getUpdateDigestInstructionDataEncoder().encode(
+			args as UpdateDigestInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
+}
+
+export type ParsedUpdateDigestInstruction<
+	TProgram extends string = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		owner: TAccountMetas[0];
+		todo: TAccountMetas[1];
+	};
+	data: UpdateDigestInstructionData;
+};
+
+export function parseUpdateDigestInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedUpdateDigestInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { owner: getNextAccount(), todo: getNextAccount() },
+		data: getUpdateDigestInstructionDataDecoder().decode(instruction.data),
+	};
 }

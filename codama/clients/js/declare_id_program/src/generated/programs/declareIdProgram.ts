@@ -6,43 +6,116 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getInitializeInstruction, parseInitializeInstruction, type InitializeInput, type ParsedInitializeInstruction } from '../instructions';
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	extendClient,
+	type ExtendedClient,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getInitializeInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	parseInitializeInstruction,
+} from "../instructions";
 
-export const DECLARE_ID_PROGRAM_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const DECLARE_ID_PROGRAM_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;
 
-export enum DeclareIdProgramInstruction { Initialize }
-
-export function identifyDeclareIdProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): DeclareIdProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return DeclareIdProgramInstruction.Initialize; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "declareIdProgram" });
+export enum DeclareIdProgramInstruction {
+	Initialize,
 }
 
-export type ParsedDeclareIdProgramInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
-| { instructionType: DeclareIdProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
+export function identifyDeclareIdProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): DeclareIdProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return DeclareIdProgramInstruction.Initialize;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "declareIdProgram" },
+	);
+}
 
+export type ParsedDeclareIdProgramInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	& { instructionType: DeclareIdProgramInstruction.Initialize }
+	& ParsedInitializeInstruction<TProgram>;
 
-        export function parseDeclareIdProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedDeclareIdProgramInstruction<TProgram> {
-            const instructionType = identifyDeclareIdProgramInstruction(instruction);
-            switch (instructionType) {
-                case DeclareIdProgramInstruction.Initialize: { return { instructionType: DeclareIdProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "declareIdProgram" });
-            }
-        }
+export function parseDeclareIdProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedDeclareIdProgramInstruction<TProgram> {
+	const instructionType = identifyDeclareIdProgramInstruction(instruction);
+	switch (instructionType) {
+		case DeclareIdProgramInstruction.Initialize: {
+			return {
+				instructionType: DeclareIdProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "declareIdProgram",
+				},
+			);
+	}
+}
 
-export type DeclareIdProgramPlugin = { instructions: DeclareIdProgramPluginInstructions; identifyInstruction: typeof identifyDeclareIdProgramInstruction; parseInstruction: typeof parseDeclareIdProgramInstruction; }
+export type DeclareIdProgramPlugin = {
+	instructions: DeclareIdProgramPluginInstructions;
+	identifyInstruction: typeof identifyDeclareIdProgramInstruction;
+	parseInstruction: typeof parseDeclareIdProgramInstruction;
+};
 
-export type DeclareIdProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; }
+export type DeclareIdProgramPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type DeclareIdProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
+export type DeclareIdProgramPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function declareIdProgramProgram() {
-    return <T extends DeclareIdProgramPluginRequirements>(client: T): ExtendedClient<T, { declareIdProgram: DeclareIdProgramPlugin }> => {
-        return extendClient(client, { declareIdProgram: <DeclareIdProgramPlugin>{ instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) }, identifyInstruction: identifyDeclareIdProgramInstruction, parseInstruction: parseDeclareIdProgramInstruction } });
-    };
+	return <T extends DeclareIdProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { declareIdProgram: DeclareIdProgramPlugin }> => {
+		return extendClient(client, {
+			declareIdProgram: <DeclareIdProgramPlugin> {
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+				},
+				identifyInstruction: identifyDeclareIdProgramInstruction,
+				parseInstruction: parseDeclareIdProgramInstruction,
+			},
+		});
+	};
 }

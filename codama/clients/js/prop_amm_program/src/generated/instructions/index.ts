@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './initialize';
-export * from './rotateAuthority';
-export * from './update';
+export * from "./initialize";
+export * from "./rotateAuthority";
+export * from "./update";

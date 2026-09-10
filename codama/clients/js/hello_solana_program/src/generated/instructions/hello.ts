@@ -6,76 +6,169 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	transformEncoder,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
-export function getHelloDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(HELLO_DISCRIMINATOR); }
-
-export type HelloInstruction<TProgram extends string = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS, TAccountUser extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountUser extends string ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser> : TAccountUser, ...TRemainingAccounts]>;
-
-export type HelloInstructionData = { discriminator: number;  };
-
-export type HelloInstructionDataArgs = {  };
-
-export function getHelloInstructionDataEncoder(): FixedSizeEncoder<HelloInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()]]), (value) => ({ ...value, discriminator: 0 }));
+export function getHelloDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(HELLO_DISCRIMINATOR);
 }
 
-export function getHelloInstructionDataDecoder(): FixedSizeDecoder<HelloInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder())]]);
+export type HelloInstruction<
+	TProgram extends string = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS,
+	TAccountUser extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountUser extends string
+				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+				: TAccountUser,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type HelloInstructionData = { discriminator: number };
+
+export type HelloInstructionDataArgs = {};
+
+export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
+	HelloInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
-export function getHelloInstructionDataCodec(): FixedSizeCodec<HelloInstructionDataArgs, HelloInstructionData> {
-    return combineCodec(getHelloInstructionDataEncoder(), getHelloInstructionDataDecoder());
+export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
+	HelloInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
-export type HelloInput<TAccountUser extends string = string> =  {
-  /**
- * The user invoking the program. Must be a signer so we can trust the
- * address is authentic.
- */
-user: TransactionSigner<TAccountUser>;
+export function getHelloInstructionDataCodec(): FixedSizeCodec<
+	HelloInstructionDataArgs,
+	HelloInstructionData
+> {
+	return combineCodec(
+		getHelloInstructionDataEncoder(),
+		getHelloInstructionDataDecoder(),
+	);
 }
 
-export function getHelloInstruction<TAccountUser extends string, TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS>(input: HelloInput<TAccountUser>, config?: { programAddress?: TProgramAddress } ): HelloInstruction<TProgramAddress, TAccountUser> {
-  // Program address.
-const programAddress = config?.programAddress ?? HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { user: { value: input.user ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("user", accounts.user)], data: getHelloInstructionDataEncoder().encode({}), programAddress } as HelloInstruction<TProgramAddress, TAccountUser>);
-}
-
-export type ParsedHelloInstruction<TProgram extends string = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/**
- * The user invoking the program. Must be a signer so we can trust the
- * address is authentic.
- */
-user: TAccountMetas[0];
+export type HelloInput<TAccountUser extends string = string> = {
+	/**
+	 * The user invoking the program. Must be a signer so we can trust the
+	 * address is authentic.
+	 */
+	user: TransactionSigner<TAccountUser>;
 };
-data: HelloInstructionData; };
 
-export function parseHelloInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedHelloInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 1) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 1 });
+export function getHelloInstruction<
+	TAccountUser extends string,
+	TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: HelloInput<TAccountUser>,
+	config?: { programAddress?: TProgramAddress },
+): HelloInstruction<TProgramAddress, TAccountUser> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		user: { value: input.user ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze(
+		{
+			accounts: [getAccountMeta("user", accounts.user)],
+			data: getHelloInstructionDataEncoder().encode({}),
+			programAddress,
+		} as HelloInstruction<TProgramAddress, TAccountUser>,
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { user: getNextAccount() }, data: getHelloInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedHelloInstruction<
+	TProgram extends string = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/**
+		 * The user invoking the program. Must be a signer so we can trust the
+		 * address is authentic.
+		 */
+		user: TAccountMetas[0];
+	};
+	data: HelloInstructionData;
+};
+
+export function parseHelloInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedHelloInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 1) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 1,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { user: getNextAccount() },
+		data: getHelloInstructionDataDecoder().decode(instruction.data),
+	};
 }
