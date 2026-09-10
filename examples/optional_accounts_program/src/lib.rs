@@ -156,7 +156,6 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 		let seeds = StoreState::seeds(&authority_key);
 
 		self.authority.assert_signer()?;
-		self.store.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		CreateProgramAccountWithBump {

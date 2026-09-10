@@ -100,7 +100,7 @@ fn lint_forwards_configured_levels() {
 	let environment = fixture.lint_environment();
 	fs::write(
 		fixture.project.join("pina.toml"),
-		"[project]\nprogram = \".\"\n\n[lints]\nrequire_empty_before_init = \
+		"[project]\nprogram = \".\"\n\n[lints]\nrequire_writable_before_account_resize = \
 		 \"deny\"\ndeny_heap_allocations_in_onchain_instruction_handlers = \
 		 \"warn\"\nrequire_zeroed_before_close = \"allow\"\n",
 	)

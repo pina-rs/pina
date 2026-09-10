@@ -167,7 +167,6 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 			let args = CreatePdaInstruction::try_from_bytes(data)?;
 
 			self.payer.assert_signer()?.assert_writable()?;
-			self.state.assert_empty()?;
 			self.system_program.assert_address(&system::ID)?;
 			CreateProgramAccountWithBump {
 				account: self.state,

@@ -82,7 +82,6 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::require_canonical_instruction_dispatch_for_idl::REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL,
 	lints::require_checked_asset_arithmetic::REQUIRE_CHECKED_ASSET_ARITHMETIC,
 	lints::require_consistent_token_program::REQUIRE_CONSISTENT_TOKEN_PROGRAM,
-	lints::require_empty_before_init::REQUIRE_EMPTY_BEFORE_INIT,
 	lints::require_explicit_discriminators_and_seed_namespaces::REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 	lints::require_explicit_token_2022_extension_policy::REQUIRE_EXPLICIT_TOKEN_2022_EXTENSION_POLICY,
 	lints::require_idl_root_to_define_one_program_id::REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID,
@@ -106,7 +105,6 @@ pub const LINT_NAMES: &[&str] = &[
 	"require_canonical_instruction_dispatch_for_idl",
 	"require_checked_asset_arithmetic",
 	"require_consistent_token_program",
-	"require_empty_before_init",
 	"require_explicit_discriminators_and_seed_namespaces",
 	"require_explicit_token_2022_extension_policy",
 	"require_idl_root_to_define_one_program_id",
@@ -248,13 +246,6 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 			]);
 			lint_store.register_late_pass(|_| {
 				Box::new(lints::require_consistent_token_program::RequireConsistentTokenProgram)
-			});
-		}
-		"require_empty_before_init" => {
-			lint_store
-				.register_lints(&[lints::require_empty_before_init::REQUIRE_EMPTY_BEFORE_INIT]);
-			lint_store.register_late_pass(|_| {
-				Box::new(lints::require_empty_before_init::RequireEmptyBeforeInit)
 			});
 		}
 		"require_explicit_discriminators_and_seed_namespaces" => {

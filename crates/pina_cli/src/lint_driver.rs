@@ -417,8 +417,11 @@ mod tests {
 	#[test]
 	fn formats_lint_levels_for_the_driver_environment() {
 		assert_eq!(
-			format_lint_levels([("require_empty_before_init", "deny"), ("other", "allow")]),
-			"require_empty_before_init=deny,other=allow"
+			format_lint_levels([
+				("require_writable_before_account_resize", "deny"),
+				("other", "allow")
+			]),
+			"require_writable_before_account_resize=deny,other=allow"
 		);
 		assert_eq!(format_lint_levels(std::iter::empty::<(&str, &str)>()), "");
 	}

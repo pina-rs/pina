@@ -334,7 +334,8 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 /// # Errors
 ///
 /// Returns `InvalidSeeds` when `bump` is not canonical or `account` does not
-/// match the canonical address. It also returns allocation and system-program
+/// match the canonical address, and `AccountAlreadyInitialized` when the
+/// target storage is not zeroed. It also returns allocation and system-program
 /// CPI errors from the checked creation path.
 ///
 /// # Examples
@@ -443,6 +444,11 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
 		AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
@@ -466,9 +472,11 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 /// [`Self::invoke`] when the patch does not need it, or use
 /// [`Self::invoke_with_bump`] to construct a patch that stores the derived bump.
 ///
-/// Pina clears the new account data if initialization fails. With the
-/// `validation` feature, the generated account boundary runs application
-/// validation and clears the data before returning its error.
+/// Pina rejects a target whose storage holds any nonzero byte with
+/// `AccountAlreadyInitialized`, and clears the new account data if
+/// initialization fails. With the `validation` feature, the generated account
+/// boundary runs application validation and clears the data before returning
+/// its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed> {
@@ -594,9 +602,11 @@ impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 /// The builder derives the canonical PDA once and rejects a supplied bump that
 /// does not match it.
 ///
-/// Pina clears the new account data if initialization fails. With the
-/// `validation` feature, the generated account boundary runs application
-/// validation and clears the data before returning its error.
+/// Pina rejects a target whose storage holds any nonzero byte with
+/// `AccountAlreadyInitialized`, and clears the new account data if
+/// initialization fails. With the `validation` feature, the generated account
+/// boundary runs application validation and clears the data before returning
+/// its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed, P> {
@@ -661,6 +671,11 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
 		AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
@@ -2372,6 +2387,63 @@ mod tests {
 				.iter()
 				.all(|byte| *byte == 0)
 		);
+	}
+
+	#[test]
+	fn fixed_creation_builder_rejects_non_empty_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"occupied-state"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive occupied-state address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored_state = TestAccount::<32>::new(address, owner, 0, state_size);
+		stored_state.data[0] = TestState::VALUE;
+		let mut state = stored_state.view();
+
+		let result = CreateProgramAccountWithBump {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert_eq!(stored_state.data[0], TestState::VALUE);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_creation_builder_rejects_non_empty_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"occupied-compact"];
+		let (address, _) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive occupied-compact address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = TestCompactState::HEADER_SIZE;
+
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		stored_state.data[0] = 1;
+		let mut state = stored_state.view();
+
+		let result = CreateCompactProgramAccount {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(&[], test_rent(), |_| {
+			TestCompactStatePatch::new().value(7)
+		});
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert_eq!(stored_state.data[0], 1);
 	}
 
 	#[cfg(all(feature = "account-resize", feature = "compact"))]

@@ -291,7 +291,7 @@ CreateCompactProgramAccount {
 .invoke_with_bump::<Journal, _>(|bump| JournalPatch::new().bump(bump))?;
 ```
 
-Canonical PDA builders derive and validate the target address once and return `(Address, u8)`. Explicit-bump creation builders require the supplied bump to equal the canonical bump before moving lamports. Do not precede these builders with `assert_canonical_bump` or `assert_seeds_with_bump`; that repeats the derivation. Both forms automatically append the target PDA signer to additional signers supplied by the caller.
+Canonical PDA builders derive and validate the target address once and return `(Address, u8)`. Explicit-bump creation builders require the supplied bump to equal the canonical bump before moving lamports. Do not precede these builders with `assert_canonical_bump` or `assert_seeds_with_bump`; that repeats the derivation. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Typed creation builders reject a target whose storage holds any nonzero byte with `AccountAlreadyInitialized`, so do not precede them with a manual `assert_empty()` call.
 
 `AllocateAccountWithNonCanonicalBump` is the low-level compatibility path for an existing protocol that deliberately uses a valid noncanonical PDA. It allocates untyped bytes and does not initialize a Pina account. Prefer `AllocateAccount` for new namespaces.
 
