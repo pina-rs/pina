@@ -573,7 +573,7 @@ mod tests {
 		assert_eq!(report.status, ComparisonStatus::Unchanged);
 		assert!(!report.exceeds_threshold);
 		assert_eq!(report.totals.delta_cu, 0);
-		assert_eq!(report.totals.delta_percent, 0.0);
+		assert!(report.totals.delta_percent.abs() < f64::EPSILON);
 		assert_eq!(changed_function_count(&report), 0);
 		assert!(
 			report
@@ -700,7 +700,7 @@ mod tests {
 		assert_eq!(report.status, ComparisonStatus::ThresholdRegression);
 		assert!(report.exceeds_threshold);
 		assert_eq!(report.totals.delta_cu, 80);
-		assert_eq!(report.totals.delta_percent, 400.0);
+		assert!((report.totals.delta_percent - 400.0).abs() < f64::EPSILON);
 
 		let relaxed = RegressionThreshold {
 			delta_cu: 500,
@@ -722,11 +722,11 @@ mod tests {
 
 	#[test]
 	fn delta_percent_treats_a_zero_base_like_the_ci_policy() {
-		assert_eq!(delta_percent(0, 0), 0.0);
-		assert_eq!(delta_percent(0, 40), 100.0);
-		assert_eq!(delta_percent(20, 20), 0.0);
-		assert_eq!(delta_percent(20, 40), 100.0);
-		assert_eq!(delta_percent(40, 20), -50.0);
+		assert!(delta_percent(0, 0).abs() < f64::EPSILON);
+		assert!((delta_percent(0, 40) - 100.0).abs() < f64::EPSILON);
+		assert!(delta_percent(20, 20).abs() < f64::EPSILON);
+		assert!((delta_percent(20, 40) - 100.0).abs() < f64::EPSILON);
+		assert!((delta_percent(40, 20) + 50.0).abs() < f64::EPSILON);
 	}
 
 	#[test]
