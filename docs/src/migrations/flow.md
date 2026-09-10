@@ -1,0 +1,233 @@
+# How a migration flows
+
+This page is the map of the whole migration system: what happens when a developer changes a contract, what the program does at runtime, and exactly what is expected from clients. Everything described here is the implemented behavior — [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md) collects the parts that are designed but not built yet.
+
+## The one-paragraph answer
+
+**Migration happens on-chain, inside the program, on demand.** A client never migrates account data and never needs to know a migration exists. Every wire carrier — account, instruction payload, event — carries a version envelope right after its discriminator, every client writes the version it was generated with, and the program normalizes whatever arrives into its current representation inside the transaction that touched it. If the transaction fails, Solana rolls the migration back with everything else.
+
+## Development-time flow
+
+```text
+                 ┌──────────────────────────────┐
+                 │ developer changes a struct,  │
+                 │ instruction, or event        │
+                 └──────────────┬───────────────┘
+                                │
+                                ▼
+                 ┌──────────────────────────────┐
+                 │ `pina build` / macro drift   │
+                 │ gate fails:                  │
+                 │ "run pina migrations make"   │
+                 └──────────────┬───────────────┘
+                                │
+                                ▼
+                 ┌──────────────────────────────┐
+        ┌────────│   `pina migrations make`     │─────────┐
+        │        └──────────────┬───────────────┘         │
+        │                       │                         │
+        │ ambiguous change?     │ plain change            │ unpaired removal
+        ▼                       ▼                         ▼
+┌───────────────┐   ┌────────────────────────┐   ┌──────────────────┐
+│ terminal:     │   │ automatic transition   │   │ fails with the   │
+│ prompt per    │   │ generated (byte moves, │   │ exact flag:      │
+│ field         │   │ zero-fill, relayout)   │   │ --assume-removed │
+│               │   └───────────┬────────────┘   └────────┬─────────┘
+│ no terminal:  │               │ type change / compact?  │
+│ fails naming  │               ▼                         │
+│ --rename a:b  │   ┌────────────────────────┐            │
+│ or            │   │ manual TODO transition │            │
+│ --assume-     │   │ developer fills body,  │            │
+│  removed a    │   │ re-runs make to record │            │
+└───────┬───────┘   │ its hash               │            │
+        │           └───────────┬────────────┘            │
+        └─────────────┬─────────┴─────────────────────────┘
+                      ▼
+        ┌──────────────────────────────┐
+        │ `pina migrations check`      │
+        │ drift, hashes, publication   │
+        │ pins all verified            │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ `pina build`                 │
+        │ program compiles with the    │
+        │ manifest + transitions       │
+        │ embedded (include! bytes)    │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ `pina deploy`                │
+        │ 1. pending record written    │
+        │    atomically (versions      │
+        │    frozen — may already be   │
+        │    live)                     │
+        │ 2. remote command runs       │
+        │    (solana program deploy or │
+        │    --remote-command)         │
+        │ 3. immutable receipt with    │
+        │    pinned schema history     │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ `pina codama generate`       │
+        │ TypeScript, Rust, Dart, CPI  │
+        │ clients embed the CURRENT    │
+        │ version as an omitted        │
+        │ constant — callers never     │
+        │ pass a version               │
+        └──────────────────────────────┘
+```
+
+Once a version appears in a receipt or pending record it is frozen: `make` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check.
+
+## Runtime flow inside the program
+
+This is the generated dispatcher's decision tree for one instruction invocation:
+
+```text
+                transaction arrives
+                        │
+                        ▼
+        ┌───────────────────────────────┐
+        │ read discriminator, dispatch   │
+        │ to the instruction             │
+        └───────────────┬───────────────┘
+                        ▼
+        ┌───────────────────────────────┐
+        │ inspect instruction version    │
+        │ (one read after the disc)      │
+        └───────┬───────────┬───────────┘
+        current │    stale   │   future/corrupt
+                ▼           ▼               ▼
+      ┌──────────────┐ ┌──────────────────┐ ┌────────────────┐
+      │ validate &   │ │ normalize:       │ │ reject now —   │
+      │ run handler  │ │ zero workspace,  │ │ no trial       │
+      │ (hot path:   │ │ walk adjacent    │ │ decoding       │
+      │ no history   │ │ payload steps,   │ └────────────────┘
+      │ scans)       │ │ validate each,   │
+      └──────┬───────┘ │ commit current   │
+             │         │ version marker    │
+             │         └────────┬─────────┘
+             │                  ▼
+             │    ┌───────────────────────────────┐
+             │    │ for each migratable account   │
+             │    │ the route touches:            │
+             │    │                               │
+             │    │  version == current?          │
+             │    │    yes → validate, done       │
+             │    │    no  → PLAN                 │
+             │    │      (validate exact source   │
+             │    │       shape, owned detached   │
+             │    │       state, no borrows)      │
+             │    │          │                    │
+             │    │          ▼                    │
+             │    │    need growth & rent?        │
+             │    │      yes → explicit capped    │
+             │    │      payer transfers deficit  │
+             │    │          │                    │
+             │    │          ▼                    │
+             │    │    RESIZE → APPLY (infallible)│
+             │    │    → VALIDATE destination     │
+             │    │    → WRITE version → re-      │
+             │    │    VALIDATE                   │
+             │    │          │                    │
+             │    │          ▼                    │
+             │    │    next adjacent version      │
+             │    │    until current              │
+             │    └──────────────┬────────────────┘
+             │                   │
+             └────────┬──────────┘
+                      ▼
+        ┌───────────────────────────────┐
+        │ run current handler with      │
+        │ current types only            │
+        └───────────────────────────────┘
+
+  failure BEFORE first mutation  → ordinary ProgramError
+  failure AFTER first mutation   → instruction ABORTS (never a
+                                   catchable error) so the transaction
+                                   rolls back every resize, transfer,
+                                   and byte write together
+```
+
+Accounts in one instruction migrate independently — a mixed set (`Profile@v0`, `Journal@v1`, …) each climb their own ladder atomically within the same invocation.
+
+## What is expected from each side
+
+|                     | Client (generated)                                                   | Program (generated + handler)                                                                                                   |
+| ------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Version envelope    | writes its frozen version automatically; caller never sees it        | reads it before any payload decode                                                                                              |
+| Account data        | never migrates, never rewrites                                       | migrates on demand, on-chain, in-transaction                                                                                    |
+| Instruction payload | encodes args in its version's shape                                  | normalizes stale payloads into current args                                                                                     |
+| Rent for growth     | supplies an explicit payer account when the instruction declares one | transfers only the deficit, capped, never refunds                                                                               |
+| Old clients         | keep sending their old bytes unchanged                               | are the reason the whole system exists                                                                                          |
+| Breaking cases      | —                                                                    | fail closed: unknown/future versions, privilege changes, unprovable process changes are rejected or require a new discriminator |
+
+## The four scenarios
+
+### 1. Current client → current program (the hot path)
+
+```text
+client encodes v_N payload ──► program sees version == current
+                                   │
+                                   ▼
+                          validate current shape
+                                   │
+                                   ▼
+                          handler runs — zero
+                          migration work done
+```
+
+One version-byte comparison is the entire overhead.
+
+### 2. Old client → updated program (the migration path)
+
+```text
+old client encodes v_0 payload
+        │
+        ▼
+program sees 0 < current ──► stale
+        │
+        ▼
+normalize payload: v_0 → v_1 → … → v_N
+(zeroed workspace, each step validated,
+ current marker committed last)
+        │
+        ▼
+migrate every stale account the route touches
+(plan → fund → resize → apply → validate → commit,
+ one adjacent step at a time)
+        │
+        ▼
+current authorization + business logic run
+with current types
+        │
+        ▼
+success: one transaction did everything
+failure anywhere: everything rolls back
+```
+
+The old client cannot tell that anything happened. This is the property the whole design protects: **backwards compatibility is the default, and the program owns it.**
+
+### 3. Old client → rolled-back program (the honest limit)
+
+Rolling back the _binary_ to a previous executable does not roll back accounts. Accounts written by version N carry `N`; a program compiled when `current == N-1` sees those as **future** versions and rejects them without trial decoding. The supported rollback is redeploying an executable built from the current manifest history (an old _binary_ with the current _ABI_), which keeps every live account readable. This is a deliberate security stance, not an implementation gap: silently guessing at newer layouts would let a rolled-back program misinterpret post-rollback data.
+
+### 4. Where the migration lives: program or client?
+
+**Implemented: the program.** Inline, on-demand, per-account — the transaction that touches a stale account performs its migration before the handler runs, funded by the payer that transaction already declared.
+
+**Designed, not yet built (ADR 0008): the client-driven prefix.** A reserved `Migrate` instruction clients may prepend (`[Migrate { payer }, …real
+instructions]`) when an account is stale but the business instruction declares no payer, plus a generated `migrateIfNeeded` client helper that fetches accounts, compares the version constant it already embeds, and only prepends the migration when needed. Until that ships, the requirement is simple: any instruction that can touch a migratable account during a growth step must declare an optional `migration_payer` slot, and current clients pass it.
+
+## Seeing it live
+
+The whole of this page runs for real in the ten-deployment walkthrough:
+
+```bash
+pnpm walkthrough:migrations            # full run, ~3 minutes
+pnpm walkthrough:migrations -- --from-step 6 --to-step 8 --keep
+```
+
+It scaffolds a program, evolves it through ten published generations (add field, rename through the question flow, type change via a manual transition, compact growth, payload growth, appended optional accounts, event growth, acknowledged removal, full-ladder replay), deploys each one to an isolated Surfpool network through `pina deploy`, regenerates every client each time, and proves that step-1 clients keep submitting successfully against the step-9 program with their data preserved.
