@@ -24,6 +24,18 @@ pub mod sysvars {
 			pub unsafe fn from_bytes_unchecked(_data: &[u8]) -> Self {
 				Self { slot: 0 }
 			}
+
+			pub fn advance(&mut self, by: u64) {
+				self.slot += by;
+			}
+		}
+
+		pub struct ClockWrapper;
+
+		impl ClockWrapper {
+			pub fn from_bytes(_data: &[u8]) -> Self {
+				Self
+			}
 		}
 	}
 
@@ -63,6 +75,10 @@ pub mod sysvars {
 
 			pub fn from_bytes(_data: &[u8]) -> Result<Self, ()> {
 				Ok(Self)
+			}
+
+			pub unsafe fn from_bytes_unchecked(_data: &[u8]) -> Self {
+				Self
 			}
 
 			pub fn minimum_balance(&self, _data_len: usize) -> u64 {

@@ -3,6 +3,7 @@
 pub mod sysvar {
 	pub mod clock {
 		pub static ID: () = ();
+		pub const NAME: &str = "clock";
 	}
 
 	pub mod rent {

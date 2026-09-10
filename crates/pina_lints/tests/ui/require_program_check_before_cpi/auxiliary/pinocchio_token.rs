@@ -38,3 +38,27 @@ impl Instruction {
 		Ok(())
 	}
 }
+
+pub struct InstructionMut;
+
+impl InstructionMut {
+	pub fn invoke_with_unverified_program(&mut self, _program: &Address) -> Result<(), ()> {
+		Ok(())
+	}
+
+	pub fn invoke_signed_with_unverified_program(
+		&mut self,
+		_signers: &[Signer],
+		_program: &Address,
+	) -> Result<(), ()> {
+		Ok(())
+	}
+}
+
+pub struct InstructionLegacy;
+
+impl InstructionLegacy {
+	pub fn invoke_signed_with_unverified_program(&self, _signers: &[Signer]) -> Result<(), ()> {
+		Ok(())
+	}
+}

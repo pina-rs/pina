@@ -1,0 +1,50 @@
+error: `invoke_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:24:15
+   |
+LL |     let invoke = Instruction::invoke_with_unverified_program;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
+   = note: `#[deny(require_program_check_before_cpi)]` on by default
+
+error: `invoke_signed_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:30:15
+   |
+LL |     let invoke = Instruction::invoke_signed_with_unverified_program;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_signed_with_program` variant
+
+error: `invoke_signed_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:36:15
+   |
+LL |     let invoke = Instruction::invoke_signed_with_unverified_program as InvokeSignedFn;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_signed_with_program` variant
+
+error: `invoke_signed_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:42:20
+   |
+LL |     let invoke = Some(Instruction::invoke_signed_with_unverified_program);
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_signed_with_program` variant
+
+error: `invoke_signed_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:48:18
+   |
+LL |     let invoke = || Instruction::invoke_signed_with_unverified_program;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_signed_with_program` variant
+
+error: `invoke_signed_with_unverified_program` cannot be used as a function value
+  --> $DIR/cpi_function_values.rs:54:19
+   |
+LL |     let (invoke,) = (Instruction::invoke_signed_with_unverified_program,);
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_signed_with_program` variant
+
+error: aborting due to 6 previous errors

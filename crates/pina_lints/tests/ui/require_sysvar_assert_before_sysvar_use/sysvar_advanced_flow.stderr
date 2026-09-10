@@ -1,0 +1,10 @@
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_advanced_flow.rs:27:9
+   |
+LL |         yield clock_account.slot();
+   |               ^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+   = note: `#[deny(require_sysvar_assert_before_sysvar_use)]` on by default
+
+error: aborting due to 1 previous error

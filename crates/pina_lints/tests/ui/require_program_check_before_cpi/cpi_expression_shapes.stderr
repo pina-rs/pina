@@ -1,0 +1,114 @@
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:46:2
+   |
+LL |     instruction.invoke_with_unverified_program(holder.program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = note: `#[deny(require_program_check_before_cpi)]` on by default
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:63:2
+   |
+LL |     instruction.invoke_with_unverified_program(program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:90:3
+   |
+LL |         instruction.invoke_with_unverified_program(program.address())?;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:102:18
+   |
+LL |     let invoke = || instruction.invoke_with_unverified_program(program.address());
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:111:18
+   |
+LL |     let invoke = || instruction.invoke_with_unverified_program(program.address());
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:125:2
+   |
+LL |     instruction.invoke_with_unverified_program(program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:138:2
+   |
+LL |     instruction.invoke_with_unverified_program(program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:152:2
+   |
+LL |     instruction.invoke_with_unverified_program(program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:164:3
+   |
+LL |         instruction.invoke_with_unverified_program(program.address()),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:166:3
+   |
+LL |         instruction.invoke_signed_with_unverified_program(&[], program.address()),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:171:18
+   |
+LL |     let repeated = [instruction.invoke_with_unverified_program(program.address()); 2];
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:177:12
+   |
+LL |         outcome: instruction.invoke_with_unverified_program(program.address()),
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:222:10
+   |
+LL |         return instruction.invoke_with_unverified_program(program.address());
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/cpi_expression_shapes.rs:234:9
+   |
+LL |         break instruction.invoke_with_unverified_program(program.address());
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+
+error: aborting due to 14 previous errors
