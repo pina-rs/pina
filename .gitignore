@@ -93,3 +93,6 @@ crates/pina_fuzz/target/
 
 # Advisory locks created by migration commands
 **/migrations/.lock
+
+# Dart/Flutter transient build state
+.dart_tool/
