@@ -88,8 +88,31 @@ fn process_interior_mutable_cpi_target(
 	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
+// A const of reference type can alias an interior-mutable static, so the const
+// would launder the static's runtime-replaceable contents past this check. The
+// reference type is not `Freeze`, so the const must not establish a proof.
+const MUTEX_ALIAS: &Mutex<Address> = &MUTEX_ID;
+
+fn process_const_alias(
+	instruction: &InstructionFor<Mutex<Address>>,
+	program: &MutexAccount,
+) -> Result<(), ()> {
+	*MUTEX_ID.lock().unwrap() = Address;
+	program.assert_program(MUTEX_ALIAS)?;
+	instruction.invoke_with_unverified_program(program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
 fn process_plain_statics(instruction: &Instruction, program: &ProgramAccount) -> Result<(), ()> {
 	program.assert_program(&ADDRESS_ID)?;
+	instruction.invoke_with_unverified_program(program.address())
+}
+
+// Interior-mutability-free consts remain trusted provenance.
+const ADDRESS_CONST: Address = Address;
+
+fn process_const(instruction: &Instruction, program: &ProgramAccount) -> Result<(), ()> {
+	program.assert_program(&ADDRESS_CONST)?;
 	instruction.invoke_with_unverified_program(program.address())
 }
 

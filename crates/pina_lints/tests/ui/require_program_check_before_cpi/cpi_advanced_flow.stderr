@@ -4,7 +4,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |         yield instruction.invoke_with_unverified_program(program.address());
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or an immutable static without interior mutability
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
    = note: `#[deny(require_program_check_before_cpi)]` on by default
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
@@ -13,6 +13,6 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |         let _ = instruction.invoke_with_unverified_program(program.address());
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or an immutable static without interior mutability
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: aborting due to 2 previous errors
