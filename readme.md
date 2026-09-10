@@ -614,6 +614,14 @@ Available assertions:
 - `assert_canonical_bump(seeds, program_id)` — returns the canonical bump
 - `assert_associated_token_address(wallet, mint, token_program)` — ATA check (requires `token` feature)
 
+Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` and `.invoke_signed()` builders encode their program ID. Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`. Neither form needs a preceding account assertion.
+
+If you call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first with Pina's assertion API and a compile-time program ID. An instruction argument is not a trusted expected ID. Prefer `assert_program()`, propagate assertion failure on every continuing path, and call the method directly. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks and closures that may replace the validated binding invalidate the proof. Do not store an unverified CPI method as a function value.
+
+When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. The sysvar lint rejects `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` or `new_unchecked` because they do not validate sysvar identity.
+
+For deliberate raw access, successfully call Pina's `assert_sysvar()` with the matching `pina_sdk_ids::sysvar::<name>::ID` on every continuing path. The canonical ID also supports generic bindings such as `epoch_sysvar` whose name does not identify a specific sysvar. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks and closures that may replace the asserted binding invalidate the proof. Call a reviewed unchecked constructor directly after that assertion. Place a narrow lint allowance on the constructor. Identity-unchecked constructors cannot be hidden in function values.
+
 When you need token data, use the checked loader instead of an assertion followed by a second parse:
 
 ```rust
@@ -1025,7 +1033,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view, so the layout, canonical bump, and PDA address are validated during the same borrow
-- **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
+- **Validate dynamic program accounts** with Pina's `assert_program()` before explicitly unverified CPI invocations; static and self-verifying CPI APIs need no redundant assertion
 - **Use `as_account::<T>()` or `as_account_mut::<T>()`** when a handler needs fixed-account fields; these guard-backed loaders check the owner, discriminator, exact size, and nested values
 - **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation

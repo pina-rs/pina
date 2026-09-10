@@ -1,53 +1,72 @@
 extern crate rustc_hir;
 extern crate rustc_span;
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
+use rustc_hir::Node;
+use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
 
+use crate::shared;
+
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or
-	/// `.invoke_signed_with_program()` is called without a preceding
-	/// `assert_address()`, `assert_addresses()`, or `assert_program()` call on a
-	/// program account within the same function.
+	/// Warns when `.invoke_with_unverified_program()` or
+	/// `.invoke_signed_with_unverified_program()` is called with a dynamic
+	/// program address that has not passed
+	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
+	/// same account within the same function against a compile-time program ID.
+	/// The resolved Pina assertion must succeed on every continuing path without
+	/// a success-side callback. The lint also rejects taking either unverified CPI
+	/// method as a function value.
 	///
 	/// ### Why is this bad?
 	///
-	/// Without verifying the target program's address, an attacker can
-	/// substitute a malicious program that executes arbitrary logic with the
-	/// authority and accounts passed to the CPI.
+	/// A dynamic program argument controls the CPI target. Without verifying
+	/// that exact argument, an attacker can substitute a malicious program.
+	/// Discarding the assertion `Result`, inspecting failure, or checking only
+	/// one branch does not establish a proof. Success-side adapters such as
+	/// `map()`, `and_then()`, and `inspect()` do not establish a proof because
+	/// their callbacks can replace the validated binding before execution
+	/// continues. An instruction argument is not a trusted expected ID: comparing
+	/// two attacker-controlled values proves consistency, not authenticity.
+	/// Assignments, mutable borrows, and methods that take the validated binding
+	/// through `&mut self` invalidate the earlier proof.
+	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
+	/// the builder and do not accept a replaceable program argument. Restricting
+	/// unverified calls to direct method or UFCS syntax keeps the target proof
+	/// local and reviewable.
 	///
 	/// ### Example
 	///
 	/// Bad:
 	/// ```ignore
-	/// system::instructions::Transfer { from, to, lamports }.invoke()?;
+	/// transfer.invoke_with_unverified_program(token_program.address())?;
 	/// ```
 	///
 	/// Good:
 	/// ```ignore
-	/// system_program.assert_address(&system::ID)?;
-	/// system::instructions::Transfer { from, to, lamports }.invoke()?;
+	/// transfer.invoke_with_program(token_program.address())?;
+	/// // Or, when deliberately using the unchecked API:
+	/// token_program.assert_program(&token::ID)?;
+	/// transfer.invoke_with_unverified_program(token_program.address())?;
 	/// ```
 	pub REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
 	Deny,
-	"CPI invocations should be preceded by program address verification"
+	"dynamic CPI targets should be validated before invocation"
 }
 
-const CPI_METHODS: &[&str] = &[
-	"invoke",
-	"invoke_signed",
-	"invoke_with_program",
-	"invoke_signed_with_program",
+const DYNAMIC_CPI_METHODS: &[&str] = &[
+	"invoke_with_unverified_program",
+	"invoke_signed_with_unverified_program",
 ];
 
 const PROGRAM_CHECK_METHODS: &[&str] = &["assert_address", "assert_addresses", "assert_program"];
@@ -68,87 +87,116 @@ impl Place {
 	}
 }
 
-#[derive(Clone, Debug)]
-struct PlaceIdentity {
-	place: Place,
-	name: String,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DynamicCpiMethod {
+	Invoke,
+	InvokeSigned,
 }
 
-type ValidationState = HashMap<Place, String>;
+impl DynamicCpiMethod {
+	const fn name(self) -> &'static str {
+		match self {
+			Self::Invoke => "invoke_with_unverified_program",
+			Self::InvokeSigned => "invoke_signed_with_unverified_program",
+		}
+	}
 
-const TRUSTED_PINA_CPI_TYPES: &[&str] = &[
-	"AllocateAccount",
-	"AllocateAccountWithBump",
-	"AllocateAccountWithNonCanonicalBump",
-	"CloseAccount",
-	"CloseAccountZeroed",
-	"CpiContext",
-	"CreateAccount",
-	"CreateCompactProgramAccount",
-	"CreateCompactProgramAccountWithBump",
-	"CreateProgramAccount",
-	"CreateProgramAccountWithBump",
-	"ReallocAccount",
-	"ReallocAccountZeroed",
-	"ReallocCompactAccount",
-	"UpdateResizableAccount",
-];
+	const fn program_index(self) -> usize {
+		match self {
+			Self::Invoke => 1,
+			Self::InvokeSigned => 2,
+		}
+	}
+}
 
-fn is_trusted_pina_cpi_type(cx: &LateContext<'_>, receiver: &Expr<'_>) -> bool {
-	let receiver_type = cx.typeck_results().expr_ty(receiver).peel_refs();
-	let Some(definition) = receiver_type.ty_adt_def() else {
-		return false;
+#[derive(Clone, Debug, Default)]
+struct ValidationState {
+	places: HashSet<Place>,
+	trusted_ids: HashSet<Place>,
+}
+
+impl ValidationState {
+	fn contains(&self, place: &Place) -> bool {
+		self.places.contains(place)
+	}
+
+	fn insert(&mut self, place: Place) {
+		self.places.insert(place);
+	}
+
+	fn contains_trusted_id(&self, place: &Place) -> bool {
+		self.trusted_ids.contains(place)
+	}
+
+	fn insert_trusted_id(&mut self, place: Place) {
+		self.trusted_ids.insert(place);
+	}
+
+	fn new() -> Self {
+		Self::default()
+	}
+}
+
+fn program_argument<'a>(method: &str, args: &'a [Expr<'a>]) -> Option<&'a Expr<'a>> {
+	let index = match method {
+		"invoke_with_unverified_program" => 0,
+		"invoke_signed_with_unverified_program" => 1,
+		_ => return None,
 	};
-	let path = cx.tcx.def_path_str(definition.did());
-	is_trusted_pina_cpi_type_path(&path)
+
+	args.get(index)
 }
 
-fn is_trusted_pina_cpi_type_path(path: &str) -> bool {
-	path.strip_prefix("pina::cpi::")
-		.or_else(|| path.strip_prefix("pina::"))
-		.is_some_and(|name| TRUSTED_PINA_CPI_TYPES.contains(&name))
+fn is_pinocchio_token_crate(cx: &LateContext<'_>, definition: rustc_hir::def_id::DefId) -> bool {
+	matches!(
+		cx.tcx.crate_name(definition.krate).as_str(),
+		"pinocchio_token" | "pinocchio_token_2022"
+	)
 }
 
-fn place_identity(expr: &Expr<'_>) -> Option<PlaceIdentity> {
-	match &expr.kind {
-		ExprKind::Field(base, ident) => {
-			let base = place_identity(base)?;
-			Some(PlaceIdentity {
-				place: Place::Field(Box::new(base.place), ident.name),
-				name: ident.name.as_str().to_string(),
-			})
-		}
-		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
-			let Res::Local(binding) = path.res else {
-				return None;
-			};
-			let name = path.segments.last()?.ident.name.as_str().to_string();
+fn dynamic_cpi_method_from_definition(
+	cx: &LateContext<'_>,
+	definition: rustc_hir::def_id::DefId,
+) -> Option<DynamicCpiMethod> {
+	if !is_pinocchio_token_crate(cx, definition) {
+		return None;
+	}
 
-			Some(PlaceIdentity {
-				place: Place::Local(binding),
-				name,
-			})
-		}
-		ExprKind::MethodCall(segment, receiver, ..) if segment.ident.name.as_str() == "address" => {
-			place_identity(receiver)
-		}
-		ExprKind::Unary(rustc_hir::UnOp::Deref, inner) => place_identity(inner),
-		ExprKind::Use(inner, _)
-		| ExprKind::Type(inner, _)
-		| ExprKind::DropTemps(inner)
-		| ExprKind::AddrOf(_, _, inner) => place_identity(inner),
+	match cx.tcx.item_name(definition).as_str() {
+		"invoke_with_unverified_program" => Some(DynamicCpiMethod::Invoke),
+		"invoke_signed_with_unverified_program" => Some(DynamicCpiMethod::InvokeSigned),
 		_ => None,
 	}
 }
 
-fn program_argument(method: &str, args: &[Expr<'_>]) -> Option<PlaceIdentity> {
-	let index = match method {
-		"invoke_with_program" => 0,
-		"invoke_signed_with_program" => 1,
-		_ => return None,
+fn dynamic_cpi_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<DynamicCpiMethod> {
+	let ExprKind::Path(path) = &expr.kind else {
+		return None;
 	};
+	let Res::Def(DefKind::AssocFn, definition) = cx.qpath_res(path, expr.hir_id) else {
+		return None;
+	};
+	dynamic_cpi_method_from_definition(cx, definition)
+}
 
-	args.get(index).and_then(place_identity)
+fn is_static_address(expr: &Expr<'_>) -> bool {
+	match &expr.kind {
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			match path.res {
+				Res::Def(DefKind::Const | DefKind::AssocConst, _) => true,
+				Res::Def(DefKind::Static { mutability, .. }, _) => {
+					mutability == rustc_hir::Mutability::Not
+				}
+				_ => false,
+			}
+		}
+		ExprKind::Unary(_, inner)
+		| ExprKind::Use(inner, _)
+		| ExprKind::Type(inner, _)
+		| ExprKind::DropTemps(inner)
+		| ExprKind::AddrOf(_, _, inner) => is_static_address(inner),
+		_ => false,
+	}
 }
 
 fn intersect_states(states: &[ValidationState]) -> ValidationState {
@@ -156,7 +204,14 @@ fn intersect_states(states: &[ValidationState]) -> ValidationState {
 		return ValidationState::new();
 	};
 	let mut intersection = first.clone();
-	intersection.retain(|place, _| states[1..].iter().all(|state| state.contains_key(place)));
+	intersection
+		.places
+		.retain(|place| states[1..].iter().all(|state| state.contains(place)));
+	intersection.trusted_ids.retain(|place| {
+		states[1..]
+			.iter()
+			.all(|state| state.contains_trusted_id(place))
+	});
 	intersection
 }
 
@@ -165,22 +220,144 @@ struct Analyzer<'cx, 'tcx> {
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn place_identity(&self, expression: &Expr<'_>) -> Option<Place> {
+		match &expression.kind {
+			ExprKind::Field(base, identifier) => {
+				let base = self.place_identity(base)?;
+				Some(Place::Field(Box::new(base), identifier.name))
+			}
+			ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+				let Res::Local(binding) = path.res else {
+					return None;
+				};
+
+				Some(Place::Local(binding))
+			}
+			ExprKind::MethodCall(segment, receiver, ..)
+				if segment.ident.name.as_str() == "address"
+					|| shared::is_pina_method(self.cx, expression, PROGRAM_CHECK_METHODS)
+					|| shared::is_result_method(
+						self.cx,
+						expression,
+						&["expect", "inspect_err", "map_err", "unwrap"],
+					) =>
+			{
+				self.place_identity(receiver)
+			}
+			ExprKind::Match(scrutinee, _, rustc_hir::MatchSource::TryDesugar(_)) => {
+				self.place_identity(scrutinee)
+			}
+			ExprKind::Call(..) => {
+				self.place_identity(shared::try_branch_argument(self.cx, expression)?)
+			}
+			ExprKind::Unary(rustc_hir::UnOp::Deref, inner) => self.place_identity(inner),
+			ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => self.place_identity(inner),
+			_ => None,
+		}
+	}
+
 	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
-		state.retain(|place, _| !place.is_same_or_descendant_of(assigned));
+		state
+			.places
+			.retain(|place| !place.is_same_or_descendant_of(assigned));
+		state
+			.trusted_ids
+			.retain(|place| !place.is_same_or_descendant_of(assigned));
+	}
+
+	fn is_trusted_program_id(&self, expression: &Expr<'_>, state: &ValidationState) -> bool {
+		if is_static_address(expression)
+			|| self
+				.place_identity(expression)
+				.is_some_and(|place| state.contains_trusted_id(&place))
+		{
+			return true;
+		}
+
+		match &expression.kind {
+			ExprKind::Array(expressions) => {
+				expressions
+					.iter()
+					.all(|expression| self.is_trusted_program_id(expression, state))
+			}
+			ExprKind::Repeat(inner, _) => self.is_trusted_program_id(inner, state),
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => self.is_trusted_program_id(inner, state),
+			_ => false,
+		}
+	}
+
+	fn assertion_uses_trusted_id(&self, arguments: &[Expr<'_>], state: &ValidationState) -> bool {
+		arguments
+			.first()
+			.is_some_and(|expected| self.is_trusted_program_id(expected, state))
+	}
+
+	fn method_mutably_borrows_receiver(&self, expression: &Expr<'_>) -> bool {
+		let Some(definition) = self
+			.cx
+			.typeck_results()
+			.type_dependent_def_id(expression.hir_id)
+		else {
+			return false;
+		};
+
+		self.cx
+			.tcx
+			.fn_sig(definition)
+			.instantiate_identity()
+			.skip_binder()
+			.inputs()
+			.first()
+			.and_then(|receiver| receiver.ref_mutability())
+			== Some(rustc_hir::Mutability::Mut)
 	}
 
 	fn lint_unchecked_cpi(&self, expr: &Expr<'_>, method: &str) {
+		let verified_method = match method {
+			"invoke_signed_with_unverified_program" => "invoke_signed_with_program",
+			_ => "invoke_with_program",
+		};
 		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
 			diag.span(expr.span);
 			diag.primary_message(format!(
 				"`.{}()` called without a preceding program address verification",
 				method
 			));
-			diag.help(
-				"add `program_account.assert_address(&expected_id)?` or \
-				 `program_account.assert_program(&expected_id)?` before the CPI invocation",
-			);
+			diag.help(format!(
+				"use the verified `{verified_method}` variant, or call \
+				 `program_account.assert_program(&trusted_program_id)?` before the unverified CPI \
+				 invocation; the expected ID must come from a const or immutable static"
+			));
 		});
+	}
+
+	fn lint_unverified_function_value(&self, expr: &Expr<'_>, method: DynamicCpiMethod) {
+		let verified_method = match method {
+			DynamicCpiMethod::Invoke => "invoke_with_program",
+			DynamicCpiMethod::InvokeSigned => "invoke_signed_with_program",
+		};
+		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
+			diag.span(expr.span);
+			diag.primary_message(format!(
+				"`{}` cannot be used as a function value",
+				method.name()
+			));
+			diag.help(format!(
+				"invoke the unverified CPI function directly so the lint can prove its exact \
+				 program target, or use the verified `{verified_method}` variant"
+			));
+		});
+	}
+
+	fn expression_can_continue(&self, expr: &Expr<'_>) -> bool {
+		!self.cx.typeck_results().expr_ty(expr).is_never()
 	}
 
 	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, state: &mut ValidationState) {
@@ -190,16 +367,19 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					if let Some(init) = local.init {
 						self.visit_expr(init, state);
 
-						// Preserve a proven program identity when an immutable local is
-						// derived from the checked account (for example,
-						// `let token_program = *account.address()`). The new HIR binding
-						// remains independent, so a later assignment invalidates it
-						// without affecting the source account's validation.
-						if let rustc_hir::PatKind::Binding(_, binding, ident, None) = local.pat.kind
-							&& let Some(source) = place_identity(init)
-							&& state.contains_key(&source.place)
-						{
-							state.insert(Place::Local(binding), ident.name.as_str().to_string());
+						// Preserve authenticated account aliases separately from aliases
+						// whose values originate at compile time. Conflating the two would
+						// let an authenticated account become trusted expected-ID provenance.
+						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind {
+							let source = self.place_identity(init);
+							let inherits_identity = is_static_address(init)
+								|| source.as_ref().is_some_and(|source| state.contains(source));
+							if inherits_identity {
+								state.insert(Place::Local(binding));
+							}
+							if self.is_trusted_program_id(init, state) {
+								state.insert_trusted_id(Place::Local(binding));
+							}
 						}
 					}
 					if let Some(else_block) = local.els {
@@ -226,39 +406,68 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				for argument in *args {
 					self.visit_expr(argument, state);
 				}
+				let mutably_borrows_receiver = self.method_mutably_borrows_receiver(expr);
 
 				let method = segment.ident.name.as_str();
 				if PROGRAM_CHECK_METHODS.contains(&method) {
-					if let Some(identity) = place_identity(receiver) {
-						state.insert(identity.place, identity.name);
+					if shared::is_pina_method(self.cx, expr, PROGRAM_CHECK_METHODS)
+						&& shared::result_success_is_required(self.cx, expr)
+						&& self.assertion_uses_trusted_id(args, state)
+						&& let Some(place) = self.place_identity(receiver)
+					{
+						state.insert(place);
 					}
 					return;
 				}
 
-				if !CPI_METHODS.contains(&method) || is_trusted_pina_cpi_type(self.cx, receiver) {
+				if !DYNAMIC_CPI_METHODS.contains(&method) {
+					if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+						self.invalidate(state, &place);
+					}
+					return;
+				}
+				let Some(definition) = self.cx.typeck_results().type_dependent_def_id(expr.hir_id)
+				else {
+					return;
+				};
+				if dynamic_cpi_method_from_definition(self.cx, definition).is_none() {
 					return;
 				}
 
-				let target = program_argument(method, args);
-				let validated = target.as_ref().map_or_else(
-					|| {
-						state.values().any(|name| {
-							name.contains("program")
-								|| name.contains("system")
-								|| name.contains("token")
-						})
-					},
-					|identity| state.contains_key(&identity.place),
-				);
+				let validated = program_argument(method, args).is_some_and(|target| {
+					is_static_address(target)
+						|| self
+							.place_identity(target)
+							.is_some_and(|place| state.contains(&place))
+				});
 
 				if !validated {
 					self.lint_unchecked_cpi(expr, method);
 				}
+				if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+					self.invalidate(state, &place);
+				}
 			}
 			ExprKind::Call(callee, args) => {
-				self.visit_expr(callee, state);
+				let direct_method = dynamic_cpi_method(self.cx, callee);
+				if direct_method.is_none() {
+					self.visit_expr(callee, state);
+				}
 				for argument in *args {
 					self.visit_expr(argument, state);
+				}
+
+				let Some(method) = direct_method else {
+					return;
+				};
+				let validated = args.get(method.program_index()).is_some_and(|target| {
+					is_static_address(target)
+						|| self
+							.place_identity(target)
+							.is_some_and(|place| state.contains(&place))
+				});
+				if !validated {
+					self.lint_unchecked_cpi(expr, method.name());
 				}
 			}
 			ExprKind::Block(block, _) => self.visit_block(block, state),
@@ -273,7 +482,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						self.visit_expr(guard, &mut branch);
 					}
 					self.visit_expr(arm.body, &mut branch);
-					branches.push(branch);
+					if self.expression_can_continue(arm.body) {
+						branches.push(branch);
+					}
 				}
 
 				*state = if branches.is_empty() {
@@ -285,20 +496,41 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::If(condition, then, else_opt) => {
 				self.visit_expr(condition, state);
 				let base = state.clone();
+				let mut branches = Vec::with_capacity(2);
 				let mut then_state = base.clone();
 				self.visit_expr(then, &mut then_state);
-
-				let mut else_state = base;
-				if let Some(else_expr) = else_opt {
-					self.visit_expr(else_expr, &mut else_state);
+				if self.expression_can_continue(then) {
+					branches.push(then_state);
 				}
 
-				*state = intersect_states(&[then_state, else_state]);
+				if let Some(else_expr) = else_opt {
+					let mut else_state = base;
+					self.visit_expr(else_expr, &mut else_state);
+					if self.expression_can_continue(else_expr) {
+						branches.push(else_state);
+					}
+				} else {
+					branches.push(base);
+				}
+
+				if !branches.is_empty() {
+					*state = intersect_states(&branches);
+				}
 			}
 			ExprKind::Loop(block, ..) => {
 				let entry = state.clone();
 				let mut body_state = entry.clone();
 				self.visit_block(block, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
+			}
+			ExprKind::Closure(closure) => {
+				// A closure can run after this point and replace a captured binding.
+				// Keep only proofs that survive both the no-call and called paths;
+				// proofs established inside the closure cannot escape either.
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				let body = self.cx.tcx.hir_body(closure.body);
+				self.visit_expr(body.value, &mut body_state);
 				*state = intersect_states(&[entry, body_state]);
 			}
 			ExprKind::Binary(operation, lhs, rhs) => {
@@ -307,8 +539,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					operation.node,
 					rustc_hir::BinOpKind::And | rustc_hir::BinOpKind::Or
 				) {
+					let base = state.clone();
 					let mut conditional = state.clone();
 					self.visit_expr(rhs, &mut conditional);
+					*state = intersect_states(&[base, conditional]);
 				} else {
 					self.visit_expr(rhs, state);
 				}
@@ -316,14 +550,14 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 				self.visit_expr(lhs, state);
 				self.visit_expr(rhs, state);
-				if let Some(identity) = place_identity(lhs) {
-					self.invalidate(state, &identity.place);
+				if let Some(place) = self.place_identity(lhs) {
+					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
 				self.visit_expr(inner, state);
-				if let Some(identity) = place_identity(inner) {
-					self.invalidate(state, &identity.place);
+				if let Some(place) = self.place_identity(inner) {
+					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::Unary(_, inner)
@@ -366,6 +600,22 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 }
 
 impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
+	fn check_expr(&mut self, cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>) {
+		let Some(method) = dynamic_cpi_method(cx, expr) else {
+			return;
+		};
+		let is_direct_callee = matches!(
+			cx.tcx.parent_hir_node(expr.hir_id),
+			Node::Expr(Expr {
+				kind: ExprKind::Call(callee, _),
+				..
+			}) if callee.hir_id == expr.hir_id
+		);
+		if !is_direct_callee {
+			Analyzer { cx }.lint_unverified_function_value(expr, method);
+		}
+	}
+
 	fn check_fn(
 		&mut self,
 		cx: &LateContext<'tcx>,
@@ -376,36 +626,5 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 		_: rustc_hir::def_id::LocalDefId,
 	) {
 		Analyzer { cx }.visit_expr(body.value, &mut ValidationState::new());
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::is_trusted_pina_cpi_type_path;
-
-	#[test]
-	fn trusts_every_typed_compact_account_builder() {
-		for name in [
-			"CreateCompactProgramAccount",
-			"CreateCompactProgramAccountWithBump",
-			"ReallocCompactAccount",
-			"UpdateResizableAccount",
-		] {
-			assert!(is_trusted_pina_cpi_type_path(&format!("pina::{name}")));
-			assert!(is_trusted_pina_cpi_type_path(&format!("pina::cpi::{name}")));
-		}
-	}
-
-	#[test]
-	fn rejects_similarly_named_or_external_builders() {
-		assert!(!is_trusted_pina_cpi_type_path(
-			"attacker::cpi::UpdateResizableAccount",
-		));
-		assert!(!is_trusted_pina_cpi_type_path(
-			"pina::cpi::UpdateResizableAccountUnchecked",
-		));
-		assert!(!is_trusted_pina_cpi_type_path(
-			"pina::external::UpdateResizableAccount",
-		));
 	}
 }

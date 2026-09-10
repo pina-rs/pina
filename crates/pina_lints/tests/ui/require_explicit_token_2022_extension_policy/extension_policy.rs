@@ -29,6 +29,18 @@ fn process(account: &Account, program: &[u8]) -> Result<(), ()> {
 	mint.assert_no_extensions()
 }
 
+fn process_unwrap(account: &Account, program: &[u8]) -> Result<(), ()> {
+	let mint = account.as_token_mint_for_program(program).unwrap();
+	mint.assert_no_extensions()
+}
+
+fn process_expect(account: &Account, program: &[u8]) -> Result<(), ()> {
+	let mint = account
+		.as_token_mint_for_program(program)
+		.expect("valid mint");
+	mint.assert_no_extensions()
+}
+
 fn process_explicit_legacy(account: &Account) -> Result<(), ()> {
 	account
 		.as_token_mint_for_program(&pinocchio_token::ID)

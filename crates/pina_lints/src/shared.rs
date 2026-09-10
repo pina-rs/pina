@@ -16,6 +16,7 @@ use rustc_hir::Body;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
+use rustc_hir::Node;
 use rustc_lint::LateContext;
 use rustc_span::Span;
 
@@ -69,6 +70,104 @@ fn definition_identity(cx: &LateContext<'_>, def_id: rustc_hir::def_id::DefId) -
 		cx.tcx.def_path_str(def_id),
 		cx.tcx.crate_name(def_id.krate).as_str().to_string(),
 	)
+}
+
+pub(crate) fn is_pina_method(
+	cx: &LateContext<'_>,
+	expression: &Expr<'_>,
+	methods: &[&str],
+) -> bool {
+	let Some(definition) = cx.typeck_results().type_dependent_def_id(expression.hir_id) else {
+		return false;
+	};
+	cx.tcx.crate_name(definition.krate).as_str() == "pina"
+		&& methods.contains(&cx.tcx.item_name(definition).as_str())
+}
+
+pub(crate) fn is_result_method(
+	cx: &LateContext<'_>,
+	expression: &Expr<'_>,
+	methods: &[&str],
+) -> bool {
+	let ExprKind::MethodCall(segment, ..) = &expression.kind else {
+		return false;
+	};
+	let Some(definition) = cx.typeck_results().type_dependent_def_id(expression.hir_id) else {
+		return false;
+	};
+	let method = segment.ident.name.as_str();
+	let path = cx.tcx.def_path_str(definition);
+
+	cx.tcx.crate_name(definition.krate).as_str() == "core"
+		&& path.contains("::result::Result")
+		&& path.rsplit("::").next() == Some(method)
+		&& methods.contains(&method)
+}
+
+pub(crate) fn result_success_is_required(cx: &LateContext<'_>, expression: &Expr<'_>) -> bool {
+	let mut child = expression.hir_id;
+
+	loop {
+		let parent_node = cx.tcx.parent_hir_node(child);
+		let Node::Expr(parent) = parent_node else {
+			return false;
+		};
+		match &parent.kind {
+			ExprKind::Match(scrutinee, _, rustc_hir::MatchSource::TryDesugar(_))
+				if scrutinee.hir_id == child =>
+			{
+				return true;
+			}
+			ExprKind::MethodCall(_, receiver, ..) if receiver.hir_id == child => {
+				if is_result_method(cx, parent, &["expect", "unwrap"]) {
+					return true;
+				}
+				if is_result_method(cx, parent, &["inspect_err", "map_err"]) {
+					child = parent.hir_id;
+					continue;
+				}
+				return false;
+			}
+			ExprKind::Call(callee, arguments)
+				if arguments.len() == 1 && arguments[0].hir_id == child =>
+			{
+				let is_try_branch =
+					expression_definition(cx, callee).is_some_and(|(path, crate_name)| {
+						crate_name == "core" && path.ends_with("::ops::Try::branch")
+					});
+				if !is_try_branch {
+					return false;
+				}
+				child = parent.hir_id;
+			}
+			ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::UnsafeBinderCast(_, inner, _)
+				if inner.hir_id == child =>
+			{
+				child = parent.hir_id;
+			}
+			_ => return false,
+		}
+	}
+}
+
+pub(crate) fn try_branch_argument<'a>(
+	cx: &LateContext<'_>,
+	expression: &'a Expr<'a>,
+) -> Option<&'a Expr<'a>> {
+	let ExprKind::Call(callee, arguments) = &expression.kind else {
+		return None;
+	};
+	let [argument] = *arguments else {
+		return None;
+	};
+	let is_try_branch = expression_definition(cx, callee).is_some_and(|(path, crate_name)| {
+		crate_name == "core" && path.ends_with("::ops::Try::branch")
+	});
+
+	is_try_branch.then_some(argument)
 }
 
 fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(String, String)> {
@@ -240,17 +339,30 @@ fn collect_from_expr_inner(
 ) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
-			collect_from_expr(cx, receiver, facts, result_binding);
-			for arg in *args {
-				collect_from_expr(cx, arg, facts, None);
-			}
+			let method = path_segment.ident.name.as_str();
 			let definition = cx
 				.typeck_results()
 				.type_dependent_def_id(expr.hir_id)
 				.map(|def_id| definition_identity(cx, def_id));
+			let receiver_result_binding = is_result_method(
+				cx,
+				expr,
+				&["expect", "inspect", "inspect_err", "map_err", "unwrap"],
+			)
+			.then_some(result_binding)
+			.flatten();
+			// A chained receiver contributes to the method result but is not itself
+			// the value assigned to `result_binding`. Associating both calls with
+			// the same binding would let a discarded checked loader grant provenance
+			// to an unchecked value returned by a later combinator. Only resolved
+			// Result methods that preserve or extract the successful value forward it.
+			collect_from_expr(cx, receiver, facts, receiver_result_binding);
+			for arg in *args {
+				collect_from_expr(cx, arg, facts, None);
+			}
 			facts.calls.push(CallInfo {
 				span: expr.span,
-				method: path_segment.ident.name.as_str().to_string(),
+				method: method.to_string(),
 				receiver: expression_identity(receiver),
 				receiver_span: Some(receiver.span),
 				path: None,
@@ -352,13 +464,15 @@ fn collect_from_expr_inner(
 				collect_from_expr(cx, el, facts, result_binding);
 			}
 		}
+		ExprKind::Field(receiver, _) => {
+			collect_from_expr(cx, receiver, facts, result_binding);
+		}
 		ExprKind::Unary(_, expr)
 		| ExprKind::Use(expr, _)
 		| ExprKind::Cast(expr, _)
 		| ExprKind::Type(expr, _)
 		| ExprKind::DropTemps(expr)
 		| ExprKind::AddrOf(_, _, expr)
-		| ExprKind::Field(expr, _)
 		| ExprKind::Repeat(expr, _)
 		| ExprKind::Yield(expr, _)
 		| ExprKind::Become(expr)

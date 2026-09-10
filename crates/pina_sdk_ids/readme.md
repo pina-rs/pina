@@ -33,7 +33,7 @@ use pina_sdk_ids::system_program;
 use pina_sdk_ids::sysvar;
 
 // Validation chains read best with named IDs:
-self.system_program.assert_address(&system_program::ID)?;
+self.system_program.assert_program(&system_program::ID)?;
 self.clock.assert_sysvar(&sysvar::clock::ID)?;
 // Signature-verification programs stay typed during CPI checks:
 self.ed25519_program.assert_address(&pina_sdk_ids::ed25519_program::ID)?;
