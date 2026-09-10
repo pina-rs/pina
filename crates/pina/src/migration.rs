@@ -584,14 +584,224 @@ mod executor {
 		}
 	}
 
-	fn continue_or_abort<T>(
-		result: Result<T, ProgramError>,
-		mutation_started: bool,
-	) -> Result<T, ProgramError> {
-		match (result, mutation_started) {
-			(Ok(value), _) => Ok(value),
-			(Err(error), false) => Err(error),
-			(Err(error), true) => abort_after_mutation(error),
+	/// Shared state for one in-flight account migration.
+	struct MigrationCtx<'account, 'payer, 'signers> {
+		account: &'account mut AccountView,
+		payer: Option<&'payer AccountView>,
+		signers: &'signers [Signer<'signers, 'signers>],
+		rent: Option<Rent>,
+		max_lamports: u64,
+		original_size: usize,
+		stored: u32,
+		transferred: u64,
+		from: u32,
+		current: u32,
+		completed_steps: u16,
+	}
+
+	/// Effects planned for one adjacent transition, validated but not yet
+	/// applied.
+	struct PlannedStep<P> {
+		payload: Option<P>,
+		to: u32,
+		target_size: usize,
+		allocated_working_size: usize,
+		working_size: usize,
+		funding: u64,
+	}
+
+	/// Plan the next adjacent transition without producing any effect.
+	///
+	/// Every check here is effect-free, so [`Preflight`] may surface failures
+	/// as ordinary errors while [`Mutating`] must abort on them instead.
+	fn plan_next_step<T>(
+		ctx: &mut MigrationCtx<'_, '_, '_>,
+	) -> Result<PlannedStep<T::Plan>, ProgramError>
+	where
+		T: MigratableAccount,
+	{
+		let plan = {
+			let data = ctx.account.try_borrow()?;
+			T::plan_migration(&data)?
+		};
+
+		// `from < current <= u32::MAX`, so this addition cannot overflow.
+		let to = ctx.from + 1;
+		if plan.from_version() != ctx.from
+			|| plan.to_version() != to
+			|| plan.steps() != 1
+			|| plan.target_size() < T::MIGRATION_HEADER_SIZE
+			|| plan.working_size() < plan.target_size()
+		{
+			return Err(PinaProgramError::MigrationUnavailable.into());
+		}
+
+		let current_size = ctx.account.data_len();
+		let target_size = plan.target_size();
+		let working_size = plan.working_size();
+		let allocated_working_size = current_size.max(working_size);
+		if allocated_working_size
+			.checked_sub(ctx.original_size)
+			.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
+		{
+			return Err(PinaProgramError::MigrationBudgetExceeded.into());
+		}
+
+		let funding = if working_size > current_size {
+			let rent = match ctx.rent {
+				Some(rent) => rent,
+				None => Rent::get()?,
+			};
+			let target_minimum = rent.try_minimum_balance(working_size)?;
+			target_minimum.saturating_sub(ctx.account.lamports())
+		} else {
+			0
+		};
+		let next_transferred = ctx.transferred.checked_add(funding);
+		if next_transferred.is_none_or(|total| total > ctx.max_lamports) {
+			return Err(PinaProgramError::MigrationBudgetExceeded.into());
+		}
+
+		if funding > 0 {
+			let payer = ctx
+				.payer
+				.ok_or_else(|| ProgramError::from(PinaProgramError::MigrationRequired))?;
+			validate_funding_payer(payer, ctx.account, !ctx.signers.is_empty())?;
+		}
+
+		Ok(PlannedStep {
+			payload: Some(plan.into_payload()),
+			to,
+			target_size,
+			allocated_working_size,
+			working_size,
+			funding,
+		})
+	}
+
+	impl MigrationCtx<'_, '_, '_> {
+		/// Apply one planned transition. Only reachable after the first
+		/// effect, so every failure aborts the instruction.
+		fn complete_step_after_effect<T>(&mut self, step: &mut PlannedStep<T::Plan>)
+		where
+			T: MigratableAccount,
+		{
+			if step.funding > 0 {
+				let payer = self.payer.expect("planned transfer validated the payer");
+				finish_after_mutation(
+					SystemTransfer {
+						from: payer,
+						to: self.account,
+						lamports: step.funding,
+					}
+					.invoke_signed(self.signers),
+				);
+				self.transferred = self.transferred.saturating_add(step.funding);
+			}
+			if step.working_size > self.account.data_len() {
+				finish_after_mutation(self.account.resize(step.working_size));
+			}
+			if let Some(payload) = step.payload.take() {
+				let mut data = finish_after_mutation(self.account.try_borrow_mut());
+				T::apply_migration(payload, &mut data);
+			}
+			if step.target_size < step.allocated_working_size {
+				finish_after_mutation(self.account.resize(step.target_size));
+			}
+			{
+				let mut data = finish_after_mutation(self.account.try_borrow_mut());
+				finish_after_mutation(T::validate_migration_destination(step.to, &data));
+				let version = finish_after_mutation(T::Version::try_from_u32(step.to));
+				finish_after_mutation(T::write_migration_version(version, &mut data));
+				finish_after_mutation(T::validate_migration_destination(step.to, &data));
+			}
+
+			self.from = step.to;
+			// The preflight caps total steps to `MAX_INLINE_STEPS: u16`.
+			self.completed_steps += 1;
+		}
+	}
+
+	/// Ladder state before any effect has occurred.
+	///
+	/// Fallible operations surface as ordinary errors: the caller may catch
+	/// them and continue without migrating.
+	struct Preflight<'account, 'payer, 'signers> {
+		ctx: MigrationCtx<'account, 'payer, 'signers>,
+	}
+
+	impl<'account, 'payer, 'signers> Preflight<'account, 'payer, 'signers> {
+		/// Attempt the first adjacent transition.
+		///
+		/// Returns `Err` only when the step failed before producing any
+		/// effect. The first effect itself is the boundary: once the funding
+		/// transfer, resize, or rewrite has succeeded, every later failure
+		/// aborts the instruction through [`Mutating`], so a partial
+		/// migration can never be caught and committed.
+		fn first_step<T>(mut self) -> Result<Mutating<'account, 'payer, 'signers>, ProgramError>
+		where
+			T: MigratableAccount,
+		{
+			let mut step = plan_next_step::<T>(&mut self.ctx)?;
+			if step.funding > 0 {
+				// The transfer is the first effect; its failure leaves the
+				// account untouched and stays catchable. Everything after it
+				// runs through the aborting tail.
+				let payer = self
+					.ctx
+					.payer
+					.ok_or_else(|| ProgramError::from(PinaProgramError::MigrationRequired))?;
+				SystemTransfer {
+					from: payer,
+					to: self.ctx.account,
+					lamports: step.funding,
+				}
+				.invoke_signed(self.ctx.signers)?;
+				self.ctx.transferred = self.ctx.transferred.saturating_add(step.funding);
+				step.funding = 0;
+			} else if step.working_size > self.ctx.account.data_len() {
+				// The resize is the first effect; its failure also leaves the
+				// account untouched. The tail's own size check then skips it.
+				self.ctx.account.resize(step.working_size)?;
+			}
+
+			let mut mutating = Mutating { ctx: self.ctx };
+			mutating.ctx.complete_step_after_effect::<T>(&mut step);
+			Ok(mutating)
+		}
+	}
+
+	/// Ladder state after at least one effect has occurred.
+	///
+	/// No method returns `Result`: any failure from here on aborts the whole
+	/// instruction, which makes a catchable partial migration unrepresentable.
+	struct Mutating<'account, 'payer, 'signers> {
+		ctx: MigrationCtx<'account, 'payer, 'signers>,
+	}
+
+	impl Mutating<'_, '_, '_> {
+		/// Run one adjacent transition to completion, aborting on failure.
+		fn step<T>(&mut self)
+		where
+			T: MigratableAccount,
+		{
+			let mut planned = finish_after_mutation(plan_next_step::<T>(&mut self.ctx));
+			self.ctx.complete_step_after_effect::<T>(&mut planned);
+		}
+
+		/// Validate the final representation and report the outcome.
+		fn finish<T>(self) -> AccountMigrationOutcome<T::Version>
+		where
+			T: MigratableAccount,
+		{
+			let data = finish_after_mutation(self.ctx.account.try_borrow());
+			finish_after_mutation(T::validate_current_migration(&data));
+
+			AccountMigrationOutcome::Migrated {
+				from: finish_after_mutation(T::Version::try_from_u32(self.ctx.stored)),
+				to: T::CURRENT_VERSION,
+				steps: self.ctx.completed_steps,
+			}
 		}
 	}
 
@@ -707,137 +917,36 @@ mod executor {
 				return Err(PinaProgramError::MigrationUnavailable.into());
 			}
 
-			// Application code can catch a returned `ProgramError` and continue.
-			// Preflight the mutable borrow before funding, then abort the whole
-			// instruction if any adjacent planner or invariant fails after the first
-			// successful effect. This lets variable-length migrations derive each next
-			// allocation from the representation produced by the preceding step without
-			// exposing a catchable partial migration.
+			// Preflight the mutable borrow before funding. `Preflight` keeps
+			// every failure before the first effect catchable; once the first
+			// effect succeeds, `Mutating` aborts on any failure so a partial
+			// migration can never be caught and committed. This lets
+			// variable-length migrations derive each next allocation from the
+			// representation produced by the preceding step.
 			self.account.check_borrow_mut()?;
 			let original_size = self.account.data_len();
-			let mut transferred = 0_u64;
-			let mut mutation_started = false;
-			let mut from = stored.into_u32();
-			let mut completed_steps = 0_u16;
+			let ladder = Preflight {
+				ctx: MigrationCtx {
+					account: self.account,
+					payer: self.payer,
+					signers,
+					rent,
+					max_lamports: self.max_lamports,
+					original_size,
+					stored: stored.into_u32(),
+					transferred: 0,
+					from: stored.into_u32(),
+					current: current.into_u32(),
+					completed_steps: 0,
+				},
+			};
 
-			while from < current.into_u32() {
-				let plan = {
-					let data = continue_or_abort(self.account.try_borrow(), mutation_started)?;
-					continue_or_abort(T::plan_migration(&data), mutation_started)?
-				};
-
-				// `from < current <= u32::MAX`, so this addition cannot overflow.
-				let to = from + 1;
-				if plan.from_version() != from
-					|| plan.to_version() != to
-					|| plan.steps() != 1
-					|| plan.target_size() < T::MIGRATION_HEADER_SIZE
-					|| plan.working_size() < plan.target_size()
-				{
-					return continue_or_abort(
-						Err(PinaProgramError::MigrationUnavailable.into()),
-						mutation_started,
-					);
-				}
-
-				let current_size = self.account.data_len();
-				let target_size = plan.target_size();
-				let working_size = plan.working_size();
-				let allocated_working_size = current_size.max(working_size);
-				if allocated_working_size
-					.checked_sub(original_size)
-					.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
-				{
-					return continue_or_abort(
-						Err(PinaProgramError::MigrationBudgetExceeded.into()),
-						mutation_started,
-					);
-				}
-
-				let funding = if working_size > current_size {
-					let rent = match rent {
-						Some(rent) => rent,
-						None => continue_or_abort(Rent::get(), mutation_started)?,
-					};
-					let target_minimum = continue_or_abort(
-						rent.try_minimum_balance(working_size),
-						mutation_started,
-					)?;
-					target_minimum.saturating_sub(self.account.lamports())
-				} else {
-					0
-				};
-				let next_transferred = transferred.checked_add(funding);
-				if next_transferred.is_none_or(|total| total > self.max_lamports) {
-					return continue_or_abort(
-						Err(PinaProgramError::MigrationBudgetExceeded.into()),
-						mutation_started,
-					);
-				}
-
-				if funding > 0 {
-					let payer = continue_or_abort(
-						self.payer
-							.ok_or_else(|| PinaProgramError::MigrationRequired.into()),
-						mutation_started,
-					)?;
-					continue_or_abort(
-						validate_funding_payer(payer, self.account, !signers.is_empty()),
-						mutation_started,
-					)?;
-
-					continue_or_abort(
-						SystemTransfer {
-							from: payer,
-							to: self.account,
-							lamports: funding,
-						}
-						.invoke_signed(signers),
-						mutation_started,
-					)?;
-					transferred = next_transferred.unwrap_or(u64::MAX);
-					mutation_started = true;
-				}
-
-				if working_size > current_size {
-					continue_or_abort(self.account.resize(working_size), mutation_started)?;
-					mutation_started = true;
-				}
-
-				{
-					let mut data =
-						continue_or_abort(self.account.try_borrow_mut(), mutation_started)?;
-					T::apply_migration(plan.into_payload(), &mut data);
-					mutation_started = true;
-				}
-
-				if target_size < allocated_working_size {
-					finish_after_mutation(self.account.resize(target_size));
-				}
-
-				{
-					let mut data = finish_after_mutation(self.account.try_borrow_mut());
-					finish_after_mutation(T::validate_migration_destination(to, &data));
-					let version = finish_after_mutation(T::Version::try_from_u32(to));
-					finish_after_mutation(T::write_migration_version(version, &mut data));
-					finish_after_mutation(T::validate_migration_destination(to, &data));
-				}
-
-				from = to;
-				// The preflight caps total steps to `MAX_INLINE_STEPS: u16`.
-				completed_steps += 1;
+			let mut mutating = ladder.first_step::<T>()?;
+			while mutating.ctx.from < mutating.ctx.current {
+				mutating.step::<T>();
 			}
 
-			{
-				let data = finish_after_mutation(self.account.try_borrow());
-				finish_after_mutation(T::validate_current_migration(&data));
-			}
-
-			Ok(AccountMigrationOutcome::Migrated {
-				from: stored,
-				to: current,
-				steps: completed_steps,
-			})
+			Ok(mutating.finish::<T>())
 		}
 	}
 }
