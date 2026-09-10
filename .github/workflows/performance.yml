@@ -68,6 +68,17 @@ jobs:
           printf '%s\n' "$status" > ./target/performance/programs/compare.status
         shell: devenv shell -c -- bash -e {0}
 
+      # Diagnostic only: the script exits 0 unless it cannot run at all, so the
+      # instruction-CU policy gate above stays the sole enforcement point.
+      - name: diff program function profiles
+        if: always()
+        run: |
+          node ./scripts/profile-example-diffs.ts \
+            ./target/performance/programs/base \
+            ./target/performance/programs/head \
+            ./target/performance/programs/function-diffs
+        shell: devenv shell -c -- bash -e {0}
+
       - name: prepare program report
         id: program-report
         if: always()
@@ -523,6 +534,8 @@ jobs:
             append_report ./target/performance/reports/performance-token-loader/report.md "Focused token-loader compute units"
             echo
             append_report ./target/performance/reports/performance-programs/report.md "Program compute units and build sizes"
+            echo
+            append_report ./target/performance/reports/performance-programs/function-diffs/function-diff.md "Program function-level profile diffs"
             echo
             append_report ./target/performance/reports/performance-cli/report.md "CLI performance"
             echo
