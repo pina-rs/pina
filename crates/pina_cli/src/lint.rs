@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crate::lint_driver::DriverError;
-use crate::lint_driver::cargo_home;
 use crate::lint_driver::driver_build_identity;
+use crate::lint_driver::driver_library_environment;
 use crate::lint_driver::format_lint_levels;
 use crate::lint_driver::prepare_driver;
 use crate::project::Project;
@@ -51,20 +51,20 @@ pub enum LintError {
 /// Discover a Pina project and run this CLI release's official lint set.
 ///
 /// The lints are compiled into the `pina_lints` crate and statically linked
-/// into the `pina_lint_driver` binary. This command prepares the driver for
-/// the active toolchain (see [`crate::lint_driver`]), then runs
+/// into the `pina_lint_driver` binary, which ships prebuilt next to this CLI
+/// (see [`crate::lint_driver`]). This command resolves the driver, then runs
 /// `cargo check` — or `cargo fix` with `--fix` — with the driver as
 /// `RUSTC_WORKSPACE_WRAPPER`. Level overrides from the project's `pina.toml`
 /// `[lints]` table are forwarded through `PINA_LINT_LEVELS`.
 ///
 /// # Errors
 ///
-/// Returns an error when project discovery fails, the lint driver cannot be
-/// prepared, or cargo reports a lint or compilation failure.
+/// Returns an error when project discovery fails, the prebuilt lint driver
+/// cannot be resolved or loaded, or cargo reports a lint or compilation
+/// failure.
 pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
-	let cargo_home = cargo_home()?;
-	let driver = prepare_driver(&cargo_home, &project.root)?;
+	let driver = prepare_driver(&project.root)?;
 	let driver_build =
 		driver_build_identity(&driver.path).map_err(|source| LintError::RunCargo { source })?;
 	let manifest = project.program_dir.join("Cargo.toml");
@@ -75,13 +75,24 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 		.map(|(name, level)| (name.as_str(), level.as_str()))
 		.collect::<Vec<_>>();
 
-	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+	// Some environments (devenv's rust integration) export `CARGO` as an
+	// empty string; treat that like an unset variable rather than spawning a
+	// nameless executable.
+	let cargo = std::env::var_os("CARGO")
+		.filter(|cargo| !cargo.is_empty())
+		.unwrap_or_else(|| OsString::from("cargo"));
 	let mut command = Command::new(&cargo);
 	command
 		.current_dir(&project.root)
 		.env("RUSTC_WORKSPACE_WRAPPER", &driver.path)
 		.env("PINA_LINT_DRIVER_BUILD", driver_build)
 		.env("PINA_LINT_NO_DEPS", "1");
+	// The driver loads `librustc_driver` through the rpath baked in at build
+	// time; cargo and every wrapper it spawns also need the sysroot's library
+	// directory on the search path for toolchains whose rpath went stale.
+	for (name, value) in driver_library_environment(&driver.sysroot) {
+		command.env(name, value);
+	}
 	if !levels.is_empty() {
 		command.env("PINA_LINT_LEVELS", format_lint_levels(levels));
 	}

@@ -596,7 +596,12 @@ fn library_details(package: &Package) -> Result<(String, PathBuf), ProjectError>
 }
 
 fn cargo_metadata(start: &Path, manifest_path: Option<&Path>) -> Result<Metadata, ProjectError> {
-	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+	// Some environments (devenv's rust integration) export `CARGO` as an
+	// empty string; treat that like an unset variable rather than spawning a
+	// nameless executable.
+	let cargo = std::env::var_os("CARGO")
+		.filter(|cargo| !cargo.is_empty())
+		.unwrap_or_else(|| OsString::from("cargo"));
 	let mut command = MetadataCommand::new();
 	command.cargo_path(cargo).current_dir(start).no_deps();
 

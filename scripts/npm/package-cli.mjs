@@ -188,6 +188,12 @@ function findBinary(directory, binaryName) {
 	return null;
 }
 
+export function driverBinaryName(binaryName) {
+	return binaryName === "pina.exe"
+		? "pina_lint_driver.exe"
+		: "pina_lint_driver";
+}
+
 export function populatePlatformPackage(
 	{ assetsDirectory, packagesDirectory, releaseTag, specification },
 ) {
@@ -223,6 +229,17 @@ export function populatePlatformPackage(
 	if (specification.binaryName === "pina") {
 		chmodSync(destination, 0o755);
 	}
+
+	const driverName = driverBinaryName(specification.binaryName);
+	const driverPath = findBinary(extractionDirectory, driverName);
+	if (driverPath === null) {
+		// The release matrix only builds the lint driver where the toolchain
+		// can; targets without one ship CLI-only packages.
+		return;
+	}
+	const driverDestination = join(binaryDirectory, driverName);
+	copyFileSync(driverPath, driverDestination);
+	chmodSync(driverDestination, 0o755);
 }
 
 export function main(arguments_ = process.argv.slice(2)) {
