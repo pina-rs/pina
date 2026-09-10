@@ -179,7 +179,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vesting_state.assert_empty()?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?

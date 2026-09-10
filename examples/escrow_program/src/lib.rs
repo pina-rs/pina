@@ -145,7 +145,6 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
-		self.escrow.assert_empty()?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?

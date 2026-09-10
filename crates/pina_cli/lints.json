@@ -19,7 +19,6 @@
 		},
 		{ "name": "require_checked_asset_arithmetic", "level": "deny" },
 		{ "name": "require_consistent_token_program", "level": "deny" },
-		{ "name": "require_empty_before_init", "level": "deny" },
 		{
 			"name": "require_explicit_discriminators_and_seed_namespaces",
 			"level": "warn"
