@@ -54,7 +54,7 @@ Options:
           Record migration publication receipts even for loopback targets. Useful for exercising the full publication lifecycle against a local network such as Surfpool
 
       --remote-command <COMMAND>
-          Run this command instead of `solana program deploy`. The deployment facts are exported as PINA_DEPLOY_RPC_URL, PINA_DEPLOY_PROGRAM, PINA_DEPLOY_PROGRAM_ID, PINA_DEPLOY_PROGRAM_KEYPAIR, PINA_DEPLOY_UPGRADE_AUTHORITY, PINA_DEPLOY_PAYER, and PINA_DEPLOY_CLUSTER environment variables
+          Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`, `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables
 
   -h, --help
           Print help (see a summary with '-h')

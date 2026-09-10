@@ -274,16 +274,16 @@ impl DeploymentPlan {
 	pub fn commands(&self) -> Vec<CommandPlan> {
 		vec![match &self.remote_command {
 			Some(command) => {
-				override_command(
-					command,
-					self.program(),
-					self.program_id(),
-					self.program_keypair(),
-					self.upgrade_authority(),
-					self.payer(),
-					self.rpc_url(),
-					&self.target.cluster,
-				)
+				let facts = DeploymentFacts {
+					program: self.program(),
+					program_id: self.program_id(),
+					program_keypair: self.program_keypair(),
+					upgrade_authority: self.upgrade_authority(),
+					payer: self.payer(),
+					rpc_url: self.rpc_url(),
+					cluster: &self.target.cluster,
+				};
+				override_command(&facts, command)
 			}
 			None => {
 				deploy_command(
@@ -706,16 +706,27 @@ fn deploy_command(
 ///
 /// The override runs through the platform shell so simple commands like
 /// `make deploy-remote` or `node scripts/deploy.mjs` work without a wrapper.
-fn override_command(
-	command: &str,
-	program: &str,
-	program_id: &str,
-	program_keypair: &str,
-	upgrade_authority: &str,
-	payer: &str,
-	rpc_url: &str,
-	cluster: &str,
-) -> CommandPlan {
+/// Deployment facts exported to an operator-supplied remote command.
+struct DeploymentFacts<'a> {
+	program: &'a str,
+	program_id: &'a str,
+	program_keypair: &'a str,
+	upgrade_authority: &'a str,
+	payer: &'a str,
+	rpc_url: &'a str,
+	cluster: &'a str,
+}
+
+fn override_command(facts: &DeploymentFacts<'_>, command: &str) -> CommandPlan {
+	let DeploymentFacts {
+		program,
+		program_id,
+		program_keypair,
+		upgrade_authority,
+		payer,
+		rpc_url,
+		cluster,
+	} = *facts;
 	#[cfg(unix)]
 	let (shell, flag) = ("sh", "-c");
 	#[cfg(not(unix))]

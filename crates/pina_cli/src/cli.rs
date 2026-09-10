@@ -607,10 +607,10 @@ Safety:
 		record_publication: bool,
 
 		/// Run this command instead of `solana program deploy`. The deployment
-		/// facts are exported as PINA_DEPLOY_RPC_URL, PINA_DEPLOY_PROGRAM,
-		/// PINA_DEPLOY_PROGRAM_ID, PINA_DEPLOY_PROGRAM_KEYPAIR,
-		/// PINA_DEPLOY_UPGRADE_AUTHORITY, PINA_DEPLOY_PAYER, and
-		/// PINA_DEPLOY_CLUSTER environment variables.
+		/// facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`,
+		/// `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`,
+		/// `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and
+		/// `PINA_DEPLOY_CLUSTER` environment variables.
 		#[arg(long, value_name = "COMMAND")]
 		remote_command: Option<String>,
 	},
