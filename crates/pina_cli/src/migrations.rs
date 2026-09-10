@@ -387,12 +387,65 @@ fn resolve_field_changes(
 		.filter(|field| !source_names.contains(field.name.as_str()))
 		.collect();
 
+	// Validate every answer against this diff before it can influence a
+	// transition: `--assume-removed` naming a retained field would silently
+	// zero its live data through the effective schema, and `--rename` naming
+	// anything other than a removed-to-added pair would be silently ignored.
+	let removed_types = removed_fields
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
+	for field in &answers.removed {
+		if !removed_types.contains_key(field.as_str()) {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: `--assume-removed {field}` names a field that was not \
+				 removed by this change",
+			)));
+		}
+		if answers.renames.contains_key(field) {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: field `{field}` is answered with both `--rename` and \
+				 `--assume-removed`; pick one",
+			)));
+		}
+	}
+	for (from, to) in &answers.renames {
+		let Some(&from_type) = removed_types.get(from.as_str()) else {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: `--rename {from}:{to}` names a field that was not removed \
+				 by this change",
+			)));
+		};
+		let Some(&to_type) = destination_types.get(to.as_str()) else {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: `--rename {from}:{to}` targets `{to}`, which is not an \
+				 added field",
+			)));
+		};
+		if from_type != to_type {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: `--rename {from}:{to}` changes the field type \
+				 (`{from_type}` to `{to_type}`); write a manual transition instead",
+			)));
+		}
+	}
+
 	let mut questions = Vec::new();
 	for removed_field in &removed_fields {
 		if renames
 			.iter()
 			.any(|mapping| mapping.from == removed_field.name)
 		{
+			continue;
+		}
+		// An explicit `--rename from:to` selects the target itself, so a
+		// developer can correct the same-type pairing the heuristic proposes.
+		// Validation above guarantees `to` is an added field of the same type.
+		if let Some(to) = answers.renames.get(removed_field.name.as_str()) {
+			renames.push(pina_abi::RenameMapping {
+				from: removed_field.name.clone(),
+				to: to.clone(),
+			});
 			continue;
 		}
 		// Pair the removal with the first unused addition of the same type:
@@ -425,14 +478,6 @@ fn resolve_field_changes(
 			continue;
 		}
 		let Some(candidate) = candidate else {
-			if dropped.contains(removed_field.name.as_str()) {
-				warnings.push(format!(
-					"contract `{contract}`: field `{}` (type `{}`) is removed by this migration \
-					 and its stored data is discarded",
-					removed_field.name, removed_field.rust_type
-				));
-				continue;
-			}
 			// An unpaired removal discards stored data, so it needs the same
 			// explicit acknowledgement as a declined rename. Type changes
 			// (the removed name reappears with a different type) never pair
@@ -476,17 +521,6 @@ fn resolve_field_changes(
 			to: candidate.name.clone(),
 			rust_type: removed_field.rust_type.clone(),
 		};
-		if answers
-			.renames
-			.get(removed_field.name.as_str())
-			.is_some_and(|to| to == &candidate.name)
-		{
-			renames.push(pina_abi::RenameMapping {
-				from: removed_field.name.clone(),
-				to: candidate.name.clone(),
-			});
-			continue;
-		}
 		if answers.no_interactive || !std::io::stdin().is_terminal() {
 			questions.push(question);
 			continue;
@@ -1751,6 +1785,14 @@ fn create_transition(
 	if mode == TransitionMode::Manual {
 		output.manual_transitions.push(path.clone());
 	}
+	warn_about_account_growth(
+		identity,
+		rust_name,
+		source,
+		destination,
+		project.migration_version_type.bytes(),
+		output,
+	);
 	let implementation_sha256 = Some(hash_transition_file(&path)?);
 	Ok(Transition {
 		from: source.version,
@@ -1764,6 +1806,57 @@ fn create_transition(
 		process,
 		implementation_sha256,
 	})
+}
+
+/// Approximate rent-exemption cost of one byte of account data.
+///
+/// Solana charges `LAMPORTS_PER_BYTE_YEAR * EXEMPTION_THRESHOLD`
+/// (3,480 * 2) lamports per byte for a rent-exempt account; the constants
+/// have been fixed since genesis, so this is a planning figure, not a quote.
+const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
+
+/// Warn when a transition grows an account, because a stale account must
+/// fund the rent deficit from the migration payer inside the touching
+/// transaction. An undersized lamport budget makes those migrations fail
+/// with `MigrationBudgetExceeded` until the budget is raised.
+fn warn_about_account_growth(
+	identity: &ContractIdentity,
+	rust_name: &str,
+	source: &SchemaVersion,
+	destination: &DataSchema,
+	version_bytes: usize,
+	output: &mut MakeMigrationsOutput,
+) {
+	if identity.kind != ContractKind::Account {
+		return;
+	}
+	let header = usize::from(identity.discriminator_bytes) + version_bytes;
+	if let (Some(from_payload), Some(to_payload)) = (
+		source.schema.fixed_payload_size(),
+		destination.fixed_payload_size(),
+	) && to_payload > from_payload
+	{
+		let growth = to_payload - from_payload;
+		let rent =
+			RENT_EXEMPT_LAMPORTS_PER_BYTE.saturating_mul(u64::try_from(growth).unwrap_or(u64::MAX));
+		output.data_warnings.push(format!(
+			"account `{rust_name}` grows from {} to {} bytes in transition v{} to v{}: a stale \
+			 account funds roughly {rent} lamports of rent exemption from the migration payer, so \
+			 size the invoking instruction's lamport budget and pass a signer or PDA payer",
+			header + from_payload,
+			header + to_payload,
+			source.version,
+			source.version + 1,
+		));
+	} else if destination.layout == LayoutKind::Compact {
+		output.data_warnings.push(format!(
+			"account `{rust_name}` keeps a compact layout in transition v{} to v{}: capacity \
+			 growth funds rent from the migration payer, so confirm the invoking instruction's \
+			 lamport budget covers rent exemption at the new capacity",
+			source.version,
+			source.version + 1,
+		));
+	}
 }
 
 fn process_transition(
@@ -3565,9 +3658,13 @@ mod tests {
 	}
 
 	fn publication_fixture() -> PublicationFixture {
+		published_fixture_with(&[("value", "u64")])
+	}
+
+	fn published_fixture_with(fields: &[(&str, &str)]) -> PublicationFixture {
 		let fixture = migration_fixture();
 		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
-		let schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let schema = schema(LayoutKind::Fixed, fields);
 		let mut manifest =
 			MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
 		manifest.contracts.insert(
@@ -3588,9 +3685,15 @@ mod tests {
 		std::fs::write(
 			fixture.root.join(MANIFEST_PATH),
 			serde_json::to_vec_pretty(&manifest)
-				.unwrap_or_else(|error| panic!("serialize manifest: {error}")),
+				.unwrap_or_else(|error| panic!("serialize manifest: {error:?}")),
 		)
-		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		.unwrap_or_else(|error| panic!("write manifest: {error:?}"));
+		let source_fields = fields
+			.iter()
+			.map(|(name, rust_type)| format!("{name}: {rust_type}"))
+			.collect::<Vec<_>>()
+			.join(", ");
+		write_state_source(&fixture, &source_fields);
 		fixture
 	}
 
@@ -3726,6 +3829,122 @@ mod tests {
 			.expect("advanced version carries a transition");
 		assert_eq!(transition.mode, TransitionMode::Automatic);
 		assert!(transition.renames.is_empty());
+	}
+
+	#[test]
+	fn answers_naming_fields_outside_the_diff_fail_closed() {
+		// `value` is retained by the new source, so acknowledging its removal
+		// or renaming it away would silently drop live data.
+		let retained = published_fixture_with(&[("value", "u64"), ("extra", "u8")]);
+		publish_current(&retained);
+		write_state_source(&retained, "value: u64, extra: u8, points: u64");
+
+		let removal = MigrationAnswers::from_flags(&[], &["value".to_owned()], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let rejection = make_migrations_with_answers(&retained.root, &removal)
+			.expect_err("answers must match the diff they answer");
+		let rendered = format!("{rejection}");
+		assert!(
+			rendered.contains("`--assume-removed value` names a field that was not removed"),
+			"{rendered}"
+		);
+
+		let rename = MigrationAnswers::from_flags(&["value:points".to_owned()], &[], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let rejection = make_migrations_with_answers(&retained.root, &rename)
+			.expect_err("answers must match the diff they answer");
+		let rendered = format!("{rejection}");
+		assert!(
+			rendered.contains("`--rename value:points` names a field that was not removed"),
+			"{rendered}"
+		);
+
+		// A field answered twice leaves the intent undefined.
+		let ambiguous = published_fixture_with(&[("value", "u64")]);
+		publish_current(&ambiguous);
+		write_state_source(&ambiguous, "points: u64");
+		let both =
+			MigrationAnswers::from_flags(&["value:points".to_owned()], &["value".to_owned()], true)
+				.unwrap_or_else(|error| panic!("answers: {error}"));
+		let rejection = make_migrations_with_answers(&ambiguous.root, &both)
+			.expect_err("one field cannot carry two answers");
+		let rendered = format!("{rejection}");
+		assert!(
+			rendered.contains("answered with both `--rename` and `--assume-removed`"),
+			"{rendered}"
+		);
+
+		// Renaming across types cannot preserve bytes and must stay manual.
+		let retyped = published_fixture_with(&[("count", "u64")]);
+		publish_current(&retyped);
+		write_state_source(&retyped, "total: u32");
+		let changed_type = MigrationAnswers::from_flags(&["count:total".to_owned()], &[], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let rejection = make_migrations_with_answers(&retyped.root, &changed_type)
+			.expect_err("type-changing renames are manual");
+		let rendered = format!("{rejection}");
+		assert!(rendered.contains("changes the field type"), "{rendered}");
+	}
+
+	#[test]
+	fn rename_answers_select_their_own_target() {
+		// `one` pairs with `two` by the first-candidate heuristic; the
+		// developer's `one:three` answer must win instead of being stuck
+		// behind the guess. The move stays direction-safe (everything shifts
+		// right), so the transition remains automatic.
+		let fixture = published_fixture_with(&[("one", "u64"), ("keep", "u32")]);
+		publish_current(&fixture);
+		write_state_source(&fixture, "two: u64, three: u64, keep: u32");
+
+		let answers = MigrationAnswers::from_flags(&["one:three".to_owned()], &[], true)
+			.unwrap_or_else(|error| panic!("answers: {error}"));
+		let output = make_migrations_with_answers(&fixture.root, &answers)
+			.unwrap_or_else(|error| panic!("make with overriding rename: {error:?}"));
+		assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+		let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+			.expect("fixture manifest");
+		let transition = manifest.contracts["account:1:01"].versions[1]
+			.transition
+			.as_ref()
+			.expect("advanced version carries a transition");
+		assert_eq!(transition.mode, TransitionMode::Automatic);
+		assert_eq!(
+			transition.renames,
+			vec![pina_abi::RenameMapping {
+				from: "one".to_owned(),
+				to: "three".to_owned()
+			}]
+		);
+	}
+
+	#[test]
+	fn growing_transitions_warn_about_rent_funding() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+		// v0 is 10 bytes; adding `enabled: bool` grows the account to 11.
+		write_state_source(&fixture, "value: u64, enabled: bool");
+
+		let output = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("make growth transition: {error:?}"));
+		let warning = output
+			.data_warnings
+			.iter()
+			.find(|warning| warning.contains("grows from 10 to 11 bytes"))
+			.unwrap_or_else(|| {
+				panic!(
+					"growth must warn about rent funding: {:?}",
+					output.data_warnings
+				)
+			});
+		assert!(
+			warning.contains("6960 lamports"),
+			"the warning sizes the rent deficit: {warning}"
+		);
+		assert!(
+			warning.contains("lamport budget"),
+			"the warning names the budget to raise: {warning}"
+		);
 	}
 
 	#[test]
