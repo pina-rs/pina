@@ -25,23 +25,18 @@ pina lint --project ./programs/counter
 
 `pina lint` discovers the nearest `pina.toml` or unambiguous Cargo package. It checks only that program package and does not lint workspace dependencies.
 
-## Managed lint driver
+## Prebuilt lint driver
 
 `pina lint` runs `cargo check` — or `cargo fix` with `--fix` — with the driver as `RUSTC_WORKSPACE_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint statically linked into it, and compilation continues normally with the lints emitted as ordinary compiler diagnostics. If `RUSTC_WRAPPER` already selects a compiler cache such as `sccache`, Cargo preserves it as the outer wrapper.
 
-The CLI prepares the driver below Cargo home:
+The lint code is ordinary Rust compiled into a `pina_lint_driver` binary that ships prebuilt next to the `pina` CLI itself: every release archive contains both binaries side by side, and the npm platform packages carry them into their `bin/` directory. The CLI never builds or installs anything — it runs the driver beside its own executable.
 
-```text
-$CARGO_HOME/pina/lint-driver/<pina-version>/<rustc-fingerprint>/bin/pina_lint_driver
-```
+- The driver is built in Pina's release pipeline with the pinned nightly toolchain from `rust-toolchain.toml`, the same release `pina init` scaffolds into new projects, because `pina_lints` is nightly-only: its lint passes link against the compiler's unstable `rustc_private` crates. A CLI installed with `cargo install pina_cli` does not include the driver; install the prebuilt CLI or point `PINA_LINT_DRIVER_PATH` at a locally built driver.
+- The driver loads the active toolchain's `librustc_driver` at runtime. The CLI prepends the active sysroot's library directory to the dynamic-library search path — `DYLD_LIBRARY_PATH` and `LD_LIBRARY_PATH` on macOS, `LD_LIBRARY_PATH` on other Unix, `PATH` on Windows — for the lint run, so the driver loads regardless of how the toolchain was installed. Because the compiler internals are keyed to the exact nightly build, the project's active toolchain must be the pinned nightly release; anything else fails the driver load with an error naming the required toolchain.
+- The bundled driver is started once before the lint run to confirm it loads against the active toolchain. When it does not, the error names the required nightly and the `PINA_LINT_DRIVER_PATH` escape hatch instead of failing deep inside cargo with a loader exit.
+- `CARGO_TARGET_DIR` continues to control normal project build artifacts.
 
-- The first use installs it from crates.io with `cargo install --locked --root <that directory> --bin pina_lint_driver --version =<CLI version> pina_lints`. This step requires network access once; later runs reuse the cached binary.
-- The driver release identity is the `pina_lints` version, which matches the installed CLI version. There is no separate tool release or revision selector to pick.
-- The Rust compiler fingerprint contains the release, host, commit when available, and a SHA-256 digest of the complete `rustc -vV` report. Source-built compilers without commit metadata are supported without sharing a generic fallback cache entry.
-- The driver is built from the project directory with the project's pinned nightly toolchain, the same compiler that builds the project, because `pina_lints` is nightly-only: its lint passes and the driver link against the compiler's unstable `rustc_private` crates. The toolchain must have the `rustc-dev` component installed (`rustup component add rustc-dev` if it is missing).
-- Set `CARGO_HOME` to move the driver cache. `CARGO_TARGET_DIR` continues to control normal project build artifacts.
-
-To run a driver you built yourself — typically the workspace driver while developing a lint — set `PINA_LINT_DRIVER_PATH` to an executable binary path and `pina lint` uses it instead of the managed cache. The repository's own `security:pina-lint` task uses this variable to run the workspace-built driver.
+To run a driver you built yourself — typically the workspace driver while developing a lint — set `PINA_LINT_DRIVER_PATH` to an executable binary path and `pina lint` uses it without further checks. The repository's own `security:pina-lint` task uses this variable to run the workspace-built driver.
 
 ## Driver environment variables
 
@@ -79,10 +74,10 @@ With `--fix`, `pina lint` runs `cargo fix` instead of `cargo check`. Pina suppli
 
 ## Security boundary
 
-The lint driver is native executable code, not a passive rule file: it links against the compiler's unstable internals and runs with the same local permissions as the invoking user. Pina therefore pins the driver to the crates.io release of `pina_lints` matching the exact CLI version, installs it with `--locked` into a user-owned cache outside project-controlled target trees, and never loads lint libraries from project metadata. Obtain the CLI from a trusted channel and review CLI upgrades as executable tooling changes.
+The lint driver is native executable code, not a passive rule file: it links against the compiler's unstable internals and runs with the same local permissions as the invoking user. Pina therefore ships the driver prebuilt next to the CLI from the same attested release pipeline, never loads lint libraries from project metadata, and starts the bundled driver once before the lint run so a toolchain mismatch fails fast with a clear error. Obtain the CLI from a trusted channel and review CLI upgrades as executable tooling changes.
 
 `PINA_LINT_DRIVER_PATH` executes whatever binary it names, so point it only at a driver you built yourself.
 
 ## Exit behavior
 
-The command exits successfully only when driver preparation, compilation, and all enabled security lints succeed. A diagnostic at an error level, a compilation failure, a missing network connection on first install, or an invalid `PINA_LINT_DRIVER_PATH` produces a non-zero exit. Child Cargo output stays attached to the terminal; Pina prints a short completion summary only after success.
+The command exits successfully only when the prebuilt driver resolves and loads, compilation finishes, and all enabled security lints succeed. A diagnostic at an error level, a compilation failure, a missing bundled driver, a toolchain mismatch, or an invalid `PINA_LINT_DRIVER_PATH` produces a non-zero exit. Child Cargo output stays attached to the terminal; Pina prints a short completion summary only after success.
