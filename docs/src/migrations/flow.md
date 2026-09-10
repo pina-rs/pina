@@ -158,11 +158,26 @@ Accounts in one instruction migrate independently — a mixed set (`Profile@v0`,
 |                     | Client (generated)                                                   | Program (generated + handler)                                                                                                   |
 | ------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Version envelope    | writes its frozen version automatically; caller never sees it        | reads it before any payload decode                                                                                              |
-| Account data        | never migrates, never rewrites                                       | migrates on demand, on-chain, in-transaction                                                                                    |
+| Account data        | never migrates, never rewrites; **refuses to decode** other versions | migrates on demand, on-chain, in-transaction                                                                                    |
 | Instruction payload | encodes args in its version's shape                                  | normalizes stale payloads into current args                                                                                     |
 | Rent for growth     | supplies an explicit payer account when the instruction declares one | transfers only the deficit, capped, never refunds                                                                               |
 | Old clients         | keep sending their old bytes unchanged                               | are the reason the whole system exists                                                                                          |
 | Breaking cases      | —                                                                    | fail closed: unknown/future versions, privilege changes, unprovable process changes are rejected or require a new discriminator |
+
+## Paying for growth
+
+Migration that only moves bytes is free beyond compute. Migration that makes an account **bigger** must also make it rent-exempt at its new size, and that lamports transfer happens inside the touching transaction:
+
+- the program transfers only the **deficit** (rent-exempt minimum at the new size minus what the account already holds), never more;
+- the payer is the instruction's declared migration payer — a transaction signer, or one of the program's own PDAs signing through `invoke_signed`;
+- the transfer is capped by the `max_lamports` budget the program passes to the executor. An undersized budget fails the whole transaction with `MigrationBudgetExceeded` — nothing is half-migrated — but the account also stays stale until the budget is raised, so size it deliberately.
+
+A planning figure for that budget: rent exemption costs about **6,960 lamports per byte** (3,480 lamports per byte-year at the two-year exemption threshold), so growing an account by _N_ bytes needs roughly `N × 6,960` lamports of head room on top of what the account already holds. `pina migrations make` prints a warning with the exact growth and estimate whenever a transition grows an account or keeps a compact (capacity-driven) layout.
+
+Two consequences follow from the payer model:
+
+1. **An old client cannot fund growth.** A client generated before the instruction gained its optional `migrationPayer` slot submits without a payer; if the account it touches now needs rent, that transaction fails with `MigrationRequired`. The fix is a current client (or a payer-carrying migration path) — by design, rent is never taken from an account the client did not offer.
+2. **The compute bill lands on the touching transaction.** A stale account pays its ladder's compute cost inside whichever transaction finds it, and `MAX_INLINE_STEPS` bounds how long that ladder may be. Accounts that are too expensive to migrate inline fail with `MigrationUnavailable` rather than silently burning the budget; migrating them out of band is what the [Migrate instruction](../adrs/0008-migration-ux-and-legacy-adoption.md) is for.
 
 ## The four scenarios
 

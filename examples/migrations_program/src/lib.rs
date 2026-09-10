@@ -4,6 +4,10 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
+// Rent-exemption head room for on-demand growth: roughly 6,960 lamports per
+// grown byte (3,480 per byte-year at the two-year exemption threshold), so
+// 20,000 covers the example's one-to-two byte growth steps with margin.
+// `pina migrations make` prints the same estimate when a transition grows.
 const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 
 #[discriminator]
