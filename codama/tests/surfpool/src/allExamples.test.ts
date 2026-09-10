@@ -95,7 +95,11 @@ type InstructionNode = {
 	kind: "instructionNode";
 	name: string;
 	accounts?: Array<{ name: string }>;
-	arguments?: Array<{ name: string; type: TypeNode }>;
+	arguments?: Array<{
+		name: string;
+		type: TypeNode;
+		defaultValueStrategy?: string;
+	}>;
 	discriminators?: DiscriminatorNode[];
 };
 
