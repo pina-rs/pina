@@ -91,6 +91,10 @@ type = "cargo"
 path = "crates/pina_cli"
 type = "cargo"
 
+[package.pina_cli_renderer]
+path = "crates/pina_cli_renderer"
+type = "cargo"
+
 [package.pina_macros]
 path = "crates/pina_macros"
 type = "cargo"
@@ -183,6 +187,7 @@ packages = [
 	"pina_cli",
 	"pina_lints",
 	"pina_macros",
+	"pina_cli_renderer",
 	"pina_codama_renderer",
 	"pina_cpi_renderer",
 	"pina_profile",

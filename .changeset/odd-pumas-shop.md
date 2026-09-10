@@ -1,13 +1,15 @@
 ---
-"pina_cli_renderer": feat
+pina_cli_renderer: feat
+pina_cli: feat
+pina_codama_renderer: fix
 "@pina-rs/codama-renderer-cli": feat
-"pina_cli": feat
 ---
 
 Add CLI client generation for Codama IDLs in three languages: `pina generate --client cli-rust`, `--client cli-ts`, and `--client cli-dart`.
 
-- `pina_cli_renderer` (Rust): renders complete clap-based CLI crates — one subcommand per instruction with typed flags and validation, automatic PDA derivation from IDL seed definitions, a `fetch` command per state account (including compact accounts), decoded program-error names, and shared RPC/keypair/send/simulate plumbing with https-only endpoint enforcement.
-- `@pina-rs/codama-renderer-cli`: renders commander-based TypeScript CLI apps on top of generated `@solana/kit` clients, and `args`-based Dart CLI commands on top of generated solana_kit clients, each with the same command surface and safety rules.
-- `pina codama generate` gains `--cli-rust-out`, `--cli-ts-out`, and `--cli-dart-out`; generated Rust CLIs for every example program are committed under `codama/clients/cli/rust`, TypeScript apps under `codama/clients/cli/ts`, and one shared Dart package under `codama/clients/cli/dart`, all exercised in CI.
+- `pina_cli_renderer` (new crate): renders complete clap-based CLI crates — one subcommand per instruction with typed, validated flags, automatic PDA derivation from IDL seed definitions, a `fetch` command per state account (compact-aware), decoded program-error names, and shared RPC/keypair/send/simulate plumbing with https-only endpoint enforcement and account-owner checks.
+- `@pina-rs/codama-renderer-cli` (new package): renders commander-based TypeScript CLI apps on generated `@solana/kit` clients and `args`-based Dart CLI commands on generated solana_kit clients, with the same command surface and safety rules.
+- `pina_cli`: `pina codama generate` gains opt-in `--cli-rust-out`, `--cli-ts-out`, and `--cli-dart-out`; CLI generation runs only when one of them is provided.
+- `pina_codama_renderer`: emit `Vec::with_capacity(remaining_accounts.len())` instead of `0 + len` for instructions without accounts.
 
-Selecting a CLI implies its base client, and projects normally pick one CLI; selecting several prints a warning.
+Generated CLIs for every example program are committed under `codama/clients/cli/{rust,ts,dart}`; the Rust crates are workspace members, the TypeScript apps are covered by `check:js`, and the Dart package is analyzer-clean.
