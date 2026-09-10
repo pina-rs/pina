@@ -19,7 +19,6 @@ pub mod require_canonical_bump_before_pda_write;
 pub mod require_canonical_instruction_dispatch_for_idl;
 pub mod require_checked_asset_arithmetic;
 pub mod require_consistent_token_program;
-pub mod require_empty_before_init;
 pub mod require_explicit_discriminators_and_seed_namespaces;
 pub mod require_explicit_token_2022_extension_policy;
 pub mod require_idl_root_to_define_one_program_id;

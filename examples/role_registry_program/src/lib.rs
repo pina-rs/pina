@@ -176,7 +176,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
-		self.registry_config.assert_empty()?;
 
 		CreateProgramAccountWithBump {
 			account: self.registry_config,
@@ -206,7 +205,6 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config.assert_not_empty()?;
-		self.role_entry.assert_empty()?;
 
 		let role_count = {
 			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;

@@ -240,7 +240,7 @@ chmod +x "$root/bin/pina_lint_driver"
 		let environment = self.managed_environment();
 		fs::write(
 			self.project.join("pina.toml"),
-			"[project]\nprogram = \".\"\n\n[lints]\nrequire_empty_before_init = \
+			"[project]\nprogram = \".\"\n\n[lints]\nrequire_writable_before_account_resize = \
 			 \"deny\"\ndeny_heap_allocations_in_onchain_instruction_handlers = \
 			 \"warn\"\nrequire_zeroed_before_close = \"allow\"\n",
 		)

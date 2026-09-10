@@ -216,7 +216,7 @@ fn lint_forwards_configured_levels_to_the_driver() {
 	let fixture = Fixture::new(
 		"pina-lint-levels",
 		Some(
-			"require_empty_before_init = \
+			"require_writable_before_account_resize = \
 			 \"deny\"\ndeny_heap_allocations_in_onchain_instruction_handlers = \"warn\"\n",
 		),
 	);
@@ -233,7 +233,7 @@ fn lint_forwards_configured_levels_to_the_driver() {
 	assert!(
 		log.contains(
 			"levels=deny_heap_allocations_in_onchain_instruction_handlers=warn,\
-			 require_empty_before_init=deny"
+			 require_writable_before_account_resize=deny"
 		),
 		"log: {log}"
 	);
@@ -253,7 +253,7 @@ fn lint_rejects_unknown_lint_names() {
 		"stderr: {stderr}"
 	);
 	assert!(
-		stderr.contains("require_empty_before_init"),
+		stderr.contains("require_writable_before_account_resize"),
 		"stderr: {stderr}"
 	);
 }
@@ -262,7 +262,7 @@ fn lint_rejects_unknown_lint_names() {
 fn lint_rejects_invalid_lint_levels() {
 	let fixture = Fixture::new(
 		"pina-lint-level",
-		Some("require_empty_before_init = \"error\"\n"),
+		Some("require_writable_before_account_resize = \"error\"\n"),
 	);
 	let output = fixture
 		.command()
@@ -271,7 +271,9 @@ fn lint_rejects_invalid_lint_levels() {
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("Invalid level `error` for lint `require_empty_before_init` in [lints]"),
+		stderr.contains(
+			"Invalid level `error` for lint `require_writable_before_account_resize` in [lints]"
+		),
 		"stderr: {stderr}"
 	);
 }

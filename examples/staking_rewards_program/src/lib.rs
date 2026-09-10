@@ -239,7 +239,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state.assert_empty()?;
 		self.stake_vault
 			.assert_empty()?
 			.assert_writable()?
@@ -315,7 +314,6 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		self.user.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.pool_state.assert_not_empty()?;
-		self.position_state.assert_empty()?;
 
 		// Check pool is not paused
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;

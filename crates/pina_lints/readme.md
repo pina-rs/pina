@@ -65,7 +65,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 
 | Lint                                                    | Level | Primary invariant                                   |
 | ------------------------------------------------------- | ----- | --------------------------------------------------- |
-| `require_empty_before_init`                             | deny  | Program accounts cannot be reinitialized            |
 | `require_program_check_before_cpi`                      | deny  | CPI targets are authenticated                       |
 | `deny_heap_allocations_in_onchain_instruction_handlers` | warn  | On-chain handlers avoid unbounded allocation cost   |
 | `require_writable_before_account_resize`                | deny  | Resize targets are writable                         |
@@ -87,17 +86,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_explicit_discriminators_and_seed_namespaces`   | warn  | Examples expose type and PDA namespaces             |
 
 ## Security and correctness reference
-
-### `require_empty_before_init`
-
-Detects `CreateProgramAccount`, `CreateProgramAccountWithBump`, and the matching creation functions when the target account has not first passed `assert_empty()`. It recognizes inline builders and builders stored in local variables.
-
-```rust
-state.assert_empty()?;
-CreateProgramAccount { account: state, payer, owner: &ID, seeds }.invoke::<State>()?;
-```
-
-The analysis tracks concrete local/field places and builder bindings within one function. Validation hidden behind a helper is not treated as proof at the call site.
 
 ### `require_program_check_before_cpi`
 

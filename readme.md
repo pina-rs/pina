@@ -1029,7 +1029,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Always call `assert_signer()`** before trusting authority accounts
 - **Use Pina's token loaders directly** because they delegate canonical owner and layout validation to the corresponding checked upstream parser before returning typed state
 - **Use `as_associated_token_account()`** when reading a canonical ATA because it validates the runtime owner, derived address, stored current authority, and stored mint together; enforce state, delegate, close-authority, and extension policy separately
-- **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
+- **Create accounts through the typed creation builders**, which reject targets whose storage is not zeroed with `AccountAlreadyInitialized`
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view, so the layout, canonical bump, and PDA address are validated during the same borrow

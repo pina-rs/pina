@@ -217,7 +217,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let seeds = Journal::seeds(&authority_key);
 
 		self.authority.assert_signer()?.assert_writable()?;
-		self.journal.assert_empty()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		CreateCompactProgramAccountWithBump {
