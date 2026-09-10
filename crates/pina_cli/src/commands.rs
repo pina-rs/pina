@@ -177,13 +177,12 @@ fn run_migrations(command: MigrationCommands) {
 							..
 						},
 					) => {
-						if json {
-							if let pina_cli::migrations::MigrationError::DisambiguationRequired {
+						if json
+							&& let pina_cli::migrations::MigrationError::DisambiguationRequired {
 								questions,
 							} = &error
-							{
-								print_json(&questions);
-							}
+						{
+							print_json(&questions);
 						}
 						eprintln!("{} {error}", "Error".red().bold());
 						std::process::exit(1);

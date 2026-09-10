@@ -255,30 +255,37 @@ pub struct DisambiguationQuestion {
 
 impl DisambiguationQuestion {
 	fn render_all(questions: &[DisambiguationQuestion]) -> String {
-		let mut rendered = String::from(
+		let question_lines = questions
+			.iter()
+			.map(|question| {
+				if question.to.is_empty() {
+					format!(
+						"\n  - `{}`: field `{}` (type `{}`) is removed and its stored data is \
+						 discarded. Answer with `--assume-removed {}` to acknowledge the loss",
+						question.contract, question.from, question.rust_type, question.from
+					)
+				} else {
+					format!(
+						"\n  - `{}`: was `{}` renamed to `{}` (type `{}`)? Answer with `--rename \
+						 {}:{}` to preserve its data, or `--assume-removed {}` to discard the old \
+						 field and zero-initialize `{}`",
+						question.contract,
+						question.from,
+						question.to,
+						question.rust_type,
+						question.from,
+						question.to,
+						question.from,
+						question.to
+					)
+				}
+			})
+			.collect::<String>();
+		format!(
 			"ambiguous field changes need an explicit answer before this migration can be \
-			 generated",
-		);
-		for question in questions {
-			rendered.push_str(&format!(
-				"\n  - `{}`: was `{}` renamed to `{}` (type `{}`)? Answer with `--rename {}:{}` \
-				 to preserve its data, or `--assume-removed {}` to discard the old field and \
-				 zero-initialize `{}`",
-				question.contract,
-				question.from,
-				question.to,
-				question.rust_type,
-				question.from,
-				question.to,
-				question.from,
-				question.to
-			));
-		}
-		rendered.push_str(
-			"\nRun `pina migrations make` again with those flags, or answer the prompts \
-			 interactively on a terminal",
-		);
-		rendered
+			 generated{question_lines}\nRun `pina migrations make` again with those flags, or \
+			 answer the prompts interactively on a terminal"
+		)
 	}
 }
 
@@ -332,7 +339,13 @@ fn resolve_field_changes(
 	answers: &MigrationAnswers,
 	warnings: &mut Vec<String>,
 ) -> Result<(Vec<pina_abi::RenameMapping>, BTreeSet<String>), MigrationError> {
-	let mut renames: Vec<pina_abi::RenameMapping> = previous_renames.to_vec();
+	// Only renames whose source field still exists apply to this hop;
+	// earlier hops' renames are already baked into the stored schema.
+	let mut renames: Vec<pina_abi::RenameMapping> = previous_renames
+		.iter()
+		.filter(|mapping| source.fields.iter().any(|field| field.name == mapping.from))
+		.cloned()
+		.collect();
 	let mut dropped = answers.removed.clone();
 
 	for mapping in &renames {
@@ -347,6 +360,11 @@ fn resolve_field_changes(
 		}
 	}
 
+	let destination_types = destination
+		.fields
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
 	let source_names = source
 		.fields
 		.iter()
@@ -415,9 +433,41 @@ fn resolve_field_changes(
 				));
 				continue;
 			}
-			// An unpaired removal is a type change or structural change.
-			// Leave the raw diff untouched so the transition stays manual
-			// with a TODO body the developer owns.
+			// An unpaired removal discards stored data, so it needs the same
+			// explicit acknowledgement as a declined rename. Type changes
+			// (the removed name reappears with a different type) never pair
+			// and still fall through to a manual TODO transition.
+			let same_name_retyped = destination_types
+				.get(removed_field.name.as_str())
+				.is_some_and(|destination_type| {
+					*destination_type != removed_field.rust_type.as_str()
+				});
+			if same_name_retyped {
+				continue;
+			}
+			let question = DisambiguationQuestion {
+				contract: contract.to_owned(),
+				from: removed_field.name.clone(),
+				to: String::new(),
+				rust_type: removed_field.rust_type.clone(),
+			};
+			if answers.no_interactive || !std::io::stdin().is_terminal() {
+				questions.push(question);
+				continue;
+			}
+			match prompt_removal(&question) {
+				RenameAnswer::Remove => {
+					dropped.insert(removed_field.name.clone());
+					warnings.push(format!(
+						"contract `{contract}`: field `{}` (type `{}`) is removed by this \
+						 migration and its stored data is discarded",
+						removed_field.name, removed_field.rust_type
+					));
+				}
+				RenameAnswer::Rename | RenameAnswer::Abort => {
+					questions.push(question);
+				}
+			}
 			continue;
 		};
 		let question = DisambiguationQuestion {
@@ -446,7 +496,7 @@ fn resolve_field_changes(
 				renames.push(pina_abi::RenameMapping {
 					from: removed_field.name.clone(),
 					to: candidate.name.clone(),
-				})
+				});
 			}
 			RenameAnswer::Remove => {
 				dropped.insert(removed_field.name.clone());
@@ -501,6 +551,35 @@ fn prompt_rename(question: &DisambiguationQuestion) -> RenameAnswer {
 		match line.trim().to_ascii_lowercase().as_str() {
 			"y" | "yes" | "rename" => return RenameAnswer::Rename,
 			"n" | "no" | "remove" => return RenameAnswer::Remove,
+			_ => {
+				println!("Answer `y` or `n`.");
+			}
+		}
+	}
+	RenameAnswer::Abort
+}
+
+/// Confirm one data-dropping removal on an interactive terminal.
+fn prompt_removal(question: &DisambiguationQuestion) -> RenameAnswer {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+
+	for _ in 0..3 {
+		println!(
+			"Field `{}` (type `{}`) is removed for `{}` and its stored data is discarded.",
+			question.from, question.rust_type, question.contract
+		);
+		print!("Acknowledge the removal? (y/n): ");
+		if std::io::stdout().flush().is_err() {
+			return RenameAnswer::Abort;
+		}
+		let mut line = String::new();
+		if std::io::stdin().lock().read_line(&mut line).is_err() {
+			return RenameAnswer::Abort;
+		}
+		match line.trim().to_ascii_lowercase().as_str() {
+			"y" | "yes" | "remove" => return RenameAnswer::Remove,
+			"n" | "no" | "abort" => return RenameAnswer::Abort,
 			_ => {
 				println!("Answer `y` or `n`.");
 			}
