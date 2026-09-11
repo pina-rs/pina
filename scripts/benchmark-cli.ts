@@ -170,14 +170,30 @@ function formatCount(count: number, singular: string): string {
 function run(arguments_: Arguments): void {
 	const commands: string[] = [];
 	const baseSupported = new Map<string, boolean>();
+	const cleanPaths = COMMANDS.filter((command) => "clean" in command).map(
+		(command) => resolve(command.clean),
+	);
+
+	// The renderer refuses to rewrite a generated tree written by a different
+	// revision, and base and head alternate on the same output directory. A
+	// clean slate before every probe and every timed run keeps each side
+	// measuring a cold generation.
+	const cleanOutputs = () => {
+		for (const path of cleanPaths) {
+			rmSync(path, { recursive: true, force: true });
+		}
+	};
+	const prepareArgument = cleanPaths.length === 0
+		? []
+		: ["--prepare", `rm -rf ${cleanPaths.map(shellQuote).join(" ")}`];
 
 	for (const command of COMMANDS) {
-		if ("clean" in command) {
-			rmSync(resolve(command.clean), { recursive: true, force: true });
-		}
+		cleanOutputs();
 
 		const supportsBase = commandSucceeds(arguments_.baseBin, command.args);
 		baseSupported.set(command.id, supportsBase);
+
+		cleanOutputs();
 
 		if (!commandSucceeds(arguments_.headBin, command.args)) {
 			throw new Error(
@@ -213,6 +229,7 @@ function run(arguments_: Arguments): void {
 		"--style",
 		"basic",
 		"--shell=none",
+		...prepareArgument,
 		"--export-json",
 		arguments_.jsonOutput,
 		...commands,
