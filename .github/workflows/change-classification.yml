@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: setup devenv
-        uses: ./.github/actions/devenv
+        uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
