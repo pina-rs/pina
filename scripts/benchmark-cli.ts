@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const WARMUP_RUNS = 1;
@@ -28,6 +28,10 @@ const COMMANDS = [
 			"--output",
 			"target/benchmark/clients/cli-rust",
 		],
+		// The renderer only rewrites a tree it recognises as its own, and the
+		// generated header changes between revisions. CI restores `target/` from
+		// cache, so a tree written by an older revision would abort the run.
+		clean: "target/benchmark/clients/cli-rust",
 	},
 ] as const;
 
@@ -168,6 +172,10 @@ function run(arguments_: Arguments): void {
 	const baseSupported = new Map<string, boolean>();
 
 	for (const command of COMMANDS) {
+		if ("clean" in command) {
+			rmSync(resolve(command.clean), { recursive: true, force: true });
+		}
+
 		const supportsBase = commandSucceeds(arguments_.baseBin, command.args);
 		baseSupported.set(command.id, supportsBase);
 

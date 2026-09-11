@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class RoleEntry {
   const RoleEntry({
@@ -22,8 +20,7 @@ class RoleEntry {
     required this.permissions,
     required this.active,
     required this.bump,
-  }) :
-      discriminator = 2;
+  }) : discriminator = 2;
 
   final int discriminator;
   final Address registry;
@@ -47,12 +44,20 @@ class RoleEntry {
           bump == other.bump;
 
   @override
-  int get hashCode => Object.hash(discriminator, registry, roleId, grantee, permissions, active, bump);
+  int get hashCode => Object.hash(
+    discriminator,
+    registry,
+    roleId,
+    grantee,
+    permissions,
+    active,
+    bump,
+  );
 
   @override
-  String toString() => 'RoleEntry(discriminator: $discriminator, registry: $registry, roleId: $roleId, grantee: $grantee, permissions: $permissions, active: $active, bump: $bump)';
+  String toString() =>
+      'RoleEntry(discriminator: $discriminator, registry: $registry, roleId: $roleId, grantee: $grantee, permissions: $permissions, active: $active, bump: $bump)';
 }
-
 
 Encoder<RoleEntry> getRoleEntryEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -91,47 +96,41 @@ Decoder<RoleEntry> getRoleEntryDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'roleEntry account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'roleEntry account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (RoleEntry, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(2),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
       RoleEntry(
-      registry: map['registry']! as Address,
-      roleId: map['roleId']! as BigInt,
-      grantee: map['grantee']! as Address,
-      permissions: map['permissions']! as BigInt,
-      active: map['active']! as bool,
-      bump: map['bump']! as int,
+        registry: map['registry']! as Address,
+        roleId: map['roleId']! as BigInt,
+        grantee: map['grantee']! as Address,
+        permissions: map['permissions']! as BigInt,
+        active: map['active']! as bool,
+        bump: map['bump']! as int,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() =>
-      FixedSizeDecoder<RoleEntry>(
-        fixedSize: structDecoder.fixedSize,
-        read: (bytes, offset) {
-          final bytesLength = bytes.length - offset;
-          if (bytesLength < structDecoder.fixedSize) {
-            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-          }
-          return readTopLevel(bytes, offset);
-        },
-      ),
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<RoleEntry>(
+      fixedSize: structDecoder.fixedSize,
+      read: (bytes, offset) {
+        final bytesLength = bytes.length - offset;
+        if (bytesLength < structDecoder.fixedSize) {
+          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+        }
+        return readTopLevel(bytes, offset);
+      },
+    ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<RoleEntry>(
         read: readTopLevel,

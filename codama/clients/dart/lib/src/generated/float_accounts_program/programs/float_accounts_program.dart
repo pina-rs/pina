@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -12,20 +11,16 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
-
 /// The address of the FloatAccountsProgram program.
-const floatAccountsProgramProgramAddress = Address('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS');
+const floatAccountsProgramProgramAddress = Address(
+  'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
+);
 
 /// Known accounts for the FloatAccountsProgram program.
-enum FloatAccountsProgramAccount {
-  floatDataAccount,
-}
+enum FloatAccountsProgramAccount { floatDataAccount }
 
 /// Known instructions for the FloatAccountsProgram program.
-enum FloatAccountsProgramInstruction {
-  create,
-  update,
-}
+enum FloatAccountsProgramInstruction { create, update }
 
 /// Identifies the type of a FloatAccountsProgram instruction.
 FloatAccountsProgramInstruction identifyFloatAccountsProgramInstruction(
@@ -38,13 +33,10 @@ FloatAccountsProgramInstruction identifyFloatAccountsProgramInstruction(
     return FloatAccountsProgramInstruction.update;
   }
 
-  throw SolanaError(
-    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
-    {
-      'instructionData': data,
-      'programName': 'floatAccountsProgram',
-    },
-  );
+  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
+    'instructionData': data,
+    'programName': 'floatAccountsProgram',
+  });
 }
 
 /// A parsed instruction from the FloatAccountsProgram program.
@@ -57,7 +49,7 @@ sealed class ParsedFloatAccountsProgramInstruction {
 /// A parsed Create instruction.
 final class ParsedCreate extends ParsedFloatAccountsProgramInstruction {
   const ParsedCreate({required this.data})
-      : super(FloatAccountsProgramInstruction.create);
+    : super(FloatAccountsProgramInstruction.create);
 
   final CreateInstructionData data;
 }
@@ -65,7 +57,7 @@ final class ParsedCreate extends ParsedFloatAccountsProgramInstruction {
 /// A parsed Update instruction.
 final class ParsedUpdate extends ParsedFloatAccountsProgramInstruction {
   const ParsedUpdate({required this.data})
-      : super(FloatAccountsProgramInstruction.update);
+    : super(FloatAccountsProgramInstruction.update);
 
   final UpdateInstructionData data;
 }
