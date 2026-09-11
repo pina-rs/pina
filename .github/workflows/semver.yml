@@ -10,10 +10,41 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# semver-checks only has signal when workspace crate sources or their
+# dependency graph change. Other pull requests skip the job; label a pull
+# request `ci-full` to force a run.
 jobs:
-  semver-checks:
-    timeout-minutes: 45
+  changes:
+    name: detect changes
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant_any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: classify changed paths
+        id: filter
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files_yaml: |
+            relevant:
+              - crates/**
+              - Cargo.toml
+              - Cargo.lock
+              - rust-toolchain.toml
+              - .github/workflows/semver.yml
+
+  semver-checks:
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

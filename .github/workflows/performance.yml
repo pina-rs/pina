@@ -5,6 +5,31 @@ on:
   pull_request:
     branches:
       - main
+    # Benchmarks only carry signal when program or runtime code, their build
+    # inputs, or the benchmark harness itself change. The performance workflow
+    # is not a required status check, so a skipped run (and its missing PR
+    # comment) is safe for docs- and tooling-only pull requests. Pushes to
+    # `main` do not run this workflow: benchmarks compare against the PR base.
+    paths:
+      - crates/**
+      - examples/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - devenv.nix
+      - devenv.lock
+      - devenv.yaml
+      - .github/actions/devenv/**
+      - scripts/benchmark-cli.ts
+      - scripts/benchmark-core.ts
+      - scripts/profile-tracked-examples.ts
+      - scripts/profile-example-diffs.ts
+      - scripts/build-runtime-compute-units.ts
+      - scripts/measure-example-compute-units.ts
+      - scripts/measure-runtime-compute-units.ts
+      - scripts/compare-compute-units.ts
+      - scripts/compute-unit-policy.json
+      - .github/workflows/performance.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -11,10 +11,40 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The preview is only meaningful when a pull request adds or removes
+# changesets, or when it carries the `release` label used by release pull
+# requests. Everything else skips the job; `ci-full` forces a run.
 jobs:
-  preview:
-    timeout-minutes: 45
+  changes:
+    name: detect changes
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
+    # Manual dispatches always run the preview; detection only gates pull
+    # requests.
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      changesets: ${{ steps.filter.outputs.changesets_any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: classify changed paths
+        id: filter
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files_yaml: |
+            changesets:
+              - .changeset/**
+              - .github/workflows/release-preview.yml
+
+  preview:
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.changesets == 'true' || contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
