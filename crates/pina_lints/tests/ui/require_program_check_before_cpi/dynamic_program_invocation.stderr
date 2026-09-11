@@ -13,7 +13,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:69:2
@@ -21,7 +21,7 @@ error: `.invoke_signed_with_unverified_program()` called without a preceding pro
 LL |     Instruction.invoke_signed_with_unverified_program(&[], token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:74:2
@@ -29,7 +29,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction::invoke_with_unverified_program(&Instruction, token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:77:2
@@ -37,7 +37,7 @@ error: `.invoke_signed_with_unverified_program()` called without a preceding pro
 LL |     Instruction::invoke_signed_with_unverified_program(&Instruction, &[], token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `invoke_with_unverified_program` cannot be used as a function value
   --> $DIR/dynamic_program_invocation.rs:82:15
@@ -117,7 +117,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:163:2
@@ -125,7 +125,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:172:2
@@ -133,7 +133,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:181:2
@@ -141,7 +141,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:191:2
@@ -149,7 +149,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:201:2
@@ -157,7 +157,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(second.token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:215:3
@@ -165,7 +165,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |         Instruction.invoke_with_unverified_program(token_program.address())?;
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:230:2
@@ -173,7 +173,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:242:2
@@ -181,7 +181,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:249:2
@@ -189,7 +189,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:267:2
@@ -197,7 +197,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:280:2
@@ -205,7 +205,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:296:2
@@ -213,7 +213,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:382:2
@@ -221,7 +221,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:389:2
@@ -229,7 +229,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:399:2
@@ -237,7 +237,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:410:2
@@ -245,7 +245,7 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:421:2
@@ -253,6 +253,6 @@ error: `.invoke_with_unverified_program()` called without a preceding program ad
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&trusted_program_id)?` before the unverified CPI invocation; the expected ID must come from a const or immutable static whose type contains no interior mutability
 
 error: aborting due to 32 previous errors

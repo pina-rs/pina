@@ -3,6 +3,7 @@
 //! Analyzes compiled `.so` ELF binaries to estimate per-function compute unit
 //! costs without requiring a running validator.
 
+pub mod compare;
 pub mod cost;
 pub mod elf;
 pub mod output;
@@ -10,6 +11,16 @@ pub mod sbf;
 
 use std::path::Path;
 
+pub use compare::Baseline;
+pub use compare::BaselineDocument;
+pub use compare::BaselineError;
+pub use compare::ComparisonReport;
+pub use compare::ComparisonStatus;
+pub use compare::FunctionChange;
+pub use compare::FunctionDelta;
+pub use compare::ProgramTotals;
+pub use compare::RegressionThreshold;
+pub use compare::TotalsDelta;
 pub use cost::FunctionProfile;
 pub use cost::ProgramProfile;
 pub use output::OutputFormat;

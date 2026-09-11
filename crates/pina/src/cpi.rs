@@ -1104,8 +1104,14 @@ pub type AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> =
 
 /// Maximum number of bytes an account may grow by in a single instruction.
 ///
-/// This limit is enforced by the Solana runtime. Attempting to grow an account
-/// by more than this amount returns `ProgramError::InvalidRealloc`.
+/// Currently `10 KiB` (`1_024 * 10 = 10_240` bytes), mirroring the Solana
+/// runtime constant of the same name. This is the historical, still-current
+/// cap; there has never been a 1 KiB per-instruction limit.
+///
+/// This limit is enforced by the Solana runtime itself. Attempting to grow an
+/// account by more than this amount returns `ProgramError::InvalidRealloc`,
+/// both from the runtime when it deserializes the account and from Pina's
+/// reallocation builders before any rent is moved.
 #[cfg(feature = "account-resize")]
 pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 
@@ -2158,6 +2164,16 @@ mod tests {
 			ReallocPlan::try_new(0, target_size, 0, 0),
 			Err(ProgramError::InvalidRealloc)
 		);
+	}
+
+	/// Pins the documented growth limit to the Solana runtime's 10 KiB cap. If
+	/// pinocchio ever changes the constant, the framework's reallocation
+	/// documentation and guards must be re-reviewed against the runtime
+	/// instead of silently drifting (issue #277 reported a phantom 1 KiB cap).
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn max_permitted_data_increase_is_the_runtime_ten_kib_cap() {
+		assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10 * 1024);
 	}
 
 	#[test]

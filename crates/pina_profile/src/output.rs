@@ -73,7 +73,7 @@ fn write_json(profile: &ProgramProfile, w: &mut dyn Write) -> Result<(), OutputE
 }
 
 /// Truncate a function name to fit in a column, adding `..` if needed.
-fn truncate_name(name: &str, max_len: usize) -> String {
+pub fn truncate_name(name: &str, max_len: usize) -> String {
 	if name.len() <= max_len {
 		return name.to_owned();
 	}

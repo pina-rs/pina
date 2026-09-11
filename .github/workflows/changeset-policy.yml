@@ -23,7 +23,10 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      # Commenting on a pull request needs the pull-requests write scope: with
+      # only `issues: write` the comment API returns 403 "Resource not
+      # accessible by integration", and the action degrades to a warning.
+      pull-requests: write
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

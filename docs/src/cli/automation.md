@@ -77,6 +77,13 @@ pina profile ./target/deploy/counter_program.so --json > /tmp/profile.json
 jq -e '.functions | type == "array"' /tmp/profile.json
 ```
 
+Diff the current build against a saved baseline; the exit status is 2 when a total CU regression reaches both `--fail-cu` and `--fail-percent`:
+
+```bash
+pina profile compare /tmp/profile.json --json > /tmp/comparison.json
+jq -e '.status == "unchanged" or .status == "improved"' /tmp/comparison.json
+```
+
 Diagnose project readiness through the versioned JSON contract:
 
 ```bash

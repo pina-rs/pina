@@ -467,12 +467,20 @@ pub(crate) enum Commands {
 	///
 	/// Performs static analysis of an SBF shared object. Text is written to
 	/// stdout by default. Use --json for machine-readable output and --output
-	/// to write either format to a file.
+	/// to write either format to a file. Use `pina profile compare` to diff a
+	/// saved baseline report against the current artifact.
 	#[command(
 		after_help = "Examples:\n  pina profile\n  pina profile --json\n  pina profile --project \
 		              ./programs/counter_program\n  pina profile \
 		              ./target/deploy/counter_program.so --json\n  pina profile \
-		              ./target/deploy/counter_program.so --json -o ./profile.json"
+		              ./target/deploy/counter_program.so --json -o ./profile.json\n  pina profile \
+		              compare ./profile.json\n  pina profile compare ./profile.json \
+		              ./target/deploy/counter_program.so --json\n  pina profile compare \
+		              ./profile.json --fail-cu 100 --fail-percent 5\n\nBaselines:\n  compare \
+		              accepts any report written by `pina profile --json`, including the \
+		              versioned baseline document. The exit status is 2 when the total CU \
+		              regression reaches both --fail-cu and --fail-percent, so local runs mirror \
+		              the CI compute-unit gate."
 	)]
 	Profile {
 		/// Compiled SBF shared object. Omit to discover the current project's artifact.
@@ -495,6 +503,10 @@ pub(crate) enum Commands {
 		/// Write the report to FILE instead of stdout.
 		#[arg(short, long, value_name = "FILE")]
 		output: Option<PathBuf>,
+
+		/// Compare the current artifact against a saved baseline report.
+		#[command(subcommand)]
+		command: Option<ProfileCommands>,
 	},
 
 	/// Verify deployed programs and publish source-build records.
@@ -625,6 +637,61 @@ Safety:
 	Codama {
 		#[command(subcommand)]
 		command: CodamaCommands,
+	},
+}
+
+/// Profile report workflows.
+#[derive(Subcommand, Debug)]
+pub(crate) enum ProfileCommands {
+	/// Compare the current artifact against a saved baseline profile report.
+	///
+	/// Profiles the current artifact, loads BASELINE (a report written by
+	/// `pina profile --json` or a versioned baseline document), and prints a
+	/// delta-oriented summary sorted by impact. Exits 2 when the total CU
+	/// regression reaches both --fail-cu and --fail-percent; exit 1 is
+	/// reserved for operational errors.
+	#[command(
+		after_help = "Examples:\n  pina profile compare ./profile.json\n  pina profile compare \
+		              ./profile.json ./target/deploy/counter_program.so\n  pina profile compare \
+		              ./profile.json --json\n  pina profile compare ./profile.json --fail-cu 100 \
+		              --fail-percent 5\n\nBaselines:\n  Capture a baseline with `pina profile \
+		              --json --output ./profile.json` before changing the program, rebuild, then \
+		              run this command. Functions are matched by symbol name; added and removed \
+		              functions are reported separately."
+	)]
+	Compare {
+		/// Saved profile report used as the comparison baseline.
+		#[arg(value_name = "BASELINE")]
+		baseline: PathBuf,
+
+		/// Compiled SBF shared object. Omit to discover the current project's artifact.
+		#[arg(value_name = "PROGRAM.SO")]
+		path: Option<PathBuf>,
+
+		/// Project used for artifact discovery when PROGRAM.SO is omitted.
+		#[arg(
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Emit a stable machine-readable comparison document.
+		#[arg(long)]
+		json: bool,
+
+		/// Absolute total-CU increase that fails the comparison.
+		#[arg(long, default_value_t = pina_profile::compare::DEFAULT_FAIL_DELTA_CU, value_name = "CU")]
+		fail_cu: u64,
+
+		/// Percentage total-CU increase that fails the comparison. Both limits must be reached.
+		#[arg(
+			long,
+			default_value_t = pina_profile::compare::DEFAULT_FAIL_DELTA_PERCENT,
+			value_name = "PERCENT"
+		)]
+		fail_percent: f64,
 	},
 }
 

@@ -379,3 +379,369 @@ fn cli_profile_fails_closed_when_cargo_metadata_is_invalid() {
 		"{stderr}"
 	);
 }
+
+/// Profile an ELF through the CLI and save the JSON report as a baseline file.
+fn write_baseline(elf_path: &Path) -> tempfile::NamedTempFile {
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["profile", elf_path.to_str().unwrap(), "--json"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to profile baseline: {error}"));
+
+	assert!(
+		output.status.success(),
+		"baseline profiling failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let file = tempfile::Builder::new()
+		.suffix(".json")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::write(file.path(), &output.stdout)
+		.unwrap_or_else(|error| panic!("baseline write failed: {error}"));
+	file
+}
+
+fn run_compare(baseline: &Path, artifact: &Path, extra_args: &[&str]) -> std::process::Output {
+	Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("profile")
+		.arg("compare")
+		.arg(baseline)
+		.arg(artifact)
+		.args(extra_args)
+		.output()
+		.unwrap_or_else(|error| panic!("compare failed to launch: {error}"))
+}
+
+#[test]
+fn cli_profile_compare_identical_reports_exit_zero() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let baseline = write_baseline(artifact.path());
+
+	let output = run_compare(baseline.path(), artifact.path(), &[]);
+
+	assert!(
+		output.status.success(),
+		"identical comparison failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("No function-level changes"), "{stdout}");
+	assert!(stdout.contains("No compute unit changes"), "{stdout}");
+	assert!(stdout.contains("20 -> 20"), "{stdout}");
+}
+
+#[test]
+fn cli_profile_compare_flags_regressions_beyond_the_threshold() {
+	let baseline_elf = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let baseline_artifact = write_temp_elf(&baseline_elf);
+	let baseline = write_baseline(baseline_artifact.path());
+	let current_elf = build_sbf_elf(800, &[("entry", 0, 160), ("extra", 160, 640)]);
+	let current_artifact = write_temp_elf(&current_elf);
+
+	let output = run_compare(
+		baseline.path(),
+		current_artifact.path(),
+		&["--fail-cu", "50", "--fail-percent", "10"],
+	);
+
+	assert_eq!(
+		output.status.code(),
+		Some(2),
+		"regression beyond the threshold must exit 2: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("reaches the threshold"), "{stdout}");
+	assert!(stdout.contains("+80 CU"), "{stdout}");
+	// Only changed functions are listed; `entry` is unchanged.
+	assert!(stdout.contains("extra"), "{stdout}");
+	assert!(!stdout.contains("  entry"), "{stdout}");
+}
+
+#[test]
+fn cli_profile_compare_small_regressions_below_the_threshold_exit_zero() {
+	let baseline_elf = build_sbf_elf(800, &[("entry", 0, 160), ("extra", 160, 640)]);
+	let baseline_artifact = write_temp_elf(&baseline_elf);
+	let baseline = write_baseline(baseline_artifact.path());
+	let current_elf = build_sbf_elf(880, &[("entry", 0, 160), ("extra", 160, 720)]);
+	let current_artifact = write_temp_elf(&current_elf);
+
+	let output = run_compare(baseline.path(), current_artifact.path(), &[]);
+
+	assert!(
+		output.status.success(),
+		"small regressions must not fail: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("below the threshold"), "{stdout}");
+	assert!(stdout.contains("+10 CU"), "{stdout}");
+}
+
+#[test]
+fn cli_profile_compare_improvements_exit_zero_under_strict_thresholds() {
+	let baseline_elf = build_sbf_elf(800, &[("entry", 0, 160), ("extra", 160, 640)]);
+	let baseline_artifact = write_temp_elf(&baseline_elf);
+	let baseline = write_baseline(baseline_artifact.path());
+	let current_elf = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let current_artifact = write_temp_elf(&current_elf);
+
+	let output = run_compare(
+		baseline.path(),
+		current_artifact.path(),
+		&["--fail-cu", "5", "--fail-percent", "1"],
+	);
+
+	assert!(
+		output.status.success(),
+		"improvements must not fail: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("improved by 80"), "{stdout}");
+	assert!(stdout.contains("gone"), "{stdout}");
+}
+
+#[test]
+fn cli_profile_compare_reports_added_and_removed_functions() {
+	let baseline_elf = build_sbf_elf(160, &[("first", 0, 160)]);
+	let baseline_artifact = write_temp_elf(&baseline_elf);
+	let baseline = write_baseline(baseline_artifact.path());
+	let current_elf = build_sbf_elf(160, &[("second", 0, 160)]);
+	let current_artifact = write_temp_elf(&current_elf);
+
+	let output = run_compare(baseline.path(), current_artifact.path(), &[]);
+
+	assert!(
+		output.status.success(),
+		"replaced functions must not fail: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("first"), "{stdout}");
+	assert!(stdout.contains("second"), "{stdout}");
+	assert!(stdout.contains("No compute unit changes"), "{stdout}");
+}
+
+#[test]
+fn cli_profile_compare_json_is_stable_machine_readable_output() {
+	let baseline_elf = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let baseline_artifact = write_temp_elf(&baseline_elf);
+	let baseline = write_baseline(baseline_artifact.path());
+	let current_elf = build_sbf_elf(800, &[("entry", 0, 160), ("extra", 160, 640)]);
+	let current_artifact = write_temp_elf(&current_elf);
+
+	let args = [
+		baseline.path().to_str().unwrap(),
+		current_artifact.path().to_str().unwrap(),
+		"--fail-cu",
+		"50",
+		"--fail-percent",
+		"10",
+	];
+	let first = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("profile")
+		.arg("compare")
+		.args(args)
+		.arg("--json")
+		.output()
+		.unwrap_or_else(|error| panic!("compare failed to launch: {error}"));
+	let second = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("profile")
+		.arg("compare")
+		.args(args)
+		.arg("--json")
+		.output()
+		.unwrap_or_else(|error| panic!("compare failed to launch: {error}"));
+
+	assert_eq!(
+		first.status.code(),
+		Some(2),
+		"threshold regression must exit 2 in JSON mode"
+	);
+	assert_eq!(first.stdout, second.stdout, "JSON output must be stable");
+
+	let parsed: serde_json::Value = serde_json::from_slice(&first.stdout)
+		.unwrap_or_else(|error| panic!("invalid comparison JSON: {error}"));
+	assert_eq!(parsed["schema_version"], 1);
+	assert_eq!(parsed["status"], "threshold-regression");
+	assert_eq!(parsed["exceeds_threshold"], true);
+	assert_eq!(parsed["threshold"]["delta_cu"], 50);
+	assert_eq!(parsed["totals"]["baseline"]["total_cu"], 20);
+	assert_eq!(parsed["totals"]["current"]["total_cu"], 100);
+	assert_eq!(parsed["totals"]["delta_cu"], 80);
+	assert_eq!(parsed["totals"]["delta_percent"], 400.0);
+
+	let functions = parsed["functions"]
+		.as_array()
+		.unwrap_or_else(|| panic!("functions must be an array"));
+	let names: Vec<&str> = functions
+		.iter()
+		.map(|function| function["name"].as_str().unwrap_or_default())
+		.collect();
+	assert_eq!(names, vec!["extra", "entry"]);
+	assert_eq!(functions[0]["change"], "added");
+	assert_eq!(functions[0]["baseline_cu"], serde_json::Value::Null);
+	assert_eq!(functions[1]["change"], "unchanged");
+}
+
+#[test]
+fn cli_profile_compare_accepts_versioned_baseline_documents() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let bare = write_baseline(artifact.path());
+	let profile_json = std::fs::read_to_string(bare.path())
+		.unwrap_or_else(|error| panic!("baseline read failed: {error}"));
+	let versioned = format!("{{\"schema_version\": 1, \"profile\": {profile_json}}}");
+	let versioned_file = tempfile::Builder::new()
+		.suffix(".json")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::write(versioned_file.path(), versioned)
+		.unwrap_or_else(|error| panic!("versioned write failed: {error}"));
+
+	let output = run_compare(versioned_file.path(), artifact.path(), &[]);
+
+	assert!(
+		output.status.success(),
+		"versioned baseline rejected: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+#[test]
+fn cli_profile_compare_rejects_invalid_json_with_a_clear_error() {
+	let baseline_file = tempfile::Builder::new()
+		.suffix(".json")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::write(baseline_file.path(), "not json at all")
+		.unwrap_or_else(|error| panic!("write failed: {error}"));
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+
+	let output = run_compare(baseline_file.path(), artifact.path(), &[]);
+
+	assert_eq!(output.status.code(), Some(1));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("is not valid JSON"), "{stderr}");
+	assert!(stderr.contains("baseline"), "{stderr}");
+}
+
+#[test]
+fn cli_profile_compare_rejects_non_profile_documents() {
+	let baseline_file = tempfile::Builder::new()
+		.suffix(".json")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::write(baseline_file.path(), "{\"hello\": \"world\"}")
+		.unwrap_or_else(|error| panic!("write failed: {error}"));
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+
+	let output = run_compare(baseline_file.path(), artifact.path(), &[]);
+
+	assert_eq!(output.status.code(), Some(1));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("is not a pina profile report"), "{stderr}");
+}
+
+#[test]
+fn cli_profile_compare_rejects_future_schema_versions() {
+	let baseline_file = tempfile::Builder::new()
+		.suffix(".json")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::write(
+		baseline_file.path(),
+		"{\"schema_version\": 999, \"profile\": {}}",
+	)
+	.unwrap_or_else(|error| panic!("write failed: {error}"));
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+
+	let output = run_compare(baseline_file.path(), artifact.path(), &[]);
+
+	assert_eq!(output.status.code(), Some(1));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("unsupported schema version 999"),
+		"{stderr}"
+	);
+}
+
+#[test]
+fn cli_profile_compare_fails_on_missing_baseline_file() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+
+	let output = run_compare(
+		Path::new("/nonexistent/baseline.json"),
+		artifact.path(),
+		&[],
+	);
+
+	assert_eq!(output.status.code(), Some(1));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("failed to read baseline"), "{stderr}");
+}
+
+#[test]
+fn cli_profile_compare_rejects_a_zero_fail_cu_flag() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let baseline = write_baseline(artifact.path());
+
+	let output = run_compare(baseline.path(), artifact.path(), &["--fail-cu", "0"]);
+
+	assert_eq!(output.status.code(), Some(1), "zero --fail-cu must exit 1");
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("--fail-cu must be at least 1"), "{stderr}");
+}
+
+#[test]
+fn cli_profile_compare_rejects_a_negative_fail_percent_flag() {
+	let elf_data = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let artifact = write_temp_elf(&elf_data);
+	let baseline = write_baseline(artifact.path());
+
+	let output = run_compare(baseline.path(), artifact.path(), &["--fail-percent=-5"]);
+
+	assert_eq!(
+		output.status.code(),
+		Some(1),
+		"negative --fail-percent must exit 1"
+	);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("--fail-percent must be a finite number of at least 0"),
+		"{stderr}"
+	);
+}
+
+#[test]
+fn cli_profile_compare_reports_an_unreadable_artifact() {
+	let baseline_elf = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let baseline = write_temp_elf(&baseline_elf);
+	let mut bad = tempfile::Builder::new()
+		.suffix(".so")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp file failed: {error}"));
+	bad.write_all(b"definitely not an SBF ELF")
+		.unwrap_or_else(|error| panic!("write failed: {error}"));
+	bad.as_file()
+		.flush()
+		.unwrap_or_else(|error| panic!("flush failed: {error}"));
+
+	let output = run_compare(baseline.path(), bad.path(), &[]);
+
+	assert_eq!(
+		output.status.code(),
+		Some(1),
+		"unprofileable artifact must exit 1: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("Error"), "{stderr}");
+}

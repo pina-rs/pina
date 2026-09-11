@@ -68,6 +68,17 @@ jobs:
           printf '%s\n' "$status" > ./target/performance/programs/compare.status
         shell: devenv shell -c -- bash -e {0}
 
+      # Diagnostic only: the script exits 0 unless it cannot run at all, so the
+      # instruction-CU policy gate above stays the sole enforcement point.
+      - name: diff program function profiles
+        if: always()
+        run: |
+          node ./scripts/profile-example-diffs.ts \
+            ./target/performance/programs/base \
+            ./target/performance/programs/head \
+            ./target/performance/programs/function-diffs
+        shell: devenv shell -c -- bash -e {0}
+
       - name: prepare program report
         id: program-report
         if: always()
@@ -366,15 +377,19 @@ jobs:
 
       - name: build base and head CLIs
         run: |
+          # Separate target dirs: sharing one makes cargo reuse the base
+          # build's pina_profile rlib for the head build when only content
+          # (not mtime) differs, and the head CLI then fails with missing
+          # symbols for anything the PR added to pina_profile.
           mkdir -p ./target/performance-build/cli/base-bin ./target/performance-build/cli/head-bin
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/base-target" \
             cargo build --release --locked -p pina_cli \
             --manifest-path "${{ github.workspace }}/../pina-performance-base/Cargo.toml"
-          cp ./target/performance-build/cli/target/release/pina \
+          cp ./target/performance-build/cli/base-target/release/pina \
             ./target/performance-build/cli/base-bin/pina
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/head-target" \
             cargo build --release --locked -p pina_cli
-          cp ./target/performance-build/cli/target/release/pina \
+          cp ./target/performance-build/cli/head-target/release/pina \
             ./target/performance-build/cli/head-bin/pina
         shell: devenv shell -c -- bash -e {0}
 
@@ -523,6 +538,8 @@ jobs:
             append_report ./target/performance/reports/performance-token-loader/report.md "Focused token-loader compute units"
             echo
             append_report ./target/performance/reports/performance-programs/report.md "Program compute units and build sizes"
+            echo
+            append_report ./target/performance/reports/performance-programs/function-diffs/function-diff.md "Program function-level profile diffs"
             echo
             append_report ./target/performance/reports/performance-cli/report.md "CLI performance"
             echo

@@ -16,6 +16,7 @@ use crate::cli::Commands;
 use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
 use crate::cli::MigrationCommands;
+use crate::cli::ProfileCommands;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
 use crate::idl_command;
@@ -85,7 +86,31 @@ pub(crate) fn run(cli: Cli) {
 			project,
 			json,
 			output,
-		} => run_profile(path.as_deref(), &project, json, output.as_deref()),
+			command,
+		} => {
+			match command {
+				None => run_profile(path.as_deref(), &project, json, output.as_deref()),
+				Some(ProfileCommands::Compare {
+					baseline,
+					path,
+					project,
+					json,
+					fail_cu,
+					fail_percent,
+				}) => {
+					run_profile_compare(
+						baseline.as_path(),
+						path.as_deref(),
+						&project,
+						json,
+						pina_profile::RegressionThreshold {
+							delta_cu: fail_cu,
+							delta_percent: fail_percent,
+						},
+					);
+				}
+			}
+		}
 		Commands::Verify {
 			command,
 			solana_verify,
@@ -1156,6 +1181,202 @@ fn run_profile(explicit_path: Option<&Path>, project: &Path, json: bool, output:
 		format,
 		&mut stdout,
 	));
+}
+
+fn run_profile_compare(
+	baseline_path: &Path,
+	explicit_path: Option<&Path>,
+	project: &Path,
+	json: bool,
+	threshold: pina_profile::RegressionThreshold,
+) {
+	if !threshold.delta_percent.is_finite()
+		|| threshold.delta_percent < 0.0
+		|| threshold.delta_cu == 0
+	{
+		eprintln!(
+			"{} --fail-cu must be at least 1, and --fail-percent must be a finite number of at \
+			 least 0",
+			"Error".red().bold()
+		);
+		std::process::exit(1);
+	}
+	let path = unwrap_or_exit(pina_cli::profile::resolve_profile_input(
+		explicit_path,
+		project,
+	));
+	let current = match pina_profile::profile_program(&path) {
+		Ok(p) => p,
+		Err(e) => {
+			eprintln!("{} {}", "Error".red().bold(), e);
+			std::process::exit(1);
+		}
+	};
+	let baseline = unwrap_or_exit(pina_profile::compare::load_baseline(baseline_path));
+	let report = pina_profile::compare::compare_profiles(&baseline.profile, &current, threshold);
+
+	let mut stdout = std::io::stdout().lock();
+
+	if json {
+		unwrap_or_exit(pina_profile::compare::write_comparison_json(
+			&report,
+			&mut stdout,
+		));
+	} else {
+		print_comparison_text(&report);
+	}
+
+	if report.exceeds_threshold {
+		std::process::exit(2);
+	}
+}
+
+fn print_comparison_text(report: &pina_profile::ComparisonReport) {
+	let totals = report.totals;
+
+	if report.baseline_program_name != report.current_program_name {
+		println!(
+			"{} baseline program '{}' differs from current program '{}'",
+			"Warning".yellow().bold(),
+			escaped_text(&report.baseline_program_name),
+			escaped_text(&report.current_program_name)
+		);
+	}
+
+	println!(
+		"Profile comparison for {}",
+		escaped_text(&report.current_program_name)
+	);
+	println!(
+		"  Total estimated CU: {} -> {} ({})",
+		totals.baseline.total_cu,
+		totals.current.total_cu,
+		color_delta(totals.delta_cu, format_signed(totals.delta_cu, " CU"))
+	);
+	println!(
+		"  Instructions: {} -> {} ({})",
+		totals.baseline.total_instructions,
+		totals.current.total_instructions,
+		format_signed(totals.delta_instructions, "")
+	);
+	println!(
+		"  Syscalls: {} -> {} ({})",
+		totals.baseline.total_syscalls,
+		totals.current.total_syscalls,
+		format_signed(totals.delta_syscalls, "")
+	);
+	println!(
+		"  Binary size: {} -> {} ({})",
+		totals.baseline.binary_size,
+		totals.current.binary_size,
+		format_signed(totals.delta_binary_size, " bytes")
+	);
+	println!(
+		"  Text section: {} -> {} ({})",
+		totals.baseline.text_size,
+		totals.current.text_size,
+		format_signed(totals.delta_text_size, " bytes")
+	);
+	println!();
+
+	let changed: Vec<&pina_profile::FunctionDelta> = report
+		.functions
+		.iter()
+		.filter(|function| function.change != pina_profile::FunctionChange::Unchanged)
+		.collect();
+
+	if changed.is_empty() {
+		println!("No function-level changes.");
+	} else {
+		println!("Function deltas (sorted by absolute CU change):");
+		println!(
+			"  {:<46} {:>8} {:>8} {:>9} {:>10}",
+			"Function", "Base", "Current", "Delta", "Pct"
+		);
+
+		for function in changed {
+			print_function_row(function);
+		}
+	}
+
+	println!();
+	print_comparison_status(report);
+}
+
+/// Colorize a signed delta: increases are red and decreases are green.
+fn color_delta(delta: i64, text: String) -> String {
+	match delta.cmp(&0) {
+		std::cmp::Ordering::Greater => text.red().to_string(),
+		std::cmp::Ordering::Less => text.green().to_string(),
+		std::cmp::Ordering::Equal => text,
+	}
+}
+
+fn format_signed(value: i64, suffix: &str) -> String {
+	if value > 0 {
+		format!("+{value}{suffix}")
+	} else {
+		format!("{value}{suffix}")
+	}
+}
+
+fn print_function_row(function: &pina_profile::FunctionDelta) {
+	let optional = |value: Option<u64>| value.map_or_else(|| "-".to_owned(), |cu| cu.to_string());
+	let percent = match function.change {
+		pina_profile::FunctionChange::Added => "new".to_owned(),
+		pina_profile::FunctionChange::Removed => "gone".to_owned(),
+		_ => format!("{:+.1}%", function.delta_percent),
+	};
+
+	println!(
+		"  {:<46} {:>8} {:>8} {:>9} {:>10}",
+		pina_profile::output::truncate_name(&function.name, 46),
+		optional(function.baseline_cu),
+		optional(function.current_cu),
+		color_delta(function.delta_cu, format_signed(function.delta_cu, "")),
+		percent
+	);
+}
+
+fn print_comparison_status(report: &pina_profile::ComparisonReport) {
+	let totals = report.totals;
+	let threshold = report.threshold;
+	let threshold_text = format!(
+		">= {} CU and >= {:.1}%",
+		threshold.delta_cu, threshold.delta_percent
+	);
+
+	match report.status {
+		pina_profile::ComparisonStatus::Unchanged => {
+			println!("{} No compute unit changes", "✔".green());
+		}
+		pina_profile::ComparisonStatus::Improved => {
+			println!(
+				"{} Total estimated CU improved by {} ({:+.1}%)",
+				"✔".green(),
+				-totals.delta_cu,
+				totals.delta_percent
+			);
+		}
+		pina_profile::ComparisonStatus::Regression => {
+			println!(
+				"{} Total estimated CU increased by {} ({:+.1}%), below the threshold \
+				 ({threshold_text})",
+				"⚠".yellow(),
+				totals.delta_cu,
+				totals.delta_percent
+			);
+		}
+		pina_profile::ComparisonStatus::ThresholdRegression => {
+			println!(
+				"{} Total estimated CU regression {} ({:+.1}%) reaches the threshold \
+				 ({threshold_text})",
+				"✘".red().bold(),
+				totals.delta_cu,
+				totals.delta_percent
+			);
+		}
+	}
 }
 
 fn run_codama_generate(options: &pina_cli::CodamaGenerateOptions) {
