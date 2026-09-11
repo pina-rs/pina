@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/duplicate_mutable_accounts_program.dart';
 

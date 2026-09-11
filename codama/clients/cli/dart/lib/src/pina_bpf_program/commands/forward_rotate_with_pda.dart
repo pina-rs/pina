@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/pina_bpf_program.dart';
 
@@ -15,8 +13,16 @@ final class ForwardRotateWithPdaCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('new_authority', mandatory: true, help: "newAuthority")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: derived]")
-      ..addOption('prop_amm_program', mandatory: true, help: "The prop_amm_program account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: derived]",
+      )
+      ..addOption(
+        'prop_amm_program',
+        mandatory: true,
+        help: "The prop_amm_program account",
+      );
   }
 
   @override
@@ -32,12 +38,16 @@ final class ForwardRotateWithPdaCommand extends Command<void> {
     final oracle = pubkey('--oracle', results['oracle']! as String);
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
-        : (await findAuthorityPda(
-          programAddress: context.programAddress,
-        )).$1;
-    final propAmmProgram = pubkey('--prop-amm-program', results['prop_amm_program']! as String);
+        : (await findAuthorityPda(programAddress: context.programAddress)).$1;
+    final propAmmProgram = pubkey(
+      '--prop-amm-program',
+      results['prop_amm_program']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
-    final newAuthorityValue = pubkey('--new-authority', results['new_authority']! as String);
+    final newAuthorityValue = pubkey(
+      '--new-authority',
+      results['new_authority']! as String,
+    );
     final instruction = getForwardRotateWithPdaInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

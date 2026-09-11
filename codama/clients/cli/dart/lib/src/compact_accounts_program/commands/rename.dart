@@ -14,8 +14,17 @@ final class RenameCommand extends Command<void> {
     argParser
       ..addOption('title_len', mandatory: true, help: "titleLen")
       ..addOption('title', mandatory: true, help: "title")
-      ..addOption('authority', mandatory: false, help: "Funds title growth and receives rent refunded by title shrinkage [default: payer]")
-      ..addOption('journal', mandatory: false, help: "The journal account [default: derived]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help:
+            "Funds title growth and receives rent refunded by title shrinkage [default: payer]",
+      )
+      ..addOption(
+        'journal',
+        mandatory: false,
+        help: "The journal account [default: derived]",
+      );
   }
 
   @override
@@ -34,10 +43,13 @@ final class RenameCommand extends Command<void> {
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(
-          seeds: JournalSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
-    final titleLenValue = integer('--title-len', results['title_len']! as String);
+            seeds: JournalSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
+    final titleLenValue = integer(
+      '--title-len',
+      results['title_len']! as String,
+    );
     final titleValue = base58Bytes('--title', results['title']! as String);
     final instruction = getRenameInstruction(
       programAddress: context.programAddress,

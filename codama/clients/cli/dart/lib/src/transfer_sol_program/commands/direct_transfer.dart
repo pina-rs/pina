@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/transfer_sol_program.dart';
 
@@ -13,15 +11,25 @@ final class DirectTransferCommand extends Command<void> {
   DirectTransferCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption('sender', mandatory: false, help: "The sender. Must be owned by this program, writable, and a signer [default: payer]")
-      ..addOption('recipient', mandatory: true, help: "The recipient. Must be writable");
+      ..addOption(
+        'sender',
+        mandatory: false,
+        help:
+            "The sender. Must be owned by this program, writable, and a signer [default: payer]",
+      )
+      ..addOption(
+        'recipient',
+        mandatory: true,
+        help: "The recipient. Must be writable",
+      );
   }
 
   @override
   String get name => 'direct_transfer';
 
   @override
-  String get description => "Instruction data for `DirectTransfer`.  Same layout as `CpiTransferInstruction` but with a different discriminator byte.";
+  String get description =>
+      "Instruction data for `DirectTransfer`.  Same layout as `CpiTransferInstruction` but with a different discriminator byte.";
 
   @override
   Future<void> run() async {

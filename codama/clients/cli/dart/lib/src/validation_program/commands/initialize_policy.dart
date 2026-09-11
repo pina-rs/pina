@@ -15,9 +15,21 @@ final class InitializePolicyCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('minimum', mandatory: true, help: "minimum")
       ..addOption('maximum', mandatory: true, help: "maximum")
-      ..addOption('required_approvals', mandatory: true, help: "requiredApprovals")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('policy', mandatory: false, help: "The policy account [default: derived]");
+      ..addOption(
+        'required_approvals',
+        mandatory: true,
+        help: "requiredApprovals",
+      )
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'policy',
+        mandatory: false,
+        help: "The policy account [default: derived]",
+      );
   }
 
   @override
@@ -36,13 +48,16 @@ final class InitializePolicyCommand extends Command<void> {
     final policy = (results['policy'] as String?) != null
         ? pubkey('--policy', results['policy']! as String)
         : (await findPolicyPda(
-          seeds: PolicySeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: PolicySeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final minimumValue = bigInteger('--minimum', results['minimum']! as String);
     final maximumValue = bigInteger('--maximum', results['maximum']! as String);
-    final requiredApprovalsValue = integer('--required-approvals', results['required_approvals']! as String);
+    final requiredApprovalsValue = integer(
+      '--required-approvals',
+      results['required_approvals']! as String,
+    );
     final instruction = getInitializePolicyInstruction(
       programAddress: context.programAddress,
       authority: authority,

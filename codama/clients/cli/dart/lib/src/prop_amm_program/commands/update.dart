@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/prop_amm_program.dart';
 
@@ -14,7 +12,11 @@ final class UpdateCommand extends Command<void> {
     argParser
       ..addOption('new_price', mandatory: true, help: "newPrice")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      );
   }
 
   @override
@@ -31,7 +33,10 @@ final class UpdateCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final newPriceValue = bigInteger('--new-price', results['new_price']! as String);
+    final newPriceValue = bigInteger(
+      '--new-price',
+      results['new_price']! as String,
+    );
     final instruction = getUpdateInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

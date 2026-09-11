@@ -416,12 +416,7 @@ function renderInstructionCommand(
 	instruction: InstructionModel,
 	clientBarrel: string,
 ): string {
-	return `${HEADER}
-import 'package:args/command_runner.dart';
-
-import 'package:solana_kit_address/solana_kit_address.dart';
-
-import '../context.dart';
+	const body = `import '../context.dart';
 import '${clientBarrel}';
 
 final class ${instruction.pascal}Command extends Command<void> {
@@ -457,6 +452,19 @@ ${factoryParams(instruction)}
   }
 }
 `;
+
+	// `Address` is only named for instructions that pin a constant account;
+	// the analyzer rejects the import for every other command.
+	const addressImport = instruction.accounts.some(
+			(account) => account.resolution.resolution === "constant",
+		)
+		? "\nimport 'package:solana_kit_address/solana_kit_address.dart';\n"
+		: "";
+
+	return `${HEADER}
+import 'package:args/command_runner.dart';
+${addressImport}
+${body}`;
 }
 
 function renderFetchCommand(model: CliModel, clientBarrel: string): string {
@@ -670,8 +678,6 @@ export function renderDart(
 	files.set(
 		`bin/${stem}.dart`,
 		`${HEADER}
-import 'package:args/command_runner.dart';
-
 import 'package:${options.packageName}/src/${stem}/main.dart';
 
 Future<void> main(List<String> arguments) async {

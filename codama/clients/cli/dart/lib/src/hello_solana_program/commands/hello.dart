@@ -4,22 +4,25 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/hello_solana_program.dart';
 
 final class HelloCommand extends Command<void> {
   HelloCommand() {
-    argParser
-      ..addOption('user', mandatory: false, help: "The user invoking the program. Must be a signer so we can trust the [default: payer]");
+    argParser..addOption(
+      'user',
+      mandatory: false,
+      help:
+          "The user invoking the program. Must be a signer so we can trust the [default: payer]",
+    );
   }
 
   @override
   String get name => 'hello';
 
   @override
-  String get description => "The `#[instruction]` attribute macro generates:  - A discriminator field as the first byte of the struct. - `HasDiscriminator` implementation linking this struct to `HelloInstruction::Hello`. - A generated `PinaPod` view plus checked `initialize` and `try_from_bytes` helpers.  `HelloInstructionData` has no payload fields — only the discriminator byte is needed to identify the instruction.";
+  String get description =>
+      "The `#[instruction]` attribute macro generates:  - A discriminator field as the first byte of the struct. - `HasDiscriminator` implementation linking this struct to `HelloInstruction::Hello`. - A generated `PinaPod` view plus checked `initialize` and `try_from_bytes` helpers.  `HelloInstructionData` has no payload fields — only the discriminator byte is needed to identify the instruction.";
 
   @override
   Future<void> run() async {

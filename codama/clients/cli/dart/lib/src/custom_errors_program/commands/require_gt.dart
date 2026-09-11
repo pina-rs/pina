@@ -4,15 +4,12 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/custom_errors_program.dart';
 
 final class RequireGtCommand extends Command<void> {
   RequireGtCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -23,9 +20,7 @@ final class RequireGtCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getRequireGtInstruction(
       programAddress: context.programAddress,

@@ -4,15 +4,12 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/events_program.dart';
 
 final class TestEventCommand extends Command<void> {
   TestEventCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -23,9 +20,7 @@ final class TestEventCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getTestEventInstruction(
       programAddress: context.programAddress,

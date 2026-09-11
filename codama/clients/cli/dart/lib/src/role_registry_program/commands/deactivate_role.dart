@@ -4,17 +4,27 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/role_registry_program.dart';
 
 final class DeactivateRoleCommand extends Command<void> {
   DeactivateRoleCommand() {
     argParser
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
-      ..addOption('registry_config', mandatory: true, help: "The registry_config account")
-      ..addOption('role_entry', mandatory: true, help: "The role_entry account");
+      ..addOption(
+        'admin',
+        mandatory: false,
+        help: "The admin account [default: payer]",
+      )
+      ..addOption(
+        'registry_config',
+        mandatory: true,
+        help: "The registry_config account",
+      )
+      ..addOption(
+        'role_entry',
+        mandatory: true,
+        help: "The role_entry account",
+      );
   }
 
   @override
@@ -30,7 +40,10 @@ final class DeactivateRoleCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
+    final registryConfig = pubkey(
+      '--registry-config',
+      results['registry_config']! as String,
+    );
     final roleEntry = pubkey('--role-entry', results['role_entry']! as String);
 
     final instruction = getDeactivateRoleInstruction(

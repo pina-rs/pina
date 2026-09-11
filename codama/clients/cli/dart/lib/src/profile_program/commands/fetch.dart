@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/profile_program.dart';
@@ -28,13 +29,14 @@ final class FetchProfileStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authorityValue = pubkey('--authority', results['authority']! as String);
+    final authorityValue = pubkey(
+      '--authority',
+      results['authority']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findProfilePda(
-            seeds: ProfileSeeds(
-              authority: authorityValue,
-            ),
+            seeds: ProfileSeeds(authority: authorityValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -47,19 +49,14 @@ final class FetchProfileStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeProfileState(encoded);
-    printFields(
-      context.json,
-      'profile-state',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'name': account.data.name,
-        'bio': account.data.bio,
-        'tags': account.data.tags,
-        'favorite_tag': account.data.favoriteTag,
-        'active': account.data.active,
-      },
-    );
+    printFields(context.json, 'profile-state', address, <String, Object?>{
+      'bump': account.data.bump,
+      'name': account.data.name,
+      'bio': account.data.bio,
+      'tags': account.data.tags,
+      'favorite_tag': account.data.favoriteTag,
+      'active': account.data.active,
+    });
   }
 }
 

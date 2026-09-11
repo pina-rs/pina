@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/counter_program.dart';
@@ -28,13 +29,14 @@ final class FetchCounterStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authorityValue = pubkey('--authority', results['authority']! as String);
+    final authorityValue = pubkey(
+      '--authority',
+      results['authority']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findCounterPda(
-            seeds: CounterSeeds(
-              authority: authorityValue,
-            ),
+            seeds: CounterSeeds(authority: authorityValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -47,15 +49,10 @@ final class FetchCounterStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeCounterState(encoded);
-    printFields(
-      context.json,
-      'counter-state',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'count': account.data.count,
-      },
-    );
+    printFields(context.json, 'counter-state', address, <String, Object?>{
+      'bump': account.data.bump,
+      'count': account.data.count,
+    });
   }
 }
 

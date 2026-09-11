@@ -4,16 +4,22 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class NoteCommand extends Command<void> {
   NoteCommand() {
     argParser
-      ..addOption('authority', mandatory: false, help: "The transaction fee payer; always required [default: payer]")
-      ..addOption('note', mandatory: true, help: "An arbitrary readonly account attached as context");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The transaction fee payer; always required [default: payer]",
+      )
+      ..addOption(
+        'note',
+        mandatory: true,
+        help: "An arbitrary readonly account attached as context",
+      );
   }
 
   @override

@@ -6,15 +6,18 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/prop_amm_program.dart';
 
 final class FetchOracleStateCommand extends Command<void> {
   FetchOracleStateCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -38,15 +41,10 @@ final class FetchOracleStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeOracleState(encoded);
-    printFields(
-      context.json,
-      'oracle-state',
-      address,
-      <String, Object?>{
-        'authority': account.data.authority,
-        'price': account.data.price,
-      },
-    );
+    printFields(context.json, 'oracle-state', address, <String, Object?>{
+      'authority': account.data.authority,
+      'price': account.data.price,
+    });
   }
 }
 

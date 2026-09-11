@@ -8,34 +8,35 @@ import 'commands/commands.dart';
 
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
-    'todo-program-cli',
-    "Command-line interface for todoProgram",
-  )
+      'todo-program-cli',
+      "Command-line interface for todoProgram",
+    )
     ..argParser.addOption(
-        'url',
-        abbr: 'u',
-        defaultsTo: 'devnet',
-        help: 'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
-      )
+      'url',
+      abbr: 'u',
+      defaultsTo: 'devnet',
+      help:
+          'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
+    )
     ..argParser.addOption(
-        'keypair',
-        abbr: 'k',
-        defaultsTo: '~/.config/solana/id.json',
-        help: 'Payer keypair JSON file.',
-      )
+      'keypair',
+      abbr: 'k',
+      defaultsTo: '~/.config/solana/id.json',
+      help: 'Payer keypair JSON file.',
+    )
     ..argParser.addOption(
-        'program-id',
-        help: 'Override the on-chain program address.',
-      )
+      'program-id',
+      help: 'Override the on-chain program address.',
+    )
     ..argParser.addFlag(
-        'simulate',
-        help: 'Simulate the transaction and print logs instead of sending.',
-      )
+      'simulate',
+      help: 'Simulate the transaction and print logs instead of sending.',
+    )
     ..argParser.addFlag(
-        'json',
-        negatable: false,
-        help: 'Print machine-readable JSON output.',
-      )
+      'json',
+      negatable: false,
+      help: 'Print machine-readable JSON output.',
+    )
     ..addCommand(InitializeCommand())
     ..addCommand(ToggleCompletedCommand())
     ..addCommand(UpdateDigestCommand())

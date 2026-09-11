@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/vesting_program.dart';
@@ -16,7 +17,11 @@ final class FetchVestingStateCommand extends Command<void> {
     argParser
       ..addOption('address', help: 'Account address; overrides PDA derivation.')
       ..addOption('admin', mandatory: true, help: "PDA seed `admin`.")
-      ..addOption('beneficiary', mandatory: true, help: "PDA seed `beneficiary`.")
+      ..addOption(
+        'beneficiary',
+        mandatory: true,
+        help: "PDA seed `beneficiary`.",
+      )
       ..addOption('mint', mandatory: true, help: "PDA seed `mint`.");
   }
 
@@ -31,7 +36,10 @@ final class FetchVestingStateCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final adminValue = pubkey('--admin', results['admin']! as String);
-    final beneficiaryValue = pubkey('--beneficiary', results['beneficiary']! as String);
+    final beneficiaryValue = pubkey(
+      '--beneficiary',
+      results['beneficiary']! as String,
+    );
     final mintValue = pubkey('--mint', results['mint']! as String);
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
@@ -53,23 +61,18 @@ final class FetchVestingStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeVestingState(encoded);
-    printFields(
-      context.json,
-      'vesting-state',
-      address,
-      <String, Object?>{
-        'admin': account.data.admin,
-        'beneficiary': account.data.beneficiary,
-        'mint': account.data.mint,
-        'total_amount': account.data.totalAmount,
-        'claimed_amount': account.data.claimedAmount,
-        'start_ts': account.data.startTs,
-        'cliff_ts': account.data.cliffTs,
-        'end_ts': account.data.endTs,
-        'cancelled': account.data.cancelled,
-        'bump': account.data.bump,
-      },
-    );
+    printFields(context.json, 'vesting-state', address, <String, Object?>{
+      'admin': account.data.admin,
+      'beneficiary': account.data.beneficiary,
+      'mint': account.data.mint,
+      'total_amount': account.data.totalAmount,
+      'claimed_amount': account.data.claimedAmount,
+      'start_ts': account.data.startTs,
+      'cliff_ts': account.data.cliffTs,
+      'end_ts': account.data.endTs,
+      'cancelled': account.data.cancelled,
+      'bump': account.data.bump,
+    });
   }
 }
 

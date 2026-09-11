@@ -12,8 +12,16 @@ import 'package:pina_codama_clients/prop_amm_program.dart';
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
-      ..addOption('payer', mandatory: false, help: "The payer account [default: payer]")
-      ..addOption('oracle', mandatory: false, help: "The oracle account [default: payer]");
+      ..addOption(
+        'payer',
+        mandatory: false,
+        help: "The payer account [default: payer]",
+      )
+      ..addOption(
+        'oracle',
+        mandatory: false,
+        help: "The oracle account [default: payer]",
+      );
   }
 
   @override

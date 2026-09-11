@@ -15,15 +15,26 @@ final class InitializeCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('name', mandatory: true, help: "name")
       ..addOption('bio', mandatory: true, help: "bio")
-      ..addOption('authority', mandatory: false, help: "The wallet creating the profile. Pays for account creation and becomes [default: payer]")
-      ..addOption('profile', mandatory: false, help: "The profile PDA account (must be empty — not yet created) [default: derived]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help:
+            "The wallet creating the profile. Pays for account creation and becomes [default: payer]",
+      )
+      ..addOption(
+        'profile',
+        mandatory: false,
+        help:
+            "The profile PDA account (must be empty — not yet created) [default: derived]",
+      );
   }
 
   @override
   String get name => 'initialize';
 
   @override
-  String get description => "Instruction data for `Initialize`.  Contains the PDA bump seed and bounded initial name and bio.";
+  String get description =>
+      "Instruction data for `Initialize`.  Contains the PDA bump seed and bounded initial name and bio.";
 
   @override
   Future<void> run() async {
@@ -35,9 +46,9 @@ final class InitializeCommand extends Command<void> {
     final profile = (results['profile'] as String?) != null
         ? pubkey('--profile', results['profile']! as String)
         : (await findProfilePda(
-          seeds: ProfileSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: ProfileSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final nameValue = results['name']! as String;
     final bioValue = results['bio']! as String;

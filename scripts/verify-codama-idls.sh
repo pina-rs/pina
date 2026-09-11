@@ -143,6 +143,7 @@ echo "Analyzing generated Dart CLI package..."
 	fi
 
 	dart pub get --enforce-lockfile
+	dart format .
 	dart format --output=none --set-exit-if-changed .
 	dart analyze --fatal-infos
 )

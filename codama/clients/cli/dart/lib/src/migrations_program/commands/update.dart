@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/migrations_program.dart';
 
@@ -14,13 +12,33 @@ final class UpdateCommand extends Command<void> {
     argParser
       ..addOption('value', mandatory: true, help: "value")
       ..addOption('memo', mandatory: true, help: "memo")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption('migration_payer', mandatory: false, help: "The migration_payer account [default: payer]")
-      ..addOption('system_program', mandatory: true, help: "The system_program account")
-      ..addOption('manual_state', mandatory: true, help: "The manual_state account")
-      ..addOption('compact_state', mandatory: true, help: "The compact_state account");
+      ..addOption(
+        'migration_payer',
+        mandatory: false,
+        help: "The migration_payer account [default: payer]",
+      )
+      ..addOption(
+        'system_program',
+        mandatory: true,
+        help: "The system_program account",
+      )
+      ..addOption(
+        'manual_state',
+        mandatory: true,
+        help: "The manual_state account",
+      )
+      ..addOption(
+        'compact_state',
+        mandatory: true,
+        help: "The compact_state account",
+      );
   }
 
   @override
@@ -41,9 +59,18 @@ final class UpdateCommand extends Command<void> {
     final migrationPayer = (results['migration_payer'] as String?) != null
         ? pubkey('--migration-payer', results['migration_payer']! as String)
         : context.payerAddress;
-    final systemProgram = pubkey('--system-program', results['system_program']! as String);
-    final manualState = pubkey('--manual-state', results['manual_state']! as String);
-    final compactState = pubkey('--compact-state', results['compact_state']! as String);
+    final systemProgram = pubkey(
+      '--system-program',
+      results['system_program']! as String,
+    );
+    final manualState = pubkey(
+      '--manual-state',
+      results['manual_state']! as String,
+    );
+    final compactState = pubkey(
+      '--compact-state',
+      results['compact_state']! as String,
+    );
     final valueValue = bigInteger('--value', results['value']! as String);
     final memoValue = integer('--memo', results['memo']! as String);
     final instruction = getUpdateInstruction(

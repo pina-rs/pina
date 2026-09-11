@@ -12,16 +12,36 @@ import 'package:pina_codama_clients/escrow_program.dart';
 final class TakeCommand extends Command<void> {
   TakeCommand() {
     argParser
-      ..addOption('taker', mandatory: false, help: "The taker account [default: payer]")
+      ..addOption(
+        'taker',
+        mandatory: false,
+        help: "The taker account [default: payer]",
+      )
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
       ..addOption('mint_b', mandatory: true, help: "The mint_b account")
-      ..addOption('taker_ata_a', mandatory: true, help: "The taker_ata_a account")
-      ..addOption('taker_ata_b', mandatory: true, help: "The taker_ata_b account")
+      ..addOption(
+        'taker_ata_a',
+        mandatory: true,
+        help: "The taker_ata_a account",
+      )
+      ..addOption(
+        'taker_ata_b',
+        mandatory: true,
+        help: "The taker_ata_b account",
+      )
       ..addOption('maker', mandatory: true, help: "The maker account")
-      ..addOption('maker_ata_b', mandatory: true, help: "The maker_ata_b account")
+      ..addOption(
+        'maker_ata_b',
+        mandatory: true,
+        help: "The maker_ata_b account",
+      )
       ..addOption('escrow', mandatory: true, help: "The escrow account")
       ..addOption('vault', mandatory: true, help: "The vault account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -39,13 +59,25 @@ final class TakeCommand extends Command<void> {
         : context.payerAddress;
     final mintA = pubkey('--mint-a', results['mint_a']! as String);
     final mintB = pubkey('--mint-b', results['mint_b']! as String);
-    final takerAtaA = pubkey('--taker-ata-a', results['taker_ata_a']! as String);
-    final takerAtaB = pubkey('--taker-ata-b', results['taker_ata_b']! as String);
+    final takerAtaA = pubkey(
+      '--taker-ata-a',
+      results['taker_ata_a']! as String,
+    );
+    final takerAtaB = pubkey(
+      '--taker-ata-b',
+      results['taker_ata_b']! as String,
+    );
     final maker = pubkey('--maker', results['maker']! as String);
-    final makerAtaB = pubkey('--maker-ata-b', results['maker_ata_b']! as String);
+    final makerAtaB = pubkey(
+      '--maker-ata-b',
+      results['maker_ata_b']! as String,
+    );
     final escrow = pubkey('--escrow', results['escrow']! as String);
     final vault = pubkey('--vault', results['vault']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
 
     final instruction = getTakeInstruction(
       programAddress: context.programAddress,
@@ -59,7 +91,9 @@ final class TakeCommand extends Command<void> {
       escrow: escrow,
       vault: vault,
       tokenProgram: tokenProgram,
-      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      associatedTokenProgram: Address(
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+      ),
       systemProgram: Address('11111111111111111111111111111111'),
     );
     await context.send([instruction]);

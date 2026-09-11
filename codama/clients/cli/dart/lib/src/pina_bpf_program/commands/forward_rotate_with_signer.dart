@@ -4,8 +4,6 @@
 
 import 'package:args/command_runner.dart';
 
-import 'package:solana_kit_address/solana_kit_address.dart';
-
 import '../context.dart';
 import 'package:pina_codama_clients/pina_bpf_program.dart';
 
@@ -14,8 +12,16 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
     argParser
       ..addOption('new_authority', mandatory: true, help: "newAuthority")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('prop_amm_program', mandatory: true, help: "The prop_amm_program account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'prop_amm_program',
+        mandatory: true,
+        help: "The prop_amm_program account",
+      );
   }
 
   @override
@@ -32,8 +38,14 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final propAmmProgram = pubkey('--prop-amm-program', results['prop_amm_program']! as String);
-    final newAuthorityValue = pubkey('--new-authority', results['new_authority']! as String);
+    final propAmmProgram = pubkey(
+      '--prop-amm-program',
+      results['prop_amm_program']! as String,
+    );
+    final newAuthorityValue = pubkey(
+      '--new-authority',
+      results['new_authority']! as String,
+    );
     final instruction = getForwardRotateWithSignerInstruction(
       programAddress: context.programAddress,
       oracle: oracle,
