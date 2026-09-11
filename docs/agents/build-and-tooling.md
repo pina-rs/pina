@@ -62,6 +62,18 @@ cargo llvm-cov
 cargo semver-checks
 ```
 
+## CI
+
+Pull requests run a fast, high-confidence subset of CI; pushes to `main` run the full suite after merge. Jobs are gated on changed paths, and the slowest verification tiers only run on `main`:
+
+- `kani (compact layouts)`, `program-e2e`, and the dedicated `build` job run post-merge only.
+- `coverage` runs post-merge only.
+- Everything else runs per pull request when the changed paths can affect it (for example, `surfpool` runs only for example or crate changes, and `zizmor` only for workflow changes).
+
+Add the `ci-full` label to a pull request to force every tier, including the post-merge-only jobs, before merging. The `release` label keeps the benchmark jobs and the publish dry-run from running on release pull requests.
+
+Path gating uses job-level conditions rather than workflow-level `paths:` filters because the jobs are required status checks: a skipped job reports as success, while a workflow that never runs leaves the check in `Expected` and blocks merging.
+
 ## Formatting
 
 - Use `dprint` for formatting.

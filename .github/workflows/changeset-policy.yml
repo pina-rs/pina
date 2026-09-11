@@ -16,9 +16,13 @@ concurrency:
   group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# The policy check must run on every pull request (its whole purpose is
+# catching missing changesets), so it is the one devenv job without path
+# gating. Change classification was folded into this job so a pull request
+# pays for the nix/devenv setup once instead of twice.
 jobs:
   check:
-    timeout-minutes: 60
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -65,4 +69,12 @@ jobs:
           changed-paths: ${{ steps.changed.outputs.all_changed_files }}
           setup-monochange: false
           labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: classify changes
+        uses: monochange/actions/change-classification@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
+        with:
+          setup-monochange: false
+          detection-level: signature
+          dependency-propagation: public
           github-token: ${{ secrets.GITHUB_TOKEN }}

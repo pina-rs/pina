@@ -15,10 +15,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Coverage is telemetry, not a merge gate: it re-runs the same suite the `test`
+# job already covers on pull requests under a profiling build. It therefore
+# only runs on `main` after merge; label a pull request `ci-full` to run it
+# before merging.
 jobs:
   coverage:
-    timeout-minutes: 90
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -14,10 +14,51 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# The Surfpool suite builds and validates every SBF example, so it only has
+# signal when example programs or the crates they are built from change.
+# Pull requests that touch nothing it exercises skip the job; pushes to
+# `main` always run it. Label a pull request `ci-full` to force a run.
 jobs:
-  surfpool-examples:
-    timeout-minutes: 120
+  changes:
+    name: detect changes
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
+    # Pushes to `main` and manual dispatches run the suite regardless of
+    # paths, so the detection job only exists on pull requests.
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant_any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: classify changed paths
+        id: filter
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files_yaml: |
+            relevant:
+              - examples/**
+              - crates/**
+              - codama/**
+              - Cargo.toml
+              - Cargo.lock
+              - rust-toolchain.toml
+              - devenv.nix
+              - devenv.lock
+              - devenv.yaml
+              - scripts/build-surfpool-examples.sh
+              - .github/workflows/surfpool.yml
+              - .github/actions/devenv/**
+
+  surfpool-examples:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

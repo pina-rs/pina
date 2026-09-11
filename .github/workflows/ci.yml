@@ -13,10 +13,113 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Pull requests run a fast, high-confidence subset: every job is gated on the
+# paths that can actually affect it, and the deepest verification tiers
+# (kani compact proofs, program e2e, dedicated build) are deferred to the
+# post-merge run on `main`. Pushes to `main` always run everything, so the
+# full suite still executes once per merged change.
+#
+# Path gating uses job-level conditions instead of workflow-level `paths:`
+# filters because every job here is a required status check: a skipped job
+# reports "Skipped", which branch protection treats as success, while a
+# workflow that never runs leaves the check in "Expected" and blocks merging.
+# Skipped jobs are also far cheaper: they never check out or set up devenv.
+#
+# Add the `ci-full` label to a pull request to run every tier, including the
+# main-only jobs, before merging.
 jobs:
-  lint:
-    timeout-minutes: 60
+  changes:
+    name: detect changes
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
+    # Pushes to `main` run every job regardless of paths, so the detection
+    # job (and its failure modes) only exists on pull requests.
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      core: ${{ steps.filter.outputs.core_any_changed }}
+      cli: ${{ steps.filter.outputs.cli_any_changed }}
+      rust: ${{ steps.filter.outputs.rust_any_changed }}
+      js: ${{ steps.filter.outputs.js_any_changed }}
+      docs: ${{ steps.filter.outputs.docs_any_changed }}
+      idl: ${{ steps.filter.outputs.idl_any_changed }}
+      pina_test: ${{ steps.filter.outputs.pina_test_any_changed }}
+      fuzz: ${{ steps.filter.outputs.fuzz_any_changed }}
+      changesets: ${{ steps.filter.outputs.changesets_any_changed }}
+      toolchain: ${{ steps.filter.outputs.toolchain_any_changed }}
+      workflows: ${{ steps.filter.outputs.workflows_any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: classify changed paths
+        id: filter
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files_yaml: |
+            core:
+              - crates/pina/**
+              - crates/pina_macros/**
+              - crates/pina_abi/**
+            cli:
+              - crates/pina_cli/**
+              - crates/pina_abi/**
+              - crates/pina_cli_renderer/**
+              - crates/pina_codama_renderer/**
+              - crates/pina_cpi_renderer/**
+              - crates/pina_profile/**
+            rust:
+              - crates/**
+              - examples/**
+              - Cargo.toml
+              - Cargo.lock
+              - rust-toolchain.toml
+            js:
+              - codama/**
+              - scripts/**
+              - package.json
+              - pnpm-lock.yaml
+              - pnpm-workspace.yaml
+              - tsconfig.json
+              - tsconfig.scripts.json
+            docs:
+              - docs/**
+              - template.t.md
+              - api-docs.t.md
+              - readme.md
+            idl:
+              - codama/**
+              - examples/**
+              - crates/pina_macros/**
+              - crates/pina_codama_renderer/**
+              - crates/pina_cpi_renderer/**
+              - scripts/generate-codama-idls.sh
+              - scripts/verify-codama-idls.sh
+              - pnpm-lock.yaml
+            pina_test:
+              - crates/pina_test/**
+            fuzz:
+              - crates/pina_fuzz/**
+            changesets:
+              - .changeset/**
+            toolchain:
+              - rust-toolchain.toml
+              - devenv.nix
+              - devenv.lock
+              - devenv.yaml
+              - .github/actions/devenv/**
+            workflows:
+              - .github/**
+
+  lint:
+    timeout-minutes: 40
+    runs-on: ubuntu-24.04
+    needs: changes
+    # The status functions are required: without one, a skipped `changes`
+    # dependency (pushes to `main`) would skip this job too.
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,13 +131,48 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: lint all
-        run: lint:all
+      # Formatting and doc-block sync apply to every file type, so they run on
+      # every pull request. The heavy compilers only run when the change can
+      # affect them.
+      - name: lint format
+        run: lint:format
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: check synced docs blocks
+        run: docs:check
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: lint monochange
+        run: lint:monochange
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: lint rust
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        run: lint:clippy
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: verify docs
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        run: verify:docs
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: install js dependencies
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: type-check scripts and js clients
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        run: |
+          pnpm run check:scripts
+          pnpm run check:js
         shell: devenv shell -c -- bash -e {0}
 
   security:
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,8 +197,10 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   cargo-deny:
-    timeout-minutes: 60
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,8 +217,10 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   zizmor:
-    timeout-minutes: 60
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.workflows == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,8 +237,10 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   test:
-    timeout-minutes: 60
+    timeout-minutes: 40
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,8 +260,10 @@ jobs:
 
   windows-cli:
     name: windows CLI
-    timeout-minutes: 30
+    timeout-minutes: 20
     runs-on: windows-latest
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.cli == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -133,8 +279,10 @@ jobs:
         run: cargo test --locked --all-features -p pina_cli
 
   pina-test:
-    timeout-minutes: 90
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.pina_test == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -151,8 +299,10 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   fuzz:
-    timeout-minutes: 30
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.fuzz == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -177,8 +327,10 @@ jobs:
           if-no-files-found: ignore
 
   miri:
-    timeout-minutes: 90
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -196,8 +348,10 @@ jobs:
 
   kani-quick:
     name: kani (quick)
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -213,10 +367,15 @@ jobs:
         run: test:kani:quick
         shell: devenv --profile kani shell -c -- bash -e {0}
 
+  # The bounded state-machine proofs are the slowest verification tier, so
+  # they only run after merge on `main`. Label a pull request `ci-full` to
+  # run them before merging.
   kani-compact:
     name: kani (compact layouts)
-    timeout-minutes: 60
+    timeout-minutes: 50
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -233,8 +392,14 @@ jobs:
         shell: devenv --profile kani shell -c -- bash -e {0}
 
   feature-matrix:
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: changes
+    # The job itself must always run so the matrix expands: required status
+    # checks are per matrix leg, and a job skipped before expansion reports a
+    # single literal `feature-matrix (${{ matrix.label }})` check that never
+    # satisfies branch protection. The per-step conditions skip the legs.
+    if: ${{ !failure() && !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -243,54 +408,71 @@ jobs:
             build_task: build:pina:default
             test_task: test:pina:default
             doc_task: ""
+            # `default` and `all-features` duplicate what the `test` job
+            # already covers on pull requests; they still run on `main`.
+            pr_run: false
           - label: no-default
             build_task: build:pina:no-default-only
             test_task: test:pina:no-default
             doc_task: doc:pina:no-default
+            pr_run: true
           - label: token-only
             build_task: build:pina:token-only
             test_task: test:pina:token-only
             doc_task: ""
+            pr_run: true
           - label: compact-only
             build_task: build:pina:compact-only
             test_task: test:pina:compact-only
             doc_task: doc:pina:compact-only
+            pr_run: true
           - label: account-resize-only
             build_task: build:pina:account-resize-only
             test_task: test:pina:account-resize-only
             doc_task: ""
+            pr_run: true
           - label: all-features
             build_task: build:pina:all-features
             test_task: test:pina:all-features
             doc_task: ""
+            pr_run: false
     name: feature-matrix (${{ matrix.label }})
     steps:
       - name: checkout repository
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: setup
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build `pina` for ${{ matrix.label }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         run: ${{ matrix.build_task }}
         shell: devenv shell -c -- bash -e {0}
 
       - name: test `pina` for ${{ matrix.label }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         run: ${{ matrix.test_task }}
         shell: devenv shell -c -- bash -e {0}
 
       - name: build `pina` docs for ${{ matrix.label }}
-        if: ${{ matrix.doc_task != '' }}
+        if: ${{ (github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')))) && matrix.doc_task != '' }}
         run: ${{ matrix.doc_task }}
         shell: devenv shell -c -- bash -e {0}
 
+  # The SBF example programs are exercised on pull requests by the surfpool
+  # workflow; the mollusk/LiteSVM/Quasar tier runs after merge on `main`.
+  # Label a pull request `ci-full` to run it before merging.
   program-e2e:
-    timeout-minutes: 120
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
     steps:
@@ -309,8 +491,10 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   idl:
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.idl == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -336,9 +520,15 @@ jobs:
           git --no-pager diff -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
         shell: bash
 
+  # The workspace build is fully covered on pull requests by the `test` and
+  # `lint` jobs, which compile every crate; this dedicated build-only pass
+  # runs after merge on `main`. Label a pull request `ci-full` to run it
+  # before merging.
   build:
-    timeout-minutes: 60
+    timeout-minutes: 40
     runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -360,11 +550,12 @@ jobs:
 
   release-publish:
     name: release-publish
-    if: github.event_name == 'pull_request'
+    if: ${{ !failure() && !cancelled() && github.event_name == 'pull_request' && (needs.changes.outputs.changesets == 'true' || contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     permissions:
       contents: read
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
