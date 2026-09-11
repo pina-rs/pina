@@ -8,9 +8,13 @@ use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::Write as _;
+use std::net::SocketAddr;
+use std::net::TcpStream;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
+use std::time::Instant;
 
 pub use solana_account::Account;
 use solana_client::client_error::ClientError;
@@ -30,6 +34,18 @@ use surfpool_sdk::cheatcodes::builders::SetAccount;
 
 static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
 const TEST_PAYER_SEED: [u8; 32] = [0xA5; 32];
+
+/// How long [`OfflineSurfnet::stop`] waits for both RPC listeners to close.
+///
+/// `Surfnet::stop` only confirms shutdown within five seconds, which shared CI
+/// runners exceed while several benchmark processes drain at once.
+const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Delay between RPC listener probes while a Surfpool instance drains.
+const SHUTDOWN_PROBE_INTERVAL: Duration = Duration::from_millis(250);
+
+/// How long a single probe waits for a connection attempt to resolve.
+const SHUTDOWN_PROBE_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// Run an async integration-test body on a dedicated Tokio runtime.
 ///
@@ -504,8 +520,9 @@ impl Drop for OfflineSurfnet {
 	fn drop(&mut self) {
 		// Dropping `Surfnet` hands a Terminate command to a runtime that may
 		// already be gone, which aborts the whole test process when a test
-		// panics. Drain synchronously here before the unwinder continues.
-		let _ = self.inner.stop();
+		// panics. Drain synchronously here before the unwinder continues, with
+		// the same retry budget tests get so a panic cannot leak bound ports.
+		let _ = self.stop();
 	}
 }
 
@@ -810,13 +827,66 @@ impl OfflineSurfnet {
 
 	/// Synchronously stop the owned Surfpool RPC servers and release their ports.
 	///
+	/// The SDK waits five seconds for both RPC servers to acknowledge the
+	/// terminate command. A loaded CI runner can exceed that window while the
+	/// server threads drain, so retry until the SDK confirms shutdown or both
+	/// listener ports stop accepting connections.
+	///
 	/// # Errors
 	///
 	/// Returns an error when both RPC servers do not confirm shutdown in time.
 	pub fn stop(&mut self) -> Result<(), TestError> {
-		self.inner
-			.stop()
-			.map_err(|error| test_error("stop offline Surfpool", error))
+		let deadline = Instant::now() + SHUTDOWN_TIMEOUT;
+		// Each attempt reports how many servers acknowledged shutdown, so the
+		// first failure carries the most diagnostic context.
+		let mut first_error = None;
+
+		loop {
+			match self.inner.stop() {
+				Ok(()) => return Ok(()),
+				Err(error) => {
+					first_error.get_or_insert_with(|| error.to_string());
+				}
+			}
+
+			if self.rpc_listeners_are_closed() {
+				return Ok(());
+			}
+
+			if Instant::now() >= deadline {
+				let message =
+					first_error.unwrap_or_else(|| "shutdown was not confirmed".to_owned());
+
+				return Err(test_error("stop offline Surfpool", message));
+			}
+
+			std::thread::sleep(SHUTDOWN_PROBE_INTERVAL);
+		}
+	}
+
+	/// Return whether neither RPC listener accepts connections any more.
+	fn rpc_listeners_are_closed(&self) -> bool {
+		[self.inner.rpc_url(), self.inner.ws_url()]
+			.into_iter()
+			.all(rpc_listener_is_closed)
+	}
+}
+
+/// Return whether the listener behind a `scheme://host:port` URL is gone.
+///
+/// A refused connection proves the port stopped accepting connections. Parsing
+/// failures and timeouts stay pessimistic so `stop` keeps waiting.
+fn rpc_listener_is_closed(url: &str) -> bool {
+	let Some(address) = url
+		.rsplit_once("://")
+		.and_then(|(_, address)| address.parse::<SocketAddr>().ok())
+	else {
+		return false;
+	};
+
+	match TcpStream::connect_timeout(&address, SHUTDOWN_PROBE_TIMEOUT) {
+		Ok(_) => false,
+		Err(error) => error.kind() == std::io::ErrorKind::ConnectionRefused,
 	}
 }
 
@@ -962,6 +1032,23 @@ mod tests {
 		let event = HistoricalEvent::new(1, [4, 1, 8, 7]);
 		assert_eq!(event.version(), 1);
 		assert_eq!(event.data(), [4, 1, 8, 7]);
+	}
+
+	#[test]
+	fn detects_closed_rpc_listeners() {
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.unwrap_or_else(|error| panic!("bind probe listener: {error}"));
+		let address = listener
+			.local_addr()
+			.unwrap_or_else(|error| panic!("read probe listener address: {error}"));
+		let url = format!("http://{address}");
+
+		assert!(!rpc_listener_is_closed(&url));
+
+		drop(listener);
+
+		assert!(rpc_listener_is_closed(&url));
+		assert!(!rpc_listener_is_closed("not-a-url"));
 	}
 
 	#[test]

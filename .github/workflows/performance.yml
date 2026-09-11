@@ -13,6 +13,9 @@ concurrency:
 # Release pull requests only re-version published packages, so benchmarking
 # them carries no signal. Every job skips when the pull request carries the
 # `release` label; skipped jobs still report success to required checks.
+#
+# Benchmark results are advisory: they report through the consolidated PR
+# comment, and none of these jobs is a required status check on `main`.
 jobs:
   program-profiles:
     name: program compute units and sizes
@@ -357,7 +360,10 @@ jobs:
   cli:
     name: CLI performance
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 15
+    # Building both CLIs and running the benchmarks against them peaked at
+    # ~11.5 minutes, which left too little room on a slow runner and surfaced
+    # as spurious job timeouts on otherwise healthy pull requests.
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
