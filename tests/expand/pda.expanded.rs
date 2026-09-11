@@ -2359,19 +2359,22 @@ mod __pinapod_compact_CompactState {
             data: &[u8],
         ) -> Result<usize, pina::pinapod::PinaPodError> {
             self.validate_inputs()?;
-            let view = <CompactStateRef<'_>>::new(data)?;
-            let mut updated_len = view.encoded_len();
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
+            let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            let __old_encoded_values: usize = __pinapod_checked_mul(
+                u16::from_le_bytes(__hdr.__values_len) as usize,
+                core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+            )?;
+            __offset = __pinapod_checked_add(__offset, __old_encoded_values)?;
+            let mut updated_len = __offset;
             if let Some(value) = self.values {
-                let old_len = __pinapod_checked_mul(
-                    view.values().len(),
-                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
-                )?;
                 let new_len = __pinapod_checked_mul(
                     value.len(),
                     core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
                 )?;
                 updated_len = updated_len
-                    .checked_sub(old_len)
+                    .checked_sub(__old_encoded_values)
                     .ok_or(pina::pinapod::PinaPodError::Overflow)?;
                 updated_len = __pinapod_checked_add(updated_len, new_len)?;
             }

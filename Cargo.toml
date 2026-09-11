@@ -230,7 +230,9 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.15.0" }
-pinapod = { version = "0.3", default-features = false, features = ["solana-address", "solana-program-error"] }
+# TEMPORARY measurement wiring against the 0.3.1 fix branch — swapped back
+# to the registry release once pinapod 0.3.1 is published.
+pinapod = { git = "https://github.com/pina-rs/pinapod.git", branch = "fix/updated-len-preflight-cost", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
