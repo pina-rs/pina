@@ -155,6 +155,11 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
       - name: measure base and head instructions
+        # Surfpool test binaries can hang indefinitely (the SDK's startup wait
+        # has no timeout). The measure script terminates an individual batch
+        # after 30 minutes; this bounds the whole step for hangs the watchdog
+        # does not cover instead of consuming the job budget below.
+        timeout-minutes: 45
         run: |
           set +e
           node ./scripts/measure-example-compute-units.ts \

@@ -11,12 +11,23 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
 	type CargoMetadata,
 	type ExampleProgram,
 	loadExampleInventory,
 } from "./example-inventory.ts";
+
+// A batch that outlives this budget is terminated as a failure instead of
+// stalling the workflow: Surfpool test binaries can hang indefinitely when the
+// simulated runtime wedges, and an unbounded batch once consumed the entire
+// instruction compute-unit job budget.
+const BATCH_TIMEOUT_MINUTES = 30;
+
+// How long a batch gets to honor SIGTERM before the watchdog escalates to
+// SIGKILL, which no process can ignore.
+const KILL_GRACE_MS = 5_000;
 
 interface IdlInstruction {
 	name: string;
@@ -70,22 +81,79 @@ function command(
 	return { status: result.status ?? 1, stdout: result.stdout ?? "" };
 }
 
-function commandAsync(
+export function commandAsync(
 	program: string,
 	args: string[],
 	options: {
 		cwd: string;
 		env: NodeJS.ProcessEnv;
+		timeoutMinutes?: number;
 	},
 ): Promise<number> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(program, args, {
 			cwd: options.cwd,
 			env: options.env,
+			// Own process group so the watchdog can terminate the whole batch,
+			// including the cargo test binaries and their Surfpool runtimes.
+			detached: process.platform !== "win32",
 			stdio: "inherit",
 		});
-		child.once("error", reject);
-		child.once("close", (code) => resolve(code ?? 1));
+
+		const terminate = (signal: NodeJS.Signals) => {
+			if (child.pid === undefined) {
+				return;
+			}
+
+			if (process.platform === "win32") {
+				child.kill(signal);
+				return;
+			}
+
+			try {
+				process.kill(-child.pid, signal);
+			} catch {
+				child.kill(signal);
+			}
+		};
+
+		const timers: Array<NodeJS.Timeout> = [];
+		const clearWatchdog = () => {
+			for (const timer of timers) {
+				clearTimeout(timer);
+			}
+		};
+
+		if (options.timeoutMinutes !== undefined) {
+			timers.push(
+				setTimeout(() => {
+					process.stdout.write(
+						`Batch exceeded ${options.timeoutMinutes} minutes; terminating ${program}\n`,
+					);
+					terminate("SIGTERM");
+
+					timers.push(
+						setTimeout(() => {
+							process.stdout.write(
+								`Batch ignored SIGTERM for ${
+									KILL_GRACE_MS / 1000
+								}s; sending SIGKILL\n`,
+							);
+							terminate("SIGKILL");
+						}, KILL_GRACE_MS),
+					);
+				}, options.timeoutMinutes * 60 * 1000),
+			);
+		}
+
+		child.once("error", (error) => {
+			clearWatchdog();
+			reject(error);
+		});
+		child.once("close", (code) => {
+			clearWatchdog();
+			resolve(code ?? 1);
+		});
 	});
 }
 
@@ -360,6 +428,7 @@ async function main(): Promise<number> {
 						PINA_CU_MANIFEST: benchmarkManifest,
 						PINA_CU_RECORD_FILE: recordFile,
 					},
+					timeoutMinutes: BATCH_TIMEOUT_MINUTES,
 				},
 			);
 
@@ -438,11 +507,16 @@ async function main(): Promise<number> {
 	return 0;
 }
 
-main().then((status) => {
-	process.exitCode = status;
-}).catch((error: unknown) => {
-	process.stderr.write(
-		`Error: ${error instanceof Error ? error.message : String(error)}\n`,
-	);
-	process.exitCode = 1;
-});
+if (
+	process.argv[1] !== undefined &&
+	import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+	main().then((status) => {
+		process.exitCode = status;
+	}).catch((error: unknown) => {
+		process.stderr.write(
+			`Error: ${error instanceof Error ? error.message : String(error)}\n`,
+		);
+		process.exitCode = 1;
+	});
+}
