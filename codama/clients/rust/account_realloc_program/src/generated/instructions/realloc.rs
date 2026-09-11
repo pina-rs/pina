@@ -79,17 +79,9 @@ impl ReallocInstructionData {
 }
 
 #[doc(hidden)]
-#[allow(clippy::len_without_is_empty)]
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ReallocInstructionWire {
 	pub discriminator: u8,
 	pub len: u16,
-}
-
-impl ReallocInstructionWireZc {
-	#[must_use]
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
 }

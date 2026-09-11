@@ -32,7 +32,7 @@ impl AllowsDuplicateMutable {
 		data: AllowsDuplicateMutableInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ID,
@@ -66,7 +66,6 @@ impl AllowsDuplicateMutableInstructionData {
 }
 
 #[doc(hidden)]
-#[allow(clippy::len_without_is_empty)]
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllowsDuplicateMutableInstructionWire {
