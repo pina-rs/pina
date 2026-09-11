@@ -8,6 +8,10 @@ RUST_CLIENTS_DIR="$CODAMA_DIR/clients/rust"
 CPI_CLIENTS_DIR="$CODAMA_DIR/clients/cpi"
 JS_CLIENTS_DIR="$CODAMA_DIR/clients/js"
 DART_CLIENTS_DIR="$CODAMA_DIR/clients/dart"
+CLI_CLIENTS_DIR="$CODAMA_DIR/clients/cli"
+CLI_RUST_CLIENTS_DIR="$CLI_CLIENTS_DIR/rust"
+CLI_JS_CLIENTS_DIR="$CLI_CLIENTS_DIR/ts"
+CLI_DART_CLIENTS_DIR="$CLI_CLIENTS_DIR/dart"
 
 if ! command -v git >/dev/null 2>&1; then
 	echo "git is required to verify deterministic Codama output." >&2
@@ -22,13 +26,13 @@ fi
 show_codama_diff() {
 	echo >&2
 	echo "Codama output status:" >&2
-	git -C "$ROOT" --no-pager status --short -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" >&2 || true
+	git -C "$ROOT" --no-pager status --short -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR" >&2 || true
 	echo >&2
 	echo "Codama output diff stat:" >&2
-	git -C "$ROOT" --no-pager diff --stat -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" >&2 || true
+	git -C "$ROOT" --no-pager diff --stat -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR" >&2 || true
 	echo >&2
 	echo "Codama output diff:" >&2
-	git -C "$ROOT" --no-pager diff -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" >&2 || true
+	git -C "$ROOT" --no-pager diff -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR" >&2 || true
 }
 
 format_codama_outputs() {
@@ -39,8 +43,8 @@ format_codama_outputs() {
 		while IFS= read -r file; do
 			FORMAT_FILES+=("$file")
 		done < <({
-			find codama/idls codama/clients/rust codama/clients/cpi codama/clients/js -type f
-			find codama/clients/dart \
+			find codama/idls codama/clients/rust codama/clients/cpi codama/clients/js codama/clients/cli/rust codama/clients/cli/ts -type f
+			find codama/clients/dart codama/clients/cli/dart \
 				\( -path '*/.dart_tool' -o -path '*/.dart_tool/*' \) -prune \
 				-o -type f -print
 		} | sort)
@@ -68,6 +72,9 @@ fi
 mkdir -p "$HOME"
 echo "Installing pnpm workspace dependencies..."
 pnpm install --frozen-lockfile --config.confirm-modules-purge=false
+# The TypeScript/Dart CLI renderer is resolved from this workspace package, so
+# its bundle has to exist before generation runs.
+pnpm --dir "$ROOT" run build:codama-renderer-cli
 
 echo "Generating Codama IDLs and clients for all examples..."
 cargo run -p pina_cli --quiet -- codama generate \
@@ -77,6 +84,9 @@ cargo run -p pina_cli --quiet -- codama generate \
 	--cpi-out "$CPI_CLIENTS_DIR" \
 	--js-out "$JS_CLIENTS_DIR" \
 	--dart-out "$DART_CLIENTS_DIR" \
+	--cli-rust-out "$CLI_RUST_CLIENTS_DIR" \
+	--cli-ts-out "$CLI_JS_CLIENTS_DIR" \
+	--cli-dart-out "$CLI_DART_CLIENTS_DIR" \
 	--npx node
 
 if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
@@ -124,7 +134,20 @@ echo "Resolving, analyzing, and testing generated Dart clients..."
 	dart test
 )
 
-echo "Compile-checking generated Rust and CPI client crates..."
+echo "Analyzing generated Dart CLI package..."
+(
+	cd "$CLI_DART_CLIENTS_DIR"
+	if [ ! -f pubspec.lock ]; then
+		echo "Generated Dart CLI clients require a committed pubspec.lock." >&2
+		exit 1
+	fi
+
+	dart pub get --enforce-lockfile
+	dart format --output=none --set-exit-if-changed .
+	dart analyze --fatal-infos
+)
+
+echo "Compile-checking generated Rust, CPI, and CLI client crates..."
 CLIENT_MANIFESTS=()
 while IFS= read -r manifest; do
 	CLIENT_MANIFESTS+=("$manifest")
@@ -132,6 +155,9 @@ done < <(find "$RUST_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sor
 while IFS= read -r manifest; do
 	CLIENT_MANIFESTS+=("$manifest")
 done < <(find "$CPI_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+while IFS= read -r manifest; do
+	CLIENT_MANIFESTS+=("$manifest")
+done < <(find "$CLI_RUST_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
 
 if [ "${#CLIENT_MANIFESTS[@]}" -eq 0 ]; then
 	echo "No generated Rust or CPI client manifests found." >&2
@@ -153,7 +179,7 @@ cargo check --locked "${CLIENT_ARGS[@]}"
 echo "Checking deterministic Codama output regeneration..."
 GENERATED_STATUS="$(
 	git -C "$ROOT" status --porcelain=v1 --untracked-files=all -- \
-		"$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR"
+		"$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR"
 )"
 
 if [ -n "$GENERATED_STATUS" ]; then

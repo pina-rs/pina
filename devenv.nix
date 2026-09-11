@@ -198,6 +198,7 @@ in
       exec = ''
         set -euo pipefail
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
         pina codama generate \
           --examples-dir "$DEVENV_ROOT/examples" \
           --idls-dir "$DEVENV_ROOT/codama/idls" \
@@ -205,11 +206,15 @@ in
           --cpi-out "$DEVENV_ROOT/codama/clients/cpi" \
           --js-out "$DEVENV_ROOT/codama/clients/js" \
           --dart-out "$DEVENV_ROOT/codama/clients/dart" \
+          --cli-rust-out "$DEVENV_ROOT/codama/clients/cli/rust" \
+          --cli-ts-out "$DEVENV_ROOT/codama/clients/cli/ts" \
+          --cli-dart-out "$DEVENV_ROOT/codama/clients/cli/dart" \
           --npx node
         dprint fmt "codama/**"
         dart format "$DEVENV_ROOT/codama/clients/dart"
+        dart format "$DEVENV_ROOT/codama/clients/cli/dart"
       '';
-      description = "Generate Codama IDLs and Rust/CPI/JS/Dart clients for all examples.";
+      description = "Generate Codama IDLs and Rust/CPI/JS/Dart/CLI clients for all examples.";
       binary = "bash";
     };
     "codama:test" = {
@@ -1254,6 +1259,9 @@ in
         lint:format
         pnpm install --frozen-lockfile --ignore-scripts
         pnpm run check:scripts
+        # Type-checks the committed Codama JS clients plus the generated
+        # TypeScript CLI apps, which no other task covers.
+        pnpm run check:js
         verify:docs
         security:pina-lint
         lint:monochange
