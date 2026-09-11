@@ -246,7 +246,9 @@ pub(crate) fn render_instruction_page(
 	// companion or clippy's `len_without_is_empty` fires under `-D warnings`.
 	let has_dynamic_vec_tail = instruction.arguments.last().is_some_and(|argument| {
 		let rendered = serde_json::to_string(&argument.r#type).unwrap_or_default();
-		rendered.contains("arrayTypeNode") && rendered.contains("prefixedCountNode")
+		rendered.contains("arrayTypeNode")
+			&& rendered.contains("prefixedCountNode")
+			&& !rendered.contains("fixedSizeTypeNode")
 	});
 	lines.extend(wire_fields);
 	lines.push("}".to_string());

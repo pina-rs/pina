@@ -97,10 +97,3 @@ pub struct CheckPolicyInstructionWire {
 	pub memo: pina::String<64>,
 	pub approvals: pina::Vec<u8, 4>,
 }
-
-impl CheckPolicyInstructionWireZc {
-	#[must_use]
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
-}
