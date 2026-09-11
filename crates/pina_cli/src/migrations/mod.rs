@@ -12,6 +12,7 @@ mod transition;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -33,6 +34,7 @@ use pina_abi::ProcessContract;
 use pina_abi::SchemaVersion;
 pub use prompt::DisambiguationQuestion;
 pub use prompt::MigrationAnswers;
+use prompt::PromptIo;
 use scan::next_migration_version;
 use scan::scan_current_contracts;
 use scan::validate_program_configuration;
@@ -246,6 +248,15 @@ pub fn make_migrations_with_answers(
 ) -> Result<MakeMigrationsOutput, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
+	// Attach the process terminal once: with a tty the disambiguation
+	// questions below can be answered inline, and a piped stdin simply makes
+	// the prompts report themselves unavailable.
+	let stdin = std::io::stdin();
+	let stdout = std::io::stdout();
+	let interactive = stdin.is_terminal();
+	let mut stdin_lock = stdin.lock();
+	let mut stdout_lock = stdout.lock();
+	let mut prompts = PromptIo::new(&mut stdin_lock, &mut stdout_lock, interactive);
 	let current = scan_current_contracts(&project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
@@ -313,6 +324,7 @@ pub fn make_migrations_with_answers(
 							.map_or(&[], |transition| &transition.renames),
 						answers,
 						&mut output.data_warnings,
+						&mut prompts,
 					)?;
 					let effective = effective_source_schema(latest, &renames, &dropped)?;
 					let transition = create_transition(
@@ -354,16 +366,21 @@ pub fn make_migrations_with_answers(
 							.versions
 							.get((latest_version - 1) as usize)
 							.expect("decoded histories contain every adjacent prior version");
+						// The draft's own transition carries the disambiguation
+						// answers recorded when it was created; reusing them
+						// keeps repeated `make` runs over the draft stable
+						// instead of re-asking settled questions.
 						let (renames, dropped) = resolve_field_changes(
 							&key,
 							&previous.schema,
 							&source.schema,
-							previous
+							latest
 								.transition
 								.as_ref()
 								.map_or(&[], |transition| &transition.renames),
 							answers,
 							&mut output.data_warnings,
+							&mut prompts,
 						)?;
 						let effective = effective_source_schema(previous, &renames, &dropped)?;
 						let transition = create_transition(

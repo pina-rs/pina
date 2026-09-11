@@ -168,6 +168,91 @@ fn reserved_migrate_instruction_skips_placeholders_and_rejects_foreign_accounts(
 	});
 }
 
+/// The reserved instruction charges one shared lamport budget: a cap that
+/// funds one growing account must not fund two in the same invocation.
+#[test]
+#[ignore = "run with pina test"]
+fn reserved_migrate_instruction_shares_one_lamport_budget_across_slots() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let state_a = Pubkey::new_from_array([0x26; 32]);
+		let state_b = Pubkey::new_from_array([0x27; 32]);
+		for state in [&state_a, &state_b] {
+			program
+				.install_historical_account(&HistoricalAccount::new(
+					0,
+					*state,
+					program_id,
+					historical_state_data(&authority, 7),
+				))
+				.expect("install historical state");
+		}
+
+		// Each v0 state is rent-exempt at 42 bytes, so each migration tops up
+		// two bytes of rent (13,920 lamports). The 20,000-lamport cap funds
+		// either account alone but never both, and the transaction fails
+		// atomically with the budget error.
+		let rejection = program.send(
+			&[MIGRATE_DISCRIMINATOR],
+			vec![
+				AccountMeta::new(authority, true),
+				AccountMeta::new_readonly(system_program(), false),
+				AccountMeta::new(state_a, false),
+				AccountMeta::new_readonly(program_id, false),
+				AccountMeta::new_readonly(program_id, false),
+				AccountMeta::new(state_b, false),
+			],
+		);
+		let error = rejection.expect_err("two growing migrations must exceed the shared budget");
+		assert!(
+			error.message().contains("fffffff5"),
+			"expected the migration budget error, got: {}",
+			error.message()
+		);
+		for state in [&state_a, &state_b] {
+			assert_eq!(
+				program
+					.account(state)
+					.expect("read rolled back state")
+					.data
+					.len(),
+				42,
+				"a failed sweep must leave every account stale"
+			);
+		}
+
+		// The same cap funds one account alone, so the rejection above was the
+		// shared budget, not an undersized per-account one.
+		program
+			.send(
+				&[MIGRATE_DISCRIMINATOR],
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new_readonly(system_program(), false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new(state_b, false),
+				],
+			)
+			.expect("execute reserved Migrate within the shared budget");
+		assert_eq!(
+			program
+				.account(&state_b)
+				.expect("read migrated state")
+				.data
+				.len(),
+			CURRENT_STATE_SIZE
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// The current generated client owns the migration version and emits it
 /// without asking the caller to understand the account's migration history.
 #[test]

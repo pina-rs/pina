@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::io::BufRead;
+use std::io::Write;
 
 use serde::Serialize;
 
@@ -95,70 +97,103 @@ impl MigrationAnswers {
 	}
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RenameAnswer {
 	Rename,
 	Remove,
 	Abort,
 }
 
-/// Prompt once on an interactive terminal for one rename question.
-pub(super) fn prompt_rename(question: &DisambiguationQuestion) -> RenameAnswer {
-	use std::io::BufRead as _;
-	use std::io::Write as _;
-
-	for _ in 0..3 {
-		println!(
-			"Field `{}` was removed and `{}` (same type `{}`) was added for `{}`.",
-			question.from, question.to, question.rust_type, question.contract
-		);
-		println!(
-			"Is this a rename? [y] rename and preserve data, [n] remove and zero `{}`",
-			question.to
-		);
-		print!("Answer (y/n): ");
-		if std::io::stdout().flush().is_err() {
-			return RenameAnswer::Abort;
-		}
-		let mut line = String::new();
-		if std::io::stdin().lock().read_line(&mut line).is_err() {
-			return RenameAnswer::Abort;
-		}
-		match line.trim().to_ascii_lowercase().as_str() {
-			"y" | "yes" | "rename" => return RenameAnswer::Rename,
-			"n" | "no" | "remove" => return RenameAnswer::Remove,
-			_ => {
-				println!("Answer `y` or `n`.");
-			}
-		}
-	}
-	RenameAnswer::Abort
+/// Where prompts are written, where answers are read, and whether a human is
+/// attached to answer them.
+///
+/// The make flow depends on this struct instead of the process stdio so tests
+/// resolve disambiguations with scripted streams and every prompt branch runs
+/// deterministically. Production attaches the terminal; a piped stdin simply
+/// reports `interactive: false` and the question degrades to a flag error.
+pub(super) struct PromptIo<'io> {
+	input: &'io mut dyn BufRead,
+	output: &'io mut dyn Write,
+	interactive: bool,
 }
 
-/// Confirm one data-dropping removal on an interactive terminal.
-pub(super) fn prompt_removal(question: &DisambiguationQuestion) -> RenameAnswer {
-	use std::io::BufRead as _;
-	use std::io::Write as _;
-
-	for _ in 0..3 {
-		println!(
-			"Field `{}` (type `{}`) is removed for `{}` and its stored data is discarded.",
-			question.from, question.rust_type, question.contract
-		);
-		print!("Acknowledge the removal? (y/n): ");
-		if std::io::stdout().flush().is_err() {
-			return RenameAnswer::Abort;
-		}
-		let mut line = String::new();
-		if std::io::stdin().lock().read_line(&mut line).is_err() {
-			return RenameAnswer::Abort;
-		}
-		match line.trim().to_ascii_lowercase().as_str() {
-			"y" | "yes" | "remove" => return RenameAnswer::Remove,
-			"n" | "no" | "abort" => return RenameAnswer::Abort,
-			_ => {
-				println!("Answer `y` or `n`.");
-			}
+impl<'io> PromptIo<'io> {
+	pub(super) fn new(
+		input: &'io mut dyn BufRead,
+		output: &'io mut dyn Write,
+		interactive: bool,
+	) -> Self {
+		Self {
+			input,
+			output,
+			interactive,
 		}
 	}
-	RenameAnswer::Abort
+
+	/// Whether prompts may be asked at all.
+	pub(super) fn interactive(&self) -> bool {
+		self.interactive
+	}
+
+	/// Prompt once for one plausible rename.
+	///
+	/// The loop tolerates two invalid answers; every third failure aborts so a
+	/// wedged terminal cannot stall `pina migrations make` forever.
+	pub(super) fn prompt_rename(&mut self, question: &DisambiguationQuestion) -> RenameAnswer {
+		for _ in 0..3 {
+			let _ = writeln!(
+				self.output,
+				"Field `{}` was removed and `{}` (same type `{}`) was added for `{}`.",
+				question.from, question.to, question.rust_type, question.contract
+			);
+			let _ = writeln!(
+				self.output,
+				"Is this a rename? [y] rename and preserve data, [n] remove and zero `{}`",
+				question.to
+			);
+			let _ = write!(self.output, "Answer (y/n): ");
+			if self.output.flush().is_err() {
+				return RenameAnswer::Abort;
+			}
+			let mut line = String::new();
+			if self.input.read_line(&mut line).is_err() {
+				return RenameAnswer::Abort;
+			}
+			match line.trim().to_ascii_lowercase().as_str() {
+				"y" | "yes" | "rename" => return RenameAnswer::Rename,
+				"n" | "no" | "remove" => return RenameAnswer::Remove,
+				_ => {
+					let _ = writeln!(self.output, "Answer `y` or `n`.");
+				}
+			}
+		}
+		RenameAnswer::Abort
+	}
+
+	/// Confirm one data-dropping removal.
+	pub(super) fn prompt_removal(&mut self, question: &DisambiguationQuestion) -> RenameAnswer {
+		for _ in 0..3 {
+			let _ = writeln!(
+				self.output,
+				"Field `{}` (type `{}`) is removed for `{}` and its stored data is discarded.",
+				question.from, question.rust_type, question.contract
+			);
+			let _ = write!(self.output, "Acknowledge the removal? (y/n): ");
+			if self.output.flush().is_err() {
+				return RenameAnswer::Abort;
+			}
+			let mut line = String::new();
+			if self.input.read_line(&mut line).is_err() {
+				return RenameAnswer::Abort;
+			}
+			match line.trim().to_ascii_lowercase().as_str() {
+				"y" | "yes" | "remove" => return RenameAnswer::Remove,
+				"n" | "no" | "abort" => return RenameAnswer::Abort,
+				_ => {
+					let _ = writeln!(self.output, "Answer `y` or `n`.");
+				}
+			}
+		}
+		RenameAnswer::Abort
+	}
 }

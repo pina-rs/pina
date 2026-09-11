@@ -205,15 +205,18 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 /// A client prepends this instruction when an account is stale, so the payer
 /// authorizes exactly the migration cost and the business instruction that
 /// follows sees current data. Accounts are `[payer, systemProgram, state,
-/// manualState, compactState]`: the payer is a writable account (or the
-/// program address when no step needs funding), the system program slot backs
-/// the rent transfers, and a migratable slot holding the program address is
-/// treated as omitted, mirroring the generated clients.
+/// manualState, compactState, spareState]`: the payer is a writable account
+/// (or the program address when no step needs funding), the system program
+/// slot backs the rent transfers, a migratable slot holding the program
+/// address is treated as omitted, and the trailing `spareState` slot shows
+/// several accounts of the same contract migrating in one sweep under one
+/// shared lamport budget.
 fn process_migrate(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResult {
 	let mut context = MigrateContext::new(program_id, accounts, MAX_INLINE_MIGRATION_LAMPORTS)?;
 	context.run_optional::<State>(2)?;
 	context.run_optional::<ManualState>(3)?;
 	context.run_optional::<CompactState>(4)?;
+	context.run_optional::<State>(5)?;
 
 	Ok(())
 }

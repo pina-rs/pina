@@ -56,10 +56,13 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 	let mut events = Vec::new();
 	for resolved in &files {
 		// The shared parser has already validated discriminator declarations in
-		// these exact syntax trees while assembling `ir`.
-		discriminators.extend(parse::discriminator::extract_discriminator_enums(
-			&resolved.file,
-		)?);
+		// these exact syntax trees while assembling `ir`: the same pure
+		// extractor ran over the same files inside `parse_program_with_sources`
+		// and any error surfaced there, so this pass cannot fail.
+		discriminators.extend(
+			parse::discriminator::extract_discriminator_enums(&resolved.file)
+				.expect("the program parser validated every discriminator enum"),
+		);
 		events.extend(parse::event_data::extract_migratable_events(
 			&resolved.file,
 		)?);
@@ -99,7 +102,8 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 				schema,
 				process: None,
 			},
-		)?;
+		)
+		.expect("the program parser rejected colliding account identities");
 	}
 
 	for instruction in ir
@@ -134,7 +138,8 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 				schema,
 				process: Some(process_contract(instruction)),
 			},
-		)?;
+		)
+		.expect("the program parser rejected colliding instruction identities");
 	}
 
 	for event in events {

@@ -1,6 +1,7 @@
 //! Tests for the migration CLI, grouped by concern.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -1760,4 +1761,892 @@ fn field_type_changes_and_compact_changes_are_manual() {
 
 	assert_eq!(transition_mode(&old, &changed), TransitionMode::Manual);
 	assert_eq!(transition_mode(&old, &compact), TransitionMode::Manual);
+}
+
+struct ClosedTerminal;
+
+impl std::io::Write for ClosedTerminal {
+	fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+		Err(std::io::Error::other("terminal closed"))
+	}
+
+	fn flush(&mut self) -> std::io::Result<()> {
+		Err(std::io::Error::other("terminal closed"))
+	}
+}
+
+impl std::io::Read for ClosedTerminal {
+	fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+		Err(std::io::Error::other("terminal closed"))
+	}
+}
+
+impl std::io::BufRead for ClosedTerminal {
+	fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+		Err(std::io::Error::other("terminal closed"))
+	}
+
+	fn consume(&mut self, _: usize) {}
+}
+
+#[test]
+fn prompts_read_scripted_answers_and_print_the_question() {
+	let rename_question = DisambiguationQuestion {
+		contract: "account:1:01".to_owned(),
+		from: "value".to_owned(),
+		to: "points".to_owned(),
+		rust_type: "u64".to_owned(),
+	};
+	for (answer, expected) in [
+		(&b"y\n"[..], RenameAnswer::Rename),
+		(b"yes\n", RenameAnswer::Rename),
+		(b"rename\n", RenameAnswer::Rename),
+		(b"n\n", RenameAnswer::Remove),
+		(b"no\n", RenameAnswer::Remove),
+	] {
+		let mut reader: &[u8] = answer;
+		let mut transcript = Vec::new();
+		let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+		assert_eq!(prompts.prompt_rename(&rename_question), expected);
+		assert!(
+			String::from_utf8_lossy(&transcript)
+				.contains("Field `value` was removed and `points` (same type `u64`)"),
+			"the transcript must print the question: {transcript:?}"
+		);
+	}
+
+	let removal_question = DisambiguationQuestion {
+		to: String::new(),
+		..rename_question.clone()
+	};
+	for (answer, expected) in [
+		(&b"y\n"[..], RenameAnswer::Remove),
+		(b"yes\n", RenameAnswer::Remove),
+		(b"remove\n", RenameAnswer::Remove),
+		(b"n\n", RenameAnswer::Abort),
+		(b"abort\n", RenameAnswer::Abort),
+	] {
+		let mut reader: &[u8] = answer;
+		let mut transcript = Vec::new();
+		let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+		assert_eq!(prompts.prompt_removal(&removal_question), expected);
+		assert!(
+			String::from_utf8_lossy(&transcript)
+				.contains("Field `value` (type `u64`) is removed for `account:1:01`"),
+			"the transcript must print the removal: {transcript:?}"
+		);
+	}
+}
+
+#[test]
+fn prompts_retry_twice_then_abort_on_invalid_answers() {
+	let question = DisambiguationQuestion {
+		contract: "account:1:01".to_owned(),
+		from: "value".to_owned(),
+		to: "points".to_owned(),
+		rust_type: "u64".to_owned(),
+	};
+	let mut reader: &[u8] = b"maybe\nmaybe\nmaybe\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	assert_eq!(prompts.prompt_rename(&question), RenameAnswer::Abort);
+	assert_eq!(
+		String::from_utf8_lossy(&transcript)
+			.matches("Answer `y` or `n`.")
+			.count(),
+		3,
+		"each invalid answer must be retried exactly three times"
+	);
+
+	let mut reader: &[u8] = b"maybe\nmaybe\nmaybe\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	assert_eq!(prompts.prompt_removal(&question), RenameAnswer::Abort);
+	assert_eq!(
+		String::from_utf8_lossy(&transcript)
+			.matches("Answer `y` or `n`.")
+			.count(),
+		3
+	);
+
+	// An exhausted retry budget degrades to the flag error instead of a
+	// wrong guess, and an invalid answer followed by a valid one resolves.
+	let mut reader: &[u8] = b"maybe\ny\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	assert_eq!(prompts.prompt_rename(&question), RenameAnswer::Rename);
+}
+
+#[test]
+fn prompts_abort_when_the_terminal_breaks() {
+	let question = DisambiguationQuestion {
+		contract: "account:1:01".to_owned(),
+		from: "value".to_owned(),
+		to: "points".to_owned(),
+		rust_type: "u64".to_owned(),
+	};
+	let mut closed_write = ClosedTerminal;
+	let mut live_read: &[u8] = b"y\n";
+	let mut prompts = PromptIo::new(&mut live_read, &mut closed_write, true);
+	assert_eq!(prompts.prompt_rename(&question), RenameAnswer::Abort);
+
+	let mut live_write = Vec::new();
+	let mut closed_read = ClosedTerminal;
+	let mut prompts = PromptIo::new(&mut closed_read, &mut live_write, true);
+	assert_eq!(prompts.prompt_rename(&question), RenameAnswer::Abort);
+
+	let mut closed_write = ClosedTerminal;
+	let mut live_read: &[u8] = b"y\n";
+	let mut prompts = PromptIo::new(&mut live_read, &mut closed_write, true);
+	assert_eq!(prompts.prompt_removal(&question), RenameAnswer::Abort);
+
+	let mut live_write = Vec::new();
+	let mut closed_read = ClosedTerminal;
+	let mut prompts = PromptIo::new(&mut closed_read, &mut live_write, true);
+	assert_eq!(prompts.prompt_removal(&question), RenameAnswer::Abort);
+}
+
+#[test]
+fn recorded_renames_contradicted_by_flags_fail_closed() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("points", "u64"), ("total", "u64")]);
+	let answers = MigrationAnswers::from_flags(&["value:total".to_owned()], &[], true).unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("a contradictory --rename must fail closed");
+	assert!(
+		format!("{rejection}").contains(
+			"previously recorded the rename `value:points`; `--rename value:total` contradicts it"
+		),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn renames_must_target_added_fields() {
+	// `spare` is retained by the destination, so renaming the removed `count`
+	// onto it would overwrite live bytes through the effective schema.
+	let source = schema(LayoutKind::Fixed, &[("count", "u64"), ("spare", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("spare", "u64")]);
+	let answers = MigrationAnswers::from_flags(&["count:spare".to_owned()], &[], true).unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("renaming onto a retained field must fail closed");
+	assert!(
+		format!("{rejection}")
+			.contains("`--rename count:spare` targets `spare`, which is not an added field"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn recorded_renames_settle_draft_refreshes_without_asking_again() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("points", "u64")]);
+	let answers = MigrationAnswers::default();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("settled draft refresh: {error:?}"));
+	assert_eq!(
+		renames,
+		vec![pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}]
+	);
+	assert!(dropped.is_empty());
+}
+
+#[test]
+fn interactive_rename_prompts_resolve_ambiguities() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("points", "u64")]);
+	let answers = MigrationAnswers {
+		no_interactive: false,
+		..MigrationAnswers::default()
+	};
+
+	let mut reader: &[u8] = b"y\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	let mut warnings = Vec::new();
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("answered rename: {error:?}"));
+	assert_eq!(
+		renames,
+		vec![pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}]
+	);
+	assert!(dropped.is_empty());
+
+	let mut reader: &[u8] = b"n\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	let mut warnings = Vec::new();
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("declined rename: {error:?}"));
+	assert!(renames.is_empty());
+	assert!(dropped.contains("value"));
+	assert!(
+		warnings
+			.iter()
+			.any(|warning| warning.contains("`points` starts zeroed")),
+		"{warnings:?}"
+	);
+
+	// An aborted prompt degrades to the flag error with the question intact.
+	let mut reader: &[u8] = b"maybe\nmaybe\nmaybe\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	let mut warnings = Vec::new();
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("an aborted prompt must ask again with flags");
+	assert!(
+		matches!(rejection, MigrationError::DisambiguationRequired { .. }),
+		"{rejection:?}"
+	);
+}
+
+#[test]
+fn interactive_removal_prompts_collect_acknowledgements() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64"), ("kept", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("kept", "u8")]);
+	let answers = MigrationAnswers {
+		no_interactive: false,
+		..MigrationAnswers::default()
+	};
+
+	let mut reader: &[u8] = b"y\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	let mut warnings = Vec::new();
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("acknowledged removal: {error:?}"));
+	assert!(renames.is_empty());
+	assert!(dropped.contains("value"));
+	assert!(
+		warnings
+			.iter()
+			.any(|warning| warning.contains("field `value` (type `u64`) is removed")),
+		"{warnings:?}"
+	);
+
+	let mut reader: &[u8] = b"maybe\nmaybe\nmaybe\n";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+	let mut warnings = Vec::new();
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("an aborted removal must ask again with flags");
+	let rendered = format!("{rejection}");
+	assert!(
+		rendered.contains("field `value` (type `u64`) is removed and its stored data is discarded"),
+		"{rendered}"
+	);
+	assert!(
+		rendered.contains("Answer with `--assume-removed value`"),
+		"{rendered}"
+	);
+}
+
+#[test]
+fn dropped_fields_without_candidates_warn_without_questions() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64"), ("kept", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("kept", "u8")]);
+	let answers = MigrationAnswers::from_flags(&[], &["value".to_owned()], true).unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("acknowledged unpaired removal: {error:?}"));
+	assert!(renames.is_empty());
+	assert!(dropped.contains("value"));
+	assert!(
+		warnings
+			.iter()
+			.any(|warning| warning.contains("field `value` (type `u64`) is removed")),
+		"{warnings:?}"
+	);
+}
+
+#[test]
+fn effective_schema_rebuilds_reject_corrupted_manifest_schemas() {
+	let mut version = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	// A hand-edited manifest can carry a field type the closed grammar
+	// rejects; the rebuilt effective schema must fail instead of building a
+	// broken transition from it.
+	version.schema.fields[0].rust_type = "Widget".to_owned();
+
+	let rejection = effective_source_schema(&version, &[], &BTreeSet::new())
+		.expect_err("corrupted field types must fail the rebuild");
+	assert!(
+		format!("{rejection}").contains("produce an invalid schema"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn draft_refreshes_ask_new_questions_through_the_recorded_history() {
+	let fixture = published_fixture_with(&[("alpha", "u64"), ("beta", "u64")]);
+	publish_current(&fixture);
+	write_state_source(&fixture, "points: u64, beta: u64");
+	let answers = MigrationAnswers::from_flags(&["alpha:points".to_owned()], &[], true).unwrap();
+	let output = make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("record the rename on the draft: {error:?}"));
+	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+
+	// The draft's destination now changes again: `beta` is removed while
+	// `total` appears, and the recorded `alpha:points` rename no longer
+	// answers the new question, so the refresh must ask instead of guessing.
+	write_state_source(&fixture, "points: u64, total: u64");
+	let rejection = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+		.expect_err("an unanswered draft refresh must ask again");
+	let rendered = format!("{rejection}");
+	assert!(
+		rendered.contains("was `beta` renamed to `total`"),
+		"{rendered}"
+	);
+	assert!(
+		!rendered.contains("was `alpha` renamed"),
+		"the recorded rename must settle `alpha` instead of re-asking: {rendered}"
+	);
+}
+
+#[test]
+fn from_flags_rejects_one_sided_and_separatorless_renames() {
+	for flag in [":points", "value:", ":"] {
+		let error = MigrationAnswers::from_flags(&[flag.to_owned()], &[], true)
+			.expect_err("a one-sided rename must be rejected");
+		assert!(error.contains("must name both fields"), "{error}");
+	}
+	let error = MigrationAnswers::from_flags(&["value-points".to_owned()], &[], true)
+		.expect_err("a rename without the separator must be rejected");
+	assert!(
+		error.contains("must be written as `--rename from:to`"),
+		"{error}"
+	);
+}
+
+#[test]
+fn unpaired_removal_without_candidate_asks_with_flags_when_not_interactive() {
+	// `value` is removed and nothing of its type is added, so there is no
+	// rename to propose: the question must still demand an explicit answer.
+	let source = schema(LayoutKind::Fixed, &[("value", "u64"), ("kept", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("kept", "u8")]);
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("an unanswered unpaired removal must ask again");
+	let rendered = format!("{rejection}");
+	assert!(
+		rendered.contains("field `value` (type `u64`) is removed and its stored data is discarded"),
+		"{rendered}"
+	);
+	assert!(
+		rendered.contains("Answer with `--assume-removed value`"),
+		"{rendered}"
+	);
+}
+
+#[test]
+fn one_added_field_cannot_receive_two_renames() {
+	let source = schema(LayoutKind::Fixed, &[("alpha", "u64"), ("beta", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("points", "u64")]);
+	let answers = MigrationAnswers::from_flags(
+		&["alpha:points".to_owned(), "beta:points".to_owned()],
+		&[],
+		true,
+	)
+	.unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("two renames onto one field must fail closed");
+	assert!(
+		format!("{rejection}").contains("two renames target `points`"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn unclaimed_candidates_pair_once_across_several_removals() {
+	// Two same-typed removals and two additions: each removal pairs with its
+	// own candidate instead of both proposing the same field.
+	let source = schema(
+		LayoutKind::Fixed,
+		&[("alpha", "u64"), ("beta", "u64"), ("kept", "u8")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("kept", "u8"), ("points", "u64"), ("total", "u64")],
+	);
+	let answers = MigrationAnswers::default();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("both removals still need answers");
+	let rendered = format!("{rejection}");
+	assert!(
+		rendered.contains("was `alpha` renamed to `points`"),
+		"{rendered}"
+	);
+	assert!(
+		rendered.contains("was `beta` renamed to `total`"),
+		"{rendered}"
+	);
+	assert_eq!(
+		rendered.matches("renamed to `points`").count(),
+		1,
+		"`points` must be proposed exactly once: {rendered}"
+	);
+}
+
+#[test]
+fn growth_warnings_only_apply_to_account_contracts() {
+	let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 0).unwrap();
+	let source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("value", "u64"), ("padding", "u64"), ("extra", "u64")],
+	);
+	let mut output = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"Update",
+		&source,
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut output,
+	);
+	assert!(
+		output.data_warnings.is_empty(),
+		"instruction growth must not warn about rent"
+	);
+}
+
+#[test]
+fn compact_growth_warnings_estimate_rent_from_capacity() {
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	let destination = schema(
+		LayoutKind::Compact,
+		&[("label", "String<8>"), ("tags", "Vec<u16, 2>")],
+	);
+	let mut output = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"State",
+		&source,
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut output,
+	);
+	assert!(
+		output
+			.data_warnings
+			.iter()
+			.any(|warning| warning.contains("keeps a compact layout")),
+		"{:?}",
+		output.data_warnings
+	);
+}
+
+#[test]
+fn manual_instruction_transitions_require_fixed_layouts() {
+	let instruction = ContractIdentity::try_new(ContractKind::Instruction, 1, 0).unwrap();
+	let fixed_source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	let compact_destination = schema(LayoutKind::Compact, &[("label", "String<8>")]);
+	let rejection = manual_transition_source(
+		&instruction,
+		MigrationVersionType::U8,
+		&fixed_source,
+		1,
+		&compact_destination,
+	)
+	.expect_err("a compact instruction destination must fail closed");
+	assert!(
+		format!("{rejection}").contains("instruction and event histories must use fixed layouts"),
+		"{rejection}"
+	);
+
+	let compact_source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Compact, &[("label", "String<8>")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	let fixed_destination = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let rejection = manual_transition_source(
+		&instruction,
+		MigrationVersionType::U8,
+		&compact_source,
+		1,
+		&fixed_destination,
+	)
+	.expect_err("a compact instruction source must fail closed");
+	assert!(
+		format!("{rejection}").contains("instruction and event histories must use fixed layouts"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn scan_surfaces_the_parser_diagnostic_for_duplicate_account_identities() {
+	let fixture = migration_fixture();
+	let scan = |body: &str| {
+		std::fs::write(fixture.root.join("src/lib.rs"), body.to_owned())
+			.unwrap_or_else(|error| panic!("write scan source: {error:?}"));
+		let project = Project::discover(&fixture.root)
+			.unwrap_or_else(|error| panic!("discover scan fixture: {error:?}"));
+		scan_current_contracts(&project)
+	};
+
+	// Colliding account or instruction identities are rejected by the program
+	// parser before discovery assembles contracts.
+	let duplicate_accounts = scan(&format!(
+		"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+		 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct First {{ value: u64 \
+		 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct Second {{ value: u64 }}\n",
+		fixture.program_id
+	));
+	let rejection = match duplicate_accounts {
+		Err(error) => error.to_string(),
+		Ok(_) => panic!("colliding accounts must be rejected"),
+	};
+	assert!(
+		rejection.contains("share discriminator value 1"),
+		"colliding account identities must surface the parser diagnostic: {rejection}"
+	);
+}
+
+#[test]
+fn insert_current_rejects_one_contract_claiming_an_identity_twice() {
+	let mut contracts = BTreeMap::new();
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let contract = |rust_name: &str| {
+		CurrentContract {
+			identity: identity.clone(),
+			rust_name: rust_name.to_owned(),
+			schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+			process: None,
+		}
+	};
+
+	insert_current(&mut contracts, contract("First"))
+		.unwrap_or_else(|error| panic!("first claim: {error:?}"));
+	let rejection = insert_current(&mut contracts, contract("Second"))
+		.expect_err("a second claim on one identity must fail");
+	assert!(
+		matches!(rejection, MigrationError::DuplicateIdentity { ref identity } if identity == "account:1:01"),
+		"{rejection:?}"
+	);
+}
+
+#[test]
+fn create_transition_propagates_manual_layout_errors() {
+	let fixture = migration_fixture();
+	let project = Project::discover(&fixture.root)
+		.unwrap_or_else(|error| panic!("discover fixture: {error:?}"));
+	let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 0).unwrap();
+	let process = ProcessContract {
+		accounts: vec![ProcessAccount {
+			name: "authority".to_owned(),
+			writable: false,
+			signer: true,
+			optional: false,
+			default_value: None,
+			pda: None,
+			constraints: vec![],
+		}],
+	};
+	let source = SchemaVersion {
+		version: 0,
+		schema_sha256: "source".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: Some(process.clone()),
+		process_sha256: None,
+		transition: None,
+	};
+	let destination = schema(LayoutKind::Compact, &[("label", "String<8>")]);
+	let mut output = MakeMigrationsOutput::default();
+
+	let rejection = create_transition(
+		&project,
+		TransitionRequest {
+			identity: &identity,
+			rust_name: "Update",
+			source: &source,
+			renames: vec![],
+			destination_version: 1,
+			destination: &destination,
+			destination_process: Some(&process),
+			preserve_manual: false,
+		},
+		&mut output,
+	)
+	.expect_err("a compact instruction destination has no manual transition");
+	assert!(
+		format!("{rejection}").contains("instruction and event histories must use fixed layouts"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn reconciliation_fails_when_the_manifest_disappears() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	let digest: [u8; 32] = Sha256::digest(
+		std::fs::read(&fixture.artifact)
+			.unwrap_or_else(|error| panic!("read fixture artifact: {error:?}")),
+	)
+	.into();
+	write_state_source(&fixture, "value: u64, padding: u64");
+	make_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance draft: {error:?}"));
+	begin_publication(
+		&fixture.root,
+		"devnet",
+		"https://api.devnet.solana.com",
+		fixture.program_id,
+		&fixture.artifact,
+		digest,
+	)
+	.unwrap_or_else(|error| panic!("begin fixture publication: {error:?}"));
+
+	std::fs::remove_file(fixture.root.join(MANIFEST_PATH))
+		.unwrap_or_else(|error| panic!("remove manifest: {error:?}"));
+	let rejection = reconcile_publication(&fixture.root, false)
+		.expect_err("a missing manifest cannot be reconciled");
+	assert!(
+		format!("{rejection}").contains("migration manifest disappeared during reconciliation"),
+		"{rejection}"
+	);
+}
+
+#[test]
+fn published_contracts_must_carry_versions_and_matching_pins() {
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+	manifest.contracts.insert(
+		identity.key(),
+		ContractHistory {
+			identity: identity.clone(),
+			rust_name: "State".to_owned(),
+			versions: vec![],
+		},
+	);
+	let rejection = validate_published_contract(
+		"receipt",
+		&identity.key(),
+		&PublishedContract::legacy(0),
+		&manifest,
+	)
+	.expect_err("a versionless history cannot back a publication");
+	assert!(
+		format!("{rejection}").contains("has no versions"),
+		"{rejection}"
+	);
+
+	// The receipt pinned a different transition implementation than the
+	// manifest now records, so the publication cannot be trusted.
+	let pinned_schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let pinned_schema_sha256 = pinned_schema.sha256();
+	manifest.contracts.insert(
+		identity.key(),
+		ContractHistory {
+			identity: identity.clone(),
+			rust_name: "State".to_owned(),
+			versions: vec![SchemaVersion {
+				version: 0,
+				schema_sha256: pinned_schema.sha256(),
+				schema: pinned_schema,
+				process: None,
+				process_sha256: None,
+				transition: Some(Transition {
+					from: 0,
+					to: 0,
+					mode: TransitionMode::Automatic,
+					renames: vec![],
+					source_schema_sha256: "source".to_owned(),
+					destination_schema_sha256: "destination".to_owned(),
+					source_process_sha256: None,
+					destination_process_sha256: None,
+					process: None,
+					implementation_sha256: Some("manifest-implementation".to_owned()),
+				}),
+			}],
+		},
+	);
+	let published = PublishedContract {
+		version: 0,
+		history: vec![pina_abi::PublishedSchema {
+			schema_sha256: pinned_schema_sha256,
+			transition_sha256: Some("pinned-implementation".to_owned()),
+		}],
+	};
+	let rejection = validate_published_contract("receipt", &identity.key(), &published, &manifest)
+		.expect_err("mismatched transition pins must fail closed");
+	assert!(
+		format!("{rejection}").contains("pinned a different transition implementation"),
+		"{rejection}"
+	);
 }

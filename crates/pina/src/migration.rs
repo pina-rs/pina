@@ -37,13 +37,15 @@ pub const MAX_MIGRATION_WORKSPACE: usize = 1024;
 /// instruction enum:
 ///
 /// ```rust,ignore
-/// if data == [pina::migration::MIGRATE_DISCRIMINATOR_U8] {
+/// if is_migrate_instruction(data) {
 ///     return process_migrate(program_id, accounts);
 /// }
 /// ```
 ///
 /// Programs with wider instruction discriminators compare against the matching
-/// constant, and [`is_migrate_instruction`] covers the one-byte case.
+/// constant with an explicit length check (`data == [0xff, 0xff]` and friends
+/// compile to a `memcmp` call on SBF, which costs more compute than a direct
+/// byte comparison).
 pub const MIGRATE_DISCRIMINATOR_U8: u8 = u8::MAX;
 
 /// Two-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
@@ -57,9 +59,14 @@ pub const MIGRATE_DISCRIMINATOR_U64: u64 = u64::MAX;
 
 /// Whether `data` carries exactly the reserved `Migrate` discriminator for a
 /// one-byte instruction space.
+///
+/// The comparison stays inline: a slice equality against an array compiles to
+/// a `memcmp` call on SBF, and this check runs ahead of every instruction a
+/// program that wires the reserved path dispatches.
+#[inline]
 #[must_use]
 pub fn is_migrate_instruction(data: &[u8]) -> bool {
-	data == [MIGRATE_DISCRIMINATOR_U8]
+	data.len() == 1 && data[0] == MIGRATE_DISCRIMINATOR_U8
 }
 
 /// Integer encoding used by the program-wide migration version envelope.
@@ -1006,12 +1013,17 @@ mod executor {
 	/// write for an omitted optional account) and slots past the end of the
 	/// slice are skipped by [`Self::run_optional`], so a client may send only
 	/// the accounts it needs to migrate.
+	///
+	/// `max_lamports` caps the rent transfers of the whole reserved
+	/// instruction: every slot this context migrates draws from the same
+	/// budget, so the payer can never be charged the cap once per account.
 	#[must_use]
 	pub struct MigrateContext<'account> {
 		program_id: &'account Address,
 		accounts: &'account mut [AccountView],
 		max_lamports: u64,
 		migrated: u64,
+		spent_lamports: u64,
 		rent: Option<Rent>,
 	}
 
@@ -1066,6 +1078,7 @@ mod executor {
 				accounts,
 				max_lamports,
 				migrated: 0,
+				spent_lamports: 0,
 				rent: None,
 			})
 		}
@@ -1129,7 +1142,9 @@ mod executor {
 				}
 			}
 
-			let payer = if payer_slot.address() == self.program_id {
+			let payer_is_placeholder = payer_slot.address() == self.program_id;
+			let payer_lamports_before = payer_slot.lamports();
+			let payer = if payer_is_placeholder {
 				None
 			} else {
 				Some(&*payer_slot)
@@ -1138,10 +1153,15 @@ mod executor {
 				account,
 				payer,
 				program_id: self.program_id,
-				max_lamports: self.max_lamports,
+				// Spend from the instruction-wide budget, not a per-account
+				// copy of the cap: the payer may fund several slots in one
+				// reserved invocation.
+				max_lamports: self.max_lamports.saturating_sub(self.spent_lamports),
 			};
 			let outcome = executor.invoke_signed_inner::<T>(&[], self.rent)?;
 			self.migrated |= bit;
+			let spent = payer_lamports_before.saturating_sub(payer_slot.lamports());
+			self.spent_lamports = self.spent_lamports.saturating_add(spent);
 
 			Ok(outcome)
 		}
@@ -1208,6 +1228,19 @@ mod tests {
 	use super::*;
 	#[cfg(feature = "account-resize")]
 	use crate::MAX_PERMITTED_DATA_INCREASE;
+
+	#[test]
+	fn reserved_instruction_identification_matches_only_the_exact_one_byte_discriminator() {
+		assert!(is_migrate_instruction(&[MIGRATE_DISCRIMINATOR_U8]));
+		assert!(!is_migrate_instruction(&[]));
+		assert!(!is_migrate_instruction(&[0x00]));
+		// A wider instruction space uses the wider constants, so the one-byte
+		// check must reject longer payloads instead of prefix-matching.
+		assert!(!is_migrate_instruction(&[
+			MIGRATE_DISCRIMINATOR_U8,
+			MIGRATE_DISCRIMINATOR_U8
+		]));
+	}
 
 	struct U8Versioned;
 
@@ -1865,6 +1898,17 @@ mod tests {
 			Some(ProgramError::NotEnoughAccountKeys)
 		);
 
+		// A payer slot without the system program slot is just as unusable.
+		let mut payer_only =
+			[
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[])
+					.view(),
+			];
+		assert_eq!(
+			MigrateContext::new(&program_id, &mut payer_only, 0).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+
 		// A payer that is not the program-address placeholder must be writable.
 		let mut stored_payer =
 			TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[]);
@@ -1958,6 +2002,12 @@ mod tests {
 		assert_eq!(
 			context.run::<GrowingAccount>(3).err(),
 			Some(ProgramError::NotEnoughAccountKeys)
+		);
+		// Slots are tracked in a u64 bitmask, so the declared layout caps at
+		// 63 migratable slots and a slot past that cap fails closed.
+		assert_eq!(
+			context.run::<GrowingAccount>(65).err(),
+			Some(PinaProgramError::MigrationUnavailable.into())
 		);
 
 		let outcome = context

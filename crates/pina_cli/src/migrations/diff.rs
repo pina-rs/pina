@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::io::IsTerminal as _;
 
 use pina_abi::DataSchema;
 use pina_abi::FieldSchema;
@@ -13,9 +12,8 @@ use pina_abi::TransitionMode;
 use super::MigrationError;
 use super::prompt::DisambiguationQuestion;
 use super::prompt::MigrationAnswers;
+use super::prompt::PromptIo;
 use super::prompt::RenameAnswer;
-use super::prompt::prompt_removal;
-use super::prompt::prompt_rename;
 
 /// Resolve every ambiguous field change for one contract against the answers.
 ///
@@ -30,6 +28,7 @@ pub(super) fn resolve_field_changes(
 	previous_renames: &[pina_abi::RenameMapping],
 	answers: &MigrationAnswers,
 	warnings: &mut Vec<String>,
+	prompts: &mut PromptIo<'_>,
 ) -> Result<(Vec<pina_abi::RenameMapping>, BTreeSet<String>), MigrationError> {
 	// Only renames whose source field still exists apply to this hop;
 	// earlier hops' renames are already baked into the stored schema.
@@ -52,11 +51,6 @@ pub(super) fn resolve_field_changes(
 		}
 	}
 
-	let destination_types = destination
-		.fields
-		.iter()
-		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
-		.collect::<BTreeMap<_, _>>();
 	let source_names = source
 		.fields
 		.iter()
@@ -78,6 +72,10 @@ pub(super) fn resolve_field_changes(
 		.iter()
 		.filter(|field| !source_names.contains(field.name.as_str()))
 		.collect();
+	let added_types = added
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
 
 	// Validate every answer against this diff before it can influence a
 	// transition: `--assume-removed` naming a retained field would silently
@@ -102,22 +100,41 @@ pub(super) fn resolve_field_changes(
 		}
 	}
 	for (from, to) in &answers.renames {
-		let Some(&from_type) = removed_types.get(from.as_str()) else {
+		if !removed_types.contains_key(from.as_str()) {
 			return Err(MigrationError::InvalidHistory(format!(
 				"contract `{contract}`: `--rename {from}:{to}` names a field that was not removed \
 				 by this change",
 			)));
-		};
-		let Some(&to_type) = destination_types.get(to.as_str()) else {
+		}
+		// The target must be an added field: a retained name would let one
+		// `--rename` overwrite another field's live bytes through the
+		// effective schema.
+		let Some(&to_type) = added_types.get(to.as_str()) else {
 			return Err(MigrationError::InvalidHistory(format!(
 				"contract `{contract}`: `--rename {from}:{to}` targets `{to}`, which is not an \
 				 added field",
 			)));
 		};
+		let &from_type = removed_types
+			.get(from.as_str())
+			.expect("removed_types was just checked for `from`");
 		if from_type != to_type {
 			return Err(MigrationError::InvalidHistory(format!(
 				"contract `{contract}`: `--rename {from}:{to}` changes the field type \
 				 (`{from_type}` to `{to_type}`); write a manual transition instead",
+			)));
+		}
+	}
+
+	// Two renames onto one added field would duplicate that name in the
+	// effective schema and overwrite its bytes twice.
+	let mut claimed_targets: BTreeSet<String> =
+		renames.iter().map(|mapping| mapping.to.clone()).collect();
+	for target in answers.renames.values() {
+		if !claimed_targets.insert(target.clone()) {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: two renames target `{target}`; each added field can \
+				 receive at most one renamed source field",
 			)));
 		}
 	}
@@ -134,27 +151,27 @@ pub(super) fn resolve_field_changes(
 		// developer can correct the same-type pairing the heuristic proposes.
 		// Validation above guarantees `to` is an added field of the same type.
 		if let Some(to) = answers.renames.get(removed_field.name.as_str()) {
+			claimed_targets.insert(to.clone());
 			renames.push(pina_abi::RenameMapping {
 				from: removed_field.name.clone(),
 				to: to.clone(),
 			});
 			continue;
 		}
-		// Pair the removal with the first unused addition of the same type:
-		// that is the rename this change most plausibly represents.
+		// Pair the removal with the first unclaimed addition of the same
+		// type: that is the rename this change most plausibly represents.
+		// Claimed targets — by recorded or answered renames, by earlier
+		// questions, or by earlier removals — never pair twice.
 		let candidate = added.iter().find(|added_field| {
 			added_field.rust_type == removed_field.rust_type
-				&& !renames.iter().any(|mapping| mapping.to == added_field.name)
+				&& !claimed_targets.contains(added_field.name.as_str())
 		});
-		let has_candidate = candidate.is_some();
 		if dropped.contains(removed_field.name.as_str()) {
-			if has_candidate {
-				// The developer answered the rename question with an explicit
-				// removal: the old data is discarded and the paired new field
-				// starts zeroed.
-				let candidate = candidate.unwrap_or_else(|| {
-					panic!("candidate presence was just checked");
-				});
+			// The developer answered the rename question with an explicit
+			// removal: the old data is discarded and the paired new field, if
+			// any, starts zeroed.
+			if let Some(candidate) = candidate {
+				claimed_targets.insert(candidate.name.clone());
 				warnings.push(format!(
 					"contract `{contract}`: field `{}` is removed by this migration and its \
 					 stored data is discarded; `{}` starts zeroed",
@@ -171,28 +188,20 @@ pub(super) fn resolve_field_changes(
 		}
 		let Some(candidate) = candidate else {
 			// An unpaired removal discards stored data, so it needs the same
-			// explicit acknowledgement as a declined rename. Type changes
-			// (the removed name reappears with a different type) never pair
-			// and still fall through to a manual TODO transition.
-			let same_name_retyped = destination_types
-				.get(removed_field.name.as_str())
-				.is_some_and(|destination_type| {
-					*destination_type != removed_field.rust_type.as_str()
-				});
-			if same_name_retyped {
-				continue;
-			}
+			// explicit acknowledgement as a declined rename. A field whose
+			// name reappears with a different type is not removed at all —
+			// the mode classifier sends that diff to a manual transition.
 			let question = DisambiguationQuestion {
 				contract: contract.to_owned(),
 				from: removed_field.name.clone(),
 				to: String::new(),
 				rust_type: removed_field.rust_type.clone(),
 			};
-			if answers.no_interactive || !std::io::stdin().is_terminal() {
+			if answers.no_interactive || !prompts.interactive() {
 				questions.push(question);
 				continue;
 			}
-			match prompt_removal(&question) {
+			match prompts.prompt_removal(&question) {
 				RenameAnswer::Remove => {
 					dropped.insert(removed_field.name.clone());
 					warnings.push(format!(
@@ -213,11 +222,15 @@ pub(super) fn resolve_field_changes(
 			to: candidate.name.clone(),
 			rust_type: removed_field.rust_type.clone(),
 		};
-		if answers.no_interactive || !std::io::stdin().is_terminal() {
+		// The pairing is claimed either way: an answered rename moves the
+		// bytes, and an acknowledged removal or a pending question explains
+		// the new field without leaving it free for a later iteration.
+		claimed_targets.insert(candidate.name.clone());
+		if answers.no_interactive || !prompts.interactive() {
 			questions.push(question);
 			continue;
 		}
-		match prompt_rename(&question) {
+		match prompts.prompt_rename(&question) {
 			RenameAnswer::Rename => {
 				renames.push(pina_abi::RenameMapping {
 					from: removed_field.name.clone(),
