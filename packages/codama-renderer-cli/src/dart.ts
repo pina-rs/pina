@@ -27,6 +27,92 @@ const HEADER =
 // Regenerate it from the program IDL instead.
 `;
 
+/** Emitted verbatim as `lib/src/endpoint_guard.dart`; must stay import-free. */
+const ENDPOINT_GUARD_SOURCE = `${HEADER}
+const _loopbackHosts = {'localhost', '127.0.0.1', '::1'};
+
+/// Whether an endpoint may be used as-is: any https URL, or plaintext http
+/// pointed at exactly localhost, 127.0.0.1, or [::1].
+///
+/// The host is read from the URL authority after rejecting userinfo, so
+/// lookalikes such as \`http://localhost.evil.com\` or
+/// \`http://127.0.0.1@evil.com\` do not count as local.
+bool endpointIsSecure(String endpoint) {
+  final lowercase = endpoint.toLowerCase();
+  if (lowercase.startsWith('https://')) {
+    return true;
+  }
+  const scheme = 'http://';
+  if (!lowercase.startsWith(scheme)) {
+    return false;
+  }
+  final authority = _authority(lowercase.substring(scheme.length));
+  if (authority.contains('@')) {
+    return false;
+  }
+  return _loopbackHosts.contains(_authorityHost(authority));
+}
+
+String _authority(String rest) {
+  var result = rest;
+  for (final character in const ['/', '?', '#']) {
+    final index = result.indexOf(character);
+    if (index != -1) {
+      result = result.substring(0, index);
+    }
+  }
+  return result;
+}
+
+String _authorityHost(String authority) {
+  if (authority.startsWith('[')) {
+    final close = authority.indexOf(']');
+    return close == -1 ? authority : authority.substring(1, close);
+  }
+  final port = authority.lastIndexOf(':');
+  return port == -1 ? authority : authority.substring(0, port);
+}
+`;
+
+function endpointGuardTest(packageName: string): string {
+	return `${HEADER}
+import 'package:test/test.dart';
+import 'package:${packageName}/src/endpoint_guard.dart';
+
+void main() {
+  group('endpointIsSecure', () {
+    test('accepts https and exact loopback hosts', () {
+      for (final endpoint in [
+        'https://rpc.example.com',
+        'http://localhost',
+        'http://localhost:8899',
+        'http://127.0.0.1',
+        'http://127.0.0.1:8899',
+        'http://[::1]:8899',
+      ]) {
+        expect(endpointIsSecure(endpoint), isTrue, reason: endpoint);
+      }
+    });
+
+    test('rejects remote lookalikes and other plaintext', () {
+      for (final endpoint in [
+        'http://localhost.evil.com',
+        'http://127.0.0.1.evil.com',
+        'http://127.0.0.1@evil.com',
+        'http://user:password@localhost',
+        'http://evil.com',
+        'http://example.com/localhost',
+        'http://192.168.0.10',
+        'ftp://localhost',
+      ]) {
+        expect(endpointIsSecure(endpoint), isFalse, reason: endpoint);
+      }
+    });
+  });
+}
+`;
+}
+
 const CONTEXT = `${HEADER}
 import 'dart:convert';
 import 'dart:io';
@@ -41,6 +127,8 @@ import 'package:solana_kit_rpc_api/solana_kit_rpc_api.dart';
 import 'package:solana_kit_rpc_spec/solana_kit_rpc_spec.dart';
 import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
 import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
+
+import '../endpoint_guard.dart';
 import 'package:solana_kit_transactions/solana_kit_transactions.dart';
 
 const clusters = <String, String>{
@@ -215,12 +303,7 @@ Uint8List base58Bytes(String flag, String value) {
 
 String resolveEndpoint(String value) {
   final endpoint = clusters[value] ?? value;
-  final lowercase = endpoint.toLowerCase();
-  final isLocal = lowercase.startsWith('http://localhost') ||
-      lowercase.startsWith('http://127.0.0.1') ||
-      lowercase.startsWith('http://[::1]');
-  if (!lowercase.startsWith('https://') &&
-      !(lowercase.startsWith('http://') && isLocal)) {
+  if (!endpointIsSecure(endpoint)) {
     throw CliError(
       'plaintext http:// endpoints are only allowed on localhost; '
       'use https for remote clusters',
@@ -644,6 +727,12 @@ export function renderDart(
 	const files = new Map<string, string>();
 	const stem = model.programSnake;
 	const clientBarrel = options.clientBarrel;
+
+	files.set("lib/src/endpoint_guard.dart", ENDPOINT_GUARD_SOURCE);
+	files.set(
+		"test/endpoint_guard_test.dart",
+		endpointGuardTest(options.packageName),
+	);
 
 	files.set(
 		`lib/src/${stem}/context.dart`,

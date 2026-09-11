@@ -28,6 +28,44 @@ const HEADER =
 // Regenerate it from the program IDL instead.
 `;
 
+/** Emitted verbatim as `src/endpoint.ts`; must stay import-free. */
+const ENDPOINT_SOURCE = `${HEADER}
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * Whether an endpoint may be used as-is: any \`https://\` URL, or plaintext
+ * \`http://\` pointed at exactly \`localhost\`, \`127.0.0.1\`, or \`[::1]\`.
+ *
+ * The host is read from the URL authority after rejecting userinfo, so
+ * lookalikes such as \`http://localhost.evil.com\` or
+ * \`http://127.0.0.1@evil.com\` do not count as local.
+ */
+export function endpointIsSecure(endpoint: string): boolean {
+	const lowercase = endpoint.toLowerCase();
+	if (lowercase.startsWith("https://")) {
+		return true;
+	}
+	const scheme = "http://";
+	if (!lowercase.startsWith(scheme)) {
+		return false;
+	}
+	const authority = lowercase.slice(scheme.length).split(/[/?#]/)[0] ?? "";
+	if (authority.includes("@")) {
+		return false;
+	}
+	return LOOPBACK_HOSTS.has(authorityHost(authority));
+}
+
+function authorityHost(authority: string): string {
+	if (authority.startsWith("[")) {
+		const end = authority.indexOf("]");
+		return end === -1 ? authority : authority.slice(1, end);
+	}
+	const port = authority.lastIndexOf(":");
+	return port === -1 ? authority : authority.slice(0, port);
+}
+`;
+
 const CONTEXT = `${HEADER}
 import {
 	type Address,
@@ -49,6 +87,7 @@ import {
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { endpointIsSecure } from "./endpoint";
 
 const CLUSTERS: Record<string, string> = {
 	"mainnet": "https://api.mainnet-beta.solana.com",
@@ -110,7 +149,7 @@ export class CliContext {
 		const rpc = createSolanaRpc(endpoint as Parameters<typeof createSolanaRpc>[0]);
 		const payer = await loadKeypair(keypair);
 		const programAddress = options.programId
-			? (options.programId as Address)
+			? pubkey("--program-id", options.programId)
 			: (PROGRAM_ADDRESS as Address);
 		return new CliContext(rpc, payer, programAddress, options.simulate ?? false, options.json ?? false, clusterOf(endpoint));
 	}
@@ -225,12 +264,7 @@ export function base58(flag: string, value: string): Uint8Array {
 
 function resolveEndpoint(value: string): string {
 	const endpoint = CLUSTERS[value] ?? value;
-	const lowercase = endpoint.toLowerCase();
-	const isLocal =
-		lowercase.startsWith("http://localhost") ||
-		lowercase.startsWith("http://127.0.0.1") ||
-		lowercase.startsWith("http://[::1]");
-	if (!lowercase.startsWith("https://") && !(lowercase.startsWith("http://") && isLocal)) {
+	if (!endpointIsSecure(endpoint)) {
 		throw new CliError(
 			"plaintext http:// endpoints are only allowed on localhost; use https for remote clusters",
 		);
@@ -425,6 +459,11 @@ ${options.join("\n")}
 						const context = await CliContext.create(options);
 ${derivation}
 						const account = await fetch${account.pascal}(context.rpc, address);
+						if (account.programAddress !== context.programAddress) {
+							throw new CliError(
+								\`account \${address} belongs to \${account.programAddress}, not the configured program\`,
+							);
+						}
 						printAccount(context.json, "${
 				kebab(account.snake)
 			}", address, account.data);
@@ -447,7 +486,7 @@ import {
 ${findImports}
 ${fetchImports}
 } from "./client";
-import { CliContext, bigInteger, pubkey, registerGlobals } from "./context";
+import { CliContext, CliError, bigInteger, pubkey, registerGlobals } from "./context";
 
 export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
@@ -512,6 +551,7 @@ export function renderTypeScript(
 		"src/client.ts",
 		`${HEADER}\nexport * from "${options.clientImportPath}";\n`,
 	);
+	files.set("src/endpoint.ts", ENDPOINT_SOURCE);
 	files.set(
 		"src/context.ts",
 		CONTEXT.replace("PROGRAM_ADDRESS", JSON.stringify(model.programAddress)),
@@ -542,8 +582,8 @@ export function renderTypeScript(
 					bin: { [bin]: "./src/main.ts" },
 					scripts: { start: "tsx src/main.ts" },
 					dependencies: {
-						"@cliffy/command": "^2.5.0",
-						"@solana/kit": options.kitVersion ?? "^6.10.0",
+						"@solana/kit": options.kitVersion ?? "^8.0.0",
+						commander: "^15.0.0",
 					},
 					devDependencies: { tsx: "^4.20.0", typescript: "^5.9.0" },
 				},
