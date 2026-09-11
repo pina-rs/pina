@@ -241,19 +241,16 @@ pub(crate) fn render_instruction_page(
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
-	// The derive generates a `len()` accessor only for dynamically sized
-	// (prefixed-count) vector tails; those views need an `is_empty()`
-	// companion or clippy's `len_without_is_empty` fires under `-D warnings`.
-	let has_dynamic_vec_tail = instruction.arguments.last().is_some_and(|argument| {
-		let rendered = serde_json::to_string(&argument.r#type).unwrap_or_default();
-		rendered.contains("arrayTypeNode")
-			&& rendered.contains("prefixedCountNode")
-			&& !rendered.contains("fixedSizeTypeNode")
-	});
+	// Clippy's `len_without_is_empty` fires only when a wire field is
+	// literally named `len` (the derive turns it into a `pub fn len`
+	// accessor); give those views an `is_empty()` companion.
+	let has_len_field = wire_fields
+		.iter()
+		.any(|field| field.starts_with("\tpub len: "));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());
 
-	if has_dynamic_vec_tail {
+	if has_len_field {
 		lines.push(String::new());
 		lines.push(format!(
 			"impl {wire_name}Zc {{\n\t#[must_use]\n\tpub fn is_empty(&self) -> bool \

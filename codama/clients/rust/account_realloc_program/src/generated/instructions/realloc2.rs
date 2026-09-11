@@ -93,3 +93,10 @@ pub struct Realloc2InstructionWire {
 	pub discriminator: u8,
 	pub len: u16,
 }
+
+impl Realloc2InstructionWireZc {
+	#[must_use]
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
+}
