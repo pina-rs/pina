@@ -2082,6 +2082,15 @@ mod tests {
 			TwoStepAccount::plan_migration(&[11, 2, 5, 9, 7]),
 			Err(ProgramError::InvalidAccountData)
 		);
+		assert_eq!(
+			FundedLadderAccount::plan_migration(&[12, 2, 5, 9, 7]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		FundedLadderAccount::apply_migration(9, &mut [0_u8; 1]);
+		assert_eq!(
+			FundedLadderAccount::validate_migration_destination(2, &[12, 2, 5]),
+			Err(ProgramError::InvalidAccountData)
+		);
 		let mut ignored = [0_u8; 1];
 		TwoStepAccount::apply_migration(2, &mut ignored);
 		assert_eq!(
