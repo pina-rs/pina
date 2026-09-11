@@ -1,0 +1,279 @@
+//! Codama renderer that generates standalone clap-based CLI crates.
+//!
+//! The renderer consumes a Codama root node and
+//! emits a complete Rust binary crate: one clap subcommand per instruction,
+//! typed flags for instruction arguments, PDA derivation for defaulted
+//! accounts, a `fetch` command per state account, and shared RPC, keypair, and
+//! send/simulate plumbing.
+
+mod emit;
+mod error;
+mod model;
+
+#[cfg(test)]
+mod __tests;
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
+
+use codama_nodes::RootNode;
+pub use error::RenderError;
+pub use error::Result;
+
+/// Configuration for rendering a Codama IDL into a CLI crate.
+#[derive(Clone, Debug)]
+pub struct RenderConfig {
+	/// Destination policy applied before any files are written. Defaults to [`RenderMode::Auto`].
+	pub mode: RenderMode,
+	/// Create missing manifests and entrypoints around the generated sources. Defaults to `true`.
+	pub scaffold: bool,
+	/// Package name of the generated Rust client crate the CLI depends on.
+	pub client_package: String,
+	/// Path from the CLI crate to the generated Rust client crate.
+	pub client_path: String,
+}
+
+impl Default for RenderConfig {
+	fn default() -> Self {
+		Self {
+			mode: RenderMode::Auto,
+			scaffold: true,
+			client_package: String::new(),
+			client_path: String::new(),
+		}
+	}
+}
+
+/// Controls how a renderer treats the CLI destination.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum RenderMode {
+	/// Create an empty destination or update an existing CLI.
+	#[default]
+	Auto,
+	/// Require an empty or nonexistent destination.
+	Create,
+	/// Require an existing, nonempty destination.
+	Update,
+	/// Remove the complete destination before rendering.
+	Overwrite,
+}
+
+impl RenderMode {
+	const fn as_str(self) -> &'static str {
+		match self {
+			Self::Auto => "automatically generate",
+			Self::Create => "create",
+			Self::Update => "update",
+			Self::Overwrite => "overwrite",
+		}
+	}
+}
+
+/// Read and parse a Codama IDL JSON file into a [`RootNode`].
+///
+/// # Errors
+///
+/// Returns an error when the file cannot be read or parsed.
+pub fn read_root_node(path: &Path) -> Result<RootNode> {
+	let idl = fs::read_to_string(path).map_err(|source| {
+		RenderError::ReadFile {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	serde_json::from_str(&idl).map_err(|source| {
+		RenderError::ParseIdl {
+			path: path.to_path_buf(),
+			source,
+		}
+	})
+}
+
+/// Render a Codama IDL JSON file into the CLI crate at `crate_dir`.
+///
+/// # Errors
+///
+/// Returns an error when the IDL cannot be read or the CLI cannot be rendered.
+pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
+	let root = read_root_node(path)?;
+	render_root_node(&root, crate_dir, config)
+}
+
+/// Render an already-parsed Codama [`RootNode`] into the CLI crate at `crate_dir`.
+///
+/// # Errors
+///
+/// Returns an error when the destination is unsafe, its state conflicts with
+/// [`RenderConfig::mode`], or the IDL uses unsupported shapes.
+pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
+	if config.scaffold && (config.client_package.is_empty() || config.client_path.is_empty()) {
+		return Err(RenderError::MissingClientConfig);
+	}
+
+	let model = model::CliModel::from_root(root)?;
+	let mode = resolve_render_mode(crate_dir, config.mode)?;
+
+	if mode == RenderMode::Overwrite {
+		remove_crate_dir(crate_dir)?;
+	}
+
+	validate_tree_has_no_symlinks(crate_dir)?;
+	fs::create_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))?;
+	let files = emit::render_files(&model, &config.client_package)?;
+	write_files(crate_dir, &files)?;
+
+	if config.scaffold && mode != RenderMode::Update {
+		let scaffold = emit::render_scaffold(&model, &config.client_package, &config.client_path);
+		write_missing_files(crate_dir, &scaffold)?;
+	}
+
+	Ok(())
+}
+
+fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {
+	let metadata = match fs::symlink_metadata(crate_dir) {
+		Ok(metadata) => Some(metadata),
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => None,
+		Err(source) => return Err(read_file_error(crate_dir, source)),
+	};
+	let is_empty = match metadata {
+		None => true,
+		Some(metadata) if metadata.file_type().is_symlink() => {
+			return Err(RenderError::UnsafeOutputPath {
+				path: crate_dir.to_path_buf(),
+				reason: "CLI destinations cannot be symbolic links".to_string(),
+			});
+		}
+		Some(metadata) if !metadata.is_dir() => {
+			return Err(RenderError::UnsafeOutputPath {
+				path: crate_dir.to_path_buf(),
+				reason: "CLI destinations must be directories".to_string(),
+			});
+		}
+		Some(_) => {
+			fs::read_dir(crate_dir)
+				.map_err(|source| read_file_error(crate_dir, source))?
+				.next()
+				.transpose()
+				.map_err(|source| read_file_error(crate_dir, source))?
+				.is_none()
+		}
+	};
+
+	match (requested, is_empty) {
+		(RenderMode::Auto, true) => Ok(RenderMode::Create),
+		(RenderMode::Auto, false) => Ok(RenderMode::Update),
+		(RenderMode::Create, false) => {
+			Err(RenderError::InvalidGenerationState {
+				path: crate_dir.to_path_buf(),
+				mode: requested.as_str(),
+				reason: "the destination is not empty",
+			})
+		}
+		(RenderMode::Update, true) => {
+			Err(RenderError::InvalidGenerationState {
+				path: crate_dir.to_path_buf(),
+				mode: requested.as_str(),
+				reason: "the destination is empty or does not exist",
+			})
+		}
+		(mode, _) => Ok(mode),
+	}
+}
+
+fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
+	if !crate_dir.exists() {
+		return Ok(());
+	}
+
+	let absolute =
+		fs::canonicalize(crate_dir).map_err(|source| read_file_error(crate_dir, source))?;
+	let current_dir =
+		std::env::current_dir().map_err(|source| read_file_error(Path::new("."), source))?;
+	let current =
+		fs::canonicalize(&current_dir).map_err(|source| read_file_error(&current_dir, source))?;
+
+	if absolute.parent().is_none()
+		|| current.starts_with(&absolute)
+		|| absolute.join(".git").exists()
+	{
+		return Err(RenderError::UnsafeOutputPath {
+			path: absolute,
+			reason: "refusing to overwrite a filesystem root or working tree".to_string(),
+		});
+	}
+
+	validate_tree_has_no_symlinks(crate_dir)?;
+	fs::remove_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))
+}
+
+fn validate_tree_has_no_symlinks(path: &Path) -> Result<()> {
+	let metadata = match fs::symlink_metadata(path) {
+		Ok(metadata) => metadata,
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+		Err(source) => return Err(read_file_error(path, source)),
+	};
+
+	if !metadata.is_dir() {
+		return Ok(());
+	}
+
+	for entry in walkdir::WalkDir::new(path).follow_links(false).min_depth(1) {
+		let entry = entry.map_err(|source| read_file_error(path, std::io::Error::other(source)))?;
+		let metadata = fs::symlink_metadata(entry.path())
+			.map_err(|source| read_file_error(entry.path(), source))?;
+		if metadata.file_type().is_symlink() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: path.to_path_buf(),
+				reason: format!(
+					"generation output trees cannot contain symbolic link {}",
+					entry.path().display()
+				),
+			});
+		}
+	}
+
+	Ok(())
+}
+
+fn write_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Result<()> {
+	for (relative, contents) in files {
+		let destination = crate_dir.join(relative);
+		if let Some(parent) = destination.parent() {
+			fs::create_dir_all(parent).map_err(|source| write_file_error(parent, source))?;
+		}
+		fs::write(&destination, contents)
+			.map_err(|source| write_file_error(&destination, source))?;
+	}
+	Ok(())
+}
+
+fn write_missing_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Result<()> {
+	for (relative, contents) in files {
+		let destination = crate_dir.join(relative);
+		if destination.exists() {
+			continue;
+		}
+		if let Some(parent) = destination.parent() {
+			fs::create_dir_all(parent).map_err(|source| write_file_error(parent, source))?;
+		}
+		fs::write(&destination, contents)
+			.map_err(|source| write_file_error(&destination, source))?;
+	}
+	Ok(())
+}
+
+fn read_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::ReadFile {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn write_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::WriteFile {
+		path: path.to_path_buf(),
+		source,
+	}
+}

@@ -1,0 +1,21 @@
+{
+	"name": "hello-solana-program-cli",
+	"version": "0.1.0",
+	"description": "Command-line interface for helloSolanaProgram",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"hello-solana-program-cli": "./src/main.ts"
+	},
+	"scripts": {
+		"start": "tsx src/main.ts"
+	},
+	"dependencies": {
+		"@cliffy/command": "^2.5.0",
+		"@solana/kit": "^6.10.0"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.0",
+		"typescript": "^5.9.0"
+	}
+}

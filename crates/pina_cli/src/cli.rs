@@ -153,7 +153,7 @@ pub(crate) enum Commands {
 		              --client typescript --client dart\n  pina generate --project \
 		              ./programs/counter --output ./generated\n  pina generate --mode update \
 		              --no-scaffold\n\nConfiguration:\n  [clients]\n  output = \"clients\"\n  \
-		              languages = [\"cpi\", \"rust\", \"typescript\"]\n  mode = \"auto\"\n  \
+		              languages = [\"cpi\", \"rust\", \"cli-rust\"]\n  mode = \"auto\"\n  \
 		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\""
 	)]
 	Generate {
@@ -952,6 +952,12 @@ pub(crate) enum ClientArg {
 	Rust,
 	Typescript,
 	Dart,
+	/// A clap-based Rust CLI application.
+	CliRust,
+	/// A cliffy-based TypeScript CLI application.
+	CliTs,
+	/// An args-based Dart CLI application.
+	CliDart,
 }
 
 /// Program identity operations.
@@ -1279,6 +1285,21 @@ pub(crate) enum CodamaCommands {
 			value_name = "DIR"
 		)]
 		dart_out: PathBuf,
+
+		/// Output directory for generated Rust CLI crates. Omit to skip
+		/// CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_rust_out: Option<PathBuf>,
+
+		/// Output directory for generated TypeScript CLI applications.
+		/// Omit to skip CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_ts_out: Option<PathBuf>,
+
+		/// Output directory for the generated Dart CLI package. Omit to
+		/// skip CLI generation.
+		#[arg(long, value_name = "DIR")]
+		cli_dart_out: Option<PathBuf>,
 
 		/// Program name to generate. Repeat to select multiple programs.
 		/// When omitted, every program below --examples-dir is generated.

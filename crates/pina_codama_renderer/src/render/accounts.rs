@@ -115,6 +115,7 @@ pub(crate) fn render_account_page(
 	}
 
 	let mut lines = Vec::new();
+	lines.push("#[allow(clippy::len_without_is_empty)]".to_string());
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	if compact_account {

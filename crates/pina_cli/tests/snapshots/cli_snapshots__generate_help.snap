@@ -21,8 +21,15 @@ Options:
 
       --client <LANGUAGE>
           Client ecosystem to generate. Repeat to override pina.toml
-          
-          [possible values: cpi, rust, typescript, dart]
+
+          Possible values:
+          - cpi
+          - rust
+          - typescript
+          - dart
+          - cli-rust:   A clap-based Rust CLI application
+          - cli-ts:     A cliffy-based TypeScript CLI application
+          - cli-dart:   An args-based Dart CLI application
 
   -o, --output <DIR>
           Override the configured client output directory
@@ -55,7 +62,7 @@ Examples:
 Configuration:
   [clients]
   output = "clients"
-  languages = ["cpi", "rust", "typescript"]
+  languages = ["cpi", "rust", "cli-rust"]
   mode = "auto"
   scaffold = true
 

@@ -329,11 +329,11 @@ jobs:
       - name: show codama diff on failure
         if: failure()
         run: |
-          git --no-pager status --short -- codama/idls codama/clients/rust codama/clients/js
+          git --no-pager status --short -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
           echo
-          git --no-pager diff --stat -- codama/idls codama/clients/rust codama/clients/js
+          git --no-pager diff --stat -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
           echo
-          git --no-pager diff -- codama/idls codama/clients/rust codama/clients/js
+          git --no-pager diff -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
         shell: bash
 
   build:

@@ -161,9 +161,12 @@ pub(crate) fn render_instruction_page(
 	lines.push(format!("\t\tdata: {data_name},"));
 	lines.push("\t\tremaining_accounts: &[solana_instruction::AccountMeta],".to_string());
 	lines.push("\t) -> solana_instruction::Instruction {".to_string());
+	let capacity = match instruction.accounts.len() {
+		0 => "remaining_accounts.len()".to_string(),
+		count => format!("{count} + remaining_accounts.len()"),
+	};
 	lines.push(format!(
-		"\t\tlet mut accounts = Vec::with_capacity({} + remaining_accounts.len());",
-		instruction.accounts.len()
+		"\t\tlet mut accounts = Vec::with_capacity({capacity});"
 	));
 	lines.extend(render_instruction_account_metas(
 		instruction,
@@ -234,11 +237,26 @@ pub(crate) fn render_instruction_page(
 		wire_fields.push(format!("\tpub {argument_name}: {argument_type},"));
 	}
 	lines.push("#[doc(hidden)]".to_string());
+	lines.push("#[allow(clippy::len_without_is_empty)]".to_string());
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
+	// Clippy's `len_without_is_empty` fires only when a wire field is
+	// literally named `len` (the derive turns it into a `pub fn len`
+	// accessor); give those views an `is_empty()` companion.
+	let has_len_field = wire_fields
+		.iter()
+		.any(|field| field.starts_with("\tpub len: "));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());
+
+	if has_len_field {
+		lines.push(String::new());
+		lines.push(format!(
+			"impl {wire_name}Zc {{\n\t#[must_use]\n\tpub fn is_empty(&self) -> bool \
+			 {{\n\t\tself.len() == 0\n\t}}\n}}"
+		));
+	}
 
 	Ok(lines.join("\n"))
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const WARMUP_RUNS = 1;
@@ -12,7 +12,27 @@ const COMMANDS = [
 	{ id: "profile help", args: ["profile", "--help"] },
 	{ id: "IDL help", args: ["idl", "--help"] },
 	{ id: "client generation help", args: ["generate", "--help"] },
+	{
+		id: "cli-rust generation help",
+		args: ["generate", "--client", "cli-rust", "--help"],
+	},
 	{ id: "render bundled docs", args: ["docs", "pina-overview"] },
+	{
+		id: "cli-rust project generation",
+		args: [
+			"generate",
+			"--client",
+			"cli-rust",
+			"--project",
+			"examples/counter_program",
+			"--output",
+			"target/benchmark/clients/cli-rust",
+		],
+		// The renderer only rewrites a tree it recognises as its own, and the
+		// generated header changes between revisions. CI restores `target/` from
+		// cache, so a tree written by an older revision would abort the run.
+		clean: "target/benchmark/clients/cli-rust",
+	},
 ] as const;
 
 interface HyperfineResult {
@@ -126,10 +146,18 @@ function statusLabel(status: PerformanceStatus): string {
 }
 
 function commandSucceeds(binary: string, args: readonly string[]): boolean {
-	const result = spawnSync(binary, args, { stdio: "ignore" });
+	const result = spawnSync(binary, args, { encoding: "utf8" });
 
 	if (result.error !== undefined) {
 		throw result.error;
+	}
+
+	if (result.status !== 0) {
+		console.error(
+			`probe failed: ${binary} ${args.join(" ")}\n${result.stdout ?? ""}\n${
+				result.stderr ?? ""
+			}`,
+		);
 	}
 
 	return result.status === 0;
@@ -144,6 +172,10 @@ function run(arguments_: Arguments): void {
 	const baseSupported = new Map<string, boolean>();
 
 	for (const command of COMMANDS) {
+		if ("clean" in command) {
+			rmSync(resolve(command.clean), { recursive: true, force: true });
+		}
+
 		const supportsBase = commandSucceeds(arguments_.baseBin, command.args);
 		baseSupported.set(command.id, supportsBase);
 

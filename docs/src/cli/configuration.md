@@ -28,20 +28,20 @@ scaffold = false
 mode = "update"
 ```
 
-| Field                       | Required | Default                    | Meaning                                                    |
-| --------------------------- | -------- | -------------------------- | ---------------------------------------------------------- |
-| `project.program`           | no       | `.`                        | Directory containing the program `Cargo.toml`.             |
-| `project.idl_dir`           | no       | Cargo target directory/idl | Override for generated IDL files.                          |
-| `clients.output`            | no       | `clients`                  | Root directory for generated client ecosystems.            |
-| `clients.languages`         | no       | `rust`, `typescript`       | Any of `cpi`, `rust`, `typescript`, and `dart`.            |
-| `clients.mode`              | no       | `auto`                     | Default destination policy for every selected client.      |
-| `clients.scaffold`          | no       | `true`                     | Whether missing manifests and entrypoints are initialized. |
-| `clients.<target>.output`   | no       | target name                | Target directory beneath `clients.output`.                 |
-| `clients.<target>.mode`     | no       | `clients.mode`             | Destination policy for one target.                         |
-| `clients.<target>.scaffold` | no       | `clients.scaffold`         | Scaffold policy for one target.                            |
-| `lints.<lint-name>`         | no       | built-in level             | Per-lint override: `allow`, `warn`, or `deny`.             |
+| Field                       | Required | Default                    | Meaning                                                                           |
+| --------------------------- | -------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `project.program`           | no       | `.`                        | Directory containing the program `Cargo.toml`.                                    |
+| `project.idl_dir`           | no       | Cargo target directory/idl | Override for generated IDL files.                                                 |
+| `clients.output`            | no       | `clients`                  | Root directory for generated client ecosystems.                                   |
+| `clients.languages`         | no       | `rust`, `typescript`       | Any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`. |
+| `clients.mode`              | no       | `auto`                     | Default destination policy for every selected client.                             |
+| `clients.scaffold`          | no       | `true`                     | Whether missing manifests and entrypoints are initialized.                        |
+| `clients.<target>.output`   | no       | target name                | Target directory beneath `clients.output`.                                        |
+| `clients.<target>.mode`     | no       | `clients.mode`             | Destination policy for one target.                                                |
+| `clients.<target>.scaffold` | no       | `clients.scaffold`         | Scaffold policy for one target.                                                   |
+| `lints.<lint-name>`         | no       | built-in level             | Per-lint override: `allow`, `warn`, or `deny`.                                    |
 
-`<target>` is `cpi`, `rust`, `typescript`, or `dart`. Dart is the Dart and Flutter target; there is no separate Flutter generator.
+`<target>` is `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, or `cli-dart`. Dart is the Dart and Flutter target; there is no separate Flutter generator. Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients.cli-rust`, `clients.cli-ts`, and `clients.cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program.
 
 Lint levels are validated against the bundled lint catalog; see [Run Security Lints](./lint.md) for the full lint-level workflow.
 

@@ -77,6 +77,7 @@ impl AllowsDuplicateReadonlyInstructionData {
 }
 
 #[doc(hidden)]
+#[allow(clippy::len_without_is_empty)]
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllowsDuplicateReadonlyInstructionWire {

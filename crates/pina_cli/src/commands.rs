@@ -155,6 +155,9 @@ pub(crate) fn run(cli: Cli) {
 					cpi_out,
 					js_out,
 					dart_out,
+					cli_rust_out,
+					cli_ts_out,
+					cli_dart_out,
 					examples,
 					npx,
 				} => {
@@ -165,6 +168,9 @@ pub(crate) fn run(cli: Cli) {
 						cpi_out,
 						js_out,
 						dart_out,
+						cli_rust_out,
+						cli_ts_out,
+						cli_dart_out,
 						examples,
 						npx,
 					});
@@ -731,6 +737,9 @@ fn run_generate(
 				ClientArg::Rust => pina_cli::project::ClientLanguage::Rust,
 				ClientArg::Typescript => pina_cli::project::ClientLanguage::Typescript,
 				ClientArg::Dart => pina_cli::project::ClientLanguage::Dart,
+				ClientArg::CliRust => pina_cli::project::ClientLanguage::CliRust,
+				ClientArg::CliTs => pina_cli::project::ClientLanguage::CliTs,
+				ClientArg::CliDart => pina_cli::project::ClientLanguage::CliDart,
 			}
 		})
 		.collect();

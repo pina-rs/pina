@@ -3,8 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"generate": "cargo run -p pina_cli -- codama generate --npx node",
-		"check:js": "tsc --noEmit -p codama/tsconfig.json",
+		"generate": "pnpm run build:codama-renderer-cpi >/dev/null 2>&1 || true; pnpm run build:codama-renderer-cli && cargo run -p pina_cli -- codama generate --npx node",
+		"check:js": "tsc --noEmit -p codama/tsconfig.json && tsc --noEmit -p codama/tsconfig.cli.json",
 		"check:scripts": "tsc --noEmit -p tsconfig.scripts.json",
 		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",
 		"build:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi build",
@@ -16,12 +16,14 @@
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
 		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
-		"test": "pnpm run generate && pnpm run check:js"
+		"test": "pnpm run generate && pnpm run check:js",
+		"build:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli build"
 	},
 	"dependencies": {
 		"@codama/renderers-js": "^2.4.0",
 		"codama": "^1.10.2",
-		"codama-renderers-dart": "0.5.5"
+		"codama-renderers-dart": "0.5.5",
+		"@pina-rs/codama-renderer-cli": "workspace:*"
 	},
 	"devDependencies": {
 		"@codama/nodes-from-anchor": "1.5.5",
@@ -29,6 +31,7 @@
 		"@solana/program-client-core": "^8.2.0",
 		"@solana/surfpool": "^1.5.0",
 		"@types/node": "^26.4.0",
+		"commander": "^15.0.0",
 		"tsx": "^4.23.13",
 		"typescript": "^7.0.2"
 	}

@@ -91,6 +91,10 @@ type = "cargo"
 path = "crates/pina_cli"
 type = "cargo"
 
+[package.pina_cli_renderer]
+path = "crates/pina_cli_renderer"
+type = "cargo"
+
 [package.pina_macros]
 path = "crates/pina_macros"
 type = "cargo"
@@ -130,6 +134,10 @@ type = "npm"
 
 [package.pina_codama_renderer_cpi]
 path = "packages/codama-renderer-cpi"
+type = "npm"
+
+[package.pina_codama_renderer_cli]
+path = "packages/codama-renderer-cli"
 type = "npm"
 
 [package.pina_cli_npm]
@@ -183,6 +191,7 @@ packages = [
 	"pina_cli",
 	"pina_lints",
 	"pina_macros",
+	"pina_cli_renderer",
 	"pina_codama_renderer",
 	"pina_cpi_renderer",
 	"pina_profile",
@@ -190,6 +199,7 @@ packages = [
 	"pina_test",
 	"pina_codama_nodes",
 	"pina_codama_renderer_cpi",
+	"pina_codama_renderer_cli",
 	"pina_cli_npm",
 	"pina_cli_darwin_arm64",
 	"pina_cli_darwin_x64",
