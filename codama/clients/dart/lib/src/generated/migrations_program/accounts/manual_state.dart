@@ -120,3 +120,20 @@ Codec<ManualState, ManualState> getManualStateCodec() {
 Account<ManualState> decodeManualState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getManualStateDecoder());
 }
+
+/// The account schema version this client was generated from.
+const int manualStateMigrationVersion = 2;
+
+/// Cheap envelope check for fetched `ManualState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool manualStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 2) {
+    return false;
+  }
+  return data[1] < 2;
+}

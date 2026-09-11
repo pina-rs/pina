@@ -199,3 +199,20 @@ Codec<CompactState, CompactState> getCompactStateCodec() {
 Account<CompactState> decodeCompactState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getCompactStateDecoder());
 }
+
+/// The account schema version this client was generated from.
+const int compactStateMigrationVersion = 1;
+
+/// Cheap envelope check for fetched `CompactState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool compactStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 3) {
+    return false;
+  }
+  return data[1] < 1;
+}

@@ -3,8 +3,13 @@ use std::fmt::Write as _;
 use codama_nodes::AccountNode;
 use codama_nodes::DefaultValueStrategy;
 use codama_nodes::NestedTypeNodeTrait;
+use codama_nodes::Number;
+use codama_nodes::NumberFormat;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
+use codama_nodes::TypeNode;
+use codama_nodes::ValueNode;
+use heck::ToShoutySnakeCase as _;
 
 use super::capacity::CompactCapacityIndex;
 use super::discriminator::render_constant_discriminator;
@@ -164,6 +169,14 @@ pub(crate) fn render_account_page(
 		let helpers =
 			render_account_pda_helpers(account_name.as_str(), pda, primary_program_const)?;
 		lines.extend(helpers);
+	}
+
+	// Migratable accounts also carry a cheap stale-bytes check next to the
+	// version constant, so released clients can decide when to send the
+	// reserved `Migrate` instruction.
+	if let Some(envelope) = migration_envelope(account) {
+		lines.push(String::new());
+		lines.push(render_needs_migration(&envelope));
 	}
 
 	Ok(lines.join("\n"))
@@ -404,4 +417,102 @@ fn render_account_pda_helpers(
 	lines.push("}".to_string());
 
 	Ok(lines)
+}
+
+/// Migration envelope facts for one account, when it is migratable.
+pub(crate) struct MigrationEnvelope {
+	pub(crate) module_name: String,
+	pub(crate) version: u64,
+	pub(crate) version_offset: usize,
+	pub(crate) version_bytes: usize,
+	pub(crate) discriminator: Vec<u8>,
+}
+
+/// Extract the `[discriminator, migrationVersion]` envelope from an account.
+///
+/// Returns `None` unless the account's first two fields carry numeric
+/// defaults under exactly those names.
+pub(crate) fn migration_envelope(account: &AccountNode) -> Option<MigrationEnvelope> {
+	let fields = &account.data.get_nested_type_node().fields;
+	let mut envelope = fields.iter().take(2).filter_map(|field| {
+		let default_value = field.default_value.as_ref().as_ref()?;
+		let kind = match field.name.as_ref() {
+			"discriminator" => "discriminator",
+			"migrationVersion" => "migrationVersion",
+			_ => return None,
+		};
+		Some((kind, field.r#type.as_ref(), default_value))
+	});
+
+	let number_facts = |field_type: &TypeNode, default_value: &ValueNode| -> Option<(u64, usize)> {
+		let ValueNode::Number(number_value) = default_value else {
+			return None;
+		};
+		let TypeNode::Number(number_type) = field_type else {
+			return None;
+		};
+		let width = match number_type.format {
+			NumberFormat::U8 => 1,
+			NumberFormat::U16 => 2,
+			NumberFormat::U32 => 4,
+			NumberFormat::U64 => 8,
+			_ => return None,
+		};
+		let value = match number_value.number {
+			Number::UnsignedInteger(value) => value,
+			_ => return None,
+		};
+		Some((value, width))
+	};
+
+	let Some(("discriminator", field_type, default_value)) = envelope.next() else {
+		return None;
+	};
+	let discriminator = number_facts(field_type, default_value)?;
+	let Some(("migrationVersion", field_type, default_value)) = envelope.next() else {
+		return None;
+	};
+	let version = number_facts(field_type, default_value)?;
+
+	Some(MigrationEnvelope {
+		module_name: snake(account.name.as_ref()),
+		version: version.0,
+		version_offset: discriminator.1,
+		version_bytes: version.1,
+		discriminator: discriminator.0.to_le_bytes()[..discriminator.1].to_vec(),
+	})
+}
+
+/// Render the per-account stale-bytes check for one migratable account.
+pub(crate) fn render_needs_migration(envelope: &MigrationEnvelope) -> String {
+	let constant = format!(
+		"{}_MIGRATION_VERSION",
+		envelope.module_name.to_shouty_snake_case()
+	);
+	let module = &envelope.module_name;
+	let header = envelope.version_offset + envelope.version_bytes;
+	let version_end = header;
+	let mut conditions = Vec::new();
+	for (index, byte) in envelope.discriminator.iter().enumerate() {
+		conditions.push(format!("data[{index}] == {byte}"));
+	}
+	let conditions = conditions.join("\n\t\t\t&& ");
+
+	format!(
+		"\n/// Whether raw account bytes are stale for this contract: the envelope names this \
+		 account's discriminator and carries a version older than\n/// [`{constant}`]. Current or \
+		 foreign bytes return false; decoding explains the difference.\npub fn \
+		 {module}_needs_migration(data: &[u8]) -> bool {{\n\tdata.len() >= {header}\n\t\t\t&& \
+		 {conditions}\n\t\t\t&& {{\n\t\t\t\tlet mut version = [0_u8; \
+		 8];\n\t\t\t\tversion[..{vb}]\n\t\t\t\t\t.copy_from_slice(&data[{vo}..{ve}]);\n\t\t\t\t		 \
+		 u64::from_le_bytes(version) < {version}\n\t\t\t}}\n}}\n",
+		constant = constant,
+		module = module,
+		header = header,
+		conditions = conditions,
+		vb = envelope.version_bytes,
+		vo = envelope.version_offset,
+		ve = version_end,
+		version = envelope.version,
+	)
 }

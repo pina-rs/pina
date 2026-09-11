@@ -672,11 +672,19 @@ if is_migrate_instruction(data) {
 <p>Slot 0 is a writable payer funding the rent deficits (or the program address when no step needs funding), slot 1 is the system program the transfers invoke, and every later slot is a program-owned, self-describing account. A slot holding the program address, or an index past the end of the list, is skipped — so a client sends only the accounts it needs to migrate. <code class="inline">MigrateContext</code> validates ownership, rejects duplicated slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.</p>
 <p>That is the client flow the sweep section below describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
+<h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains a <code class="inline">&lt;account&gt;NeedsMigration(bytes)</code> envelope check — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p>
+<div class="code"><span class="k">const</span> { data } = <span class="k">await</span> fetchEncodedAccount(rpc, address);
+<span class="k">if</span> (stateNeedsMigration(data)) {
+	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }).make());
+}
+<span class="comment">// now decode `state` and send the real instruction</span></div>
+
 <h3 style="font-size:18px; margin-top: 28px;">Planned but not built (ADR 0008 and follow-ups)</h3>
 <div class="future">
 	
 	<div class="future-item"><span class="tag t-soon">Next</span><p><b>On-chain state inspection</b> (<a href="https://github.com/pina-rs/pina/issues/337">#337</a>). A command to read an account's version envelope over RPC and report "stored v0, current v2, about two steps, roughly this many CU, needs this many lamports". There is currently no way to see on-chain migration state from the CLI.</p></div>
-	<div class="future-item"><span class="tag t-later">Later</span><p><b>Client helpers</b> (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>). Generated <code>needsMigration()</code> and <code>migrateInstruction()</code> so "check, then migrate, then act" is one call. Decode-time version enforcement already ships in all three clients.</p></div>
+	<div class="future-item"><span class="tag t-soon">Next</span><p><b>One-call migration</b> (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>). A <code>migrateIfNeeded()</code> wrapper that fetches, checks the envelope, and sends the Migrate instruction in one call over an RPC handle. The per-account checks and the Migrate composer already ship in all three clients.</p></div>
 	<div class="future-item"><span class="tag t-later">Later</span><p><b>Persisted answers</b> (<a href="https://github.com/pina-rs/pina/issues/340">#340</a>). Disambiguation decisions saved next to the manifest, so fresh clones and CI can answer rename questions without replaying flags.</p></div>
 	<div class="future-item"><span class="tag t-later">Later</span><p><b>Cost preview</b> (<a href="https://github.com/pina-rs/pina/issues/341">#341</a>). Reuse the static SBF profiler to show the rent and compute cost of a migration before you ship it.</p></div>
 </div>

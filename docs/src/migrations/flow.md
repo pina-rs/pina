@@ -193,7 +193,26 @@ if is_migrate_instruction(data) {
 
 Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.
 
-That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails. Generated `migrateIfNeeded` helpers are designed in [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md) and tracked in #339.
+That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
+
+### Generated client helpers
+
+Generated clients turn that flow into a one-call routine. Next to each migratable account module the TypeScript, Dart, and Rust clients emit:
+
+- a `<Account>MIGRATION_VERSION` constant — the schema version the client was generated from;
+- `<account>NeedsMigration(bytes)` — a cheap envelope check that returns true only when the bytes name this account's discriminator and a version older than the client's schema. Future versions and foreign discriminators return false; the decoder explains those when the account is decoded.
+
+The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
+
+```ts
+const { data } = await fetchEncodedAccount(rpc, address);
+if (stateNeedsMigration(data)) {
+	await send(getMigrateInstruction({ state: address, payer }).make());
+}
+// now decode `state` and send the real instruction
+```
+
+`migrateIfNeeded` — fetching, checking, and migrating in one call over an RPC handle — is designed in [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md).
 
 ## The four scenarios
 

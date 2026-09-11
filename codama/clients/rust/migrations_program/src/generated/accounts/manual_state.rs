@@ -50,3 +50,13 @@ impl ManualState {
 		Ok(account)
 	}
 }
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`MANUAL_STATE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+pub fn manual_state_needs_migration(data: &[u8]) -> bool {
+	data.len() >= 2 && data[0] == 2 && {
+		let mut version = [0_u8; 8];
+		version[..1].copy_from_slice(&data[1..2]);
+		u64::from_le_bytes(version) < 2
+	}
+}

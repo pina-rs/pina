@@ -22,6 +22,7 @@ pub(crate) use helpers::program_id_const_name;
 pub(crate) use helpers::snake;
 pub(crate) use instructions::render_instruction_page;
 pub(crate) use instructions::render_instructions_mod;
+pub use instructions::render_migrate_instruction_page;
 pub(crate) use mods::render_programs_mod;
 pub(crate) use mods::render_root_mod;
 pub(crate) use scaffold::ensure_crate_scaffold;

@@ -137,3 +137,20 @@ Codec<State, State> getStateCodec() {
 Account<State> decodeState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getStateDecoder());
 }
+
+/// The account schema version this client was generated from.
+const int stateMigrationVersion = 2;
+
+/// Cheap envelope check for fetched `State` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool stateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 2;
+}
