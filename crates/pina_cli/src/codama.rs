@@ -1293,9 +1293,7 @@ fn add_npx_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 		}
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
 		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
-		ClientLanguage::CliTs | ClientLanguage::CliDart => {
-			command.arg("@pina-rs/codama-renderer-cli@0.1.0")
-		}
+		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
 }
 
@@ -1308,10 +1306,14 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 		}
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
 		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
-		ClientLanguage::CliTs | ClientLanguage::CliDart => {
-			command.arg("@pina-rs/codama-renderer-cli@0.1.0")
-		}
+		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
+}
+
+/// `@pina-rs/codama-renderer-cli` is released in lockstep with this crate, so
+/// the install spec has to track the crate version instead of a fixed pin.
+fn renderer_cli_package() -> String {
+	format!("@pina-rs/codama-renderer-cli@{}", env!("CARGO_PKG_VERSION"))
 }
 
 #[cfg(test)]
@@ -1545,11 +1547,15 @@ mod tests {
 
 	#[test]
 	fn renderer_command_helpers_cover_each_language() {
+		let renderer_cli = renderer_cli_package();
 		for (language, package) in [
 			(ClientLanguage::Cpi, "codama@1.10.1"),
 			(ClientLanguage::Rust, "codama@1.10.1"),
+			(ClientLanguage::CliRust, "codama@1.10.1"),
 			(ClientLanguage::Typescript, "@codama/renderers-js@2.3.1"),
 			(ClientLanguage::Dart, "codama-renderers-dart@0.5.5"),
+			(ClientLanguage::CliTs, renderer_cli.as_str()),
+			(ClientLanguage::CliDart, renderer_cli.as_str()),
 		] {
 			let mut npx = Command::new("npx");
 			add_npx_renderer_package(&mut npx, language);
@@ -1565,6 +1571,22 @@ mod tests {
 				[OsStr::new("--package"), OsStr::new(package)],
 			);
 		}
+	}
+
+	#[test]
+	fn renderer_cli_package_tracks_the_published_npm_version() {
+		let manifest: serde_json::Value = serde_json::from_str(include_str!(
+			"../../../packages/codama-renderer-cli/package.json"
+		))
+		.expect("renderer package manifest is valid JSON");
+		let published = manifest["version"]
+			.as_str()
+			.expect("renderer package manifest declares a version");
+
+		assert_eq!(
+			renderer_cli_package(),
+			format!("@pina-rs/codama-renderer-cli@{published}")
+		);
 	}
 
 	#[test]

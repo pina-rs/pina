@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/codama-renderer-cli",
-	"version": "0.1.0",
+	"version": "0.15.0",
 	"description": "Codama visitor that renders commander-based TypeScript CLI applications from program IDLs",
 	"license": "Apache-2.0",
 	"homepage": "https://pina.rs",
