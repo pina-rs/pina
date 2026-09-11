@@ -518,7 +518,6 @@ use serde_json::json;
 
 use crate::context::CliContext;
 use crate::context::CliError;
-use @@CLIENT_CRATE@@;
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Subcommand)]
