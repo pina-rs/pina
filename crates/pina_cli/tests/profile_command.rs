@@ -719,3 +719,29 @@ fn cli_profile_compare_rejects_a_negative_fail_percent_flag() {
 		"{stderr}"
 	);
 }
+
+#[test]
+fn cli_profile_compare_reports_an_unreadable_artifact() {
+	let baseline_elf = build_sbf_elf(160, &[("entry", 0, 160)]);
+	let baseline = write_temp_elf(&baseline_elf);
+	let mut bad = tempfile::Builder::new()
+		.suffix(".so")
+		.tempfile()
+		.unwrap_or_else(|error| panic!("temp file failed: {error}"));
+	bad.write_all(b"definitely not an SBF ELF")
+		.unwrap_or_else(|error| panic!("write failed: {error}"));
+	bad.as_file()
+		.flush()
+		.unwrap_or_else(|error| panic!("flush failed: {error}"));
+
+	let output = run_compare(baseline.path(), bad.path(), &[]);
+
+	assert_eq!(
+		output.status.code(),
+		Some(1),
+		"unprofileable artifact must exit 1: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("Error"), "{stderr}");
+}

@@ -989,15 +989,15 @@ fn run_profile_compare(
 	json: bool,
 	threshold: pina_profile::RegressionThreshold,
 ) {
-	if !threshold.delta_percent.is_finite() || threshold.delta_percent < 0.0 {
+	if !threshold.delta_percent.is_finite()
+		|| threshold.delta_percent < 0.0
+		|| threshold.delta_cu == 0
+	{
 		eprintln!(
-			"{} --fail-percent must be a finite number of at least 0",
+			"{} --fail-cu must be at least 1, and --fail-percent must be a finite number of at \
+			 least 0",
 			"Error".red().bold()
 		);
-		std::process::exit(1);
-	}
-	if threshold.delta_cu == 0 {
-		eprintln!("{} --fail-cu must be at least 1", "Error".red().bold());
 		std::process::exit(1);
 	}
 	let path = unwrap_or_exit(pina_cli::profile::resolve_profile_input(
