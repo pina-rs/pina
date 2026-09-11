@@ -23,28 +23,35 @@ use solana_sdk::pubkey::Pubkey;
 #[command(name = "role-registry-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {
 	/// RPC endpoint: `mainnet`, `devnet`, `testnet`, `localhost`, or an https URL.
-	#[arg(short = 'u', long, default_value = "devnet", env = "SOLANA_URL")]
+	#[arg(
+		short = 'u',
+		long,
+		global = true,
+		default_value = "devnet",
+		env = "SOLANA_URL"
+	)]
 	url: String,
 
 	/// Payer keypair file in the standard Solana JSON byte-array format.
 	#[arg(
 		short = 'k',
 		long,
+		global = true,
 		default_value = "~/.config/solana/id.json",
 		env = "PINA_KEYPAIR"
 	)]
 	keypair: String,
 
 	/// Override the on-chain program address.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	program_id: Option<String>,
 
 	/// Simulate the transaction and print its logs instead of sending.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	simulate: bool,
 
 	/// Print machine-readable JSON output.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	json: bool,
 
 	#[command(subcommand)]

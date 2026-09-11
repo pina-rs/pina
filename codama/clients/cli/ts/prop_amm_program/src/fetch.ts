@@ -4,7 +4,13 @@
 
 import { Command } from "commander";
 import { fetchOracleState } from "./client";
-import { bigInteger, CliContext, pubkey, registerGlobals } from "./context";
+import {
+	bigInteger,
+	CliContext,
+	CliError,
+	pubkey,
+	registerGlobals,
+} from "./context";
 
 export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
@@ -19,6 +25,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 				const context = await CliContext.create(options);
 				const address = pubkey("--address", options.address as string);
 				const account = await fetchOracleState(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
 				printAccount(context.json, "oracle-state", address, account.data);
 			}),
 	);

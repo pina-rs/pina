@@ -99,23 +99,35 @@ use solana_sdk::pubkey::Pubkey;
 #[command(name = "@@BIN_NAME@@", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {
 	/// RPC endpoint: `mainnet`, `devnet`, `testnet`, `localhost`, or an https URL.
-	#[arg(short = 'u', long, default_value = "devnet", env = "SOLANA_URL")]
+	#[arg(
+		short = 'u',
+		long,
+		global = true,
+		default_value = "devnet",
+		env = "SOLANA_URL"
+	)]
 	url: String,
 
 	/// Payer keypair file in the standard Solana JSON byte-array format.
-	#[arg(short = 'k', long, default_value = "~/.config/solana/id.json", env = "PINA_KEYPAIR")]
+	#[arg(
+		short = 'k',
+		long,
+		global = true,
+		default_value = "~/.config/solana/id.json",
+		env = "PINA_KEYPAIR"
+	)]
 	keypair: String,
 
 	/// Override the on-chain program address.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	program_id: Option<String>,
 
 	/// Simulate the transaction and print its logs instead of sending.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	simulate: bool,
 
 	/// Print machine-readable JSON output.
-	#[arg(long)]
+	#[arg(long, global = true)]
 	json: bool,
 
 	#[command(subcommand)]
@@ -1042,18 +1054,110 @@ pub fn resolve_endpoint(value: &str) -> Result<(String, &'static str), CliError>
 		custom => (custom, "custom"),
 	};
 
-	let lowercase = endpoint.to_ascii_lowercase();
-	let is_local = lowercase.starts_with("http://localhost")
-		|| lowercase.starts_with("http://127.0.0.1")
-		|| lowercase.starts_with("http://[::1]");
-	let secure = lowercase.starts_with("https://") || (lowercase.starts_with("http://") && is_local);
-	if !secure {
+	if !endpoint_is_secure(&endpoint) {
 		return Err(CliError::InsecureEndpoint {
 			value: value.to_string(),
 		});
 	}
 
 	Ok((endpoint.to_string(), cluster))
+}
+
+/// Whether an endpoint may be used as-is: any `https://` URL, or plaintext
+/// `http://` pointed at exactly `localhost`, `127.0.0.1`, or `[::1]`.
+///
+/// The host is read from the URL authority after rejecting userinfo, so
+/// lookalikes such as `http://localhost.evil.com` or
+/// `http://127.0.0.1@evil.com` do not count as local.
+fn endpoint_is_secure(endpoint: &str) -> bool {
+	let lowercase = endpoint.to_ascii_lowercase();
+	if lowercase.starts_with("https://") {
+		return true;
+	}
+	let Some(rest) = lowercase.strip_prefix("http://") else {
+		return false;
+	};
+	let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+	if authority.contains('@') {
+		return false;
+	}
+	let host = endpoint_authority_host(authority);
+	matches!(host, "localhost" | "127.0.0.1" | "::1")
+}
+
+/// The host portion of a URL authority, with the port and any IPv6 brackets
+/// removed.
+fn endpoint_authority_host(authority: &str) -> &str {
+	if let Some(inner) = authority.strip_prefix('[') {
+		let end = inner.find(']').unwrap_or(inner.len());
+		return &inner[..end];
+	}
+	match authority.rsplit_once(':') {
+		Some((host, _port)) => host,
+		None => authority,
+	}
+}
+
+#[cfg(test)]
+mod resolve_endpoint_tests {
+	use super::resolve_endpoint;
+
+	#[test]
+	fn accepts_cluster_names_and_https_urls() {
+		assert_eq!(
+			resolve_endpoint("devnet").unwrap(),
+			("https://api.devnet.solana.com".to_string(), "devnet")
+		);
+		assert_eq!(
+			resolve_endpoint("mainnet").unwrap().1,
+			""
+		);
+		assert!(
+			resolve_endpoint("https://rpc.example.com").is_ok(),
+			"https URLs are always allowed"
+		);
+	}
+
+	#[test]
+	fn allows_plaintext_http_only_for_exact_loopback_hosts() {
+		for endpoint in [
+			"http://localhost",
+			"http://localhost:8899",
+			"http://127.0.0.1",
+			"http://127.0.0.1:8899",
+			"http://[::1]",
+			"http://[::1]:8899",
+			"localhost",
+			"localnet",
+		] {
+			assert!(
+				resolve_endpoint(endpoint).is_ok(),
+				"{endpoint} must be allowed"
+			);
+		}
+	}
+
+	#[test]
+	fn rejects_remote_lookalikes_and_other_plaintext() {
+		for endpoint in [
+			"http://localhost.evil.com",
+			"http://127.0.0.1.evil.com",
+			"http://127.0.0.1@evil.com",
+			"http://[::1]@evil.com",
+			"http://user:password@localhost",
+			"http://evil.com",
+			"http://example.com/localhost",
+			"http://192.168.0.10",
+			"ftp://localhost",
+			"localhost.evil.com",
+			"evil.com",
+		] {
+			assert!(
+				resolve_endpoint(endpoint).is_err(),
+				"{endpoint} must be rejected"
+			);
+		}
+	}
 }
 
 fn load_keypair(path: &str) -> Result<Keypair, CliError> {

@@ -11,8 +11,8 @@
 		"start": "tsx src/main.ts"
 	},
 	"dependencies": {
-		"@cliffy/command": "^2.5.0",
-		"@solana/kit": "^6.10.0"
+		"@solana/kit": "^8.0.0",
+		"commander": "^15.0.0"
 	},
 	"devDependencies": {
 		"tsx": "^4.20.0",

@@ -9,7 +9,13 @@ import {
 	findRegistryConfigPda,
 	findRoleEntryPda,
 } from "./client";
-import { bigInteger, CliContext, pubkey, registerGlobals } from "./context";
+import {
+	bigInteger,
+	CliContext,
+	CliError,
+	pubkey,
+	registerGlobals,
+} from "./context";
 
 export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
@@ -29,6 +35,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 						programAddress: context.programAddress,
 					}))[0];
 				const account = await fetchRegistryConfig(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
 				printAccount(context.json, "registry-config", address, account.data);
 			}),
 	)
@@ -50,6 +61,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 						programAddress: context.programAddress,
 					}))[0];
 				const account = await fetchRoleEntry(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
 				printAccount(context.json, "role-entry", address, account.data);
 			}),
 	);
