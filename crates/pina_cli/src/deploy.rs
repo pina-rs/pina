@@ -483,6 +483,30 @@ impl CommandRunner for SystemCommandRunner {
 		env: &[(String, String)],
 		current_dir: &Path,
 	) -> io::Result<CommandStatus> {
+		// Through cmd.exe the operator's command travels as a raw argument:
+		// the runtime's automatic quote-escaping mangles nested quotes, and
+		// cmd.exe re-parses the raw string itself. Unix shells receive the
+		// command as an ordinary argv entry.
+		#[cfg(windows)]
+		if program == OsStr::new("cmd")
+			&& args.first().is_some_and(|flag| flag == OsStr::new("/C"))
+			&& let Some(command) = args.get(1)
+		{
+			use std::os::windows::process::CommandExt as _;
+
+			let status = Command::new(program)
+				.raw_arg(args[0].clone())
+				.raw_arg(command.clone())
+				.envs(env.iter().map(|(key, value)| (key, value)))
+				.current_dir(current_dir)
+				.stdin(Stdio::null())
+				.status()?;
+			return Ok(CommandStatus {
+				success: status.success(),
+				code: status.code(),
+			});
+		}
+
 		let status = Command::new(program)
 			.args(args)
 			.envs(env.iter().map(|(key, value)| (key, value)))
@@ -2217,5 +2241,42 @@ mod tests {
 
 	fn path(path: &Path) -> String {
 		path.to_string_lossy().into_owned()
+	}
+}
+
+#[cfg(all(test, windows))]
+mod windows_remote_command_tests {
+	use super::*;
+
+	/// The `if` comparison only balances when the quotes reach cmd.exe
+	/// intact; runtime quote-escaping mangles them and cmd exits nonzero.
+	#[test]
+	fn system_runner_passes_nested_quotes_through_cmd_intact() {
+		let mut runner = SystemCommandRunner;
+		let command = OsString::from("if \"a b\" == \"a b\" (exit /b 0) else (exit /b 1)");
+		let status = runner
+			.run(
+				OsStr::new("cmd"),
+				&[OsString::from("/C"), command],
+				&[],
+				Path::new("."),
+			)
+			.expect("run cmd");
+		assert!(
+			status.success,
+			"nested quotes must survive the cmd.exe round trip: {:?}",
+			status.code
+		);
+
+		// And the same runner surfaces a genuine nonzero exit.
+		let failing = runner
+			.run(
+				OsStr::new("cmd"),
+				&[OsString::from("/C"), OsString::from("exit /b 7")],
+				&[],
+				Path::new("."),
+			)
+			.expect("run cmd failure");
+		assert_eq!(failing.code, Some(7));
 	}
 }
