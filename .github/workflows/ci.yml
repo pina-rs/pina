@@ -395,7 +395,11 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: changes
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    # The job itself must always run so the matrix expands: required status
+    # checks are per matrix leg, and a job skipped before expansion reports a
+    # single literal `feature-matrix (${{ matrix.label }})` check that never
+    # satisfies branch protection. The per-step conditions skip the legs.
+    if: ${{ !failure() && !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -435,29 +439,29 @@ jobs:
     name: feature-matrix (${{ matrix.label }})
     steps:
       - name: checkout repository
-        if: ${{ github.event_name == 'push' || matrix.pr_run }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: setup
-        if: ${{ github.event_name == 'push' || matrix.pr_run }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build `pina` for ${{ matrix.label }}
-        if: ${{ github.event_name == 'push' || matrix.pr_run }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         run: ${{ matrix.build_task }}
         shell: devenv shell -c -- bash -e {0}
 
       - name: test `pina` for ${{ matrix.label }}
-        if: ${{ github.event_name == 'push' || matrix.pr_run }}
+        if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
         run: ${{ matrix.test_task }}
         shell: devenv shell -c -- bash -e {0}
 
       - name: build `pina` docs for ${{ matrix.label }}
-        if: ${{ (github.event_name == 'push' || matrix.pr_run) && matrix.doc_task != '' }}
+        if: ${{ (github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')))) && matrix.doc_task != '' }}
         run: ${{ matrix.doc_task }}
         shell: devenv shell -c -- bash -e {0}
 
