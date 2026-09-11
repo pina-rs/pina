@@ -238,7 +238,7 @@ use @@CLIENT_CRATE@@::instructions::@@DATA_IDENT@@;
 pub struct @@PASCAL@@Args {
 @@FLAG_FIELDS@@}
 
-pub(crate) fn run(context: &CliContext, args: @@PASCAL@@Args) -> Result<(), CliError> {
+pub(crate) fn run(context: &CliContext, @@ARGS@@: @@PASCAL@@Args) -> Result<(), CliError> {
 @@LOCALS@@@@DATA_SETUP@@
 	let accounts = @@ACCOUNTS_STRUCT@@ {
 @@LITERAL@@	};
@@ -384,6 +384,14 @@ fn emit_instruction(instruction: &InstructionModel, client_crate: &str) -> Strin
 			("@@ACCOUNTS_STRUCT@@", instruction.accounts_struct.clone()),
 			("@@DATA_IDENT@@", instruction.data_ident.clone()),
 			("@@PASCAL@@", instruction.pascal.clone()),
+			(
+				"@@ARGS@@",
+				if instruction.args.is_empty() && instruction.accounts.is_empty() {
+					"_args".to_string()
+				} else {
+					"args".to_string()
+				},
+			),
 			("@@FLAG_FIELDS@@", flag_fields),
 			("@@LOCALS@@", locals),
 			("@@DATA_SETUP@@", data_setup),
@@ -806,7 +814,10 @@ const DEVNET_ENDPOINT: &str = "https://api.devnet.solana.com";
 const TESTNET_ENDPOINT: &str = "https://api.testnet.solana.com";
 const LOCALNET_ENDPOINT: &str = "http://localhost:8899";
 
-/// Errors surfaced by every generated command.
+/// Errors surfaced by every generated command. Programs without
+/// accounts or byte flags never construct some variants; the blanket
+/// allow keeps the emitted file warning-free under `-D warnings`.
+#[allow(dead_code)]
 #[derive(Debug, Error)]
 pub enum CliError {
 	#[error("`{value}` is not a valid RPC endpoint; expected mainnet, devnet, testnet, localhost, or an http(s) URL")]
@@ -856,7 +867,10 @@ pub enum CliError {
 	MissingSeed { account: String, seed: String },
 }
 
-/// Shared configuration and RPC connection for one CLI invocation.
+/// Shared runtime for generated CLIs. Helpers unused by a given program
+/// (e.g. fetch in a no-account program) are `#[allow(dead_code)]` so the
+/// emitted context stays warning-free under `-D warnings`.
+#[allow(dead_code)]
 pub struct CliContext {
 	pub rpc: RpcClient,
 	pub payer: Keypair,
@@ -1021,7 +1035,8 @@ pub fn resolve_endpoint(value: &str) -> Result<(String, &'static str), CliError>
 	let is_local = lowercase.starts_with("http://localhost")
 		|| lowercase.starts_with("http://127.0.0.1")
 		|| lowercase.starts_with("http://[::1]");
-	if !lowercase.starts_with("https://") && !(lowercase.starts_with("http://") && is_local) {
+	let secure = lowercase.starts_with("https://") || (lowercase.starts_with("http://") && is_local);
+	if !secure {
 		return Err(CliError::InsecureEndpoint {
 			value: value.to_string(),
 		});

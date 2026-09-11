@@ -648,7 +648,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			let crate_dir = plan.cli_rust_out.join(example);
 			validate_generation_target(&crate_dir, settings)?;
 			let client_dir = plan.rust_out.join(example);
-			let client_path = relative_path(&crate_dir, &client_dir)?;
+			let client_path = format!("../../../rust/{example}");
 			let client_package = rust_client_package(&client_dir, example);
 			let render_config = CliRenderConfig {
 				mode: cli_render_mode(settings.mode),
@@ -682,29 +682,6 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	Ok(idl_paths)
-}
-
-/// Compute a relative import path from one directory to another without
-/// symlink resolution, so generated manifests stay workspace-portable.
-fn relative_path(from: &Path, to: &Path) -> Result<String, CodamaError> {
-	let from_components: Vec<_> = from.components().collect();
-	let to_components: Vec<_> = to.components().collect();
-	let mut shared = 0;
-	while shared < from_components.len()
-		&& shared < to_components.len()
-		&& from_components[shared] == to_components[shared]
-	{
-		shared += 1;
-	}
-
-	let ups = from_components.len() - shared;
-	let mut parts = vec![".."; ups];
-	parts.extend(
-		to_components[shared..]
-			.iter()
-			.map(|component| component.as_os_str().to_str().unwrap_or_default()),
-	);
-	Ok(parts.join("/"))
 }
 
 /// Read the package name of a generated Rust client crate, falling back to

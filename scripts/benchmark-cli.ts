@@ -142,10 +142,18 @@ function statusLabel(status: PerformanceStatus): string {
 }
 
 function commandSucceeds(binary: string, args: readonly string[]): boolean {
-	const result = spawnSync(binary, args, { stdio: "ignore" });
+	const result = spawnSync(binary, args, { encoding: "utf8" });
 
 	if (result.error !== undefined) {
 		throw result.error;
+	}
+
+	if (result.status !== 0) {
+		console.error(
+			`probe failed: ${binary} ${args.join(" ")}\n${result.stdout ?? ""}\n${
+				result.stderr ?? ""
+			}`,
+		);
 	}
 
 	return result.status === 0;
