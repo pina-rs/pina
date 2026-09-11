@@ -11,6 +11,7 @@ use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
 use cargo_metadata::TargetKind;
 use clap::ValueEnum;
+use pina_abi::MigrationVersionType;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -102,6 +103,8 @@ pub struct Project {
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
 	pub client_generation: BTreeMap<ClientLanguage, ClientGenerationConfig>,
+	/// Program-wide migration version encoding.
+	pub migration_version_type: MigrationVersionType,
 	#[serde(skip)]
 	pub lint_levels: BTreeMap<String, LintLevel>,
 }
@@ -114,6 +117,8 @@ struct ProjectConfig {
 	#[serde(default)]
 	clients: ClientsConfig,
 	#[serde(default)]
+	migrations: MigrationsConfig,
+	#[serde(default)]
 	lints: LintsConfig,
 }
 
@@ -123,6 +128,13 @@ struct ProjectConfig {
 /// that are not listed keep their built-in default level.
 #[derive(Debug, Default, Deserialize)]
 struct LintsConfig(BTreeMap<String, String>);
+
+/// Program-wide migration settings.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+struct MigrationsConfig {
+	version_type: MigrationVersionType,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -374,6 +386,7 @@ impl Project {
 			clients_dir,
 			clients: config.clients.languages,
 			client_generation,
+			migration_version_type: config.migrations.version_type,
 			lint_levels,
 			root,
 		})
@@ -438,6 +451,7 @@ impl Project {
 			clients_dir,
 			clients: clients_config.languages,
 			client_generation,
+			migration_version_type: MigrationVersionType::default(),
 			lint_levels: BTreeMap::new(),
 			root,
 		})

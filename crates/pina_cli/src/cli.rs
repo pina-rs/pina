@@ -133,6 +133,16 @@ pub(crate) enum Commands {
 		fix: bool,
 	},
 
+	/// Create and verify checked-in ABI migrations.
+	///
+	/// `make` snapshots the current desired schema. It rewrites an unpublished
+	/// draft in place and advances only after that version has been published.
+	/// `check` is the non-mutating build/CI gate. `status` reports the same checks.
+	Migrations {
+		#[command(subcommand)]
+		command: MigrationCommands,
+	},
+
 	/// Generate configured clients for the current Pina program.
 	///
 	/// Discovers the project, refreshes its IDL, and generates only the selected
@@ -370,12 +380,13 @@ pub(crate) enum Commands {
 	/// Mollusk tests only.
 	#[command(
 		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
-		              --unit\n  pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  \
-		              --unit keeps the fast native/Mollusk loop and does not build SBF.\n  The \
-		              default builds SBF and runs the ignored test in the isolated \
-		              `tests/surfpool` package.\n\nSafety:\n  Embedded Surfpool tests allocate \
-		              isolated ports and must stop their instance before returning. Missing SBF \
-		              artifacts and incomplete Surfpool test packages are hard failures."
+		              --unit\n  pina test --compatibility\n  pina test --unit --filter \
+		              rejects_wrong_owner\n\nTest layers:\n  --unit keeps the fast native/Mollusk \
+		              loop and does not build SBF.\n  The default builds SBF and runs the ignored \
+		              test in the isolated `tests/surfpool` package.\n\nSafety:\n  Embedded \
+		              Surfpool tests allocate isolated ports and must stop their instance before \
+		              returning. Missing SBF artifacts and incomplete Surfpool test packages are \
+		              hard failures."
 	)]
 	Test {
 		/// Project directory or a directory below it. Defaults to the current directory.
@@ -391,6 +402,10 @@ pub(crate) enum Commands {
 		/// Run native Rust and Mollusk tests without building SBF or starting Surfpool.
 		#[arg(long)]
 		unit: bool,
+
+		/// Verify migration history, then expose historical fixtures to the complete Surfpool suite.
+		#[arg(long, conflicts_with = "unit")]
+		compatibility: bool,
 
 		/// Run only tests whose names contain FILTER.
 		#[arg(short, long, value_name = "FILTER")]
@@ -599,6 +614,20 @@ Safety:
 		/// Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets.
 		#[arg(long, conflicts_with = "dry_run")]
 		allow_mainnet: bool,
+
+		/// Record migration publication receipts even for loopback targets.
+		/// Useful for exercising the full publication lifecycle against a
+		/// local network such as Surfpool.
+		#[arg(long)]
+		record_publication: bool,
+
+		/// Run this command instead of `solana program deploy`. The deployment
+		/// facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`,
+		/// `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`,
+		/// `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and
+		/// `PINA_DEPLOY_CLUSTER` environment variables.
+		#[arg(long, value_name = "COMMAND")]
+		remote_command: Option<String>,
 	},
 
 	/// Run Codama IDL and client-generation workflows.
@@ -946,6 +975,62 @@ pub(crate) enum KeysCommands {
 		/// Replace an existing keypair and rotate the source program ID.
 		#[arg(long)]
 		force: bool,
+	},
+}
+
+/// ABI migration history operations.
+#[derive(Subcommand, Debug)]
+pub(crate) enum MigrationCommands {
+	/// Snapshot source changes and generate the adjacent transition.
+	Make {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Answer an ambiguous rename with `--rename from:to` to preserve the
+		/// field's stored data. Repeatable.
+		#[arg(long = "rename", value_name = "FROM:TO")]
+		renames: Vec<String>,
+		/// Acknowledge that a removed field's stored data is discarded.
+		/// Repeatable.
+		#[arg(long = "assume-removed", value_name = "FIELD")]
+		assume_removed: Vec<String>,
+		/// Never prompt for disambiguation, even on a terminal.
+		#[arg(long)]
+		no_interactive: bool,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
+	/// Fail if source, process contracts, or transition files drifted.
+	Check {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
+	/// Show the current version and publication state of every contract.
+	Status {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
+	/// Inspect or abandon an ambiguous pending deployment.
+	Reconcile {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Convert the pending deployment into an abandoned receipt. The pinned
+		/// versions stay frozen because the deployment may still have gone live.
+		#[arg(long)]
+		abandon: bool,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
 	},
 }
 

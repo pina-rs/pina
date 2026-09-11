@@ -11,14 +11,16 @@ This section captures the durable architectural decisions behind Pina's public m
 
 ## ADR index
 
-| ADR                                                      | Status   | Decision                                                                        |
-| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------- |
-| [ADR 0001](./0001-discriminator-first-layout.md)         | Accepted | Keep discriminator bytes as the first field inside typed layouts.               |
-| [ADR 0002](./0002-zero-copy-account-model.md)            | Accepted | Keep zero-copy for fixed-size Pod layouts, but only behind explicit validation. |
-| [ADR 0003](./0003-guard-backed-typed-account-loaders.md) | Accepted | Keep runtime borrow guards alive for the full typed loader lifetime.            |
-| [ADR 0004](./0004-no-std-and-no-allocator-boundary.md)   | Accepted | Preserve `no_std` / no-allocator constraints for on-chain code paths.           |
-| [ADR 0005](./0005-token-feature-boundaries.md)           | Accepted | Keep SPL token support optional and feature-gated.                              |
-| [ADR 0006](./0006-verification-layers-in-ci.md)          | Accepted | Treat CI as layered verification, not a single all-purpose test lane.           |
+| ADR                                                      | Status   | Decision                                                                                                                      |
+| -------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [ADR 0001](./0001-discriminator-first-layout.md)         | Accepted | Keep discriminator bytes as the first field inside typed layouts.                                                             |
+| [ADR 0002](./0002-zero-copy-account-model.md)            | Accepted | Keep zero-copy for fixed-size Pod layouts, but only behind explicit validation.                                               |
+| [ADR 0003](./0003-guard-backed-typed-account-loaders.md) | Accepted | Keep runtime borrow guards alive for the full typed loader lifetime.                                                          |
+| [ADR 0004](./0004-no-std-and-no-allocator-boundary.md)   | Accepted | Preserve `no_std` / no-allocator constraints for on-chain code paths.                                                         |
+| [ADR 0005](./0005-token-feature-boundaries.md)           | Accepted | Keep SPL token support optional and feature-gated.                                                                            |
+| [ADR 0006](./0006-verification-layers-in-ci.md)          | Accepted | Treat CI as layered verification, not a single all-purpose test lane.                                                         |
+| [ADR 0007](./0007-first-class-versioned-abi.md)          | Proposed | Make migrations a generated, on-demand, versioned ABI compatibility boundary.                                                 |
+| [ADR 0008](./0008-migration-ux-and-legacy-adoption.md)   | Proposed | Reserve a migration instruction, add client migrate-first flow, and support adopting migrations on already-launched programs. |
 
 ## How to use this section
 

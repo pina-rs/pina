@@ -13,6 +13,7 @@ pub mod keys;
 pub mod lint;
 pub mod lint_catalog;
 pub mod lint_driver;
+pub mod migrations;
 pub mod parse;
 mod path_security;
 pub mod profile;
@@ -27,13 +28,14 @@ mod verifiable;
 use std::path::Path;
 
 use codama_nodes::RootNode;
+pub use pina_abi::MigrationVersionType;
 
 pub use crate::codama::CodamaGenerateOptions;
 pub use crate::codama::ProjectGenerateOptions;
 pub use crate::codama::ProjectGenerateOutput;
 pub use crate::codama::generate_codama;
 pub use crate::codama::generate_project_clients;
-use crate::codegen::try_ir_to_root_node;
+use crate::codegen::try_ir_to_root_node_with_migrations;
 pub use crate::cpi::CpiGenerateOptions;
 pub use crate::cpi::generate_cpi_crate;
 pub use crate::cpi::generate_cpi_crate_from_reader;
@@ -54,5 +56,12 @@ pub fn generate_idl(
 	name_override: Option<&str>,
 ) -> Result<RootNode, IdlError> {
 	let ir = parse_program(program_path, name_override)?;
-	try_ir_to_root_node(&ir)
+	let needs_migration_constants = ir.accounts.iter().any(ir::AccountIr::is_migratable)
+		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable);
+	let migrations = needs_migration_constants
+		.then(|| migrations::idl_migration_metadata(program_path))
+		.transpose()
+		.map_err(|error| IdlError::Other(error.to_string()))?
+		.flatten();
+	try_ir_to_root_node_with_migrations(&ir, migrations.as_ref())
 }

@@ -11,7 +11,7 @@ readonly FUZZ_CRATE_DIR="$ROOT_DIR/crates/pina_fuzz"
 readonly FUZZ_DIR="$FUZZ_CRATE_DIR/fuzz"
 readonly SEED_CORPUS_DIR="$FUZZ_DIR/seed_corpus"
 readonly RUNTIME_CORPUS_DIR="$FUZZ_DIR/target/smoke-corpus"
-readonly -a FUZZ_TARGETS=(account_deserialize parse_instruction)
+readonly -a FUZZ_TARGETS=(account_deserialize migration_decode parse_instruction)
 
 if [[ ! "$FUZZ_SECONDS_PER_TARGET" =~ ^[1-9][0-9]*$ ]]; then
 	echo "PINA_FUZZ_SECONDS_PER_TARGET must be a positive integer." >&2

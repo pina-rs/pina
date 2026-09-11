@@ -13,6 +13,7 @@ members = [
 	"codama/clients/cpi/events_program",
 	"codama/clients/cpi/float_accounts_program",
 	"codama/clients/cpi/hello_solana_program",
+	"codama/clients/cpi/migrations_program",
 	"codama/clients/cpi/optional_accounts_program",
 	"codama/clients/cpi/pina_bpf_program",
 	"codama/clients/cpi/profile_program",
@@ -36,6 +37,7 @@ members = [
 	"codama/clients/rust/events_program",
 	"codama/clients/rust/float_accounts_program",
 	"codama/clients/rust/hello_solana_program",
+	"codama/clients/rust/migrations_program",
 	"codama/clients/rust/optional_accounts_program",
 	"codama/clients/rust/pina_bpf_program",
 	"codama/clients/rust/profile_program",
@@ -49,6 +51,7 @@ members = [
 	"codama/clients/rust/validation_program",
 	"codama/clients/rust/vesting_program",
 	"crates/pina",
+	"crates/pina_abi",
 	"crates/pina_cli",
 	"crates/pina_codama_renderer",
 	"crates/pina_cpi_renderer",
@@ -79,6 +82,8 @@ members = [
 	"examples/float_accounts_program/tests/surfpool",
 	"examples/hello_solana_program",
 	"examples/hello_solana_program/tests/surfpool",
+	"examples/migrations_program",
+	"examples/migrations_program/tests/surfpool",
 	"examples/optional_accounts_program",
 	"examples/optional_accounts_program/tests/surfpool",
 	"examples/pina_bpf_program",
@@ -147,6 +152,7 @@ account_realloc_program = { path = "examples/account_realloc_program", version =
 counter_program = { path = "examples/counter_program", version = "0.0.0" }
 insta = { workspace = true }
 macrotest = { workspace = true }
+migrations_program = { path = "examples/migrations_program", version = "0.0.0" }
 mollusk-svm = { workspace = true, default-features = true }
 prettyplease = { workspace = true }
 profile_program = { path = "examples/profile_program", version = "0.0.0" }
@@ -240,6 +246,7 @@ walkdir = { default-features = false, version = "^2" }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.15.0" }
+pina_abi = { default-features = false, path = "crates/pina_abi", version = "0.15.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.15.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.15.0" }
 pina_cpi_renderer = { default-features = false, path = "crates/pina_cpi_renderer", version = "0.15.0" }

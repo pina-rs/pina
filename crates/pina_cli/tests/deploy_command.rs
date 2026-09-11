@@ -19,6 +19,7 @@ struct ProjectFixture {
 	root: PathBuf,
 	program: PathBuf,
 	program_keypair: PathBuf,
+	program_id: String,
 	authority: PathBuf,
 	payer: PathBuf,
 }
@@ -57,6 +58,7 @@ impl ProjectFixture {
 			root,
 			program,
 			program_keypair,
+			program_id,
 			authority,
 			payer,
 		}
@@ -73,6 +75,26 @@ impl ProjectFixture {
 			.arg("--payer")
 			.arg(&self.payer);
 		command
+	}
+
+	fn enable_migrations(&self) {
+		fs::write(
+			self.root.join("pina.toml"),
+			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write migration config: {error}"));
+		fs::write(
+			self.root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+				 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ value: \
+				 u64 }}\n",
+				self.program_id
+			),
+		)
+		.unwrap_or_else(|error| panic!("write migration source: {error}"));
+		pina_cli::migrations::make_migrations(&self.root)
+			.unwrap_or_else(|error| panic!("create migration snapshot: {error}"));
 	}
 }
 
@@ -430,4 +452,134 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 			.unwrap_or_else(|error| panic!("read stdin EOF marker: {error}")),
 		"eof\n"
 	);
+}
+
+#[cfg(unix)]
+fn remote_command(fixture: &ProjectFixture, name: &str, script: &str) -> Command {
+	use std::os::unix::fs::PermissionsExt as _;
+
+	let bin = fixture.root.join(name);
+	let solana = bin.join("solana");
+	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
+	fs::write(&solana, script).unwrap_or_else(|error| panic!("write fake Solana CLI: {error}"));
+	let mut permissions = fs::metadata(&solana)
+		.unwrap_or_else(|error| panic!("stat fake Solana CLI: {error}"))
+		.permissions();
+	permissions.set_mode(0o755);
+	fs::set_permissions(&solana, permissions)
+		.unwrap_or_else(|error| panic!("make fake Solana CLI executable: {error}"));
+	let existing_path = std::env::var_os("PATH").unwrap_or_default();
+	let paths = std::iter::once(bin)
+		.chain(std::env::split_paths(&existing_path))
+		.collect::<Vec<_>>();
+	let joined_path =
+		std::env::join_paths(paths).unwrap_or_else(|error| panic!("construct test PATH: {error}"));
+	let mut command = fixture.command();
+	command
+		.args(["--cluster", "devnet", "--yes"])
+		.env("PATH", joined_path);
+	command
+}
+
+#[cfg(unix)]
+#[test]
+fn remote_deployments_record_and_retain_crash_safe_migration_state() {
+	let successful = ProjectFixture::new();
+	successful.enable_migrations();
+	let output = remote_command(&successful, "success-bin", "#!/bin/sh\nset -eu\nexit 0\n")
+		.output()
+		.unwrap_or_else(|error| panic!("run successful remote deployment: {error}"));
+	assert!(
+		output.status.success(),
+		"remote deployment failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let ledger = pina_abi::decode_publication_ledger(
+		&fs::read(successful.root.join("migrations/publications.json"))
+			.unwrap_or_else(|error| panic!("read successful publication: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("decode successful publication: {error}"));
+	assert!(ledger.pending.is_none());
+	assert_eq!(ledger.receipts.len(), 1);
+
+	let failed = ProjectFixture::new();
+	failed.enable_migrations();
+	let output = remote_command(&failed, "failure-bin", "#!/bin/sh\nset -eu\nexit 73\n")
+		.output()
+		.unwrap_or_else(|error| panic!("run failed remote deployment: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success());
+	assert!(stderr.contains("recoverable pending publication was retained"));
+	let ledger = pina_abi::decode_publication_ledger(
+		&fs::read(failed.root.join("migrations/publications.json"))
+			.unwrap_or_else(|error| panic!("read retained publication: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("decode retained publication: {error}"));
+	assert!(ledger.pending.is_some());
+}
+
+#[cfg(unix)]
+#[test]
+fn remote_deployment_detects_post_plan_artifact_and_history_tampering() {
+	let artifact_swap = ProjectFixture::new();
+	artifact_swap.enable_migrations();
+	let output = remote_command(
+		&artifact_swap,
+		"artifact-swap-bin",
+		"#!/bin/sh\nset -eu\nprintf tampered >> \"$PINA_DEPLOY_MUTATE_PATH\"\n",
+	)
+	.env("PINA_DEPLOY_MUTATE_PATH", &artifact_swap.program)
+	.output()
+	.unwrap_or_else(|error| panic!("run artifact-swap deployment: {error}"));
+	assert!(!output.status.success());
+	assert!(String::from_utf8_lossy(&output.stderr).contains("inputs changed"));
+
+	let history_swap = ProjectFixture::new();
+	history_swap.enable_migrations();
+	let manifest = history_swap.root.join("migrations/manifest.json");
+	let output = remote_command(
+		&history_swap,
+		"history-swap-bin",
+		"#!/bin/sh\nset -eu\nrm \"$PINA_DEPLOY_MUTATE_PATH\"\n",
+	)
+	.env("PINA_DEPLOY_MUTATE_PATH", &manifest)
+	.output()
+	.unwrap_or_else(|error| panic!("run history-swap deployment: {error}"));
+	assert!(!output.status.success());
+	assert!(String::from_utf8_lossy(&output.stderr).contains("inputs changed"));
+}
+
+#[cfg(unix)]
+#[test]
+fn conflicting_pending_publication_stops_before_remote_execution() {
+	use sha2::Digest as _;
+
+	let fixture = ProjectFixture::new();
+	fixture.enable_migrations();
+	let digest: [u8; 32] = sha2::Sha256::digest(b"synthetic SBF").into();
+	let program = fs::canonicalize(&fixture.program)
+		.unwrap_or_else(|error| panic!("canonicalize fixture program: {error}"));
+	pina_cli::migrations::begin_publication(
+		&fixture.root,
+		"testnet",
+		"https://api.testnet.solana.com",
+		&fixture.program_id,
+		&program,
+		digest,
+	)
+	.unwrap_or_else(|error| panic!("reserve conflicting publication: {error}"));
+	let marker = fixture.root.join("unexpected-solana-execution");
+	let output = remote_command(
+		&fixture,
+		"pending-conflict-bin",
+		"#!/bin/sh\nset -eu\nprintf invoked > \"$PINA_DEPLOY_MARKER\"\n",
+	)
+	.env("PINA_DEPLOY_MARKER", &marker)
+	.output()
+	.unwrap_or_else(|error| panic!("run conflicting deployment: {error}"));
+	assert!(!output.status.success());
+	assert!(
+		String::from_utf8_lossy(&output.stderr).contains("Could not reserve migration publication")
+	);
+	assert!(!marker.exists());
 }

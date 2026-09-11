@@ -208,6 +208,28 @@ export function getPinaPodDiscriminatorDecoder<
 	});
 }
 
+/** Rejects account or instruction data from another migration version. */
+export function getPinaPodMigrationVersionDecoder<
+	TDecoded extends Integer,
+	TSize extends number,
+>(
+	expected: Integer,
+	decoder: FixedSizeDecoder<TDecoded, TSize>,
+): FixedSizeDecoder<TDecoded, TSize> {
+	return transformDecoder(decoder, (value) => {
+		if (BigInt(value) !== BigInt(expected)) {
+			const hint =
+				BigInt(value) < BigInt(expected)
+					? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
+					: "the data was written by a newer program; upgrade this client";
+			throw new RangeError(
+				`migration version mismatch: expected ${expected}, received ${value} (${hint})`,
+			);
+		}
+		return value;
+	});
+}
+
 /** Rejects numeric enum representations not declared by the native schema. */
 export function getPinaPodEnumDecoder<TValue extends number, TSize extends number>(
 	decoder: FixedSizeDecoder<TValue, TSize>,
@@ -485,6 +507,34 @@ fn harden_codec_source_with_capacities(
 		}
 	}
 
+	// The encoder pins the framework-owned migration version it writes; the
+	// decoder must reject every other version instead of misreading a stale
+	// or future layout through the current field set. Dart and Rust clients
+	// enforce the same invariant natively.
+	if let Some(version) = migration_version_literal(&hardened).map(str::to_owned) {
+		for bits in [8, 16, 32] {
+			let decoder = format!("getU{bits}Decoder()");
+			let replacement = format!("getPinaPodMigrationVersionDecoder({version}, {decoder})");
+			hardened = hardened.replace(
+				&format!("[\"migrationVersion\", {decoder}]"),
+				&format!("[\"migrationVersion\", {replacement}]"),
+			);
+			hardened = hardened.replace(
+				&format!("['migrationVersion', {decoder}]"),
+				&format!("['migrationVersion', {replacement}]"),
+			);
+		}
+		for bits in [8, 16, 32, 64] {
+			for quote in ['"', '\''] {
+				let bare = format!("migrationVersion{quote}, getU{bits}Decoder()]");
+				assert!(
+					!hardened.contains(&bare),
+					"generated client has an unhardened migrationVersion decoder: `{bare}`"
+				);
+			}
+		}
+	}
+
 	let mut helpers = Vec::new();
 	for (name, marker) in [
 		("fixPinaPodEncoderSize", "fixPinaPodEncoderSize("),
@@ -514,6 +564,10 @@ fn harden_codec_source_with_capacities(
 			"getPinaPodDiscriminatorDecoder(",
 		),
 		("getPinaPodEnumDecoder", "getPinaPodEnumDecoder("),
+		(
+			"getPinaPodMigrationVersionDecoder",
+			"getPinaPodMigrationVersionDecoder(",
+		),
 		("getPinaPodOptionTagDecoder", "getPinaPodOptionTagDecoder("),
 		("getPinaPodStringDecoder", "getPinaPodStringDecoder("),
 		("getPinaPodUtf8Decoder", "getPinaPodUtf8Decoder("),
@@ -1008,6 +1062,25 @@ fn discriminator_constant(source: &str) -> Option<&str> {
 	Some(&rest[..end])
 }
 
+/// The migration version this file's encoder writes, e.g. `2` from
+/// `...value, migrationVersion: 2 })`. Skips non-literal occurrences such as
+/// the `migrationVersion: number` type declaration.
+fn migration_version_literal(source: &str) -> Option<&str> {
+	const MARKER: &str = "migrationVersion: ";
+	let mut search = 0;
+	while let Some(found) = source[search..].find(MARKER) {
+		let rest = &source[search + found + MARKER.len()..];
+		let end = rest
+			.find(|character: char| !character.is_ascii_digit())
+			.unwrap_or(rest.len());
+		if end > 0 {
+			return Some(&rest[..end]);
+		}
+		search += found + MARKER.len();
+	}
+	None
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -1030,6 +1103,34 @@ const decoder = getStructDecoder([["discriminator", getU8Decoder()], ["name", fi
 			"getPinaPodDiscriminatorDecoder(PROFILE_STATE_DISCRIMINATOR, getU8Decoder())"
 		));
 		assert!(hardened.contains("from \"../pinaPodCodecs\""));
+	}
+
+	#[test]
+	fn migration_version_decoders_reject_other_versions() {
+		// Mirrors the shape Codama emits for a migratable contract: a type
+		// declaration (non-literal), an encoder that pins the version, and a
+		// decoder that previously ignored it.
+		let source = r#"/** generated */
+import { getStructDecoder, getU8Decoder } from "@solana/kit";
+export const STATE_DISCRIMINATOR = 1;
+export type State = { discriminator: number; migrationVersion: number; value: bigint };
+const encoder = transformEncoder(
+	getStructEncoder([["discriminator", getU8Encoder()], ["migrationVersion", getU8Encoder()], ["value", getU64Encoder()]]),
+	(value) => ({ ...value, discriminator: 1, migrationVersion: 2 }),
+);
+const decoder = getStructDecoder([["discriminator", getU8Decoder()], ["migrationVersion", getU8Decoder()], ["value", getU64Decoder()]]);
+"#;
+
+		let hardened = harden_codec_source(source);
+		assert!(hardened.contains(
+			"[\"migrationVersion\", getPinaPodMigrationVersionDecoder(2, getU8Decoder())]"
+		));
+		assert!(!hardened.contains("[\"migrationVersion\", getU8Decoder()]"));
+
+		// Without a pinned encoder literal there is no version to enforce.
+		let unversioned =
+			harden_codec_source(&source.replace("migrationVersion: 2", "migrationVersion: value"));
+		assert!(unversioned.contains("[\"migrationVersion\", getU8Decoder()]"));
 	}
 
 	#[test]

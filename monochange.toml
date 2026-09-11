@@ -83,6 +83,10 @@ publish = { enabled = false }
 path = "crates/pina"
 type = "cargo"
 
+[package.pina_abi]
+path = "crates/pina_abi"
+type = "cargo"
+
 [package.pina_cli]
 path = "crates/pina_cli"
 type = "cargo"
@@ -175,6 +179,7 @@ type = "npm"
 [group.core]
 packages = [
 	"pina",
+	"pina_abi",
 	"pina_cli",
 	"pina_lints",
 	"pina_macros",

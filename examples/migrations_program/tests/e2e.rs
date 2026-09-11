@@ -1,0 +1,733 @@
+//! SBF compatibility and rollback tests for first-class migrations.
+//!
+//! Build the program before running these ignored tests:
+//!
+//! ```sh
+//! cargo build-sbf --manifest-path examples/migrations_program/Cargo.toml \
+//!     --sbf-out-dir target/deploy --features bpf-entrypoint
+//! SBF_OUT_DIR=target/deploy \
+//!     cargo test -p migrations_program --test e2e -- --include-ignored
+//! ```
+
+use migrations_program::ID;
+use migrations_program::MigrationAccount;
+use migrations_program::MigrationInstruction;
+use migrations_program::RelayInstruction;
+use migrations_program::State;
+use mollusk_svm::Mollusk;
+use mollusk_svm::program::create_program_account_loader_v3;
+use mollusk_svm::program::keyed_account_for_system_program;
+use mollusk_svm::result::Check;
+use mollusk_svm::result::InstructionResult;
+use pina::MigratableAccount;
+use pina::PinaProgramError;
+use pina::ProgramError;
+use solana_account::Account;
+use solana_instruction::AccountMeta;
+use solana_instruction::Instruction;
+use solana_pubkey::Pubkey;
+
+const HISTORICAL_STATE_SIZE: usize = 42;
+const HISTORICAL_UPDATE_SIZE: usize = 10;
+
+fn program_id() -> Pubkey {
+	let bytes: &[u8] = ID.as_ref();
+	let array: [u8; 32] = bytes
+		.try_into()
+		.unwrap_or_else(|_| panic!("program address must be 32 bytes"));
+	Pubkey::new_from_array(array)
+}
+
+fn create_mollusk() -> Mollusk {
+	let so_name = "migrations_program.so";
+	let search_dirs: Vec<std::path::PathBuf> = [
+		std::env::var("SBF_OUT_DIR").ok(),
+		std::env::var("BPF_OUT_DIR").ok(),
+		Some("tests/fixtures".to_owned()),
+	]
+	.into_iter()
+	.flatten()
+	.map(std::path::PathBuf::from)
+	.collect();
+
+	assert!(
+		search_dirs.iter().any(|dir| dir.join(so_name).is_file()),
+		"migrations_program SBF binary not found; build it before running ignored e2e tests"
+	);
+
+	Mollusk::new(&program_id(), "migrations_program")
+}
+
+fn historical_update_data(value: u64) -> [u8; HISTORICAL_UPDATE_SIZE] {
+	let mut data = [0_u8; HISTORICAL_UPDATE_SIZE];
+	data[0] = MigrationInstruction::Update as u8;
+	data[1] = 0;
+	data[2..].copy_from_slice(&value.to_le_bytes());
+	data
+}
+
+fn relay_data(value: u64) -> Vec<u8> {
+	let mut data = vec![0_u8; RelayInstruction::SIZE];
+	RelayInstruction::initialize(&mut data, |instruction| {
+		instruction.value.set(value);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("relay instruction encoding failed: {error:?}"));
+	data
+}
+
+fn historical_state_data(authority: &Pubkey, value: u64) -> Vec<u8> {
+	let mut data = vec![0_u8; HISTORICAL_STATE_SIZE];
+	data[0] = MigrationAccount::State as u8;
+	data[1] = 0;
+	data[2..34].copy_from_slice(authority.as_ref());
+	data[34..].copy_from_slice(&value.to_le_bytes());
+	data
+}
+
+fn system_account(lamports: u64) -> Account {
+	Account::new(lamports, 0, &solana_sdk_ids::system_program::id())
+}
+
+fn stored_state(data: Vec<u8>, lamports: u64) -> Account {
+	Account {
+		lamports,
+		data,
+		owner: program_id(),
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
+fn account<'a>(result: &'a InstructionResult, address: &Pubkey) -> &'a Account {
+	&result
+		.resulting_accounts
+		.iter()
+		.find(|(candidate, _)| candidate == address)
+		.unwrap_or_else(|| panic!("account {address} missing from result"))
+		.1
+}
+
+fn update_instruction(
+	authority: Pubkey,
+	referrer: Pubkey,
+	state: Pubkey,
+	payer: Pubkey,
+	data: &[u8],
+) -> Instruction {
+	Instruction::new_with_bytes(
+		program_id(),
+		data,
+		vec![
+			AccountMeta::new_readonly(authority, true),
+			AccountMeta::new_readonly(referrer, false),
+			AccountMeta::new(state, false),
+			AccountMeta::new(payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	)
+}
+
+/// Update instruction that also carries the appended optional migratable
+/// accounts expected by the v2 process contract.
+fn update_instruction_with_optional(
+	authority: Pubkey,
+	referrer: Pubkey,
+	state: Pubkey,
+	payer: Pubkey,
+	manual_state: Option<Pubkey>,
+	compact_state: Option<Pubkey>,
+	data: &[u8],
+) -> Instruction {
+	let mut metas = vec![
+		AccountMeta::new_readonly(authority, true),
+		AccountMeta::new_readonly(referrer, false),
+		AccountMeta::new(state, false),
+		AccountMeta::new(payer, true),
+		AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+	];
+	if let Some(manual_state) = manual_state {
+		metas.push(AccountMeta::new(manual_state, false));
+	}
+	if let Some(compact_state) = compact_state {
+		metas.push(AccountMeta::new(compact_state, false));
+	}
+	Instruction::new_with_bytes(program_id(), data, metas)
+}
+
+/// Historical v1 ManualState bytes: fixed layout with a u16 amount.
+fn historical_manual_state_v1(amount: u16) -> Vec<u8> {
+	let mut data = vec![MigrationAccount::ManualState as u8, 1];
+	data.extend_from_slice(&amount.to_le_bytes());
+	data
+}
+
+/// Historical v0 CompactState bytes with a full-capacity name.
+fn historical_compact_state_v0() -> Vec<u8> {
+	vec![
+		MigrationAccount::CompactState as u8,
+		0,
+		4,
+		b'L',
+		b'o',
+		b'g',
+		b'z',
+	]
+}
+
+fn migration_accounts(
+	mollusk: &Mollusk,
+	authority: Pubkey,
+	referrer: Pubkey,
+	state: Pubkey,
+	payer: Pubkey,
+	state_authority: &Pubkey,
+) -> (Vec<(Pubkey, Account)>, Vec<u8>, u64, u64) {
+	let old_data = historical_state_data(state_authority, 7);
+	let old_lamports = mollusk.sysvars.rent.minimum_balance(HISTORICAL_STATE_SIZE);
+	let payer_lamports = 1_000_000_000;
+	let accounts = vec![
+		(authority, system_account(1_000_000)),
+		(referrer, system_account(1)),
+		(state, stored_state(old_data.clone(), old_lamports)),
+		(payer, system_account(payer_lamports)),
+		keyed_account_for_system_program(),
+	];
+
+	(accounts, old_data, old_lamports, payer_lamports)
+}
+
+fn assert_current_state(result: &InstructionResult, state: &Pubkey, value: u64) {
+	let stored = account(result, state);
+	assert_eq!(stored.data.len(), State::SIZE);
+	State::validate_current_migration(&stored.data)
+		.unwrap_or_else(|error| panic!("migrated state validation failed: {error:?}"));
+	let current = State::try_from_bytes(&stored.data)
+		.unwrap_or_else(|error| panic!("migrated state decoding failed: {error:?}"));
+	assert_eq!(current.value.get(), value);
+	assert!(bool::from(current.enabled));
+	assert_eq!(u8::from(current.revision), 1);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn old_client_can_omit_every_appended_optional_account() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&historical_update_data(42),
+		vec![AccountMeta::new_readonly(authority, true)],
+	);
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&[(authority, system_account(1_000_000))],
+		&[Check::success()],
+	);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn historical_payload_migrates_and_resizes_stale_state_before_business_logic() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, _, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 88);
+
+	let required_lamports = mollusk.sysvars.rent.minimum_balance(State::SIZE);
+	let transfer = required_lamports.saturating_sub(old_lamports);
+	assert_eq!(account(&result, &state).lamports, required_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports - transfer);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn authorization_failure_after_migration_rolls_back_bytes_length_and_lamports() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let victim = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, old_data, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &victim);
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidAccountData)],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn malformed_historical_state_cannot_smuggle_a_trailing_byte() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (mut accounts, mut old_data, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	old_data.push(0xff);
+	accounts[2].1.data = old_data.clone();
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidAccountData)],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn self_cpi_migrates_callee_owned_state_and_caller_reloads_after_resize() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (mut accounts, ..) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	accounts.push((
+		program_id(),
+		create_program_account_loader_v3(&program_id()),
+	));
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&relay_data(144),
+		vec![
+			AccountMeta::new_readonly(authority, true),
+			AccountMeta::new_readonly(referrer, false),
+			AccountMeta::new(state, false),
+			AccountMeta::new(payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			AccountMeta::new_readonly(program_id(), false),
+		],
+	);
+
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 144);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn migration_budget_is_checked_before_funding_or_resize() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (mut accounts, old_data, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let underfunded_lamports = old_lamports.saturating_sub(100_000);
+	accounts[2].1.lamports = underfunded_lamports;
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(PinaProgramError::MigrationBudgetExceeded.into())],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, underfunded_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn foreign_owned_historical_bytes_are_not_a_migratable_account() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (mut accounts, old_data, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	accounts[2].1.owner = solana_sdk_ids::system_program::id();
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidAccountOwner)],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn readonly_state_is_rejected_before_the_migration_runtime() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, old_data, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&historical_update_data(88),
+		vec![
+			AccountMeta::new_readonly(authority, true),
+			AccountMeta::new_readonly(referrer, false),
+			AccountMeta::new_readonly(state, false),
+			AccountMeta::new(payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidAccountData)],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn migration_target_and_payer_may_not_alias() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let (mut accounts, old_data, old_lamports, _) =
+		migration_accounts(&mollusk, authority, referrer, state, state, &authority);
+	accounts.remove(3);
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		state,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(PinaProgramError::DuplicateMutableAccount.into())],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn future_account_version_is_rejected_without_trial_decoding() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (mut accounts, _, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let mut future_data = vec![0_u8; State::SIZE];
+	future_data[0] = MigrationAccount::State as u8;
+	future_data[1] = 3;
+	future_data[2..34].copy_from_slice(authority.as_ref());
+	accounts[2].1.data = future_data.clone();
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(PinaProgramError::InvalidMigrationVersion.into())],
+	);
+	assert_eq!(account(&result, &state).data, future_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports);
+}
+
+/// Compute-unit ceiling for the current-version update hot path.
+///
+/// The version check adds one envelope read over a non-migratable instruction;
+/// growth beyond this budget means the hot path started doing historical work.
+const CURRENT_UPDATE_CU_BUDGET: u64 = 1_000;
+
+/// Compute-unit ceiling for the full on-demand migration path: historical
+/// payload normalization, the complete two-step account ladder, rent
+/// inspection, funded growth, resize, rewrite, destination validation, and
+/// the business handler.
+const MIGRATING_UPDATE_CU_BUDGET: u64 = 5_000;
+
+/// Compute-unit ceiling for migration overhead alone.
+const MIGRATION_OVERHEAD_CU_BUDGET: u64 = 4_000;
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn migration_paths_stay_within_compute_budgets() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+
+	let current_data = {
+		let mut data = historical_state_data(&authority, 7);
+		data.push(1);
+		data.push(0);
+		data[1] = 2;
+		data
+	};
+	let mut current_accounts = vec![
+		(authority, system_account(1_000_000)),
+		(referrer, system_account(1)),
+		(
+			state,
+			stored_state(
+				current_data,
+				mollusk.sysvars.rent.minimum_balance(State::SIZE),
+			),
+		),
+		(payer, system_account(1_000_000_000)),
+		keyed_account_for_system_program(),
+	];
+	let _ = &mut current_accounts;
+	let current_instruction_data = {
+		let mut data = [0_u8; 12];
+		data[0] = MigrationInstruction::Update as u8;
+		data[1] = 2;
+		data[2..10].copy_from_slice(&88_u64.to_le_bytes());
+		data
+	};
+	let current_result = mollusk.process_and_validate_instruction(
+		&update_instruction(authority, referrer, state, payer, &current_instruction_data),
+		&current_accounts,
+		&[Check::success()],
+	);
+	let current_cu = current_result.compute_units_consumed;
+
+	let (accounts, ..) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let migrating_result = mollusk.process_and_validate_instruction(
+		&update_instruction(
+			authority,
+			referrer,
+			state,
+			payer,
+			&historical_update_data(88),
+		),
+		&accounts,
+		&[Check::success()],
+	);
+	let migrating_cu = migrating_result.compute_units_consumed;
+
+	assert!(
+		current_cu <= CURRENT_UPDATE_CU_BUDGET,
+		"current update path consumed {current_cu} CU, budget {CURRENT_UPDATE_CU_BUDGET}",
+	);
+	assert!(
+		migrating_cu <= MIGRATING_UPDATE_CU_BUDGET,
+		"migrating update path consumed {migrating_cu} CU, budget {MIGRATING_UPDATE_CU_BUDGET}",
+	);
+	assert!(
+		migrating_cu.saturating_sub(current_cu) <= MIGRATION_OVERHEAD_CU_BUDGET,
+		"migration overhead consumed {} CU over the current hot path, budget \
+		 {MIGRATION_OVERHEAD_CU_BUDGET}",
+		migrating_cu.saturating_sub(current_cu),
+	);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn mixed_version_sets_migrate_every_contract_independently() {
+	use migrations_program::CompactState;
+	use migrations_program::ManualState;
+
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let manual_state = Pubkey::new_unique();
+	let compact_state = Pubkey::new_unique();
+
+	// One instruction carries three migratable accounts at three different
+	// historical versions: State@v0, ManualState@v1 (fixed, converting to
+	// compact), and CompactState@v0 (compact relayout).
+	let (accounts, ..) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let mut accounts = accounts;
+	accounts.extend_from_slice(&[
+		(
+			manual_state,
+			Account {
+				lamports: mollusk.sysvars.rent.minimum_balance(4),
+				data: historical_manual_state_v1(255),
+				owner: program_id(),
+				executable: false,
+				rent_epoch: 0,
+			},
+		),
+		(
+			compact_state,
+			Account {
+				lamports: mollusk.sysvars.rent.minimum_balance(7),
+				data: historical_compact_state_v0(),
+				owner: program_id(),
+				executable: false,
+				rent_epoch: 0,
+			},
+		),
+	]);
+	let instruction = update_instruction_with_optional(
+		authority,
+		referrer,
+		state,
+		payer,
+		Some(manual_state),
+		Some(compact_state),
+		&historical_update_data(88),
+	);
+
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 88);
+
+	// ManualState reached its compact v2 shape with the decimal code.
+	let manual = account(&result, &manual_state);
+	ManualState::validate_current_migration(&manual.data)
+		.unwrap_or_else(|error| panic!("manual state validation failed: {error:?}"));
+	assert_eq!(
+		&manual.data[..6],
+		&[MigrationAccount::ManualState as u8, 2, 3, b'2', b'5', b'5']
+	);
+
+	// CompactState relaid out to its v1 shape without spare bytes.
+	let compact = account(&result, &compact_state);
+	CompactState::validate_current_migration(&compact.data)
+		.unwrap_or_else(|error| panic!("compact state validation failed: {error:?}"));
+	assert_eq!(compact.data.len(), 9);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn mid_chain_funding_failure_rolls_back_every_earlier_step() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, old_data, old_lamports, _) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+
+	// The payer funds exactly the first growth step (42 -> 43 bytes) but not
+	// the second (43 -> 44). The first step mutates lamports, length, and
+	// bytes before the second step's transfer fails, so the instruction must
+	// abort and the transaction rolls every effect back.
+	let first_step_only = mollusk.sysvars.rent.minimum_balance(43)
+		- mollusk.sysvars.rent.minimum_balance(HISTORICAL_STATE_SIZE);
+	let mut accounts = accounts;
+	for (address, stored) in &mut accounts {
+		if *address == payer {
+			stored.lamports = first_step_only;
+		}
+	}
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	// The system program surfaces the failed transfer as custom error 1;
+	// Pina aborts the instruction after the first step's mutation so the
+	// transaction rolls every effect back.
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::Custom(1))],
+	);
+	assert_eq!(account(&result, &state).data, old_data);
+	assert_eq!(account(&result, &state).lamports, old_lamports);
+	assert_eq!(account(&result, &payer).lamports, first_step_only);
+}
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn full_ladder_reaches_current_in_one_instruction() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+	let (accounts, _, old_lamports, payer_lamports) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let instruction = update_instruction(
+		authority,
+		referrer,
+		state,
+		payer,
+		&historical_update_data(88),
+	);
+
+	// A v0 account walks v0 -> v1 -> v2 inside one invocation.
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	assert_current_state(&result, &state, 88);
+
+	let required_lamports = mollusk.sysvars.rent.minimum_balance(State::SIZE);
+	let transfer = required_lamports - old_lamports;
+	assert_eq!(account(&result, &state).lamports, required_lamports);
+	assert_eq!(account(&result, &payer).lamports, payer_lamports - transfer);
+}

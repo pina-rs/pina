@@ -28,6 +28,9 @@ pub(crate) struct AccountArgs {
 	/// Use `PinaPod`'s compact, variable-length layout when the feature is enabled.
 	#[darling(default)]
 	pub(crate) compact: Flag,
+	/// Opt this account into generated ABI history and on-demand migration.
+	#[darling(default)]
+	pub(crate) migrations: Flag,
 	/// Validate the generated account view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }
@@ -42,6 +45,9 @@ pub(crate) struct InstructionArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
+	/// Opt this instruction payload into generated ABI history.
+	#[darling(default)]
+	pub(crate) migrations: Flag,
 	/// Validate the generated instruction view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }
@@ -56,6 +62,9 @@ pub(crate) struct EventArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
+	/// Opt this event into generated historical decoding.
+	#[darling(default)]
+	pub(crate) migrations: Flag,
 	/// Validate the generated event view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }

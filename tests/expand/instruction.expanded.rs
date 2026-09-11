@@ -202,9 +202,9 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<InitializeZc>() == 1",
         )
     }
-    if !(::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES) {
+    if !(::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES + 0usize) {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES",
+            "assertion failed: ::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES + 0usize",
         )
     }
 };
@@ -220,27 +220,31 @@ impl Initialize {
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaPodFixed>::initialize(
+        let value = <Self as pina::PinaPodFixed>::initialize(
                 data,
                 |value| {
                     <Self as pina::HasDiscriminator>::write_discriminator(
@@ -249,12 +253,25 @@ impl Initialize {
                     initialize(value)
                 },
             )
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for Initialize {
     type Type = InstructionDisc;
     const VALUE: Self::Type = InstructionDisc::Initialize;
+}
+impl pina::PinaValidate for InitializeZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FlipBit {
@@ -495,13 +512,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<FlipBitZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == InstructionDisc::BYTES + 0usize
+            + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<FlipBitZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<::core::primitive::u8>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<FlipBitZc>() ==\n    InstructionDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<::core::primitive::u8>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -517,27 +535,31 @@ impl FlipBit {
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaPodFixed>::initialize(
+        let value = <Self as pina::PinaPodFixed>::initialize(
                 data,
                 |value| {
                     <Self as pina::HasDiscriminator>::write_discriminator(
@@ -546,12 +568,25 @@ impl FlipBit {
                     initialize(value)
                 },
             )
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for FlipBit {
     type Type = InstructionDisc;
     const VALUE: Self::Type = InstructionDisc::FlipBit;
+}
+impl pina::PinaValidate for FlipBitZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct Transfer {
@@ -675,10 +710,10 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<TransferZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>())
+        == InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<TransferZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>()",
+            "assertion failed: ::core::mem::size_of::<TransferZc>() ==\n    InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>()",
         )
     }
 };
@@ -694,27 +729,31 @@ impl Transfer {
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaPodFixed>::initialize(
+        let value = <Self as pina::PinaPodFixed>::initialize(
                 data,
                 |value| {
                     <Self as pina::HasDiscriminator>::write_discriminator(
@@ -723,12 +762,25 @@ impl Transfer {
                     initialize(value)
                 },
             )
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for Transfer {
     type Type = InstructionDisc;
     const VALUE: Self::Type = InstructionDisc::Transfer;
+}
+impl pina::PinaValidate for TransferZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CustomTransferData {
@@ -891,11 +943,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<CustomTransferDataZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>()
+        == InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<[::core::primitive::u8; 32]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<CustomTransferDataZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
+            "assertion failed: ::core::mem::size_of::<CustomTransferDataZc>() ==\n    InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
         )
     }
 };
@@ -911,27 +963,31 @@ impl CustomTransferData {
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaPodFixed>::initialize(
+        let value = <Self as pina::PinaPodFixed>::initialize(
                 data,
                 |value| {
                     <Self as pina::HasDiscriminator>::write_discriminator(
@@ -940,12 +996,25 @@ impl CustomTransferData {
                     initialize(value)
                 },
             )
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for CustomTransferData {
     type Type = InstructionDisc;
     const VALUE: Self::Type = InstructionDisc::TransferData;
+}
+impl pina::PinaValidate for CustomTransferDataZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ComplexInstruction {
@@ -1186,13 +1255,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<ComplexInstructionZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == InstructionDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<[::core::primitive::u8; 4]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<ComplexInstructionZc>() ==\n    InstructionDisc::BYTES +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
+            "assertion failed: ::core::mem::size_of::<ComplexInstructionZc>() ==\n    InstructionDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
         )
     }
 };
@@ -1208,27 +1278,31 @@ impl ComplexInstruction {
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaPodFixed>::initialize(
+        let value = <Self as pina::PinaPodFixed>::initialize(
                 data,
                 |value| {
                     <Self as pina::HasDiscriminator>::write_discriminator(
@@ -1237,10 +1311,23 @@ impl ComplexInstruction {
                     initialize(value)
                 },
             )
-            .map_err(|_| pina::ProgramError::InvalidInstructionData)
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for ComplexInstruction {
     type Type = InstructionDisc;
     const VALUE: Self::Type = InstructionDisc::ComplexInstruction;
+}
+impl pina::PinaValidate for ComplexInstructionZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
 }

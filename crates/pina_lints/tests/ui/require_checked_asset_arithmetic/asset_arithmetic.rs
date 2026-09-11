@@ -117,6 +117,12 @@ fn process_non_asset_remainder_assignment(raw_value: &mut u64, offset: u64) {
 	*raw_value %= offset;
 }
 
+fn process_assignment_shapes(mut raw_value: u64, other: u64) -> bool {
+	raw_value = raw_value + 1;
+	raw_value += 1;
+	raw_value == other
+}
+
 fn main() {}
 
 // compile-fail

@@ -15,6 +15,7 @@ use crate::cli::CodamaCommands;
 use crate::cli::Commands;
 use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
+use crate::cli::MigrationCommands;
 use crate::cli::ProfileCommands;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
@@ -38,6 +39,7 @@ pub(crate) fn run(cli: Cli) {
 			);
 		}
 		Commands::Lint { project, fix } => run_lint(project, fix),
+		Commands::Migrations { command } => run_migrations(command),
 		Commands::Generate {
 			project,
 			clients,
@@ -70,8 +72,9 @@ pub(crate) fn run(cli: Cli) {
 		Commands::Test {
 			project,
 			unit,
+			compatibility,
 			filter,
-		} => run_test(project, unit, filter),
+		} => run_test(project, unit, compatibility, filter),
 		Commands::Dev {
 			project,
 			network,
@@ -124,6 +127,8 @@ pub(crate) fn run(cli: Cli) {
 			json,
 			yes,
 			allow_mainnet,
+			record_publication,
+			remote_command,
 		} => {
 			run_deploy(
 				project,
@@ -137,6 +142,8 @@ pub(crate) fn run(cli: Cli) {
 				json,
 				yes,
 				allow_mainnet,
+				record_publication,
+				remote_command,
 			);
 		}
 		Commands::Codama { command } => {
@@ -163,6 +170,133 @@ pub(crate) fn run(cli: Cli) {
 					});
 				}
 			}
+		}
+	}
+}
+
+fn run_migrations(command: MigrationCommands) {
+	match command {
+		MigrationCommands::Make {
+			project,
+			renames,
+			assume_removed,
+			no_interactive,
+			json,
+		} => {
+			let answers = match pina_cli::migrations::MigrationAnswers::from_flags(
+				&renames,
+				&assume_removed,
+				no_interactive,
+			) {
+				Ok(answers) => answers,
+				Err(reason) => {
+					eprintln!("{} {reason}", "Error".red().bold());
+					std::process::exit(1);
+				}
+			};
+			let output =
+				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+					Ok(output) => output,
+					Err(
+						error @ pina_cli::migrations::MigrationError::DisambiguationRequired {
+							..
+						},
+					) => {
+						if json
+							&& let pina_cli::migrations::MigrationError::DisambiguationRequired {
+								questions,
+							} = &error
+						{
+							print_json(&questions);
+						}
+						eprintln!("{} {error}", "Error".red().bold());
+						std::process::exit(1);
+					}
+					Err(error) => {
+						eprintln!("{} {error}", "Error".red().bold());
+						std::process::exit(1);
+					}
+				};
+			if json {
+				print_json(&output);
+				return;
+			}
+			println!("{} Updated {}", "✔".green(), escaped_path(&output.manifest));
+			for contract in output.created_contracts {
+				println!("Created {contract}@0");
+			}
+			for contract in output.advanced_versions {
+				println!("Advanced {contract}");
+			}
+			for contract in output.updated_drafts {
+				println!("Updated draft {contract}");
+			}
+			for path in output.manual_transitions {
+				println!("Manual migration required: {}", escaped_path(&path));
+			}
+			for warning in output.data_warnings {
+				println!("{} {warning}", "⚠".yellow().bold());
+			}
+		}
+		MigrationCommands::Check { project, json }
+		| MigrationCommands::Status { project, json } => {
+			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
+			if json {
+				print_json(&statuses);
+				return;
+			}
+			if statuses.is_empty() {
+				println!("No migration-aware contracts.");
+				return;
+			}
+			for status in statuses {
+				let publication = if status.publication_pending {
+					"publication pending"
+				} else if status.published {
+					"published"
+				} else {
+					"draft"
+				};
+				println!(
+					"{} {} v{} ({publication})",
+					status.kind, status.rust_name, status.current_version
+				);
+			}
+			println!("{} Migration history is consistent", "✔".green());
+		}
+		MigrationCommands::Reconcile {
+			project,
+			abandon,
+			json,
+		} => {
+			let output = unwrap_or_exit(pina_cli::migrations::reconcile_publication(
+				&project, abandon,
+			));
+			if json {
+				print_json(&output);
+				return;
+			}
+			if output.no_pending {
+				println!("No pending deployment.");
+				return;
+			}
+			if output.abandoned {
+				println!(
+					"{} Pending deployment recorded as abandoned. Its versions stay frozen.",
+					"✔".green()
+				);
+				return;
+			}
+			let cluster = output.cluster.as_deref().unwrap_or("unknown");
+			let rpc_url = output.rpc_url.as_deref().unwrap_or("unknown");
+			let program_id = output.program_id.as_deref().unwrap_or("unknown");
+			let digest = output.executable_sha256.as_deref().unwrap_or("unknown");
+			println!("Pending deployment for {program_id} on {cluster} ({rpc_url})");
+			println!("Planned executable digest: {digest}");
+			println!(
+				"Rerun the exact same {cluster} deployment to reconcile it, or pass --abandon \
+				 once you are certain it never went live."
+			);
 		}
 	}
 }
@@ -667,10 +801,11 @@ fn run_cpi(
 	);
 }
 
-fn run_test(project: PathBuf, unit: bool, filter: Option<String>) {
+fn run_test(project: PathBuf, unit: bool, compatibility: bool, filter: Option<String>) {
 	let options = pina_cli::workflow::TestOptions {
 		project,
 		unit,
+		compatibility,
 		filter,
 	};
 
@@ -718,10 +853,13 @@ fn run_deploy(
 	json: bool,
 	yes: bool,
 	allow_mainnet: bool,
+	record_publication: bool,
+	remote_command: Option<String>,
 ) {
 	let target = pina_cli::deploy::DeploymentTarget::from_cluster_arg(cluster);
 	let request = pina_cli::deploy::DeploymentRequest {
 		project,
+		remote_command,
 		program,
 		program_keypair,
 		upgrade_authority,
@@ -758,17 +896,80 @@ fn run_deploy(
 	if dry_run {
 		return;
 	}
-
 	let mut confirmer = StdinDeploymentConfirmer;
+	let approved =
+		match pina_cli::deploy::approve_deployment(&plan, yes, allow_mainnet, &mut confirmer) {
+			Ok(approved) => approved,
+			Err(error) => {
+				eprintln!("{} {}", "Error".red().bold(), error);
+				std::process::exit(1);
+			}
+		};
+	unwrap_or_exit(plan.verify_inputs_unchanged());
 
-	if let Err(error) =
-		pina_cli::deploy::execute_deployment(&plan, yes, allow_mainnet, &mut runner, &mut confirmer)
-	{
+	let pending_publication = if plan.is_local() && !record_publication {
+		None
+	} else {
+		match pina_cli::migrations::begin_publication(
+			Path::new(plan.project_root()),
+			plan.cluster(),
+			plan.rpc_url(),
+			plan.program_id(),
+			Path::new(plan.program()),
+			plan.program_digest(),
+		) {
+			Ok(pending) => pending,
+			Err(error) => {
+				eprintln!(
+					"{} Could not reserve migration publication: {}",
+					"Error".red().bold(),
+					error
+				);
+				std::process::exit(1);
+			}
+		}
+	};
+
+	if let Err(error) = approved.execute(&mut runner) {
+		if pending_publication.is_some() {
+			eprintln!(
+				"{} The recoverable pending publication was retained; rerun this exact deployment \
+				 to reconcile whether it became live.",
+				"Warning".yellow().bold()
+			);
+		}
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(1);
 	}
 
+	if pending_publication.is_some() {
+		if let Err(error) = plan.verify_inputs_unchanged() {
+			eprintln!(
+				"{} Deployment succeeded, but its inputs changed before migration publication \
+				 could be recorded: {}",
+				"Error".red().bold(),
+				error
+			);
+			std::process::exit(1);
+		}
+		unwrap_or_exit(
+			pina_cli::migrations::record_publication(
+				Path::new(plan.project_root()),
+				plan.cluster(),
+				plan.rpc_url(),
+				plan.program_id(),
+				Path::new(plan.program()),
+				plan.program_digest(),
+			)
+			.map_err(publication_record_error),
+		);
+	}
+
 	println!("{} Deployment complete", "✔".green());
+}
+
+fn publication_record_error(error: impl std::fmt::Display) -> String {
+	format!("Deployment succeeded, but migration publication could not be recorded: {error}")
 }
 
 struct StdinDeploymentConfirmer;
@@ -1209,6 +1410,7 @@ mod tests {
 	use super::escaped_path;
 	use super::escaped_text;
 	use super::prepare_and_confirm_record;
+	use super::publication_record_error;
 
 	#[test]
 	fn escapes_control_characters_in_confirmation_paths() {
@@ -1225,6 +1427,11 @@ mod tests {
 		assert_eq!(
 			display_features(&["logs".to_owned(), "trace".to_owned()]),
 			"logs,trace"
+		);
+		assert_eq!(
+			publication_record_error("ledger became unreadable"),
+			"Deployment succeeded, but migration publication could not be recorded: ledger became \
+			 unreadable"
 		);
 	}
 

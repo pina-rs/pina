@@ -138,6 +138,25 @@ fn process_instruction_variant(mode: Mode) -> Result<(), ()> {
 	}
 }
 
+unsafe fn process_instruction(_data: &[u8]) -> Result<(), ()> {
+	//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+	process_a()
+}
+
+macro_rules! generated_entrypoint {
+	() => {
+		fn entrypoint_generated(data: &[u8]) -> Result<(), ()> {
+			if data.is_empty() {
+				process_a()
+			} else {
+				process_b()
+			}
+		}
+	};
+}
+
+generated_entrypoint!();
+
 fn main() {}
 
 // check-warn

@@ -5,6 +5,11 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// Return whether any existing path component is link-like.
+///
+/// A path that traverses a non-directory component can never resolve, and the
+/// failure surfaces as different io error kinds per platform (`NotADirectory`
+/// on unix, `NotFound` on Windows), so that case is reported as an error in
+/// both.
 pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Error> {
 	let absolute = if path.is_absolute() {
 		path.to_path_buf()
@@ -12,6 +17,7 @@ pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Erro
 		std::env::current_dir()?.join(path)
 	};
 	let mut current = PathBuf::new();
+	let mut parent_is_directory = true;
 
 	for component in absolute.components() {
 		current.push(component);
@@ -25,9 +31,22 @@ pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Erro
 
 		match fs::symlink_metadata(&current) {
 			Ok(metadata) if is_link_like(&metadata) => return Ok(true),
-			Ok(_) => {}
-			Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-			Err(error) => return Err(error),
+			Ok(metadata) => parent_is_directory = metadata.is_dir(),
+			// Plain misses below an existing directory are not link-like.
+			// Everything else through this lookup is either a real error or a
+			// traversal into a non-directory (`ENOTDIR` on unix, `NotFound` on
+			// Windows); both normalize to one synthetic error so the reported
+			// kind is identical on every platform.
+			Err(error) => {
+				let not_found = error.kind() == std::io::ErrorKind::NotFound;
+				if not_found && parent_is_directory {
+					return Ok(false);
+				}
+				if !not_found && error.kind() != std::io::ErrorKind::NotADirectory {
+					return Err(error);
+				}
+				return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
+			}
 		}
 	}
 
@@ -85,6 +104,19 @@ mod tests {
 		let invalid = PathBuf::from("x".repeat(32 * 1024));
 
 		assert!(has_link_like_component(&invalid).is_err());
+	}
+
+	#[test]
+	fn traversal_through_a_file_is_an_error_on_every_platform() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let root = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let blocked = root.join("blocked");
+		fs::write(&blocked, b"not a directory")
+			.unwrap_or_else(|error| panic!("write failed: {error}"));
+
+		assert!(has_link_like_component(&blocked.join("migrations")).is_err());
+		assert!(has_link_like_component(&blocked.join("migrations/.lock")).is_err());
 	}
 
 	#[cfg(unix)]

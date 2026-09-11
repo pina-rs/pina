@@ -286,11 +286,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<ConfigStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<ConfigStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<ConfigStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -306,27 +306,32 @@ impl ConfigState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for ConfigState {
@@ -391,7 +396,16 @@ impl pina::AccountValidation for ConfigStateZc {
         }
     }
 }
+impl pina::PinaValidate for ConfigStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for ConfigState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <ConfigStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -573,11 +587,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<GameStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<GameStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<GameStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -593,27 +607,32 @@ impl GameState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for GameState {
@@ -678,7 +697,16 @@ impl pina::AccountValidation for GameStateZc {
         }
     }
 }
+impl pina::PinaValidate for GameStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for GameState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <GameStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -883,12 +911,13 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<DataAccountZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<[::core::primitive::u8; 64]>()
             + ::core::mem::size_of::<[::core::primitive::u8; 4]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<DataAccountZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n            + ::core::mem::size_of::<[::core::primitive::u8; 64]>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
+            "assertion failed: ::core::mem::size_of::<DataAccountZc>() ==\n    AccountDisc::BYTES + 0usize +\n                ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n            ::core::mem::size_of::<[::core::primitive::u8; 64]>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
         )
     }
 };
@@ -904,27 +933,32 @@ impl DataAccount {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for DataAccount {
@@ -989,7 +1023,16 @@ impl pina::AccountValidation for DataAccountZc {
         }
     }
 }
+impl pina::PinaValidate for DataAccountZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for DataAccount {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <DataAccountZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -1233,13 +1276,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<BalanceAccountZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<pina::PodBool>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<BalanceAccountZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n                + ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<pina::PodBool>()",
+            "assertion failed: ::core::mem::size_of::<BalanceAccountZc>() ==\n    AccountDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<pina::PodBool>()",
         )
     }
 };
@@ -1255,27 +1299,32 @@ impl BalanceAccount {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for BalanceAccount {
@@ -1340,7 +1389,16 @@ impl pina::AccountValidation for BalanceAccountZc {
         }
     }
 }
+impl pina::PinaValidate for BalanceAccountZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for BalanceAccount {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <BalanceAccountZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -1467,10 +1525,10 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<MyStructZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>())
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<MyStructZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<MyStructZc>() ==\n    AccountDisc::BYTES + 0usize +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -1486,27 +1544,32 @@ impl MyStruct {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for MyStruct {
@@ -1571,7 +1634,16 @@ impl pina::AccountValidation for MyStructZc {
         }
     }
 }
+impl pina::PinaValidate for MyStructZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for MyStruct {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <MyStructZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -1971,7 +2043,8 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<LargeStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
@@ -1981,7 +2054,7 @@ const _: () = {
             + ::core::mem::size_of::<[::core::primitive::u8; 32]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<LargeStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n                                + ::core::mem::size_of::<::core::primitive::u8>() +\n                            ::core::mem::size_of::<::core::primitive::u8>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<[::core::primitive::u8; 3]>() +\n            ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
+            "assertion failed: ::core::mem::size_of::<LargeStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n                                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                                ::core::mem::size_of::<::core::primitive::u8>() +\n                            ::core::mem::size_of::<::core::primitive::u8>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<[::core::primitive::u8; 3]>() +\n            ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
         )
     }
 };
@@ -1997,27 +2070,32 @@ impl LargeState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for LargeState {
@@ -2082,7 +2160,16 @@ impl pina::AccountValidation for LargeStateZc {
         }
     }
 }
+impl pina::PinaValidate for LargeStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for LargeState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <LargeStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }

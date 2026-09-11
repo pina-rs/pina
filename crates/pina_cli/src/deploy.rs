@@ -117,6 +117,8 @@ pub struct DeploymentRequest {
 	pub payer: PathBuf,
 	/// Explicit cluster or RPC target.
 	pub target: DeploymentTarget,
+	/// Operator-supplied command that replaces `solana program deploy`.
+	pub remote_command: Option<String>,
 }
 
 /// A command that will be executed as part of a deployment.
@@ -126,6 +128,8 @@ pub struct CommandPlan {
 	pub program: String,
 	/// Arguments passed directly to the executable without a shell.
 	pub args: Vec<String>,
+	/// Extra environment variables the executable receives.
+	pub env: Vec<(String, String)>,
 }
 
 /// Complete, immutable deployment plan.
@@ -140,6 +144,7 @@ pub struct DeploymentPlan {
 	payer: String,
 	program_id: String,
 	target: ResolvedTarget,
+	remote_command: Option<String>,
 	input_fingerprint: InputFingerprint,
 }
 
@@ -210,6 +215,12 @@ impl DeploymentPlan {
 		&self.program
 	}
 
+	/// SHA-256 captured for the exact program artifact in this plan.
+	#[must_use]
+	pub const fn program_digest(&self) -> [u8; 32] {
+		self.input_fingerprint.program
+	}
+
 	/// Keypair defining the program address.
 	#[must_use]
 	pub fn program_keypair(&self) -> &str {
@@ -261,13 +272,37 @@ impl DeploymentPlan {
 	/// Exact modeled command derived from the validated plan state.
 	#[must_use]
 	pub fn commands(&self) -> Vec<CommandPlan> {
-		vec![deploy_command(
-			self.program(),
-			self.program_keypair(),
-			self.upgrade_authority(),
-			self.payer(),
-			self.rpc_url(),
-		)]
+		vec![match &self.remote_command {
+			Some(command) => {
+				let facts = DeploymentFacts {
+					program: self.program(),
+					program_id: self.program_id(),
+					program_keypair: self.program_keypair(),
+					upgrade_authority: self.upgrade_authority(),
+					payer: self.payer(),
+					rpc_url: self.rpc_url(),
+					cluster: &self.target.cluster,
+				};
+				override_command(&facts, command)
+			}
+			None => {
+				deploy_command(
+					self.program(),
+					self.program_keypair(),
+					self.upgrade_authority(),
+					self.payer(),
+					self.rpc_url(),
+				)
+			}
+		}]
+	}
+
+	/// Recheck every planned deployment input against its captured digest.
+	///
+	/// Call this after a successful deployment before recording publication so
+	/// a concurrently replaced artifact cannot be bound to the receipt.
+	pub fn verify_inputs_unchanged(&self) -> Result<(), DeployError> {
+		self.revalidate()
 	}
 
 	fn serializable(&self) -> SerializableDeploymentPlan<'_> {
@@ -402,11 +437,12 @@ pub struct CommandStatus {
 
 /// Boundary used to execute planned commands without a shell.
 pub trait CommandRunner {
-	/// Run one executable with its exact argument vector.
+	/// Run one executable with its exact argument vector and environment.
 	fn run(
 		&mut self,
 		program: &OsStr,
 		args: &[OsString],
+		env: &[(String, String)],
 		current_dir: &Path,
 	) -> io::Result<CommandStatus>;
 }
@@ -444,10 +480,12 @@ impl CommandRunner for SystemCommandRunner {
 		&mut self,
 		program: &OsStr,
 		args: &[OsString],
+		env: &[(String, String)],
 		current_dir: &Path,
 	) -> io::Result<CommandStatus> {
 		let status = Command::new(program)
 			.args(args)
+			.envs(env.iter().map(|(key, value)| (key, value)))
 			.current_dir(current_dir)
 			.stdin(Stdio::null())
 			.status()?;
@@ -607,6 +645,7 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 	};
 
 	Ok(DeploymentPlan {
+		remote_command: request.remote_command.clone(),
 		project_root,
 		program_dir,
 		library_name: project.library_name,
@@ -659,17 +698,89 @@ fn deploy_command(
 			"--url".to_owned(),
 			rpc_url.to_owned(),
 		],
+		env: Vec::new(),
 	}
 }
 
-/// Execute an already-reviewed deployment plan.
-pub fn execute_deployment(
-	plan: &DeploymentPlan,
+/// Build the operator-supplied deployment command with exported facts.
+///
+/// The override runs through the platform shell so simple commands like
+/// `make deploy-remote` or `node scripts/deploy.mjs` work without a wrapper.
+/// Deployment facts exported to an operator-supplied remote command.
+struct DeploymentFacts<'a> {
+	program: &'a str,
+	program_id: &'a str,
+	program_keypair: &'a str,
+	upgrade_authority: &'a str,
+	payer: &'a str,
+	rpc_url: &'a str,
+	cluster: &'a str,
+}
+
+fn override_command(facts: &DeploymentFacts<'_>, command: &str) -> CommandPlan {
+	let DeploymentFacts {
+		program,
+		program_id,
+		program_keypair,
+		upgrade_authority,
+		payer,
+		rpc_url,
+		cluster,
+	} = *facts;
+	#[cfg(unix)]
+	let (shell, flag) = ("sh", "-c");
+	#[cfg(not(unix))]
+	let (shell, flag) = ("cmd", "/C");
+	CommandPlan {
+		program: shell.to_owned(),
+		args: vec![flag.to_owned(), command.to_owned()],
+		env: vec![
+			("PINA_DEPLOY_PROGRAM".to_owned(), program.to_owned()),
+			("PINA_DEPLOY_PROGRAM_ID".to_owned(), program_id.to_owned()),
+			(
+				"PINA_DEPLOY_PROGRAM_KEYPAIR".to_owned(),
+				program_keypair.to_owned(),
+			),
+			(
+				"PINA_DEPLOY_UPGRADE_AUTHORITY".to_owned(),
+				upgrade_authority.to_owned(),
+			),
+			("PINA_DEPLOY_PAYER".to_owned(), payer.to_owned()),
+			("PINA_DEPLOY_RPC_URL".to_owned(), rpc_url.to_owned()),
+			("PINA_DEPLOY_CLUSTER".to_owned(), cluster.to_owned()),
+		],
+	}
+}
+
+/// A deployment that passed target policy and operator confirmation.
+///
+/// Only [`approve_deployment`] can construct this token. Callers may therefore
+/// persist any required pre-execution state before handing it to [`Self::execute`].
+#[must_use = "an approved deployment has not executed yet"]
+pub struct ApprovedDeployment<'plan> {
+	plan: &'plan DeploymentPlan,
+}
+
+impl ApprovedDeployment<'_> {
+	/// Revalidate every planned input and execute the remote command.
+	pub fn execute(self, runner: &mut impl CommandRunner) -> Result<(), DeployError> {
+		self.plan.revalidate()?;
+		let command = self
+			.plan
+			.commands()
+			.pop()
+			.expect("a deployment plan always carries exactly one command");
+		run_command(&command, Path::new(self.plan.project_root()), runner)
+	}
+}
+
+/// Enforce target policy and obtain any required operator confirmation.
+pub fn approve_deployment<'plan>(
+	plan: &'plan DeploymentPlan,
 	yes: bool,
 	allow_mainnet: bool,
-	runner: &mut impl CommandRunner,
 	confirmer: &mut impl DeploymentConfirmer,
-) -> Result<(), DeployError> {
+) -> Result<ApprovedDeployment<'plan>, DeployError> {
 	if allow_mainnet && !plan.requires_mainnet_acknowledgement() {
 		return Err(DeployError::UnexpectedMainnetAcknowledgement);
 	}
@@ -694,15 +805,18 @@ pub fn execute_deployment(
 		}
 	}
 
-	plan.revalidate()?;
-	let command = deploy_command(
-		plan.program(),
-		plan.program_keypair(),
-		plan.upgrade_authority(),
-		plan.payer(),
-		plan.rpc_url(),
-	);
-	run_command(&command, Path::new(plan.project_root()), runner)
+	Ok(ApprovedDeployment { plan })
+}
+
+/// Approve and execute an already-reviewed deployment plan.
+pub fn execute_deployment(
+	plan: &DeploymentPlan,
+	yes: bool,
+	allow_mainnet: bool,
+	runner: &mut impl CommandRunner,
+	confirmer: &mut impl DeploymentConfirmer,
+) -> Result<(), DeployError> {
+	approve_deployment(plan, yes, allow_mainnet, confirmer)?.execute(runner)
 }
 
 fn run_command(
@@ -712,7 +826,12 @@ fn run_command(
 ) -> Result<(), DeployError> {
 	let args = command.args.iter().map(OsString::from).collect::<Vec<_>>();
 	let status = runner
-		.run(OsStr::new(&command.program), &args, current_dir)
+		.run(
+			OsStr::new(&command.program),
+			&args,
+			&command.env,
+			current_dir,
+		)
 		.map_err(|source| {
 			DeployError::CommandStart {
 				program: command.program.clone(),
@@ -1120,6 +1239,7 @@ mod tests {
 
 		fn request(&self, target: DeploymentTarget) -> DeploymentRequest {
 			DeploymentRequest {
+				remote_command: None,
 				project: self.root.clone(),
 				program: None,
 				program_keypair: None,
@@ -1172,6 +1292,7 @@ mod tests {
 			&mut self,
 			program: &OsStr,
 			args: &[OsString],
+			_env: &[(String, String)],
 			current_dir: &Path,
 		) -> io::Result<CommandStatus> {
 			self.calls.push((
@@ -1266,6 +1387,7 @@ mod tests {
 					"--url".to_owned(),
 					DEVNET_URL.to_owned(),
 				],
+				env: Vec::new(),
 			}
 		);
 	}
@@ -1813,8 +1935,13 @@ mod tests {
 			prompts: Vec::new(),
 		};
 
-		execute_deployment(&plan, false, false, &mut runner, &mut confirmer)
-			.unwrap_or_else(|error| panic!("execute deployment: {error}"));
+		let approved = approve_deployment(&plan, false, false, &mut confirmer)
+			.unwrap_or_else(|error| panic!("approve deployment: {error}"));
+		assert!(runner.calls.is_empty());
+		assert_eq!(confirmer.prompts.len(), 1);
+		approved
+			.execute(&mut runner)
+			.unwrap_or_else(|error| panic!("execute approved deployment: {error}"));
 		assert_eq!(runner.calls.len(), 1);
 	}
 
@@ -1967,6 +2094,56 @@ mod tests {
 		}
 		assert!(format!("{:?}", DeploymentTarget::Cluster(Cluster::Localnet)).contains("Localnet"));
 		assert!(format!("{plan:?}").contains("DeploymentPlan"));
+	}
+
+	#[test]
+	fn remote_command_plan_exports_facts_and_executes_through_the_runner() {
+		let fixture = Fixture::new();
+		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+		request.remote_command = Some("deploy-wrapper --verbose".to_owned());
+		let plan = prepare_deployment(&request)
+			.unwrap_or_else(|error| panic!("prepare remote deployment: {error}"));
+
+		let commands = plan.commands();
+		assert_eq!(commands.len(), 1);
+		#[cfg(unix)]
+		let (shell, flag) = ("sh", "-c");
+		#[cfg(not(unix))]
+		let (shell, flag) = ("cmd", "/C");
+		assert_eq!(commands[0].program, shell);
+		assert_eq!(
+			commands[0].args,
+			vec![flag.to_owned(), "deploy-wrapper --verbose".to_owned()]
+		);
+		let env = commands[0]
+			.env
+			.iter()
+			.cloned()
+			.collect::<std::collections::BTreeMap<_, _>>();
+		assert_eq!(env["PINA_DEPLOY_PROGRAM"], plan.program());
+		assert_eq!(env["PINA_DEPLOY_PROGRAM_ID"], plan.program_id());
+		assert_eq!(env["PINA_DEPLOY_PROGRAM_KEYPAIR"], plan.program_keypair());
+		assert_eq!(
+			env["PINA_DEPLOY_UPGRADE_AUTHORITY"],
+			plan.upgrade_authority()
+		);
+		assert_eq!(env["PINA_DEPLOY_PAYER"], plan.payer());
+		assert_eq!(env["PINA_DEPLOY_RPC_URL"], plan.rpc_url());
+		assert_eq!(env["PINA_DEPLOY_CLUSTER"], plan.cluster());
+
+		let approved = approve_deployment(&plan, true, false, &mut rejecting_confirmer())
+			.unwrap_or_else(|error| panic!("approve remote deployment: {error}"));
+		let mut runner = FakeRunner::default();
+		approved
+			.execute(&mut runner)
+			.unwrap_or_else(|error| panic!("execute remote deployment: {error}"));
+		assert_eq!(runner.calls.len(), 1);
+		assert_eq!(runner.calls[0].0, shell);
+		assert_eq!(
+			runner.calls[0].1,
+			vec![flag.to_owned(), "deploy-wrapper --verbose".to_owned()]
+		);
+		assert_eq!(runner.calls[0].2, PathBuf::from(plan.project_root()));
 	}
 
 	#[test]

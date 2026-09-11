@@ -16,6 +16,7 @@ pub struct AccountStruct {
 	pub variant: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
+	pub migratable: bool,
 	/// The name of the PDA declared for this account via `#[pda(...)]`.
 	pub pda_name: Option<String>,
 }
@@ -54,6 +55,7 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 			docs.push(COMPACT_ACCOUNT_DOC_MARKER.to_owned());
 		}
 		let pda_name = extract_pda_name(&item_struct.attrs, &item_struct.ident.to_string());
+		let migratable = super::event_data::has_migrations_flag(&item_struct.attrs, "account");
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
@@ -61,6 +63,7 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 			variant,
 			fields,
 			docs,
+			migratable,
 			pda_name,
 		});
 	}

@@ -26,6 +26,8 @@ use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::IsSigner;
+use codama_nodes::NestedTypeNodeTrait;
+use codama_nodes::Number;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
@@ -47,6 +49,7 @@ use codama_nodes::StructFieldTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 use codama_nodes::U8;
+use codama_nodes::ValueNode;
 use codama_nodes::VariablePdaSeedNode;
 
 use super::render::capacity::CompactCapacityIndex;
@@ -85,6 +88,63 @@ fn render_fixture_program(name: &str, prefix: &str) -> PathBuf {
 	render_root_node(&root, &crate_dir, &RenderConfig::default())
 		.unwrap_or_else(|e| panic!("render failed for `{name}`: {e}"));
 	crate_dir
+}
+
+/// The fixture's current version for a framework-owned `migrationVersion`
+/// field, so migration assertions survive example version bumps.
+fn fixture_current_migration_version(root: &RootNode, owner: &str) -> u8 {
+	fn unsigned_version(number: &Number, owner: &str) -> u8 {
+		match number {
+			Number::UnsignedInteger(parsed) => {
+				u8::try_from(*parsed).unwrap_or_else(|_| {
+					panic!("fixture `{owner}` migrationVersion `{parsed}` does not fit u8")
+				})
+			}
+			other => {
+				panic!("fixture `{owner}` migrationVersion is not an unsigned integer: {other:?}")
+			}
+		}
+	}
+
+	for instruction in &root.program.instructions {
+		if instruction.name.as_ref() == owner {
+			for argument in &instruction.arguments {
+				if argument.name.as_ref() == "migrationVersion" {
+					return match argument.default_value.as_ref().as_ref() {
+						Some(InstructionInputValueNode::NumberValue(value)) => {
+							unsigned_version(&value.number, owner)
+						}
+						other => {
+							panic!(
+								"fixture `{owner}` migrationVersion has no numeric default: \
+								 {other:?}"
+							)
+						}
+					};
+				}
+			}
+			panic!("instruction `{owner}` has no migrationVersion argument");
+		}
+	}
+	for account in &root.program.accounts {
+		if account.name.as_ref() == owner {
+			for field in &account.data.get_nested_type_node().fields {
+				if field.name.as_ref() == "migrationVersion" {
+					return match field.default_value.as_ref().as_ref() {
+						Some(ValueNode::Number(value)) => unsigned_version(&value.number, owner),
+						other => {
+							panic!(
+								"fixture `{owner}` migrationVersion has no numeric default: \
+								 {other:?}"
+							)
+						}
+					};
+				}
+			}
+			panic!("account `{owner}` has no migrationVersion field");
+		}
+	}
+	panic!("fixture `{owner}` not found");
 }
 
 fn read_generated_file(crate_dir: &Path, path: &str) -> String {
@@ -513,6 +573,34 @@ fn renders_instruction_data_with_discriminator_prefix() {
 	let content = read_generated_file(&crate_dir, "instructions/initialize.rs");
 
 	insta::assert_snapshot!("todo_initialize_instruction_rs", content);
+}
+
+#[test]
+fn framework_owned_migration_versions_are_written_and_validated() {
+	let root = load_fixture_root("migrations_program");
+	let crate_dir = render_fixture_program("migrations_program", "pina-codama-render-migrations");
+	let update = read_generated_file(&crate_dir, "instructions/update.rs");
+	let state = read_generated_file(&crate_dir, "accounts/state.rs");
+	let compact = read_generated_file(&crate_dir, "accounts/compact_state.rs");
+
+	let update_version = fixture_current_migration_version(&root, "update");
+	let state_version = fixture_current_migration_version(&root, "state");
+	let compact_version = fixture_current_migration_version(&root, "compactState");
+
+	assert!(update.contains(&format!(
+		"pub const UPDATE_MIGRATION_VERSION: u8 = {update_version}u8;"
+	)));
+	assert!(update.contains("data.migration_version = UPDATE_MIGRATION_VERSION;"));
+	assert!(state.contains(&format!(
+		"pub const STATE_MIGRATION_VERSION: u8 = {state_version}u8;"
+	)));
+	assert!(state.contains("account.migration_version = STATE_MIGRATION_VERSION;"));
+	assert!(state.contains("if account.migration_version != STATE_MIGRATION_VERSION"));
+	assert!(compact.contains(&format!(
+		"pub const COMPACT_STATE_MIGRATION_VERSION: u8 = {compact_version}u8;"
+	)));
+	assert!(compact.contains(".migration_version(COMPACT_STATE_MIGRATION_VERSION)"));
+	assert!(compact.contains("if account.migration_version != COMPACT_STATE_MIGRATION_VERSION"));
 }
 
 #[test]

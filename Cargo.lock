@@ -4986,6 +4986,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "migrations-program-client"
+version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "migrations-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "migrations-program-client",
+ "migrations_program",
+ "pina_test",
+]
+
+[[package]]
+name = "migrations_program"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm",
+ "pina",
+ "solana-account 4.3.2",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "migrations_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5772,6 +5815,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pina_abi"
+version = "0.15.0"
+dependencies = [
+ "quote",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "syn 3.0.4",
+]
+
+[[package]]
 name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
@@ -5809,6 +5863,7 @@ dependencies = [
  "insta-cmd",
  "object 0.40.0",
  "owo-colors",
+ "pina_abi",
  "pina_codama_renderer",
  "pina_cpi_renderer",
  "pina_profile",
@@ -5877,6 +5932,7 @@ version = "0.15.0"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
+ "pina_abi",
  "proc-macro2",
  "quote",
  "syn 3.0.4",
@@ -5901,6 +5957,7 @@ dependencies = [
  "counter_program",
  "insta",
  "macrotest",
+ "migrations_program",
  "mollusk-svm",
  "pina",
  "pina_macros",
@@ -5953,6 +6010,7 @@ dependencies = [
  "solana-slot-history 3.1.0",
  "solana-stake-history",
  "solana-transaction 4.1.5",
+ "solana-transaction-error 3.3.2",
  "surfpool-sdk",
  "thiserror 2.0.20",
  "tokio",

@@ -27,6 +27,7 @@ mod discriminator;
 mod error;
 mod event;
 mod instruction;
+mod migration;
 mod pda;
 mod schema;
 mod support;
@@ -193,6 +194,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `exact_len`, and `error` rules, plus a type-level
 /// `validate(with = function)` hook. Event views implement `PinaValidate` and
 /// generated read/initialize helpers validate automatically.
+///
+/// Add `migrations` to generate exact historical decoders and
+/// `with_current_event_data`. The helper projects immutable historical bytes to
+/// the current representation and supplies their source version as provenance.
 ///
 /// # Example
 ///

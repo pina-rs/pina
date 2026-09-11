@@ -33,27 +33,29 @@ The enum primitive width controls both on-chain layout and migration surface.
 
 <!-- {=pinaDiscriminatorVersionCompatibility} -->
 
-## Discriminator and payload versioning
+## Discriminators and ABI migrations
 
-| Change                                      | Compatibility impact                                               |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| Add a new enum variant                      | Usually backward-compatible if old clients ignore unknown variants |
-| Change an existing variant value            | **Breaking** for every historical byte slice                       |
-| Reorder or remove struct fields             | **Breaking** (offsets change)                                      |
-| Append fields to a struct                   | Mostly non-breaking, but consumers must accept the larger size     |
-| Switch primitive width (`u8` → `u16`, etc.) | **Breaking** for serialized payloads at that boundary              |
+| Change                                           | Compatibility impact                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------ |
+| Add a new discriminator variant                  | Backward-compatible; existing routes keep their identity                 |
+| Change an existing discriminator value           | **Breaking** for every historical byte slice                             |
+| Change a migration-aware account or payload      | Compatible only when the checked-in history has an adjacent transition   |
+| Append optional accounts to an instruction route | Compatible when the existing positional list remains an identical prefix |
+| Reorder, remove, or escalate an instruction slot | **Breaking**; create a new instruction discriminator                     |
+| Change the migration version width after release | **Breaking** for every migration-aware wire contract                     |
 
-For on-chain accounts, treat layout as part of protocol ABI:
+Add `migrations` to an account, instruction, or event attribute to opt into a framework-owned version field. Pina places the field immediately after the discriminator. Set its width once for the program:
 
-- Keep field order stable.
-- Introduce optional `version` fields at the tail for in-place migration strategies.
-- Never change existing discriminator values in place.
-- When incompatible layout changes are required, perform explicit migration with a new account version and an operator upgrade flow.
+```toml
+[migrations]
+version-type = "u8"
+```
 
-For instruction payloads:
+Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 
-- Prefer additive migration: add a new variant and keep legacy handlers for a release cycle.
-- Reject stale payload shapes with explicit errors rather than silently reinterpreting bytes.
+An old instruction can omit only newly appended optional accounts. Pina does not synthesize signers, writable privileges, PDAs, or required accounts. Any change to an existing process slot requires a new discriminator.
+
+Historical events are immutable. Generated event decoders validate their exact released shape, project them into current-shape scratch bytes, and retain the source version so consumers can distinguish an absent historical field from an emitted default value.
 
 <!-- {/pinaDiscriminatorVersionCompatibility} -->
 
@@ -154,11 +156,11 @@ A compact account with a stored bump generates `Type::with_pda`. The method vali
 
 ## Account cursors
 
-`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` preserves account order and rejects duplicate mutable addresses by default; mutable trailing slices also reject readonly accounts. When duplicate addresses are an intentional part of the instruction contract, `#[pina(remaining, distinct = false)]` restores pass-through aliasing and the field must have a doc comment explaining the invariant that makes it safe. Optional slots via `Option<&AccountView>` / `Option<&mut AccountView>` keep the account count fixed: a slot holding the executing program's own address parses as `None`, matching the readonly filler that generated Codama clients emit for omitted optional accounts.
+`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` preserves account order and rejects duplicate mutable addresses by default; mutable trailing slices also reject readonly accounts. When duplicate addresses are an intentional part of the instruction contract, `#[pina(remaining, distinct = false)]` restores pass-through aliasing and the field must have a doc comment explaining the invariant that makes it safe. A missing trailing `Option<&AccountView>` or `Option<&mut AccountView>` parses as `None`, which lets a current process accept the shorter positional prefix sent by an older client. An optional field before another positional field still occupies a slot.
 
 ## Optional accounts
 
-Account fields wrapped in `Option` mark a slot as optional while keeping the instruction's account count fixed:
+Account fields wrapped in `Option` mark a slot as optional. Trailing optional fields may be omitted entirely; optional fields before another positional field keep their slots:
 
 ```rust
 #[derive(Accounts)]
@@ -171,7 +173,7 @@ pub struct MakeAccounts<'a> {
 
 Only `Option<&'a AccountView>` and `Option<&'a mut AccountView>` are supported; other inner types fail to compile.
 
-The absent convention is the executing program's own address. Generated Codama clients fill an omitted optional slot with a readonly account meta pointing at the program address, so transactions never change length, and on-chain parsing maps any slot whose address equals `program_id` back to `None`. Because the filler is readonly, provided values still enforce their declared writability through `next_mut_opt()`.
+Within a positional list, the absent convention is the executing program's own address. Generated Codama clients may fill an omitted optional slot with a readonly account meta pointing at the program address, and on-chain parsing maps it back to `None`. A trailing optional suffix may instead be left out, including by an older client that predates those fields. Because the filler is readonly, provided values still enforce their declared writability through `next_mut_opt()`.
 
 Program logic branches on presence with plain pattern matching. Load the account directly when the branch needs its fields:
 

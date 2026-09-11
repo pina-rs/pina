@@ -15,6 +15,26 @@ struct Value;
 struct Scheduler;
 struct State;
 
+trait AccountRead {
+	fn read(&self) -> usize;
+}
+
+impl AccountRead for AccountView {
+	fn read(&self) -> usize {
+		0
+	}
+}
+
+trait AsAccount {
+	fn as_account_mut(&mut self) -> Result<Guard, ()>;
+}
+
+impl AsAccount for AccountView {
+	fn as_account_mut(&mut self) -> Result<Guard, ()> {
+		Ok(Guard)
+	}
+}
+
 impl Cache {
 	fn try_borrow_mut(&mut self) -> Result<UnrelatedGuard, ()> {
 		Ok(UnrelatedGuard)
@@ -201,6 +221,29 @@ fn process_shadowed_drop(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()>
 	shadowed::drop(guard);
 	cpi.invoke()
 	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+}
+
+fn helper_expression_shapes(account: &mut AccountView, cpi: &Cpi, flag: bool) -> Result<(), ()> {
+	use AccountRead as _;
+
+	let value = account.read();
+	let guard = match account.try_borrow_mut() {
+		Ok(guard) => guard,
+		Err(()) => return Err(()),
+	};
+	drop(guard);
+	let guard = account.as_account_mut()?;
+	drop(guard);
+	let mut count = value;
+	count = count + usize::from(flag);
+	count += 1;
+	let _indexed = [count][0];
+	if flag {
+		let _ = cpi;
+	} else {
+		let _ = account;
+	}
+	cpi.invoke()
 }
 
 fn main() {}

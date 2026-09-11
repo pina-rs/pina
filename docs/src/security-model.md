@@ -24,27 +24,29 @@ The discriminator-first model makes byte layout part of protocol compatibility. 
 
 <!-- {=pinaDiscriminatorVersionCompatibility} -->
 
-## Discriminator and payload versioning
+## Discriminators and ABI migrations
 
-| Change                                      | Compatibility impact                                               |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| Add a new enum variant                      | Usually backward-compatible if old clients ignore unknown variants |
-| Change an existing variant value            | **Breaking** for every historical byte slice                       |
-| Reorder or remove struct fields             | **Breaking** (offsets change)                                      |
-| Append fields to a struct                   | Mostly non-breaking, but consumers must accept the larger size     |
-| Switch primitive width (`u8` → `u16`, etc.) | **Breaking** for serialized payloads at that boundary              |
+| Change                                           | Compatibility impact                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------ |
+| Add a new discriminator variant                  | Backward-compatible; existing routes keep their identity                 |
+| Change an existing discriminator value           | **Breaking** for every historical byte slice                             |
+| Change a migration-aware account or payload      | Compatible only when the checked-in history has an adjacent transition   |
+| Append optional accounts to an instruction route | Compatible when the existing positional list remains an identical prefix |
+| Reorder, remove, or escalate an instruction slot | **Breaking**; create a new instruction discriminator                     |
+| Change the migration version width after release | **Breaking** for every migration-aware wire contract                     |
 
-For on-chain accounts, treat layout as part of protocol ABI:
+Add `migrations` to an account, instruction, or event attribute to opt into a framework-owned version field. Pina places the field immediately after the discriminator. Set its width once for the program:
 
-- Keep field order stable.
-- Introduce optional `version` fields at the tail for in-place migration strategies.
-- Never change existing discriminator values in place.
-- When incompatible layout changes are required, perform explicit migration with a new account version and an operator upgrade flow.
+```toml
+[migrations]
+version-type = "u8"
+```
 
-For instruction payloads:
+Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 
-- Prefer additive migration: add a new variant and keep legacy handlers for a release cycle.
-- Reject stale payload shapes with explicit errors rather than silently reinterpreting bytes.
+An old instruction can omit only newly appended optional accounts. Pina does not synthesize signers, writable privileges, PDAs, or required accounts. Any change to an existing process slot requires a new discriminator.
+
+Historical events are immutable. Generated event decoders validate their exact released shape, project them into current-shape scratch bytes, and retain the source version so consumers can distinguish an absent historical field from an emitted default value.
 
 <!-- {/pinaDiscriminatorVersionCompatibility} -->
 

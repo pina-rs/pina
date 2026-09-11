@@ -180,7 +180,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 	fn check_fn(
 		&mut self,
 		cx: &LateContext<'tcx>,
-		_: FnKind<'tcx>,
+		kind: FnKind<'tcx>,
 		_: &'tcx rustc_hir::FnDecl<'tcx>,
 		body: &'tcx rustc_hir::Body<'tcx>,
 		span: rustc_span::Span,
@@ -190,7 +190,16 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 		let function_name = def_path.rsplit("::").next().unwrap_or_default();
 		let is_entrypoint = matches!(function_name, "process_instruction" | "entrypoint")
 			|| function_name.starts_with("entrypoint_");
-		if shared::should_skip_def_path(&def_path) || !is_entrypoint {
+		let generated_name = match kind {
+			FnKind::ItemFn(ident, ..) => ident.span.from_expansion(),
+			FnKind::Method(..) | FnKind::Closure => false,
+		};
+		if generated_name
+			|| span.from_expansion()
+			|| body.value.span.from_expansion()
+			|| shared::should_skip_def_path(&def_path)
+			|| !is_entrypoint
+		{
 			return;
 		}
 

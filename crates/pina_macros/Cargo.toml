@@ -20,6 +20,7 @@ validation = []
 [dependencies]
 darling = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
+pina_abi = { workspace = true, default-features = true }
 proc-macro2 = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full"] }

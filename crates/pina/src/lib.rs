@@ -50,6 +50,7 @@ mod cpi;
 mod error;
 mod impls;
 pub mod introspection;
+mod migration;
 mod pda;
 mod pod;
 #[cfg(feature = "token")]
@@ -163,6 +164,8 @@ pub use solana_program_log::log_cu_usage;
 pub use crate::cpi::*;
 /// Built-in framework error types.
 pub use crate::error::*;
+/// Version envelopes and generated account-migration runtime contracts.
+pub use crate::migration::*;
 /// PDA (Program Derived Address) derivation and verification functions.
 pub use crate::pda::*;
 /// Core traits for account validation, deserialization, and instruction

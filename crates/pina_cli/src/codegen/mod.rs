@@ -36,6 +36,9 @@ use codama_nodes::StringValueNode;
 use codama_nodes::StructFieldTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::VariablePdaSeedNode;
+use pina_abi::ContractIdentity;
+use pina_abi::ContractKind;
+use pina_abi::MigrationVersionType;
 
 use crate::compact_capacity::COMPACT_CAPACITY_MARKER_PREFIX;
 use crate::compact_capacity::compact_capacity_marker_name;
@@ -51,6 +54,7 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::PinaPodEnumIr;
 use crate::ir::ProgramIr;
+use crate::migrations::IdlMigrationMetadata;
 use crate::parse::types::CompactTailSchema;
 use crate::parse::types::compact_tail_schema;
 use crate::parse::types::try_rust_type_to_codama_compact_tail;
@@ -61,6 +65,14 @@ use crate::parse::types::type_node_size;
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
 /// `RootNode`.
 pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
+	try_ir_to_root_node_with_migrations(ir, None)
+}
+
+/// Lower the current source contract with checked-in migration constants.
+pub(crate) fn try_ir_to_root_node_with_migrations(
+	ir: &ProgramIr,
+	migrations: Option<&IdlMigrationMetadata>,
+) -> Result<RootNode, IdlError> {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
 
 	for pinapod_enum in &ir.pinapod_enums {
@@ -78,7 +90,14 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	}
 
 	for account in &ir.accounts {
-		program = program.add_account(build_account_node(account, &ir.pinapod_enums)?);
+		let migration = current_migration(
+			ContractKind::Account,
+			&account.name,
+			&account.discriminator,
+			account.is_migratable(),
+			migrations,
+		)?;
+		program = program.add_account(build_account_node(account, &ir.pinapod_enums, migration)?);
 
 		if account.is_compact() {
 			for field in &account.fields {
@@ -100,10 +119,18 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	}
 
 	for instruction in &ir.instructions {
+		let migration = current_migration(
+			ContractKind::Instruction,
+			&instruction.name,
+			&instruction.discriminator,
+			instruction.is_migratable(),
+			migrations,
+		)?;
 		program = program.add_instruction(build_instruction_node(
 			instruction,
 			&ir.pdas,
 			&ir.pinapod_enums,
+			migration,
 		)?);
 	}
 
@@ -116,6 +143,46 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	}
 
 	Ok(RootNode::new(program))
+}
+
+#[derive(Clone, Copy)]
+struct CurrentMigration {
+	version_type: MigrationVersionType,
+	version: u32,
+}
+
+fn current_migration(
+	kind: ContractKind,
+	name: &str,
+	discriminator: &DiscriminatorIr,
+	is_migratable: bool,
+	metadata: Option<&IdlMigrationMetadata>,
+) -> Result<Option<CurrentMigration>, IdlError> {
+	if !is_migratable {
+		return Ok(None);
+	}
+
+	let metadata = metadata.ok_or_else(|| {
+		IdlError::Other(format!(
+			"Migration-aware {kind} `{name}` requires checked-in migration metadata"
+		))
+	})?;
+	let identity = ContractIdentity::try_new(kind, discriminator.repr_size, discriminator.value)
+		.map_err(IdlError::Other)?;
+	let version = metadata
+		.current_versions
+		.get(&identity.key())
+		.copied()
+		.ok_or_else(|| {
+			IdlError::Other(format!(
+				"Migration-aware {kind} `{name}` is missing current version metadata"
+			))
+		})?;
+
+	Ok(Some(CurrentMigration {
+		version_type: metadata.version_type,
+		version,
+	}))
 }
 
 fn build_compact_capacity_marker(account: &str, field: &str, capacity: usize) -> DefinedTypeNode {
@@ -167,8 +234,12 @@ fn build_pinapod_enum_node(pinapod_enum: &PinaPodEnumIr) -> DefinedTypeNode {
 fn build_account_node(
 	account: &AccountIr,
 	pinapod_enums: &[PinaPodEnumIr],
+	migration: Option<CurrentMigration>,
 ) -> Result<AccountNode, IdlError> {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
+	if let Some(migration) = migration {
+		fields.push(build_account_migration_field(migration));
+	}
 	let compact_schemas = if account.is_compact() {
 		Some(
 			account
@@ -198,7 +269,8 @@ fn build_account_node(
 			reason: "compact accounts require at least one dynamic compact field".to_string(),
 		});
 	}
-	let mut header_offset = account.discriminator.repr_size;
+	let mut header_offset = account.discriminator.repr_size
+		+ migration.map_or(0, |migration| migration.version_type.bytes());
 	let tail_prefix_sizes = first_tail
 		.map(|start| {
 			compact_schemas
@@ -285,6 +357,12 @@ fn build_account_node(
 	let data = StructTypeNode::new(fields);
 	let mut node = AccountNode::new(account.name.as_str(), data);
 	node.discriminators = vec![build_discriminator_node(&account.discriminator)];
+	if let Some(migration) = migration {
+		node.discriminators.push(build_migration_discriminator_node(
+			migration,
+			account.discriminator.repr_size,
+		));
+	}
 	node.pda = account
 		.pda_name
 		.as_ref()
@@ -302,6 +380,7 @@ fn build_instruction_node(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
 	pinapod_enums: &[PinaPodEnumIr],
+	migration: Option<CurrentMigration>,
 ) -> Result<InstructionNode, IdlError> {
 	let accounts: Vec<InstructionAccountNode> = instruction
 		.accounts
@@ -312,6 +391,9 @@ fn build_instruction_node(
 	let mut arguments = vec![build_instruction_discriminator_argument(
 		&instruction.discriminator,
 	)];
+	if let Some(migration) = migration {
+		arguments.push(build_instruction_migration_argument(migration));
+	}
 	for argument in &instruction.arguments {
 		let r#type = map_type(
 			&argument.rust_type,
@@ -321,7 +403,13 @@ fn build_instruction_node(
 		arguments.push(InstructionArgumentNode::new(argument.name.as_str(), r#type));
 	}
 
-	let discriminators = vec![build_discriminator_node(&instruction.discriminator)];
+	let mut discriminators = vec![build_discriminator_node(&instruction.discriminator)];
+	if let Some(migration) = migration {
+		discriminators.push(build_migration_discriminator_node(
+			migration,
+			instruction.discriminator.repr_size,
+		));
+	}
 
 	let mut node = InstructionNode {
 		name: instruction.name.as_str().into(),
@@ -336,8 +424,9 @@ fn build_instruction_node(
 		..Default::default()
 	};
 
-	if !instruction.docs.is_empty() {
-		node.docs = instruction.docs.clone().into();
+	let docs = instruction.visible_docs();
+	if !docs.is_empty() {
+		node.docs = docs.into();
 	}
 
 	Ok(node)
@@ -461,9 +550,25 @@ fn build_account_discriminator_field(disc: &DiscriminatorIr) -> StructFieldTypeN
 	field
 }
 
+fn build_account_migration_field(migration: CurrentMigration) -> StructFieldTypeNode {
+	let (r#type, value) = migration_type_and_value(migration);
+	let mut field = StructFieldTypeNode::new("migrationVersion", r#type);
+	field.default_value = Box::new(Some(value.into()));
+	field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+	field
+}
+
 fn build_instruction_discriminator_argument(disc: &DiscriminatorIr) -> InstructionArgumentNode {
 	let (r#type, value) = build_discriminator_type_and_value(disc);
 	let mut argument = InstructionArgumentNode::new("discriminator", r#type);
+	argument.default_value = Box::new(Some(InstructionInputValueNode::NumberValue(value)));
+	argument.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+	argument
+}
+
+fn build_instruction_migration_argument(migration: CurrentMigration) -> InstructionArgumentNode {
+	let (r#type, value) = migration_type_and_value(migration);
+	let mut argument = InstructionArgumentNode::new("migrationVersion", r#type);
 	argument.default_value = Box::new(Some(InstructionInputValueNode::NumberValue(value)));
 	argument.default_value_strategy = Some(DefaultValueStrategy::Omitted);
 	argument
@@ -478,6 +583,17 @@ fn build_discriminator_node(disc: &DiscriminatorIr) -> DiscriminatorNode {
 	))
 }
 
+fn build_migration_discriminator_node(
+	migration: CurrentMigration,
+	offset: usize,
+) -> DiscriminatorNode {
+	let (r#type, value) = migration_type_and_value(migration);
+	DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+		ConstantValueNode::new(r#type, value),
+		offset as u64,
+	))
+}
+
 fn build_discriminator_type_and_value(disc: &DiscriminatorIr) -> (NumberTypeNode, NumberValueNode) {
 	let format = match disc.repr_size {
 		2 => NumberFormat::U16,
@@ -487,6 +603,19 @@ fn build_discriminator_type_and_value(disc: &DiscriminatorIr) -> (NumberTypeNode
 	};
 
 	(NumberTypeNode::le(format), NumberValueNode::new(disc.value))
+}
+
+fn migration_type_and_value(migration: CurrentMigration) -> (NumberTypeNode, NumberValueNode) {
+	let format = match migration.version_type {
+		MigrationVersionType::U8 => NumberFormat::U8,
+		MigrationVersionType::U16 => NumberFormat::U16,
+		MigrationVersionType::U32 => NumberFormat::U32,
+	};
+
+	(
+		NumberTypeNode::le(format),
+		NumberValueNode::new(u64::from(migration.version)),
+	)
 }
 
 fn build_pda_node(pda: &PdaIr) -> Result<PdaNode, IdlError> {
@@ -542,6 +671,8 @@ fn build_error_node(error: &ErrorIr) -> ErrorNode {
 
 #[cfg(test)]
 mod tests {
+	use std::collections::BTreeMap;
+
 	use codama_nodes::DefaultValueStrategy;
 	use codama_nodes::DiscriminatorNode;
 	use codama_nodes::InstructionInputValueNode;
@@ -675,13 +806,14 @@ mod tests {
 			}
 		}
 
-		let missing_tail = build_account_node(&compact_account(vec![]), &[])
+		let missing_tail = build_account_node(&compact_account(vec![]), &[], None)
 			.expect_err("compact IR without a tail must be rejected");
 		assert!(missing_tail.to_string().contains("at least one dynamic"));
 
 		let inline_after_tail = build_account_node(
 			&compact_account(vec![field("values", "Vec<u64, 8>"), field("count", "u64")]),
 			&[],
+			None,
 		)
 		.expect_err("inline fields after a tail must be rejected");
 		assert!(
@@ -702,6 +834,7 @@ mod tests {
 				field("values", "Vec<u64, 8>"),
 			]),
 			&enums,
+			None,
 		)
 		.expect_err("compact inline fields need a known byte size");
 		assert!(
@@ -716,6 +849,7 @@ mod tests {
 				field("unknown", "Vec<Unknown, 8>"),
 			]),
 			&[],
+			None,
 		)
 		.expect_err("every compact tail element needs a known size");
 		assert!(invalid_tail.to_string().contains("element size"));
@@ -792,6 +926,7 @@ mod tests {
 			}],
 			instructions: vec![InstructionIr {
 				name: "update".to_string(),
+				rust_name: "UpdateInstruction".to_string(),
 				accounts: vec![],
 				arguments: vec![],
 				discriminator,
@@ -827,6 +962,116 @@ mod tests {
 	}
 
 	#[test]
+	fn lowers_only_current_migration_constants_into_encoded_data() {
+		let account_discriminator = DiscriminatorIr {
+			value: 1,
+			repr_size: 1,
+		};
+		let instruction_discriminator = DiscriminatorIr {
+			value: 2,
+			repr_size: 1,
+		};
+		let ir = ProgramIr {
+			name: "migration_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![AccountIr {
+				name: "State".to_owned(),
+				fields: vec![],
+				discriminator: account_discriminator.clone(),
+				docs: vec![crate::ir::MIGRATABLE_DOC_MARKER.to_owned()],
+				pda_name: None,
+			}],
+			instructions: vec![InstructionIr {
+				name: "update".to_owned(),
+				rust_name: "update".to_owned(),
+				accounts: vec![],
+				arguments: vec![],
+				discriminator: instruction_discriminator.clone(),
+				docs: vec![crate::ir::MIGRATABLE_DOC_MARKER.to_owned()],
+			}],
+			errors: vec![],
+			pdas: vec![],
+		};
+		let account_key = ContractIdentity::try_new(
+			ContractKind::Account,
+			account_discriminator.repr_size,
+			account_discriminator.value,
+		)
+		.unwrap_or_else(|error| panic!("account identity: {error}"))
+		.key();
+		let instruction_key = ContractIdentity::try_new(
+			ContractKind::Instruction,
+			instruction_discriminator.repr_size,
+			instruction_discriminator.value,
+		)
+		.unwrap_or_else(|error| panic!("instruction identity: {error}"))
+		.key();
+		let metadata = IdlMigrationMetadata {
+			version_type: MigrationVersionType::U16,
+			current_versions: BTreeMap::from([(account_key.clone(), 7), (instruction_key, 9)]),
+		};
+
+		let missing = try_ir_to_root_node(&ir)
+			.expect_err("migration-aware lowering without checked history must fail");
+		assert!(
+			missing
+				.to_string()
+				.contains("checked-in migration metadata")
+		);
+		let account_only_metadata = IdlMigrationMetadata {
+			version_type: MigrationVersionType::U16,
+			current_versions: BTreeMap::from([(account_key.clone(), 7)]),
+		};
+		let missing_instruction =
+			try_ir_to_root_node_with_migrations(&ir, Some(&account_only_metadata))
+				.expect_err("every migratable instruction needs a current version");
+		assert!(
+			missing_instruction
+				.to_string()
+				.contains("missing current version metadata")
+		);
+
+		let root = try_ir_to_root_node_with_migrations(&ir, Some(&metadata))
+			.unwrap_or_else(|error| panic!("migration-aware IDL codegen failed: {error}"));
+		let json = serde_json::to_value(root)
+			.unwrap_or_else(|error| panic!("serialize generated IDL: {error}"));
+		assert_eq!(
+			json.pointer("/program/accounts/0/data/fields/1/name"),
+			Some(&serde_json::json!("migrationVersion")),
+		);
+		assert_eq!(
+			json.pointer("/program/accounts/0/data/fields/1/type/format"),
+			Some(&serde_json::json!("u16")),
+		);
+		assert_eq!(
+			json.pointer("/program/accounts/0/data/fields/1/defaultValue/number"),
+			Some(&serde_json::json!(7)),
+		);
+		assert_eq!(
+			json.pointer("/program/accounts/0/discriminators/1/offset"),
+			Some(&serde_json::json!(1)),
+		);
+		assert_eq!(
+			json.pointer("/program/instructions/0/arguments/1/name"),
+			Some(&serde_json::json!("migrationVersion")),
+		);
+		assert_eq!(
+			json.pointer("/program/instructions/0/arguments/1/defaultValue/number"),
+			Some(&serde_json::json!(9)),
+		);
+		assert!(json.get("versions").is_none());
+		assert!(!json.to_string().contains("transition"));
+
+		let (version_type, version) = migration_type_and_value(CurrentMigration {
+			version_type: MigrationVersionType::U32,
+			version: 11,
+		});
+		assert_eq!(version_type.format, NumberFormat::U32);
+		assert_eq!(version.number, codama_nodes::Number::UnsignedInteger(11));
+	}
+
+	#[test]
 	fn optional_accounts_never_carry_default_values() {
 		let ir = ProgramIr {
 			name: "optional_pda_program".to_string(),
@@ -835,6 +1080,7 @@ mod tests {
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "touch".to_string(),
+				rust_name: "touch".to_string(),
 				accounts: vec![
 					InstructionAccountIr {
 						name: "authority".to_string(),
@@ -844,6 +1090,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 					// An optional PDA must stay a plain optional slot.
@@ -855,6 +1102,7 @@ mod tests {
 						default_value: None,
 						is_pda: true,
 						pda_name: Some("store".to_string()),
+						constraints: vec![],
 						docs: vec![],
 					},
 					InstructionAccountIr {
@@ -867,6 +1115,7 @@ mod tests {
 						)),
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 				],
@@ -916,6 +1165,7 @@ mod tests {
 				default_value: None,
 				is_pda: false,
 				pda_name: None,
+				constraints: vec![],
 				docs: vec![],
 			}
 		};
@@ -928,6 +1178,7 @@ mod tests {
 				accounts: vec![],
 				instructions: vec![InstructionIr {
 					name: "do_it".to_string(),
+					rust_name: "do_it".to_string(),
 					accounts,
 					arguments: vec![],
 					discriminator: discriminator.clone(),
@@ -1064,6 +1315,7 @@ mod tests {
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),
+				rust_name: "initialize".to_string(),
 				accounts: vec![
 					InstructionAccountIr {
 						name: "authority".to_string(),
@@ -1073,6 +1325,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 					InstructionAccountIr {
@@ -1083,6 +1336,7 @@ mod tests {
 						default_value: None,
 						is_pda: true,
 						pda_name: Some("state".to_string()),
+						constraints: vec![],
 						docs: vec![],
 					},
 				],

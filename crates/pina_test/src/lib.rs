@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 pub use solana_account::Account;
+use solana_client::client_error::ClientError;
 pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
@@ -22,8 +23,10 @@ pub use solana_rent::Rent;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
 use solana_transaction::Transaction;
+use solana_transaction_error::TransactionError;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
+use surfpool_sdk::cheatcodes::builders::SetAccount;
 
 static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
 const TEST_PAYER_SEED: [u8; 32] = [0xA5; 32];
@@ -54,12 +57,24 @@ where
 	}
 }
 
+/// Return whether the suite was started with `pina test --compatibility`.
+///
+/// Compatibility mode still runs the complete Surfpool suite. Tests can use
+/// this signal to add expensive historical matrices while preserving all
+/// current-flow assertions in the same run.
+#[must_use]
+pub fn compatibility_mode() -> bool {
+	std::env::var_os("PINA_COMPATIBILITY").is_some_and(|value| value == "1")
+}
+
 /// An error from an isolated Pina integration-test operation.
 #[derive(Debug, thiserror::Error)]
 #[error("{operation}: {message}")]
 pub struct TestError {
 	operation: &'static str,
 	message: String,
+	#[source]
+	client_error: Option<ClientError>,
 }
 
 impl TestError {
@@ -73,6 +88,179 @@ impl TestError {
 	#[must_use]
 	pub fn message(&self) -> &str {
 		&self.message
+	}
+
+	/// Complete RPC client error retained for transaction execution failures.
+	#[must_use]
+	pub const fn client_error(&self) -> Option<&ClientError> {
+		self.client_error.as_ref()
+	}
+
+	/// Transaction-level failure extracted from the retained RPC client error.
+	#[must_use]
+	pub fn transaction_error(&self) -> Option<TransactionError> {
+		self.client_error
+			.as_ref()
+			.and_then(ClientError::get_transaction_error)
+	}
+}
+
+/// Exact bytes and account metas captured from one historical client version.
+///
+/// `version` is diagnostic metadata. Pina never rewrites `data` or fills in
+/// account metas on the host: the deployed program must accept the old request
+/// exactly as a released client produced it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HistoricalInstruction {
+	version: u32,
+	data: Vec<u8>,
+	accounts: Vec<AccountMeta>,
+}
+
+impl HistoricalInstruction {
+	/// Create an immutable historical request from golden wire bytes.
+	#[must_use]
+	pub fn new(version: u32, data: impl Into<Vec<u8>>, accounts: Vec<AccountMeta>) -> Self {
+		Self {
+			version,
+			data: data.into(),
+			accounts,
+		}
+	}
+
+	/// Historical migration version named by the fixture.
+	#[must_use]
+	pub const fn version(&self) -> u32 {
+		self.version
+	}
+
+	/// Exact historical instruction bytes.
+	#[must_use]
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+
+	/// Exact positional account list and privileges sent by the old client.
+	#[must_use]
+	pub fn accounts(&self) -> &[AccountMeta] {
+		&self.accounts
+	}
+
+	fn instruction(&self, program_id: Pubkey) -> Instruction {
+		Instruction::new_with_bytes(program_id, &self.data, self.accounts.clone())
+	}
+}
+
+/// Exact event bytes captured from one released program version.
+///
+/// Keep these bytes as a golden fixture and pass them to the event type's
+/// generated projection API. Encoding the fixture with the current event type
+/// would only test the current schema and can conceal a broken decoder.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HistoricalEvent {
+	version: u32,
+	data: Vec<u8>,
+}
+
+impl HistoricalEvent {
+	/// Create one immutable event fixture from released wire bytes.
+	#[must_use]
+	pub fn new(version: u32, data: impl Into<Vec<u8>>) -> Self {
+		Self {
+			version,
+			data: data.into(),
+		}
+	}
+
+	/// Historical migration version named by the fixture.
+	#[must_use]
+	pub const fn version(&self) -> u32 {
+		self.version
+	}
+
+	/// Exact discriminator, version, and payload bytes emitted historically.
+	#[must_use]
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+}
+
+/// Exact account state captured for one historical on-chain schema version.
+///
+/// The data includes the discriminator and migration version envelope. Tests
+/// install these bytes directly instead of constructing them with the current
+/// generated account type.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HistoricalAccount {
+	version: u32,
+	address: Pubkey,
+	account: Account,
+}
+
+impl HistoricalAccount {
+	/// Create a rent-exempt, non-executable historical account fixture.
+	#[must_use]
+	pub fn new(version: u32, address: Pubkey, owner: Pubkey, data: impl Into<Vec<u8>>) -> Self {
+		let data = data.into();
+		let lamports = Rent::default().minimum_balance(data.len());
+
+		Self {
+			version,
+			address,
+			account: Account {
+				lamports,
+				data,
+				owner,
+				executable: false,
+				rent_epoch: 0,
+			},
+		}
+	}
+
+	/// Override lamports to exercise rent deficits, surplus retention, or overflow.
+	#[must_use]
+	pub const fn with_lamports(mut self, lamports: u64) -> Self {
+		self.account.lamports = lamports;
+		self
+	}
+
+	/// Historical migration version named by the fixture.
+	#[must_use]
+	pub const fn version(&self) -> u32 {
+		self.version
+	}
+
+	/// Address where this state will be installed.
+	#[must_use]
+	pub const fn address(&self) -> Pubkey {
+		self.address
+	}
+
+	/// Complete account state that will be installed.
+	#[must_use]
+	pub const fn account(&self) -> &Account {
+		&self.account
+	}
+}
+
+/// Exact pre-transaction state used to prove Solana rollback behavior.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountSnapshot {
+	address: Pubkey,
+	account: Account,
+}
+
+impl AccountSnapshot {
+	/// Snapshotted account address.
+	#[must_use]
+	pub const fn address(&self) -> Pubkey {
+		self.address
+	}
+
+	/// Complete snapshotted account state.
+	#[must_use]
+	pub const fn account(&self) -> &Account {
+		&self.account
 	}
 }
 
@@ -192,6 +380,75 @@ impl ProgramTest {
 		)
 	}
 
+	/// Install exact historical account bytes owned by this program.
+	///
+	/// # Errors
+	///
+	/// Returns an error when Surfpool rejects the direct fixture update.
+	pub fn install_historical_account(&self, fixture: &HistoricalAccount) -> Result<(), TestError> {
+		if fixture.account.owner != self.program_id {
+			return Err(test_error(
+				"install historical account",
+				format_args!(
+					"fixture owner {} does not match deployed program {}",
+					fixture.account.owner, self.program_id
+				),
+			));
+		}
+
+		self.surfnet.install_historical_account(fixture)
+	}
+
+	/// Submit one exact historical request to the latest deployed program.
+	///
+	/// # Errors
+	///
+	/// Returns an error when signing, submission, execution, or confirmation fails.
+	pub fn send_historical_instruction(
+		&self,
+		fixture: &HistoricalInstruction,
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		self.surfnet
+			.send_historical_instruction(self.program_id, fixture, signers)
+	}
+
+	/// Capture complete state for accounts that a rejected migration may touch.
+	///
+	/// # Errors
+	///
+	/// Returns an error when any account cannot be fetched.
+	pub fn snapshot_accounts(
+		&self,
+		addresses: &[Pubkey],
+	) -> Result<Vec<AccountSnapshot>, TestError> {
+		self.surfnet.snapshot_accounts(addresses)
+	}
+
+	/// Require a historical request to fail in program execution and prove that
+	/// every protected account rolled back byte-for-byte.
+	///
+	/// Errors before program execution, such as missing transaction signatures or
+	/// RPC failure, do not satisfy the assertion.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the request succeeds, fails before execution, or any
+	/// protected account differs after rejection.
+	pub fn expect_historical_rejection_with_rollback(
+		&self,
+		fixture: &HistoricalInstruction,
+		protected_accounts: &[Pubkey],
+		signers: &[&dyn Signer],
+	) -> Result<(), TestError> {
+		self.surfnet.expect_historical_rejection_with_rollback(
+			self.program_id,
+			fixture,
+			protected_accounts,
+			signers,
+		)
+	}
+
 	/// Fund an address inside the isolated Surfnet.
 	///
 	/// # Errors
@@ -305,6 +562,25 @@ impl OfflineSurfnet {
 			.map_err(|error| test_error("deploy SBF program", error))
 	}
 
+	/// Install one exact historical account fixture without running a transaction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when Surfpool rejects the direct state update.
+	pub fn install_historical_account(&self, fixture: &HistoricalAccount) -> Result<(), TestError> {
+		self.inner
+			.cheatcodes()
+			.execute(
+				SetAccount::new(fixture.address)
+					.lamports(fixture.account.lamports)
+					.owner(fixture.account.owner)
+					.data(fixture.account.data.clone())
+					.rent_epoch(fixture.account.rent_epoch)
+					.executable(fixture.account.executable),
+			)
+			.map_err(|error| test_error("install historical account", error))
+	}
+
 	/// Return whether the deployed account exists and is executable.
 	///
 	/// # Errors
@@ -396,7 +672,99 @@ impl OfflineSurfnet {
 		}
 
 		rpc.send_and_confirm_transaction(&transaction)
-			.map_err(|error| test_error("execute program instruction", error))
+			.map_err(execution_error)
+	}
+
+	/// Submit exact historical bytes and account metas to `program_id`.
+	///
+	/// # Errors
+	///
+	/// Returns an error when signing, submission, execution, or confirmation fails.
+	pub fn send_historical_instruction(
+		&self,
+		program_id: Pubkey,
+		fixture: &HistoricalInstruction,
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		self.send_instruction_with_signers(fixture.instruction(program_id), signers)
+	}
+
+	/// Capture complete state for a set of existing accounts.
+	///
+	/// # Errors
+	///
+	/// Returns an error when any account cannot be fetched.
+	pub fn snapshot_accounts(
+		&self,
+		addresses: &[Pubkey],
+	) -> Result<Vec<AccountSnapshot>, TestError> {
+		addresses
+			.iter()
+			.map(|address| {
+				self.account(address).map(|account| {
+					AccountSnapshot {
+						address: *address,
+						account,
+					}
+				})
+			})
+			.collect()
+	}
+
+	/// Compare current account state with a previously captured exact snapshot.
+	///
+	/// # Errors
+	///
+	/// Returns an error naming the first account whose lamports, data, owner,
+	/// executable flag, or rent epoch changed.
+	pub fn assert_accounts_match(&self, snapshots: &[AccountSnapshot]) -> Result<(), TestError> {
+		for snapshot in snapshots {
+			let current = self.account(&snapshot.address)?;
+			if current != snapshot.account {
+				return Err(test_error(
+					"assert transaction rollback",
+					format_args!("account {} changed after rejection", snapshot.address),
+				));
+			}
+		}
+
+		Ok(())
+	}
+
+	/// Require program execution to reject a historical request and prove exact
+	/// rollback for every protected account.
+	///
+	/// # Errors
+	///
+	/// Returns an error when execution succeeds, fails before the program runs,
+	/// or any protected account changes.
+	pub fn expect_historical_rejection_with_rollback(
+		&self,
+		program_id: Pubkey,
+		fixture: &HistoricalInstruction,
+		protected_accounts: &[Pubkey],
+		signers: &[&dyn Signer],
+	) -> Result<(), TestError> {
+		let snapshots = self.snapshot_accounts(protected_accounts)?;
+		match self.send_historical_instruction(program_id, fixture, signers) {
+			Ok(signature) => {
+				return Err(test_error(
+					"assert historical rejection",
+					format_args!(
+						"version {} unexpectedly succeeded as transaction {signature}",
+						fixture.version
+					),
+				));
+			}
+			Err(error)
+				if matches!(
+					error.transaction_error(),
+					Some(TransactionError::InstructionError(..))
+				) => {}
+			Err(error) => return Err(error),
+		}
+
+		self.assert_accounts_match(&snapshots)
 	}
 
 	/// Fund an address inside the isolated Surfnet by transferring lamports
@@ -492,6 +860,15 @@ fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestErr
 	TestError {
 		operation,
 		message: error.to_string(),
+		client_error: None,
+	}
+}
+
+fn execution_error(error: ClientError) -> TestError {
+	TestError {
+		operation: "execute program instruction",
+		message: error.to_string(),
+		client_error: Some(error),
 	}
 }
 
@@ -562,6 +939,32 @@ mod tests {
 	}
 
 	#[test]
+	fn historical_fixtures_preserve_golden_bytes_and_account_metas() {
+		let address = Pubkey::new_unique();
+		let owner = Pubkey::new_unique();
+		let account =
+			HistoricalAccount::new(3, address, owner, [7, 3, 1, 2, 3]).with_lamports(42_000);
+		assert_eq!(account.version(), 3);
+		assert_eq!(account.address(), address);
+		assert_eq!(account.account().owner, owner);
+		assert_eq!(account.account().data, [7, 3, 1, 2, 3]);
+		assert_eq!(account.account().lamports, 42_000);
+
+		let metas = vec![
+			AccountMeta::new(address, true),
+			AccountMeta::new_readonly(owner, false),
+		];
+		let instruction = HistoricalInstruction::new(2, [9, 2, 4, 5], metas.clone());
+		assert_eq!(instruction.version(), 2);
+		assert_eq!(instruction.data(), [9, 2, 4, 5]);
+		assert_eq!(instruction.accounts(), metas);
+
+		let event = HistoricalEvent::new(1, [4, 1, 8, 7]);
+		assert_eq!(event.version(), 1);
+		assert_eq!(event.data(), [4, 1, 8, 7]);
+	}
+
+	#[test]
 	fn owns_offline_lifecycle_and_reports_failed_operations() {
 		run(async {
 			let mut surfnet = OfflineSurfnet::start()
@@ -579,6 +982,50 @@ mod tests {
 
 			let invalid_instruction = Instruction::new_with_bytes(program_id, &[], Vec::new());
 			assert!(surfnet.send_instruction(invalid_instruction).is_err());
+			surfnet
+				.stop()
+				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));
+		});
+	}
+
+	#[test]
+	fn installs_historical_state_and_proves_rejected_transaction_rollback() {
+		run(async {
+			let mut surfnet = OfflineSurfnet::start()
+				.await
+				.unwrap_or_else(|error| panic!("start offline Surfpool test instance: {error}"));
+			let address = Pubkey::new_unique();
+			let fixture = HistoricalAccount::new(0, address, Pubkey::new_unique(), [1, 0, 2, 3, 4])
+				.with_lamports(1_000_000);
+			surfnet
+				.install_historical_account(&fixture)
+				.unwrap_or_else(|error| panic!("install historical fixture: {error}"));
+			assert_eq!(
+				surfnet
+					.account(&address)
+					.unwrap_or_else(|error| panic!("fetch historical fixture: {error}")),
+				*fixture.account()
+			);
+
+			let rejected = HistoricalInstruction::new(0, [9, 0], Vec::new());
+			surfnet
+				.expect_historical_rejection_with_rollback(
+					system_program_id(),
+					&rejected,
+					&[address],
+					&[],
+				)
+				.unwrap_or_else(|error| panic!("prove rollback: {error}"));
+
+			let snapshots = surfnet
+				.snapshot_accounts(&[address])
+				.unwrap_or_else(|error| panic!("snapshot fixture: {error}"));
+			let changed = fixture.clone().with_lamports(2_000_000);
+			surfnet
+				.install_historical_account(&changed)
+				.unwrap_or_else(|error| panic!("mutate historical fixture: {error}"));
+			assert!(surfnet.assert_accounts_match(&snapshots).is_err());
+
 			surfnet
 				.stop()
 				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));

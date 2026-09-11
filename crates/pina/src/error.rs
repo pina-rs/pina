@@ -14,6 +14,14 @@
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PinaProgramError {
+	/// A generated migration exceeds its configured step, growth, or rent budget.
+	MigrationBudgetExceeded = 0xFFFF_FFF5,
+	/// No generated transition can safely satisfy the requested historical contract.
+	MigrationUnavailable = 0xFFFF_FFF6,
+	/// A stored version is malformed, unknown, or newer than this program.
+	InvalidMigrationVersion = 0xFFFF_FFF7,
+	/// The operation needs a dedicated migration or authorized funding first.
+	MigrationRequired = 0xFFFF_FFF8,
 	/// Two mutable account fields point at the same runtime account.
 	DuplicateMutableAccount = 0xFFFF_FFF9,
 	/// Account or instruction data is shorter than the expected minimum.

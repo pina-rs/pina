@@ -5,6 +5,8 @@
 use crate::Address;
 use crate::CloseAccountWithRecipient;
 use crate::CpiHandle;
+use crate::HasDiscriminator;
+use crate::HasMigrationVersion;
 use crate::IntoDiscriminator;
 use crate::LamportTransfer;
 #[cfg(feature = "account-resize")]
@@ -20,6 +22,20 @@ use crate::pinocchio::AccountView;
 use crate::pinocchio::account::NOT_BORROWED;
 use crate::pinocchio::account::RuntimeAccount;
 use crate::transaction;
+
+struct ProofVersioned;
+
+impl HasDiscriminator for ProofVersioned {
+	type Type = u16;
+
+	const VALUE: Self::Type = 0x1234;
+}
+
+impl HasMigrationVersion for ProofVersioned {
+	type Version = u32;
+
+	const CURRENT_VERSION: Self::Version = 7;
+}
 
 #[cfg(feature = "compact")]
 mod compact;
@@ -110,6 +126,65 @@ fn quick_discriminator_matching_agrees_with_parsing() {
 		expected.matches_discriminator(&bytes),
 		parsed == Ok(expected)
 	);
+}
+
+#[kani::proof]
+fn quick_migration_version_codecs_roundtrip() {
+	let value_u8: u8 = kani::any();
+	let value_u16: u16 = kani::any();
+	let value_u32: u32 = kani::any();
+	let mut bytes_u8 = [0_u8; 1];
+	let mut bytes_u16 = [0_u8; 2];
+	let mut bytes_u32 = [0_u8; 4];
+
+	assert!(<u8 as crate::MigrationVersion>::write_le(value_u8, &mut bytes_u8).is_ok());
+	assert!(<u16 as crate::MigrationVersion>::write_le(value_u16, &mut bytes_u16).is_ok());
+	assert!(<u32 as crate::MigrationVersion>::write_le(value_u32, &mut bytes_u32).is_ok());
+	assert_eq!(
+		<u8 as crate::MigrationVersion>::read_le(&bytes_u8),
+		Ok(value_u8),
+	);
+	assert_eq!(
+		<u16 as crate::MigrationVersion>::read_le(&bytes_u16),
+		Ok(value_u16),
+	);
+	assert_eq!(
+		<u32 as crate::MigrationVersion>::read_le(&bytes_u32),
+		Ok(value_u32),
+	);
+}
+
+#[kani::proof]
+fn quick_migration_header_classification_matches_numeric_ordering() {
+	let stored: u32 = kani::any();
+	let mut data = [0_u8; 6];
+	ProofVersioned::write_discriminator(&mut data);
+	assert!(ProofVersioned::write_migration_version(stored, &mut data).is_ok());
+
+	let classification = ProofVersioned::inspect_migration_version(&data);
+	match stored.cmp(&ProofVersioned::CURRENT_VERSION) {
+		core::cmp::Ordering::Less => {
+			assert!(matches!(
+				classification,
+				Ok(crate::StoredVersion::Stale {
+					stored: value,
+					current: 7,
+				}) if value == stored
+			))
+		}
+		core::cmp::Ordering::Equal => {
+			assert_eq!(classification, Ok(crate::StoredVersion::Current(stored)));
+		}
+		core::cmp::Ordering::Greater => {
+			assert!(matches!(
+				classification,
+				Ok(crate::StoredVersion::Future {
+					stored: value,
+					current: 7,
+				}) if value == stored
+			))
+		}
+	}
 }
 
 #[kani::proof]

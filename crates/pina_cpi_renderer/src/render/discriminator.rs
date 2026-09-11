@@ -24,45 +24,70 @@ pub(crate) struct DiscriminatorBytes {
 	pub(crate) bytes: Vec<u8>,
 }
 
-/// Resolves the offset-zero discriminator of an instruction.
+/// Resolves the contiguous constant discriminator prefix of an instruction.
 ///
 /// Native Codama roots typically use constant discriminators. Anchor roots use
 /// an omitted instruction argument whose default value carries the same
-/// bytes. Both forms are resolved before CPI arguments are rendered.
+/// bytes. Both forms are resolved before CPI arguments are rendered. Multiple
+/// adjacent constants are combined so framework-owned fields such as a current
+/// migration version cannot be omitted from generated CPI data.
 pub(crate) fn render_constant_discriminator(
 	prefix: &str,
 	discriminators: &[DiscriminatorNode],
 	arguments: &[InstructionArgumentNode],
 	context: &str,
 ) -> Result<DiscriminatorBytes> {
-	let bytes = if let Some(constant) = discriminators.iter().find_map(|discriminator| {
-		match discriminator {
-			DiscriminatorNode::Constant(node) if node.offset == 0 => Some(node),
-			_ => None,
-		}
-	}) {
-		discriminator_bytes(constant, context)?
-	} else if let Some(field) = discriminators.iter().find_map(|discriminator| {
-		match discriminator {
-			DiscriminatorNode::Field(node) if node.offset == 0 => Some(node),
-			_ => None,
-		}
-	}) {
-		let argument = arguments
-			.iter()
-			.find(|argument| argument.name.as_ref() == field.name.as_ref())
-			.ok_or_else(|| {
-				unsupported_discriminator(
-					context,
-					format!("field `{}` has no matching argument", field.name.as_ref()),
-				)
-			})?;
-		field_discriminator_bytes(argument, context)?
-	} else {
+	let mut parts = discriminators
+		.iter()
+		.filter_map(|discriminator| {
+			match discriminator {
+				DiscriminatorNode::Constant(node) => {
+					Some(discriminator_bytes(node, context).map(|bytes| (node.offset, bytes)))
+				}
+				DiscriminatorNode::Field(node) => {
+					Some(
+						arguments
+							.iter()
+							.find(|argument| argument.name.as_ref() == node.name.as_ref())
+							.ok_or_else(|| {
+								unsupported_discriminator(
+									context,
+									format!(
+										"field `{}` has no matching argument",
+										node.name.as_ref()
+									),
+								)
+							})
+							.and_then(|argument| field_discriminator_bytes(argument, context))
+							.map(|bytes| (node.offset, bytes)),
+					)
+				}
+				DiscriminatorNode::Size(_) => None,
+			}
+		})
+		.collect::<Result<Vec<_>>>()?;
+	parts.sort_unstable_by_key(|(offset, _)| *offset);
+
+	if parts.first().map(|(offset, _)| *offset) != Some(0) {
 		return Err(RenderError::MissingDiscriminator {
 			context: context.to_string(),
 		});
-	};
+	}
+
+	let mut bytes = Vec::new();
+	for (offset, part) in parts {
+		if offset != bytes.len() as u64 {
+			return Err(unsupported_discriminator(
+				context,
+				format!(
+					"constant discriminator at offset {offset} does not continue the {}-byte \
+					 prefix",
+					bytes.len()
+				),
+			));
+		}
+		bytes.extend_from_slice(&part);
+	}
 
 	Ok(DiscriminatorBytes {
 		name: format!("{}_DISCRIMINATOR", prefix.to_shouty_snake_case()),
@@ -303,6 +328,51 @@ mod tests {
 			render_constant_discriminator("test", &[field], &[field_argument()], "test"),
 			Err(RenderError::MissingDiscriminator { .. })
 		));
+	}
+
+	#[test]
+	fn combines_adjacent_constant_discriminators_into_one_prefix() {
+		let discriminators = [
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				codama_nodes::ConstantValueNode::new(
+					NumberTypeNode::le(U8),
+					NumberValueNode::new(0u8),
+				),
+				0,
+			)),
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				codama_nodes::ConstantValueNode::new(
+					NumberTypeNode::le(U16),
+					NumberValueNode::new(0x1234u16),
+				),
+				1,
+			)),
+		];
+
+		let rendered = render_constant_discriminator("update", &discriminators, &[], "test")
+			.unwrap_or_else(|error| panic!("adjacent constants should render: {error}"));
+		assert_eq!(rendered.bytes, [0, 0x34, 0x12]);
+	}
+
+	#[test]
+	fn rejects_constant_and_field_discriminators_at_the_same_offset() {
+		let constant = DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			codama_nodes::ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(0u8)),
+			0,
+		));
+		let field = DiscriminatorNode::Field(FieldDiscriminatorNode::new("discriminator", 0));
+
+		for discriminators in [vec![constant.clone(), field.clone()], vec![field, constant]] {
+			assert!(matches!(
+				render_constant_discriminator(
+					"update",
+					&discriminators,
+					&[field_argument()],
+					"test"
+				),
+				Err(RenderError::UnsupportedDiscriminator { .. })
+			));
+		}
 	}
 
 	#[test]

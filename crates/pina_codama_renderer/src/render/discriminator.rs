@@ -2,6 +2,7 @@ use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::Endianness;
 use codama_nodes::HasKind;
+use codama_nodes::InstructionInputValueNode;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
@@ -19,6 +20,95 @@ pub(crate) struct DiscriminatorInfo {
 	pub(crate) name: String,
 	pub(crate) ty: String,
 	pub(crate) value: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OmittedConstantInfo {
+	pub(crate) field: String,
+	pub(crate) name: String,
+	pub(crate) ty: String,
+	pub(crate) value: String,
+}
+
+pub(crate) fn render_omitted_instruction_constant(
+	prefix: &str,
+	field: &str,
+	r#type: &TypeNode,
+	default_value: Option<&InstructionInputValueNode>,
+	context: &str,
+) -> Result<OmittedConstantInfo> {
+	let (number_type, number_value) = match (r#type, default_value) {
+		(TypeNode::Number(number_type), Some(InstructionInputValueNode::NumberValue(value))) => {
+			(number_type, &value.number)
+		}
+		(other_type, Some(value)) => {
+			return Err(RenderError::UnsupportedDiscriminator {
+				context: context.to_string(),
+				reason: format!(
+					"omitted field `{field}` requires a numeric constant, found type `{}` and \
+					 value `{}`",
+					other_type.kind(),
+					value.kind(),
+				),
+			});
+		}
+		(_, None) => {
+			return Err(RenderError::UnsupportedDiscriminator {
+				context: context.to_string(),
+				reason: format!("omitted field `{field}` has no default value"),
+			});
+		}
+	};
+
+	render_omitted_number_constant(prefix, field, number_type, number_value, context)
+}
+
+pub(crate) fn render_omitted_value_constant(
+	prefix: &str,
+	field: &str,
+	r#type: &TypeNode,
+	default_value: Option<&ValueNode>,
+	context: &str,
+) -> Result<OmittedConstantInfo> {
+	let (number_type, number_value) = match (r#type, default_value) {
+		(TypeNode::Number(number_type), Some(ValueNode::Number(value))) => {
+			(number_type, &value.number)
+		}
+		(other_type, Some(value)) => {
+			return Err(RenderError::UnsupportedDiscriminator {
+				context: context.to_string(),
+				reason: format!(
+					"omitted field `{field}` requires a numeric constant, found type `{}` and \
+					 value `{}`",
+					other_type.kind(),
+					value.kind(),
+				),
+			});
+		}
+		(_, None) => {
+			return Err(RenderError::UnsupportedDiscriminator {
+				context: context.to_string(),
+				reason: format!("omitted field `{field}` has no default value"),
+			});
+		}
+	};
+
+	render_omitted_number_constant(prefix, field, number_type, number_value, context)
+}
+
+fn render_omitted_number_constant(
+	prefix: &str,
+	field: &str,
+	number_type: &NumberTypeNode,
+	number_value: &Number,
+	context: &str,
+) -> Result<OmittedConstantInfo> {
+	Ok(OmittedConstantInfo {
+		field: super::helpers::snake(field),
+		name: format!("{}_{}", shouty(prefix), shouty(field)),
+		ty: render_discriminator_type(number_type, context)?,
+		value: render_discriminator_literal(number_type, number_value, context)?,
+	})
 }
 
 pub(crate) fn render_constant_discriminator(
@@ -177,4 +267,60 @@ fn render_discriminator_literal(
 		NumberFormat::I128 => format!("pina::PodI128::from({literal})"),
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => unreachable!(),
 	})
+}
+
+#[cfg(test)]
+mod tests {
+	use codama_nodes::InstructionInputValueNode;
+	use codama_nodes::NumberValueNode;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::TypeNode;
+	use codama_nodes::ValueNode;
+
+	use super::render_omitted_instruction_constant;
+	use super::render_omitted_value_constant;
+
+	#[test]
+	fn omitted_constants_require_numeric_defaults() {
+		let string_type = TypeNode::from(StringTypeNode::utf8());
+		let instruction_value = InstructionInputValueNode::NumberValue(NumberValueNode::new(1_u8));
+		let account_value = ValueNode::Number(NumberValueNode::new(1_u8));
+
+		for result in [
+			render_omitted_instruction_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				Some(&instruction_value),
+				"instruction",
+			),
+			render_omitted_instruction_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				None,
+				"instruction",
+			),
+		] {
+			assert!(result.is_err());
+		}
+		for result in [
+			render_omitted_value_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				Some(&account_value),
+				"account",
+			),
+			render_omitted_value_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				None,
+				"account",
+			),
+		] {
+			assert!(result.is_err());
+		}
+	}
 }

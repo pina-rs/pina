@@ -19,6 +19,8 @@ Commands:
           Build the current Pina program for SBF and generate its IDL
   lint
           Run Pina's official security lints against the current program
+  migrations
+          Create and verify checked-in ABI migrations
   generate
           Generate configured clients for the current Pina program
   cpi

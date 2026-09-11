@@ -200,6 +200,27 @@ export function getPinaPodDiscriminatorDecoder<
 	});
 }
 
+/** Rejects account or instruction data from another migration version. */
+export function getPinaPodMigrationVersionDecoder<
+	TDecoded extends Integer,
+	TSize extends number,
+>(
+	expected: Integer,
+	decoder: FixedSizeDecoder<TDecoded, TSize>,
+): FixedSizeDecoder<TDecoded, TSize> {
+	return transformDecoder(decoder, (value) => {
+		if (BigInt(value) !== BigInt(expected)) {
+			const hint = BigInt(value) < BigInt(expected)
+				? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
+				: "the data was written by a newer program; upgrade this client";
+			throw new RangeError(
+				`migration version mismatch: expected ${expected}, received ${value} (${hint})`,
+			);
+		}
+		return value;
+	});
+}
+
 /** Rejects numeric enum representations not declared by the native schema. */
 export function getPinaPodEnumDecoder<
 	TValue extends number,

@@ -30,6 +30,7 @@ pub(crate) fn validate_fixed_schema(
 	crate_path: &syn::Path,
 	discriminator: &syn::Path,
 	zc_name: &syn::Ident,
+	extra_header_bytes: usize,
 ) -> syn::Result<proc_macro2::TokenStream> {
 	if !item.generics.params.is_empty() || item.generics.where_clause.is_some() {
 		return Err(syn::Error::new_spanned(
@@ -99,7 +100,7 @@ pub(crate) fn validate_fixed_schema(
 		field_sizes.push(quote!(::core::mem::size_of::<#pod>()));
 	}
 
-	let expected_size = quote!(#discriminator::BYTES #(+ #field_sizes)*);
+	let expected_size = quote!(#discriminator::BYTES + #extra_header_bytes #(+ #field_sizes)*);
 
 	Ok(quote! {
 		#(#field_proofs)*
@@ -159,6 +160,7 @@ pub(crate) fn validate_compact_schema(
 	crate_path: &syn::Path,
 	discriminator: &syn::Path,
 	header_name: &syn::Ident,
+	extra_header_bytes: usize,
 ) -> syn::Result<CompactSchema> {
 	validate_schema_container(item)?;
 
@@ -274,7 +276,7 @@ pub(crate) fn validate_compact_schema(
 		));
 	}
 
-	let expected_header = quote!(#discriminator::BYTES #(+ #header_sizes)*);
+	let expected_header = quote!(#discriminator::BYTES + #extra_header_bytes #(+ #header_sizes)*);
 	let max_size = quote!(#expected_header #(+ #tail_max_sizes)*);
 	let tail_alignment = quote!({
 		const fn gcd(mut left: usize, mut right: usize) -> usize {

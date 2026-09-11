@@ -106,11 +106,24 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 		}
 	}
 
+	/// Reject bytes whose migration version envelope is not current.
+	///
+	/// The default accepts every representation. The `#[account]` macro
+	/// overrides this hook for `migrations`-aware schemas so every generic
+	/// read path (`as_account`, `as_account_mut`, `validate_account_data`)
+	/// refuses stale bytes instead of misreading them as the current layout.
+	#[doc(hidden)]
+	fn require_current_migration_envelope(_data: &[u8]) -> ProgramResult {
+		Ok(())
+	}
+
 	/// Validate the discriminator and content of `data`.
 	fn validate_account_data(data: &[u8]) -> Result<(), ProgramError> {
 		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
 			return Err(ProgramError::InvalidAccountData);
 		}
+
+		Self::require_current_migration_envelope(data)?;
 
 		#[cfg(not(feature = "validation"))]
 		{
@@ -133,6 +146,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
+		Self::require_current_migration_envelope(data)?;
+
 		#[cfg(not(feature = "validation"))]
 		{
 			return <Self as PinaPodFixed>::read_exact(data)
@@ -154,6 +169,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
 			return Err(ProgramError::InvalidAccountData);
 		}
+
+		Self::require_current_migration_envelope(data)?;
 
 		#[cfg(not(feature = "validation"))]
 		{
@@ -948,10 +965,12 @@ pub trait CloseAccountWithRecipient {
 /// `distinct = false` escape hatch uses [`Self::remaining_mut`] to preserve
 /// aliases for instruction contracts that intentionally allow them.
 ///
-/// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) keep
-/// the account count fixed: a slot holding the executing program's own address
-/// marks the value as absent, matching the readonly filler emitted by the
-/// generated Codama clients.
+/// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) may
+/// be absent at the end of the account slice. Within a positional list, a slot
+/// holding the executing program's own address marks the value as absent,
+/// matching the readonly filler emitted by generated Codama clients. This
+/// allows a newer process to append optional accounts while accepting the
+/// shorter prefix sent by an older client.
 pub struct AccountsCursor<'a> {
 	program_id: Address,
 	remaining: &'a mut [AccountView],
@@ -1011,14 +1030,15 @@ impl<'a> AccountsCursor<'a> {
 
 	/// Parse the next account as an optional immutable account field.
 	///
-	/// The slot counts toward the fixed account layout either way. A slot
-	/// holding the executing program's own address marks the value as absent
-	/// and yields [`None`]; any other address is returned as [`Some`].
+	/// A missing trailing slot yields [`None`]. A present slot holding the
+	/// executing program's own address also yields [`None`]; any other address
+	/// is returned as [`Some`]. Optional fields followed by another positional
+	/// field still require the program-address filler when absent.
 	pub fn next_opt(&mut self) -> Result<Option<&'a AccountView>, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Ok(None);
+		};
 		self.remaining = rest;
 
 		if account.address() == &self.program_id {
@@ -1030,17 +1050,14 @@ impl<'a> AccountsCursor<'a> {
 
 	/// Parse the next account as an optional mutable account field.
 	///
-	/// Like [`Self::next_mut`], the account must be marked writable whenever a
-	/// value is present; otherwise a `ProgramError::InvalidAccountData` error
-	/// is returned. A slot holding the executing program's own address marks
-	/// the value as absent and yields [`None`] without any writability
-	/// requirements, matching the readonly filler emitted by the generated
-	/// clients.
+	/// Like [`Self::next_mut`], a present account must be marked writable. A
+	/// missing trailing slot or a present slot holding the executing program's
+	/// own address yields [`None`] without a writability requirement.
 	pub fn next_mut_opt(&mut self) -> Result<Option<&'a mut AccountView>, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Ok(None);
+		};
 		self.remaining = rest;
 
 		if account.address() == &self.program_id {
@@ -1251,6 +1268,30 @@ mod tests {
 		type Type = u8;
 
 		const VALUE: u8 = 7;
+	}
+
+	#[test]
+	fn trailing_optional_accounts_may_be_absent() {
+		let program_id = Address::new_from_array([7; 32]);
+		let mut immutable_accounts: [AccountView; 0] = [];
+		let mut immutable = AccountsCursor::new(program_id, &mut immutable_accounts);
+		assert!(immutable.next_opt().unwrap().is_none());
+
+		let mut mutable_accounts: [AccountView; 0] = [];
+		let mut mutable = AccountsCursor::new(program_id, &mut mutable_accounts);
+		assert!(mutable.next_mut_opt().unwrap().is_none());
+	}
+
+	#[test]
+	fn absent_optional_does_not_hide_a_missing_required_account() {
+		let program_id = Address::new_from_array([7; 32]);
+		let mut accounts: [AccountView; 0] = [];
+		let mut cursor = AccountsCursor::new(program_id, &mut accounts);
+		assert!(cursor.next_opt().unwrap().is_none());
+		assert_eq!(
+			cursor.next().unwrap_err(),
+			ProgramError::NotEnoughAccountKeys
+		);
 	}
 
 	#[test]

@@ -1,0 +1,10 @@
+[package]
+name = "migrations-surfpool-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+generated_client = { package = "migrations-program-client", path = "../../../../codama/clients/rust/migrations_program" }
+pina_test = { workspace = true }
+program_under_test = { package = "migrations_program", path = "../.." }

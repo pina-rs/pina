@@ -1,0 +1,21 @@
+[package]
+name = "pina_abi"
+version = { workspace = true }
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish = true
+readme = "readme.md"
+repository.workspace = true
+description = "Canonical ABI history model shared by Pina migration tooling and macros"
+
+[dependencies]
+quote = { workspace = true, default-features = true }
+serde = { workspace = true, features = ["derive"], default-features = true }
+serde_json = { workspace = true, default-features = true }
+sha2 = { workspace = true, default-features = true }
+syn = { workspace = true, default-features = true, features = ["full", "printing"] }
+
+[lints]
+workspace = true

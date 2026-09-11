@@ -543,6 +543,29 @@ fn exercise_analysis_shapes(remaining: &[u8]) {
 	};
 }
 
+struct Shape {
+	value: usize,
+	other: usize,
+}
+
+fn helper_expression_shapes(remaining: &[u8], other: &[u8], flag: bool) -> usize {
+	let mut value = remaining.len();
+	value = value + other.len();
+	value += remaining[0] as usize;
+	if let Some(first) = remaining.first() {
+		value += *first as usize;
+	} else {
+		value += usize::from(flag);
+	}
+	let pair = (value, [value]);
+	let base = Shape { value, other: 0 };
+	let copied = Shape {
+		value: pair.0,
+		..base
+	};
+	copied.value + copied.other
+}
+
 fn main() {}
 
 // compile-fail

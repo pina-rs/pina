@@ -52,6 +52,9 @@ pub enum BuildError {
 	#[error(transparent)]
 	Verify(#[from] VerifyBuildError),
 
+	#[error(transparent)]
+	Migration(#[from] crate::migrations::MigrationError),
+
 	#[error("Failed to run `{command}`: {source}")]
 	RunCargo {
 		command: String,
@@ -152,6 +155,7 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 /// [`build_project`].
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
+	check_migrations_for_build(&project)?;
 	let manifest_path = project.program_dir.join("Cargo.toml");
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 	let features = options
@@ -254,6 +258,7 @@ pub fn build_project_verified_with_options(
 	verify: &VerifyBuildOptions,
 ) -> Result<VerifiedBuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
+	check_migrations_for_build(&project)?;
 	let features = options
 		.features
 		.iter()
@@ -266,6 +271,19 @@ pub fn build_project_verified_with_options(
 	let verified =
 		crate::verifiable::build(&project, &features, options.no_default_features, verify)?;
 	publish_verified_build(&project, &verified)
+}
+
+fn check_migrations_for_build(project: &Project) -> Result<(), BuildError> {
+	match crate::migrations::check_project_migrations(project) {
+		Ok(_) => Ok(()),
+		Err(crate::migrations::MigrationError::Parse(source)) => {
+			Err(BuildError::GenerateIdl {
+				package: project.package_name.clone(),
+				source,
+			})
+		}
+		Err(error) => Err(BuildError::Migration(error)),
+	}
 }
 
 /// Read a Pina-local deterministic build record and verify its adjacent
@@ -538,6 +556,35 @@ mod tests {
 			.expect_err("missing project should fail discovery");
 
 		assert!(matches!(error, BuildError::Project(_)));
+	}
+
+	#[test]
+	fn build_requires_checked_migration_history() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		fs::create_dir_all(temp.path().join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		fs::write(
+			temp.path().join("Cargo.toml"),
+			"[package]\nname = \"migration-build\"\nversion = \"0.0.0\"\nedition = \
+			 \"2024\"\n[lib]\npath = \"src/lib.rs\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		fs::write(
+			temp.path().join("src/lib.rs"),
+			"use pina::*;\ndeclare_id!(\"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS\");\n#\
+			 [discriminator]\nenum Kind { State = 1 }\n#[account(discriminator = Kind::State, \
+			 migrations)]\nstruct State { value: u64 }\n",
+		)
+		.unwrap_or_else(|error| panic!("write source: {error}"));
+		let project = Project::discover(temp.path())
+			.unwrap_or_else(|error| panic!("discover fixture: {error}"));
+
+		assert!(matches!(
+			check_migrations_for_build(&project),
+			Err(BuildError::Migration(
+				crate::migrations::MigrationError::MissingSnapshot { .. }
+			))
+		));
 	}
 
 	#[test]

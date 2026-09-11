@@ -186,6 +186,7 @@ mod tests {
 	) -> InstructionIr {
 		InstructionIr {
 			name: name.to_owned(),
+			rust_name: name.to_owned(),
 			accounts: account_names
 				.iter()
 				.map(|n| {
@@ -197,6 +198,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					}
 				})

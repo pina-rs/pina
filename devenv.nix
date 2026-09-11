@@ -666,6 +666,12 @@ in
           "$cargo_build_sbf_real" \
             --skip-tools-install \
             --tools-version v1.54 \
+            --manifest-path examples/migrations_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
             --manifest-path examples/optional_accounts_program/Cargo.toml \
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
@@ -695,6 +701,7 @@ in
             --features bpf-entrypoint
         else
           cargo build-escrow-program
+          cargo build-migrations-program
           cargo build-optional-accounts-program
           cargo build-profile-program
           cargo build-role-registry-program
@@ -708,6 +715,7 @@ in
         # that the on-chain programs accept and process correctly.
         SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
           cargo test --locked \
+            -p migrations_program --test e2e \
             -p profile_program --test e2e \
             -p role_registry_program --test e2e \
             -p staking_rewards_program --test e2e \
@@ -858,6 +866,32 @@ in
           --locked \
           -p pina_cli \
           --test generated_surfpool \
+          -- \
+          --ignored \
+          --nocapture
+        # The hand-written migrations suite is not driven by `pina test`, so it
+        # needs the artifact path the build script just produced.
+        migrations_out="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}"
+        migrations_artifact=""
+        for candidate in "$migrations_out/migrations_program.so" "$migrations_out/libmigrations_program.so"; do
+          if [ -f "$candidate" ]; then
+            migrations_artifact="$candidate"
+            break
+          fi
+        done
+        if [ -z "$migrations_artifact" ]; then
+          echo "missing migrations_program SBF artifact under $migrations_out" >&2
+          exit 1
+        fi
+        PINA_SBF_ARTIFACT="$migrations_artifact" cargo test \
+          --locked \
+          -p migrations-surfpool-tests \
+          -- \
+          --ignored \
+          --nocapture
+        PINA_SBF_ARTIFACT="$migrations_artifact" PINA_COMPATIBILITY=1 cargo test \
+          --locked \
+          -p migrations-surfpool-tests \
           -- \
           --ignored \
           --nocapture

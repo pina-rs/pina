@@ -44,6 +44,7 @@ const EXAMPLE_PROGRAMS = [
 	"events_program",
 	"float_accounts_program",
 	"hello_solana_program",
+	"migrations_program",
 	"optional_accounts_program",
 	"pina_bpf_program",
 	"profile_program",
@@ -94,7 +95,11 @@ type InstructionNode = {
 	kind: "instructionNode";
 	name: string;
 	accounts?: Array<{ name: string }>;
-	arguments?: Array<{ name: string; type: TypeNode }>;
+	arguments?: Array<{
+		name: string;
+		type: TypeNode;
+		defaultValueStrategy?: string;
+	}>;
 	discriminators?: DiscriminatorNode[];
 };
 
@@ -264,8 +269,15 @@ function encodeInstruction(instruction: InstructionNode): Uint8Array {
 		(size, part) => Math.max(size, part.offset + part.bytes.length),
 		0,
 	);
+	// Omitted arguments (the framework discriminator and migration version)
+	// are already carried by the constant discriminator prefix; encoding them
+	// again would double-count their bytes and shift every later field.
 	const args = (instruction.arguments ?? [])
-		.filter((argument) => argument.name !== "discriminator")
+		.filter(
+			(argument) =>
+				argument.name !== "discriminator" &&
+				argument.defaultValueStrategy !== "omitted",
+		)
 		.map((argument) => zeroValue(argument.type));
 	const bytes = new Uint8Array(
 		discriminatorSize +
@@ -483,6 +495,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		programError: "NotEnoughAccountKeys",
 	},
 	hello_solana_program: { instruction: "hello", accounts: "payerSigner" },
+	migrations_program: {
+		instruction: "update",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	optional_accounts_program: {
 		instruction: "init",
 		accounts: "none",
@@ -542,6 +559,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
 	hello_solana_program: "MissingRequiredSignature",
+	migrations_program: "InvalidAccountData",
 	optional_accounts_program: "MissingRequiredSignature",
 	profile_program: "InvalidAccountData",
 	prop_amm_program: "InvalidAccountData",
@@ -662,6 +680,35 @@ async function runSpecificGuards(
 				},
 				"hello_solana_program accepted an unsigned user account",
 				"MissingRequiredSignature",
+			);
+			return;
+		}
+		case "migrations_program": {
+			// Version 0 predates the `memo` argument, the appended migratable
+			// account slots, and both schema growth steps. The current program
+			// must migrate its shorter payload and accept the original
+			// one-account process without client changes.
+			const historical = new Uint8Array(10);
+			historical[0] = 0;
+			historical[1] = 0;
+			new DataView(historical.buffer).setBigUint64(2, 42n, true);
+			await submit(rawInstruction(
+				descriptor.programId,
+				historical,
+				[payerSigner],
+			));
+
+			const future = historical.slice();
+			future[1] = 3;
+			await assertRejected(
+				() =>
+					submit(rawInstruction(
+						descriptor.programId,
+						future,
+						[payerSigner],
+					)),
+				"migrations_program accepted an unsupported future instruction version",
+				{ Custom: 0xfffffff7n },
 			);
 			return;
 		}

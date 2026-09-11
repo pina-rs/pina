@@ -115,6 +115,9 @@ case "${1:-}" in
 		: > "$PINA_FAKE_TARGET/sbf-build/test_program.so"
 		;;
 	test)
+		if [[ "${PINA_COMPATIBILITY:-}" == "1" ]]; then
+			printf 'compatibility enabled\n' >> "$PINA_FAKE_LOG"
+		fi
 		if [[ " $* " == *" --lib "* ]]; then
 			test -f "${PINA_SBF_ARTIFACT:?}"
 			printf 'artifact %s\n' "$PINA_SBF_ARTIFACT" >> "$PINA_FAKE_LOG"
@@ -696,6 +699,7 @@ fn unit_test_mode_never_builds_or_starts_surfpool() {
 		.env("PINA_FAKE_LOG", &log)
 		.env("PINA_FAKE_MANIFEST", &manifest)
 		.env("PINA_FAKE_TARGET", &target)
+		.env("PINA_COMPATIBILITY", "1")
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run pina test --unit: {error}"));
 
@@ -706,6 +710,7 @@ fn unit_test_mode_never_builds_or_starts_surfpool() {
 	assert!(commands.contains("cargo test"));
 	assert!(commands.contains("authority"));
 	assert!(!commands.contains("cargo build"));
+	assert!(!commands.contains("compatibility enabled"));
 }
 
 #[cfg(unix)]
@@ -739,6 +744,32 @@ fn surfpool_test_mode_builds_and_requires_the_real_artifact() {
 	assert!(build_position < test_position);
 	assert!(commands.contains("tests/surfpool/Cargo.toml --lib deploys -- --ignored --nocapture"));
 	assert!(commands.contains(&format!("artifact {}", artifact.display())));
+	assert!(!commands.contains("compatibility enabled"));
+}
+
+#[cfg(unix)]
+#[test]
+fn compatibility_mode_runs_the_complete_surfpool_suite_with_fixture_signal() {
+	let (project, manifest, target, log) = create_fake_workflow_project("compatibility workflow");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["test", "--project"])
+		.arg(&project)
+		.arg("--compatibility")
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina test --compatibility: {error}"));
+
+	assert!(output.status.success());
+	let commands = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", log.display()));
+	assert!(commands.contains("cargo build-sbf"));
+	assert!(commands.contains("cargo test"));
+	assert!(commands.contains(" -- --ignored --nocapture"));
+	assert!(commands.contains("compatibility enabled"));
 }
 
 #[cfg(unix)]

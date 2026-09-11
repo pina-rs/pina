@@ -1,0 +1,76 @@
+{
+	"formatVersion": 3,
+	"receipts": [
+		{
+			"sequence": 0,
+			"cluster": "fixture",
+			"rpcUrl": "fixture",
+			"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+			"executableSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+			"versions": {
+				"account:1:01": {
+					"version": 1,
+					"history": [
+						{
+							"schemaSha256": "caa5add7a68860297b8f2bccde442192f0d62bb6bcbd8eebece4cc9cdb5353be"
+						},
+						{
+							"schemaSha256": "bf8dae233939b31f09aac16b19688192caf2a1103934d71ea053d93b5996a8fd",
+							"transitionSha256": "6bda773f65d18948730da72fd92083f2b309b0ba1ce35d714e952e5508a5fda0"
+						}
+					]
+				},
+				"account:1:02": {
+					"version": 1,
+					"history": [
+						{
+							"schemaSha256": "62446cee3971ee19dce3b3476bbbd56966e01c71ed67d96a0e23945a8caacaae"
+						},
+						{
+							"schemaSha256": "4138df043c52fbf476ba3b845bf76ce6a56183cf595df4f61da7fea2ed7ee1b5",
+							"transitionSha256": "f191f13303cf51ca540056ebbda747f0844a1279b8e0bdf125d909546e1d5b54"
+						}
+					]
+				},
+				"account:1:03": {
+					"version": 1,
+					"history": [
+						{
+							"schemaSha256": "fdb42d160f586fd4728f0bf88de4dd7978ca51ad413af170c83d638ebdb390bd"
+						},
+						{
+							"schemaSha256": "6853af9f3e897aad9856239f5a8e079b22c5196ee9f0fb132a38781a5d33c02b",
+							"transitionSha256": "4760911720a193a16955bca7ec3a67984a26fee17c09d67ecdbe8cefce120283"
+						}
+					]
+				},
+				"event:1:04": {
+					"version": 1,
+					"history": [
+						{
+							"schemaSha256": "f0753a6ecc27d4882c1c9e15ff0b7e72f7627cd8439ce435b17acfe28a02bf14"
+						},
+						{
+							"schemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
+							"transitionSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+						}
+					]
+				},
+				"instruction:1:00": {
+					"version": 1,
+					"history": [
+						{
+							"schemaSha256": "f0753a6ecc27d4882c1c9e15ff0b7e72f7627cd8439ce435b17acfe28a02bf14"
+						},
+						{
+							"schemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
+							"transitionSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+						}
+					]
+				}
+			},
+			"previousReceiptSha256": null
+		}
+	]
+}
