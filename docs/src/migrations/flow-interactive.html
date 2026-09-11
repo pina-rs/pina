@@ -554,7 +554,7 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 </svg>
 </div>
 
-<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent, never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
+<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent — about 6,960 lamports per byte at the two-year exemption threshold — never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
 
 <!-- ============ PART 3: CLIENTS ============ -->
 <h2>Part 3: old clients, new clients, who does what</h2>
@@ -673,7 +673,7 @@ if is_migrate_instruction(data) {
 <p>That is the client flow the sweep section below describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
 <h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
-<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains a <code class="inline">&lt;account&gt;NeedsMigration(bytes)</code> envelope check — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p>
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p>
 <div class="code"><span class="k">const</span> { data } = <span class="k">await</span> fetchEncodedAccount(rpc, address);
 <span class="k">if</span> (stateNeedsMigration(data)) {
 	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }).make());

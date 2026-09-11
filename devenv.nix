@@ -1321,6 +1321,7 @@ in
         [ -f ${lib.escapeShellArg "${currentDir}/docs/src/SUMMARY.md"} ]
         ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
         ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
+        node ${lib.escapeShellArg "${currentDir}/scripts/check-migration-docs.mjs"}
       '';
       description = "Verify docs folder structure, build mdBook, and check API docs.";
       binary = "bash";

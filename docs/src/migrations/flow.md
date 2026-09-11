@@ -158,6 +158,8 @@ This is the generated dispatcher's decision tree for one instruction invocation:
         │ current types only            │
         └───────────────────────────────┘
 
+The version envelope supports `u8`, `u16`, and `u32` encodings (program-wide, `u8` by default) — never `u64`.
+
   failure BEFORE first mutation  → ordinary ProgramError
   failure AFTER first mutation   → instruction ABORTS (never a
                                    catchable error) so the transaction
@@ -203,7 +205,7 @@ if is_migrate_instruction(data) {
 }
 ```
 
-Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.
+Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
 
 That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
 
@@ -212,6 +214,7 @@ That makes the client flow explicit: when an account is stale and the business i
 Generated clients turn that flow into a one-call routine. Next to each migratable account module the TypeScript, Dart, and Rust clients emit:
 
 - a `<Account>MIGRATION_VERSION` constant — the schema version the client was generated from;
+- the generic `needsMigration` envelope check is that per-account helper (`stateNeedsMigration` for a `State` account, and so on);
 - `<account>NeedsMigration(bytes)` — a cheap envelope check that returns true only when the bytes name this account's discriminator and a version older than the client's schema. Future versions and foreign discriminators return false; the decoder explains those when the account is decoded.
 
 The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
