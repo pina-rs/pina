@@ -94,10 +94,3 @@ pub struct InitializeInstructionWire {
 	pub name: pina::String<32>,
 	pub bio: pina::String<128>,
 }
-
-impl InitializeInstructionWireZc {
-	#[must_use]
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
-}
