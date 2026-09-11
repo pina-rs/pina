@@ -2106,10 +2106,14 @@ mod tests {
 
 		let commands = plan.commands();
 		assert_eq!(commands.len(), 1);
-		assert_eq!(commands[0].program, "sh");
+		#[cfg(unix)]
+		let (shell, flag) = ("sh", "-c");
+		#[cfg(not(unix))]
+		let (shell, flag) = ("cmd", "/C");
+		assert_eq!(commands[0].program, shell);
 		assert_eq!(
 			commands[0].args,
-			vec!["-c".to_owned(), "deploy-wrapper --verbose".to_owned()]
+			vec![flag.to_owned(), "deploy-wrapper --verbose".to_owned()]
 		);
 		let env = commands[0]
 			.env
@@ -2134,10 +2138,10 @@ mod tests {
 			.execute(&mut runner)
 			.unwrap_or_else(|error| panic!("execute remote deployment: {error}"));
 		assert_eq!(runner.calls.len(), 1);
-		assert_eq!(runner.calls[0].0, "sh");
+		assert_eq!(runner.calls[0].0, shell);
 		assert_eq!(
 			runner.calls[0].1,
-			vec!["-c".to_owned(), "deploy-wrapper --verbose".to_owned()]
+			vec![flag.to_owned(), "deploy-wrapper --verbose".to_owned()]
 		);
 		assert_eq!(runner.calls[0].2, PathBuf::from(plan.project_root()));
 	}
