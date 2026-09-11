@@ -6355,7 +6355,7 @@ dependencies = [
 [[package]]
 name = "pinapod"
 version = "0.3.0"
-source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#07578ba3399ae7bc5d530c2a9b43ee285f355c00"
+source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#56018d420545a1d14e7fc4e245d42fbc6cff9711"
 dependencies = [
  "pinapod-derive",
  "solana-address 2.6.1",
@@ -6365,7 +6365,7 @@ dependencies = [
 [[package]]
 name = "pinapod-derive"
 version = "0.3.0"
-source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#07578ba3399ae7bc5d530c2a9b43ee285f355c00"
+source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#56018d420545a1d14e7fc4e245d42fbc6cff9711"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",

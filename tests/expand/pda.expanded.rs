@@ -1990,9 +1990,11 @@ mod __pinapod_compact_CompactState {
             let __tail = data
                 .get(__tail_offset..__tail_end)
                 .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
-            for __chunk in __tail.chunks_exact(__elem_size) {
+            for __i in 0..__values_len {
+                let __elem_offset = __pinapod_checked_mul(__i, __elem_size)?;
                 let __elem = unsafe {
-                    &*(__chunk.as_ptr() as *const <u64 as pina::pinapod::ZcField>::Pod)
+                    &*(__tail.as_ptr().add(__elem_offset)
+                        as *const <u64 as pina::pinapod::ZcField>::Pod)
                 };
                 <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
                     __elem,
