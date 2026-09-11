@@ -5266,6 +5266,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "migrations_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "migrations-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "migrations_program_cpi"
 version = "0.0.0"
 dependencies = [

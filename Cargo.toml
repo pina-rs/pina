@@ -13,6 +13,7 @@ members = [
 	"codama/clients/cli/rust/events_program",
 	"codama/clients/cli/rust/float_accounts_program",
 	"codama/clients/cli/rust/hello_solana_program",
+	"codama/clients/cli/rust/migrations_program",
 	"codama/clients/cli/rust/optional_accounts_program",
 	"codama/clients/cli/rust/pina_bpf_program",
 	"codama/clients/cli/rust/profile_program",

@@ -690,7 +690,7 @@ fn emit_fetch(model: &CliModel, client_crate: &str) -> String {
 	};
 	let data = context.fetch_account(&address)?;
 	let value = match @@CLIENT_CRATE@@::accounts::@@PASCAL@@::from_bytes(&data) {
-		Ok(account) => @@SNAKE@@_json(&account),
+		Ok(account) => @@SNAKE@@_json(@@ACCOUNT_BORROW@@account),
 		Err(error) => return Err(CliError::AccountDecode {
 			address: address.to_string(),
 			message: error.to_string(),
@@ -708,6 +708,13 @@ fn emit_fetch(model: &CliModel, client_crate: &str) -> String {
 				("@@CLIENT_CRATE@@", client_crate.to_string()),
 				("@@DERIVATION@@", derivation),
 				("@@DERIVE_EXPR@@", derive_expr),
+				// Compact accounts decode into an owned `…Ref<'_>` value, so the
+				// helper needs `&value`; fixed-layout accounts already decode
+				// into a reference and borrowing again is redundant.
+				(
+					"@@ACCOUNT_BORROW@@",
+					if account.compact { "&" } else { "" }.to_string(),
+				),
 			],
 		));
 
@@ -717,7 +724,7 @@ fn emit_fetch(model: &CliModel, client_crate: &str) -> String {
 				match field.kind {
 					FieldKind::Vec {
 						plain_element: true,
-					} => format!("{receiver}.iter().copied().collect::<Vec<_>>()",),
+					} => format!("{receiver}.to_vec()"),
 					_ => format!("{receiver}.iter().map(|value| value.get()).collect::<Vec<_>>()"),
 				}
 			};
