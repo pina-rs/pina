@@ -2362,11 +2362,9 @@ mod __pinapod_compact_CompactState {
             <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
             let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
             let mut __offset = core::mem::size_of::<CompactStateHeader>();
-            let __old_encoded_values: usize = __pinapod_checked_mul(
-                u16::from_le_bytes(__hdr.__values_len) as usize,
-                core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
-            )?;
-            __offset = __pinapod_checked_add(__offset, __old_encoded_values)?;
+            let __old_encoded_values: usize = u16::from_le_bytes(__hdr.__values_len)
+                as usize * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            __offset += __old_encoded_values;
             let mut updated_len = __offset;
             if let Some(value) = self.values {
                 let new_len = __pinapod_checked_mul(
