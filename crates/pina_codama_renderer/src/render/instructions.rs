@@ -594,8 +594,8 @@ pub fn render_migrate_instruction_page(
 	let reserved_value = reserved.first().copied().unwrap_or(u8::MAX);
 
 	let mut lines = Vec::new();
-	lines.push(format!(
-		"/// Discriminator reserved by Pina for the framework `Migrate` instruction."
+	lines.push(String::from(
+		"/// Discriminator reserved by Pina for the framework `Migrate` instruction.",
 	));
 	lines.push(format!(
 		"pub const MIGRATE_DISCRIMINATOR: u8 = {reserved_value}u8;"
