@@ -1199,6 +1199,17 @@ mod tests {
 
 	impl Fixture {
 		fn new() -> Self {
+			// `Project` resolves a project's target directory through cargo
+			// metadata, which honors `CARGO_TARGET_DIR`. Exporting that
+			// variable points every fixture at the shared workspace artifacts
+			// instead of its own temp target, so digest-change assertions read
+			// files another test wrote. Fail with the fix instead of a
+			// misleading mismatch.
+			assert!(
+				std::env::var_os("CARGO_TARGET_DIR").is_none(),
+				"unset CARGO_TARGET_DIR before running the deploy tests: it redirects fixture \
+				 projects at shared workspace artifacts and breaks their isolation"
+			);
 			let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 			let root = temp.path().join("project");
 			let deploy = root.join("target/deploy");
