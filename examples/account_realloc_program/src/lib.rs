@@ -118,7 +118,7 @@ pub struct Realloc2Accounts<'a> {
 
 /// Rejects growth beyond Solana's per-instruction reallocation cap.
 ///
-/// The cap is `MAX_PERMITTED_DATA_INCREASE` (`1_024 * 10` = 10_240 bytes per
+/// The cap is `MAX_PERMITTED_DATA_INCREASE` (`1_024 * 10` = `10_240` bytes per
 /// top-level instruction), re-exported by pina from pinocchio; there has never
 /// been a 1 KiB cap (see issue #277). The runtime itself rejects larger growth
 /// with `InvalidRealloc` when it deserializes the account, and pinocchio's
