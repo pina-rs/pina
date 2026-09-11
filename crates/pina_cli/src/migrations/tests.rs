@@ -2392,13 +2392,23 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 		MigrationVersionType::U8.bytes(),
 		&mut output,
 	);
+	let from_total = 2 + source.schema.maximum_payload_size().expect("fixed size");
+	let to_total = 2 + destination.maximum_payload_size().expect("compact maximum");
+	assert_eq!(
+		(from_total, to_total),
+		(10, 17),
+		"compact capacity arithmetic"
+	);
+	let rent = 6_960_u64 * u64::try_from(to_total - from_total).expect("small growth");
+	let warning = &output.data_warnings[0];
 	assert!(
-		output
-			.data_warnings
-			.iter()
-			.any(|warning| warning.contains("keeps a compact layout")),
-		"{:?}",
-		output.data_warnings
+		warning.contains("worst-case size grows from 10 to 17 bytes"),
+		"{warning}"
+	);
+	assert!(warning.contains("(compact capacity)"), "{warning}");
+	assert!(
+		warning.contains(&format!("roughly {rent} lamports of rent exemption")),
+		"{warning}"
 	);
 }
 

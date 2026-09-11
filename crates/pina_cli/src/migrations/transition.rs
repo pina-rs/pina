@@ -130,6 +130,12 @@ pub(super) const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
 /// fund the rent deficit from the migration payer inside the touching
 /// transaction. An undersized lamport budget makes those migrations fail
 /// with `MigrationBudgetExceeded` until the budget is raised.
+/// Warn when a transition grows an account, because a stale account must
+/// fund the rent deficit from the migration payer inside the touching
+/// transaction. An undersized lamport budget makes those migrations fail
+/// with `MigrationBudgetExceeded` until the budget is raised. Fixed
+/// layouts quote exact byte growth; compact layouts quote the exact
+/// worst-case growth the declared capacities imply.
 pub(super) fn warn_about_account_growth(
 	identity: &ContractIdentity,
 	rust_name: &str,
@@ -142,32 +148,43 @@ pub(super) fn warn_about_account_growth(
 		return;
 	}
 	let header = usize::from(identity.discriminator_bytes) + version_bytes;
-	if let (Some(from_payload), Some(to_payload)) = (
-		source.schema.fixed_payload_size(),
-		destination.fixed_payload_size(),
-	) && to_payload > from_payload
-	{
-		let growth = to_payload - from_payload;
-		let rent =
-			RENT_EXEMPT_LAMPORTS_PER_BYTE.saturating_mul(u64::try_from(growth).unwrap_or(u64::MAX));
-		output.data_warnings.push(format!(
-			"account `{rust_name}` grows from {} to {} bytes in transition v{} to v{}: a stale \
-			 account funds roughly {rent} lamports of rent exemption from the migration payer, so \
-			 size the invoking instruction's lamport budget and pass a signer or PDA payer",
+	let Some((from_payload, to_payload)) = source
+		.schema
+		.maximum_payload_size()
+		.zip(destination.maximum_payload_size())
+	else {
+		return;
+	};
+	if to_payload <= from_payload {
+		return;
+	}
+	let growth = to_payload - from_payload;
+	let rent =
+		RENT_EXEMPT_LAMPORTS_PER_BYTE.saturating_mul(u64::try_from(growth).unwrap_or(u64::MAX));
+	let compact =
+		source.schema.layout == LayoutKind::Compact || destination.layout == LayoutKind::Compact;
+	let sizes = if compact {
+		format!(
+			"worst-case size grows from {} to {} bytes (compact capacity) in transition v{} to v{}",
 			header + from_payload,
 			header + to_payload,
 			source.version,
 			source.version + 1,
-		));
-	} else if destination.layout == LayoutKind::Compact {
-		output.data_warnings.push(format!(
-			"account `{rust_name}` keeps a compact layout in transition v{} to v{}: capacity \
-			 growth funds rent from the migration payer, so confirm the invoking instruction's \
-			 lamport budget covers rent exemption at the new capacity",
+		)
+	} else {
+		format!(
+			"grows from {} to {} bytes in transition v{} to v{}",
+			header + from_payload,
+			header + to_payload,
 			source.version,
 			source.version + 1,
-		));
-	}
+		)
+	};
+	output.data_warnings.push(format!(
+		"account `{rust_name}` {sizes}: a stale account funds roughly {rent} lamports of rent \
+		 exemption from the migration payer, so size the invoking instruction's lamport budget \
+		 and pass a signer or PDA payer",
+	));
 }
 
 pub(super) fn process_transition(
