@@ -179,7 +179,21 @@ A planning figure for that budget: rent exemption costs about **6,960 lamports p
 Two consequences follow from the payer model:
 
 1. **An old client cannot fund growth.** A client generated before the instruction gained its optional `migrationPayer` slot submits without a payer; if the account it touches now needs rent, that transaction fails with `MigrationRequired`. The fix is a current client (or a payer-carrying migration path) — by design, rent is never taken from an account the client did not offer.
-2. **The compute bill lands on the touching transaction.** A stale account pays its ladder's compute cost inside whichever transaction finds it, and `MAX_INLINE_STEPS` bounds how long that ladder may be. Accounts that are too expensive to migrate inline fail with `MigrationUnavailable` rather than silently burning the budget; migrating them out of band is what the [Migrate instruction](../adrs/0008-migration-ux-and-legacy-adoption.md) is for.
+2. **The compute bill lands on the touching transaction.** A stale account pays its ladder's compute cost inside whichever transaction finds it, and `MAX_INLINE_STEPS` bounds how long that ladder may be. Accounts that are too expensive to migrate inline fail with `MigrationUnavailable` rather than silently burning the budget; the reserved `Migrate` instruction below is the out-of-band path.
+
+### The reserved Migrate instruction
+
+Pina reserves the all-ones value of every instruction discriminator width (`0xff`, `0xffff`, `0xffff_ffff`, `0xffff_ffff_ffff_ffff`) for a framework migration instruction; `#[discriminator]` rejects user variants that claim it at compile time. A program with migratable accounts wires the reserved route before parsing its own instruction enum:
+
+```rust,ignore
+if is_migrate_instruction(data) {
+    return process_migrate(program_id, accounts);
+}
+```
+
+Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.
+
+That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails. Generated `migrateIfNeeded` helpers are designed in [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md) and tracked in #339.
 
 ## The four scenarios
 
@@ -235,8 +249,7 @@ Rolling back the _binary_ to a previous executable does not roll back accounts. 
 
 **Implemented: the program.** Inline, on-demand, per-account — the transaction that touches a stale account performs its migration before the handler runs, funded by the payer that transaction already declared.
 
-**Designed, not yet built (ADR 0008): the client-driven prefix.** A reserved `Migrate` instruction clients may prepend (`[Migrate { payer }, …real
-instructions]`) when an account is stale but the business instruction declares no payer, plus a generated `migrateIfNeeded` client helper that fetches accounts, compares the version constant it already embeds, and only prepends the migration when needed. Until that ships, the requirement is simple: any instruction that can touch a migratable account during a growth step must declare an optional `migration_payer` slot, and current clients pass it.
+**Implemented: the reserved prefix.** A program wires the reserved `Migrate` instruction (see "The reserved Migrate instruction" above) so a client can prepend `[Migrate { payer }, …real instructions]` when an account is stale and the business instruction declares no payer. Still designed, not built (ADR 0008, tracked in #339): the generated `migrateIfNeeded` helper that fetches accounts, compares the version constant it already embeds, and prepends the migration only when needed. Until that ships, any instruction that can touch a migratable account during a growth step must also declare an optional `migration_payer` slot, and current clients pass it.
 
 ## Seeing it live
 

@@ -78,6 +78,50 @@ impl ::core::convert::TryFrom<u8> for EventDisc {
         const __INITIALIZE_EVENT: u8 = 2;
         const __EMPTY_EVENT: u8 = 3;
         const __AUDIT_EVENT: u8 = 4;
+        const _: () = {
+            if !(__TRANSFER_EVENT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `TransferEvent` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__INITIALIZE_EVENT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `InitializeEvent` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__EMPTY_EVENT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `EmptyEvent` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__AUDIT_EVENT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `AuditEvent` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __TRANSFER_EVENT => ::core::result::Result::Ok(Self::TransferEvent),

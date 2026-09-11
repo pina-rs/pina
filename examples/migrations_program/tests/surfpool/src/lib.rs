@@ -12,6 +12,13 @@ const STATE_DISCRIMINATOR: u8 = 1;
 const UPDATE_DISCRIMINATOR: u8 = 0;
 const RELAY_DISCRIMINATOR: u8 = 1;
 const CURRENT_STATE_SIZE: usize = 44;
+const MIGRATE_DISCRIMINATOR: u8 = 0xff;
+
+/// The well-known system program that the reserved instruction's rent
+/// transfers invoke.
+fn system_program() -> Pubkey {
+	Pubkey::new_from_array([0; 32])
+}
 
 fn historical_update_data(value: u64) -> Vec<u8> {
 	let mut data = vec![UPDATE_DISCRIMINATOR, 0];
@@ -50,6 +57,112 @@ fn historical_update_confirms_without_appended_optional_accounts() {
 				vec![AccountMeta::new_readonly(authority, true)],
 			)
 			.expect("execute historical Update");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The reserved framework instruction migrates a stale account on its own:
+/// no business instruction runs, and the payer authorizes exactly the
+/// migration cost.
+#[test]
+#[ignore = "run with pina test"]
+fn reserved_migrate_instruction_advances_a_stale_account() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let state = Pubkey::new_from_array([0x22; 32]);
+		program
+			.install_historical_account(&HistoricalAccount::new(
+				0,
+				state,
+				program_id,
+				historical_state_data(&authority, 7),
+			))
+			.expect("install historical state");
+
+		let stale = program.account(&state).expect("read stale state");
+		assert_eq!(stale.data.len(), 42);
+
+		program
+			.send(
+				&[MIGRATE_DISCRIMINATOR],
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new_readonly(system_program(), false),
+					AccountMeta::new(state, false),
+				],
+			)
+			.expect("execute reserved Migrate");
+
+		let migrated = program.account(&state).expect("read migrated state");
+		assert_eq!(migrated.data.len(), CURRENT_STATE_SIZE);
+		assert_eq!(migrated.data[1], 2);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A client may send only the slots it needs and fill the rest with the
+/// program address; a foreign account in a declared slot fails closed.
+#[test]
+#[ignore = "run with pina test"]
+fn reserved_migrate_instruction_skips_placeholders_and_rejects_foreign_accounts() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let state = Pubkey::new_from_array([0x24; 32]);
+		program
+			.install_historical_account(&HistoricalAccount::new(
+				0,
+				state,
+				program_id,
+				historical_state_data(&authority, 7),
+			))
+			.expect("install historical state");
+
+		// The trailing slots hold the program-address placeholder and are skipped.
+		program
+			.send(
+				&[MIGRATE_DISCRIMINATOR],
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new_readonly(system_program(), false),
+					AccountMeta::new(state, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+				],
+			)
+			.expect("execute reserved Migrate with placeholders");
+		assert_eq!(
+			program
+				.account(&state)
+				.expect("read migrated state")
+				.data
+				.len(),
+			CURRENT_STATE_SIZE
+		);
+
+		// A funded account is owned by the system program, not by this program.
+		let foreign = Pubkey::new_from_array([0x25; 32]);
+		program
+			.fund(&foreign, 1_000_000)
+			.expect("fund foreign account");
+		let rejection = program.send(
+			&[MIGRATE_DISCRIMINATOR],
+			vec![
+				AccountMeta::new(authority, true),
+				AccountMeta::new_readonly(system_program(), false),
+				AccountMeta::new(foreign, false),
+			],
+		);
+		assert!(rejection.is_err(), "a foreign account was migrated");
 
 		program.stop().expect("stop isolated program test");
 	});

@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: discriminator value for `Reserved` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value
+ --> tests/ui/reserved_migrate_discriminator.rs:4:1
+  |
+4 | #[discriminator]
+  | ^^^^^^^^^^^^^^^^ evaluation of `<Instruction as std::convert::TryFrom<u8>>::try_from::_` failed here

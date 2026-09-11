@@ -81,6 +81,61 @@ impl ::core::convert::TryFrom<u8> for InstructionDisc {
         const __TRANSFER: u8 = 2;
         const __TRANSFER_DATA: u8 = 3;
         const __COMPLEX_INSTRUCTION: u8 = 4;
+        const _: () = {
+            if !(__INITIALIZE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Initialize` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__FLIP_BIT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `FlipBit` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__TRANSFER != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Transfer` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__TRANSFER_DATA != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `TransferData` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__COMPLEX_INSTRUCTION != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `ComplexInstruction` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __INITIALIZE => ::core::result::Result::Ok(Self::Initialize),

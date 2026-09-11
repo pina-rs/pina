@@ -200,6 +200,24 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	}
 }
 
+/// Reserved framework `Migrate` instruction.
+///
+/// A client prepends this instruction when an account is stale, so the payer
+/// authorizes exactly the migration cost and the business instruction that
+/// follows sees current data. Accounts are `[payer, systemProgram, state,
+/// manualState, compactState]`: the payer is a writable account (or the
+/// program address when no step needs funding), the system program slot backs
+/// the rent transfers, and a migratable slot holding the program address is
+/// treated as omitted, mirroring the generated clients.
+fn process_migrate(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResult {
+	let mut context = MigrateContext::new(program_id, accounts, MAX_INLINE_MIGRATION_LAMPORTS)?;
+	context.run_optional::<State>(2)?;
+	context.run_optional::<ManualState>(3)?;
+	context.run_optional::<CompactState>(4)?;
+
+	Ok(())
+}
+
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
 	use super::*;
@@ -212,6 +230,9 @@ pub mod entrypoint {
 		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
+		if is_migrate_instruction(data) {
+			return process_migrate(program_id, accounts);
+		}
 		let instruction: MigrationInstruction = parse_instruction(program_id, &ID, data)?;
 		match instruction {
 			MigrationInstruction::Update => {

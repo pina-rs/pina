@@ -78,6 +78,7 @@ pub(crate) fn expand(
 
 	let mut consts = Vec::new();
 	let mut match_arms = Vec::new();
+	let mut reserved_assertions = Vec::new();
 	for variant in &item_enum.variants {
 		if let Some((_, discriminant)) = &variant.discriminant {
 			let variant_name = &variant.ident;
@@ -86,6 +87,23 @@ pub(crate) fn expand(
 
 			consts.push(quote! {
 				const #const_ident: #primitive = #discriminant;
+			});
+
+			// The all-ones discriminator belongs to the framework's reserved
+			// `Migrate` instruction. Const evaluation catches every spelling
+			// of the value, not just the literal.
+			reserved_assertions.push(quote! {
+				const _: () = {
+					::core::assert!(
+						#const_ident != !0,
+						concat!(
+							"discriminator value for `",
+							stringify!(#variant_name),
+							"` is the all-ones value reserved by Pina for the framework `Migrate` \
+							 instruction; choose another value"
+						)
+					);
+				};
 			});
 
 			match_arms.push(quote! {
@@ -117,6 +135,7 @@ pub(crate) fn expand(
 			fn try_from(number: #primitive) -> ::core::result::Result<Self, #crate_path::ProgramError> {
 				#![allow(non_upper_case_globals)]
 				#(#consts)*
+				#(#reserved_assertions)*
 				#[deny(unreachable_patterns)]
 				match number {
 					#(#match_arms)*

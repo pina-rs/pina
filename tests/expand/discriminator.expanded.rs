@@ -75,6 +75,39 @@ impl ::core::convert::TryFrom<u8> for MyDiscriminator {
         const __FIRST: u8 = 0;
         const __SECOND: u8 = 1;
         const __THIRD: u8 = 2;
+        const _: () = {
+            if !(__FIRST != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `First` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__SECOND != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Second` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__THIRD != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Third` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __FIRST => ::core::result::Result::Ok(Self::First),
@@ -187,6 +220,28 @@ impl ::core::convert::TryFrom<u16> for U16Discriminator {
         #![allow(non_upper_case_globals)]
         const __FIRST: u16 = 0;
         const __SECOND: u16 = 1;
+        const _: () = {
+            if !(__FIRST != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `First` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__SECOND != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Second` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __FIRST => ::core::result::Result::Ok(Self::First),
@@ -298,6 +353,28 @@ impl ::core::convert::TryFrom<u32> for U32Discriminator {
         #![allow(non_upper_case_globals)]
         const __FIRST: u32 = 0;
         const __SECOND: u32 = 1;
+        const _: () = {
+            if !(__FIRST != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `First` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__SECOND != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Second` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __FIRST => ::core::result::Result::Ok(Self::First),
@@ -409,6 +486,28 @@ impl ::core::convert::TryFrom<u64> for U64Discriminator {
         #![allow(non_upper_case_globals)]
         const __FIRST: u64 = 0;
         const __SECOND: u64 = 1;
+        const _: () = {
+            if !(__FIRST != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `First` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__SECOND != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Second` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __FIRST => ::core::result::Result::Ok(Self::First),
@@ -509,6 +608,17 @@ impl ::core::convert::TryFrom<u8> for FinalDiscriminator {
     fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
         #![allow(non_upper_case_globals)]
         const __ONLY: u8 = 0;
+        const _: () = {
+            if !(__ONLY != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Only` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __ONLY => ::core::result::Result::Ok(Self::Only),
