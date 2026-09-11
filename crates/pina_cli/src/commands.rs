@@ -182,6 +182,70 @@ pub(crate) fn run(cli: Cli) {
 
 fn run_migrations(command: MigrationCommands) {
 	match command {
+		MigrationCommands::Sync {
+			project,
+			renames,
+			assume_removed,
+			no_interactive,
+			json,
+		} => {
+			// The one-command loop: make -> build -> generate. Each stage
+			// keeps its own gate; make fails with the same question payloads
+			// as the standalone command.
+			let answers = match build_migration_answers(
+				&project,
+				&renames,
+				&assume_removed,
+				no_interactive,
+			) {
+				Ok(answers) => answers,
+				Err(reason) => {
+					if json {
+						print_json(&pina_cli::migrations::JsonErrorEnvelope {
+							error: reason.clone(),
+							questions: None,
+						});
+					}
+					eprintln!("{} {reason}", "Error".red().bold());
+					std::process::exit(1);
+				}
+			};
+			let output =
+				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+					Ok(output) => output,
+					Err(error) => {
+						if json {
+							let questions = match &error {
+								pina_cli::migrations::MigrationError::DisambiguationRequired {
+									questions,
+								} => Some(questions.as_slice()),
+								_ => None,
+							};
+							print_json(&pina_cli::migrations::JsonErrorEnvelope {
+								error: error.to_string(),
+								questions,
+							});
+						}
+						eprintln!("{} {error}", "Error".red().bold());
+						std::process::exit(1);
+					}
+				};
+			for warning in &output.data_warnings {
+				println!("{} {warning}", "⚠".yellow().bold());
+			}
+			run_build(
+				project.clone(),
+				Vec::new(),
+				false,
+				false,
+				std::ffi::OsString::from("solana"),
+			);
+			run_generate(project, Vec::new(), None, None, false, "node".to_owned());
+			if json {
+				print_json(&output);
+			}
+			println!("{} Sync complete", "✔".green());
+		}
 		MigrationCommands::Make {
 			project,
 			renames,
@@ -422,7 +486,7 @@ fn print_json(value: &impl serde::Serialize) {
 /// Layer CLI disambiguation flags over the persisted `[migrations.answers]`
 /// table discovered with the project.
 fn build_migration_answers(
-	project_path: &std::path::Path,
+	project_path: &Path,
 	renames: &[String],
 	removed: &[String],
 	no_interactive: bool,
