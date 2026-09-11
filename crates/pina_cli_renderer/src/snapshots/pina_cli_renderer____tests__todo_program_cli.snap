@@ -493,7 +493,7 @@ pub fn resolve_endpoint(value: &str) -> Result<(String, &'static str), CliError>
 		custom => (custom, "custom"),
 	};
 
-	if !endpoint_is_secure(&endpoint) {
+	if !endpoint_is_secure(endpoint) {
 		return Err(CliError::InsecureEndpoint {
 			value: value.to_string(),
 		});
