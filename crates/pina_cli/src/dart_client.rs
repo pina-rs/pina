@@ -1498,14 +1498,19 @@ fn emit_dart_migration_helpers(
 				source: Box::new(source),
 			}
 		})?;
-		if source.contains("NeedsMigration") {
+		let original = source.clone();
+		let mut source = source;
+		if !source.contains("NeedsMigration") {
+			source = format!(
+				"{}\n{}",
+				source.trim_end(),
+				dart_needs_migration_module(account)
+			);
+		}
+		let hardened = enforce_dart_migration_version(&source, account).unwrap_or(source);
+		if hardened == original {
 			continue;
 		}
-		let hardened = format!(
-			"{}\n{}",
-			source.trim_end(),
-			dart_needs_migration_module(account)
-		);
 		std::fs::write(&path, hardened).map_err(|source| {
 			CodamaError::DartClient {
 				path,
@@ -1734,4 +1739,62 @@ Instruction getMigrateInstruction({{
 		metas = metas,
 		provided = provided,
 	)
+}
+
+/// Replace the migration version's constant-decoder call with a
+/// direction-aware check.
+///
+/// The generated Dart decoder reads the envelope version with a generic
+/// constant decoder whose mismatch names neither the expected nor the
+/// received version. The replacement mirrors the JavaScript decoder's two
+/// hints. Returns `None` when the statement is absent or already rewritten.
+fn enforce_dart_migration_version(source: &str, account: &MigratableAccount) -> Option<String> {
+	if source.contains("storedMigrationVersion") {
+		return None;
+	}
+	let marker = format!(".read(bytes, offset + {});", account.version_offset());
+	let marker_position = source.find(&marker)?;
+	let decoder_start = source[..marker_position].rfind("getConstantDecoder(")?;
+	let line_start = source[..decoder_start]
+		.rfind('\n')
+		.map_or(0, |position| position + 1);
+	let indent = &source[line_start..decoder_start];
+
+	let decoder = match account.version_bytes {
+		2 => "getU16Decoder()",
+		4 => "getU32Decoder()",
+		_ => "getU8Decoder()",
+	};
+	let version = account.version;
+	let offset = account.version_offset();
+	let hint_stale = "the data predates this client; migrate it by sending a transaction to the \
+	                  program, or decode it with a client generated from an older IDL";
+	let hint_future = "the data was written by a newer program; upgrade this client";
+
+	let replacement = [
+		format!(
+			"{indent}final (storedMigrationVersion, _) = {decoder}.read(bytes, offset + {offset});"
+		),
+		format!("{indent}if (storedMigrationVersion != {version}) {{"),
+		format!("{indent}  throw StateError("),
+		format!("{indent}    storedMigrationVersion < {version}"),
+		format!(
+			"{indent}        ? 'migration version mismatch: expected {version}, received \
+			 $storedMigrationVersion ({hint_stale})'"
+		),
+		format!(
+			"{indent}        : 'migration version mismatch: expected {version}, received \
+			 $storedMigrationVersion ({hint_future})',"
+		),
+		format!("{indent}  );"),
+		format!("{indent}}}"),
+	]
+	.join("\n");
+
+	Some(format!(
+		"{}{}{}",
+		&source[..line_start],
+		replacement,
+		&source[marker_position + marker.len()..],
+	))
 }

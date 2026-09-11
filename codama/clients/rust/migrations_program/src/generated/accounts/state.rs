@@ -79,3 +79,98 @@ pub fn state_needs_migration(data: &[u8]) -> bool {
 		u64::from_le_bytes(version) < 2
 	}
 }
+
+/// Why `State::try_from_bytes` rejected account bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StateVersionError {
+	/// The bytes do not decode as this account's layout at all.
+	InvalidData,
+	/// The envelope names this account but the stored version predates this client: migrate the account on-chain, then retry.
+	Stale { stored: u8 },
+	/// The envelope names this account but the stored version is newer than this client's schema: upgrade this client.
+	Future { stored: u8 },
+}
+
+impl core::fmt::Display for StateVersionError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::InvalidData => write!(f, "invalid State account data"),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 2, received {stored} (the data predates \
+					 this client; migrate it by sending a transaction to the program, or decode \
+					 it with a client generated from an older IDL)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 2, received {stored} (the data was \
+					 written by a newer program; upgrade this client)"
+				)
+			}
+		}
+	}
+}
+
+impl State {
+	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`State::from_bytes`].
+	pub fn try_from_bytes(data: &[u8]) -> Result<&StateZc, StateVersionError> {
+		let account = <Self as pina::PinaPodFixed>::read_exact(data)
+			.map_err(|_| StateVersionError::InvalidData)?;
+		if account.discriminator != STATE_DISCRIMINATOR {
+			return Err(StateVersionError::InvalidData);
+		}
+		if account.migration_version < STATE_MIGRATION_VERSION {
+			return Err(StateVersionError::Stale {
+				stored: account.migration_version,
+			});
+		}
+		if account.migration_version > STATE_MIGRATION_VERSION {
+			return Err(StateVersionError::Future {
+				stored: account.migration_version,
+			});
+		}
+		Ok(account)
+	}
+}
+
+#[cfg(test)]
+mod state_version_error_tests {
+	use super::*;
+
+	fn envelope(version: u8) -> Vec<u8> {
+		let mut data = vec![0_u8; core::mem::size_of::<StateZc>()];
+		data[..1].copy_from_slice(&[1]);
+		data[1..2].copy_from_slice(&version.to_le_bytes());
+		data
+	}
+
+	#[test]
+	fn stale_and_future_versions_are_distinguishable() {
+		let error = State::try_from_bytes(&envelope(0 as u8))
+			.err()
+			.expect("a stale envelope must fail");
+		assert_eq!(error, StateVersionError::Stale { stored: 0 });
+		assert_eq!(
+			StateVersionError::Stale { stored: 0 }.to_string(),
+			"migration version mismatch: expected 2, received 0 (the data predates this client; \
+			 migrate it by sending a transaction to the program, or decode it with a client \
+			 generated from an older IDL)"
+		);
+		let error = State::try_from_bytes(&envelope(3 as u8))
+			.err()
+			.expect("a future envelope must fail");
+		assert_eq!(error, StateVersionError::Future { stored: 3 });
+		assert_eq!(
+			StateVersionError::Future { stored: 3 }.to_string(),
+			"migration version mismatch: expected 2, received 3 (the data was written by a newer \
+			 program; upgrade this client)"
+		);
+		assert!(
+			State::try_from_bytes(&envelope(2 as u8)).is_ok(),
+			"the current version must decode",
+		);
+	}
+}

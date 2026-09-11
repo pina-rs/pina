@@ -161,7 +161,14 @@ Decoder<CompactState> getCompactStateDecoder() {
 
   (CompactState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 1);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 1) {
+      throw StateError(
+        storedMigrationVersion < 1
+            ? 'migration version mismatch: expected 1, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 1, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
