@@ -1,4 +1,5 @@
 pub mod build;
+mod client_migrations;
 pub mod codama;
 pub mod codegen;
 mod compact_capacity;

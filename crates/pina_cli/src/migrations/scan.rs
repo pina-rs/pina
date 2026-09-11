@@ -60,8 +60,9 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 		// extractor ran over the same files inside `parse_program_with_sources`
 		// and any error surfaced there, so this pass cannot fail.
 		discriminators.extend(
-			parse::discriminator::extract_discriminator_enums(&resolved.file)
-				.expect("the program parser validated every discriminator enum"),
+			parse::discriminator::extract_discriminator_enums(&resolved.file).unwrap_or_else(
+				|error| panic!("the program parser validated every discriminator enum: {error:?}"),
+			),
 		);
 		events.extend(parse::event_data::extract_migratable_events(
 			&resolved.file,
@@ -103,7 +104,9 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 				process: None,
 			},
 		)
-		.expect("the program parser rejected colliding account identities");
+		.unwrap_or_else(|error| {
+			panic!("the program parser rejected colliding account identities: {error:?}")
+		});
 	}
 
 	for instruction in ir
@@ -139,7 +142,9 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 				process: Some(process_contract(instruction)),
 			},
 		)
-		.expect("the program parser rejected colliding instruction identities");
+		.unwrap_or_else(|error| {
+			panic!("the program parser rejected colliding instruction identities: {error:?}")
+		});
 	}
 
 	for event in events {

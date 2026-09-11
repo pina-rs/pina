@@ -1,6 +1,6 @@
 ---
 pina: feat
-pina_cli: patch
+pina_cli: feat
 pina_macros: feat
 ---
 
