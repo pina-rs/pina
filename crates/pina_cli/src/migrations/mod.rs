@@ -539,3 +539,19 @@ pub(crate) fn idl_migration_metadata(
 			.collect(),
 	}))
 }
+
+/// Machine-actionable failure envelope printed when a migration command
+/// fails under `--json`.
+///
+/// `error` carries the human-readable message and `questions` the exact
+/// disambiguation state, so CI logs and agents can answer with flags
+/// without re-parsing prose.
+#[derive(Debug, Serialize)]
+pub struct JsonErrorEnvelope<'a> {
+	/// The rendered failure message.
+	pub error: String,
+	/// The unanswered disambiguation questions, when the failure is
+	/// [`MigrationError::DisambiguationRequired`].
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub questions: Option<&'a [DisambiguationQuestion]>,
+}

@@ -2660,3 +2660,73 @@ fn published_contracts_must_carry_versions_and_matching_pins() {
 		"{rejection}"
 	);
 }
+
+#[test]
+fn persisted_answers_answer_makes_without_flags() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	write_state_source(&fixture, "points: u64");
+	std::fs::write(
+		fixture.root.join("pina.toml"),
+		"[migrations.answers]\nrename = [\"value:points\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("write pina.toml: {error:?}"));
+	let project =
+		Project::discover(&fixture.root).unwrap_or_else(|error| panic!("discover: {error:?}"));
+
+	let answers = MigrationAnswers::from_layers(&project.migration_answers, &[], &[], false)
+		.unwrap_or_else(|error| panic!("layer answers: {error}"));
+	let output = make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make with persisted answers: {error:?}"));
+	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+}
+
+#[test]
+fn flag_answers_override_persisted_answers_without_conflict() {
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: vec!["value:points".to_owned()],
+		assume_removed: vec![],
+	};
+	let answers = MigrationAnswers::from_layers(&persisted, &["value:total".to_owned()], &[], true)
+		.unwrap_or_else(|error| panic!("layer overriding answers: {error}"));
+	let source = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("total", "u64")]);
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
+
+	let (renames, dropped) = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&[],
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("resolved override: {error:?}"));
+	assert_eq!(
+		renames,
+		vec![pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "total".to_owned(),
+		}]
+	);
+	assert!(dropped.is_empty());
+}
+
+#[test]
+fn flag_answers_contradicting_persisted_answers_fail_closed() {
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: vec!["value:points".to_owned()],
+		assume_removed: vec![],
+	};
+	let removal_conflict =
+		MigrationAnswers::from_layers(&persisted, &[], &["value".to_owned()], true)
+			.expect_err("a removal against a persisted rename must fail closed");
+	assert!(
+		removal_conflict.contains("contradicts the persisted rename `value:points`"),
+		"{removal_conflict}"
+	);
+}

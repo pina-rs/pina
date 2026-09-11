@@ -189,13 +189,20 @@ fn run_migrations(command: MigrationCommands) {
 			no_interactive,
 			json,
 		} => {
-			let answers = match pina_cli::migrations::MigrationAnswers::from_flags(
+			let answers = match build_migration_answers(
+				&project,
 				&renames,
 				&assume_removed,
 				no_interactive,
 			) {
 				Ok(answers) => answers,
 				Err(reason) => {
+					if json {
+						print_json(&pina_cli::migrations::JsonErrorEnvelope {
+							error: reason.clone(),
+							questions: None,
+						});
+					}
 					eprintln!("{} {reason}", "Error".red().bold());
 					std::process::exit(1);
 				}
@@ -203,22 +210,19 @@ fn run_migrations(command: MigrationCommands) {
 			let output =
 				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
 					Ok(output) => output,
-					Err(
-						error @ pina_cli::migrations::MigrationError::DisambiguationRequired {
-							..
-						},
-					) => {
-						if json
-							&& let pina_cli::migrations::MigrationError::DisambiguationRequired {
-								questions,
-							} = &error
-						{
-							print_json(&questions);
-						}
-						eprintln!("{} {error}", "Error".red().bold());
-						std::process::exit(1);
-					}
 					Err(error) => {
+						if json {
+							let questions = match &error {
+								pina_cli::migrations::MigrationError::DisambiguationRequired {
+									questions,
+								} => Some(questions.as_slice()),
+								_ => None,
+							};
+							print_json(&pina_cli::migrations::JsonErrorEnvelope {
+								error: error.to_string(),
+								questions,
+							});
+						}
 						eprintln!("{} {error}", "Error".red().bold());
 						std::process::exit(1);
 					}
@@ -413,6 +417,24 @@ fn run_doctor(path: &Path, json: bool) {
 fn print_json(value: &impl serde::Serialize) {
 	let json = unwrap_or_exit(serde_json::to_string_pretty(value));
 	println!("{json}");
+}
+
+/// Layer CLI disambiguation flags over the persisted `[migrations.answers]`
+/// table discovered with the project.
+fn build_migration_answers(
+	project_path: &std::path::Path,
+	renames: &[String],
+	removed: &[String],
+	no_interactive: bool,
+) -> Result<pina_cli::migrations::MigrationAnswers, String> {
+	let project =
+		pina_cli::project::Project::discover(project_path).map_err(|error| error.to_string())?;
+	pina_cli::migrations::MigrationAnswers::from_layers(
+		&project.migration_answers,
+		renames,
+		removed,
+		no_interactive,
+	)
 }
 
 fn unwrap_or_exit<T, E: std::fmt::Display>(result: Result<T, E>) -> T {

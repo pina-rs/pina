@@ -689,6 +689,7 @@ if is_migrate_instruction(data) {
 	<div class="future-item"><span class="tag t-later">Later</span><p><b>Cost preview</b> (<a href="https://github.com/pina-rs/pina/issues/341">#341</a>). Reuse the static SBF profiler to show the rent and compute cost of a migration before you ship it.</p></div>
 </div>
 
+<p>Disambiguation answers can also live in the repo: a <code class="inline">[migrations.answers]</code> table in <code class="inline">pina.toml</code> is consulted before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename fails closed — so fresh clones and CI replay an answer made locally without re-deriving flag lists.</p>
 <p class="footnote">Also see <code>docs/src/migrations/flow.md</code> and ADRs 0007 and 0008 in <code>docs/src/adrs/</code>.</p>
 
 </div>

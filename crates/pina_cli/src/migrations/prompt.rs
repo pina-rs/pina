@@ -79,6 +79,47 @@ impl MigrationAnswers {
 		removed: &[String],
 		no_interactive: bool,
 	) -> Result<Self, String> {
+		Self::parse_answers(renames, removed, no_interactive)
+	}
+
+	/// Layer CLI arguments over the persisted `[migrations.answers]` table.
+	///
+	/// Flags override the persisted answer for the same field. A removal
+	/// that contradicts a persisted rename fails closed — the two answers
+	/// disagree about whether the field's bytes survive — so a stale
+	/// `pina.toml` cannot silently drop data.
+	pub fn from_layers(
+		persisted: &crate::project::MigrationsAnswersConfig,
+		renames: &[String],
+		removed: &[String],
+		no_interactive: bool,
+	) -> Result<Self, String> {
+		let mut answers =
+			Self::parse_answers(&persisted.rename, &persisted.assume_removed, no_interactive)?;
+		let flag_answers = Self::parse_answers(renames, removed, no_interactive)?;
+		for field in &flag_answers.removed {
+			if let Some(persisted_to) = answers.renames.get(field) {
+				return Err(format!(
+					"`--assume-removed {field}` contradicts the persisted rename \
+					 `{field}:{persisted_to}` in pina.toml; update one of them"
+				));
+			}
+		}
+		// Flag renames replace persisted answers for the same field, and a
+		// flag rename moves a field out of the persisted removal set.
+		for field in flag_answers.renames.keys() {
+			answers.removed.remove(field.as_str());
+		}
+		answers.renames.extend(flag_answers.renames);
+		answers.removed.extend(flag_answers.removed);
+		Ok(answers)
+	}
+
+	fn parse_answers(
+		renames: &[String],
+		removed: &[String],
+		no_interactive: bool,
+	) -> Result<Self, String> {
 		let mut answers = Self {
 			renames: BTreeMap::new(),
 			removed: removed.iter().cloned().collect(),

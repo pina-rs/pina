@@ -83,6 +83,18 @@ An interactive version of this page is at [flow-interactive.html](./flow-interac
 
 Once a version appears in a receipt or pending record it is frozen: `make` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check.
 
+### Persisted answers
+
+Disambiguation answers do not have to travel as flags every run. A `[migrations.answers]` table in `pina.toml` persists them for the whole checkout:
+
+```toml
+[migrations.answers]
+rename = ["value:points"]
+assume-removed = []
+```
+
+`make` consults the table before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename (for example `--assume-removed value` when the file renames `value`) fails closed. Fresh clones and CI therefore replay an answer made locally without anyone re-deriving flag lists, and `--json` failures print a machine-actionable envelope carrying the message plus the exact outstanding questions.
+
 ## Runtime flow inside the program
 
 This is the generated dispatcher's decision tree for one instruction invocation:
