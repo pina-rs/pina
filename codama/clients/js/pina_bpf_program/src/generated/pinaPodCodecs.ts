@@ -214,7 +214,7 @@ export function getPinaPodMigrationVersionDecoder<
 				? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
 				: "the data was written by a newer program; upgrade this client";
 			throw new RangeError(
-				`stale migration version: expected ${expected}, received ${value} (${hint})`,
+				`migration version mismatch: expected ${expected}, received ${value} (${hint})`,
 			);
 		}
 		return value;

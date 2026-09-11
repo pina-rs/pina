@@ -152,7 +152,11 @@ fn migration_version_is_part_of_the_framework_owned_cpi_prefix() {
 		else {
 			panic!("fixture discriminator is not a numeric constant");
 		};
-		assert_eq!(node.offset, bytes.len() as u64, "prefix must be contiguous");
+		assert_eq!(
+			node.offset as usize,
+			bytes.len(),
+			"prefix must be contiguous"
+		);
 		assert_eq!(r#type.format, U8, "fixture prefix is u8");
 		let Number::UnsignedInteger(byte) = value.number else {
 			panic!("fixture discriminator value is not an unsigned integer");

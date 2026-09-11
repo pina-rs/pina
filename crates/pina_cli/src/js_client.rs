@@ -223,7 +223,7 @@ export function getPinaPodMigrationVersionDecoder<
 					? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
 					: "the data was written by a newer program; upgrade this client";
 			throw new RangeError(
-				`stale migration version: expected ${expected}, received ${value} (${hint})`,
+				`migration version mismatch: expected ${expected}, received ${value} (${hint})`,
 			);
 		}
 		return value;
@@ -523,6 +523,16 @@ fn harden_codec_source_with_capacities(
 				&format!("['migrationVersion', {decoder}]"),
 				&format!("['migrationVersion', {replacement}]"),
 			);
+		}
+		for bits in [8, 16, 32, 64] {
+			for quote in ['"', '\''] {
+				let bare = format!("migrationVersion{quote}, getU{bits}Decoder()]");
+				if hardened.contains(&bare) {
+					panic!(
+						"generated client has an unhardened migrationVersion decoder: `{bare}`; 						 the hardening pass must wrap every version field"
+					);
+				}
+			}
 		}
 	}
 

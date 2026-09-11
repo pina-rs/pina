@@ -99,6 +99,12 @@
 		padding: 18px 20px;
 		cursor: pointer;
 		user-select: none;
+		width: 100%;
+		background: none;
+		border: none;
+		text-align: left;
+		font: inherit;
+		color: inherit;
 	}
 	.step-head:hover { background: #fafaf9; }
 	.step-num {
@@ -249,16 +255,16 @@
 <p class="lead">Seven steps from turning migrations on to shipping a new version. Click each step to expand it. The under-the-hood panels explain the machinery for anyone curious.</p>
 
 <div class="step open" id="s1">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="true">
 		<div class="step-num">1</div>
 		<div>
 			<div class="step-title">Turn migrations on once</div>
 			<div class="step-what">One line in <code class="inline">pina.toml</code>, then you can stop thinking about it.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
-		<p>Add a <code class="inline">[migrations]</code> section to your program's <code class="inline">pina.toml</code> and pick how wide the version counter should be. <code class="inline">u8</code> is fine for almost every program, and gives 255 versions per contract.</p>
+		<p>Add a <code class="inline">[migrations]</code> section to your program's <code class="inline">pina.toml</code> and pick how wide the version counter should be. <code class="inline">u8</code> is fine for almost every program, and distinguishes 256 versions per contract.</p>
 		<div class="cmd"><span class="prompt">$ </span>cat pina.toml
 <span class="comment">[project]
 program = "."
@@ -276,14 +282,14 @@ version-type = "u8"</span></div>
 </div>
 
 <div class="step" id="s2">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">2</div>
 		<div>
 			<div class="step-title">Change your code like you always do</div>
 			<div class="step-what">Add a field, add an instruction argument, change whatever the product needs.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<p>Nothing special here, and that is the point. Say your <code class="inline">State</code> account needs a new <code class="inline">revision</code> counter:</p>
 		<div class="cmd"><span class="comment">// v1: authority + value
@@ -293,14 +299,14 @@ version-type = "u8"</span></div>
 </div>
 
 <div class="step" id="s3">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">3</div>
 		<div>
 			<div class="step-title">The build catches the change</div>
 			<div class="step-what">Compilation fails with one instruction: run <code class="inline">pina migrations make</code>.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<div class="cmd"><span class="prompt">$ </span>pina build
 <span class="comment">error: State changed since the recorded schema (v1).
@@ -317,14 +323,14 @@ version-type = "u8"</span></div>
 </div>
 
 <div class="step" id="s4">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">4</div>
 		<div>
 			<div class="step-title">Record the migration</div>
 			<div class="step-what"><code class="inline">pina migrations make</code> handles most changes on its own. Renames and removals ask one question.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<div class="cmd"><span class="prompt">$ </span>pina migrations make
 <span class="comment">contract `state`: appended field `revision: u8`
@@ -338,7 +344,8 @@ version-type = "u8"</span></div>
   [n] remove, discard the stored data and zero-fill `balance`</span></div>
 		<p>On a terminal you answer interactively. In CI or an agent, the same questions arrive as JSON, or as a failure that names the flag to run:</p>
 		<div class="cmd"><span class="prompt">$ </span>pina migrations make <span class="flag">--json</span>
-<span class="comment">error: ambiguous field changes need an explicit answer
+<span class="comment">stdout: [{"contract":"state","from":"value","to":"balance","rustType":"u64"}]
+stderr: error: ambiguous field changes need an explicit answer
   - `state`: was `value` renamed to `balance` (type `u64`)?
     answer with --rename value:balance, or --assume-removed value</span>
 <span class="prompt">$ </span>pina migrations make <span class="flag">--rename value:balance</span>   <span class="comment"># non-interactive answer</span></div>
@@ -361,14 +368,14 @@ version-type = "u8"</span></div>
 </div>
 
 <div class="step" id="s5">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">5</div>
 		<div>
 			<div class="step-title">Fill the rare manual transition</div>
 			<div class="step-what">Type changes and layout switches leave a marked TODO. You write the conversion; the framework keeps the plumbing.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<p>Some changes have no safe automatic answer, like changing a field's type or moving an account from fixed to compact layout. The CLI still records the migration, but generates the transition with a failing <code class="inline">todo!()</code> body so the build will not let you forget it:</p>
 		<div class="cmd"><span class="comment">// TODO: convert the stored representation (runs on-chain, must be infallible)
@@ -380,14 +387,14 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 </div>
 
 <div class="step" id="s6">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">6</div>
 		<div>
 			<div class="step-title">Ship it, and freeze history</div>
 			<div class="step-what"><code class="inline">pina deploy --record-publication</code> publishes the program and pins every version you just shipped.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<div class="cmd"><span class="prompt">$ </span>pina build
 <span class="prompt">$ </span>pina deploy <span class="flag">--record-publication</span> --program-id &lt;ID&gt; ...</div>
@@ -402,14 +409,14 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 </div>
 
 <div class="step" id="s7">
-	<div class="step-head" onclick="toggle(this)">
+	<button type="button" class="step-head" onclick="toggle(this)" aria-expanded="false">
 		<div class="step-num">7</div>
 		<div>
 			<div class="step-title">Regenerate clients</div>
 			<div class="step-what">TypeScript, Dart, and Rust clients come out with the new shape, and they embed the current version for you.</div>
 		</div>
 		<div class="step-caret">▶</div>
-	</div>
+	</button>
 	<div class="step-body">
 		<div class="cmd"><span class="prompt">$ </span>pina generate
 <span class="comment">✓ typescript → clients/typescript
@@ -671,6 +678,10 @@ if let Some(view) = accounts.escrow {
 <script>
 	function toggle(head) {
 		head.parentElement.classList.toggle('open');
+		head.setAttribute(
+			'aria-expanded',
+			head.parentElement.classList.contains('open') ? 'true' : 'false',
+		);
 	}
 	document.getElementById('s1').classList.add('open');
 </script>

@@ -714,7 +714,7 @@ async function step2_add_field(context: StepContext): Promise<void> {
 		staleRejection = String(error);
 	}
 	expect(
-		staleRejection?.includes("stale migration version") === true,
+		staleRejection?.includes("migration version mismatch") === true,
 		`the current client rejects a stale account with an actionable error (got: ${staleRejection})`,
 	);
 

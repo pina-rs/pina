@@ -48,7 +48,7 @@ describe("generated migration version decoder", () => {
 		}
 
 		expect(rejection).toBeInstanceOf(RangeError);
-		expect(String(rejection)).toContain("stale migration version");
+		expect(String(rejection)).toContain("migration version mismatch");
 		expect(String(rejection)).toContain("expected 2, received 1");
 		expect(String(rejection)).toContain("migrate it by sending a transaction");
 	});
@@ -62,7 +62,7 @@ describe("generated migration version decoder", () => {
 		}
 
 		expect(rejection).toBeInstanceOf(RangeError);
-		expect(String(rejection)).toContain("stale migration version");
+		expect(String(rejection)).toContain("migration version mismatch");
 		expect(String(rejection)).toContain("expected 2, received 3");
 		expect(String(rejection)).toContain("upgrade this client");
 	});
