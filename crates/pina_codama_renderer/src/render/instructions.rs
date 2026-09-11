@@ -241,9 +241,13 @@ pub(crate) fn render_instruction_page(
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
+	// The derive generates `len()` only when the last field is a pod
+	// string or vector (a compact tail); those views need `is_empty()`.
 	let has_collection_field = wire_fields
 		.iter()
-		.any(|field| field.contains("pina::Vec<") || field.contains("pina::String<"));
+		.rev()
+		.find(|field| field.starts_with("\tpub "))
+		.is_some_and(|last| last.contains("pina::Vec<") || last.contains("pina::String<"));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());
 
