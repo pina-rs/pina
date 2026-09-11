@@ -527,11 +527,10 @@ fn harden_codec_source_with_capacities(
 		for bits in [8, 16, 32, 64] {
 			for quote in ['"', '\''] {
 				let bare = format!("migrationVersion{quote}, getU{bits}Decoder()]");
-				if hardened.contains(&bare) {
-					panic!(
-						"generated client has an unhardened migrationVersion decoder: `{bare}`; 						 the hardening pass must wrap every version field"
-					);
-				}
+				assert!(
+					!hardened.contains(&bare),
+					"generated client has an unhardened migrationVersion decoder: `{bare}`"
+				);
 			}
 		}
 	}
