@@ -131,7 +131,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	if mode == RenderMode::Overwrite {
-		remove_crate_dir(crate_dir);
+		remove_crate_dir(crate_dir)?;
 	}
 
 	validate_tree_has_no_symlinks(crate_dir)?;
