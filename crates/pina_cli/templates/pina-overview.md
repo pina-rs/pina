@@ -191,9 +191,10 @@ The `pina profile` command analyzes compiled SBF `.so` binaries to estimate per-
 pina profile target/deploy/my_program.so          # text summary
 pina profile target/deploy/my_program.so --json    # JSON for CI
 pina profile target/deploy/my_program.so -o r.json # write to file
+pina profile compare r.json                        # diff against a saved baseline
 ```
 
-The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU.
+The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU. `pina profile compare` diffs the current artifact against a saved report and exits 2 when the total CU regression reaches both `--fail-cu` (default 500) and `--fail-percent` (default 10), mirroring the CI compute-unit gate.
 
 <!-- {/pinaProfileDescription} -->
 

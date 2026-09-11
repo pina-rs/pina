@@ -33,6 +33,7 @@
 //! - **No loop analysis** — loops are counted once; actual CU depends on
 //!   iteration count at runtime.
 
+use serde::Deserialize;
 use serde::Serialize;
 
 /// CU cost per regular instruction (ALU, memory, branch).
@@ -69,7 +70,7 @@ pub fn estimate_instruction_cu(instruction_bytes: &[u8; 8]) -> u64 {
 }
 
 /// Per-function CU profile.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FunctionProfile {
 	/// Function name (symbol name or `<unknown+offset>`).
 	pub name: String,
@@ -86,7 +87,7 @@ pub struct FunctionProfile {
 }
 
 /// Complete profile for a program binary.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProgramProfile {
 	/// Program name (derived from the ELF filename).
 	pub program_name: String,
