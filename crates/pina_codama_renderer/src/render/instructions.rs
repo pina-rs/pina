@@ -241,8 +241,22 @@ pub(crate) fn render_instruction_page(
 	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
+	let has_collection_field = wire_fields
+		.iter()
+		.any(|field| field.contains("pina::Vec<") || field.contains("pina::String<"));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());
+
+	// Wire views with pod strings or vectors expose a derive-generated
+	// `len()`; clippy demands an `is_empty()` companion, and attribute
+	// allows do not survive the `-D warnings` lint job.
+	if has_collection_field {
+		lines.push(String::new());
+		lines.push(format!(
+			"impl {wire_name}Zc {{\n\t#[must_use]\n\tpub fn is_empty(&self) -> bool \
+			 {{\n\t\tself.len() == 0\n\t}}\n}}"
+		));
+	}
 
 	Ok(lines.join("\n"))
 }
