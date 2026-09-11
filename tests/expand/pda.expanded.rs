@@ -1807,7 +1807,7 @@ mod __pinapod_compact_CompactState {
             }
             _ => return Err(pina::pinapod::PinaPodError::InvalidLength),
         };
-        usize::try_from(value).map_err(|_| pina::pinapod::PinaPodError::Overflow)
+        usize::try_from(value).map_err(|_| pina::pinapod::PinaPodError::InvalidLength)
     }
     #[inline(always)]
     fn __pinapod_read_prefix(
@@ -1990,14 +1990,12 @@ mod __pinapod_compact_CompactState {
             let __tail = data
                 .get(__tail_offset..__tail_end)
                 .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
-            for __i in 0..__values_len {
-                let __elem_offset = __pinapod_checked_mul(__i, __elem_size)?;
-                let __elem_ptr = unsafe {
-                    &*(__tail.as_ptr().add(__elem_offset)
-                        as *const <u64 as pina::pinapod::ZcField>::Pod)
+            for __chunk in __tail.chunks_exact(__elem_size) {
+                let __elem = unsafe {
+                    &*(__chunk.as_ptr() as *const <u64 as pina::pinapod::ZcField>::Pod)
                 };
                 <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
-                    __elem_ptr,
+                    __elem,
                 )?;
             }
             __tail_offset = __tail_end;
@@ -2013,6 +2011,7 @@ mod __pinapod_compact_CompactState {
     {
         data: &'__pinapod_data [u8],
         encoded_len: usize,
+        tail_offsets: [usize; 1usize],
     }
     impl<'__pinapod_data> core::ops::Deref for CompactStateRef<'__pinapod_data>
     where
@@ -2037,21 +2036,22 @@ mod __pinapod_compact_CompactState {
             data: &'__pinapod_data [u8],
         ) -> Result<Self, pina::pinapod::PinaPodError> {
             <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
-            let mut value = Self { data, encoded_len: 0 };
-            value.encoded_len = value.current_encoded_len();
-            Ok(value)
+            let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
+            let mut __tail_offsets = [0usize; 1usize];
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            __tail_offsets[0usize] = __offset;
+            let __values_walk_count = u16::from_le_bytes(__hdr.__values_len) as usize;
+            __offset
+                += __values_walk_count
+                    * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            Ok(Self {
+                data,
+                encoded_len: __offset,
+                tail_offsets: __tail_offsets,
+            })
         }
         fn header(&self) -> &'__pinapod_data CompactStateHeader {
             unsafe { &*(self.data.as_ptr() as *const CompactStateHeader) }
-        }
-        fn current_encoded_len(&self) -> usize {
-            let __hdr = self.header();
-            let mut __offset = core::mem::size_of::<CompactStateHeader>();
-            let __values_offset_count = u16::from_le_bytes(__hdr.__values_len) as usize;
-            __offset
-                += __values_offset_count
-                    * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
-            __offset
         }
         pub fn encoded_len(&self) -> usize {
             self.encoded_len
@@ -2065,7 +2065,7 @@ mod __pinapod_compact_CompactState {
         pub fn values(&self) -> &'__pinapod_data [<u64 as pina::pinapod::ZcField>::Pod] {
             let __hdr = self.header();
             let __count = u16::from_le_bytes(__hdr.__values_len) as usize;
-            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            let __offset = self.tail_offsets[0usize];
             unsafe {
                 let __ptr = self.data.as_ptr().add(__offset)
                     as *const <u64 as pina::pinapod::ZcField>::Pod;
