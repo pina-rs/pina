@@ -8,6 +8,8 @@ mod scan;
 mod storage;
 mod transition;
 
+pub mod inspect;
+
 #[cfg(test)]
 mod tests;
 

@@ -641,16 +641,23 @@ fn event_discovery_rejects_invalid_unresolved_and_duplicate_contracts() {
 		scan_current_contracts(&project)
 	};
 
-	assert!(matches!(
-		scan("#[event(migrations)] struct ValueEvent { value: u64 }"),
-		Err(MigrationError::Parse(_))
-	));
-	assert!(matches!(
-		scan(
-			"#[event(discriminator = Missing::Value, migrations)] struct ValueEvent { value: u64 }"
-		),
-		Err(MigrationError::InvalidHistory(_))
-	));
+	let first = scan("#[event(migrations)] struct ValueEvent { value: u64 }")
+		.map(|program| format!("Ok({} contracts)", program.contracts.len()))
+		.map_err(|error| format!("Err({error})"));
+	let failure = first.expect_err("an event without a discriminator argument must fail");
+	assert!(
+		failure.contains("missing `discriminator` argument"),
+		"{failure}"
+	);
+	// An unresolved discriminator enum now fails during the shared parse
+	// stage, before the migration scan can classify it as invalid history.
+	let unresolved = scan(
+		"#[event(discriminator = Missing::Value, migrations)] struct ValueEvent { value: u64 }",
+	)
+	.map(|program| format!("Ok({} contracts)", program.contracts.len()))
+	.map_err(|error| format!("Err({error})"));
+	let failure = unresolved.expect_err("an unresolved event discriminator must fail");
+	assert!(failure.contains("Missing"), "{failure}");
 	assert!(matches!(
 		scan(
 			"#[event(discriminator = EventKind::Value, migrations)] struct First { value: u64 \

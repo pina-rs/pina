@@ -369,7 +369,7 @@ pub(super) fn validate_published_contract(
 	Ok(())
 }
 
-pub(super) fn load_manifest(path: &Path) -> Result<Option<MigrationManifest>, MigrationError> {
+pub(crate) fn load_manifest(path: &Path) -> Result<Option<MigrationManifest>, MigrationError> {
 	if !path.exists() {
 		return Ok(None);
 	}

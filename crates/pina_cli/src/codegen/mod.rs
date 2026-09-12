@@ -727,6 +727,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
 			accounts: vec![account],
+			events: Vec::new(),
 			instructions: vec![],
 			errors: vec![],
 			pdas: vec![],
@@ -774,6 +775,7 @@ mod tests {
 				docs: vec![],
 			}],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![],
 			errors: vec![],
 			pdas: vec![],
@@ -919,6 +921,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "discriminator_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
@@ -977,6 +980,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1083,6 +1087,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![InstructionIr {
 				name: "touch".to_string(),
 				rust_name: "touch".to_string(),
@@ -1181,6 +1186,7 @@ mod tests {
 				public_key: "11111111111111111111111111111111".to_string(),
 				pinapod_enums: vec![],
 				accounts: vec![],
+				events: Vec::new(),
 				instructions: vec![InstructionIr {
 					name: "do_it".to_string(),
 					rust_name: "do_it".to_string(),
@@ -1223,6 +1229,7 @@ mod tests {
 	#[test]
 	fn rejects_unresolved_pod_collection_layouts() {
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "unsupported_collection_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
@@ -1255,6 +1262,7 @@ mod tests {
 	#[test]
 	fn lowers_local_pinapod_enums() {
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "pinapod_enum_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![PinaPodEnumIr {
@@ -1318,6 +1326,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),
 				rust_name: "initialize".to_string(),

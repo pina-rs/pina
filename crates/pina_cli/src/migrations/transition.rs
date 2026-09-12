@@ -124,7 +124,7 @@ pub(super) fn create_transition(
 /// Solana charges `LAMPORTS_PER_BYTE_YEAR * EXEMPTION_THRESHOLD`
 /// (3,480 * 2) lamports per byte for a rent-exempt account; the constants
 /// have been fixed since genesis, so this is a planning figure, not a quote.
-pub(super) const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
+pub(crate) const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
 
 /// Warn when a transition grows an account, because a stale account must
 /// fund the rent deficit from the migration payer inside the touching

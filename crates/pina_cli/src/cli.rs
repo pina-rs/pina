@@ -1008,6 +1008,29 @@ pub(crate) enum MigrationCommands {
 		#[arg(long, default_value_t = false)]
 		json: bool,
 	},
+	/// Inspect one on-chain account's migration envelope against the
+	/// checked-in manifest. Exits non-zero when the account is stale or
+	/// from the future.
+	Inspect {
+		/// Base58 address of the account to inspect.
+		address: String,
+
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+
+		/// JSON-RPC endpoint to read the account from.
+		#[arg(
+			long,
+			default_value = "http://127.0.0.1:8899",
+			hide_default_value = true
+		)]
+		url: String,
+
+		/// Print the machine-readable record.
+		#[arg(long, default_value_t = false)]
+		json: bool,
+	},
 	/// Snapshot source changes and generate the adjacent transition.
 	Make {
 		/// Directory inside the project to discover.
