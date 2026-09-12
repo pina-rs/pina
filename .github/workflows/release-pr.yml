@@ -147,7 +147,7 @@ jobs:
   tag:
     if: github.repository_owner == 'pina-rs' && needs.create.outputs.is_release_commit == 'true'
     needs: create
-    timeout-minutes: 20
+    timeout-minutes: 90
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -179,32 +179,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh auth setup-git
 
-      - name: require a successful publish dry run for this tree
+      - name: dispatch publish dry run for the release tree
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # The release must not be tagged or published unless a publish dry
-          # run has already succeeded against this exact tree. The dry run is
-          # dispatched automatically every time the release PR is refreshed.
-          head_tree="$(git rev-parse HEAD^{tree})"
-          dry_ok=false
-          while read -r sha; do
-            [ -z "$sha" ] && continue
-            run_tree="$(git rev-parse "${sha}^{tree}" 2>/dev/null)" || continue
-            if [ "$run_tree" = "$head_tree" ]; then
-              dry_ok=true
-              break
-            fi
-          done < <(gh run list \
-            --workflow publish.yml \
-            --json conclusion,headSha \
-            --jq '.[] | select(.conclusion == "success") | .headSha')
-          if [ "$dry_ok" != true ]; then
-            echo "::error::No successful publish dry run exists for this release tree. Dispatch publish.yml with dry_run=true against this commit, then re-merge the release PR." >&2
-            exit 1
-          fi
-          echo "A successful publish dry run covers this release tree."
+          # Run the publish dry run against the exact merge commit being
+          # tagged. If it fails, the release stops here: no tag, no draft
+          # release, no registry publish.
+          release_tag="$(monochange step release-record --from HEAD --format json \
+            | jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' \
+            | head -1)"
+          commit="$(git rev-parse HEAD)"
+          gh workflow run publish.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$commit" \
+            -f "tag=$release_tag" \
+            -f "checkout_ref=$commit" \
+            -f "dry_run=true"
+          sleep 20
+          dry_run_id="$(gh run list --workflow publish.yml --event workflow_dispatch \
+            --json databaseId,createdAt --jq 'sort_by(.createdAt) | last | .databaseId')"
+          echo "Waiting for the publish dry run $dry_run_id..."
+          gh run watch "$dry_run_id" --exit-status --interval 30
+        shell: devenv shell -- bash -e {0}
 
       - name: create release tags
         env:
