@@ -1807,7 +1807,7 @@ mod __pinapod_compact_CompactState {
             }
             _ => return Err(pina::pinapod::PinaPodError::InvalidLength),
         };
-        usize::try_from(value).map_err(|_| pina::pinapod::PinaPodError::Overflow)
+        usize::try_from(value).map_err(|_| pina::pinapod::PinaPodError::InvalidLength)
     }
     #[inline(always)]
     fn __pinapod_read_prefix(
@@ -1992,12 +1992,12 @@ mod __pinapod_compact_CompactState {
                 .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
             for __i in 0..__values_len {
                 let __elem_offset = __pinapod_checked_mul(__i, __elem_size)?;
-                let __elem_ptr = unsafe {
+                let __elem = unsafe {
                     &*(__tail.as_ptr().add(__elem_offset)
                         as *const <u64 as pina::pinapod::ZcField>::Pod)
                 };
                 <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
-                    __elem_ptr,
+                    __elem,
                 )?;
             }
             __tail_offset = __tail_end;
@@ -2359,19 +2359,20 @@ mod __pinapod_compact_CompactState {
             data: &[u8],
         ) -> Result<usize, pina::pinapod::PinaPodError> {
             self.validate_inputs()?;
-            let view = <CompactStateRef<'_>>::new(data)?;
-            let mut updated_len = view.encoded_len();
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
+            let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            let __old_encoded_values: usize = u16::from_le_bytes(__hdr.__values_len)
+                as usize * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            __offset += __old_encoded_values;
+            let mut updated_len = __offset;
             if let Some(value) = self.values {
-                let old_len = __pinapod_checked_mul(
-                    view.values().len(),
-                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
-                )?;
                 let new_len = __pinapod_checked_mul(
                     value.len(),
                     core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
                 )?;
                 updated_len = updated_len
-                    .checked_sub(old_len)
+                    .checked_sub(__old_encoded_values)
                     .ok_or(pina::pinapod::PinaPodError::Overflow)?;
                 updated_len = __pinapod_checked_add(updated_len, new_len)?;
             }
