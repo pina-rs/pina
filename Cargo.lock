@@ -6354,8 +6354,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.3.0"
-source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#5a9b00b3b848ec0b489219b9c3c1a915b74708de"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe376adb6c800fc9af6b2b90e9af755e73477f9fd57da64eb3f0fc8dcb1ddbb3"
 dependencies = [
  "pinapod-derive",
  "solana-address 2.6.1",
@@ -6364,8 +6365,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.3.0"
-source = "git+https://github.com/pina-rs/pinapod.git?branch=fix%2Fupdated-len-preflight-cost#5a9b00b3b848ec0b489219b9c3c1a915b74708de"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d1da098232fcca1e8daff90ce7dbbd69d6865f619090664ee39d3483f64aa19"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
