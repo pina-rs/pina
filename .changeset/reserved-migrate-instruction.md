@@ -1,6 +1,7 @@
 ---
 pina: feat
 pina_cli: feat
+pina_abi: feat
 pina_codama_renderer: feat
 pina_macros: feat
 ---

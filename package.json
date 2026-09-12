@@ -9,6 +9,7 @@
 		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",
 		"build:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi build",
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
+		"build:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli build",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
 		"test:compute-units": "node --test scripts/tests/*.test.ts",

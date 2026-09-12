@@ -462,9 +462,8 @@ pub(crate) fn migration_envelope(account: &AccountNode) -> Option<MigrationEnvel
 			NumberFormat::U64 => 8,
 			_ => return None,
 		};
-		let value = match number_value.number {
-			Number::UnsignedInteger(value) => value,
-			_ => return None,
+		let Number::UnsignedInteger(value) = number_value.number else {
+			return None;
 		};
 		Some((value, width))
 	};
