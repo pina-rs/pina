@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -12,26 +11,19 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
-
 /// The address of the PropAmmProgram program.
-const propAmmProgramProgramAddress = Address('55555555555555555555555555555555555555555555');
+const propAmmProgramProgramAddress = Address(
+  '55555555555555555555555555555555555555555555',
+);
 
 /// Known accounts for the PropAmmProgram program.
-enum PropAmmProgramAccount {
-  oracleState,
-}
+enum PropAmmProgramAccount { oracleState }
 
 /// Known instructions for the PropAmmProgram program.
-enum PropAmmProgramInstruction {
-  initialize,
-  update,
-  rotateAuthority,
-}
+enum PropAmmProgramInstruction { initialize, update, rotateAuthority }
 
 /// Identifies the type of a PropAmmProgram instruction.
-PropAmmProgramInstruction identifyPropAmmProgramInstruction(
-  Uint8List data,
-) {
+PropAmmProgramInstruction identifyPropAmmProgramInstruction(Uint8List data) {
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return PropAmmProgramInstruction.initialize;
   }
@@ -42,13 +34,10 @@ PropAmmProgramInstruction identifyPropAmmProgramInstruction(
     return PropAmmProgramInstruction.rotateAuthority;
   }
 
-  throw SolanaError(
-    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
-    {
-      'instructionData': data,
-      'programName': 'propAmmProgram',
-    },
-  );
+  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
+    'instructionData': data,
+    'programName': 'propAmmProgram',
+  });
 }
 
 /// A parsed instruction from the PropAmmProgram program.
@@ -61,7 +50,7 @@ sealed class ParsedPropAmmProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedPropAmmProgramInstruction {
   const ParsedInitialize({required this.data})
-      : super(PropAmmProgramInstruction.initialize);
+    : super(PropAmmProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -69,7 +58,7 @@ final class ParsedInitialize extends ParsedPropAmmProgramInstruction {
 /// A parsed Update instruction.
 final class ParsedUpdate extends ParsedPropAmmProgramInstruction {
   const ParsedUpdate({required this.data})
-      : super(PropAmmProgramInstruction.update);
+    : super(PropAmmProgramInstruction.update);
 
   final UpdateInstructionData data;
 }
@@ -77,7 +66,7 @@ final class ParsedUpdate extends ParsedPropAmmProgramInstruction {
 /// A parsed RotateAuthority instruction.
 final class ParsedRotateAuthority extends ParsedPropAmmProgramInstruction {
   const ParsedRotateAuthority({required this.data})
-      : super(PropAmmProgramInstruction.rotateAuthority);
+    : super(PropAmmProgramInstruction.rotateAuthority);
 
   final RotateAuthorityInstructionData data;
 }

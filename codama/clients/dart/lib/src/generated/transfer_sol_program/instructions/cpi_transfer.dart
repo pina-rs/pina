@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,13 +11,9 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class CpiTransferInstructionData {
-  const CpiTransferInstructionData({
-    required this.amount,
-  }) :
-      discriminator = 0;
+  const CpiTransferInstructionData({required this.amount}) : discriminator = 0;
 
   final int discriminator;
   final BigInt amount;
@@ -46,29 +41,22 @@ Decoder<CpiTransferInstructionData> getCpiTransferInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'cpiTransfer instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'cpiTransfer instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (CpiTransferInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      CpiTransferInstructionData(
-      amount: map['amount']! as BigInt,
-      ),
+      CpiTransferInstructionData(amount: map['amount']! as BigInt),
       newOffset,
     );
   }
@@ -93,8 +81,12 @@ Decoder<CpiTransferInstructionData> getCpiTransferInstructionDataDecoder() {
   };
 }
 
-Codec<CpiTransferInstructionData, CpiTransferInstructionData> getCpiTransferInstructionDataCodec() {
-  return combineCodec(getCpiTransferInstructionDataEncoder(), getCpiTransferInstructionDataDecoder());
+Codec<CpiTransferInstructionData, CpiTransferInstructionData>
+getCpiTransferInstructionDataCodec() {
+  return combineCodec(
+    getCpiTransferInstructionDataEncoder(),
+    getCpiTransferInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [CpiTransfer] instruction.
@@ -105,22 +97,22 @@ Instruction getCpiTransferInstruction({
   required Address systemProgram,
   required BigInt amount,
 }) {
-  final instructionData = CpiTransferInstructionData(
-      amount: amount,
-  );
+  final instructionData = CpiTransferInstructionData(amount: amount);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: sender, role: AccountRole.writableSigner),
-    AccountMeta(address: recipient, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: sender, role: AccountRole.writableSigner),
+      AccountMeta(address: recipient, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getCpiTransferInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [CpiTransfer] instruction from raw instruction data.
-CpiTransferInstructionData parseCpiTransferInstruction(Instruction instruction) {
+CpiTransferInstructionData parseCpiTransferInstruction(
+  Instruction instruction,
+) {
   return getCpiTransferInstructionDataDecoder().decode(instruction.data!);
 }
