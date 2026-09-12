@@ -1,9 +1,11 @@
 use codama_nodes::DefaultValueStrategy;
+use codama_nodes::DiscriminatorNode;
 use codama_nodes::HasKind;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::IsSigner;
+use codama_nodes::NumberFormat;
 use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
@@ -11,6 +13,7 @@ use codama_nodes::PdaSeedValueValue;
 use codama_nodes::PdaValueNode;
 use codama_nodes::PdaValuePda;
 use codama_nodes::ProgramNode;
+use codama_nodes::TypeNode;
 
 use super::discriminator::render_constant_discriminator;
 use super::discriminator::render_omitted_instruction_constant;
@@ -24,7 +27,10 @@ use super::types::render_type_for_pod;
 use crate::error::RenderError;
 use crate::error::Result;
 
-pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> String {
+pub(crate) fn render_instructions_mod(
+	instructions: &[InstructionNode],
+	extra_modules: &[&str],
+) -> String {
 	let mut lines = Vec::new();
 
 	for instruction in instructions {
@@ -32,6 +38,9 @@ pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> Strin
 			"pub(crate) mod r#{};",
 			snake(instruction.name.as_ref())
 		));
+	}
+	for module in extra_modules {
+		lines.push(format!("pub(crate) mod r#{module};"));
 	}
 
 	lines.push(String::new());
@@ -41,6 +50,9 @@ pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> Strin
 			"pub use self::r#{}::*;",
 			snake(instruction.name.as_ref())
 		));
+	}
+	for module in extra_modules {
+		lines.push(format!("pub use self::r#{module}::*;"));
 	}
 
 	lines.join("\n")
@@ -550,4 +562,174 @@ fn render_instruction_account_default_value(
 	}
 
 	Ok(Some(value))
+}
+
+/// Render the framework-owned `Migrate` instruction module for a program
+/// with migratable accounts.
+///
+/// Slots: a writable-signer payer (the program-address placeholder marks an
+/// absent payer), the system program, then every declared migratable account
+/// in wire order. Omitted accounts become program-address placeholders; the
+/// program treats those exactly like absent accounts.
+pub fn render_migrate_instruction_page(
+	program: &ProgramNode,
+	primary_program_const: &str,
+) -> String {
+	let mut slots: Vec<(String, bool)> = vec![
+		("payer".to_owned(), true),
+		("system_program".to_owned(), false),
+	];
+	for account in &program.accounts {
+		if let Some(account_envelope) = super::accounts::migration_envelope(account) {
+			slots.push((account_envelope.module_name, true));
+		}
+	}
+
+	let reserved = reserved_discriminator_bytes(program);
+	let discriminator_bytes = reserved
+		.iter()
+		.map(u8::to_string)
+		.collect::<Vec<_>>()
+		.join(", ");
+	let reserved_value = reserved.first().copied().unwrap_or(u8::MAX);
+
+	let mut lines = Vec::new();
+	lines.push(String::from(
+		"/// Discriminator reserved by Pina for the framework `Migrate` instruction.",
+	));
+	lines.push(format!(
+		"pub const MIGRATE_DISCRIMINATOR: u8 = {reserved_value}u8;"
+	));
+	lines.push(String::new());
+	lines.push(String::from(
+		"/// The reserved discriminator bytes carried as the instruction payload.",
+	));
+	lines.push(String::from(
+		"pub fn get_migrate_discriminator_bytes() -> Vec<u8> {",
+	));
+	lines.push(format!("\tvec![{discriminator_bytes}]"));
+	lines.push(String::from("}"));
+	lines.push(String::new());
+	lines.push(String::from("/// Accounts."));
+	lines.push(String::from("#[derive(Clone, Debug)]"));
+	lines.push(String::from("pub struct Migrate {"));
+	for (name, _) in &slots {
+		lines.push(format!("\tpub {name}: Option<solana_pubkey::Pubkey>,"));
+	}
+	lines.push(String::from("}"));
+	lines.push(String::new());
+	lines.push(String::from("impl Migrate {"));
+	lines.push(String::from("\tpub fn new() -> Self {"));
+	lines.push(String::from("\t\tSelf {"));
+	for (name, _) in &slots {
+		lines.push(format!("\t\t\t{name}: None,"));
+	}
+	lines.push(String::from("\t\t}"));
+	lines.push(String::from("\t}"));
+	lines.push(String::new());
+	lines.push(String::from(
+		"\t/// Composes the reserved `Migrate` instruction.",
+	));
+	lines.push(String::from("\t///"));
+	lines.push(String::from(
+		"\t/// Omitted accounts become program-address placeholders, which the",
+	));
+	lines.push(String::from(
+		"\t/// program treats as absent: send only the accounts that are stale.",
+	));
+	lines.push(String::from(
+		"\t/// The payer must sign and be writable when any migration needs funding.",
+	));
+	lines.push(String::from(
+		"\tpub fn instruction(&self) -> solana_instruction::Instruction {",
+	));
+	lines.push(String::from(
+		"\t\tself.instruction_with_remaining_accounts(&[])",
+	));
+	lines.push(String::from("\t}"));
+	lines.push(String::new());
+	lines.push(String::from(
+		"\tpub fn instruction_with_remaining_accounts(",
+	));
+	lines.push(String::from("\t\t&self,"));
+	lines.push(String::from(
+		"\t\tremaining_accounts: &[solana_instruction::AccountMeta],",
+	));
+	lines.push(String::from("\t) -> solana_instruction::Instruction {"));
+	lines.push(format!(
+		"\t\tlet mut accounts = Vec::with_capacity({} + remaining_accounts.len());",
+		slots.len()
+	));
+	for (name, writable) in &slots {
+		if *writable && name == "payer" {
+			lines.push(String::from("\t\tif let Some(payer) = self.payer {"));
+			lines.push(String::from(
+				"\t\t\taccounts.push(solana_instruction::AccountMeta::new(payer, true));",
+			));
+		} else if *writable {
+			lines.push(format!("\t\tif let Some({name}) = self.{name} {{"));
+			lines.push(format!(
+				"\t\t\taccounts.push(solana_instruction::AccountMeta::new({name}, false));"
+			));
+		} else {
+			lines.push(format!("\t\tif let Some({name}) = self.{name} {{"));
+			lines.push(String::from(
+				"\t\t\taccounts.push(solana_instruction::AccountMeta::new_readonly(",
+			));
+			lines.push(format!("\t\t\t\t{name},"));
+			lines.push(String::from("\t\t\t\tfalse,"));
+			lines.push(String::from("\t\t\t));"));
+		}
+		lines.push(String::from("\t\t} else {"));
+		lines.push(String::from(
+			"\t\t\taccounts.push(solana_instruction::AccountMeta::new_readonly(",
+		));
+		lines.push(format!("\t\t\t\tcrate::{primary_program_const},"));
+		lines.push(String::from("\t\t\t\tfalse,"));
+		lines.push(String::from("\t\t\t));"));
+		lines.push(String::from("\t\t}"));
+	}
+	lines.push(String::from(
+		"\t\taccounts.extend_from_slice(remaining_accounts);",
+	));
+	lines.push(String::from("\t\tsolana_instruction::Instruction {"));
+	lines.push(format!("\t\t\tprogram_id: crate::{primary_program_const},"));
+	lines.push(String::from("\t\t\taccounts,"));
+	lines.push(String::from(
+		"\t\t\tdata: get_migrate_discriminator_bytes(),",
+	));
+	lines.push(String::from("\t\t}"));
+	lines.push(String::from("\t}"));
+	lines.push(String::from("}"));
+	lines.join("\n")
+}
+
+/// The program's instruction discriminator width in bytes, defaulting to one.
+fn instruction_discriminator_width(program: &ProgramNode) -> usize {
+	program
+		.instructions
+		.iter()
+		.find_map(|instruction| {
+			instruction.discriminators.iter().find_map(|discriminator| {
+				let DiscriminatorNode::Constant(constant) = discriminator else {
+					return None;
+				};
+				let TypeNode::Number(number_type) = constant.constant.r#type.as_ref() else {
+					return None;
+				};
+				match number_type.format {
+					NumberFormat::U16 => Some(2),
+					NumberFormat::U32 => Some(4),
+					NumberFormat::U64 => Some(8),
+					NumberFormat::U8 => Some(1),
+					_ => None,
+				}
+			})
+		})
+		.unwrap_or(1)
+}
+
+/// The reserved all-ones discriminator bytes at the instruction width.
+fn reserved_discriminator_bytes(program: &ProgramNode) -> Vec<u8> {
+	vec![u8::MAX; instruction_discriminator_width(program)]
 }

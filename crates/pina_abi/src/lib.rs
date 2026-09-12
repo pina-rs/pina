@@ -366,6 +366,19 @@ impl DataSchema {
 		hash_json(self)
 	}
 
+	/// Worst-case payload size, excluding discriminator and version.
+	///
+	/// Fixed schemas return their exact size; compact schemas return the
+	/// `maximum_size` the capacity grammar derives from the declared field
+	/// capacities, so a warning can quote an exact worst-case figure.
+	#[must_use]
+	pub fn maximum_payload_size(&self) -> Option<usize> {
+		match &self.physical {
+			PhysicalLayout::Fixed { size, .. } => usize::try_from(*size).ok(),
+			PhysicalLayout::Compact { maximum_size, .. } => usize::try_from(*maximum_size).ok(),
+		}
+	}
+
 	/// Exact payload size for a fixed schema, excluding discriminator and version.
 	///
 	/// Compact schemas return `None` because their active tail length is dynamic.

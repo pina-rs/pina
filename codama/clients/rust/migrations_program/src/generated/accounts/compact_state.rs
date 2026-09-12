@@ -51,3 +51,13 @@ impl CompactState {
 		Ok(account)
 	}
 }
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`COMPACT_STATE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+pub fn compact_state_needs_migration(data: &[u8]) -> bool {
+	data.len() >= 2 && data[0] == 3 && {
+		let mut version = [0_u8; 8];
+		version[..1].copy_from_slice(&data[1..2]);
+		u64::from_le_bytes(version) < 1
+	}
+}

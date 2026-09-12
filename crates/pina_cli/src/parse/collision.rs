@@ -228,6 +228,7 @@ mod tests {
 			pinapod_enums: vec![],
 			accounts,
 			instructions,
+			events: vec![],
 			errors: vec![],
 			pdas: vec![],
 		}

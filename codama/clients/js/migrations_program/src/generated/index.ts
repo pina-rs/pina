@@ -7,6 +7,7 @@
  */
 
 export * from "./accounts";
+export * from "./events";
 export * from "./instructions";
 export * from "./programs";
 export * from "./types";

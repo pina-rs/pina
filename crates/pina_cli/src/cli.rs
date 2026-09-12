@@ -987,6 +987,50 @@ pub(crate) enum KeysCommands {
 /// ABI migration history operations.
 #[derive(Subcommand, Debug)]
 pub(crate) enum MigrationCommands {
+	/// Runs make -> build -> generate in one step: the default loop for
+	/// unambiguous changes. Refuses with the same question payloads as
+	/// `make` when the diff needs a disambiguation answer.
+	Sync {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Answer an ambiguous rename with `--rename from:to` to preserve the
+		/// field's stored data. Repeatable.
+		#[arg(long = "rename", value_name = "FROM:TO")]
+		renames: Vec<String>,
+		/// Acknowledge that a removed field's stored data is discarded. Repeatable.
+		#[arg(long = "assume-removed", value_name = "FIELD")]
+		assume_removed: Vec<String>,
+		/// Never prompt, even on a terminal; unanswered questions fail.
+		#[arg(long = "no-interactive", default_value_t = false)]
+		no_interactive: bool,
+		/// Print the machine-readable result.
+		#[arg(long, default_value_t = false)]
+		json: bool,
+	},
+	/// Inspect one on-chain account's migration envelope against the
+	/// checked-in manifest. Exits non-zero when the account is stale or
+	/// from the future.
+	Inspect {
+		/// Base58 address of the account to inspect.
+		address: String,
+
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+
+		/// JSON-RPC endpoint to read the account from.
+		#[arg(
+			long,
+			default_value = "http://127.0.0.1:8899",
+			hide_default_value = true
+		)]
+		url: String,
+
+		/// Print the machine-readable record.
+		#[arg(long, default_value_t = false)]
+		json: bool,
+	},
 	/// Snapshot source changes and generate the adjacent transition.
 	Make {
 		/// Directory inside the project to discover.

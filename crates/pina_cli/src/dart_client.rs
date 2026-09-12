@@ -11,6 +11,8 @@ use heck::ToSnakeCase;
 use serde_json::Value;
 use walkdir::WalkDir;
 
+use crate::client_migrations::MigratableAccount;
+use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
 use crate::compact_capacity::CompactCapacityIndex;
 use crate::compact_capacity::CompactCapacityKind;
@@ -542,6 +544,8 @@ pub fn harden_generated_dart_clients(
 				}
 			})?;
 		}
+
+		emit_dart_migration_helpers(&generated, program, &root)?;
 	}
 
 	Ok(())
@@ -1460,4 +1464,337 @@ final decoder = getStructDecoder([
 				.expect_err("unsupported options must fail closed");
 		}
 	}
+}
+
+/// Adds per-account `needsMigration` checks and the reserved `Migrate`
+/// instruction module to one generated Dart client.
+///
+/// Programs without migratable accounts get none of these. Every step is
+/// idempotent so hardening can run over an already-hardened tree.
+fn emit_dart_migration_helpers(
+	generated: &Path,
+	program: &str,
+	root: &RootNode,
+) -> Result<(), CodamaError> {
+	let error = |path: &Path, message: String| {
+		CodamaError::DartClient {
+			path: path.to_path_buf(),
+			source: message.into(),
+		}
+	};
+	let Some(plan) =
+		MigrationPlan::read(&root.program).map_err(|message| error(generated, message))?
+	else {
+		return Ok(());
+	};
+
+	for account in &plan.accounts {
+		let path = generated
+			.join("accounts")
+			.join(format!("{}.dart", account.camel.to_snake_case()));
+		let source = std::fs::read_to_string(&path).map_err(|source| {
+			CodamaError::DartClient {
+				path: path.clone(),
+				source: Box::new(source),
+			}
+		})?;
+		let original = source.clone();
+		let mut source = source;
+		if !source.contains("NeedsMigration") {
+			source = format!(
+				"{}\n{}",
+				source.trim_end(),
+				dart_needs_migration_module(account)
+			);
+		}
+		let hardened = enforce_dart_migration_version(&source, account).unwrap_or(source);
+		if hardened == original {
+			continue;
+		}
+		std::fs::write(&path, hardened).map_err(|source| {
+			CodamaError::DartClient {
+				path,
+				source: Box::new(source),
+			}
+		})?;
+	}
+
+	let instructions_dir = generated.join("instructions");
+	let migrate_path = instructions_dir.join("migrate.dart");
+	if !migrate_path.exists() {
+		std::fs::write(
+			&migrate_path,
+			dart_migrate_instruction_module(program, &plan),
+		)
+		.map_err(|source| {
+			CodamaError::DartClient {
+				path: migrate_path,
+				source: Box::new(source),
+			}
+		})?;
+	}
+
+	let barrel_path = instructions_dir.join("instructions.dart");
+	let barrel = std::fs::read_to_string(&barrel_path).map_err(|source| {
+		CodamaError::DartClient {
+			path: barrel_path.clone(),
+			source: Box::new(source),
+		}
+	})?;
+	if !barrel.contains("migrate.dart") {
+		let patched = barrel.replacen("export '", "export 'migrate.dart';\nexport '", 1);
+		std::fs::write(&barrel_path, patched).map_err(|source| {
+			CodamaError::DartClient {
+				path: barrel_path,
+				source: Box::new(source),
+			}
+		})?;
+	}
+
+	Ok(())
+}
+
+/// The per-account envelope check appended to one account module.
+fn dart_needs_migration_module(account: &MigratableAccount) -> String {
+	let version_offset = account.version_offset();
+	let header = version_offset + account.version_bytes;
+	let mut conditions = Vec::new();
+	for (index, byte) in account.discriminator.iter().enumerate() {
+		conditions.push(format!("data[{index}] != {byte}"));
+	}
+	let discriminator_check = conditions.join(" || ");
+	let version_read = dart_le_read(version_offset, account.version_bytes);
+	let camel = &account.camel;
+
+	format!(
+		r"
+/// The account schema version this client was generated from.
+const int {camel}MigrationVersion = {version};
+
+/// Cheap envelope check for fetched `{pascal}` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool {camel}NeedsMigration(List<int> data) {{
+	if (data.length < {header}) {{
+		return false;
+	}}
+	if ({discriminator_check}) {{
+		return false;
+	}}
+	return {version_read} < {version};
+}}
+",
+		camel = camel,
+		pascal = crate::client_migrations::pascal_case(camel),
+		version = account.version,
+		header = header,
+		discriminator_check = discriminator_check,
+		version_read = version_read,
+	)
+}
+
+/// A Dart expression reading `width` little-endian bytes at `offset`.
+fn dart_le_read(offset: usize, width: usize) -> String {
+	let mut terms = Vec::new();
+	for index in 0..width {
+		let position = offset + index;
+		if index == 0 {
+			terms.push(format!("data[{position}]"));
+		} else {
+			terms.push(format!("(data[{position}] << {})", index * 8));
+		}
+	}
+	terms.join(" | ")
+}
+
+/// The generated `instructions/migrate.dart` module for one program.
+///
+/// Mirrors the JavaScript semantics: omitted migratable slots become
+/// program-address placeholders and trailing omitted slots are truncated,
+/// so a client sends only the accounts it needs to migrate.
+fn dart_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> String {
+	let program_camel = {
+		let mut out = String::with_capacity(program.len());
+		for (index, segment) in program.split('_').enumerate() {
+			if index == 0 {
+				out.push_str(segment);
+			} else {
+				let mut characters = segment.chars();
+				if let Some(first) = characters.next() {
+					out.push(first.to_ascii_uppercase());
+					out.push_str(characters.as_str());
+				}
+			}
+		}
+		out
+	};
+	let program_address = format!("{program_camel}ProgramAddress");
+
+	let mut slots = vec![
+		("payer".to_owned(), true),
+		("systemProgram".to_owned(), false),
+	];
+	for account in &plan.accounts {
+		slots.push((account.camel.clone(), true));
+	}
+	let parameters = slots
+		.iter()
+		.map(|(camel, _)| format!("  Address? {camel},"))
+		.collect::<Vec<_>>()
+		.join("\n");
+	let metas = slots
+		.iter()
+		.map(|(camel, writable)| {
+			if *writable && camel == "payer" {
+				format!(
+					"    AccountMeta(\n      address: {camel} ?? resolvedProgram,\n      role: \
+					 {camel} == null ? AccountRole.readonly : AccountRole.writableSigner,\n    ),"
+				)
+			} else if *writable {
+				format!(
+					"    AccountMeta(\n      address: {camel} ?? resolvedProgram,\n      role: \
+					 {camel} == null ? AccountRole.readonly : AccountRole.writable,\n    ),"
+				)
+			} else {
+				format!(
+					"    AccountMeta(address: {camel} ?? resolvedProgram, role: \
+					 AccountRole.readonly),"
+				)
+			}
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let provided = slots
+		.iter()
+		.map(|(camel, _)| camel.clone())
+		.collect::<Vec<_>>()
+		.join(", ");
+	let discriminator_bytes = plan
+		.reserved_discriminator
+		.iter()
+		.map(u8::to_string)
+		.collect::<Vec<_>>()
+		.join(", ");
+	let reserved_value = plan
+		.reserved_discriminator
+		.first()
+		.copied()
+		.unwrap_or(u8::MAX);
+
+	format!(
+		r"// Auto-generated. Do not edit.
+// ignore_for_file: type=lint
+
+import 'dart:typed_data';
+
+import 'package:solana_kit_addresses/solana_kit_addresses.dart';
+import 'package:solana_kit_instructions/solana_kit_instructions.dart';
+
+import '../programs/{program_snake}.dart' show {program_address};
+
+/// Discriminator reserved by Pina for the framework `Migrate` instruction.
+const migrateDiscriminator = {reserved_value};
+
+Uint8List getMigrateDiscriminatorBytes() =>
+    Uint8List.fromList(const [{discriminator_bytes}]);
+
+/// Creates the framework-owned `Migrate` instruction: it runs the program's
+/// on-demand account migrations on their own, so the payer authorizes exactly
+/// the migration cost and the business instruction that follows sees current
+/// data. The intended flow around any instruction that failed with a
+/// migration version mismatch is catch -> migrate -> retry.
+///
+/// Every migratable account is optional: omitted slots become program-address
+/// placeholders and trailing omitted slots are truncated, so a client sends
+/// only the accounts it needs to migrate. The `payer` funds rent deficits and
+/// must sign; omit it when no migration needs funding.
+Instruction getMigrateInstruction({{
+  Address? programAddress,
+{parameters}
+}}) {{
+  final resolvedProgram = programAddress ?? {program_address};
+  final metas = <AccountMeta>[
+{metas}
+  ];
+  final provided = [{provided}];
+  var last = -1;
+  for (var index = 0; index < provided.length; index++) {{
+    if (provided[index] != null) {{
+      last = index;
+    }}
+  }}
+  return Instruction(
+    programAddress: resolvedProgram,
+    accounts: metas.sublist(0, last + 1),
+    data: getMigrateDiscriminatorBytes(),
+  );
+}}
+",
+		program_snake = program.to_snake_case(),
+		program_address = program_address,
+		reserved_value = reserved_value,
+		discriminator_bytes = discriminator_bytes,
+		parameters = parameters,
+		metas = metas,
+		provided = provided,
+	)
+}
+
+/// Replace the migration version's constant-decoder call with a
+/// direction-aware check.
+///
+/// The generated Dart decoder reads the envelope version with a generic
+/// constant decoder whose mismatch names neither the expected nor the
+/// received version. The replacement mirrors the JavaScript decoder's two
+/// hints. Returns `None` when the statement is absent or already rewritten.
+fn enforce_dart_migration_version(source: &str, account: &MigratableAccount) -> Option<String> {
+	if source.contains("storedMigrationVersion") {
+		return None;
+	}
+	let marker = format!(".read(bytes, offset + {});", account.version_offset());
+	let marker_position = source.find(&marker)?;
+	let decoder_start = source[..marker_position].rfind("getConstantDecoder(")?;
+	let line_start = source[..decoder_start]
+		.rfind('\n')
+		.map_or(0, |position| position + 1);
+	let indent = &source[line_start..decoder_start];
+
+	let decoder = match account.version_bytes {
+		2 => "getU16Decoder()",
+		4 => "getU32Decoder()",
+		_ => "getU8Decoder()",
+	};
+	let version = account.version;
+	let offset = account.version_offset();
+	let hint_stale = "the data predates this client; migrate it by sending a transaction to the \
+	                  program, or decode it with a client generated from an older IDL";
+	let hint_future = "the data was written by a newer program; upgrade this client";
+
+	let replacement = [
+		format!(
+			"{indent}final (storedMigrationVersion, _) = {decoder}.read(bytes, offset + {offset});"
+		),
+		format!("{indent}if (storedMigrationVersion != {version}) {{"),
+		format!("{indent}  throw StateError("),
+		format!("{indent}    storedMigrationVersion < {version}"),
+		format!(
+			"{indent}        ? 'migration version mismatch: expected {version}, received \
+			 $storedMigrationVersion ({hint_stale})'"
+		),
+		format!(
+			"{indent}        : 'migration version mismatch: expected {version}, received \
+			 $storedMigrationVersion ({hint_future})',"
+		),
+		format!("{indent}  );"),
+		format!("{indent}}}"),
+	]
+	.join("\n");
+
+	Some(format!(
+		"{}{}{}",
+		&source[..line_start],
+		replacement,
+		&source[marker_position + marker.len()..],
+	))
 }

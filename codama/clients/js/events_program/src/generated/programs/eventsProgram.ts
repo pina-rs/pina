@@ -45,6 +45,26 @@ export const EVENTS_PROGRAM_PROGRAM_ADDRESS =
 		"2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy"
 	>;
 
+export enum EventsProgramEvent {
+	MyEvent,
+	MyOtherEvent,
+}
+
+export function identifyEventsProgramEvent(
+	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): EventsProgramEvent {
+	const data = "data" in event ? event.data : event;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return EventsProgramEvent.MyEvent;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return EventsProgramEvent.MyOtherEvent;
+	}
+	throw new Error(
+		"The provided event could not be identified as a eventsProgram event.",
+	);
+}
+
 export enum EventsProgramInstruction {
 	Initialize,
 	TestEvent,

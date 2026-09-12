@@ -29,6 +29,46 @@ mod private {
 /// the 4 KiB SBF stack budget.
 pub const MAX_MIGRATION_WORKSPACE: usize = 1024;
 
+/// All-ones one-byte discriminator reserved for the framework `Migrate`
+/// instruction.
+///
+/// `#[discriminator]` rejects user variants that claim the reserved value, so
+/// a program can route the reserved instruction before parsing its own
+/// instruction enum:
+///
+/// ```rust,ignore
+/// if is_migrate_instruction(data) {
+///     return process_migrate(program_id, accounts);
+/// }
+/// ```
+///
+/// Programs with wider instruction discriminators compare against the matching
+/// constant with an explicit length check (`data == [0xff, 0xff]` and friends
+/// compile to a `memcmp` call on SBF, which costs more compute than a direct
+/// byte comparison).
+pub const MIGRATE_DISCRIMINATOR_U8: u8 = u8::MAX;
+
+/// Two-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+pub const MIGRATE_DISCRIMINATOR_U16: u16 = u16::MAX;
+
+/// Four-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+pub const MIGRATE_DISCRIMINATOR_U32: u32 = u32::MAX;
+
+/// Eight-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+pub const MIGRATE_DISCRIMINATOR_U64: u64 = u64::MAX;
+
+/// Whether `data` carries exactly the reserved `Migrate` discriminator for a
+/// one-byte instruction space.
+///
+/// The comparison stays inline: a slice equality against an array compiles to
+/// a `memcmp` call on SBF, and this check runs ahead of every instruction a
+/// program that wires the reserved path dispatches.
+#[inline]
+#[must_use]
+pub fn is_migrate_instruction(data: &[u8]) -> bool {
+	data.len() == 1 && data[0] == MIGRATE_DISCRIMINATOR_U8
+}
+
 /// Integer encoding used by the program-wide migration version envelope.
 ///
 /// Pina implements this trait only for `u8`, `u16`, and `u32`. A program picks
@@ -952,10 +992,220 @@ mod executor {
 			Ok(mutating.finish::<T>())
 		}
 	}
+
+	/// Framework entry point for the reserved `Migrate` instruction.
+	///
+	/// Account layout: slot 0 is the funding payer — a writable account, or the
+	/// executing program's address when this invocation needs no funding —
+	/// slot 1 is the system program the rent transfers invoke, and every later
+	/// slot is a program-owned migratable account. Each migratable slot is
+	/// used at most once. A program wires the reserved instruction by running
+	/// the declared accounts in order:
+	///
+	/// ```rust,ignore
+	/// let mut migrate = MigrateContext::new(program_id, accounts, cap)?;
+	/// migrate.run_optional::<State>(2)?;
+	/// migrate.run_optional::<ManualState>(3)?;
+	/// Ok(())
+	/// ```
+	///
+	/// Slots that hold the program address (the placeholder generated clients
+	/// write for an omitted optional account) and slots past the end of the
+	/// slice are skipped by [`Self::run_optional`], so a client may send only
+	/// the accounts it needs to migrate.
+	///
+	/// `max_lamports` caps the rent transfers of the whole reserved
+	/// instruction: every slot this context migrates draws from the same
+	/// budget, so the payer can never be charged the cap once per account.
+	#[must_use]
+	pub struct MigrateContext<'account> {
+		program_id: &'account Address,
+		accounts: &'account mut [AccountView],
+		max_lamports: u64,
+		migrated: u64,
+		spent_lamports: u64,
+		rent: Option<Rent>,
+	}
+
+	impl<'account> MigrateContext<'account> {
+		/// Validate the reserved instruction's account layout.
+		///
+		/// # Errors
+		///
+		/// Returns `NotEnoughAccountKeys` when the payer or system program
+		/// slot is missing, `InvalidAccountData` when the system program slot
+		/// is not the system program, `InvalidAccountOwner` when a migratable
+		/// slot is not owned by the program, and `DuplicateMutableAccount`
+		/// when one account fills several slots.
+		pub fn new(
+			program_id: &'account Address,
+			accounts: &'account mut [AccountView],
+			max_lamports: u64,
+		) -> Result<Self, ProgramError> {
+			let Some((payer, rest)) = accounts.split_first_mut() else {
+				return Err(ProgramError::NotEnoughAccountKeys);
+			};
+			// Slot 1 is the system program: the rent transfers invoke it, so
+			// the runtime requires it in the instruction's account list.
+			let Some((system_program, migratable)) = rest.split_first_mut() else {
+				return Err(ProgramError::NotEnoughAccountKeys);
+			};
+			system_program.assert_address(&crate::system::ID)?;
+			// The program-address filler marks an absent payer. A present payer
+			// must be writable because it is the only account that can fund a
+			// rent deficit.
+			if payer.address() != program_id {
+				payer.assert_writable()?;
+			}
+			for (position, account) in migratable.iter().enumerate() {
+				if account.address() == program_id {
+					continue;
+				}
+				account.assert_owner(program_id)?;
+				// The same account may appear once: a second slot would let
+				// one invocation mutate shared bytes twice.
+				if migratable
+					.iter()
+					.skip(position + 1)
+					.any(|other| other.address() == account.address())
+				{
+					return Err(PinaProgramError::DuplicateMutableAccount.into());
+				}
+			}
+
+			Ok(Self {
+				program_id,
+				accounts,
+				max_lamports,
+				migrated: 0,
+				spent_lamports: 0,
+				rent: None,
+			})
+		}
+
+		/// Same layout validation with an injected rent sysvar for tests.
+		#[cfg(test)]
+		pub(super) fn with_rent(
+			program_id: &'account Address,
+			accounts: &'account mut [AccountView],
+			max_lamports: u64,
+			rent: Rent,
+		) -> Result<Self, ProgramError> {
+			let mut context = Self::new(program_id, accounts, max_lamports)?;
+			context.rent = Some(rent);
+
+			Ok(context)
+		}
+
+		/// Migrate one declared account slot.
+		///
+		/// # Errors
+		///
+		/// Fails closed when the slot is the payer, past the end of the slice,
+		/// already migrated, not owned by the program, or does not carry the
+		/// requested contract's discriminator. Planning failures are catchable
+		/// before any effect; invariant failures after the first effect abort
+		/// the instruction.
+		pub fn run<T>(
+			&mut self,
+			index: usize,
+		) -> Result<AccountMigrationOutcome<T::Version>, ProgramError>
+		where
+			T: MigratableAccount,
+		{
+			let Some(slot) = index.checked_sub(2) else {
+				return Err(ProgramError::NotEnoughAccountKeys);
+			};
+			if slot >= u64::BITS as usize - 1 {
+				return Err(PinaProgramError::MigrationUnavailable.into());
+			}
+			let bit = 1_u64 << slot;
+			if self.migrated & bit != 0 {
+				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			}
+
+			let (payer_slot, rest) = self
+				.accounts
+				.split_first_mut()
+				.ok_or(ProgramError::NotEnoughAccountKeys)?;
+			let (_, migratable) = rest
+				.split_first_mut()
+				.ok_or(ProgramError::NotEnoughAccountKeys)?;
+			let account = migratable
+				.get_mut(slot)
+				.ok_or(ProgramError::NotEnoughAccountKeys)?;
+			account.assert_owner(self.program_id)?;
+			{
+				let data = account.try_borrow()?;
+				if !T::matches_discriminator(&data) {
+					return Err(ProgramError::InvalidAccountData);
+				}
+			}
+
+			let payer_is_placeholder = payer_slot.address() == self.program_id;
+			let payer_lamports_before = payer_slot.lamports();
+			let payer = if payer_is_placeholder {
+				None
+			} else {
+				Some(&*payer_slot)
+			};
+			let mut executor = MigrateAccount {
+				account,
+				payer,
+				program_id: self.program_id,
+				// Spend from the instruction-wide budget, not a per-account
+				// copy of the cap: the payer may fund several slots in one
+				// reserved invocation.
+				max_lamports: self.max_lamports.saturating_sub(self.spent_lamports),
+			};
+			let outcome = executor.invoke_signed_inner::<T>(&[], self.rent)?;
+			self.migrated |= bit;
+			let spent = payer_lamports_before.saturating_sub(payer_slot.lamports());
+			self.spent_lamports = self.spent_lamports.saturating_add(spent);
+
+			Ok(outcome)
+		}
+
+		/// Migrate one declared account slot, treating an omitted slot as
+		/// nothing to do.
+		///
+		/// A slot holding the program address, or an index past the end of the
+		/// slice, is reported as absent instead of failing.
+		///
+		/// # Errors
+		///
+		/// Inherits [`Self::run`]'s failures for a present slot.
+		pub fn run_optional<T>(
+			&mut self,
+			index: usize,
+		) -> Result<Option<AccountMigrationOutcome<T::Version>>, ProgramError>
+		where
+			T: MigratableAccount,
+		{
+			if self.slot_is_absent(index) {
+				return Ok(None);
+			}
+			self.run::<T>(index).map(Some)
+		}
+
+		/// Whether this context migrated at least one account.
+		#[must_use]
+		pub const fn migrated_any(&self) -> bool {
+			self.migrated != 0
+		}
+
+		fn slot_is_absent(&self, index: usize) -> bool {
+			self.accounts
+				.get(index)
+				.is_none_or(|account| account.address() == self.program_id)
+		}
+	}
 }
 
 #[cfg(feature = "account-resize")]
 pub use executor::MigrateAccount;
+#[cfg(feature = "account-resize")]
+pub use executor::MigrateContext;
 
 #[cfg(test)]
 #[allow(unsafe_code)]
@@ -978,6 +1228,19 @@ mod tests {
 	use super::*;
 	#[cfg(feature = "account-resize")]
 	use crate::MAX_PERMITTED_DATA_INCREASE;
+
+	#[test]
+	fn reserved_instruction_identification_matches_only_the_exact_one_byte_discriminator() {
+		assert!(is_migrate_instruction(&[MIGRATE_DISCRIMINATOR_U8]));
+		assert!(!is_migrate_instruction(&[]));
+		assert!(!is_migrate_instruction(&[0x00]));
+		// A wider instruction space uses the wider constants, so the one-byte
+		// check must reject longer payloads instead of prefix-matching.
+		assert!(!is_migrate_instruction(&[
+			MIGRATE_DISCRIMINATOR_U8,
+			MIGRATE_DISCRIMINATOR_U8
+		]));
+	}
 
 	struct U8Versioned;
 
@@ -1623,6 +1886,235 @@ mod tests {
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1_u64.to_le_bytes())
 			.unwrap_or_else(|error| panic!("create test rent: {error:?}"))
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn migrate_context_validates_the_funding_slot_and_system_program() {
+		let program_id = Address::new_from_array([9; 32]);
+
+		assert_eq!(
+			MigrateContext::new(&program_id, &mut [], 0).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+
+		// A payer slot without the system program slot is just as unusable.
+		let mut payer_only =
+			[
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[])
+					.view(),
+			];
+		assert_eq!(
+			MigrateContext::new(&program_id, &mut payer_only, 0).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+
+		// A payer that is not the program-address placeholder must be writable.
+		let mut stored_payer =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[]);
+		stored_payer.header.is_writable = 0;
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut stored_target = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			500,
+			&[7, 0, 42],
+		);
+		let mut views = [stored_payer.view(), system.view(), stored_target.view()];
+		assert!(matches!(
+			MigrateContext::new(&program_id, &mut views, 0),
+			Err(ProgramError::InvalidAccountData)
+		));
+
+		// The rent transfers invoke the system program, so its slot must name it.
+		let mut stored_payer =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[]);
+		let mut wrong_system =
+			TestAccount::<8>::new(Address::new_from_array([7; 32]), program_id, 0, &[]);
+		let mut stored_target = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			500,
+			&[7, 0, 42],
+		);
+		let mut views = [
+			stored_payer.view(),
+			wrong_system.view(),
+			stored_target.view(),
+		];
+		assert!(MigrateContext::new(&program_id, &mut views, 0).is_err());
+
+		// Every migratable slot must be owned by the executing program.
+		let mut stored_payer =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 500, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut foreign = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			Address::new_from_array([8; 32]),
+			500,
+			&[7, 0, 42],
+		);
+		let mut views = [stored_payer.view(), system.view(), foreign.view()];
+		assert_eq!(
+			MigrateContext::new(&program_id, &mut views, 0).err(),
+			Some(ProgramError::InvalidAccountOwner)
+		);
+
+		// The program address in the payer slot marks an absent payer.
+		let mut placeholder = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut stored_target = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			500,
+			&[7, 0, 42],
+		);
+		let mut views = [placeholder.view(), system.view(), stored_target.view()];
+		let context = MigrateContext::new(&program_id, &mut views, 0)
+			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
+		assert!(!context.migrated_any());
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn migrate_context_migrates_declared_slots_exactly_once() {
+		let program_id = Address::new_from_array([9; 32]);
+		let mut placeholder = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut stored = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			10_000,
+			&[7, 0, 42],
+		);
+		let mut views = [placeholder.view(), system.view(), stored.view()];
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
+
+		assert_eq!(
+			context.run::<GrowingAccount>(0).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+		assert_eq!(
+			context.run::<GrowingAccount>(1).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+		assert_eq!(
+			context.run::<GrowingAccount>(3).err(),
+			Some(ProgramError::NotEnoughAccountKeys)
+		);
+		// Slots are tracked in a u64 bitmask, so the declared layout caps at
+		// 63 migratable slots and a slot past that cap fails closed.
+		assert_eq!(
+			context.run::<GrowingAccount>(65).err(),
+			Some(PinaProgramError::MigrationUnavailable.into())
+		);
+
+		let outcome = context
+			.run::<GrowingAccount>(2)
+			.unwrap_or_else(|error| panic!("migrate slot: {error:?}"));
+		assert_eq!(
+			outcome,
+			AccountMigrationOutcome::Migrated {
+				from: 0,
+				to: 1,
+				steps: 1,
+			}
+		);
+		assert!(context.migrated_any());
+		assert_eq!(
+			context.run::<GrowingAccount>(2).err(),
+			Some(PinaProgramError::DuplicateMutableAccount.into())
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn migrate_context_rejects_duplicate_account_slots() {
+		let program_id = Address::new_from_array([9; 32]);
+		let mut placeholder = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut stored = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			10_000,
+			&[7, 0, 42],
+		);
+		let duplicate = stored.view();
+		let mut views = [placeholder.view(), system.view(), stored.view(), duplicate];
+		assert_eq!(
+			MigrateContext::new(&program_id, &mut views, 0).err(),
+			Some(PinaProgramError::DuplicateMutableAccount.into())
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn migrate_context_rejects_slots_with_the_wrong_discriminator() {
+		let program_id = Address::new_from_array([9; 32]);
+		let mut placeholder = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut stored = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			10_000,
+			&[8, 0, 11, 42],
+		);
+		let mut views = [placeholder.view(), system.view(), stored.view()];
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
+
+		assert_eq!(
+			context.run::<GrowingAccount>(2).err(),
+			Some(ProgramError::InvalidAccountData)
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn migrate_context_skips_absent_slots_and_honors_the_lamport_cap() {
+		let program_id = Address::new_from_array([9; 32]);
+		let mut placeholder = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut absent = TestAccount::<8>::new(program_id, program_id, 0, &[]);
+		let mut stored = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			10_000,
+			&[7, 0, 42],
+		);
+		let mut views = [
+			placeholder.view(),
+			system.view(),
+			absent.view(),
+			stored.view(),
+		];
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
+
+		assert_eq!(context.run_optional::<GrowingAccount>(2).ok(), Some(None));
+		assert_eq!(context.run_optional::<GrowingAccount>(9).ok(), Some(None));
+		assert!(
+			context
+				.run_optional::<GrowingAccount>(3)
+				.ok()
+				.flatten()
+				.is_some()
+		);
+
+		// A growing step whose rent deficit exceeds the cap fails closed.
+		let mut payer =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), program_id, 10_000, &[]);
+		let mut system = TestAccount::<8>::new(crate::system::ID, program_id, 0, &[]);
+		let mut poor =
+			TestAccount::<8>::new(Address::new_from_array([3; 32]), program_id, 0, &[7, 0, 42]);
+		let mut views = [payer.view(), system.view(), poor.view()];
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
+		assert_eq!(
+			context.run::<GrowingAccount>(2).err(),
+			Some(PinaProgramError::MigrationBudgetExceeded.into())
+		);
 	}
 
 	#[cfg(feature = "account-resize")]

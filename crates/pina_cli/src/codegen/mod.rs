@@ -13,6 +13,7 @@ use codama_nodes::EnumEmptyVariantTypeNode;
 use codama_nodes::EnumTypeNode;
 use codama_nodes::EnumVariantTypeNode;
 use codama_nodes::ErrorNode;
+use codama_nodes::EventNode;
 use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
@@ -132,6 +133,10 @@ pub(crate) fn try_ir_to_root_node_with_migrations(
 			&ir.pinapod_enums,
 			migration,
 		)?);
+	}
+
+	for event in &ir.events {
+		program = program.add_event(build_event_node(event, &ir.pinapod_enums)?);
 	}
 
 	for pda in &ir.pdas {
@@ -722,6 +727,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
 			accounts: vec![account],
+			events: Vec::new(),
 			instructions: vec![],
 			errors: vec![],
 			pdas: vec![],
@@ -769,6 +775,7 @@ mod tests {
 				docs: vec![],
 			}],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![],
 			errors: vec![],
 			pdas: vec![],
@@ -914,6 +921,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "discriminator_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
@@ -972,6 +980,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1078,6 +1087,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![InstructionIr {
 				name: "touch".to_string(),
 				rust_name: "touch".to_string(),
@@ -1176,6 +1186,7 @@ mod tests {
 				public_key: "11111111111111111111111111111111".to_string(),
 				pinapod_enums: vec![],
 				accounts: vec![],
+				events: Vec::new(),
 				instructions: vec![InstructionIr {
 					name: "do_it".to_string(),
 					rust_name: "do_it".to_string(),
@@ -1218,6 +1229,7 @@ mod tests {
 	#[test]
 	fn rejects_unresolved_pod_collection_layouts() {
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "unsupported_collection_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
@@ -1250,6 +1262,7 @@ mod tests {
 	#[test]
 	fn lowers_local_pinapod_enums() {
 		let ir = ProgramIr {
+			events: Vec::new(),
 			name: "pinapod_enum_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![PinaPodEnumIr {
@@ -1313,6 +1326,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
 			accounts: vec![],
+			events: Vec::new(),
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),
 				rust_name: "initialize".to_string(),
@@ -1379,4 +1393,25 @@ mod tests {
 			PdaSeedValueValue::Account(account) if account.name.as_ref() == "authority"
 		));
 	}
+}
+
+/// Build a Codama event node: camel-cased name, constant discriminator at
+/// offset 0, and the event's field schema as its data struct.
+fn build_event_node(
+	event: &crate::ir::EventIr,
+	pinapod_enums: &[PinaPodEnumIr],
+) -> Result<EventNode, IdlError> {
+	let mut fields = Vec::with_capacity(event.fields.len());
+	for field in &event.fields {
+		let context = format!("event `{}.{}`", event.name, field.name);
+		fields.push(build_struct_field(field, context, pinapod_enums)?);
+	}
+
+	let mut node = EventNode::new(event.name.as_str(), StructTypeNode::new(fields));
+	node.discriminators = vec![build_discriminator_node(&event.discriminator)];
+	if !event.docs.is_empty() {
+		node.docs = event.docs.clone().into();
+	}
+
+	Ok(node)
 }

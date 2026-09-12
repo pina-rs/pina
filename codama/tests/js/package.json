@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test": "node validate-idls.mjs"
+		"test": "node validate-idls.mjs && tsx --test migration-helpers.test.ts"
 	},
 	"devDependencies": {
 		"codama": "^1.10.2"

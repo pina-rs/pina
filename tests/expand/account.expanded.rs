@@ -84,6 +84,72 @@ impl ::core::convert::TryFrom<u8> for AccountDisc {
         const __BALANCE_ACCOUNT: u8 = 4;
         const __CUSTOM: u8 = 5;
         const __LARGE_STATE: u8 = 6;
+        const _: () = {
+            if !(__CONFIG_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `ConfigState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__GAME_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `GameState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__DATA_ACCOUNT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `DataAccount` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__BALANCE_ACCOUNT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `BalanceAccount` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__CUSTOM != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Custom` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__LARGE_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `LargeState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __CONFIG_STATE => ::core::result::Result::Ok(Self::ConfigState),

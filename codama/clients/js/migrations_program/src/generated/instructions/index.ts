@@ -6,5 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./migrate";
 export * from "./relay";
 export * from "./update";

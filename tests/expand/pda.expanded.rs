@@ -79,6 +79,50 @@ impl ::core::convert::TryFrom<u8> for PdaDisc {
         const __ALL_SEED_STATE: u8 = 2;
         const __TODO_STATE: u8 = 3;
         const __COMPACT: u8 = 4;
+        const _: () = {
+            if !(__COUNTER_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `CounterState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__ALL_SEED_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `AllSeedState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__TODO_STATE != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `TodoState` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
+        const _: () = {
+            if !(__COMPACT != !0) {
+                {
+                    ::core::panicking::panic_fmt(
+                        format_args!(
+                            "discriminator value for `Compact` is the all-ones value reserved by Pina for the framework `Migrate` instruction; choose another value",
+                        ),
+                    );
+                }
+            }
+        };
         #[deny(unreachable_patterns)]
         match number {
             __COUNTER_STATE => ::core::result::Result::Ok(Self::CounterState),

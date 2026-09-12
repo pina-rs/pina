@@ -182,20 +182,30 @@ pub(crate) fn run(cli: Cli) {
 
 fn run_migrations(command: MigrationCommands) {
 	match command {
-		MigrationCommands::Make {
+		MigrationCommands::Sync {
 			project,
 			renames,
 			assume_removed,
 			no_interactive,
 			json,
 		} => {
-			let answers = match pina_cli::migrations::MigrationAnswers::from_flags(
+			// The one-command loop: make -> build -> generate. Each stage
+			// keeps its own gate; make fails with the same question payloads
+			// as the standalone command.
+			let answers = match build_migration_answers(
+				&project,
 				&renames,
 				&assume_removed,
 				no_interactive,
 			) {
 				Ok(answers) => answers,
 				Err(reason) => {
+					if json {
+						print_json(&pina_cli::migrations::JsonErrorEnvelope {
+							error: reason.clone(),
+							questions: None,
+						});
+					}
 					eprintln!("{} {reason}", "Error".red().bold());
 					std::process::exit(1);
 				}
@@ -203,22 +213,110 @@ fn run_migrations(command: MigrationCommands) {
 			let output =
 				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
 					Ok(output) => output,
-					Err(
-						error @ pina_cli::migrations::MigrationError::DisambiguationRequired {
-							..
-						},
-					) => {
-						if json
-							&& let pina_cli::migrations::MigrationError::DisambiguationRequired {
+					Err(error) => {
+						if json {
+							let questions = match &error {
+								pina_cli::migrations::MigrationError::DisambiguationRequired {
+									questions,
+								} => Some(questions.as_slice()),
+								_ => None,
+							};
+							print_json(&pina_cli::migrations::JsonErrorEnvelope {
+								error: error.to_string(),
 								questions,
-							} = &error
-						{
-							print_json(&questions);
+							});
 						}
 						eprintln!("{} {error}", "Error".red().bold());
 						std::process::exit(1);
 					}
+				};
+			for warning in &output.data_warnings {
+				println!("{} {warning}", "⚠".yellow().bold());
+			}
+			run_build(
+				project.clone(),
+				Vec::new(),
+				false,
+				false,
+				std::ffi::OsString::from("solana"),
+			);
+			run_generate(project, Vec::new(), None, None, false, "node".to_owned());
+			if json {
+				print_json(&output);
+			}
+			println!("{} Sync complete", "✔".green());
+		}
+		MigrationCommands::Inspect {
+			address,
+			project,
+			url,
+			json,
+		} => {
+			let report = pina_cli::migrations::inspect::run_inspect(&project, &address, &url);
+			match report {
+				Ok((report, exit)) => {
+					if json {
+						print_json(&report);
+					} else {
+						print_inspect_report(&report);
+					}
+					if exit.code != 0 {
+						std::process::exit(exit.code);
+					}
+				}
+				Err(error) => {
+					if json {
+						print_json(&pina_cli::migrations::JsonErrorEnvelope {
+							error: error.to_string(),
+							questions: None,
+						});
+					}
+					eprintln!("{} {error}", "Error".red().bold());
+					std::process::exit(2);
+				}
+			}
+		}
+		MigrationCommands::Make {
+			project,
+			renames,
+			assume_removed,
+			no_interactive,
+			json,
+		} => {
+			let answers = match build_migration_answers(
+				&project,
+				&renames,
+				&assume_removed,
+				no_interactive,
+			) {
+				Ok(answers) => answers,
+				Err(reason) => {
+					if json {
+						print_json(&pina_cli::migrations::JsonErrorEnvelope {
+							error: reason.clone(),
+							questions: None,
+						});
+					}
+					eprintln!("{} {reason}", "Error".red().bold());
+					std::process::exit(1);
+				}
+			};
+			let output =
+				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+					Ok(output) => output,
 					Err(error) => {
+						if json {
+							let questions = match &error {
+								pina_cli::migrations::MigrationError::DisambiguationRequired {
+									questions,
+								} => Some(questions.as_slice()),
+								_ => None,
+							};
+							print_json(&pina_cli::migrations::JsonErrorEnvelope {
+								error: error.to_string(),
+								questions,
+							});
+						}
 						eprintln!("{} {error}", "Error".red().bold());
 						std::process::exit(1);
 					}
@@ -413,6 +511,24 @@ fn run_doctor(path: &Path, json: bool) {
 fn print_json(value: &impl serde::Serialize) {
 	let json = unwrap_or_exit(serde_json::to_string_pretty(value));
 	println!("{json}");
+}
+
+/// Layer CLI disambiguation flags over the persisted `[migrations.answers]`
+/// table discovered with the project.
+fn build_migration_answers(
+	project_path: &Path,
+	renames: &[String],
+	removed: &[String],
+	no_interactive: bool,
+) -> Result<pina_cli::migrations::MigrationAnswers, String> {
+	let project =
+		pina_cli::project::Project::discover(project_path).map_err(|error| error.to_string())?;
+	pina_cli::migrations::MigrationAnswers::from_layers(
+		&project.migration_answers,
+		renames,
+		removed,
+		no_interactive,
+	)
 }
 
 fn unwrap_or_exit<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
@@ -1598,5 +1714,149 @@ mod tests {
 			error,
 			pina_cli::verification::VerifyError::UnsupportedRecordHost { .. }
 		));
+	}
+}
+
+/// Print the human-readable form of a migrations inspect report.
+pub fn print_inspect_report(report: &pina_cli::migrations::inspect::InspectReport) {
+	if !report.exists {
+		println!(
+			"{} Account {} does not exist on chain (rpc: {}).",
+			"⚠".yellow().bold(),
+			report.address,
+			report.rpc_url
+		);
+		return;
+	}
+	println!(
+		"Account {} ({} bytes on chain, rpc: {})",
+		report.address,
+		report
+			.data_len
+			.map_or_else(|| "?".to_owned(), |len| len.to_string()),
+		report.rpc_url
+	);
+	let Some(contract) = &report.contract else {
+		println!(
+			"{} No migration manifest contract matches this account's discriminator.",
+			"⚠".yellow().bold()
+		);
+		return;
+	};
+	println!(
+		"Contract {contract} ({})",
+		report.rust_name.as_deref().unwrap_or("?")
+	);
+	match report.state {
+		pina_cli::migrations::inspect::InspectState::Current => {
+			println!(
+				"{} Stored v{} matches the manifest's current version.",
+				"✔".green(),
+				report.stored_version.unwrap_or_default()
+			);
+		}
+		pina_cli::migrations::inspect::InspectState::Future => {
+			println!(
+				"{} Stored v{} is newer than this checkout knows (current v{}); upgrade the \
+				 client.",
+				"✖".red().bold(),
+				report.stored_version.unwrap_or_default(),
+				report.current_version.unwrap_or_default()
+			);
+		}
+		pina_cli::migrations::inspect::InspectState::Stale => {
+			println!(
+				"{} Stored v{} is stale; manifest current is v{} ({} pending hop(s)):",
+				"⚠".yellow().bold(),
+				report.stored_version.unwrap_or_default(),
+				report.current_version.unwrap_or_default(),
+				report.hops.len()
+			);
+			for hop in &report.hops {
+				println!(
+					"  v{} -> v{}: {} -> {} bytes, roughly {} lamports of rent",
+					hop.from, hop.to, hop.byte_size_from, hop.byte_size_to, hop.rent_delta_lamports
+				);
+			}
+			println!(
+				"Route the reserved Migrate instruction (or rerun the touching transaction) to \
+				 bring this account current."
+			);
+		}
+		pina_cli::migrations::inspect::InspectState::UnknownContract => {
+			println!(
+				"{} The account data does not carry a decodable migration envelope.",
+				"⚠".yellow().bold()
+			);
+		}
+		pina_cli::migrations::inspect::InspectState::Empty => {}
+	}
+}
+
+#[cfg(test)]
+mod inspect_command_tests {
+	use super::*;
+
+	#[test]
+	fn print_inspect_report_renders_every_state() {
+		let address = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
+		let report = pina_cli::migrations::inspect::InspectReport {
+			address: address.to_owned(),
+			rpc_url: "http://rpc".to_owned(),
+			exists: false,
+			data_len: None,
+			contract: None,
+			rust_name: None,
+			stored_version: None,
+			current_version: None,
+			state: pina_cli::migrations::inspect::InspectState::Empty,
+			hops: Vec::new(),
+		};
+		print_inspect_report(&report);
+
+		let future = pina_cli::migrations::inspect::InspectReport {
+			exists: true,
+			data_len: Some(13),
+			contract: Some("account:1:01".to_owned()),
+			rust_name: Some("State".to_owned()),
+			stored_version: Some(9),
+			current_version: Some(2),
+			state: pina_cli::migrations::inspect::InspectState::Future,
+			hops: Vec::new(),
+			..report
+		};
+		print_inspect_report(&future);
+
+		let stale = pina_cli::migrations::inspect::InspectReport {
+			state: pina_cli::migrations::inspect::InspectState::Stale,
+			stored_version: Some(0),
+			hops: vec![pina_cli::migrations::inspect::InspectHop {
+				from: 0,
+				to: 1,
+				byte_size_from: 10,
+				byte_size_to: 11,
+				rent_delta_lamports: 6_960,
+			}],
+			..future
+		};
+		print_inspect_report(&stale);
+
+		let current = pina_cli::migrations::inspect::InspectReport {
+			state: pina_cli::migrations::inspect::InspectState::Current,
+			stored_version: Some(2),
+			..stale
+		};
+		print_inspect_report(&current);
+
+		let unknown = pina_cli::migrations::inspect::InspectReport {
+			state: pina_cli::migrations::inspect::InspectState::UnknownContract,
+			contract: None,
+			rust_name: None,
+			stored_version: None,
+			current_version: None,
+			hops: Vec::new(),
+			..current
+		};
+		print_inspect_report(&unknown);
 	}
 }

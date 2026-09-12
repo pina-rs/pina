@@ -554,7 +554,7 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 </svg>
 </div>
 
-<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent, never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
+<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent — about 6,960 lamports per byte at the two-year exemption threshold — never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
 
 <!-- ============ PART 3: CLIENTS ============ -->
 <h2>Part 3: old clients, new clients, who does what</h2>
@@ -641,7 +641,7 @@ if let Some(view) = accounts.escrow {
 
 <p>Two details are worth calling out. On refunds: shrinking keeps every lamport in the account by design. Refunding would mean picking a recipient when the funder and the owner differ, and it would add a transfer per step. A refund-to-payer variant could exist later, but the current rule is simple and safe: money only ever moves inward. And on surplus bytes: they stay on the account, exactly as stored.</p>
 
-<div class="box warn"><b>What the framework would add to this pattern.</b> Nothing blocks hand-rolling it today. What a framework-level version adds is a reserved discriminator so the instruction can never collide with a user instruction, a generated handler and client helper so no instruction is hand-written at all, and a client-side staleness check so the helper is only sent when an account is actually behind. That is the planned Migrate instruction in ADR 0008, and this sweep is its hand-rolled form.</div>
+<div class="box warn"><b>What the framework would add to this pattern.</b> Nothing blocks hand-rolling it today. What a framework-level version adds is a reserved discriminator so the instruction can never collide with a user instruction, a generated handler and client helper so no instruction is hand-written at all, and a client-side staleness check so the helper is only sent when an account is actually behind. That is the Migrate instruction described above, and this sweep is its hand-rolled form for programs that want extra policy in the handler.</div>
 
 <!-- ============ CLI REFERENCE ============ -->
 <h2>CLI cheat sheet</h2>
@@ -662,15 +662,34 @@ if let Some(view) = accounts.escrow {
 <div class="box warn"><b>Hard limits, and all of them fail cleanly.</b> At most <code>MAX_INLINE_STEPS</code> adjacent versions are walked in one instruction. The normalization workspace is capped at 1 KiB of stack, and generated code does not compile past that. Growth is capped by <code>MAX_PERMITTED_DATA_INCREASE</code> per step and by the payer's <code>max_lamports</code> budget overall. Exceeding any of these fails the transaction. It never silently skips a migration.</div>
 <div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> is SHA-256-chained and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can regenerate it. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
 
+<h3 style="font-size:18px; margin-top: 28px;">The reserved Migrate instruction</h3>
+<p>Pina reserves the all-ones value of every instruction discriminator width for a framework migration instruction, and <code class="inline">#[discriminator]</code> rejects user variants that claim it at compile time. A program with migratable accounts routes it before parsing its own enum:</p>
+<div class="cmd"><span class="comment">// data: [0xff] — no payload
+// accounts: [payer, systemProgram, state?, …]
+if is_migrate_instruction(data) {
+    return process_migrate(program_id, accounts);
+}</span></div>
+<p>Slot 0 is a writable payer funding the rent deficits (or the program address when no step needs funding), slot 1 is the system program the transfers invoke, and every later slot is a program-owned, self-describing account. A slot holding the program address, or an index past the end of the list, is skipped — so a client sends only the accounts it needs to migrate. <code class="inline">MigrateContext</code> validates ownership, rejects duplicated slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.</p>
+<p>That is the client flow the sweep section below describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
+
+<h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p>
+<div class="code"><span class="k">const</span> { data } = <span class="k">await</span> fetchEncodedAccount(rpc, address);
+<span class="k">if</span> (stateNeedsMigration(data)) {
+	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }).make());
+}
+<span class="comment">// now decode `state` and send the real instruction</span></div>
+
 <h3 style="font-size:18px; margin-top: 28px;">Planned but not built (ADR 0008 and follow-ups)</h3>
 <div class="future">
-	<div class="future-item"><span class="tag t-soon">Next</span><p><b>A dedicated Migrate instruction</b> (<a href="https://github.com/pina-rs/pina/issues/338">#338</a>). A framework-reserved, generated version of the sweep instruction documented above, with its own payer. It exists as a hand-rolled pattern today; the framework version adds the reserved discriminator, the generated handler, and the client helper so nothing needs writing by hand.</p></div>
+	
 	<div class="future-item"><span class="tag t-soon">Next</span><p><b>On-chain state inspection</b> (<a href="https://github.com/pina-rs/pina/issues/337">#337</a>). A command to read an account's version envelope over RPC and report "stored v0, current v2, about two steps, roughly this many CU, needs this many lamports". There is currently no way to see on-chain migration state from the CLI.</p></div>
-	<div class="future-item"><span class="tag t-later">Later</span><p><b>Client helpers</b> (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>). Generated <code>needsMigration()</code> and <code>migrateInstruction()</code> so "check, then migrate, then act" is one call. Decode-time version enforcement already ships in all three clients.</p></div>
+	<div class="future-item"><span class="tag t-soon">Next</span><p><b>One-call migration</b> (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>). A <code>migrateIfNeeded()</code> wrapper that fetches, checks the envelope, and sends the Migrate instruction in one call over an RPC handle. The per-account checks and the Migrate composer already ship in all three clients.</p></div>
 	<div class="future-item"><span class="tag t-later">Later</span><p><b>Persisted answers</b> (<a href="https://github.com/pina-rs/pina/issues/340">#340</a>). Disambiguation decisions saved next to the manifest, so fresh clones and CI can answer rename questions without replaying flags.</p></div>
 	<div class="future-item"><span class="tag t-later">Later</span><p><b>Cost preview</b> (<a href="https://github.com/pina-rs/pina/issues/341">#341</a>). Reuse the static SBF profiler to show the rent and compute cost of a migration before you ship it.</p></div>
 </div>
 
+<p>Disambiguation answers can also live in the repo: a <code class="inline">[migrations.answers]</code> table in <code class="inline">pina.toml</code> is consulted before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename fails closed — so fresh clones and CI replay an answer made locally without re-deriving flag lists.</p>
 <p class="footnote">Also see <code>docs/src/migrations/flow.md</code> and ADRs 0007 and 0008 in <code>docs/src/adrs/</code>.</p>
 
 </div>

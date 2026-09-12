@@ -53,6 +53,7 @@ import {
 	type RelayInput,
 	type UpdateInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
 export const MIGRATIONS_PROGRAM_PROGRAM_ADDRESS =
 	"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS" as Address<
@@ -84,6 +85,22 @@ export function identifyMigrationsProgramAccount(
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "migrationsProgram" },
+	);
+}
+
+export enum MigrationsProgramEvent {
+	ValueChangedEvent,
+}
+
+export function identifyMigrationsProgramEvent(
+	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): MigrationsProgramEvent {
+	const data = "data" in event ? event.data : event;
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return MigrationsProgramEvent.ValueChangedEvent;
+	}
+	throw new Error(
+		"The provided event could not be identified as a migrationsProgram event.",
 	);
 }
 
@@ -195,6 +212,8 @@ export function migrationsProgramProgram() {
 					compactState: addSelfFetchFunctions(client, getCompactStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					update: (input) =>
 						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
 					relay: (input) =>

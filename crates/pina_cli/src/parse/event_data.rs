@@ -98,3 +98,41 @@ mod tests {
 		assert!(events.is_empty());
 	}
 }
+
+/// One `#[event]` source declaration of any flavor.
+#[derive(Debug, Clone)]
+pub struct EventDeclaration {
+	pub name: String,
+	pub discriminator_enum: String,
+	pub variant: String,
+	pub fields: Vec<crate::ir::FieldIr>,
+	pub docs: Vec<String>,
+}
+
+/// Extract every `#[event]` struct, regardless of its event-macro arguments.
+///
+/// Unlike [`extract_migratable_events`] this does not require the `migrations`
+/// flag and does not parse migration-specific arguments, so events decorated
+/// with other event-macro options (for example `validate(...)`) still
+/// contribute their identity and field schema to the IDL.
+pub fn extract_event_declarations(file: &File) -> Result<Vec<EventDeclaration>, IdlError> {
+	let mut events = Vec::new();
+	for item in &file.items {
+		let Item::Struct(item_struct) = item else {
+			continue;
+		};
+		let Some((discriminator_enum, variant)) =
+			extract_discriminator_and_variant(&item_struct.attrs, "event", &item_struct.ident)?
+		else {
+			continue;
+		};
+		events.push(EventDeclaration {
+			name: item_struct.ident.to_string(),
+			discriminator_enum,
+			variant,
+			fields: super::account_state::extract_named_fields(&item_struct.fields),
+			docs: super::doc_comments::extract_docs(&item_struct.attrs),
+		});
+	}
+	Ok(events)
+}

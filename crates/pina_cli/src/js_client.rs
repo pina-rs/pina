@@ -4,6 +4,8 @@ use std::path::Path;
 use codama_nodes::RootNode;
 use walkdir::WalkDir;
 
+use crate::client_migrations::MigratableAccount;
+use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
 use crate::compact_capacity::CompactCapacityIndex;
 use crate::compact_capacity::CompactCapacityKind;
@@ -317,6 +319,8 @@ pub fn harden_generated_clients(
 			})?;
 		}
 
+		harden_js_event_decoders(&generated, &root)?;
+
 		let helper_path = generated.join("pinaPodCodecs.ts");
 		std::fs::write(&helper_path, HELPER_MODULE).map_err(|source| {
 			CodamaError::HardenJavaScript {
@@ -324,6 +328,8 @@ pub fn harden_generated_clients(
 				source,
 			}
 		})?;
+
+		emit_js_migration_helpers(&generated, program, &root)?;
 	}
 
 	Ok(())
@@ -406,7 +412,7 @@ fn is_codec_source(path: &Path) -> bool {
 		return false;
 	};
 
-	(parent == "accounts" || parent == "instructions" || parent == "types")
+	(parent == "accounts" || parent == "instructions" || parent == "types" || parent == "events")
 		&& path.extension().is_some_and(|extension| extension == "ts")
 }
 
@@ -1427,4 +1433,625 @@ const wideDecoder = getOptionDecoder(getU64Decoder(), { prefix: getU16Decoder(),
 			"export const value = 1;"
 		);
 	}
+}
+
+/// Append per-account `needsMigration` checks, the reserved `Migrate`
+/// instruction module, and its program-plugin wiring to one generated
+/// TypeScript client.
+///
+/// Programs without migratable accounts get none of these. Every step is
+/// idempotent so hardening can run over an already-hardened tree.
+fn emit_js_migration_helpers(
+	generated: &Path,
+	program: &str,
+	root: &RootNode,
+) -> Result<(), CodamaError> {
+	let harden = |path: &Path, message: String| {
+		CodamaError::HardenJavaScript {
+			path: path.to_path_buf(),
+			source: std::io::Error::other(message),
+		}
+	};
+	let Some(plan) =
+		MigrationPlan::read(&root.program).map_err(|message| harden(generated, message))?
+	else {
+		return Ok(());
+	};
+
+	for account in &plan.accounts {
+		let path = generated
+			.join("accounts")
+			.join(format!("{}.ts", account.camel));
+		let source = std::fs::read_to_string(&path).map_err(|source| {
+			CodamaError::HardenJavaScript {
+				path: path.clone(),
+				source,
+			}
+		})?;
+		if source.contains("NeedsMigration") {
+			continue;
+		}
+		let hardened = format!(
+			"{}\n{}",
+			source.trim_end(),
+			js_needs_migration_module(account)
+		);
+		std::fs::write(&path, hardened)
+			.map_err(|source| CodamaError::HardenJavaScript { path, source })?;
+	}
+
+	let instructions_dir = generated.join("instructions");
+	let migrate_path = instructions_dir.join("migrate.ts");
+	if !migrate_path.exists() {
+		std::fs::write(&migrate_path, js_migrate_instruction_module(program, &plan)).map_err(
+			|source| {
+				CodamaError::HardenJavaScript {
+					path: migrate_path.clone(),
+					source,
+				}
+			},
+		)?;
+	}
+
+	let index_path = instructions_dir.join("index.ts");
+	let index = std::fs::read_to_string(&index_path).map_err(|source| {
+		CodamaError::HardenJavaScript {
+			path: index_path.clone(),
+			source,
+		}
+	})?;
+	if !index.contains("\"./migrate\"") {
+		let patched = index.replacen(
+			"export * from",
+			"export * from \"./migrate\";\nexport * from",
+			1,
+		);
+		std::fs::write(&index_path, patched).map_err(|source| {
+			CodamaError::HardenJavaScript {
+				path: index_path,
+				source,
+			}
+		})?;
+	}
+
+	let programs_dir = generated.join("programs");
+	let program_camel = snake_to_camel(program);
+	let plugin_path = programs_dir.join(format!("{program_camel}.ts"));
+	let plugin = std::fs::read_to_string(&plugin_path).map_err(|source| {
+		CodamaError::HardenJavaScript {
+			path: plugin_path.clone(),
+			source,
+		}
+	})?;
+	if let Some(patched) = patch_js_program_plugin(&plugin) {
+		std::fs::write(&plugin_path, patched).map_err(|source| {
+			CodamaError::HardenJavaScript {
+				path: plugin_path,
+				source,
+			}
+		})?;
+	}
+
+	Ok(())
+}
+
+/// Register the reserved `Migrate` instruction in one program plugin.
+///
+/// The patch is formatting-agnostic: it locates the generated-instructions
+/// import by its module specifier and the plugin's instruction map by its
+/// `instructions: {` marker, so it works on the raw generator output and on
+/// formatted files alike. Returns `None` for already-patched plugins.
+fn patch_js_program_plugin(plugin: &str) -> Option<String> {
+	if plugin.contains("getMigrateInstruction") {
+		return None;
+	}
+
+	// Raw generator output quotes module specifiers singly; formatted output
+	// quotes them doubly. Accept either.
+	let mut anchor = None;
+	for specifier in ["from \"../instructions\"", "from '../instructions'"] {
+		if let Some(found) = plugin.find(specifier) {
+			anchor = Some(found);
+			break;
+		}
+	}
+	let anchor = anchor?;
+	let statement_end = anchor + plugin[anchor..].find(';')? + 1;
+	let import = "\nimport { getMigrateInstruction, type MigrateInput } from \"../instructions\";";
+
+	let marker = plugin.find("instructions: {")?;
+	let brace = marker + "instructions: {".len();
+	// Fixed relative indentation: the raw generator output places
+	// `instructions: {` mid-line, so the arm carries its own leading newline
+	// and the formatter normalizes the result.
+	let arm = "\n\t\t\tmigrate: (input: MigrateInput) \
+	           =>\n\t\t\t\taddSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),";
+
+	let mut patched = String::with_capacity(plugin.len() + import.len() + arm.len());
+	patched.push_str(&plugin[..statement_end]);
+	patched.push_str(import);
+	patched.push('\n');
+	patched.push_str(&plugin[statement_end..=brace]);
+	patched.push_str(arm);
+	patched.push_str(&plugin[brace + 1..]);
+	Some(patched)
+}
+
+/// `migrations_program` becomes `migrationsProgram`.
+fn snake_to_camel(snake: &str) -> String {
+	let mut out = String::with_capacity(snake.len());
+	for (index, segment) in snake.split('_').enumerate() {
+		if index == 0 {
+			out.push_str(segment);
+		} else {
+			let mut characters = segment.chars();
+			if let Some(first) = characters.next() {
+				out.push(first.to_ascii_uppercase());
+				out.push_str(characters.as_str());
+			}
+		}
+	}
+	out
+}
+
+/// The per-account envelope check appended to one account module.
+fn js_needs_migration_module(account: &MigratableAccount) -> String {
+	let version_offset = account.version_offset();
+	let header = version_offset + account.version_bytes;
+	let mut conditions = Vec::new();
+	for (index, byte) in account.discriminator.iter().enumerate() {
+		conditions.push(format!("data[{index}] !== {byte}"));
+	}
+	let discriminator_check = conditions.join(" || ");
+	let version_read = js_le_read(version_offset, account.version_bytes);
+
+	format!(
+		r"
+/** The account schema version this client was generated from. */
+export const {shouting}_MIGRATION_VERSION = {version};
+
+/**
+ * Cheap envelope check for a fetched `{pascal}` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {{@link getMigrateInstruction}} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const {{ data }} = await fetchEncodedAccount(rpc, address);
+ * if ({camel}NeedsMigration(data)) {{
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({{ {camel}: address, payer }}).make());
+ * }}
+ * ```
+ */
+export function {camel}NeedsMigration(data: ReadonlyUint8Array): boolean {{
+	if (data.length < {header}) {{
+		return false;
+	}}
+	if ({discriminator_check}) {{
+		return false;
+	}}
+	return {version_read} < {version};
+}}
+",
+		shouting = account.shouting,
+		pascal = crate::client_migrations::pascal_case(&account.camel),
+		camel = account.camel,
+		version = account.version,
+		header = header,
+		discriminator_check = discriminator_check,
+		version_read = version_read,
+	)
+}
+
+/// A TypeScript expression reading `width` little-endian bytes at `offset`.
+fn js_le_read(offset: usize, width: usize) -> String {
+	let mut terms = Vec::new();
+	for index in 0..width {
+		let position = offset + index;
+		if index == 0 {
+			terms.push(format!("data[{position}]!"));
+		} else if index * 8 < 24 {
+			terms.push(format!("(data[{position}]! << {})", index * 8));
+		} else {
+			terms.push(format!("(data[{position}]! * 2**{})", index * 8));
+		}
+	}
+	terms.join(" + ")
+}
+
+/// The generated `instructions/migrate.ts` module for one program.
+///
+/// The reserved `Migrate` instruction carries no payload beyond its
+/// all-ones discriminator. Its account list is
+/// `[payer, systemProgram, …declared migratable accounts]`: the payer is a
+/// writable signer, or the program-address placeholder when no step needs
+/// funding; a migratable slot holding the program address, or a slot past
+/// the end of the list, is treated as omitted by the program.
+fn js_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> String {
+	let program_constant = format!(
+		"{}_PROGRAM_ADDRESS",
+		crate::client_migrations::shouting_snake(&snake_to_camel(program))
+	);
+
+	// (camel, pascal, role) for every declared slot in wire order.
+	let mut slots = vec![
+		("payer".to_owned(), "WritableSignerAccount".to_owned()),
+		("systemProgram".to_owned(), "ReadonlyAccount".to_owned()),
+	];
+	for account in &plan.accounts {
+		slots.push((account.camel.clone(), "WritableAccount".to_owned()));
+	}
+
+	let type_parameters = slots
+		.iter()
+		.map(|(camel, _)| {
+			format!(
+				"\tTAccount{} extends string | AccountMeta<string> = string,",
+				crate::client_migrations::pascal_case(camel)
+			)
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let input_type_parameters = slots
+		.iter()
+		.map(|(camel, _)| {
+			format!(
+				"\tTAccount{} extends string = string,",
+				crate::client_migrations::pascal_case(camel)
+			)
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let input_argument_names = slots
+		.iter()
+		.map(|(camel, _)| {
+			format!(
+				"\t\tTAccount{},",
+				crate::client_migrations::pascal_case(camel)
+			)
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let instruction_accounts = slots
+		.iter()
+		.map(|(camel, role)| {
+			let pascal = crate::client_migrations::pascal_case(camel);
+			match role.as_str() {
+				"WritableSignerAccount" => {
+					format!(
+						"\t\t\tTAccount{pascal} extends string ?\n\t\t\t\t\t& \
+						 WritableSignerAccount<TAccount{pascal}>\n\t\t\t\t\t& \
+						 AccountSignerMeta<TAccount{pascal}>\n\t\t\t\t: TAccount{pascal},"
+					)
+				}
+				"ReadonlyAccount" => {
+					format!(
+						"\t\t\tTAccount{pascal} extends string ? \
+						 ReadonlyAccount<TAccount{pascal}>\n\t\t\t\t: TAccount{pascal},"
+					)
+				}
+				_ => {
+					format!(
+						"\t\t\tTAccount{pascal} extends string ? \
+						 WritableAccount<TAccount{pascal}>\n\t\t\t\t: TAccount{pascal},"
+					)
+				}
+			}
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let input_fields = slots
+		.iter()
+		.map(|(camel, role)| {
+			let pascal = crate::client_migrations::pascal_case(camel);
+			match role.as_str() {
+				"WritableSignerAccount" => {
+					format!("\t{camel}?: TransactionSigner<TAccount{pascal}>;")
+				}
+				_ => format!("\t{camel}?: Address<TAccount{pascal}>;"),
+			}
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let original_accounts = slots
+		.iter()
+		.map(|(camel, role)| {
+			let writable = role.as_str() != "ReadonlyAccount";
+			format!("\t\t{camel}: {{ value: input.{camel} ?? null, isWritable: {writable} }},")
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let metas = slots
+		.iter()
+		.map(|(camel, _)| format!("\t\tgetAccountMeta(\"{camel}\", accounts.{camel}),"))
+		.collect::<Vec<_>>()
+		.join("\n");
+	let provided = slots
+		.iter()
+		.map(|(camel, _)| format!("input.{camel}"))
+		.collect::<Vec<_>>()
+		.join(", ");
+	let function_type_parameters = slots
+		.iter()
+		.map(|(camel, _)| {
+			format!(
+				"\tTAccount{} extends string = string,",
+				crate::client_migrations::pascal_case(camel)
+			)
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	let return_type_arguments =
+		std::iter::once("TProgramAddress".to_owned())
+			.chain(slots.iter().map(|(camel, _)| {
+				format!("TAccount{}", crate::client_migrations::pascal_case(camel))
+			}))
+			.collect::<Vec<_>>()
+			.join(",\n\t");
+	let discriminator_bytes = plan
+		.reserved_discriminator
+		.iter()
+		.map(u8::to_string)
+		.collect::<Vec<_>>()
+		.join(", ");
+
+	format!(
+		r#"/**
+ * This code was AUTOGENERATED using the Codama library.
+ * Please DO NOT EDIT THIS FILE, instead use visitors
+ * to add features, then rerun Codama to update it.
+ *
+ * @see https://github.com/codama-idl/codama
+ *
+ * The framework-owned `Migrate` instruction: it runs the program's on-demand
+ * account migrations on their own, so the payer authorizes exactly the
+ * migration cost and the business instruction that follows sees current
+ * data. The intended flow around any instruction that failed with a
+ * migration version mismatch is catch -> migrate -> retry.
+ */
+
+import {{
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	type TransactionSigner,
+	type WritableAccount,
+	type WritableSignerAccount,
+}} from "@solana/kit";
+import {{
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+}} from "@solana/program-client-core";
+import {{ {program_constant} }} from "../programs";
+
+/** Discriminator reserved by Pina for the framework `Migrate` instruction. */
+export const MIGRATE_DISCRIMINATOR = {reserved_value};
+
+export function getMigrateDiscriminatorBytes(): ReadonlyUint8Array {{
+	return new Uint8Array([{discriminator_bytes}]);
+}}
+
+export type MigrateInstruction<
+	TProgram extends string = typeof {program_constant},
+{type_parameters}
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+{instruction_accounts}
+			...TRemainingAccounts,
+		]
+	>;
+
+export type MigrateInput<
+{input_type_parameters}
+> = {{
+{input_fields}
+}};
+
+/**
+ * Composes the reserved `Migrate` instruction.
+ *
+ * Every migratable account is optional: omitted slots are filled with the
+ * program-address placeholder and trailing omitted slots are dropped, so a
+ * client sends only the accounts it needs to migrate. The `payer` funds rent
+ * deficits and must be a writable signer; omit it when no migration needs
+ * funding. The program caps the whole instruction's rent transfers at a
+ * program-chosen lamport budget.
+ */
+export function getMigrateInstruction<
+{function_type_parameters}
+	TProgramAddress extends Address = typeof {program_constant},
+>(
+	input: MigrateInput<
+{input_argument_names}
+	>,
+	config?: {{ programAddress?: TProgramAddress }},
+): MigrateInstruction<
+	{return_type_arguments}
+> {{
+	// Program address.
+	const programAddress = config?.programAddress ??
+		{program_constant};
+
+	// Original accounts.
+	const originalAccounts = {{
+{original_accounts}
+	}};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Slots after the last provided account may be truncated: the program
+	// treats a missing trailing slot exactly like the program-address
+	// placeholder.
+	const provided = [{provided}];
+	let lastProvided = -1;
+	for (let index = 0; index < provided.length; index += 1) {{
+		if (provided[index] != null) {{
+			lastProvided = index;
+		}}
+	}}
+
+	return Object.freeze({{
+		accounts: [
+{metas}
+		].slice(0, lastProvided + 1),
+		data: getMigrateDiscriminatorBytes(),
+		programAddress,
+	}} as MigrateInstruction<
+		{return_type_arguments}
+	>);
+}}
+"#,
+		program_constant = program_constant,
+		reserved_value = plan
+			.reserved_discriminator
+			.first()
+			.copied()
+			.unwrap_or(u8::MAX),
+		discriminator_bytes = discriminator_bytes,
+		type_parameters = type_parameters,
+		input_type_parameters = input_type_parameters,
+		instruction_accounts = instruction_accounts,
+		input_fields = input_fields,
+		original_accounts = original_accounts,
+		metas = metas,
+		provided = provided,
+		input_argument_names = input_argument_names,
+		function_type_parameters = function_type_parameters,
+		return_type_arguments = return_type_arguments,
+	)
+}
+
+/// Fix the generated event decoders' discriminator guard.
+///
+/// The upstream Codama JavaScript renderer emits
+/// `containsBytes(data, MY_EVENT_DISCRIMINATOR, 0)` with the scalar constant,
+/// which does not typecheck: `containsBytes` compares byte slices. Rewrite the
+/// call to encode the constant with the event's discriminator width, matching
+/// how the generated program module encodes account and instruction
+/// discriminators.
+fn harden_js_event_decoders(generated: &Path, root: &RootNode) -> Result<(), CodamaError> {
+	let events_dir = generated.join("events");
+	// Programs without events have no directory to harden.
+	let Ok(entries) = std::fs::read_dir(&events_dir) else {
+		return Ok(());
+	};
+
+	for entry in entries {
+		let path = entry
+			.map_err(|source| {
+				CodamaError::HardenJavaScript {
+					path: events_dir.clone(),
+					source,
+				}
+			})?
+			.path();
+		if path.extension().is_none_or(|extension| extension != "ts") {
+			continue;
+		}
+		// The event's discriminator width comes from its constant
+		// discriminator node in the IDL; events without one are left alone.
+		let event_name = path.file_stem().and_then(|stem| stem.to_str());
+		let Some(width) = event_name
+			.and_then(|name| {
+				root.program.events.iter().find_map(|event| {
+					let matches = event.name.as_ref() == name;
+					matches.then(|| {
+						event.discriminators.iter().find_map(|discriminator| {
+							let codama_nodes::DiscriminatorNode::Constant(constant) = discriminator
+							else {
+								return None;
+							};
+							let codama_nodes::TypeNode::Number(number_type) =
+								constant.constant.r#type.as_ref()
+							else {
+								return None;
+							};
+							match number_type.format {
+								codama_nodes::NumberFormat::U16 => Some(16),
+								codama_nodes::NumberFormat::U32 => Some(32),
+								_ => Some(8),
+							}
+						})
+					})
+				})
+			})
+			.flatten()
+		else {
+			continue;
+		};
+		let encoder = format!("getU{width}Encoder");
+
+		let source = std::fs::read_to_string(&path).map_err(|source| {
+			CodamaError::HardenJavaScript {
+				path: path.clone(),
+				source,
+			}
+		})?;
+		let hardened = harden_event_contains_bytes(&source, &encoder);
+		if hardened != source {
+			std::fs::write(&path, hardened)
+				.map_err(|source| CodamaError::HardenJavaScript { path, source })?;
+		}
+	}
+
+	Ok(())
+}
+
+/// Rewrite every scalar `containsBytes(data, <CONST>, <offset>)` guard to
+/// encode the constant with `encoder`, and import that encoder.
+fn harden_event_contains_bytes(source: &str, encoder: &str) -> String {
+	let mut hardened = String::with_capacity(source.len());
+	let mut rest = source;
+	while let Some(position) = rest.find("containsBytes(data, ") {
+		let after = &rest[position + "containsBytes(data, ".len()..];
+		let Some(comma) = after.find(", ") else {
+			hardened.push_str(&rest[..position + "containsBytes(data, ".len()]);
+			rest = after;
+			continue;
+		};
+		let constant = &after[..comma];
+		// Only rewrite scalar constants: identifiers (or numbers) that are
+		// not already encoded byte arrays.
+		let scalar = !constant.starts_with("get")
+			&& !constant.starts_with('"')
+			&& !constant.contains("Encoder()");
+		if !scalar {
+			hardened.push_str(&rest[..position + "containsBytes(data, ".len() + comma + 2]);
+			rest = &after[comma + 2..];
+			continue;
+		}
+		let Some(close) = after[comma + 2..].find(')') else {
+			break;
+		};
+		let offset = &after[comma + 2..comma + 2 + close];
+		hardened.push_str(&rest[..position]);
+		hardened.push_str("containsBytes(data, ");
+		hardened.push_str(encoder);
+		hardened.push_str("().encode(");
+		hardened.push_str(constant);
+		hardened.push_str("), ");
+		hardened.push_str(offset);
+		hardened.push(')');
+		rest = &after[comma + 2 + close + 1..];
+	}
+	hardened.push_str(rest);
+
+	if hardened != source {
+		hardened = ensure_kit_import(&hardened, encoder);
+	}
+	hardened
 }

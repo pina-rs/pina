@@ -122,6 +122,8 @@ pub struct Project {
 	pub client_generation: BTreeMap<ClientLanguage, ClientGenerationConfig>,
 	/// Program-wide migration version encoding.
 	pub migration_version_type: MigrationVersionType,
+	/// Persisted disambiguation answers from `[migrations.answers]`.
+	pub migration_answers: MigrationsAnswersConfig,
 	#[serde(skip)]
 	pub lint_levels: BTreeMap<String, LintLevel>,
 }
@@ -151,6 +153,20 @@ struct LintsConfig(BTreeMap<String, String>);
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 struct MigrationsConfig {
 	version_type: MigrationVersionType,
+	/// Persisted disambiguation answers consulted before `pina migrations
+	/// make` prompts; command-line flags override these per field.
+	#[serde(default)]
+	answers: MigrationsAnswersConfig,
+}
+
+/// Persisted disambiguation answers under `[migrations.answers]`.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MigrationsAnswersConfig {
+	/// Persisted rename answers in `from:to` form.
+	pub rename: Vec<String>,
+	/// Persisted data-dropping acknowledgements.
+	pub assume_removed: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -419,6 +435,7 @@ impl Project {
 			clients: config.clients.languages,
 			client_generation,
 			migration_version_type: config.migrations.version_type,
+			migration_answers: config.migrations.answers,
 			lint_levels,
 			root,
 		})
@@ -484,6 +501,7 @@ impl Project {
 			clients: clients_config.languages,
 			client_generation,
 			migration_version_type: MigrationVersionType::default(),
+			migration_answers: MigrationsAnswersConfig::default(),
 			lint_levels: BTreeMap::new(),
 			root,
 		})

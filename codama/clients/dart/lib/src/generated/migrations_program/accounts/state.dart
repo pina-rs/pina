@@ -98,7 +98,14 @@ Decoder<State> getStateDecoder() {
 
   (State, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 1);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 2) {
+      throw StateError(
+        storedMigrationVersion < 2
+            ? 'migration version mismatch: expected 2, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 2, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -136,4 +143,21 @@ Codec<State, State> getStateCodec() {
 
 Account<State> decodeState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int stateMigrationVersion = 2;
+
+/// Cheap envelope check for fetched `State` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool stateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 2;
 }

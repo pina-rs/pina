@@ -8,8 +8,10 @@
 	clippy::too_many_arguments
 )]
 
+pub(crate) mod r#migrate;
 pub(crate) mod r#relay;
 pub(crate) mod r#update;
 
+pub use self::r#migrate::*;
 pub use self::r#relay::*;
 pub use self::r#update::*;

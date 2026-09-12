@@ -9,6 +9,7 @@
 		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",
 		"build:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi build",
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
+		"build:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli build",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
 		"test:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli test",
@@ -18,7 +19,7 @@
 		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
 		"test": "pnpm run generate && pnpm run check:js",
-		"build:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli build"
+		"check:migration-docs": "node scripts/check-migration-docs.mjs"
 	},
 	"dependencies": {
 		"@codama/renderers-js": "^2.4.0",

@@ -11,6 +11,7 @@ use codama_nodes::ProgramNode;
 use codama_nodes::RootNode;
 pub use error::RenderError;
 pub use error::Result;
+use render::accounts::migration_envelope;
 use render::*;
 
 /// Configuration for rendering a Codama IDL into a client crate.
@@ -274,10 +275,22 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 	}
 
 	// Instruction files
+	let extra_instruction_modules: Vec<&str> = if program
+		.accounts
+		.iter()
+		.any(|account| migration_envelope(account).is_some())
+	{
+		vec!["migrate"]
+	} else {
+		Vec::new()
+	};
 	if !program.instructions.is_empty() {
 		files.insert(
 			PathBuf::from("instructions/mod.rs"),
-			page(&render_instructions_mod(&program.instructions)),
+			page(&render_instructions_mod(
+				&program.instructions,
+				&extra_instruction_modules,
+			)),
 		);
 
 		for instruction in &program.instructions {
@@ -287,6 +300,22 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 
 			files.insert(PathBuf::from(filename), page(&instruction_content));
 		}
+	}
+
+	// The framework-owned `Migrate` instruction, for programs with migratable
+	// accounts.
+	if program
+		.accounts
+		.iter()
+		.any(|account| migration_envelope(account).is_some())
+	{
+		files.insert(
+			PathBuf::from("instructions/migrate.rs"),
+			page(&render_migrate_instruction_page(
+				program,
+				&primary_program_const,
+			)),
+		);
 	}
 
 	// Type definitions

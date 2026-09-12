@@ -3,8 +3,13 @@ use std::fmt::Write as _;
 use codama_nodes::AccountNode;
 use codama_nodes::DefaultValueStrategy;
 use codama_nodes::NestedTypeNodeTrait;
+use codama_nodes::Number;
+use codama_nodes::NumberFormat;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
+use codama_nodes::TypeNode;
+use codama_nodes::ValueNode;
+use heck::ToShoutySnakeCase as _;
 
 use super::capacity::CompactCapacityIndex;
 use super::discriminator::render_constant_discriminator;
@@ -164,6 +169,18 @@ pub(crate) fn render_account_page(
 		let helpers =
 			render_account_pda_helpers(account_name.as_str(), pda, primary_program_const)?;
 		lines.extend(helpers);
+	}
+
+	// Migratable accounts also carry a cheap stale-bytes check next to the
+	// version constant, so released clients can decide when to send the
+	// reserved `Migrate` instruction. Fixed layouts additionally expose a
+	// direction-aware decode with generated contract tests.
+	if let Some(envelope) = migration_envelope(account) {
+		lines.push(String::new());
+		lines.push(render_needs_migration(&envelope));
+		if !compact_account {
+			lines.push(render_try_from_bytes(&envelope));
+		}
 	}
 
 	Ok(lines.join("\n"))
@@ -404,4 +421,280 @@ fn render_account_pda_helpers(
 	lines.push("}".to_string());
 
 	Ok(lines)
+}
+
+/// Migration envelope facts for one account, when it is migratable.
+pub(crate) struct MigrationEnvelope {
+	pub(crate) module_name: String,
+	pub(crate) version: u64,
+	pub(crate) version_offset: usize,
+	pub(crate) version_bytes: usize,
+	pub(crate) discriminator: Vec<u8>,
+}
+
+/// Extract the `[discriminator, migrationVersion]` envelope from an account.
+///
+/// Returns `None` unless the account's first two fields carry numeric
+/// defaults under exactly those names.
+pub(crate) fn migration_envelope(account: &AccountNode) -> Option<MigrationEnvelope> {
+	let fields = &account.data.get_nested_type_node().fields;
+	let mut envelope = fields.iter().take(2).filter_map(|field| {
+		let default_value = field.default_value.as_ref().as_ref()?;
+		let kind = match field.name.as_ref() {
+			"discriminator" => "discriminator",
+			"migrationVersion" => "migrationVersion",
+			_ => return None,
+		};
+		Some((kind, field.r#type.as_ref(), default_value))
+	});
+
+	let number_facts = |field_type: &TypeNode, default_value: &ValueNode| -> Option<(u64, usize)> {
+		let ValueNode::Number(number_value) = default_value else {
+			return None;
+		};
+		let TypeNode::Number(number_type) = field_type else {
+			return None;
+		};
+		let width = match number_type.format {
+			NumberFormat::U8 => 1,
+			NumberFormat::U16 => 2,
+			NumberFormat::U32 => 4,
+			NumberFormat::U64 => 8,
+			_ => return None,
+		};
+		let Number::UnsignedInteger(value) = number_value.number else {
+			return None;
+		};
+		Some((value, width))
+	};
+
+	let Some(("discriminator", field_type, default_value)) = envelope.next() else {
+		return None;
+	};
+	let discriminator = number_facts(field_type, default_value)?;
+	let Some(("migrationVersion", field_type, default_value)) = envelope.next() else {
+		return None;
+	};
+	let version = number_facts(field_type, default_value)?;
+
+	Some(MigrationEnvelope {
+		module_name: snake(account.name.as_ref()),
+		version: version.0,
+		version_offset: discriminator.1,
+		version_bytes: version.1,
+		discriminator: discriminator.0.to_le_bytes()[..discriminator.1].to_vec(),
+	})
+}
+
+/// Render the per-account stale-bytes check for one migratable account.
+pub(crate) fn render_needs_migration(envelope: &MigrationEnvelope) -> String {
+	let constant = format!(
+		"{}_MIGRATION_VERSION",
+		envelope.module_name.to_shouty_snake_case()
+	);
+	let module = &envelope.module_name;
+	let header = envelope.version_offset + envelope.version_bytes;
+	let version_end = header;
+	let mut conditions = Vec::new();
+	for (index, byte) in envelope.discriminator.iter().enumerate() {
+		conditions.push(format!("data[{index}] == {byte}"));
+	}
+	let conditions = conditions.join("\n\t\t\t&& ");
+
+	format!(
+		"\n/// Whether raw account bytes are stale for this contract: the envelope names this \
+		 account's discriminator and carries a version older than\n/// [`{constant}`]. Current or \
+		 foreign bytes return false; decoding explains the difference.\npub fn \
+		 {module}_needs_migration(data: &[u8]) -> bool {{\n\tdata.len() >= {header}\n\t\t\t&& \
+		 {conditions}\n\t\t\t&& {{\n\t\t\t\tlet mut version = [0_u8; \
+		 8];\n\t\t\t\tversion[..{vb}]\n\t\t\t\t\t.copy_from_slice(&data[{vo}..{ve}]);\n\t\t\t\t		 \
+		 u64::from_le_bytes(version) < {version}\n\t\t\t}}\n}}\n",
+		constant = constant,
+		module = module,
+		header = header,
+		conditions = conditions,
+		vb = envelope.version_bytes,
+		vo = envelope.version_offset,
+		ve = version_end,
+		version = envelope.version,
+	)
+}
+/// Render the direction-aware decode API and contract tests for one fixed
+/// migratable account.
+fn render_try_from_bytes(envelope: &MigrationEnvelope) -> String {
+	let account = pascal(&envelope.module_name);
+	let zc_name = format!("{account}Zc");
+	let error_enum = format!("{account}VersionError");
+	let version_constant = format!(
+		"{}_MIGRATION_VERSION",
+		envelope.module_name.to_shouty_snake_case()
+	);
+	let discriminator_constant = format!(
+		"{}_DISCRIMINATOR",
+		envelope.module_name.to_shouty_snake_case()
+	);
+	let version_type = match envelope.version_bytes {
+		2 => "u16",
+		4 => "u32",
+		8 => "u64",
+		_ => "u8",
+	};
+	let version = envelope.version;
+	let version_plus_one = version + 1;
+	let version_offset = envelope.version_offset;
+	let version_end = version_offset + envelope.version_bytes;
+	let module = &envelope.module_name;
+	let discriminator_len = envelope.discriminator.len();
+	let discriminator_bytes = envelope
+		.discriminator
+		.iter()
+		.map(u8::to_string)
+		.collect::<Vec<_>>()
+		.join(", ");
+	let invalid_message = format!("invalid {account} account data");
+	let stale_message = format!(
+		"migration version mismatch: expected {version}, received 0 (the data predates this \
+		 client; migrate it by sending a transaction to the program, or decode it with a client \
+		 generated from an older IDL)"
+	);
+	let future_message = format!(
+		"migration version mismatch: expected {version}, received {version_plus_one} (the data \
+		 was written by a newer program; upgrade this client)"
+	);
+
+	let stale_hint = "the data predates this client; migrate it by sending a transaction to the \
+	                  program, or decode it with a client generated from an older IDL";
+	let future_hint = "the data was written by a newer program; upgrade this client";
+
+	let mut lines = Vec::new();
+	lines.push(String::new());
+	lines.push(format!(
+		"/// Why `{account}::try_from_bytes` rejected account bytes."
+	));
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_owned());
+	lines.push(format!("pub enum {error_enum} {{"));
+	lines.push("\t/// The bytes do not decode as this account's layout at all.".to_owned());
+	lines.push("\tInvalidData,".to_owned());
+	lines.push(
+		"\t/// The envelope names this account but the stored version predates this client: \
+		 migrate the account on-chain, then retry."
+			.to_owned(),
+	);
+	lines.push(format!("\tStale {{ stored: {version_type} }},"));
+	lines.push(
+		"\t/// The envelope names this account but the stored version is newer than this client's \
+		 schema: upgrade this client."
+			.to_owned(),
+	);
+	lines.push(format!("\tFuture {{ stored: {version_type} }},"));
+	lines.push("}".to_owned());
+	lines.push(String::new());
+	lines.push(format!("impl core::fmt::Display for {error_enum} {{"));
+	lines.push(
+		"\tfn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {".to_owned(),
+	);
+	lines.push("\t\tmatch self {".to_owned());
+	lines.push(format!(
+		"\t\t\tSelf::InvalidData => write!(f, \"{invalid_message}\"),"
+	));
+	lines.push("\t\t\tSelf::Stale { stored } => write!(".to_owned());
+	lines.push("\t\t\t\tf,".to_owned());
+	lines.push(format!(
+		"\t\t\t\t\"migration version mismatch: expected {version}, received {{stored}} \
+		 ({stale_hint})\""
+	));
+	lines.push("\t\t\t),".to_owned());
+	lines.push("\t\t\tSelf::Future { stored } => write!(".to_owned());
+	lines.push("\t\t\t\tf,".to_owned());
+	lines.push(format!(
+		"\t\t\t\t\"migration version mismatch: expected {version}, received {{stored}} \
+		 ({future_hint})\""
+	));
+	lines.push("\t\t\t),".to_owned());
+	lines.push("\t\t}".to_owned());
+	lines.push("\t}".to_owned());
+	lines.push("}".to_owned());
+	lines.push(String::new());
+	lines.push(format!("impl {account} {{"));
+	lines.push(format!(
+		"\t/// Decodes current-version bytes and tells stale envelopes (migrate the account) \
+		 apart from future ones (upgrade this client). The failure message mirrors the generated \
+		 JavaScript decoder. For the strict current-only convenience returning `ProgramError`, \
+		 see [`{account}::from_bytes`]."
+	));
+	lines.push("\tpub fn try_from_bytes(".to_owned());
+	lines.push("\t\tdata: &[u8],".to_owned());
+	lines.push(format!("\t) -> Result<&{zc_name}, {error_enum}> {{"));
+	lines.push(format!(
+		"\t\tlet account = <Self as pina::PinaPodFixed>::read_exact(data)\n\t\t\t.map_err(|_| \
+		 {error_enum}::InvalidData)?;"
+	));
+	lines.push(format!(
+		"\t\tif account.discriminator != {discriminator_constant} {{"
+	));
+	lines.push(format!("\t\t\treturn Err({error_enum}::InvalidData);"));
+	lines.push("\t\t}".to_owned());
+	lines.push(format!(
+		"\t\tif account.migration_version < {version_constant} {{"
+	));
+	lines.push(format!(
+		"\t\t\treturn Err({error_enum}::Stale {{ stored: account.migration_version }});"
+	));
+	lines.push("\t\t}".to_owned());
+	lines.push(format!(
+		"\t\tif account.migration_version > {version_constant} {{"
+	));
+	lines.push(format!(
+		"\t\t\treturn Err({error_enum}::Future {{ stored: account.migration_version }});"
+	));
+	lines.push("\t\t}".to_owned());
+	lines.push("\t\tOk(account)".to_owned());
+	lines.push("\t}".to_owned());
+	lines.push("}".to_owned());
+	lines.push(String::new());
+	lines.push("#[cfg(test)]".to_owned());
+	lines.push(format!("mod {module}_version_error_tests {{"));
+	lines.push("\tuse super::*;".to_owned());
+	lines.push(String::new());
+	lines.push(format!(
+		"\tfn envelope(version: {version_type}) -> Vec<u8> {{"
+	));
+	lines.push(format!(
+		"\t\tlet mut data = vec![0_u8; core::mem::size_of::<{zc_name}>()];"
+	));
+	lines.push(format!(
+		"\t\tdata[..{discriminator_len}].copy_from_slice(&[{discriminator_bytes}]);"
+	));
+	lines.push(format!(
+		"\t\tdata[{version_offset}..{version_end}].copy_from_slice(&version.to_le_bytes());"
+	));
+	lines.push("\t\tdata".to_owned());
+	lines.push("\t}".to_owned());
+	lines.push(String::new());
+	lines.push("\t#[test]".to_owned());
+	lines.push("\tfn stale_and_future_versions_are_distinguishable() {".to_owned());
+	lines.push(format!(
+		"\t\tlet error = {account}::try_from_bytes(&envelope(0 as \
+		 {version_type})).err().expect(\"a stale envelope must fail\");\n\t\tassert_eq!(error, \
+		 {error_enum}::Stale {{ stored: 0 }});"
+	));
+	lines.push(format!(
+		"\t\tassert_eq!({error_enum}::Stale {{ stored: 0 }}.to_string(), {stale_message:?});"
+	));
+	lines.push(format!(
+		"\t\tlet error = {account}::try_from_bytes(&envelope({version_plus_one} as \
+		 {version_type})).err().expect(\"a future envelope must fail\");\n\t\tassert_eq!(error, \
+		 {error_enum}::Future {{ stored: {version_plus_one} }});"
+	));
+	lines.push(format!(
+		"\t\tassert_eq!({error_enum}::Future {{ stored: {version_plus_one} }}.to_string(), \
+		 {future_message:?});"
+	));
+	lines.push(format!(
+		"\t\tassert!(\n\t\t\t{account}::try_from_bytes(&envelope({version} as \
+		 {version_type})).is_ok(),\n\t\t\t\"the current version must decode\",\n\t\t);"
+	));
+	lines.push("\t}".to_owned());
+	lines.push("}".to_owned());
+	lines.join("\n")
 }

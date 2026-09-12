@@ -218,3 +218,31 @@ export async function fetchAllMaybeCompactState(
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeCompactState(maybeAccount));
 }
+
+/** The account schema version this client was generated from. */
+export const COMPACT_STATE_MIGRATION_VERSION = 1;
+
+/**
+ * Cheap envelope check for a fetched `CompactState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (compactStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ compactState: address, payer }).make());
+ * }
+ * ```
+ */
+export function compactStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 3) {
+		return false;
+	}
+	return data[1]! < 1;
+}

@@ -6,6 +6,8 @@ import 'package:pina_codama_clients/account_realloc_program.dart'
     show Sample, getSampleDecoder, getSampleEncoder;
 import 'package:pina_codama_clients/compact_accounts_program.dart'
     show Journal, getJournalDecoder, getJournalEncoder;
+import 'package:pina_codama_clients/migrations_program.dart'
+    as migrations_program;
 import 'package:pina_codama_clients/profile_program.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -385,6 +387,64 @@ void main() {
     expect(decoder.decode(Uint8List.fromList([0])), _Status.inactive);
     expect(decoder.decode(Uint8List.fromList([1])), _Status.active);
     expect(() => decoder.decode(Uint8List.fromList([2])), throwsRangeError);
+  });
+  group('migrations program migration helpers', () {
+    test('exposes the reserved all-ones discriminator', () {
+      expect(migrations_program.migrateDiscriminator, 255);
+      expect(migrations_program.getMigrateDiscriminatorBytes(), [255]);
+    });
+
+    test('flags stale State envelopes only', () {
+      expect(migrations_program.stateMigrationVersion, 2);
+      final stale = List<int>.filled(10, 0)
+        ..[0] = 1
+        ..[1] = 0;
+      expect(migrations_program.stateNeedsMigration(stale), isTrue);
+      final current = List<int>.filled(10, 0)
+        ..[0] = 1
+        ..[1] = 2;
+      expect(migrations_program.stateNeedsMigration(current), isFalse);
+      final future = List<int>.filled(10, 0)
+        ..[0] = 1
+        ..[1] = 3;
+      expect(migrations_program.stateNeedsMigration(future), isFalse);
+      final foreign = List<int>.filled(10, 0)
+        ..[0] = 9
+        ..[1] = 0;
+      expect(migrations_program.stateNeedsMigration(foreign), isFalse);
+      expect(migrations_program.stateNeedsMigration(<int>[1]), isFalse);
+    });
+
+    test('composes placeholder-filled truncated migrate instructions', () {
+      final program = migrations_program.migrationsProgramProgramAddress;
+      final instruction = migrations_program.getMigrateInstruction(
+        programAddress: program,
+        payer: systemAddress,
+        systemProgram: systemAddress,
+        state: systemAddress,
+      );
+      expect(instruction.accounts!.length, 3);
+      expect(instruction.accounts![0].address, systemAddress);
+      expect(instruction.accounts![0].role, AccountRole.writableSigner);
+      expect(instruction.accounts![1].role, AccountRole.readonly);
+      expect(instruction.accounts![2].role, AccountRole.writable);
+      expect(
+        instruction.data!,
+        migrations_program.getMigrateDiscriminatorBytes(),
+      );
+      expect(instruction.programAddress, program);
+
+      final omitted = migrations_program.getMigrateInstruction(
+        programAddress: program,
+        compactState: systemAddress,
+      );
+      expect(omitted.accounts!.length, 5);
+      expect(
+        omitted.accounts!.take(4).map((meta) => meta.role),
+        everyElement(AccountRole.readonly),
+      );
+      expect(omitted.accounts![4].role, AccountRole.writable);
+    });
   });
 }
 

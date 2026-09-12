@@ -11,8 +11,18 @@ pub struct ProgramIr {
 	pub pinapod_enums: Vec<PinaPodEnumIr>,
 	pub accounts: Vec<AccountIr>,
 	pub instructions: Vec<InstructionIr>,
+	pub events: Vec<EventIr>,
 	pub errors: Vec<ErrorIr>,
 	pub pdas: Vec<PdaIr>,
+}
+
+/// An `#[event]` struct with its resolved discriminator.
+#[derive(Debug, Clone)]
+pub struct EventIr {
+	pub name: String,
+	pub discriminator: DiscriminatorIr,
+	pub fields: Vec<FieldIr>,
+	pub docs: Vec<String>,
 }
 
 /// A local unit enum derived with `PinaPod` and its generated companion.
