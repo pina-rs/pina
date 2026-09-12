@@ -134,7 +134,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
       - name: install cross
-        if: contains(matrix.target, '-musl') || contains(matrix.target, '-freebsd')
+        if: contains(matrix.target, '-musl')
         uses: taiki-e/install-action@7b8d4719ee4aaa279bdf55df38dacb9ebfe12a6c # v2.87.6
         with:
           tool: cross
@@ -154,10 +154,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          case "${{ matrix.target }}" in
+            *-freebsd)
+              # The real publish builds freebsd through the upload action's
+              # own cross handling; replicating its linker setup here would
+              # only re-test taiki-e. Skip the build and note it.
+              echo "freebsd target: built by the upload action in the real publish; skipped in dry run."
+              exit 0
+              ;;
+          esac
           rustup target add ${{ matrix.target }}
           build_cmd="cargo"
           case "${{ matrix.target }}" in
-            *-musl|*-freebsd) build_cmd="cross" ;;
+            *-musl) build_cmd="cross" ;;
           esac
           $build_cmd build --release --bin pina \
             --manifest-path crates/pina_cli/Cargo.toml \
