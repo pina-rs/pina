@@ -2039,9 +2039,13 @@ fn harden_event_contains_bytes(source: &str, encoder: &str) -> String {
 		};
 		let offset = &after[comma + 2..comma + 2 + close];
 		hardened.push_str(&rest[..position]);
-		hardened.push_str(&format!(
-			"containsBytes(data, {encoder}().encode({constant}), {offset})"
-		));
+		hardened.push_str("containsBytes(data, ");
+		hardened.push_str(encoder);
+		hardened.push_str("().encode(");
+		hardened.push_str(constant);
+		hardened.push_str("), ");
+		hardened.push_str(offset);
+		hardened.push(')');
 		rest = &after[comma + 2 + close + 1..];
 	}
 	hardened.push_str(rest);
