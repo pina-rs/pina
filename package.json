@@ -11,6 +11,7 @@
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
+		"test:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli test",
 		"test:compute-units": "node --test scripts/tests/*.test.ts",
 		"walkthrough:migrations": "tsx scripts/migrations-walkthrough.ts",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",

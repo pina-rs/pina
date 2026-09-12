@@ -40,3 +40,6 @@ dependencies:
   solana_kit_rpc: ^0.8.0
   solana_kit_transaction_messages: ^0.8.0
   solana_kit_transactions: ^0.8.0
+
+dev_dependencies:
+  test: ^1.25.0

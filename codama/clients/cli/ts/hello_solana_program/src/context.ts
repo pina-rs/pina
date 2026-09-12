@@ -22,6 +22,7 @@ import {
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { endpointIsSecure } from "./endpoint";
 
 const CLUSTERS: Record<string, string> = {
 	"mainnet": "https://api.mainnet-beta.solana.com",
@@ -92,7 +93,7 @@ export class CliContext {
 		);
 		const payer = await loadKeypair(keypair);
 		const programAddress = options.programId
-			? (options.programId as Address)
+			? pubkey("--program-id", options.programId)
 			: ("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A" as Address);
 		return new CliContext(
 			rpc,
@@ -221,14 +222,7 @@ export function base58(flag: string, value: string): Uint8Array {
 
 function resolveEndpoint(value: string): string {
 	const endpoint = CLUSTERS[value] ?? value;
-	const lowercase = endpoint.toLowerCase();
-	const isLocal = lowercase.startsWith("http://localhost") ||
-		lowercase.startsWith("http://127.0.0.1") ||
-		lowercase.startsWith("http://[::1]");
-	if (
-		!lowercase.startsWith("https://") &&
-		!(lowercase.startsWith("http://") && isLocal)
-	) {
+	if (!endpointIsSecure(endpoint)) {
 		throw new CliError(
 			"plaintext http:// endpoints are only allowed on localhost; use https for remote clusters",
 		);

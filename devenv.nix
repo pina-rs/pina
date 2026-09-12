@@ -371,7 +371,15 @@ in
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
         fi
+        # The root Cargo.toml names a package (pina_root), so plain `cargo
+        # test` only covers it; member crates are tested explicitly.
         cargo test --all-features --locked
+        cargo test --locked --all-features \
+          -p pina_abi \
+          -p pina_cli \
+          -p pina_cli_renderer \
+          -p pina_codama_renderer \
+          -p pina_cpi_renderer
         cargo check \
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
           --all-targets \
@@ -447,6 +455,7 @@ in
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi
+        pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cli
       '';
       description = "Verify npm metadata, platform launchers, the CPI visitor, the skill installer, and release packaging scripts.";
       binary = "bash";
@@ -924,6 +933,7 @@ in
           --locked \
           -p pina \
           -p pina_cli \
+          -p pina_cli_renderer \
           -p pina_codama_renderer \
           -p pina_cpi_renderer \
           -p pina_lints \

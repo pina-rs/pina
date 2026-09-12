@@ -146,6 +146,7 @@ echo "Analyzing generated Dart CLI package..."
 	dart format .
 	dart format --output=none --set-exit-if-changed .
 	dart analyze --fatal-infos
+	dart test
 )
 
 echo "Compile-checking generated Rust, CPI, and CLI client crates..."
@@ -176,6 +177,24 @@ for manifest in "${CLIENT_MANIFESTS[@]}"; do
 done
 
 cargo check --locked "${CLIENT_ARGS[@]}"
+
+echo "Testing generated CLI client crates..."
+CLI_ARGS=()
+while IFS= read -r manifest; do
+	package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
+	if [ -z "$package_name" ]; then
+		echo "Failed to read package name from $manifest" >&2
+		exit 1
+	fi
+	CLI_ARGS+=("-p" "$package_name")
+done < <(find "$CLI_RUST_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+
+if [ "${#CLI_ARGS[@]}" -eq 0 ]; then
+	echo "No generated CLI client manifests found." >&2
+	exit 1
+fi
+
+cargo test --locked "${CLI_ARGS[@]}"
 
 echo "Checking deterministic Codama output regeneration..."
 GENERATED_STATUS="$(

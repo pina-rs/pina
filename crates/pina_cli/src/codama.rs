@@ -31,6 +31,7 @@ use crate::project::Project;
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import { createFromJson, visit } from "codama";
 import {
+	copyFileSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -182,12 +183,25 @@ function publishDartCli() {
 		);
 		publishDirectory(join(stagingRoot, "bin"), join(outputRoot, "bin"));
 	}
+	publishFile(
+		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
+		join(outputRoot, "lib", "src", "endpoint_guard.dart"),
+	);
+	publishFile(
+		join(stagingRoot, "test", "endpoint_guard_test.dart"),
+		join(outputRoot, "test", "endpoint_guard_test.dart"),
+	);
 
 	const manifest = join(outputRoot, "pubspec.yaml");
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(outputRoot, { recursive: true });
 		writeFileSync(manifest, dartCliManifest(), "utf8");
 	}
+}
+
+function publishFile(staged, destination) {
+	mkdirSync(dirname(destination), { recursive: true });
+	copyFileSync(staged, destination);
 }
 
 function dartCliManifest() {
@@ -215,6 +229,9 @@ dependencies:
   solana_kit_rpc: ^0.8.0
   solana_kit_transaction_messages: ^0.8.0
   solana_kit_transactions: ^0.8.0
+
+dev_dependencies:
+  test: ^1.25.0
 `;
 }
 

@@ -4,7 +4,13 @@
 
 import { Command } from "commander";
 import { fetchStoreState, findStorePda } from "./client";
-import { bigInteger, CliContext, pubkey, registerGlobals } from "./context";
+import {
+	bigInteger,
+	CliContext,
+	CliError,
+	pubkey,
+	registerGlobals,
+} from "./context";
 
 export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
@@ -26,6 +32,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 						programAddress: context.programAddress,
 					}))[0];
 				const account = await fetchStoreState(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
 				printAccount(context.json, "store-state", address, account.data);
 			}),
 	);

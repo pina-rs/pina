@@ -241,6 +241,7 @@ impl CliModel {
 		let program = &root.program;
 		let program_camel = program.name.as_ref().to_lower_camel_case();
 		let program_snake = program_camel.to_snake_case();
+		validate_identifier("program", &program_snake, &program_camel)?;
 
 		let instructions = program
 			.instructions
@@ -294,6 +295,11 @@ fn instruction_model(
 ) -> Result<InstructionModel> {
 	let pascal = instruction.name.as_ref().to_upper_camel_case();
 	let snake = pascal.to_snake_case();
+	validate_identifier(
+		&format!("instruction `{}`", instruction.name.as_ref()),
+		&snake,
+		&pascal,
+	)?;
 	let context = format!("instruction `{pascal}`");
 
 	let args = instruction
@@ -327,6 +333,11 @@ fn instruction_model(
 fn argument_model(argument: &InstructionArgumentNode, context: &str) -> Result<ArgModel> {
 	let pascal = argument.name.as_ref().to_upper_camel_case();
 	let snake = pascal.to_snake_case();
+	validate_identifier(
+		&format!("{context} argument `{}`", argument.name.as_ref()),
+		&snake,
+		&pascal,
+	)?;
 
 	Ok(ArgModel {
 		kind: arg_kind(&argument.r#type, context)?,
@@ -479,6 +490,11 @@ fn account_ref_model(
 	context: &str,
 ) -> Result<AccountRefModel> {
 	let snake = account.name.as_ref().to_snake_case();
+	validate_identifier(
+		&format!("{context} account `{}`", account.name.as_ref()),
+		&snake,
+		&snake,
+	)?;
 
 	let resolution = match account.default_value.as_ref().as_ref() {
 		Some(InstructionInputValueNode::PublicKeyValue(PublicKeyValueNode {
@@ -604,6 +620,11 @@ fn seed_model(
 ) -> Result<SeedModel> {
 	let PdaSeedValueNode { name, value } = seed;
 	let seed_name = name.as_ref().to_snake_case();
+	validate_identifier(
+		&format!("{context} PDA seed `{}`", name.as_ref()),
+		&seed_name,
+		&seed_name,
+	)?;
 
 	match value.as_ref() {
 		PdaSeedValueValue::Account(account) => {
@@ -679,6 +700,7 @@ fn seed_model(
 fn account_model(account: &AccountNode, program: &ProgramNode) -> Result<AccountModel> {
 	let pascal = account.name.as_ref().to_upper_camel_case();
 	let snake = pascal.to_snake_case();
+	validate_identifier(&format!("account `{pascal}`"), &snake, &pascal)?;
 
 	let seeds = account
 		.pda
@@ -928,4 +950,58 @@ fn error_model(error: &ErrorNode) -> ErrorModel {
 		code: error.code,
 		message: error.message.clone(),
 	}
+}
+
+/// Rust keywords that cannot be emitted as bare identifiers.
+const RUST_KEYWORDS: &[&str] = &[
+	"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
+	"false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+	"ref", "return", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use",
+	"where", "while", "abstract", "become", "box", "do", "final", "macro", "override", "priv",
+	"try", "typeof", "unsized", "virtual", "yield", "gen",
+];
+
+/// Reject IDL names that would not emit as valid Rust identifiers.
+///
+/// Codama names only get case conversion, so a hostile or unusual name
+/// (`match`, `3addr`, an empty string) would otherwise generate code that
+/// fails to compile instead of a clear renderer error.
+fn validate_identifier(context: &str, snake: &str, pascal: &str) -> Result<()> {
+	let invalid = |reason: String| {
+		RenderError::UnsupportedIdl {
+			context: context.to_string(),
+			reason,
+		}
+	};
+
+	let starts_validly = snake
+		.chars()
+		.next()
+		.is_some_and(|character| character.is_ascii_alphabetic() || character == '_');
+	if !starts_validly {
+		return Err(invalid(format!(
+			"name converts to the invalid identifier `{snake}`; identifiers must start with an \
+			 ASCII letter or underscore"
+		)));
+	}
+	if !snake
+		.chars()
+		.all(|character| character.is_ascii_alphanumeric() || character == '_')
+	{
+		return Err(invalid(format!(
+			"name converts to the invalid identifier `{snake}`; only ASCII letters, digits, and \
+			 underscores are supported"
+		)));
+	}
+	if RUST_KEYWORDS.contains(&snake) {
+		return Err(invalid(format!(
+			"name converts to the Rust keyword `{snake}`"
+		)));
+	}
+	if pascal == "Self" {
+		return Err(invalid(
+			"name converts to the reserved Rust type name `Self`".to_string(),
+		));
+	}
+	Ok(())
 }

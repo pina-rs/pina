@@ -16,6 +16,8 @@ import 'package:solana_kit_rpc_spec/solana_kit_rpc_spec.dart';
 import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
     hide TransactionVersion;
 import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
+
+import '../endpoint_guard.dart';
 import 'package:solana_kit_transactions/solana_kit_transactions.dart';
 
 const clusters = <String, String>{
@@ -192,13 +194,7 @@ Uint8List base58Bytes(String flag, String value) {
 
 String resolveEndpoint(String value) {
   final endpoint = clusters[value] ?? value;
-  final lowercase = endpoint.toLowerCase();
-  final isLocal =
-      lowercase.startsWith('http://localhost') ||
-      lowercase.startsWith('http://127.0.0.1') ||
-      lowercase.startsWith('http://[::1]');
-  if (!lowercase.startsWith('https://') &&
-      !(lowercase.startsWith('http://') && isLocal)) {
+  if (!endpointIsSecure(endpoint)) {
     throw CliError(
       'plaintext http:// endpoints are only allowed on localhost; '
       'use https for remote clusters',
