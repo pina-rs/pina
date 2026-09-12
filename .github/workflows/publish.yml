@@ -134,7 +134,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
       - name: install cross
-        if: contains(matrix.target, '-musl')
+        if: contains(matrix.target, '-musl') || contains(matrix.target, '-freebsd')
         uses: taiki-e/install-action@7b8d4719ee4aaa279bdf55df38dacb9ebfe12a6c # v2.87.6
         with:
           tool: cross
@@ -154,7 +154,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --bin pina \
+          rustup target add ${{ matrix.target }}
+          build_cmd="cargo"
+          case "${{ matrix.target }}" in
+            *-musl|*-freebsd) build_cmd="cross" ;;
+          esac
+          $build_cmd build --release --bin pina \
             --manifest-path crates/pina_cli/Cargo.toml \
             --target ${{ matrix.target }}
           test -f "target/${{ matrix.target }}/release/pina"
