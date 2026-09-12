@@ -190,12 +190,16 @@ jobs:
           release_tag="$(monochange step release-record --from HEAD --format json \
             | jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' \
             | head -1)"
-          commit="$(git rev-parse HEAD)"
+          # The dispatch API requires a branch or tag ref, not a raw SHA:
+          # push a stable per-release branch pointing at the release commit
+          # and dispatch against it.
+          dry_ref="publish-dry-run/$release_tag"
+          git push --force origin "+$(git rev-parse HEAD):refs/heads/$dry_ref"
           gh workflow run publish.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref "$commit" \
+            --ref "$dry_ref" \
             -f "tag=$release_tag" \
-            -f "checkout_ref=$commit" \
+            -f "checkout_ref=$dry_ref" \
             -f "dry_run=true"
           sleep 20
           dry_run_id="$(gh run list --workflow publish.yml --event workflow_dispatch \
