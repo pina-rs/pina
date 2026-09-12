@@ -1753,7 +1753,7 @@ pub fn print_inspect_report(report: &pina_cli::migrations::inspect::InspectRepor
 				"{} Stored v{} matches the manifest's current version.",
 				"✔".green(),
 				report.stored_version.unwrap_or_default()
-			)
+			);
 		}
 		pina_cli::migrations::inspect::InspectState::Future => {
 			println!(
@@ -1787,7 +1787,7 @@ pub fn print_inspect_report(report: &pina_cli::migrations::inspect::InspectRepor
 			println!(
 				"{} The account data does not carry a decodable migration envelope.",
 				"⚠".yellow().bold()
-			)
+			);
 		}
 		pina_cli::migrations::inspect::InspectState::Empty => {}
 	}
