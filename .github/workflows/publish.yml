@@ -17,6 +17,10 @@ on:
         required: false
         type: boolean
         default: false
+      checkout_ref:
+        description: "Ref to check out instead of the tag. Dry runs against a release PR pass its branch here so the exact PR commit is validated."
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -87,8 +91,10 @@ jobs:
     steps:
       # The release-pr tag job pushes the tag (firing this workflow) and then
       # creates the draft release. Wait for that draft release to exist before
-      # uploading assets into it.
+      # uploading assets into it. A dry run never waits (and never uploads):
+      # no draft release is created for it.
       - name: wait for draft release
+        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -108,7 +114,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
       - name: install rust toolchain
@@ -143,7 +149,22 @@ jobs:
           set -euo pipefail
           cargo build --release --package pina_lints --bin pina_lint_driver \
             --target ${{ matrix.target }}
+      - name: build and verify release artifacts (dry run)
+        if: inputs.dry_run == true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --bin pina \
+            --manifest-path crates/pina_cli/Cargo.toml \
+            --target ${{ matrix.target }}
+          test -f "target/${{ matrix.target }}/release/pina"
+          if [ "${{ matrix.lint_driver }}" == "true" ]; then
+            test -f "target/${{ matrix.target }}/release/pina_lint_driver"
+          fi
+          echo "Dry run: all expected artifacts for ${{ matrix.target }} exist."
+
       - name: upload binaries
+        if: inputs.dry_run != true
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: pina
@@ -260,7 +281,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
       - name: setup
