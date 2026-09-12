@@ -1945,10 +1945,9 @@ export function getMigrateInstruction<
 /// discriminators.
 fn harden_js_event_decoders(generated: &Path, root: &RootNode) -> Result<(), CodamaError> {
 	let events_dir = generated.join("events");
-	let entries = match std::fs::read_dir(&events_dir) {
-		Ok(entries) => entries,
-		// Programs without events have no directory to harden.
-		Err(_) => return Ok(()),
+	// Programs without events have no directory to harden.
+	let Ok(entries) = std::fs::read_dir(&events_dir) else {
+		return Ok(());
 	};
 
 	for entry in entries {

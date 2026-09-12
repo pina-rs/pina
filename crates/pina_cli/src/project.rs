@@ -501,7 +501,7 @@ impl Project {
 			clients: clients_config.languages,
 			client_generation,
 			migration_version_type: MigrationVersionType::default(),
-			migration_answers: Default::default(),
+			migration_answers: MigrationsAnswersConfig::default(),
 			lint_levels: BTreeMap::new(),
 			root,
 		})

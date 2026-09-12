@@ -147,13 +147,11 @@ pub fn fetch_account_data(rpc_url: &str, address: &Address) -> Result<Option<Vec
 fn parse_rpc_account_data(text: &str, address: &Address) -> Result<Option<Vec<u8>>, String> {
 	let value: serde_json::Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
 	if let Some(error) = value.get("error") {
-		return Err(format!(
-			"{}",
-			error
-				.get("message")
-				.and_then(|m| m.as_str())
-				.unwrap_or("unknown JSON-RPC error")
-		));
+		return Err(error
+			.get("message")
+			.and_then(|message| message.as_str())
+			.unwrap_or("unknown JSON-RPC error")
+			.to_owned());
 	}
 	let account = value
 		.pointer("/result/value")

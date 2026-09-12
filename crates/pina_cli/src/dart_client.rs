@@ -1683,7 +1683,7 @@ fn dart_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> Strin
 		.unwrap_or(u8::MAX);
 
 	format!(
-		r#"// Auto-generated. Do not edit.
+		r"// Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
 import 'dart:typed_data';
@@ -1730,7 +1730,7 @@ Instruction getMigrateInstruction({{
     data: getMigrateDiscriminatorBytes(),
   );
 }}
-"#,
+",
 		program_snake = program.to_snake_case(),
 		program_address = program_address,
 		reserved_value = reserved_value,
