@@ -197,10 +197,12 @@ jobs:
     name: attest release assets
     # Require every direct asset-producing dependency to succeed before the
     # release archives are attested.
+    # Nothing was uploaded in a dry run, so there is nothing to attest.
     if: >-
       needs.upload_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
-      startsWith(inputs.tag || github.ref_name, 'v')
+      startsWith(inputs.tag || github.ref_name, 'v') &&
+      (inputs.dry_run != true)
     needs:
       - upload_assets
     # Read release archives, then attach OIDC-backed provenance attestations.
