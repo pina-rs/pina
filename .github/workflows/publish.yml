@@ -12,6 +12,15 @@ on:
         description: "Release tag to publish (for example v0.8.0). Used by the automated release handoff and manual retries."
         required: true
         type: string
+      dry_run:
+        description: "Simulate the publish: build every artifact and validate the release, but publish nothing and keep the release a draft."
+        required: false
+        type: boolean
+        default: false
+      checkout_ref:
+        description: "Ref to check out instead of the tag. Dry runs against a release PR pass its branch here so the exact PR commit is validated."
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -57,24 +66,24 @@ jobs:
           # archived.
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
+            lint_driver: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
           - target: aarch64-apple-darwin
             os: macos-latest
-            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
+            lint_driver: true
           - target: aarch64-pc-windows-msvc
             os: windows-latest
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
+            lint_driver: true
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver.exe
+            lint_driver: true
           - target: x86_64-unknown-freebsd
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
@@ -82,8 +91,10 @@ jobs:
     steps:
       # The release-pr tag job pushes the tag (firing this workflow) and then
       # creates the draft release. Wait for that draft release to exist before
-      # uploading assets into it.
+      # uploading assets into it. A dry run never waits (and never uploads):
+      # no draft release is created for it.
       - name: wait for draft release
+        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -103,7 +114,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
       - name: install rust toolchain
@@ -138,7 +149,22 @@ jobs:
           set -euo pipefail
           cargo build --release --package pina_lints --bin pina_lint_driver \
             --target ${{ matrix.target }}
+      - name: build and verify release artifacts (dry run)
+        if: inputs.dry_run == true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --bin pina \
+            --manifest-path crates/pina_cli/Cargo.toml \
+            --target ${{ matrix.target }}
+          test -f "target/${{ matrix.target }}/release/pina"
+          if [ "${{ matrix.lint_driver }}" == "true" ]; then
+            test -f "target/${{ matrix.target }}/release/pina_lint_driver"
+          fi
+          echo "Dry run: all expected artifacts for ${{ matrix.target }} exist."
+
       - name: upload binaries
+        if: inputs.dry_run != true
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: pina
@@ -147,7 +173,7 @@ jobs:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
-          include: ${{ matrix.lint_driver }}
+          include: target/${{ matrix.target }}/release/pina_lint_driver
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -234,10 +260,13 @@ jobs:
       contents: write # Publish the draft GitHub release after registry publication.
       id-token: write # Authenticate to crates.io and npm trusted publishing.
     # Never publish unless every release asset was attested successfully.
+    # A dry run stops here: assets are built and attested against the draft
+    # release but no registry publish happens and the release stays draft.
     if: >-
       needs.attest_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
-      startsWith(inputs.tag || github.ref_name, 'v')
+      startsWith(inputs.tag || github.ref_name, 'v') &&
+      (inputs.dry_run != true)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -252,7 +281,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
       - name: setup

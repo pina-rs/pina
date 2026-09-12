@@ -7,6 +7,7 @@ on:
       - main
 
 permissions:
+  actions: write # Dispatch the publish dry run against the release branch.
   contents: write
   pull-requests: write
 
@@ -108,6 +109,33 @@ jobs:
           printf '%s\n' "$output"
         shell: devenv shell -- bash -e {0}
 
+      - name: dispatch publish dry run
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Simulate the full publish against the release PR's own commit: the
+          # dry run builds every release artifact and validates the release,
+          # but creates no tag, no draft release, and publishes nothing. The
+          # tag job refuses to run until a dry run has succeeded for the
+          # exact tree being released.
+          release_branch="monochange/release/release"
+          tag="$(monochange step release-record --from "$release_branch" --format json \
+            | jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' \
+            | head -1)"
+          if [ -z "$tag" ]; then
+            echo "::error::Could not determine the release tag for the dry run." >&2
+            exit 1
+          fi
+          gh workflow run publish.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$release_branch" \
+            -f "tag=$tag" \
+            -f "checkout_ref=$release_branch" \
+            -f "dry_run=true"
+        shell: devenv shell -- bash -e {0}
+
       - name: skip refresh without changesets
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets != 'true'
         run: echo "No pending changesets found; skipping release PR refresh."
@@ -150,6 +178,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh auth setup-git
+
+      - name: require a successful publish dry run for this tree
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The release must not be tagged or published unless a publish dry
+          # run has already succeeded against this exact tree. The dry run is
+          # dispatched automatically every time the release PR is refreshed.
+          head_tree="$(git rev-parse HEAD^{tree})"
+          dry_ok=false
+          while read -r sha; do
+            [ -z "$sha" ] && continue
+            run_tree="$(git rev-parse "${sha}^{tree}" 2>/dev/null)" || continue
+            if [ "$run_tree" = "$head_tree" ]; then
+              dry_ok=true
+              break
+            fi
+          done < <(gh run list \
+            --workflow publish.yml \
+            --json conclusion,headSha \
+            --jq '.[] | select(.conclusion == "success") | .headSha')
+          if [ "$dry_ok" != true ]; then
+            echo "::error::No successful publish dry run exists for this release tree. Dispatch publish.yml with dry_run=true against this commit, then re-merge the release PR." >&2
+            exit 1
+          fi
+          echo "A successful publish dry run covers this release tree."
 
       - name: create release tags
         env:
