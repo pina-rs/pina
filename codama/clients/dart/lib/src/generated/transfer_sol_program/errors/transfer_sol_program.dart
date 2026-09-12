@@ -9,8 +9,7 @@ const int transferSolProgramErrorInsufficientFunds = 0x0; // 0
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _transferSolProgramErrorMessages = {
-  transferSolProgramErrorInsufficientFunds:
-      'The sender does not have enough lamports for the transfer.',
+    transferSolProgramErrorInsufficientFunds: 'The sender does not have enough lamports for the transfer.',
 };
 
 /// Get the error message for a TransferSolProgram program error code.

@@ -13,6 +13,7 @@ use codama_nodes::EnumEmptyVariantTypeNode;
 use codama_nodes::EnumTypeNode;
 use codama_nodes::EnumVariantTypeNode;
 use codama_nodes::ErrorNode;
+use codama_nodes::EventNode;
 use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
@@ -132,6 +133,10 @@ pub(crate) fn try_ir_to_root_node_with_migrations(
 			&ir.pinapod_enums,
 			migration,
 		)?);
+	}
+
+	for event in &ir.events {
+		program = program.add_event(build_event_node(event, &ir.pinapod_enums)?);
 	}
 
 	for pda in &ir.pdas {
@@ -1379,4 +1384,25 @@ mod tests {
 			PdaSeedValueValue::Account(account) if account.name.as_ref() == "authority"
 		));
 	}
+}
+
+/// Build a Codama event node: camel-cased name, constant discriminator at
+/// offset 0, and the event's field schema as its data struct.
+fn build_event_node(
+	event: &crate::ir::EventIr,
+	pinapod_enums: &[PinaPodEnumIr],
+) -> Result<EventNode, IdlError> {
+	let mut fields = Vec::with_capacity(event.fields.len());
+	for field in &event.fields {
+		let context = format!("event `{}.{}`", event.name, field.name);
+		fields.push(build_struct_field(field, context, pinapod_enums)?);
+	}
+
+	let mut node = EventNode::new(event.name.as_str(), StructTypeNode::new(fields));
+	node.discriminators = vec![build_discriminator_node(&event.discriminator)];
+	if !event.docs.is_empty() {
+		node.docs = event.docs.clone().into();
+	}
+
+	Ok(node)
 }

@@ -71,6 +71,22 @@ export function identifyValidationProgramAccount(
 	);
 }
 
+export enum ValidationProgramEvent {
+	PolicyChecked,
+}
+
+export function identifyValidationProgramEvent(
+	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): ValidationProgramEvent {
+	const data = "data" in event ? event.data : event;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return ValidationProgramEvent.PolicyChecked;
+	}
+	throw new Error(
+		"The provided event could not be identified as a validationProgram event.",
+	);
+}
+
 export enum ValidationProgramInstruction {
 	InitializePolicy,
 	CheckPolicy,

@@ -93,6 +93,7 @@ pub fn assemble_program_ir_multi(
 ) -> Result<ProgramIr, IdlError> {
 	let mut all_disc_enums = Vec::new();
 	let mut all_account_structs = Vec::new();
+	let mut all_event_structs = Vec::new();
 	let mut all_instruction_structs = Vec::new();
 	let mut all_ix_accounts_structs = Vec::new();
 	let mut all_errors = Vec::new();
@@ -115,6 +116,7 @@ pub fn assemble_program_ir_multi(
 
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
 		all_account_structs.extend(account_state::extract_account_structs(file)?);
+		all_event_structs.extend(event_data::extract_event_declarations(file)?);
 		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
 		all_ix_accounts_structs.extend(
 			accounts_struct::extract_accounts_structs(file)
@@ -167,6 +169,7 @@ pub fn assemble_program_ir_multi(
 		public_key,
 		&all_disc_enums,
 		&all_account_structs,
+		&all_event_structs,
 		&all_instruction_structs,
 		&all_ix_accounts_structs,
 		&all_errors,
@@ -189,6 +192,7 @@ fn assemble_from_extracted(
 	public_key: String,
 	disc_enums: &[discriminator::DiscriminatorEnum],
 	account_structs: &[account_state::AccountStruct],
+	event_structs: &[event_data::EventDeclaration],
 	instruction_structs: &[instruction_data::InstructionStruct],
 	ix_accounts_structs: &[accounts_struct::AccountsStruct],
 	errors: &[ErrorIr],
@@ -230,6 +234,27 @@ fn assemble_from_extracted(
 		})
 		.collect::<Result<_, _>>()?;
 
+	// Step 2b: Build events IR.
+	let events: Vec<crate::ir::EventIr> = event_structs
+		.iter()
+		.map(|event| {
+			resolve_discriminator_value(
+				&discriminator_map,
+				&event.discriminator_enum,
+				&event.variant,
+				"event",
+			)
+			.map(|discriminator| {
+				crate::ir::EventIr {
+					name: event.name.clone(),
+					discriminator,
+					fields: event.fields.clone(),
+					docs: event.docs.clone(),
+				}
+			})
+		})
+		.collect::<Result<_, _>>()?;
+
 	// Step 3: Build instructions IR by connecting dispatch, accounts structs,
 	// instruction data, and validation properties.
 	for account in &accounts {
@@ -259,6 +284,7 @@ fn assemble_from_extracted(
 		pinapod_enums: pinapod_enums.to_vec(),
 		accounts,
 		instructions,
+		events,
 		errors: errors.to_vec(),
 		pdas: pdas_ir.to_vec(),
 	};
@@ -888,6 +914,7 @@ mod tests {
 			pinapod_enums: Vec::new(),
 			accounts: Vec::new(),
 			instructions: Vec::new(),
+			events: Vec::new(),
 			errors: Vec::new(),
 			pdas: vec![pda.clone(), pda],
 		};
@@ -925,6 +952,7 @@ mod tests {
 			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
 			&[discriminator],
 			&[account],
+			&[],
 			&[],
 			&[],
 			&[],

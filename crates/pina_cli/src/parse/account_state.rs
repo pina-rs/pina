@@ -96,7 +96,7 @@ fn extract_pda_name(attrs: &[syn::Attribute], struct_name: &str) -> Option<Strin
 	Some(super::pda_attr::pda_name_for_struct(struct_name))
 }
 
-fn extract_named_fields(fields: &syn::Fields) -> Vec<FieldIr> {
+pub(crate) fn extract_named_fields(fields: &syn::Fields) -> Vec<FieldIr> {
 	let syn::Fields::Named(named) = fields else {
 		return Vec::new();
 	};

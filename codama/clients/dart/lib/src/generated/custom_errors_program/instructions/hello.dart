@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,11 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class HelloInstructionData {
-  const HelloInstructionData() : discriminator = 0;
+  const HelloInstructionData() :
+      discriminator = 0;
 
   final int discriminator;
 }
@@ -25,7 +28,9 @@ Encoder<HelloInstructionData> getHelloInstructionDataEncoder() {
 
   return transformEncoder(
     structEncoder,
-    (HelloInstructionData value) => <String, Object?>{'discriminator': 0},
+    (HelloInstructionData value) => <String, Object?>{
+      'discriminator': 0,
+    },
   );
 }
 
@@ -35,21 +40,31 @@ Decoder<HelloInstructionData> getHelloInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'hello instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'hello instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (HelloInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (HelloInstructionData(), newOffset);
+    return (
+      HelloInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -72,21 +87,25 @@ Decoder<HelloInstructionData> getHelloInstructionDataDecoder() {
   };
 }
 
-Codec<HelloInstructionData, HelloInstructionData>
-getHelloInstructionDataCodec() {
-  return combineCodec(
-    getHelloInstructionDataEncoder(),
-    getHelloInstructionDataDecoder(),
-  );
+Codec<HelloInstructionData, HelloInstructionData> getHelloInstructionDataCodec() {
+  return combineCodec(getHelloInstructionDataEncoder(), getHelloInstructionDataDecoder());
 }
 
 /// Creates a [Hello] instruction.
-Instruction getHelloInstruction({required Address programAddress}) {
-  final instructionData = HelloInstructionData();
+Instruction getHelloInstruction({
+  required Address programAddress,
+
+
+}) {
+  final instructionData = HelloInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getHelloInstructionDataEncoder().encode(instructionData),
   );
 }

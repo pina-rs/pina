@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class Realloc2InstructionData {
-  const Realloc2InstructionData({required this.len}) : discriminator = 1;
+  const Realloc2InstructionData({
+    required this.len,
+  }) :
+      discriminator = 1;
 
   final int discriminator;
   final int len;
@@ -41,21 +46,31 @@ Decoder<Realloc2InstructionData> getRealloc2InstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'realloc2 instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'realloc2 instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Realloc2InstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (Realloc2InstructionData(len: map['len']! as int), newOffset);
+    return (
+      Realloc2InstructionData(
+      len: map['len']! as int,
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -78,12 +93,8 @@ Decoder<Realloc2InstructionData> getRealloc2InstructionDataDecoder() {
   };
 }
 
-Codec<Realloc2InstructionData, Realloc2InstructionData>
-getRealloc2InstructionDataCodec() {
-  return combineCodec(
-    getRealloc2InstructionDataEncoder(),
-    getRealloc2InstructionDataDecoder(),
-  );
+Codec<Realloc2InstructionData, Realloc2InstructionData> getRealloc2InstructionDataCodec() {
+  return combineCodec(getRealloc2InstructionDataEncoder(), getRealloc2InstructionDataDecoder());
 }
 
 /// Creates a [Realloc2] instruction.
@@ -95,15 +106,17 @@ Instruction getRealloc2Instruction({
   required Address systemProgram,
   required int len,
 }) {
-  final instructionData = Realloc2InstructionData(len: len);
+  final instructionData = Realloc2InstructionData(
+      len: len,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.writableSigner),
-      AccountMeta(address: sample1, role: AccountRole.writable),
-      AccountMeta(address: sample2, role: AccountRole.writable),
-      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+    AccountMeta(address: authority, role: AccountRole.writableSigner),
+    AccountMeta(address: sample1, role: AccountRole.writable),
+    AccountMeta(address: sample2, role: AccountRole.writable),
+    AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getRealloc2InstructionDataEncoder().encode(instructionData),
   );

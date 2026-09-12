@@ -319,6 +319,8 @@ pub fn harden_generated_clients(
 			})?;
 		}
 
+		harden_js_event_decoders(&generated, &root)?;
+
 		let helper_path = generated.join("pinaPodCodecs.ts");
 		std::fs::write(&helper_path, HELPER_MODULE).map_err(|source| {
 			CodamaError::HardenJavaScript {
@@ -410,7 +412,7 @@ fn is_codec_source(path: &Path) -> bool {
 		return false;
 	};
 
-	(parent == "accounts" || parent == "instructions" || parent == "types")
+	(parent == "accounts" || parent == "instructions" || parent == "types" || parent == "events")
 		&& path.extension().is_some_and(|extension| extension == "ts")
 }
 
@@ -1931,4 +1933,122 @@ export function getMigrateInstruction<
 		function_type_parameters = function_type_parameters,
 		return_type_arguments = return_type_arguments,
 	)
+}
+
+/// Fix the generated event decoders' discriminator guard.
+///
+/// The upstream Codama JavaScript renderer emits
+/// `containsBytes(data, MY_EVENT_DISCRIMINATOR, 0)` with the scalar constant,
+/// which does not typecheck: `containsBytes` compares byte slices. Rewrite the
+/// call to encode the constant with the event's discriminator width, matching
+/// how the generated program module encodes account and instruction
+/// discriminators.
+fn harden_js_event_decoders(generated: &Path, root: &RootNode) -> Result<(), CodamaError> {
+	let events_dir = generated.join("events");
+	let entries = match std::fs::read_dir(&events_dir) {
+		Ok(entries) => entries,
+		// Programs without events have no directory to harden.
+		Err(_) => return Ok(()),
+	};
+
+	for entry in entries {
+		let path = entry
+			.map_err(|source| {
+				CodamaError::HardenJavaScript {
+					path: events_dir.clone(),
+					source,
+				}
+			})?
+			.path();
+		if path.extension().is_none_or(|extension| extension != "ts") {
+			continue;
+		}
+		// The event's discriminator width comes from its constant
+		// discriminator node in the IDL; events without one are left alone.
+		let event_name = path.file_stem().and_then(|stem| stem.to_str());
+		let Some(width) = event_name
+			.and_then(|name| {
+				root.program.events.iter().find_map(|event| {
+					let matches = event.name.as_ref() == name;
+					matches.then(|| {
+						event.discriminators.iter().find_map(|discriminator| {
+							let codama_nodes::DiscriminatorNode::Constant(constant) = discriminator
+							else {
+								return None;
+							};
+							let codama_nodes::TypeNode::Number(number_type) =
+								constant.constant.r#type.as_ref()
+							else {
+								return None;
+							};
+							match number_type.format {
+								codama_nodes::NumberFormat::U16 => Some(16),
+								codama_nodes::NumberFormat::U32 => Some(32),
+								_ => Some(8),
+							}
+						})
+					})
+				})
+			})
+			.flatten()
+		else {
+			continue;
+		};
+		let encoder = format!("getU{width}Encoder");
+
+		let source = std::fs::read_to_string(&path).map_err(|source| {
+			CodamaError::HardenJavaScript {
+				path: path.clone(),
+				source,
+			}
+		})?;
+		let hardened = harden_event_contains_bytes(&source, &encoder);
+		if hardened != source {
+			std::fs::write(&path, hardened)
+				.map_err(|source| CodamaError::HardenJavaScript { path, source })?;
+		}
+	}
+
+	Ok(())
+}
+
+/// Rewrite every scalar `containsBytes(data, <CONST>, <offset>)` guard to
+/// encode the constant with `encoder`, and import that encoder.
+fn harden_event_contains_bytes(source: &str, encoder: &str) -> String {
+	let mut hardened = String::with_capacity(source.len());
+	let mut rest = source;
+	while let Some(position) = rest.find("containsBytes(data, ") {
+		let after = &rest[position + "containsBytes(data, ".len()..];
+		let Some(comma) = after.find(", ") else {
+			hardened.push_str(&rest[..position + "containsBytes(data, ".len()]);
+			rest = after;
+			continue;
+		};
+		let constant = &after[..comma];
+		// Only rewrite scalar constants: identifiers (or numbers) that are
+		// not already encoded byte arrays.
+		let scalar = !constant.starts_with("get")
+			&& !constant.starts_with('"')
+			&& !constant.contains("Encoder()");
+		if !scalar {
+			hardened.push_str(&rest[..position + "containsBytes(data, ".len() + comma + 2]);
+			rest = &after[comma + 2..];
+			continue;
+		}
+		let Some(close) = after[comma + 2..].find(')') else {
+			break;
+		};
+		let offset = &after[comma + 2..comma + 2 + close];
+		hardened.push_str(&rest[..position]);
+		hardened.push_str(&format!(
+			"containsBytes(data, {encoder}().encode({constant}), {offset})"
+		));
+		rest = &after[comma + 2 + close + 1..];
+	}
+	hardened.push_str(rest);
+
+	if hardened != source {
+		hardened = ensure_kit_import(&hardened, encoder);
+	}
+	hardened
 }

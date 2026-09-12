@@ -122,6 +122,102 @@
 					}
 				]
 			}
+		],
+		"events": [
+			{
+				"kind": "eventNode",
+				"name": "myEvent",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "data",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "label",
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 8,
+								"type": {
+									"kind": "bytesTypeNode"
+								}
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "eventNode",
+				"name": "myOtherEvent",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "data",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "label",
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 8,
+								"type": {
+									"kind": "bytesTypeNode"
+								}
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			}
 		]
 	}
 }

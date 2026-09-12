@@ -381,6 +381,97 @@
 				]
 			}
 		],
+		"events": [
+			{
+				"kind": "eventNode",
+				"name": "policyChecked",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "amount",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "memo",
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 65,
+								"type": {
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "approvals",
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 6,
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "numberTypeNode",
+											"format": "u16",
+											"endian": "le"
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "requiredApprovals",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
 		"errors": [
 			{
 				"kind": "errorNode",

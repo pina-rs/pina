@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,13 +12,14 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the SystemAccountsProgram program.
-const systemAccountsProgramProgramAddress = Address(
-  'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
-);
+const systemAccountsProgramProgramAddress = Address('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS');
 
 /// Known instructions for the SystemAccountsProgram program.
-enum SystemAccountsProgramInstruction { initialize }
+enum SystemAccountsProgramInstruction {
+  initialize,
+}
 
 /// Identifies the type of a SystemAccountsProgram instruction.
 SystemAccountsProgramInstruction identifySystemAccountsProgramInstruction(
@@ -27,10 +29,13 @@ SystemAccountsProgramInstruction identifySystemAccountsProgramInstruction(
     return SystemAccountsProgramInstruction.initialize;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'systemAccountsProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'systemAccountsProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the SystemAccountsProgram program.
@@ -43,7 +48,7 @@ sealed class ParsedSystemAccountsProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedSystemAccountsProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(SystemAccountsProgramInstruction.initialize);
+      : super(SystemAccountsProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
