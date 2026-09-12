@@ -1,0 +1,7 @@
+---
+pina: fix
+---
+
+# Upgrade pinapod to 0.3.2
+
+Bump the workspace `pinapod` dependency from 0.3.1 to 0.3.2 and refresh the pina_fuzz lock files. No pina source changes are required: pina re-exports and type-mentions the pinapod API, and 0.3.2 changes no public API. The release cuts generated compact validation to bounded plain arithmetic — vector element validation strides the payload once through the audited `from_raw_parts` slice pattern instead of re-deriving every element offset, one- and two-byte prefix tail ends and byte lengths use plain adds/multiplies licensed by a compile-time division-form capacity assertion, and one- and two-byte optional tail prefixes are read with a single bounds compare plus a constant-width decode. Four- and eight-byte prefixes keep the checked arithmetic, so lengths that saturate or exceed `usize` on 32-bit targets can never wrap a plain sum before the bounds check. Fixed-layout `validate_exact` takes a single length compare on the happy path. Measured on-chain: compact `validate` with dense non-trivial elements drops 5 compute units and every other measured instruction is unchanged; wire format, validation order, error variants, and error precedence are unchanged. One compile-time edge: schemas declaring a one- or two-byte-prefix vector whose `max * size_of::<T>()` exceeds `isize::MAX` now fail to compile instead of always failing validation at runtime.
