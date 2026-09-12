@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/codama-renderer-cpi",
-	"version": "0.15.0",
+	"version": "0.16.0",
 	"description": "Codama visitor that renders standalone Pina CPI crates",
 	"license": "Apache-2.0",
 	"homepage": "https://pina.rs",
@@ -35,7 +35,7 @@
 		"test:unit": "vitest run"
 	},
 	"dependencies": {
-		"@pina-rs/cli": "^0.15.0",
+		"@pina-rs/cli": "^0.16.0",
 		"codama": "^1.10.2"
 	},
 	"devDependencies": {
