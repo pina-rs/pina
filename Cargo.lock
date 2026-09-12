@@ -6086,7 +6086,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pina"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "pastey",
  "pina_macros",
@@ -6113,7 +6113,7 @@ dependencies = [
 
 [[package]]
 name = "pina_abi"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "quote",
  "serde",
@@ -6164,7 +6164,7 @@ version = "0.0.0"
 
 [[package]]
 name = "pina_cli"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "atomic-write-file",
  "base64 0.23.1",
@@ -6211,7 +6211,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cli_renderer"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -6225,7 +6225,7 @@ dependencies = [
 
 [[package]]
 name = "pina_codama_renderer"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -6239,7 +6239,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cpi_renderer"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -6254,7 +6254,7 @@ dependencies = [
 
 [[package]]
 name = "pina_lints"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "paste",
  "regex",
@@ -6264,7 +6264,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
@@ -6276,7 +6276,7 @@ dependencies = [
 
 [[package]]
 name = "pina_profile"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "object 0.40.0",
  "serde",
@@ -6287,7 +6287,7 @@ dependencies = [
 
 [[package]]
 name = "pina_root"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "account_realloc_program",
  "counter_program",
@@ -6312,7 +6312,7 @@ dependencies = [
 
 [[package]]
 name = "pina_sdk_ids"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "proptest",
  "solana-address 2.6.1",
@@ -6320,7 +6320,7 @@ dependencies = [
 
 [[package]]
 name = "pina_test"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "serde_json",
  "solana-account 4.3.2",
