@@ -57,24 +57,24 @@ jobs:
           # archived.
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            lint_driver: target/release/pina_lint_driver
+            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
           - target: aarch64-apple-darwin
             os: macos-latest
-            lint_driver: target/release/pina_lint_driver
+            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
           - target: aarch64-pc-windows-msvc
             os: windows-latest
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            lint_driver: target/release/pina_lint_driver
+            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            lint_driver: target/release/pina_lint_driver.exe
+            lint_driver: target/${{ matrix.target }}/release/pina_lint_driver.exe
           - target: x86_64-unknown-freebsd
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
@@ -136,7 +136,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --package pina_lints --bin pina_lint_driver
+          cargo build --release --package pina_lints --bin pina_lint_driver \
+            --target ${{ matrix.target }}
       - name: upload binaries
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
