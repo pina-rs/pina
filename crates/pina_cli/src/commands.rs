@@ -1762,7 +1762,7 @@ pub fn print_inspect_report(report: &pina_cli::migrations::inspect::InspectRepor
 				"✖".red().bold(),
 				report.stored_version.unwrap_or_default(),
 				report.current_version.unwrap_or_default()
-			)
+			);
 		}
 		pina_cli::migrations::inspect::InspectState::Stale => {
 			println!(
