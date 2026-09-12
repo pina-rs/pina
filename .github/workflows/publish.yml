@@ -187,7 +187,7 @@ jobs:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
-          include: target/${{ matrix.target }}/release/pina_lint_driver
+          include: ${{ matrix.lint_driver == true && format('target/{0}/release/pina_lint_driver', matrix.target) || '' }}
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
