@@ -599,49 +599,62 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 
 <!-- ============ SWEEP INSTRUCTION ============ -->
 <h2>Migrating read-only accounts: the sweep instruction</h2>
-<p class="lead">Migration needs a writable account, since it rewrites bytes and may resize. So a stale account that your program only reads will fail its load with a "migration required" error until one transaction touches it as writable. The clean fix is a small instruction whose only job is migrating.</p>
+<p class="lead">A typed reader refuses a stale account: the load fails with a "migration required" error whether the account was passed writable or read-only. Migration itself needs a writable position, because it rewrites bytes and may resize and fund the account. So a stale account that your program only reads keeps failing until one transaction migrates it in a writable slot. The clean fix is a small instruction whose only job is migrating: the <strong>sweep</strong>.</p>
 
-<p>You can write this instruction by hand today, and it takes one of two shapes. Either one migration instruction per account, or <strong>one catch-all instruction where every migratable account appears as an optional, writable view</strong>, plus a payer. The catch-all is usually the better deal: optional views already give you per-account granularity, because the client simply omits the accounts it does not need. A typical program ends up with:</p>
+<p>Write one sweep per program with its own discriminator. Every migratable account appears as an <strong>optional, writable view</strong>, the payer funding growth appears once, and the system program the rent transfers invoke is declared:</p>
 
-<div class="cmd"><span class="comment">// one instruction, every migratable account optional and writable
-instruction migrate_accounts {
-    payer        AccountMeta  // writable + signer, usually the transaction fee payer
-    escrow       Option&lt;AccountMeta&gt;  // writable
-    user_profile Option&lt;AccountMeta&gt;  // writable
-    stake        Option&lt;AccountMeta&gt;  // writable
+<div class="cmd"><span class="comment">// the accounts: everything optional except the system program
+#[derive(Accounts)]
+pub struct SweepAccounts&lt;'a&gt; {
+    /// Writable signer funding every rent deficit, usually the fee payer.
+    #[pina(validate(signer))]
+    pub payer: Option&lt;&amp;'a mut AccountView&gt;,
+    /// The system program every growth transfer invokes.
+    pub system_program: &amp;'a AccountView,
+    /// Every migratable account this program owns, writable and optional.
+    pub state: Option&lt;&amp;'a mut AccountView&gt;,
+    pub profile: Option&lt;&amp;'a mut AccountView&gt;,
+    pub vault: Option&lt;&amp;'a mut AccountView&gt;,
 }</span></div>
 
 <div class="cmd"><span class="comment">// the handler is a straight line of independent sweeps
-if let Some(view) = accounts.escrow {
+let SweepAccounts { payer, system_program, state, profile, vault } = self;
+system_program.assert_address(&amp;system::ID)?;
+let payer = payer.map(|account| &amp;*account);
+if let Some(state) = state {
     MigrateAccount {
-        account: view,
-        payer: Some(accounts.payer),
-        program_id,
-        max_lamports,
+        account: state,
+        payer,
+        program_id: &amp;ID,
+        max_lamports: MAX_MIGRATION_LAMPORTS,
     }
-    .invoke::&lt;Escrow&gt;()?;
+    .invoke::&lt;State&gt;()?;
 }
-// ...same for each account. Absent accounts are skipped.
-// Already-current accounts return early and write nothing.</span></div>
+// ...same for profile and vault. Absent accounts arrive as None and are
+// skipped: nothing is validated, charged, or written for them.</span></div>
 
-<p>The client sends this instruction first, then the real one, in the same transaction:</p>
-<div class="cmd"><span class="prompt">$ </span>transaction: [ migrate_accounts(escrow, user_profile, payer) , swap(...) ]</div>
+<p>The client sends the sweep first, then the real instruction, in the same transaction:</p>
+<div class="cmd"><span class="prompt">$ </span>transaction: [ sweep(state, profile, payer) , swap(...) ]</div>
 
-<div class="box info"><b>Why this is safe to expose.</b> The sweep only moves accounts forward through published transitions, and each account is checked to be owned by your program before anything happens. It is idempotent: current accounts cost one envelope read and write nothing, so the client can send it speculatively without wasting budget. The payer only ever adds lamports to an account, never removes any, and only up to the <code class="inline">max_lamports</code> cap the developer sets. And since each caller supplies its own payer, nobody can be made to fund someone else's migration.</div>
+<p><strong>First, not last.</strong> Instructions run in order and any failure aborts the whole transaction. The real instruction loads the stale account and fails with <code class="inline">MigrationRequired</code>, so a sweep placed after it never runs. A sweep sent alone, with no business instruction, is a maintenance transaction that pre-migrates accounts ahead of future use — that standalone form is the only trailing sweep worth sending.</p>
+
+<div class="box info"><b>Why this is safe to expose.</b> Each account is checked to be owned by your program and writable before anything is inspected. The sweep only moves accounts forward through published transitions, validates each destination before committing the version, and aborts the instruction if anything fails after the first mutation. The payer only ever adds lamports, only the rent deficit, and only up to the <code class="inline">max_lamports</code> cap the developer sets; shrinking never moves lamports. And since each caller supplies its own payer, nobody can be made to fund someone else's migration.</div>
 
 <table>
 	<tr><th>Case</th><th>What the sweep does</th></tr>
-	<tr><td>Account absent (client omitted it)</td><td>Skipped entirely</td></tr>
-	<tr><td>Already current</td><td>One envelope read, no writes, no rent, near-zero compute</td></tr>
-	<tr><td>Stale, same size</td><td>Rewritten in place, version committed</td></tr>
-	<tr><td>Stale, growing</td><td>Payer tops up the rent deficit (capped by <code>max_lamports</code>), account resized, then rewritten</td></tr>
+	<tr><td>Account absent (client omitted it or sent the program-address filler)</td><td>Skipped entirely; no validation, charge, or write</td></tr>
+	<tr><td>Already current</td><td>Ownership, writability, and discriminator checks, a version-envelope inspection and current-layout validation; no writes, no rent, no CPI — safe to send speculatively</td></tr>
+	<tr><td>Stale, same size</td><td>Rewritten in place, destination validated, current version committed</td></tr>
+	<tr><td>Stale, growing</td><td>The payer tops up only the rent deficit for the size the step needs, capped by <code class="inline">max_lamports</code>; the account is resized, rewritten, and committed</td></tr>
 	<tr><td>Stale, shrinking</td><td>Rewritten and shrunk. Lamports stay in the account; there is no refund today</td></tr>
 	<tr><td>Any step fails</td><td>Whole transaction rolls back, including every earlier sweep in the same instruction</td></tr>
 </table>
 
+<p>Failures land in front of the first mutation. A growing step with no payer fails with <code class="inline">MigrationRequired</code>, and a deficit above the cap fails with <code class="inline">MigrationBudgetExceeded</code> — the account stays stale, never half-migrated. A read-only or foreign-owned account fails the writability or ownership check before the version is even read, a wrong discriminator fails with <code class="inline">InvalidAccountData</code>, and a version from the program's future fails with <code class="inline">InvalidMigrationVersion</code> instead of guessing at the layout.</p>
+
 <p>Two details are worth calling out. On refunds: shrinking keeps every lamport in the account by design. Refunding would mean picking a recipient when the funder and the owner differ, and it would add a transfer per step. A refund-to-payer variant could exist later, but the current rule is simple and safe: money only ever moves inward. And on surplus bytes: they stay on the account, exactly as stored.</p>
 
-<div class="box warn"><b>What the framework would add to this pattern.</b> Nothing blocks hand-rolling it today. What a framework-level version adds is a reserved discriminator so the instruction can never collide with a user instruction, a generated handler and client helper so no instruction is hand-written at all, and a client-side staleness check so the helper is only sent when an account is actually behind. That is the Migrate instruction described above, and this sweep is its hand-rolled form for programs that want extra policy in the handler.</div>
+<div class="box info"><b>The framework version of this pattern already ships.</b> The reserved <code class="inline">Migrate</code> instruction described below is the framework-owned sweep: <code class="inline">MigrateContext</code> runs the same <code class="inline">[payer, systemProgram, …accounts]</code> layout through the same <code class="inline">MigrateAccount</code> executor, and <code class="inline">run_optional</code> skips program-address placeholders and past-the-end slots. Generated clients already emit the <code class="inline">Migrate</code> composer and per-account <code class="inline">needsMigration</code> checks, so no metas are hand-composed; the one-call <code class="inline">migrateIfNeeded</code> wrapper (<a href="https://github.com/pina-rs/pina/issues/339">#339</a>) is the remaining convenience. A hand-written sweep stays compatible because it drives the same executor and produces the same state: keep it when the handler needs policy the generated route does not carry.</div>
 
 <!-- ============ CLI REFERENCE ============ -->
 <h2>CLI cheat sheet</h2>
@@ -670,7 +683,7 @@ if is_migrate_instruction(data) {
     return process_migrate(program_id, accounts);
 }</span></div>
 <p>Slot 0 is a writable payer funding the rent deficits (or the program address when no step needs funding), slot 1 is the system program the transfers invoke, and every later slot is a program-owned, self-describing account. A slot holding the program address, or an index past the end of the list, is skipped — so a client sends only the accounts it needs to migrate. <code class="inline">MigrateContext</code> validates ownership, rejects duplicated slots, migrates each slot at most once, and applies the same step, growth, and lamport caps as the inline path.</p>
-<p>That is the client flow the sweep section below describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
+<p>That is the client flow the sweep section above describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
 <h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
 <p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p>
