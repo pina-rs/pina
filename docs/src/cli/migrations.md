@@ -42,11 +42,13 @@ Commit the manifest, publication ledger, and transition files. Do not generate t
 
 - per account contract: current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the same 6,960-lamports-per-grown-byte convention the `make` warning uses;
 - per instruction process: the worst-case adjacent-step ladder a stale account the process names can trigger, with the step count, the rent that ladder funds, and a static CU estimate;
-- one program-wide "most expensive touching transaction" summary so `max_lamports` and `MAX_INLINE_STEPS` can be sized deliberately.
+- one program-wide summary that sizes both budgets deliberately: the touching transaction funding the most rent (`max_lamports`) and, independently, the longest worst-case ladder (`MAX_INLINE_STEPS`) — each names its instruction, because they need not be the same one.
 
-The output names the ladder model: the oldest version within `MAX_INLINE_STEPS` (8) of current, climbing one adjacent transition per step. When the history has more than eight transitions, the quoted ladder starts partway up and a note explains that a version-0 account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
+The preview prints the ladder model and the CU model so the numbers stay interpretable. When the history has more than eight transitions, the quoted ladder starts partway up and a note explains that a version-0 account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
 
-Two models keep the numbers interpretable. Rent reuses `RENT_EXEMPT_LAMPORTS_PER_BYTE` from the `make` warning, and the CU estimate sums `pina profile`'s static estimates for the generated adjacent `migrate` functions, so it excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. An artifact that has not been built, cannot be parsed, or lacks a transition function makes the CU figure print an explicit `CU unavailable: ...` reason instead of a zero. Instruction processes link to account contracts by account-slot name, so a slot that does not match an account's Rust name contributes no ladder.
+Two models keep the numbers interpretable. Rent reuses `RENT_EXEMPT_LAMPORTS_PER_BYTE` from the `make` warning, and the CU estimate sums `pina profile`'s static estimates for the generated adjacent `migrate` functions, so it excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. An artifact that has not been built, cannot be parsed, or lacks a transition function makes the CU figure print an explicit `CU unavailable: ...` reason instead of a zero.
+
+Instruction processes link to account contracts by account-slot name, and only a `writable`, non-signer slot can hold an account the executor migrates. A writable, non-signer slot that names no checked-in account contract produces an explicit note instead of silently costing nothing — the symptom of a renamed account or a slot typo. Read-only and signer slots (authorities, payers, programs) can never be migrated, so they are skipped without noise.
 
 `--json` emits the status array unchanged under `statuses` plus the additive cost section:
 

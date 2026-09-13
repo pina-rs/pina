@@ -363,10 +363,10 @@ fn run_migrations(command: MigrationCommands) {
 			}
 			if report.statuses.is_empty() {
 				println!("No migration-aware contracts.");
-				return;
+			} else {
+				print_migration_statuses(&report.statuses);
+				println!("{} Migration history is consistent", "✔".green());
 			}
-			print_migration_statuses(&report.statuses);
-			println!("{} Migration history is consistent", "✔".green());
 			print_migration_cost_preview(&report.cost_preview);
 		}
 		MigrationCommands::Reconcile {
@@ -1613,6 +1613,7 @@ mod tests {
 					total_steps: 1,
 					total_rent_deficit_lamports: 6_960,
 					static_cu: estimated,
+					notes: Vec::new(),
 				},
 				InstructionCostPreview {
 					identity: "instruction:1:01".to_owned(),
@@ -1633,6 +1634,7 @@ mod tests {
 					total_steps: 1,
 					total_rent_deficit_lamports: 6_960,
 					static_cu: unavailable,
+					notes: vec!["unlinked".to_owned()],
 				},
 			],
 			most_expensive: MostExpensiveTransaction::Identified {
@@ -1645,6 +1647,9 @@ mod tests {
 					estimated_cu: 10,
 					model: "model".to_owned(),
 				},
+				max_steps_instruction_identity: "instruction:1:01".to_owned(),
+				max_steps_instruction_rust_name: "RelayInstruction".to_owned(),
+				max_steps: 4,
 				model: "model".to_owned(),
 			},
 		};
@@ -1908,6 +1913,8 @@ fn print_most_expensive_transaction(transaction: &pina_cli::migrations::MostExpe
 			steps,
 			rent_deficit_lamports,
 			static_cu,
+			max_steps_instruction_rust_name,
+			max_steps,
 			..
 		} => {
 			println!(
@@ -1915,6 +1922,10 @@ fn print_most_expensive_transaction(transaction: &pina_cli::migrations::MostExpe
 				 ({account_ladders} ladder(s), {steps} step(s), ~{rent_deficit_lamports} \
 				 lamports, {})",
 				render_static_cu(static_cu)
+			);
+			println!(
+				"  Longest worst-case ladder: {max_steps_instruction_rust_name} ({max_steps} \
+				 step(s)); size `MAX_INLINE_STEPS` for this instruction"
 			);
 		}
 		pina_cli::migrations::MostExpensiveTransaction::Unavailable { reason } => {
@@ -1931,6 +1942,7 @@ fn print_migration_cost_preview(preview: &pina_cli::migrations::MigrationCostPre
 		preview.rent_lamports_per_byte
 	);
 	println!("  Ladder model: {}", preview.ladder_model);
+	println!("  CU model: {}", preview.cu_model);
 	for reason in static_cu_reasons(preview) {
 		println!("  CU unavailable: {reason}");
 	}
@@ -1983,6 +1995,9 @@ fn print_migration_cost_preview(preview: &pina_cli::migrations::MigrationCostPre
 				ladder.ladder.rent_deficit_lamports,
 				render_static_cu(&ladder.ladder.static_cu)
 			);
+		}
+		for note in &instruction.notes {
+			println!("    note: {note}");
 		}
 	}
 	print_most_expensive_transaction(&preview.most_expensive);

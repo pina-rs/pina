@@ -421,6 +421,12 @@ fn status_reports_projects_without_migration_aware_contracts() {
 	let fixture = MigrationFixture::new(false);
 	let output = run(&mut fixture.command("status"));
 	assert!(output.contains("No migration-aware contracts."));
+	// The cost preview closes the output even with nothing to estimate.
+	assert!(output.contains("Cost preview"), "stdout: {output}");
+	assert!(
+		output.contains("Most expensive touching transaction: unavailable"),
+		"stdout: {output}"
+	);
 
 	let json = run(fixture.command("status").arg("--json"));
 	let report: serde_json::Value =
@@ -497,7 +503,9 @@ fn status_previews_costs_and_json_agrees_with_human_output() {
 	assert_eq!(state["worstCaseLadder"]["steps"], 1);
 	assert_eq!(state["worstCaseLadder"]["staticCu"]["estimatedCu"], 10);
 
-	// Per instruction: the `state` slot links the process to the account.
+	// Per instruction: the `state` slot links the process to the account, and
+	// the payer/authority/program slots (writable-signer or read-only) cannot
+	// miss an account contract, so no note fires.
 	let instruction = &preview["instructions"][0];
 	assert_eq!(instruction["rustName"], "UpdateInstruction");
 	assert_eq!(instruction["ladders"][0]["accountRustName"], "State");
@@ -505,22 +513,29 @@ fn status_previews_costs_and_json_agrees_with_human_output() {
 	assert_eq!(instruction["totalSteps"], 1);
 	assert_eq!(instruction["totalRentDeficitLamports"], 6_960);
 	assert_eq!(instruction["staticCu"]["estimatedCu"], 10);
+	assert_eq!(instruction["notes"], serde_json::json!([]));
 
-	// Program-wide: one touching transaction names the same figures.
+	// Program-wide: one touching transaction names the same figures, and the
+	// rent and step maxima name it independently.
 	let summary = &preview["mostExpensive"];
 	assert_eq!(summary["status"], "identified");
 	assert_eq!(summary["instructionRustName"], "UpdateInstruction");
 	assert_eq!(summary["steps"], 1);
 	assert_eq!(summary["rentDeficitLamports"], 6_960);
 	assert_eq!(summary["staticCu"]["estimatedCu"], 10);
+	assert_eq!(summary["maxSteps"], 1);
+	assert_eq!(summary["maxStepsInstructionRustName"], "UpdateInstruction");
 
 	// Human output quotes every JSON figure the developer must act on.
 	for expected in [
+		"CU model: sum of `pina profile` static estimates",
 		"account State: 11 bytes now; a day-one account grows 1 bytes and funds ~6960 lamports",
 		"worst-case ladder v0->v1 (1 step(s), ~6960 lamports, 10 CU static)",
 		"instruction UpdateInstruction v1: 1 ladder(s), 1 step(s), ~6960 lamports, 10 CU static",
 		"Most expensive touching transaction: UpdateInstruction (1 ladder(s), 1 step(s), ~6960 \
 		 lamports, 10 CU static)",
+		"Longest worst-case ladder: UpdateInstruction (1 step(s)); size `MAX_INLINE_STEPS` for \
+		 this instruction",
 		"Funding: raise the program's lamport budget",
 	] {
 		assert!(

@@ -79,15 +79,35 @@ fn instruction_history(
 	payload_bytes: usize,
 	slots: &[&str],
 ) -> ContractHistory {
+	instruction_history_with_slots(
+		discriminator,
+		rust_name,
+		payload_bytes,
+		slots
+			.iter()
+			.map(|name| (*name, true, false))
+			.collect::<Vec<_>>()
+			.as_slice(),
+	)
+}
+
+/// Build an instruction whose slots carry explicit privileges, so tests can
+/// model authorities (signers) and payers (writable signers) faithfully.
+fn instruction_history_with_slots(
+	discriminator: u64,
+	rust_name: &str,
+	payload_bytes: usize,
+	slots: &[(&str, bool, bool)],
+) -> ContractHistory {
 	let schema = fixed_schema(payload_bytes);
 	let process = ProcessContract {
 		accounts: slots
 			.iter()
-			.map(|name| {
+			.map(|(name, writable, signer)| {
 				ProcessAccount {
 					name: (*name).to_owned(),
-					writable: true,
-					signer: false,
+					writable: *writable,
+					signer: *signer,
 					optional: true,
 					default_value: None,
 					pda: None,
@@ -446,6 +466,19 @@ fn instruction_ladders_match_account_slots_by_name() {
 			reason: "no artifact".to_owned()
 		}
 	);
+	// `authority` and `payer` are writable, name no account contract, and must
+	// not disappear silently.
+	assert_eq!(instruction.notes.len(), 2);
+	assert!(
+		instruction.notes[0].contains("cannot link writable slot `authority`"),
+		"note: {}",
+		instruction.notes[0]
+	);
+	assert!(
+		instruction.notes[1].contains("cannot link writable slot `payer`"),
+		"note: {}",
+		instruction.notes[1]
+	);
 }
 
 #[test]
@@ -481,6 +514,12 @@ fn instruction_without_matching_account_slots_is_explicit() {
 	assert!(instruction.ladders.is_empty());
 	assert_eq!(instruction.total_steps, 0);
 	assert_eq!(instruction.total_rent_deficit_lamports, 0);
+	assert_eq!(instruction.notes.len(), 2);
+	assert!(
+		instruction.notes[0].contains("cannot link writable slot `authority`"),
+		"note: {}",
+		instruction.notes[0]
+	);
 	let StaticCuEstimate::Unavailable { reason } = &instruction.static_cu else {
 		panic!("an unmatched instruction cannot be estimated");
 	};
@@ -498,6 +537,31 @@ fn instruction_without_matching_account_slots_is_explicit() {
 }
 
 #[test]
+fn signer_and_readonly_slots_cannot_miss_account_contracts() {
+	let manifest = manifest(vec![
+		account_history(1, "State", vec![fixed_schema(40), fixed_schema(41)]),
+		// A signer slot and a read-only slot can never hold an account the
+		// executor migrates, so neither is join-candidate and neither is noted.
+		instruction_history_with_slots(
+			0,
+			"RelayInstruction",
+			10,
+			&[
+				("authority", false, true),
+				("system_program", false, false),
+				("state", true, false),
+			],
+		),
+	]);
+	let preview = build_cost_preview(Some(&manifest), &unavailable_source("no artifact"));
+	let instruction = &preview.instructions[0];
+
+	assert!(instruction.notes.is_empty());
+	assert_eq!(instruction.ladders.len(), 1);
+	assert_eq!(instruction.ladders[0].account_rust_name, "State");
+}
+
+#[test]
 fn most_expensive_transaction_picks_the_largest_rent() {
 	let manifest = manifest(vec![
 		account_history(1, "State", vec![fixed_schema(40), fixed_schema(41)]),
@@ -512,6 +576,8 @@ fn most_expensive_transaction_picks_the_largest_rent() {
 		account_ladders,
 		steps,
 		rent_deficit_lamports,
+		max_steps_instruction_rust_name,
+		max_steps,
 		..
 	} = &preview.most_expensive
 	else {
@@ -521,6 +587,47 @@ fn most_expensive_transaction_picks_the_largest_rent() {
 	assert_eq!(*account_ladders, 1);
 	assert_eq!(*steps, 1);
 	assert_eq!(*rent_deficit_lamports, 5 * RENT_PER_BYTE);
+	// When one instruction holds both maxima, the summary names it twice.
+	assert_eq!(max_steps_instruction_rust_name, "ExpensiveInstruction");
+	assert_eq!(*max_steps, 1);
+}
+
+#[test]
+fn longest_ladder_is_reported_independently_of_the_rent_maximum() {
+	let manifest = manifest(vec![
+		// `State` climbs 4 steps for 1 grown byte; `ManualState` climbs 1 step
+		// for 5 grown bytes, so the rent and step maxima differ.
+		account_history(
+			1,
+			"State",
+			vec![
+				fixed_schema(40),
+				fixed_schema(40),
+				fixed_schema(40),
+				fixed_schema(40),
+				fixed_schema(41),
+			],
+		),
+		account_history(2, "ManualState", vec![fixed_schema(3), fixed_schema(8)]),
+		instruction_history(0, "LongInstruction", 10, &["state"]),
+		instruction_history(1, "RichInstruction", 10, &["manual_state"]),
+	]);
+	let preview = build_cost_preview(Some(&manifest), &unavailable_source("no artifact"));
+
+	let MostExpensiveTransaction::Identified {
+		instruction_rust_name,
+		rent_deficit_lamports,
+		max_steps_instruction_rust_name,
+		max_steps,
+		..
+	} = &preview.most_expensive
+	else {
+		panic!("an instruction touches a migration-aware account");
+	};
+	assert_eq!(instruction_rust_name, "RichInstruction");
+	assert_eq!(*rent_deficit_lamports, 5 * RENT_PER_BYTE);
+	assert_eq!(max_steps_instruction_rust_name, "LongInstruction");
+	assert_eq!(*max_steps, 4);
 }
 
 #[test]
@@ -592,9 +699,15 @@ fn serialized_preview_uses_additive_camel_case_keys() {
 	);
 	assert_eq!(json["instructions"][0]["ladders"][0]["steps"], 1);
 	assert_eq!(json["instructions"][0]["staticCu"]["estimatedCu"], 12);
+	assert_eq!(json["instructions"][0]["notes"], serde_json::json!([]));
 	assert_eq!(json["mostExpensive"]["status"], "identified");
 	assert_eq!(
 		json["mostExpensive"]["instructionRustName"],
+		"UpdateInstruction"
+	);
+	assert_eq!(json["mostExpensive"]["maxSteps"], 1);
+	assert_eq!(
+		json["mostExpensive"]["maxStepsInstructionRustName"],
 		"UpdateInstruction"
 	);
 }

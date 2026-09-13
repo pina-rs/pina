@@ -13,7 +13,6 @@
 //! printing a misleading zero.
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use heck::ToSnakeCase as _;
@@ -149,6 +148,9 @@ pub struct InstructionCostPreview {
 	pub total_rent_deficit_lamports: u64,
 	/// Static CU estimate summed across every ladder, or why none exists.
 	pub static_cu: StaticCuEstimate,
+	/// Migration-shaped slots (`writable`, not a signer) that name no checked-in
+	/// account contract, so a rename or typo cannot silently drop a ladder.
+	pub notes: Vec<String>,
 }
 
 /// A static CU estimate, or the explicit reason none exists.
@@ -182,10 +184,14 @@ pub enum StaticCuEstimate {
 )]
 pub enum MostExpensiveTransaction {
 	/// One instruction process names at least one migration-aware account.
+	///
+	/// The rent maximum and the step maximum are reported independently: the
+	/// instruction funding the most rent need not be the one with the longest
+	/// ladder, and `MAX_INLINE_STEPS` must cover the latter.
 	Identified {
-		/// Manifest contract key of the instruction.
+		/// Manifest contract key of the instruction funding the most rent.
 		instruction_identity: String,
-		/// Current Rust source name of the instruction.
+		/// Current Rust source name of the instruction funding the most rent.
 		instruction_rust_name: String,
 		/// Account ladders the process can trigger.
 		account_ladders: u32,
@@ -195,6 +201,12 @@ pub enum MostExpensiveTransaction {
 		rent_deficit_lamports: u64,
 		/// Static CU estimate summed across every ladder, or why none exists.
 		static_cu: StaticCuEstimate,
+		/// Manifest contract key of the instruction with the longest ladder.
+		max_steps_instruction_identity: String,
+		/// Current Rust source name of the instruction with the longest ladder.
+		max_steps_instruction_rust_name: String,
+		/// Adjacent transitions in that longest worst-case ladder set.
+		max_steps: u32,
 		/// Which ladder the figures assume.
 		model: String,
 	},
@@ -309,21 +321,32 @@ pub(crate) fn build_cost_preview(
 		if history.identity.kind != ContractKind::Instruction {
 			continue;
 		}
-		let mut slots = BTreeSet::new();
+
+		// Only a `writable`, non-signer slot can hold an account the executor
+		// migrates, so only those join against account contracts; every other
+		// slot (authorities, payers, programs) is dropped soundly. An unlinked
+		// candidate is recorded as a note instead of silently costing nothing.
+		let mut candidates = BTreeMap::new();
 		if let Some(process) = history
 			.current()
 			.and_then(|current| current.process.as_ref())
 		{
-			slots.extend(
+			candidates.extend(
 				process
 					.accounts
 					.iter()
-					.map(|account| account.name.to_snake_case()),
+					.filter(|account| account.writable && !account.signer)
+					.map(|account| (account.name.to_snake_case(), account.name.clone())),
 			);
 		}
+		let mut notes = Vec::new();
 		let mut ladders = Vec::new();
-		for slot in slots {
+		for (slot, name) in candidates {
 			let Some(contract) = accounts_by_slot.get(&slot) else {
+				notes.push(format!(
+					"cannot link writable slot `{name}` to a checked-in account contract, so its \
+					 ladder cost is not included"
+				));
 				continue;
 			};
 			let Some(ladder) = &contract.worst_case_ladder else {
@@ -337,7 +360,7 @@ pub(crate) fn build_cost_preview(
 		}
 		preview
 			.instructions
-			.push(instruction_cost_preview(history, ladders));
+			.push(instruction_cost_preview(history, ladders, notes));
 	}
 
 	preview.most_expensive = most_expensive_transaction(&preview.instructions);
@@ -433,6 +456,7 @@ fn account_cost_preview(
 fn instruction_cost_preview(
 	history: &ContractHistory,
 	ladders: Vec<InstructionLadder>,
+	notes: Vec<String>,
 ) -> InstructionCostPreview {
 	let total_steps = ladders.iter().map(|ladder| ladder.ladder.steps).sum();
 	let total_rent_deficit_lamports = ladders
@@ -448,6 +472,7 @@ fn instruction_cost_preview(
 		ladders,
 		total_steps,
 		total_rent_deficit_lamports,
+		notes,
 	}
 }
 
@@ -491,36 +516,57 @@ fn total_static_cu(ladders: &[InstructionLadder]) -> StaticCuEstimate {
 	}
 }
 
-/// Pick the instruction whose worst-case ladders cost the most rent.
+/// Pick the touching transaction figures that size the on-chain budgets.
+///
+/// Rent and steps are maximized independently: the instruction funding the
+/// most rent need not run the longest ladder, and sizing `max_lamports` from
+/// one while sizing `MAX_INLINE_STEPS` from the other must not understate
+/// either budget.
 fn most_expensive_transaction(instructions: &[InstructionCostPreview]) -> MostExpensiveTransaction {
-	let best = instructions
+	let candidates: Vec<&InstructionCostPreview> = instructions
 		.iter()
 		.filter(|instruction| !instruction.ladders.is_empty())
-		.max_by(|left, right| {
-			(
-				left.total_rent_deficit_lamports,
-				left.total_steps,
-				&left.identity,
-			)
-				.cmp(&(
-					right.total_rent_deficit_lamports,
-					right.total_steps,
-					&right.identity,
-				))
-		});
-	let Some(best) = best else {
+		.collect();
+	let most_rent = candidates.iter().copied().max_by(|left, right| {
+		(
+			left.total_rent_deficit_lamports,
+			left.total_steps,
+			&left.identity,
+		)
+			.cmp(&(
+				right.total_rent_deficit_lamports,
+				right.total_steps,
+				&right.identity,
+			))
+	});
+	let most_steps = candidates.iter().copied().max_by(|left, right| {
+		(
+			left.total_steps,
+			left.total_rent_deficit_lamports,
+			&left.identity,
+		)
+			.cmp(&(
+				right.total_steps,
+				right.total_rent_deficit_lamports,
+				&right.identity,
+			))
+	});
+	let (Some(most_rent), Some(most_steps)) = (most_rent, most_steps) else {
 		return MostExpensiveTransaction::Unavailable {
 			reason: NO_TOUCHING_INSTRUCTION.to_owned(),
 		};
 	};
 
 	MostExpensiveTransaction::Identified {
-		instruction_identity: best.identity.clone(),
-		instruction_rust_name: best.rust_name.clone(),
-		account_ladders: u32::try_from(best.ladders.len()).unwrap_or(u32::MAX),
-		steps: best.total_steps,
-		rent_deficit_lamports: best.total_rent_deficit_lamports,
-		static_cu: best.static_cu.clone(),
+		instruction_identity: most_rent.identity.clone(),
+		instruction_rust_name: most_rent.rust_name.clone(),
+		account_ladders: u32::try_from(most_rent.ladders.len()).unwrap_or(u32::MAX),
+		steps: most_rent.total_steps,
+		rent_deficit_lamports: most_rent.total_rent_deficit_lamports,
+		static_cu: most_rent.static_cu.clone(),
+		max_steps_instruction_identity: most_steps.identity.clone(),
+		max_steps_instruction_rust_name: most_steps.rust_name.clone(),
+		max_steps: most_steps.total_steps,
 		model: LADDER_MODEL.to_owned(),
 	}
 }
