@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.16.0](https://github.com/pina-rs/pina/releases/tag/v0.16.0) (2026-09-12)
+
+Grouped release for `core`.
+
 ### Breaking Changes
 
 - Upgrade the workspace to the Pinocchio 0.11 crate family (`pinocchio` 0.11, `pinocchio-system` 0.6, `pinocchio-token` 0.6, `pinocchio-token-2022` 0.3, `pinocchio-memo` 0.4, and `pinocchio-associated-token-account` 0.4).
@@ -19,42 +23,6 @@ All notable changes to this project will be documented in this file.
 - Remove Pina's whole-object `to_bytes()`, `PinaSerialize`, generic `InstructionBuilder`, custom `PodEnum`, and generic pointer-cast helpers. Inactive string and vector capacity is no longer observable through Pina.
 - Replace staged compact setters, `commit`, and caller-ordered reallocation with generated patches and `UpdateResizableAccount`. The new builder uses `rent_account` for growth funding and shrink refunds.
 - Token loaders no longer project Token-2022 bytes into legacy SPL Token state. Multi-program callers receive a guard-backed enum that preserves the concrete upstream type and extension layout.
-
-### Features
-
-- Add a standalone `memo` feature that re-exports `pinocchio_memo` as `pina::memo`.
-- Preserve `TokenAccount` compatibility aliases through `pina::token` and `pina::token_2022` wrapper modules.
-- Infer writable Codama/IDL accounts from mutable `#[derive(Accounts)]` fields in `pina_cli`.
-
-#### Accept PinaPod collections and nested options
-
-Pina re-exports PinaPod's fixed-capacity `PodOption`, `PodString`, and `PodVec` types. Fixed account, instruction, and event schemas now accept `String<N>`, `Vec<T, N>`, and recursively fixed `Option<T>` fields. PinaPod initializes full fixed capacity, clears removed payloads, and recursively validates tags, prefixes, active elements, booleans, enums, and UTF-8.
-
-Compact schemas now accept multiple tails using `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` values stay in the header. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix.
-
-New mdt providers:
-
-- `podCollectionTypesTable` — collection types reference table
-- `podCollectionDescription` — collection type semantics
-
-Account, instruction, and event schemas derive `PinaPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, configure the view, and validate the finished value. Generated client instruction builders own their initialized buffers and do not expose schema object representations.
-
-`CreateProgramAccount` and `CreateProgramAccountWithBump` now provide `invoke_with` and `invoke_signed_with`. These methods configure the generated fixed-account view before final validation, so accounts with required nonzero initial values can be created in one operation. Plain `invoke` and `invoke_signed` remain the all-zero-field convenience paths. Compact creation builders now require a generated initialization patch.
-
-Generated TypeScript and Dart codecs reject over-capacity values rather than truncating them. Decoders validate capacities before allocation and apply the same discriminator, boolean, option, and UTF-8 rules as the on-chain PinaPod views.
-
-### Documentation
-
-- Refresh tutorials, READMEs, API docs, and security guidance for the mutable-account parsing model.
-- Document the explicit `zeroed()` then `close_with_recipient()` close flow.
-- Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
-- Add a PinaPod v0.2 migration guide and update the Pina mdBook, crate READMEs, examples, templates, and bundled agent skill.
-
-## [0.16.0](https://github.com/pina-rs/pina/releases/tag/v0.16.0) (2026-09-12)
-
-Grouped release for `core`.
-
-### Breaking Changes
 
 #### Consolidate canonical PDA creation
 
@@ -160,6 +128,27 @@ The four typed creation builders now reject targets whose storage holds any nonz
 _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #332](https://github.com/pina-rs/pina/pull/332)
 
 ### Features
+
+- Add a standalone `memo` feature that re-exports `pinocchio_memo` as `pina::memo`.
+- Preserve `TokenAccount` compatibility aliases through `pina::token` and `pina::token_2022` wrapper modules.
+- Infer writable Codama/IDL accounts from mutable `#[derive(Accounts)]` fields in `pina_cli`.
+
+#### Accept PinaPod collections and nested options
+
+Pina re-exports PinaPod's fixed-capacity `PodOption`, `PodString`, and `PodVec` types. Fixed account, instruction, and event schemas now accept `String<N>`, `Vec<T, N>`, and recursively fixed `Option<T>` fields. PinaPod initializes full fixed capacity, clears removed payloads, and recursively validates tags, prefixes, active elements, booleans, enums, and UTF-8.
+
+Compact schemas now accept multiple tails using `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` values stay in the header. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix.
+
+New mdt providers:
+
+- `podCollectionTypesTable` — collection types reference table
+- `podCollectionDescription` — collection type semantics
+
+Account, instruction, and event schemas derive `PinaPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, configure the view, and validate the finished value. Generated client instruction builders own their initialized buffers and do not expose schema object representations.
+
+`CreateProgramAccount` and `CreateProgramAccountWithBump` now provide `invoke_with` and `invoke_signed_with`. These methods configure the generated fixed-account view before final validation, so accounts with required nonzero initial values can be created in one operation. Plain `invoke` and `invoke_signed` remain the all-zero-field convenience paths. Compact creation builders now require a generated initialization patch.
+
+Generated TypeScript and Dart codecs reject over-capacity values rather than truncating them. Decoders validate capacities before allocation and apply the same discriminator, boolean, option, and UTF-8 rules as the on-chain PinaPod views.
 
 #### Add first-class automatic ABI migrations
 
@@ -416,6 +405,11 @@ Stopping now retries within a 30 second budget and treats both listener ports re
 _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #368](https://github.com/pina-rs/pina/pull/368)
 
 ### Documentation
+
+- Refresh tutorials, READMEs, API docs, and security guidance for the mutable-account parsing model.
+- Document the explicit `zeroed()` then `close_with_recipient()` close flow.
+- Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
+- Add a PinaPod v0.2 migration guide and update the Pina mdBook, crate READMEs, examples, templates, and bundled agent skill.
 
 #### Document the real 10 KiB realloc growth limit
 
