@@ -88,6 +88,7 @@ jobs:
         run: gh auth setup-git
 
       - name: refresh release pull request
+        id: refresh
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -98,19 +99,26 @@ jobs:
           # specific case as "nothing to release" rather than failing the
           # workflow, so a docs-only changeset can sit until a releaseable one
           # arrives. Any other failure is re-raised.
+          #
+          # The dry-run dispatch below needs the release branch this step
+          # creates, so it is gated on the `created` output: a skipped refresh
+          # leaves `monochange/release/release` absent, and dispatching against
+          # a branch that does not exist would fail the workflow.
           if ! output="$(monochange run release 2>&1)"; then
             if printf '%s\n' "$output" | grep -q 'no releaseable packages were found in discovered changesets'; then
               echo "No releaseable packages in current changesets; skipping release PR refresh."
+              echo "created=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             printf '%s\n' "$output" >&2
             exit 1
           fi
           printf '%s\n' "$output"
+          echo "created=true" >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
       - name: dispatch publish dry run
-        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.refresh.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
