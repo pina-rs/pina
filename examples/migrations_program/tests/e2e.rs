@@ -366,10 +366,15 @@ fn migration_budget_is_checked_before_funding_or_resize() {
 		&historical_update_data(88),
 	);
 
+	// The account is 100,000 lamports below rent exemption, so the deficit
+	// exceeds the example's 20,000 lamport budget and reports the lamport
+	// budget failure rather than the workspace or growth code.
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
 		&accounts,
-		&[Check::err(PinaProgramError::MigrationBudgetExceeded.into())],
+		&[Check::err(
+			PinaProgramError::MigrationLamportBudgetExceeded.into(),
+		)],
 	);
 	assert_eq!(account(&result, &state).data, old_data);
 	assert_eq!(account(&result, &state).lamports, underfunded_lamports);

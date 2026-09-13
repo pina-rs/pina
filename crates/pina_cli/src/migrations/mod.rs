@@ -4,6 +4,7 @@
 mod diff;
 mod ledger;
 mod prompt;
+mod remedy;
 mod scan;
 mod storage;
 mod transition;

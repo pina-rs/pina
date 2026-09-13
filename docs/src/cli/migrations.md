@@ -32,6 +32,8 @@ Pina writes `migrations/manifest.json`, `migrations/publications.json`, and adja
 
 If the current version has never been deployed to a non-local cluster, `make` replaces that draft. If a publication receipt or pending deployment contains the version, `make` appends the next version.
 
+When a transition grows an account, `make` prints the estimated rent deficit (about 6,960 lamports per grown byte), names the program constant to raise (`max_lamports`, for example `MAX_INLINE_MIGRATION_LAMPORTS`), and points at the on-chain error an undersized budget produces: `MigrationLamportBudgetExceeded`. Worst-case growth beyond the runtime's 10,240-byte (`MAX_PERMITTED_DATA_INCREASE`) per-instruction realloc cap warns separately, because no budget raises that limit; it points at `MigrationAccountGrowthExceeded`. Both warnings quote the same numbers as the `PinaProgramError` rustdoc, so the pre-deploy estimate and a failed transaction name the same fix.
+
 Commit the manifest, publication ledger, and transition files. Do not generate them during a build.
 
 ## Disambiguate renames

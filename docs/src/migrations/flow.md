@@ -186,14 +186,25 @@ Migration that only moves bytes is free beyond compute. Migration that makes an 
 
 - the program transfers only the **deficit** (rent-exempt minimum at the new size minus what the account already holds), never more;
 - the payer is the instruction's declared migration payer — a transaction signer, or one of the program's own PDAs signing through `invoke_signed`;
-- the transfer is capped by the `max_lamports` budget the program passes to the executor. An undersized budget fails the whole transaction with `MigrationBudgetExceeded` — nothing is half-migrated — but the account also stays stale until the budget is raised, so size it deliberately.
+- the transfer is capped by the `max_lamports` budget the program passes to the executor. An undersized budget fails the whole transaction with `MigrationLamportBudgetExceeded` — nothing is half-migrated — but the account also stays stale until the budget is raised, so size it deliberately. The error names the budget to raise, and `pina migrations make` quotes the same deficit figure before you deploy.
 
-A planning figure for that budget: rent exemption costs about **6,960 lamports per byte** (3,480 lamports per byte-year at the two-year exemption threshold), so growing an account by _N_ bytes needs roughly `N × 6,960` lamports of head room on top of what the account already holds. `pina migrations make` prints a warning with the exact growth and estimate whenever a transition grows an account or keeps a compact (capacity-driven) layout.
+A planning figure for that budget: rent exemption costs about **6,960 lamports per byte** (3,480 lamports per byte-year at the two-year exemption threshold), so growing an account by _N_ bytes needs roughly `N × 6,960` lamports of head room on top of what the account already holds. `pina migrations make` prints a warning with the exact growth and estimate whenever a transition grows an account or keeps a compact (capacity-driven) layout, and adds the remedy for the failure the grown account would hit on chain.
+
+The executor keeps the workspace, realloc-growth, and lamport budgets as separate codes, so each failure names one fix:
+
+| Failure condition                                                                                | Code                             | Remedy                                                                                        |
+| ------------------------------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| The stale account is more than `MAX_INLINE_STEPS` versions behind                                | `MigrationUnavailable`           | Publish smaller, more frequent versions; migrate accounts before they fall further behind.    |
+| The normalization workspace cannot hold the generated transition                                 | `MigrationWorkspaceExceeded`     | Keep the generated workspace at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes).             |
+| One instruction would grow the account by more than `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes) | `MigrationAccountGrowthExceeded` | Publish intermediate versions so the change grows across transactions; no budget raises this. |
+| The rent deficit exceeds the program's `max_lamports` budget                                     | `MigrationLamportBudgetExceeded` | Raise the program's `max_lamports` constant to cover the quoted deficit.                      |
+
+Builds from before the split reported each of the first three budget failures as `MigrationBudgetExceeded` (`0xFFFF_FFF5`); that aggregate code stays reserved so published binaries remain decodable.
 
 Two consequences follow from the payer model:
 
 1. **An old client cannot fund growth.** A client generated before the instruction gained its optional `migrationPayer` slot submits without a payer; if the account it touches now needs rent, that transaction fails with `MigrationRequired`. The fix is a current client (or a payer-carrying migration path) — by design, rent is never taken from an account the client did not offer.
-2. **The compute bill lands on the touching transaction.** A stale account pays its ladder's compute cost inside whichever transaction finds it, and `MAX_INLINE_STEPS` bounds how long that ladder may be. Accounts that are too expensive to migrate inline fail with `MigrationUnavailable` rather than silently burning the budget; the reserved `Migrate` instruction below is the out-of-band path.
+2. **The compute bill lands on the touching transaction.** A stale account pays its ladder's compute cost inside whichever transaction finds it, and `MAX_INLINE_STEPS` (at most 8 adjacent transitions) bounds how long that ladder may be. Accounts further behind than that fail with `MigrationUnavailable` rather than silently burning the budget; the remedy is rebalancing the history into more frequent, smaller versions. The reserved `Migrate` instruction below is the out-of-band route for carrying a payer, but it enforces the same step limit.
 
 ### The reserved Migrate instruction
 

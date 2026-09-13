@@ -321,7 +321,7 @@ where
 		StoredVersion::Future { .. } => Err(PinaProgramError::InvalidMigrationVersion.into()),
 		StoredVersion::Stale { .. } => {
 			if T::WORKING_SIZE < T::CURRENT_SIZE || workspace.len() < T::WORKING_SIZE {
-				return Err(PinaProgramError::MigrationBudgetExceeded.into());
+				return Err(PinaProgramError::MigrationWorkspaceExceeded.into());
 			}
 			workspace[..T::WORKING_SIZE].fill(0);
 			T::migrate_stale_instruction(data, &mut workspace[..T::WORKING_SIZE])?;
@@ -415,7 +415,7 @@ where
 		}
 		StoredVersion::Stale { .. } => {
 			if T::WORKING_SIZE < T::CURRENT_SIZE || workspace.len() < T::WORKING_SIZE {
-				return Err(PinaProgramError::MigrationBudgetExceeded.into());
+				return Err(PinaProgramError::MigrationWorkspaceExceeded.into());
 			}
 			workspace[..T::WORKING_SIZE].fill(0);
 			T::migrate_stale_event(data, &mut workspace[..T::WORKING_SIZE])?;
@@ -684,7 +684,7 @@ mod executor {
 			.checked_sub(ctx.original_size)
 			.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
 		{
-			return Err(PinaProgramError::MigrationBudgetExceeded.into());
+			return Err(PinaProgramError::MigrationAccountGrowthExceeded.into());
 		}
 
 		let funding = if working_size > current_size {
@@ -699,7 +699,7 @@ mod executor {
 		};
 		let next_transferred = ctx.transferred.checked_add(funding);
 		if next_transferred.is_none_or(|total| total > ctx.max_lamports) {
-			return Err(PinaProgramError::MigrationBudgetExceeded.into());
+			return Err(PinaProgramError::MigrationLamportBudgetExceeded.into());
 		}
 		// Account for the planned funding up front so the post-mutation tail
 		// carries no budget bookkeeping after the transfer call: on the host
@@ -1452,7 +1452,7 @@ mod tests {
 		let mut short_workspace = [0xaa; 3];
 		assert_eq!(
 			normalize_instruction_data::<VersionedInstruction>(&[7, 0, 42], &mut short_workspace,),
-			Err(PinaProgramError::MigrationBudgetExceeded.into())
+			Err(PinaProgramError::MigrationWorkspaceExceeded.into())
 		);
 		assert_eq!(short_workspace, [0xaa; 3]);
 	}
@@ -1493,7 +1493,7 @@ mod tests {
 		let mut workspace = [0xaa; 3];
 		assert_eq!(
 			normalize_event_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace),
-			Err(PinaProgramError::MigrationBudgetExceeded.into())
+			Err(PinaProgramError::MigrationWorkspaceExceeded.into())
 		);
 	}
 
@@ -2113,7 +2113,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 		assert_eq!(
 			context.run::<GrowingAccount>(2).err(),
-			Some(PinaProgramError::MigrationBudgetExceeded.into())
+			Some(PinaProgramError::MigrationLamportBudgetExceeded.into())
 		);
 	}
 
@@ -2502,26 +2502,43 @@ mod tests {
 	#[test]
 	fn executor_enforces_plan_step_header_and_growth_budgets() {
 		let owner = Address::new_from_array([9; 32]);
-		for source in [[9, 0, 0], [9, 0, 1], [9, 0, 2]] {
+		// A plan that does not describe exactly the next adjacent step
+		// (`[9, 0, 0]`) or whose target sits below the migration header
+		// (`[9, 0, 1]`) cannot be applied and reports `MigrationUnavailable`.
+		for source in [[9, 0, 0], [9, 0, 1]] {
 			let mut stored =
 				TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &source);
 			let mut account = stored.view();
-			let result = MigrateAccount {
+			assert_eq!(
+				MigrateAccount {
+					account: &mut account,
+					payer: None,
+					program_id: &owner,
+					max_lamports: u64::MAX,
+				}
+				.invoke_with_rent::<AdversarialPlanAccount>(test_rent()),
+				Err(PinaProgramError::MigrationUnavailable.into())
+			);
+			assert_eq!(&*account.try_borrow().unwrap(), &source);
+		}
+
+		// A plan whose working size exceeds the instruction's original size by
+		// more than `MAX_PERMITTED_DATA_INCREASE` reports the growth code.
+		let source = [9, 0, 2];
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &source);
+		let mut account = stored.view();
+		assert_eq!(
+			MigrateAccount {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
 				max_lamports: u64::MAX,
 			}
-			.invoke_with_rent::<AdversarialPlanAccount>(test_rent());
-
-			assert!(matches!(
-				result,
-				Err(error)
-					if error == PinaProgramError::MigrationUnavailable.into()
-						|| error == PinaProgramError::MigrationBudgetExceeded.into()
-			));
-			assert_eq!(&*account.try_borrow().unwrap(), &source);
-		}
+			.invoke_with_rent::<AdversarialPlanAccount>(test_rent()),
+			Err(PinaProgramError::MigrationAccountGrowthExceeded.into())
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &source);
 
 		let mut stored =
 			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[11, 0, 5]);
@@ -2536,6 +2553,122 @@ mod tests {
 			.invoke_with_rent::<StepBudgetAccount>(test_rent()),
 			Err(PinaProgramError::MigrationUnavailable.into())
 		);
+	}
+
+	/// The three executor budget failures must each carry their own code so a
+	/// developer can tell the workspace, realloc-growth, and lamport-cap
+	/// conditions apart without a debugger.
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_budget_failures_are_separately_diagnosable() {
+		let owner = Address::new_from_array([9; 32]);
+
+		// Workspace: the caller's stack buffer is smaller than WORKING_SIZE.
+		let mut short_workspace = [0_u8; 3];
+		let workspace =
+			normalize_instruction_data::<VersionedInstruction>(&[7, 0, 42], &mut short_workspace)
+				.expect_err("a workspace below WORKING_SIZE must fail");
+		assert_eq!(
+			workspace,
+			PinaProgramError::MigrationWorkspaceExceeded.into()
+		);
+
+		// Growth: one step needs more than the runtime's per-instruction
+		// growth cap over the account's size at instruction start.
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[9, 0, 2]);
+		let mut account = stored.view();
+		let growth = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: u64::MAX,
+		}
+		.invoke_with_rent::<AdversarialPlanAccount>(test_rent())
+		.expect_err("growth beyond MAX_PERMITTED_DATA_INCREASE must fail");
+		assert_eq!(
+			growth,
+			PinaProgramError::MigrationAccountGrowthExceeded.into()
+		);
+
+		// Lamports: the rent deficit exceeds the explicit budget.
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+		let mut account = stored.view();
+		let lamports = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: 0,
+		}
+		.invoke_with_rent::<GrowingAccount>(test_rent())
+		.expect_err("a rent deficit beyond max_lamports must fail");
+		assert_eq!(
+			lamports,
+			PinaProgramError::MigrationLamportBudgetExceeded.into()
+		);
+
+		// A developer triaging a failed migration must be able to tell the
+		// three remedies apart from the code alone.
+		assert_ne!(workspace, growth);
+		assert_ne!(workspace, lamports);
+		assert_ne!(growth, lamports);
+	}
+
+	/// A stale account beyond the generated `MAX_INLINE_STEPS` reports
+	/// `MigrationUnavailable`; the identical bytes migrate once the ladder
+	/// exposes enough inline steps, which is the documented remedy.
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn ladder_beyond_max_inline_steps_reports_unavailable_and_rebalancing_succeeds() {
+		let owner = Address::new_from_array([9; 32]);
+		let source = [11, 0, 5];
+
+		// `StepBudgetAccount` shares `TwoStepAccount`'s two adjacent
+		// transitions but declares a one-step ladder, so a v0 account sits
+		// beyond `MAX_INLINE_STEPS`.
+		assert_eq!(
+			<StepBudgetAccount as MigratableAccount>::MAX_INLINE_STEPS,
+			1
+		);
+		let mut stored =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 10_000, &source);
+		let mut account = stored.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<StepBudgetAccount>(test_rent()),
+			Err(PinaProgramError::MigrationUnavailable.into())
+		);
+
+		// `TwoStepAccount` declares a two-step ladder for the same contract,
+		// so the same bytes reach v2 without funding: the fix is exposing
+		// enough inline steps (or rebalancing the ladder), not changing the
+		// account.
+		let mut stored =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 10_000, &source);
+		let mut account = stored.view();
+		let outcome = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: 0,
+		}
+		.invoke_with_rent::<TwoStepAccount>(test_rent())
+		.unwrap_or_else(|error| panic!("rebalanced ladder: {error:?}"));
+		assert_eq!(
+			outcome,
+			AccountMigrationOutcome::Migrated {
+				from: 0,
+				to: 2,
+				steps: 2,
+			}
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &[11, 2, 5, 9, 7]);
 	}
 
 	#[cfg(feature = "account-resize")]
@@ -2729,7 +2862,7 @@ mod tests {
 				max_lamports: 0,
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
-			Err(PinaProgramError::MigrationBudgetExceeded.into())
+			Err(PinaProgramError::MigrationLamportBudgetExceeded.into())
 		);
 
 		assert_eq!(account.lamports(), 0);

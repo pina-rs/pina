@@ -23,6 +23,8 @@ use super::MigrationError;
 use super::diff::MoveDirection;
 use super::diff::automatic_direction;
 use super::diff::transition_mode;
+use super::remedy::ACCOUNT_GROWTH_REMEDY;
+use super::remedy::LAMPORT_BUDGET_REMEDY;
 use super::storage::write_atomic;
 use crate::project::Project;
 
@@ -126,15 +128,21 @@ pub(super) fn create_transition(
 /// have been fixed since genesis, so this is a planning figure, not a quote.
 pub(crate) const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
 
+/// Maximum account growth the Solana runtime permits one top-level
+/// instruction to allocate, mirroring
+/// `pina::MAX_PERMITTED_DATA_INCREASE` / `pinocchio::account::MAX_PERMITTED_DATA_INCREASE`.
+///
+/// A transition growing an account by more than this cannot migrate inline;
+/// the executor rejects it with `MigrationAccountGrowthExceeded`.
+pub(crate) const MAX_PERMITTED_DATA_INCREASE: usize = 10 * 1024;
+
 /// Warn when a transition grows an account, because a stale account must
 /// fund the rent deficit from the migration payer inside the touching
-/// transaction. An undersized lamport budget makes those migrations fail
-/// with `MigrationBudgetExceeded` until the budget is raised.
-/// Warn when a transition grows an account, because a stale account must
-/// fund the rent deficit from the migration payer inside the touching
-/// transaction. An undersized lamport budget makes those migrations fail
-/// with `MigrationBudgetExceeded` until the budget is raised. Fixed
-/// layouts quote exact byte growth; compact layouts quote the exact
+/// transaction. An undersized lamport budget fails the migration with
+/// `MigrationLamportBudgetExceeded` until the program's `max_lamports`
+/// budget is raised, and growth beyond the runtime's per-instruction cap
+/// fails with `MigrationAccountGrowthExceeded` however large the budget is.
+/// Fixed layouts quote exact byte growth; compact layouts quote the exact
 /// worst-case growth the declared capacities imply.
 pub(super) fn warn_about_account_growth(
 	identity: &ContractIdentity,
@@ -180,10 +188,19 @@ pub(super) fn warn_about_account_growth(
 			source.version + 1,
 		)
 	};
+	if growth > MAX_PERMITTED_DATA_INCREASE {
+		output.data_warnings.push(format!(
+			"account `{rust_name}` {sizes}: that exceeds the runtime's \
+			 `MAX_PERMITTED_DATA_INCREASE` ({MAX_PERMITTED_DATA_INCREASE} bytes) for a single \
+			 instruction, so {ACCOUNT_GROWTH_REMEDY}; the runtime fails the migration with \
+			 `MigrationAccountGrowthExceeded`",
+		));
+	}
 	output.data_warnings.push(format!(
 		"account `{rust_name}` {sizes}: a stale account funds roughly {rent} lamports of rent \
-		 exemption from the migration payer, so size the invoking instruction's lamport budget \
-		 and pass a signer or PDA payer",
+		 exemption from the migration payer, so pass a signer or PDA payer and \
+		 {LAMPORT_BUDGET_REMEDY}; an undersized budget fails the migration with \
+		 `MigrationLamportBudgetExceeded`",
 	));
 }
 

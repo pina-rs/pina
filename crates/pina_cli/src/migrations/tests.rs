@@ -1758,6 +1758,78 @@ fn growing_transitions_warn_about_rent_funding() {
 		warning.contains("lamport budget"),
 		"the warning names the budget to raise: {warning}"
 	);
+	// The warning must quote the same remedy the on-chain
+	// `MigrationLamportBudgetExceeded` documents, so the pre-deploy estimate
+	// and the runtime failure name the same constant.
+	assert!(
+		warning.contains(super::remedy::LAMPORT_BUDGET_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationLamportBudgetExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
+}
+
+#[test]
+fn oversized_growth_warns_about_the_runtime_realloc_cap() {
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	// 2,000 u64 fields grow one transition by more than the runtime's 10 KiB
+	// per-instruction realloc cap.
+	let fields = (0..2_000)
+		.map(|index| (format!("field_{index}"), "u64".to_owned()))
+		.collect::<Vec<_>>();
+	let fields = fields
+		.iter()
+		.map(|(name, ty)| (name.as_str(), ty.as_str()))
+		.collect::<Vec<_>>();
+	let destination = schema(LayoutKind::Fixed, &fields);
+	let mut output = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"State",
+		&source,
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut output,
+	);
+
+	let warning = output
+		.data_warnings
+		.iter()
+		.find(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE"))
+		.unwrap_or_else(|| {
+			panic!(
+				"growth beyond the runtime cap must warn: {:?}",
+				output.data_warnings
+			)
+		});
+	assert!(
+		warning.contains(super::remedy::ACCOUNT_GROWTH_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationAccountGrowthExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
+	// The rent estimate still prints: an oversized transition needs both the
+	// budget and a rebalanced ladder.
+	assert!(
+		output
+			.data_warnings
+			.iter()
+			.any(|warning| warning.contains("lamports of rent exemption")),
+		"the rent warning must remain: {:?}",
+		output.data_warnings
+	);
 }
 
 #[test]
