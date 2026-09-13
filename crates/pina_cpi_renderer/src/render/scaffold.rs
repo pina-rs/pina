@@ -65,7 +65,7 @@ pub(crate) fn ensure_crate_scaffold(
 		"publish = false".to_string(),
 		String::new(),
 		"[dependencies]".to_string(),
-		"pina = { version = \"0.12\", default-features = false }".to_string(),
+		"pina = { version = \"0.17\", default-features = false }".to_string(),
 		String::new(),
 	]
 	.join("\n");

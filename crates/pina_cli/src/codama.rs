@@ -690,7 +690,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			let crate_dir = plan.cli_rust_out.join(example);
 			validate_generation_target(&crate_dir, settings)?;
 			let client_dir = plan.rust_out.join(example);
-			let client_path = format!("../../../rust/{example}");
+			let client_path = format!("../../rust/{example}");
 			let client_package = rust_client_package(&client_dir, example);
 			let render_config = CliRenderConfig {
 				mode: cli_render_mode(settings.mode),

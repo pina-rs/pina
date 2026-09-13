@@ -43,6 +43,12 @@ pub(crate) fn emit_js_event_log_module(
 	};
 
 	let events_dir = generated.join("events");
+	std::fs::create_dir_all(&events_dir).map_err(|source| {
+		CodamaError::HardenJavaScript {
+			path: events_dir.clone(),
+			source,
+		}
+	})?;
 	let module_path = events_dir.join("logs.ts");
 	std::fs::write(&module_path, module).map_err(|source| {
 		CodamaError::HardenJavaScript {
@@ -52,18 +58,17 @@ pub(crate) fn emit_js_event_log_module(
 	})?;
 
 	let index_path = events_dir.join("index.ts");
-	let index = std::fs::read_to_string(&index_path).map_err(|source| {
-		CodamaError::HardenJavaScript {
-			path: index_path.clone(),
-			source,
-		}
-	})?;
+	let index = std::fs::read_to_string(&index_path).unwrap_or_default();
 	if !index.contains("\"./logs\"") {
-		let patched = index.replacen(
-			"export * from",
-			"export * from \"./logs\";\nexport * from",
-			1,
-		);
+		let patched = if index.is_empty() {
+			"export * from \"./logs\";\n".to_string()
+		} else {
+			index.replacen(
+				"export * from",
+				"export * from \"./logs\";\nexport * from",
+				1,
+			)
+		};
 		std::fs::write(&index_path, patched).map_err(|source| {
 			CodamaError::HardenJavaScript {
 				path: index_path,
