@@ -13,6 +13,9 @@ pub(crate) fn render_root_mod(program: &ProgramNode, has_public_types: bool) -> 
 	if !program.errors.is_empty() {
 		lines.push("pub mod errors;".to_string());
 	}
+	if !program.events.is_empty() {
+		lines.push("pub mod events;".to_string());
+	}
 	if !program.instructions.is_empty() {
 		lines.push("pub mod instructions;".to_string());
 	}

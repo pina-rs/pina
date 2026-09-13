@@ -11,6 +11,7 @@ use heck::ToSnakeCase;
 use serde_json::Value;
 use walkdir::WalkDir;
 
+use crate::client_events::EventClientHistoryIndex;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
@@ -460,6 +461,7 @@ pub fn harden_generated_dart_clients(
 	output_root: &Path,
 	programs: &[String],
 	idl_paths: &[impl AsRef<Path>],
+	histories: &[EventClientHistoryIndex],
 ) -> Result<(), CodamaError> {
 	if programs.len() != idl_paths.len() {
 		return Err(dart_error(
@@ -472,7 +474,9 @@ pub fn harden_generated_dart_clients(
 		));
 	}
 
-	for (program, idl_path) in programs.iter().zip(idl_paths) {
+	let no_histories = EventClientHistoryIndex::default();
+
+	for (index, (program, idl_path)) in programs.iter().zip(idl_paths).enumerate() {
 		let idl_path = idl_path.as_ref();
 		let source = std::fs::read_to_string(idl_path).map_err(|source| {
 			CodamaError::DartClient {
@@ -534,6 +538,13 @@ pub fn harden_generated_dart_clients(
 			needs_helper = true;
 			harden_dart_file(&path, &[], &layouts)?;
 		}
+
+		needs_helper |= crate::dart_events::emit_dart_event_modules(
+			&generated,
+			program,
+			histories.get(index).unwrap_or(&no_histories),
+			&root,
+		)?;
 
 		if needs_helper {
 			let helper_path = generated.join("pina_pod_codecs.dart");
@@ -1158,6 +1169,32 @@ fn dart_error(path: impl AsRef<Path>, message: String) -> CodamaError {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn event_module_emission_failures_propagate() {
+		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+		let source = std::fs::read_to_string(workspace.join("codama/idls/events_program.json"))
+			.expect("events IDL should be readable");
+		let mut root: RootNode = serde_json::from_str(&source).expect("events IDL should decode");
+		for event in &mut root.program.events {
+			event.discriminators.clear();
+		}
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let idl = temporary.path().join("events_program.json");
+		std::fs::write(&idl, serde_json::to_string(&root).expect("serialize IDL"))
+			.expect("IDL should be writable");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+
+		let error = harden_generated_dart_clients(
+			temporary.path(),
+			&["events_program".to_owned()],
+			&[idl],
+			&[],
+		)
+		.expect_err("an event without a discriminator must fail");
+		assert!(matches!(error, CodamaError::DartClient { .. }));
+	}
 
 	#[test]
 	fn accepts_supported_pinapod_semantics() {

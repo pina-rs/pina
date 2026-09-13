@@ -20,10 +20,15 @@ import {
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
-import { fixPinaPodEncoderSize } from "../pinaPodCodecs";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const MY_EVENT_EVENT_DISCRIMINATOR = 1;
 
@@ -31,7 +36,11 @@ export function getMyEventEventDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR);
 }
 
-export type MyEventEvent = { data: bigint; label: ReadonlyUint8Array };
+export type MyEventEvent = {
+	discriminator: number;
+	data: bigint;
+	label: ReadonlyUint8Array;
+};
 
 export type MyEventEventArgs = {
 	data: number | bigint;
@@ -40,18 +49,28 @@ export type MyEventEventArgs = {
 
 /** Gets the encoder for {@link MyEventEventArgs} event data. */
 export function getMyEventEventEncoder(): FixedSizeEncoder<MyEventEventArgs> {
-	return getStructEncoder([["data", getU64Encoder()], [
-		"label",
-		fixPinaPodEncoderSize(getBytesEncoder(), 8),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"data",
+			getU64Encoder(),
+		], ["label", fixPinaPodEncoderSize(getBytesEncoder(), 8)]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link MyEventEvent} event data. */
 export function getMyEventEventDecoder(): FixedSizeDecoder<MyEventEvent> {
-	return getStructDecoder([["data", getU64Decoder()], [
-		"label",
-		fixDecoderSize(getBytesDecoder(), 8),
-	]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				MY_EVENT_EVENT_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["data", getU64Decoder()],
+		["label", fixDecoderSize(getBytesDecoder(), 8)],
+	]);
 }
 
 /** Gets the codec for {@link MyEventEvent} event data. */

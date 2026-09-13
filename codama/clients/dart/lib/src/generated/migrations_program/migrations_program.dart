@@ -5,3 +5,5 @@ export 'accounts/accounts.dart';
 export 'instructions/instructions.dart';
 export 'programs/programs.dart';
 export 'types/types.dart';
+
+export 'events/events.dart';

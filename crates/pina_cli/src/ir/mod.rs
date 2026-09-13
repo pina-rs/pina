@@ -25,6 +25,20 @@ pub struct EventIr {
 	pub docs: Vec<String>,
 }
 
+impl EventIr {
+	pub(crate) fn visible_docs(&self) -> Vec<String> {
+		self.docs
+			.iter()
+			.filter(|doc| doc.as_str() != MIGRATABLE_DOC_MARKER)
+			.cloned()
+			.collect()
+	}
+
+	pub(crate) fn is_migratable(&self) -> bool {
+		self.docs.iter().any(|doc| doc == MIGRATABLE_DOC_MARKER)
+	}
+}
+
 /// A local unit enum derived with `PinaPod` and its generated companion.
 #[derive(Debug, Clone)]
 pub struct PinaPodEnumIr {

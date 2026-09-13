@@ -6,5 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./logs";
 export * from "./myEvent";
 export * from "./myOtherEvent";

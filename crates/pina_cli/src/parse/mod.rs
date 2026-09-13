@@ -245,11 +245,15 @@ fn assemble_from_extracted(
 				"event",
 			)
 			.map(|discriminator| {
+				let mut docs = event.docs.clone();
+				if event.migratable {
+					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
+				}
 				crate::ir::EventIr {
 					name: event.name.clone(),
 					discriminator,
 					fields: event.fields.clone(),
-					docs: event.docs.clone(),
+					docs,
 				}
 			})
 		})
@@ -638,6 +642,34 @@ mod tests {
 				.iter()
 				.any(|doc| doc == crate::ir::MIGRATABLE_DOC_MARKER)
 		);
+	}
+
+	#[test]
+	fn assemble_program_ir_marks_only_migration_aware_events() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum Events {
+				Current = 1,
+				Ephemeral = 2,
+			}
+
+			#[event(discriminator = Events::Current, migrations)]
+			pub struct CurrentEvent { pub value: u64 }
+
+			#[event(discriminator = Events::Ephemeral)]
+			pub struct EphemeralEvent { pub value: u64 }
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "events").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(ir.events.len(), 2);
+		assert!(ir.events[0].is_migratable());
+		assert_eq!(ir.events[0].docs, [crate::ir::MIGRATABLE_DOC_MARKER]);
+		assert_eq!(ir.events[0].visible_docs(), Vec::<String>::new());
+		assert!(!ir.events[1].is_migratable());
+		assert!(ir.events[1].visible_docs().is_empty());
 	}
 
 	#[test]

@@ -4,12 +4,14 @@ use std::path::Path;
 use codama_nodes::RootNode;
 use walkdir::WalkDir;
 
+use crate::client_events::EventClientHistoryIndex;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
 use crate::compact_capacity::CompactCapacityIndex;
 use crate::compact_capacity::CompactCapacityKind;
 use crate::error::CodamaError;
+use crate::js_events::emit_js_event_log_module;
 
 const HELPER_IMPORT_PREFIX: &str = "import { ";
 const HELPER_MODULE: &str = r#"/**
@@ -250,6 +252,7 @@ pub fn harden_generated_clients(
 	output_root: &Path,
 	programs: &[String],
 	idl_paths: &[impl AsRef<Path>],
+	histories: &[EventClientHistoryIndex],
 ) -> Result<(), CodamaError> {
 	if programs.len() != idl_paths.len() {
 		return Err(js_validation_error(
@@ -262,7 +265,9 @@ pub fn harden_generated_clients(
 		));
 	}
 
-	for (program, idl_path) in programs.iter().zip(idl_paths) {
+	let no_histories = EventClientHistoryIndex::default();
+
+	for (index, (program, idl_path)) in programs.iter().zip(idl_paths).enumerate() {
 		let idl_path = idl_path.as_ref();
 		let idl_source = std::fs::read_to_string(idl_path).map_err(|source| {
 			CodamaError::HardenJavaScript {
@@ -320,6 +325,12 @@ pub fn harden_generated_clients(
 		}
 
 		harden_js_event_decoders(&generated, &root)?;
+		emit_js_event_log_module(
+			&generated,
+			program,
+			histories.get(index).unwrap_or(&no_histories),
+			&root,
+		)?;
 
 		let helper_path = generated.join("pinaPodCodecs.ts");
 		std::fs::write(&helper_path, HELPER_MODULE).map_err(|source| {
@@ -1092,6 +1103,26 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn event_log_emission_failures_propagate() {
+		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+		let idl = workspace.join("codama/idls/events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		// Blocking the events path makes the generated log module unwritable.
+		std::fs::write(generated.join("events"), b"file").expect("blocked events path");
+
+		let error = harden_generated_clients(
+			temporary.path(),
+			&["events_program".to_owned()],
+			&[idl],
+			&[],
+		)
+		.expect_err("an unwritable events module must fail");
+		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
+	}
+
+	#[test]
 	fn hardens_generated_codec_boundaries() {
 		let source = r#"/** generated */
 import { fixEncoderSize } from "@solana/kit";
@@ -1288,6 +1319,7 @@ const decoder = getStructDecoder([
 			temporary.path(),
 			&["compact_accounts_program".to_owned()],
 			&[idl],
+			&[],
 		)
 		.expect("generated tree should harden");
 		let hardened = std::fs::read_to_string(output).expect("hardened fixture should read");
@@ -1578,7 +1610,7 @@ fn patch_js_program_plugin(plugin: &str) -> Option<String> {
 }
 
 /// `migrations_program` becomes `migrationsProgram`.
-fn snake_to_camel(snake: &str) -> String {
+pub(crate) fn snake_to_camel(snake: &str) -> String {
 	let mut out = String::with_capacity(snake.len());
 	for (index, segment) in snake.split('_').enumerate() {
 		if index == 0 {

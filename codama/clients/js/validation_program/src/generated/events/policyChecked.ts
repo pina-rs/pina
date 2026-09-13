@@ -29,9 +29,11 @@ import {
 	getUtf8Decoder,
 	getUtf8Encoder,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import {
 	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
 	getPinaPodStringDecoder,
 } from "../pinaPodCodecs";
 
@@ -42,6 +44,7 @@ export function getPolicyCheckedEventDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type PolicyCheckedEvent = {
+	discriminator: number;
 	amount: bigint;
 	memo: string;
 	approvals: Array<number>;
@@ -59,35 +62,50 @@ export type PolicyCheckedEventArgs = {
 export function getPolicyCheckedEventEncoder(): FixedSizeEncoder<
 	PolicyCheckedEventArgs
 > {
-	return getStructEncoder([["amount", getU64Encoder()], [
-		"memo",
-		fixPinaPodEncoderSize(
-			addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-			65,
-		),
-	], [
-		"approvals",
-		fixPinaPodEncoderSize(
-			getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
-			6,
-		),
-	], ["requiredApprovals", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		], [
+			"memo",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				65,
+			),
+		], [
+			"approvals",
+			fixPinaPodEncoderSize(
+				getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
+				6,
+			),
+		], ["requiredApprovals", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link PolicyCheckedEvent} event data. */
 export function getPolicyCheckedEventDecoder(): FixedSizeDecoder<
 	PolicyCheckedEvent
 > {
-	return getStructDecoder([["amount", getU64Decoder()], [
-		"memo",
-		getPinaPodStringDecoder(getU8Decoder(), 65),
-	], [
-		"approvals",
-		fixDecoderSize(
-			getArrayDecoder(getU8Decoder(), { size: getU16Decoder() }),
-			6,
-		),
-	], ["requiredApprovals", getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				POLICY_CHECKED_EVENT_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["amount", getU64Decoder()],
+		["memo", getPinaPodStringDecoder(getU8Decoder(), 65)],
+		[
+			"approvals",
+			fixDecoderSize(
+				getArrayDecoder(getU8Decoder(), { size: getU16Decoder() }),
+				6,
+			),
+		],
+		["requiredApprovals", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link PolicyCheckedEvent} event data. */

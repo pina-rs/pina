@@ -1,4 +1,5 @@
 pub mod build;
+mod client_events;
 mod client_migrations;
 pub mod codama;
 pub mod codegen;
@@ -23,7 +24,9 @@ pub mod verification;
 pub mod workflow;
 
 mod dart_client;
+mod dart_events;
 mod js_client;
+mod js_events;
 mod verifiable;
 
 use std::path::Path;
@@ -58,7 +61,8 @@ pub fn generate_idl(
 ) -> Result<RootNode, IdlError> {
 	let ir = parse_program(program_path, name_override)?;
 	let needs_migration_constants = ir.accounts.iter().any(ir::AccountIr::is_migratable)
-		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable);
+		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable)
+		|| ir.events.iter().any(ir::EventIr::is_migratable);
 	let migrations = needs_migration_constants
 		.then(|| migrations::idl_migration_metadata(program_path))
 		.transpose()

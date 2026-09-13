@@ -7,6 +7,12 @@ import {
 	stateNeedsMigration,
 } from "../../clients/js/migrations_program/src/generated/accounts/state.js";
 import {
+	normalizeValueChangedEventEvent,
+	parseMigrationsProgramEventsFromLogs,
+	parseValueChangedEventEventFromLog,
+} from "../../clients/js/migrations_program/src/generated/events/logs.js";
+import { getValueChangedEventEventDecoder } from "../../clients/js/migrations_program/src/generated/events/valueChangedEvent.js";
+import {
 	getMigrateDiscriminatorBytes,
 	getMigrateInstruction,
 	MIGRATE_DISCRIMINATOR,
@@ -120,4 +126,114 @@ test("migrate honors a program address override", () => {
 		{ programAddress: fork },
 	);
 	assert.equal(instruction.programAddress, fork);
+});
+
+/** `[discriminator = 4][version][value(u64)]`, plus `[memo(u16)]` from v1. */
+function valueChangedEventBytes(
+	version: number,
+	value: bigint,
+	memo: number,
+): Uint8Array {
+	// Version zero carried only the u64 payload; later versions appended memo.
+	const data = new Uint8Array(version === 0 ? 10 : 12);
+	data[0] = 4;
+	data[1] = version;
+	const view = new DataView(data.buffer);
+	view.setBigUint64(2, value, true);
+	if (data.length === 12) {
+		view.setUint16(10, memo, true);
+	}
+	return data;
+}
+
+function programDataLog(bytes: Uint8Array): string {
+	return `Program data: ${Buffer.from(bytes).toString("base64")}`;
+}
+
+test("the generated event decoder enforces the current envelope", () => {
+	const current = valueChangedEventBytes(1, 42n, 7);
+	const decoded = getValueChangedEventEventDecoder().decode(current);
+	assert.equal(decoded.discriminator, 4);
+	assert.equal(decoded.migrationVersion, 1);
+	assert.equal(decoded.value, 42n);
+	assert.equal(decoded.memo, 7);
+
+	const future = valueChangedEventBytes(2, 42n, 7);
+	assert.throws(
+		() => getValueChangedEventEventDecoder().decode(future),
+		/upgrade this client/,
+	);
+	const stale = valueChangedEventBytes(0, 42n, 7);
+	assert.throws(
+		() => getValueChangedEventEventDecoder().decode(stale),
+		/migration version mismatch/,
+	);
+});
+
+test("a log written at an older version projects into the current shape", () => {
+	// Version zero carried only `value`; the projection zero-fills `memo`.
+	const historical = valueChangedEventBytes(0, 42n, 0);
+	const normalized = normalizeValueChangedEventEvent(historical);
+
+	assert.equal(normalized.name, "valueChangedEvent");
+	assert.equal(normalized.sourceVersion, 0);
+	assert.equal(normalized.wasMigrated, true);
+	assert.equal(normalized.data.value, 42n);
+	assert.equal(normalized.data.memo, 0);
+	assert.equal(normalized.data.migrationVersion, 1);
+	assert.equal(normalized.data.discriminator, 4);
+
+	const current = normalizeValueChangedEventEvent(
+		valueChangedEventBytes(1, 42n, 7),
+	);
+	assert.equal(current.sourceVersion, 1);
+	assert.equal(current.wasMigrated, false);
+	assert.equal(current.data.memo, 7);
+});
+
+test("unknown, future, and malformed event logs fail closed", () => {
+	assert.throws(
+		() => normalizeValueChangedEventEvent(valueChangedEventBytes(2, 42n, 7)),
+		/log was written by a newer program; upgrade this client/,
+	);
+	const truncated = new Uint8Array([4, 0, 1, 2, 3]);
+	assert.throws(
+		() => normalizeValueChangedEventEvent(truncated),
+		/log length does not match the v0 schema/,
+	);
+	const foreign = valueChangedEventBytes(0, 42n, 0);
+	foreign[0] = 9;
+	assert.throws(
+		() => normalizeValueChangedEventEvent(foreign),
+		/does not match the "ValueChangedEventEvent" event discriminator/,
+	);
+	assert.throws(
+		() => normalizeValueChangedEventEvent(new Uint8Array([4])),
+		/too short for the "ValueChangedEventEvent" event envelope/,
+	);
+});
+
+test("Program data log lines decode through the event entry point", () => {
+	const log = programDataLog(valueChangedEventBytes(0, 7n, 0));
+	const parsed = parseValueChangedEventEventFromLog(log);
+	assert.notEqual(parsed, null);
+	assert.equal(parsed?.sourceVersion, 0);
+	assert.equal(parsed?.wasMigrated, true);
+	assert.equal(parsed?.data.value, 7n);
+
+	assert.equal(parseValueChangedEventEventFromLog("not a log line"), null);
+	const otherProgram = programDataLog(new Uint8Array([9, 1, 0]));
+	assert.equal(parseValueChangedEventEventFromLog(otherProgram), null);
+});
+
+test("the program log parser skips unrelated lines and keeps matching ones", () => {
+	const events = parseMigrationsProgramEventsFromLogs([
+		"Program log: Instruction: Update",
+		programDataLog(valueChangedEventBytes(1, 5n, 3)),
+		programDataLog(new Uint8Array([9, 1, 0])),
+	]);
+	assert.equal(events.length, 1);
+	assert.equal(events[0]?.name, "valueChangedEvent");
+	assert.equal(events[0]?.data.memo, 3);
+	assert.deepEqual(parseMigrationsProgramEventsFromLogs([]), []);
 });

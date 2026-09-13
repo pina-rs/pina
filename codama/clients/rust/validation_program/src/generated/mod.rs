@@ -10,6 +10,7 @@
 
 pub mod accounts;
 pub mod errors;
+pub mod events;
 pub mod instructions;
 pub mod programs;
 

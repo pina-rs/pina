@@ -136,7 +136,14 @@ pub(crate) fn try_ir_to_root_node_with_migrations(
 	}
 
 	for event in &ir.events {
-		program = program.add_event(build_event_node(event, &ir.pinapod_enums)?);
+		let migration = current_migration(
+			ContractKind::Event,
+			&event.name,
+			&event.discriminator,
+			event.is_migratable(),
+			migrations,
+		)?;
+		program = program.add_event(build_event_node(event, &ir.pinapod_enums, migration)?);
 	}
 
 	for pda in &ir.pdas {
@@ -1081,6 +1088,143 @@ mod tests {
 	}
 
 	#[test]
+	fn lowers_event_version_envelopes_into_encoded_data() {
+		let discriminator = DiscriminatorIr {
+			value: 4,
+			repr_size: 1,
+		};
+		let event = |docs: Vec<String>| {
+			crate::ir::EventIr {
+				name: "ValueChangedEvent".to_owned(),
+				discriminator: discriminator.clone(),
+				fields: vec![
+					FieldIr {
+						name: "value".to_owned(),
+						rust_type: "u64".to_owned(),
+						docs: Vec::new(),
+					},
+					FieldIr {
+						name: "memo".to_owned(),
+						rust_type: "u16".to_owned(),
+						docs: Vec::new(),
+					},
+				],
+				docs,
+			}
+		};
+		let ir = ProgramIr {
+			name: "migration_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![],
+			instructions: vec![],
+			events: vec![
+				event(vec!["Tracked value changes.".to_owned()]),
+				event(vec![
+					"Versioned value changes.".to_owned(),
+					crate::ir::MIGRATABLE_DOC_MARKER.to_owned(),
+				]),
+			],
+			errors: vec![],
+			pdas: vec![],
+		};
+		let event_key = ContractIdentity::try_new(ContractKind::Event, 1, 4)
+			.unwrap_or_else(|error| panic!("event identity: {error}"))
+			.key();
+		let metadata = IdlMigrationMetadata {
+			version_type: MigrationVersionType::U8,
+			current_versions: BTreeMap::from([(event_key, 1)]),
+		};
+
+		let root = try_ir_to_root_node_with_migrations(&ir, Some(&metadata))
+			.unwrap_or_else(|error| panic!("event IDL codegen failed: {error}"));
+		let json = serde_json::to_value(root)
+			.unwrap_or_else(|error| panic!("serialize generated IDL: {error}"));
+
+		// Every event decodes the discriminator first, so generated decoders
+		// align with the `[discriminator][payload]` log record.
+		assert_eq!(
+			json.pointer("/program/events/0/data/fields/0/name"),
+			Some(&serde_json::json!("discriminator")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/0/data/fields/0/defaultValue/number"),
+			Some(&serde_json::json!(4)),
+		);
+		// Only the migration-aware event carries the version envelope.
+		assert_eq!(
+			json.pointer("/program/events/0/data/fields/1/name"),
+			Some(&serde_json::json!("value")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/data/fields/1/name"),
+			Some(&serde_json::json!("migrationVersion")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/data/fields/1/defaultValue/number"),
+			Some(&serde_json::json!(1)),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/data/fields/1/type/format"),
+			Some(&serde_json::json!("u8")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/discriminators/1/offset"),
+			Some(&serde_json::json!(1)),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/discriminators/1/constant/value/number"),
+			Some(&serde_json::json!(1)),
+		);
+		// Event docs survive while hidden migration markers never leak.
+		assert_eq!(
+			json.pointer("/program/events/0/docs/0"),
+			Some(&serde_json::json!("Tracked value changes.")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/docs/0"),
+			Some(&serde_json::json!("Versioned value changes.")),
+		);
+		assert!(!json.to_string().contains("pina:migratable"));
+		assert!(json.get("versions").is_none());
+		assert!(!json.to_string().contains("transition"));
+	}
+
+	#[test]
+	fn migratable_events_require_checked_in_metadata() {
+		let ir = ProgramIr {
+			name: "migration_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![],
+			instructions: vec![],
+			events: vec![crate::ir::EventIr {
+				name: "ValueChangedEvent".to_owned(),
+				discriminator: DiscriminatorIr {
+					value: 4,
+					repr_size: 1,
+				},
+				fields: vec![FieldIr {
+					name: "value".to_owned(),
+					rust_type: "u64".to_owned(),
+					docs: Vec::new(),
+				}],
+				docs: vec![crate::ir::MIGRATABLE_DOC_MARKER.to_owned()],
+			}],
+			errors: vec![],
+			pdas: vec![],
+		};
+
+		let missing = try_ir_to_root_node_with_migrations(&ir, None)
+			.expect_err("migration-aware events need checked history");
+		assert!(
+			missing
+				.to_string()
+				.contains("checked-in migration metadata")
+		);
+	}
+
+	#[test]
 	fn optional_accounts_never_carry_default_values() {
 		let ir = ProgramIr {
 			name: "optional_pda_program".to_string(),
@@ -1400,8 +1544,16 @@ mod tests {
 fn build_event_node(
 	event: &crate::ir::EventIr,
 	pinapod_enums: &[PinaPodEnumIr],
+	migration: Option<CurrentMigration>,
 ) -> Result<EventNode, IdlError> {
-	let mut fields = Vec::with_capacity(event.fields.len());
+	// Events are emitted as `[discriminator][migrationVersion?][payload]`
+	// records, so the IDL mirrors the account envelope: the discriminator and
+	// version are decoded fields rather than hidden offsets. Generated
+	// decoders can then align with the log bytes and enforce the version.
+	let mut fields = vec![build_account_discriminator_field(&event.discriminator)];
+	if let Some(migration) = migration {
+		fields.push(build_account_migration_field(migration));
+	}
 	for field in &event.fields {
 		let context = format!("event `{}.{}`", event.name, field.name);
 		fields.push(build_struct_field(field, context, pinapod_enums)?);
@@ -1409,8 +1561,15 @@ fn build_event_node(
 
 	let mut node = EventNode::new(event.name.as_str(), StructTypeNode::new(fields));
 	node.discriminators = vec![build_discriminator_node(&event.discriminator)];
-	if !event.docs.is_empty() {
-		node.docs = event.docs.clone().into();
+	if let Some(migration) = migration {
+		node.discriminators.push(build_migration_discriminator_node(
+			migration,
+			event.discriminator.repr_size,
+		));
+	}
+	let docs = event.visible_docs();
+	if !docs.is_empty() {
+		node.docs = docs.into();
 	}
 
 	Ok(node)

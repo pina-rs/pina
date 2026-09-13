@@ -97,6 +97,28 @@ mod tests {
 			extract_migratable_events(&file).unwrap_or_else(|error| panic!("extract: {error}"));
 		assert!(events.is_empty());
 	}
+
+	#[test]
+	fn declarations_record_which_events_opt_into_migration() {
+		let file = syn::parse_file(
+			r#"
+				#[event(discriminator = Events::Current, migrations)]
+				struct Current { value: u64 }
+
+				#[event(discriminator = Events::Ephemeral)]
+				struct Ephemeral { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+		let events =
+			extract_event_declarations(&file).unwrap_or_else(|error| panic!("extract: {error}"));
+
+		assert_eq!(events.len(), 2);
+		assert_eq!(events[0].name, "Current");
+		assert!(events[0].migratable);
+		assert_eq!(events[1].name, "Ephemeral");
+		assert!(!events[1].migratable);
+	}
 }
 
 /// One `#[event]` source declaration of any flavor.
@@ -107,6 +129,9 @@ pub struct EventDeclaration {
 	pub variant: String,
 	pub fields: Vec<crate::ir::FieldIr>,
 	pub docs: Vec<String>,
+	/// Whether the declaration carries the `migrations` flag, which puts the
+	/// version envelope between the discriminator and the payload.
+	pub migratable: bool,
 }
 
 /// Extract every `#[event]` struct, regardless of its event-macro arguments.
@@ -132,6 +157,7 @@ pub fn extract_event_declarations(file: &File) -> Result<Vec<EventDeclaration>, 
 			variant,
 			fields: super::account_state::extract_named_fields(&item_struct.fields),
 			docs: super::doc_comments::extract_docs(&item_struct.attrs),
+			migratable: has_migrations_flag(&item_struct.attrs, "event"),
 		});
 	}
 	Ok(events)
