@@ -266,6 +266,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
+					false,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -464,16 +465,23 @@ impl MigrationExpansion {
 		&self,
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
+		visibility: &syn::Visibility,
 	) -> syn::Result<Option<proc_macro2::TokenStream>> {
+		let versioned_view =
+			self.versioned_view_implementation(crate_path, struct_name, visibility);
+
 		if self
 			.history
 			.versions
 			.iter()
 			.any(|version| version.schema.layout != LayoutKind::Fixed)
 		{
-			return self
-				.variable_account_implementation(crate_path, struct_name)
-				.map(Some);
+			let implementation = self.variable_account_implementation(crate_path, struct_name)?;
+
+			return Ok(Some(quote! {
+				#implementation
+				#versioned_view
+			}));
 		}
 
 		let header_size = usize::from(self.discriminator_bytes) + self.version_bytes();
@@ -530,6 +538,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
+					true,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -659,7 +668,156 @@ impl MigrationExpansion {
 					}
 				}
 			}
+
+			#versioned_view
 		}))
+	}
+
+	/// Generate the read-only, version-dispatched view of one account history.
+	///
+	/// Every arm validates exactly one stored representation through the same
+	/// `PinaPod` reader the migration planner uses and borrows it immutably, so
+	/// the view can never migrate, resize, or require a writable account.
+	fn versioned_view_implementation(
+		&self,
+		crate_path: &syn::Path,
+		struct_name: &syn::Ident,
+		visibility: &syn::Visibility,
+	) -> proc_macro2::TokenStream {
+		let versions = &self.history.versions;
+		let current = self.current_version;
+		let version_type = self.version_type_tokens();
+		let enum_name = versioned_enum_name(struct_name);
+		let current_layout = versions
+			.last()
+			.map(|version| version.schema.layout)
+			.expect("validated migration history has a current version");
+		let error = quote!(#crate_path::ProgramError::InvalidAccountData);
+
+		let mut variants = Vec::with_capacity(versions.len());
+		let mut arms = Vec::with_capacity(versions.len());
+		let mut version_arms = Vec::with_capacity(versions.len());
+
+		for version in versions.iter().take(versions.len().saturating_sub(1)) {
+			let number = version.version;
+			let variant = versioned_variant_name(number);
+			let historical = historical_struct_name(struct_name, number);
+			let (view, read) = match version.schema.layout {
+				LayoutKind::Fixed => {
+					let view = format_ident!("{}Zc", historical);
+					(
+						quote!(&'data #view),
+						quote! {
+							<#historical as #crate_path::PinaPodFixed>::read_exact(data)
+								.map_err(|_| #error)?
+						},
+					)
+				}
+				LayoutKind::Compact => {
+					let view = format_ident!("{}Ref", historical);
+					(
+						quote!(#view<'data>),
+						quote! {
+							#view::new(data).map_err(|_| #error)?
+						},
+					)
+				}
+			};
+			let documentation = format!(
+				"Account bytes stored at version {number}. Reading this variant does not migrate \
+				 them."
+			);
+			variants.push(quote! {
+				#[doc = #documentation]
+				#variant(#view),
+			});
+			arms.push(quote! {
+				#number => Ok(#enum_name::#variant(#read)),
+			});
+			version_arms.push(quote! {
+				Self::#variant(_) => #number as #version_type,
+			});
+		}
+
+		let current_view = match current_layout {
+			LayoutKind::Fixed => {
+				let view = format_ident!("{}Zc", struct_name);
+				quote!(&'data #view)
+			}
+			LayoutKind::Compact => {
+				let view = format_ident!("{}Ref", struct_name);
+				quote!(#view<'data>)
+			}
+		};
+		variants.push(quote! {
+			/// Account bytes that already use the current representation.
+			Current(#current_view),
+		});
+		arms.push(quote! {
+			#current => Ok(#enum_name::Current(Self::try_from_bytes(data)?)),
+		});
+		version_arms.push(quote! {
+			Self::Current(_) => <#struct_name as #crate_path::HasMigrationVersion>::CURRENT_VERSION,
+		});
+
+		quote! {
+			/// A read-only view of stored account bytes, dispatched by the version envelope.
+			///
+			/// The view validates one exact generated representation and borrows the bytes
+			/// immutably: it never rewrites, resizes, or clears the account, and it never
+			/// requires a writable borrow.
+			///
+			/// Prefer this only for read-mostly accounts whose one-time writable touch is
+			/// genuinely hard to schedule. A caller that reads historical layouts must
+			/// handle every representation this enum exposes, which is the branching the
+			/// migration system exists to remove; prefer migrating the account whenever a
+			/// writable touch is schedulable.
+			#[allow(dead_code)]
+			#visibility enum #enum_name<'data> {
+				#(#variants)*
+			}
+
+			impl #enum_name<'_> {
+				/// Return the stored version whose representation this view borrows.
+				#[must_use]
+				pub fn version(&self) -> <#struct_name as #crate_path::HasMigrationVersion>::Version {
+					match self {
+						#(#version_arms)*
+					}
+				}
+			}
+
+			impl #struct_name {
+				/// Validate and borrow stored bytes at the version their envelope names.
+				///
+				/// This accessor never mutates, resizes, or requires a writable borrow, so it
+				/// reads a stale account the current transaction cannot write. Unknown
+				/// versions, future versions, foreign discriminators, and malformed
+				/// representations all fail closed.
+				///
+				/// # Errors
+				///
+				/// Returns `InvalidAccountData` when the discriminator is foreign or the bytes
+				/// are not one exact representation of the stored version, and
+				/// `InvalidMigrationVersion` when the stored version is unknown to this program
+				/// or newer than its current schema.
+				pub fn try_from_bytes_versioned(
+					data: &[u8],
+				) -> Result<#enum_name<'_>, #crate_path::ProgramError> {
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+						return Err(#error);
+					}
+					let stored =
+						<Self as #crate_path::HasMigrationVersion>::read_migration_version(data)?;
+					let stored = <<Self as #crate_path::HasMigrationVersion>::Version as #crate_path::MigrationVersion>::into_u32(stored);
+
+					match stored {
+						#(#arms)*
+						_ => Err(#crate_path::PinaProgramError::InvalidMigrationVersion.into()),
+					}
+				}
+			}
+		}
 	}
 
 	/// Generate one adjacent, allocator-free migration step at a time when any
@@ -704,6 +862,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
+					true,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -996,9 +1155,19 @@ fn historical_struct(
 	version: &pina_abi::SchemaVersion,
 	discriminator_bytes: u8,
 	version_bytes: usize,
+	expose_fields: bool,
 ) -> syn::Result<proc_macro2::TokenStream> {
 	let name = historical_struct_name(struct_name, version.version);
 	let discriminator_bytes = usize::from(discriminator_bytes);
+	// Account histories expose their payload fields (and the struct itself,
+	// which compact derives re-export their view through) so the generated
+	// versioned view can read one historical representation. Instruction and
+	// event histories stay private; only their internal migrators use them.
+	let (struct_visibility, field_visibility) = if expose_fields {
+		(quote!(pub), quote!(pub))
+	} else {
+		(quote!(), quote!())
+	};
 	let fields = version
 		.schema
 		.fields
@@ -1011,7 +1180,7 @@ fn historical_struct(
 				)
 			})?;
 			let ty = abi_type_tokens(&field.rust_type, crate_path, struct_name)?;
-			Ok(quote!(#name: #ty))
+			Ok(quote!(#field_visibility #name: #ty))
 		})
 		.collect::<syn::Result<Vec<_>>>()?;
 	let (attribute, proof) = match version.schema.layout {
@@ -1093,9 +1262,10 @@ fn historical_struct(
 
 	Ok(quote! {
 		#[allow(dead_code)]
+		#[doc(hidden)]
 		#[derive(#crate_path::pinapod::PinaPod)]
 		#attribute
-		struct #name {
+		#struct_visibility struct #name {
 			discriminator: [u8; #discriminator_bytes],
 			migration_version: [u8; #version_bytes],
 			#(#fields,)*
@@ -1107,6 +1277,14 @@ fn historical_struct(
 
 fn historical_struct_name(struct_name: &syn::Ident, version: u32) -> syn::Ident {
 	format_ident!("__PinaMigration{}V{}", struct_name, version)
+}
+
+fn versioned_enum_name(struct_name: &syn::Ident) -> syn::Ident {
+	format_ident!("{}Versioned", struct_name)
+}
+
+fn versioned_variant_name(version: u32) -> syn::Ident {
+	format_ident!("V{}", version)
 }
 
 fn abi_type_tokens(

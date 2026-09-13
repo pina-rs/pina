@@ -452,6 +452,221 @@ mod tests {
 	}
 
 	#[test]
+	fn versioned_view_reads_fixed_historical_representations_without_mutating() {
+		let authority = Address::new_from_array([9; 32]);
+
+		// v0: authority + value.
+		let mut historical = [0_u8; 42];
+		historical[0] = MigrationAccount::State as u8;
+		historical[1] = 0;
+		historical[2..34].copy_from_slice(authority.as_ref());
+		historical[34..42].copy_from_slice(&42_u64.to_le_bytes());
+		let snapshot = historical;
+
+		let versioned = State::try_from_bytes_versioned(&historical)
+			.unwrap_or_else(|error| panic!("view state v0: {error:?}"));
+		assert_eq!(versioned.version(), 0);
+		match versioned {
+			StateVersioned::V0(view) => {
+				assert_eq!(view.authority, authority);
+				assert_eq!(view.value.get(), 42);
+			}
+			_ => panic!("expected the state v0 representation"),
+		}
+		assert_eq!(historical, snapshot, "reading a view must not mutate bytes");
+
+		// v1: v0 plus `enabled`.
+		let mut enabled = [0_u8; 43];
+		enabled[..42].copy_from_slice(&historical);
+		enabled[1] = 1;
+		enabled[42] = 1;
+		let versioned = State::try_from_bytes_versioned(&enabled)
+			.unwrap_or_else(|error| panic!("view state v1: {error:?}"));
+		assert_eq!(versioned.version(), 1);
+		match versioned {
+			StateVersioned::V1(view) => {
+				assert_eq!(view.authority, authority);
+				assert_eq!(view.value.get(), 42);
+				assert!(bool::from(view.enabled));
+			}
+			_ => panic!("expected the state v1 representation"),
+		}
+
+		// Current v2: v1 plus `revision`.
+		let mut current = [0_u8; 44];
+		current[..43].copy_from_slice(&enabled);
+		current[1] = 2;
+		current[43] = 7;
+		let versioned = State::try_from_bytes_versioned(&current)
+			.unwrap_or_else(|error| panic!("view state current: {error:?}"));
+		assert_eq!(versioned.version(), 2);
+		match versioned {
+			StateVersioned::Current(view) => {
+				assert_eq!(view.authority, authority);
+				assert_eq!(view.value.get(), 42);
+				assert!(bool::from(view.enabled));
+				assert_eq!(view.revision, 7);
+			}
+			_ => panic!("expected the state current representation"),
+		}
+	}
+
+	#[test]
+	fn versioned_view_reads_a_fixed_history_that_ends_compact() {
+		let v0 = [MigrationAccount::ManualState as u8, 0, 255];
+		let versioned = ManualState::try_from_bytes_versioned(&v0)
+			.unwrap_or_else(|error| panic!("view manual v0: {error:?}"));
+		assert_eq!(versioned.version(), 0);
+		match versioned {
+			ManualStateVersioned::V0(view) => assert_eq!(view.amount, 255),
+			_ => panic!("expected the manual v0 representation"),
+		}
+
+		let v1 = [MigrationAccount::ManualState as u8, 1, 255, 0];
+		let versioned = ManualState::try_from_bytes_versioned(&v1)
+			.unwrap_or_else(|error| panic!("view manual v1: {error:?}"));
+		assert_eq!(versioned.version(), 1);
+		match versioned {
+			ManualStateVersioned::V1(view) => assert_eq!(view.amount.get(), 255),
+			_ => panic!("expected the manual v1 representation"),
+		}
+
+		let current = [MigrationAccount::ManualState as u8, 2, 3, b'2', b'5', b'5'];
+		let versioned = ManualState::try_from_bytes_versioned(&current)
+			.unwrap_or_else(|error| panic!("view manual current: {error:?}"));
+		assert_eq!(versioned.version(), 2);
+		match versioned {
+			ManualStateVersioned::Current(view) => assert_eq!(view.code(), "255"),
+			_ => panic!("expected the manual current representation"),
+		}
+	}
+
+	#[test]
+	fn versioned_view_reads_a_compact_history_with_spare_bytes() {
+		let v0 = [
+			MigrationAccount::CompactState as u8,
+			0,
+			3,
+			b'A',
+			b'd',
+			b'a',
+			0xee,
+		];
+		let snapshot = v0;
+		let versioned = CompactState::try_from_bytes_versioned(&v0)
+			.unwrap_or_else(|error| panic!("view compact v0: {error:?}"));
+		assert_eq!(versioned.version(), 0);
+		match versioned {
+			CompactStateVersioned::V0(view) => assert_eq!(view.name(), "Ada"),
+			_ => panic!("expected the compact v0 representation"),
+		}
+		assert_eq!(v0, snapshot, "reading a view must not mutate bytes");
+
+		// Current v1 header: name length, then the two-byte tags length, then
+		// the name payload.
+		let current = [
+			MigrationAccount::CompactState as u8,
+			1,
+			3,
+			0,
+			0,
+			b'A',
+			b'd',
+			b'a',
+		];
+		let versioned = CompactState::try_from_bytes_versioned(&current)
+			.unwrap_or_else(|error| panic!("view compact current: {error:?}"));
+		assert_eq!(versioned.version(), 1);
+		match versioned {
+			CompactStateVersioned::Current(view) => {
+				assert_eq!(view.name(), "Ada");
+				assert!(view.tags().is_empty());
+			}
+			_ => panic!("expected the compact current representation"),
+		}
+	}
+
+	#[test]
+	fn versioned_view_fails_closed_on_foreign_unknown_future_and_malformed_bytes() {
+		// A foreign discriminator is rejected before the version is read.
+		let mut foreign = [0_u8; 44];
+		foreign[0] = MigrationAccount::ManualState as u8;
+		foreign[1] = 0;
+		assert_eq!(
+			State::try_from_bytes_versioned(&foreign).map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+
+		// Future and unknown versions fail without trial decoding.
+		let mut versioned = [0_u8; 44];
+		versioned[0] = MigrationAccount::State as u8;
+		for rejected in [3, 200] {
+			versioned[1] = rejected;
+			assert_eq!(
+				State::try_from_bytes_versioned(&versioned).map(|_| ()),
+				Err(PinaProgramError::InvalidMigrationVersion.into()),
+			);
+		}
+
+		// A slice too short for the version envelope fails closed.
+		assert_eq!(
+			State::try_from_bytes_versioned(&[MigrationAccount::State as u8]).map(|_| ()),
+			Err(PinaProgramError::DataTooShort.into()),
+		);
+
+		// A stale envelope with a trailing byte is not one exact representation.
+		let mut trailing = [0_u8; 43];
+		trailing[0] = MigrationAccount::State as u8;
+		trailing[1] = 0;
+		assert_eq!(
+			State::try_from_bytes_versioned(&trailing).map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+
+		// A stale envelope with an invalid field value is rejected.
+		let mut invalid_enabled = [0_u8; 43];
+		invalid_enabled[0] = MigrationAccount::State as u8;
+		invalid_enabled[1] = 1;
+		invalid_enabled[42] = 2;
+		assert_eq!(
+			State::try_from_bytes_versioned(&invalid_enabled).map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+
+		// A truncated fixed historical representation is rejected.
+		assert_eq!(
+			ManualState::try_from_bytes_versioned(&[MigrationAccount::ManualState as u8, 1, 255,])
+				.map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+
+		// A forged compact tail length is rejected.
+		assert_eq!(
+			CompactState::try_from_bytes_versioned(&[
+				MigrationAccount::CompactState as u8,
+				0,
+				5,
+				b'A',
+			])
+			.map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+
+		// A malformed current compact representation fails through the same
+		// accessor that serves the `Current` variant.
+		assert_eq!(
+			ManualState::try_from_bytes_versioned(&[
+				MigrationAccount::ManualState as u8,
+				2,
+				5,
+				b'A',
+			])
+			.map(|_| ()),
+			Err(ProgramError::InvalidAccountData),
+		);
+	}
+
+	#[test]
 	fn generic_read_paths_reject_stale_version_envelopes() {
 		// A stale account whose physical size already matches the current
 		// layout (the shape produced by every same-size migration: reorders,

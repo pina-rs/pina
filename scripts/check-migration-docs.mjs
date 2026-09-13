@@ -54,6 +54,10 @@ const CANONICAL_FACTS = [
 		name: "generated client needsMigration helpers",
 		fragments: ["needsMigration", "getMigrateInstruction"],
 	},
+	{
+		name: "read-only versioned account view",
+		fragments: ["try_from_bytes_versioned", "Versioned"],
+	},
 ];
 
 const failures = [];

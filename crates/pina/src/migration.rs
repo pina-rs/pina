@@ -543,6 +543,11 @@ impl<P> AccountMigrationPlan<P> {
 /// infallible so application code cannot catch an error after a partial rewrite
 /// and continue executing. The executor still validates the final bytes before
 /// committing the current version marker.
+///
+/// `#[account(migrations)]` also generates an immutable
+/// `<Account>::try_from_bytes_versioned` accessor that borrows one exact
+/// stored representation without migrating it, for accounts the current
+/// transaction cannot mark writable.
 pub trait MigratableAccount: HasMigrationVersion {
 	/// Owned generated plan data. It must not contain account-data references.
 	type Plan: 'static;
