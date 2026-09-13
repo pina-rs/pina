@@ -18,6 +18,35 @@ pina generate
 
 SBF compilation delegates to the Agave CLI's `cargo-build-sbf`; install the Agave CLI before the first SBF build. It also installs the `pina_lint_driver` binary below Cargo home on first `pina lint` use; the driver statically links Pina's official lint catalog for the active toolchain. TypeScript client generation also requires Node.js with npm and `npx`. Keep the generated `pina.toml` as the project-local discovery and client-selection contract.
 
+## Configuration blocks
+
+```toml
+[project]
+program = "."
+
+[clients]
+output = "clients"
+languages = [
+	"cpi",
+	"rust",
+	"typescript",
+] # also dart, cli-rust, cli-ts, cli-dart
+mode = "auto"
+scaffold = true
+
+[migrations]
+version-type = "u8" # u8, u16, or u32; never u64
+auto = true # optional: true, false, or ["accounts", "events", "instructions"]
+
+[migrations.answers]
+rename = ["value:points"]
+assume-removed = []
+```
+
+- `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli-rust]`, `[clients.cli-ts]`, and `[clients.cli-dart]`.
+- `[migrations]` is only needed when the program opts into migrations. `version-type` is program-wide and freezes at the first persistent publication; `auto` opts whole contract kinds in; `[migrations.answers]` persists rename and removal decisions for CI.
+- A program with a recorded `auto` policy needs a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. `pina migrations make` scaffolds it or prints the exact line, and `pina migrations check` fails until it is present. Commit `migrations/` with the source.
+
 Before deployment, establish the program identity explicitly. Use `pina keys new` for a fresh local identity or validate a keypair produced by trusted platform tooling with `pina keys sync --keypair <path>`. Never use `--force` unless the intended operation is an identity rotation.
 
 Use `pina init --help` before selecting a destination or replacing existing scaffold files. The command preserves existing files unless the user explicitly supplies `--force`; inspect the destination before using that flag.

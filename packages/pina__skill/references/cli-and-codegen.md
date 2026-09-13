@@ -24,6 +24,7 @@ pina doctor --help
 pina completions --help
 pina profile --help
 pina deploy --help
+pina migrations --help
 pina codama generate --help
 ```
 
@@ -56,7 +57,7 @@ The library target name determines the canonical outputs:
 <cargo-target>/idl/<library-name>.json
 ```
 
-`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, or `--client dart` flags. Dart is also the Flutter target. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders.
+`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml` under `[clients] languages`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, `--client dart`, `--client cli-rust`, `--client cli-ts`, or `--client cli-dart` flags. Dart is also the Flutter target. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders. Each CLI application is generated on top of its base client (`cli-rust` requires `rust`, `cli-ts` requires `typescript`, `cli-dart` requires `dart`).
 
 Generation defaults to `mode = "auto"`: it initializes an empty target, then updates only renderer-owned source directories on later runs. Existing manifests and crate/package entrypoints are preserved. Use `mode = "create"` or `mode = "update"` to enforce the expected state, `mode = "overwrite"` for an explicit complete cleanup, and `scaffold = false` for source-only output. These settings may be global under `[clients]` or overridden under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. The CLI equivalents are `--mode` and `--no-scaffold`.
 
@@ -149,6 +150,17 @@ pina codama generate --examples-dir ./programs --idls-dir ./idls \
 Use repeatable `--example` filters for a focused run. Generated roots may be replaced; never store hand-written code inside them.
 
 Pina's generated clients preserve discriminator-first layouts and PinaPod boundary checks. Compact client codecs enforce declared capacity at both encode and decode boundaries. If a repository uses a custom renderer command, keep that command as the source of truth.
+
+## Migration-aware generated clients
+
+Generated code reads the checked-in `migrations/manifest.json`, so run `pina migrations make` before regenerating clients and never hand-edit a generated file. For every opted-in contract the Rust, TypeScript, and Dart clients emit:
+
+- `<Account>MIGRATION_VERSION` (Dart `stateMigrationVersion`) — the schema version this client was generated from. Encoders stamp it into the envelope automatically; callers never pass a version. Decoders enforce it and reject other versions with a stale/future distinction: `getPinaPodMigrationVersionDecoder` in TypeScript, `StateVersionError::{Stale, Future}` in Rust, and the generated Dart equivalent. A stale split tells the caller to migrate the account on chain and retry; a future split tells the caller to upgrade the client.
+- `<account>NeedsMigration(bytes)` (Rust `state_needs_migration`) — a cheap envelope check that returns true only when the bytes name this account's discriminator and carry a version older than the client's schema. Foreign discriminators and future versions return false; the decoder explains those when the account is decoded.
+- `Migrate` — the reserved framework instruction composer (TypeScript and Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted slots are dropped, so a client sends only the accounts that need migrating. Intended flow: check `needsMigration`, send `Migrate`, then retry the original instruction.
+- Event log decoders — `parse<Program>EventsFromLogs(logs)` plus per-event `parse<Event>FromLog` and `normalize<Event>`. A migration-aware event projects historical bytes into the current shape when the manifest proves the adjacent transition is automatic, and reports the `sourceVersion` that actually wrote the log plus whether a projection ran (`wasMigrated`). Manual, unknown, and future versions fail closed with the reason instead of misreading. The Rust event module mirrors this with `try_from_bytes` (stale/future distinction) and `project_from_bytes`, which returns a `Projected<Event>` exposing `source_version()`.
+
+The one-call `migrateIfNeeded` RPC helper is designed in ADR 0008 but not generated; compose the check, `Migrate`, and retry explicitly.
 
 ## Static SBF profiling
 
