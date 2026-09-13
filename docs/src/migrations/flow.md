@@ -192,14 +192,16 @@ A planning figure for that budget: rent exemption costs about **6,960 lamports p
 
 The executor keeps the workspace, realloc-growth, and lamport budgets as separate codes, so each failure names one fix:
 
-| Failure condition                                                                                | Code                             | Remedy                                                                                        |
-| ------------------------------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| The stale account is more than `MAX_INLINE_STEPS` versions behind                                | `MigrationUnavailable`           | Publish smaller, more frequent versions; migrate accounts before they fall further behind.    |
-| The normalization workspace cannot hold the generated transition                                 | `MigrationWorkspaceExceeded`     | Keep the generated workspace at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes).             |
-| One instruction would grow the account by more than `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes) | `MigrationAccountGrowthExceeded` | Publish intermediate versions so the change grows across transactions; no budget raises this. |
-| The rent deficit exceeds the program's `max_lamports` budget                                     | `MigrationLamportBudgetExceeded` | Raise the program's `max_lamports` constant to cover the quoted deficit.                      |
+| Failure condition                                                                                | Code                             | Remedy                                                                                                      |
+| ------------------------------------------------------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| The stale account is more than `MAX_INLINE_STEPS` versions behind                                | `MigrationUnavailable`           | Publish smaller, more frequent versions; migrate accounts before they fall further behind.                  |
+| The normalization workspace cannot hold the generated transition                                 | `MigrationWorkspaceExceeded`     | Keep the generated workspace at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes).                           |
+| One instruction would grow the account by more than `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes) | `MigrationAccountGrowthExceeded` | Publish intermediate versions so each transition migrates in a separate transaction; no budget raises this. |
+| The rent deficit exceeds the program's `max_lamports` budget                                     | `MigrationLamportBudgetExceeded` | Raise the program's `max_lamports` constant to cover the quoted deficit.                                    |
 
-Builds from before the split reported each of the first three budget failures as `MigrationBudgetExceeded` (`0xFFFF_FFF5`); that aggregate code stays reserved so published binaries remain decodable.
+Builds before the split reported the workspace, account-growth, and lamport-budget failures as `MigrationBudgetExceeded` (`0xFFFF_FFF5`); `MigrationUnavailable` was already its own code and was not part of that split. The aggregate code stays reserved so published binaries remain decodable.
+
+The growth check covers the whole supported ladder, not one hop: the executor captures the account size before the first step, so a v0 account walking two individually sub-limit transitions can still cross `MAX_PERMITTED_DATA_INCREASE` in one instruction. `pina migrations make` warns on that cumulative worst case, and publishing an intermediate version only resets the cap when it migrates in its own transaction.
 
 Two consequences follow from the payer model:
 
