@@ -500,6 +500,12 @@ mod tests {
 			assert_eq!(rendered.field, "some_value");
 			assert_eq!(rendered.rust_type, rust_type);
 			assert_eq!(rendered.wire_size, wire_size);
+			// Signed and unsigned formats share the same two's-complement
+			// little-endian write, so the offset placeholders are identical.
+			assert_eq!(
+				rendered.write,
+				"data[{offset}..{offset_end}].copy_from_slice(&self.some_value.to_le_bytes());"
+			);
 		}
 
 		let fixed = codama_nodes::FixedSizeTypeNode::new(BytesTypeNode {}, 12);
