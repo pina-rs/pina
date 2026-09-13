@@ -43,7 +43,7 @@ pub(crate) fn expand(
 	};
 
 	// Extract configuration
-	let struct_name = &item_struct.ident;
+	let struct_name = item_struct.ident.clone();
 	let zc_name = format_ident!("{}Zc", struct_name);
 
 	let InstructionArgs {
@@ -58,7 +58,7 @@ pub(crate) fn expand(
 		return validation::feature_error(&item_struct);
 	}
 	let (discriminator, variant) =
-		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
+		match resolve_discriminator_variant(&discriminator, variant, &struct_name) {
 			Ok(v) => v,
 			Err(e) => return e.to_compile_error(),
 		};
@@ -86,6 +86,10 @@ pub(crate) fn expand(
 	};
 
 	let derives = [syn::parse_quote!(#crate_path::pinapod::PinaPod)];
+
+	// Float fields must become pod fields before the `PinaPod` derive expands
+	// over the emitted struct.
+	schema::rewrite_float_fields(&mut item_struct, &crate_path);
 
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();
@@ -127,11 +131,11 @@ pub(crate) fn expand(
 	let value_validation_impl = quote! {};
 
 	let migration_impl = migration.as_ref().map(|migration| {
-		migration.implementation(&crate_path, struct_name, &discriminator, &variant)
+		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
 	});
 	let instruction_migration_impl = match migration.as_ref() {
 		Some(migration) => {
-			match migration.instruction_implementation(&crate_path, struct_name) {
+			match migration.instruction_implementation(&crate_path, &struct_name) {
 				Ok(value) => Some(value),
 				Err(error) => return error.to_compile_error(),
 			}

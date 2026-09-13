@@ -426,6 +426,11 @@ jobs:
             test_task: test:pina:compact-only
             doc_task: doc:pina:compact-only
             pr_run: true
+          - label: floats-only
+            build_task: build:pina:floats-only
+            test_task: test:pina:floats-only
+            doc_task: ""
+            pr_run: true
           - label: account-resize-only
             build_task: build:pina:account-resize-only
             test_task: test:pina:account-resize-only

@@ -63,6 +63,14 @@ mod utils;
 #[cfg(kani)]
 mod verification;
 
+/// Re-export of the pinned [`fixed`] crate behind the `floats` feature.
+///
+/// Fixed-point schema fields must use this exact crate instance: `pinapod`
+/// pins `fixed =1.30.0`, and a `ZcField` implementation for a different
+/// `fixed` build does not exist. Deriving schemas over `pina::fixed` types
+/// removes the version-mismatch failure mode entirely.
+#[cfg(feature = "floats")]
+pub use fixed;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
@@ -74,6 +82,13 @@ pub use pina_macros::*;
 /// manual trait implementations are outside that contract and must uphold
 /// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
+/// Alignment-one float storage for `f32` and `f64` schema fields.
+#[cfg(feature = "floats")]
+mod floats;
+#[cfg(feature = "floats")]
+pub use floats::PodF32;
+#[cfg(feature = "floats")]
+pub use floats::PodF64;
 /// Derives a validated zero-copy companion for a native schema.
 pub use pinapod::PinaPod;
 /// Zero-copy access for compact (variable-length) types.

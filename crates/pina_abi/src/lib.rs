@@ -2300,8 +2300,8 @@ fn fixed_type_size_at_depth(ty: &str, depth: usize) -> Option<usize> {
 	match ty.trim() {
 		"u8" | "i8" | "bool" | "PodBool" => Some(1),
 		"u16" | "i16" | "PodU16" | "PodI16" => Some(2),
-		"u32" | "i32" | "PodU32" | "PodI32" => Some(4),
-		"u64" | "i64" | "PodU64" | "PodI64" => Some(8),
+		"u32" | "i32" | "PodU32" | "PodI32" | "f32" => Some(4),
+		"u64" | "i64" | "PodU64" | "PodI64" | "f64" => Some(8),
 		"u128" | "i128" | "PodU128" | "PodI128" => Some(16),
 		"Address" => Some(32),
 		other => {
@@ -2359,9 +2359,28 @@ fn fixed_type_size_at_depth(ty: &str, depth: usize) -> Option<usize> {
 						.checked_mul(capacity)?
 						.checked_add(prefix)
 				}
-				_ => None,
+				name => {
+					match fixed_point_storage_size(name) {
+						// The single generic argument is the fractional-bits
+						// parameter; storage depends only on the backing width.
+						Some(size) if arguments.len() == 1 => Some(size),
+						_ => None,
+					}
+				}
 			}
 		}
+	}
+}
+
+/// Storage size of a `fixed` crate schema type by its backing integer width.
+fn fixed_point_storage_size(name: &str) -> Option<usize> {
+	match name {
+		"FixedI8" | "FixedU8" => Some(1),
+		"FixedI16" | "FixedU16" => Some(2),
+		"FixedI32" | "FixedU32" => Some(4),
+		"FixedI64" | "FixedU64" => Some(8),
+		"FixedI128" | "FixedU128" => Some(16),
+		_ => None,
 	}
 }
 
@@ -3661,5 +3680,39 @@ mod tests {
 		);
 		assert_eq!(fixed_type_size("u64"), Some(8));
 		assert_eq!(fixed_type_size("Option<u64>"), Some(9));
+	}
+
+	#[test]
+	fn float_types_size_by_backing_width() {
+		assert_eq!(fixed_type_size("f32"), Some(4));
+		assert_eq!(fixed_type_size("f64"), Some(8));
+		assert_eq!(fixed_type_size("Vec<f32, 4>"), Some(18));
+		assert_eq!(fixed_type_size("Option<f64>"), Some(9));
+	}
+
+	#[test]
+	fn fixed_point_types_size_by_backing_width() {
+		assert_eq!(fixed_type_size("FixedI8<U1>"), Some(1));
+		assert_eq!(fixed_type_size("FixedU8<U7>"), Some(1));
+		assert_eq!(fixed_type_size("FixedI16<U9>"), Some(2));
+		assert_eq!(fixed_type_size("FixedU16<U2>"), Some(2));
+		assert_eq!(fixed_type_size("FixedI32<U24>"), Some(4));
+		assert_eq!(fixed_type_size("FixedU32<U1>"), Some(4));
+		assert_eq!(fixed_type_size("FixedI64<U48>"), Some(8));
+		assert_eq!(fixed_type_size("FixedU64<U16>"), Some(8));
+		assert_eq!(fixed_type_size("FixedI128<U96>"), Some(16));
+		assert_eq!(fixed_type_size("FixedU128<U127>"), Some(16));
+
+		// Fixed-point values compose with the bounded collections.
+		assert_eq!(fixed_type_size("Option<FixedU64<U16>>"), Some(9));
+		assert_eq!(fixed_type_size("Vec<FixedU64<U16>, 4>"), Some(34));
+	}
+
+	#[test]
+	fn fixed_point_types_reject_invalid_arity() {
+		assert_eq!(fixed_type_size("FixedU64"), None);
+		assert_eq!(fixed_type_size("FixedU64<U16, U32>"), None);
+		assert_eq!(fixed_type_size("FixedU256<U16>"), None);
+		assert_eq!(fixed_type_size("Vec<FixedU64<U16>, 4, 2>"), None);
 	}
 }

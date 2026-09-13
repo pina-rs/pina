@@ -25,6 +25,7 @@
   - [Automation and Agent Usage](./cli/automation.md)
 - [Agent Skill](./agent-skill.md)
 - [Core Concepts](./core-concepts.md)
+- [Float and Fixed-Point Fields](./floats.md)
 - [Declarative Validation](./validation.md)
 - [How ABI Migrations Flow](./migrations/flow.md)
 - [Migrate to automatic migrations](./migrations/automatic-migrations.md)
