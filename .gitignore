@@ -96,3 +96,7 @@ crates/pina_fuzz/target/
 
 # Dart/Flutter transient build state
 .dart_tool/
+
+# Local agent scratch state and nested worktrees
+.video_agent/
+/worktrees/
