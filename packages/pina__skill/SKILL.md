@@ -1,6 +1,6 @@
 ---
 name: pina
-description: Create, audit, and maintain no_std Solana programs built with Pina and pinocchio. Use for Pina project setup, program identity, account and instruction authoring, PDA validation, diagnostics, IDL or client generation, SBF profiling, tests, and project upgrades.
+description: Create, audit, and maintain no_std Solana programs built with Pina and pinocchio. Use for Pina project setup, program identity, account and instruction authoring, PDA validation, schema migrations and wire-format compatibility, diagnostics, IDL or client generation, SBF profiling, tests, and project upgrades.
 ---
 
 # Pina
@@ -27,7 +27,9 @@ When no project exists, read [references/project-setup.md](references/project-se
 - Construct account-management operations and generated CPIs as documented instruction structs, then call `.invoke()` or `.invoke_signed(signers)`. Do not recreate the removed free-function helper API.
 - Keep instruction dispatch deterministic: parse once, match explicitly, then construct and validate the accounts type for that instruction.
 - Maintain discriminator-first layouts expected by Pina and PinaPod. Use bounded `String<N>` and `Vec<T, N>` schema types, not heap-backed standard-library collections. Use `#[account(compact)]` only for Pina's documented compact grammar.
-- Preserve error values and wire formats unless the user explicitly accepts a compatibility change.
+- Preserve error values and wire formats unless the user explicitly accepts a compatibility change. Published migration history is immutable: never edit a released schema, transition file, or recorded hash, and fix a defect with a new version.
+- After changing a migration-aware account, instruction payload, or event, run `pina migrations make` and resolve every generated `TODO(pina-manual-migration)` transition before building. An unfinished transition or a drifted schema blocks the build.
+- Never strip a version envelope the manifest records (including via `migrations = false` on a recorded contract) and never hand-edit `migrations/manifest.json`, `migrations/publications.json`, or generated transition files. Regenerate clients after `make` so the manifest and the generated clients stay in sync.
 
 Read [references/program-authoring.md](references/program-authoring.md) before changing macros, account layouts, validation chains, PDAs, CPIs, or close/reallocation logic.
 
@@ -43,6 +45,7 @@ Read [references/program-authoring.md](references/program-authoring.md) before c
 
 - Project creation, dependency features, entrypoint wiring, or workspace layout: read [references/project-setup.md](references/project-setup.md).
 - Accounts, instructions, discriminators, PDAs, declarative `#[pina(validate(...))]` rules, manual validation, CPI, resize, or close behavior: read [references/program-authoring.md](references/program-authoring.md).
+- Version envelopes, `[migrations].auto`, `pina migrations` make/check/status workflows, publication state, budget failures, or legacy adoption: read [references/migrations.md](references/migrations.md).
 - CLI discovery, project diagnostics, program keys, IDL extraction, Codama client generation, terminal docs, completions, or profiling: read [references/cli-and-codegen.md](references/cli-and-codegen.md).
 - Unit, Mollusk, SBF, generated-artifact, or release checks: read [references/testing.md](references/testing.md).
 

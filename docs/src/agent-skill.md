@@ -29,16 +29,17 @@ The skill is intentionally specific to Pina. Its entrypoint establishes the prog
 - treat generated IDLs and clients as reviewed public contracts;
 - verify changes at the smallest meaningful layer before running the full project suite.
 
-Detailed guidance is split into focused references for setup, program authoring, CLI and code generation, and testing. Agents load only the reference needed for the current task.
+Detailed guidance is split into focused references for setup, program authoring, migrations, CLI and code generation, and testing. Agents load only the reference needed for the current task.
 
 ## Package layout
 
-| Path                              | Purpose                                           |
-| --------------------------------- | ------------------------------------------------- |
-| `SKILL.md`                        | Runtime entrypoint and task routing               |
-| `agents/openai.yaml`              | Display metadata and invocation policy            |
-| `references/project-setup.md`     | Scaffolding, boundaries, features, and entrypoint |
-| `references/program-authoring.md` | Macros, validation, PDAs, CPI, resize, and close  |
-| `references/cli-and-codegen.md`   | CLI discovery, IDLs, clients, and profiling       |
-| `references/testing.md`           | Unit, VM, SBF, generated, and release checks      |
-| `bin/pina-skill.cjs`              | Non-destructive installer and path discovery      |
+| Path                              | Purpose                                                |
+| --------------------------------- | ------------------------------------------------------ |
+| `SKILL.md`                        | Runtime entrypoint and task routing                    |
+| `agents/openai.yaml`              | Display metadata and invocation policy                 |
+| `references/project-setup.md`     | Scaffolding, boundaries, features, and entrypoint      |
+| `references/program-authoring.md` | Macros, validation, PDAs, CPI, resize, and close       |
+| `references/migrations.md`        | Version envelopes, the migration loop, and publication |
+| `references/cli-and-codegen.md`   | CLI discovery, IDLs, clients, and profiling            |
+| `references/testing.md`           | Unit, VM, SBF, generated, and release checks           |
+| `bin/pina-skill.cjs`              | Non-destructive installer and path discovery           |
