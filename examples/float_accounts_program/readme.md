@@ -20,6 +20,8 @@ Pina parity port of Anchor's float account-data patterns.
 - Authority checks and update rules are explicit in `apply_update`.
 - Account creation uses the explicit `CreateAccount` CPI builder plus type validation calls.
 
+This example intentionally stays on raw `u32`/`u64` bit-pattern fields to mirror Anchor. New programs should prefer the `floats` feature, which accepts native `f32`/`f64` (and fixed-point `FixedI*`/`FixedU*`) schema fields and converts under the hood; see the book's [Float and Fixed-Point Fields](../../docs/src/floats.md) page.
+
 ## Run
 
 <br>

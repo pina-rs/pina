@@ -316,6 +316,14 @@ in
       description = "Verify `pina` builds with only the `compact` feature enabled.";
       binary = "bash";
     };
+    "build:pina:floats-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo check -p pina --no-default-features --features floats --locked
+      '';
+      description = "Verify `pina` builds with only the `floats` feature enabled.";
+      binary = "bash";
+    };
     "build:pina:account-resize-only" = {
       exec = ''
         set -euo pipefail
@@ -338,6 +346,7 @@ in
         build:pina:no-default-only
         cargo check -p pina --no-default-features --features derive --locked
         build:pina:compact-only
+        build:pina:floats-only
         build:pina:account-resize-only
         build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
@@ -351,6 +360,7 @@ in
         build:pina:default
         build:pina:no-default-only
         build:pina:compact-only
+        build:pina:floats-only
         build:pina:account-resize-only
         build:pina:token-only
         build:pina:all-features
@@ -554,6 +564,14 @@ in
       description = "Run compact schema and loader tests without unrelated optional features.";
       binary = "bash";
     };
+    "test:pina:floats-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo test -p pina --no-default-features --features floats --lib --test floats --locked
+      '';
+      description = "Run float and fixed-point schema tests without unrelated optional features.";
+      binary = "bash";
+    };
     "test:pina:account-resize-only" = {
       exec = ''
         set -euo pipefail
@@ -595,6 +613,7 @@ in
         doc:pina:no-default
         test:pina:compact-only
         doc:pina:compact-only
+        test:pina:floats-only
         test:pina:account-resize-only
         test:pina:token-only
         test:pina:all-features

@@ -34,8 +34,11 @@ pub fn try_rust_type_to_codama_with_pinapod_enums(
 	match ty {
 		"u8" => Ok(NumberTypeNode::le(NumberFormat::U8).into()),
 		"u16" | "PodU16" => Ok(NumberTypeNode::le(NumberFormat::U16).into()),
-		"u32" | "PodU32" => Ok(NumberTypeNode::le(NumberFormat::U32).into()),
-		"u64" | "PodU64" => Ok(NumberTypeNode::le(NumberFormat::U64).into()),
+		// Float fields are stored as the complete bit pattern of their backing
+		// little-endian integer, so generated clients read and write plain
+		// integers and convert to floats themselves.
+		"u32" | "PodU32" | "f32" => Ok(NumberTypeNode::le(NumberFormat::U32).into()),
+		"u64" | "PodU64" | "f64" => Ok(NumberTypeNode::le(NumberFormat::U64).into()),
 		"u128" | "PodU128" => Ok(NumberTypeNode::le(NumberFormat::U128).into()),
 		"i8" => Ok(NumberTypeNode::le(NumberFormat::I8).into()),
 		"i16" | "PodI16" => Ok(NumberTypeNode::le(NumberFormat::I16).into()),
@@ -47,6 +50,12 @@ pub fn try_rust_type_to_codama_with_pinapod_enums(
 		_ => {
 			if pinapod_enums.iter().any(|item| item.name == ty) {
 				return Ok(DefinedTypeLinkNode::new(ty).into());
+			}
+			// Fixed-point schema types store the bit pattern of their backing
+			// little-endian integer.
+			if let Some(mapped) = fixed_point_number_format(ty) {
+				let format = mapped?;
+				return Ok(NumberTypeNode::le(format).into());
 			}
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
@@ -612,7 +621,9 @@ fn is_known_fixed_size_type(ty: &str, pinapod_enums: &[PinaPodEnumIr]) -> bool {
 			| "PodBool"
 			| "bool" | "Address"
 			| "Pubkey"
-	) || pinapod_enums.iter().any(|item| item.name == ty)
+			| "f32" | "f64"
+	) || fixed_point_number_format(ty).is_some_and(|mapped| mapped.is_ok())
+		|| pinapod_enums.iter().any(|item| item.name == ty)
 		|| parse_byte_array(ty).is_some()
 		|| ty.starts_with("String<")
 		|| ty.starts_with("Vec<")
@@ -714,6 +725,37 @@ fn parse_byte_array(ty: &str) -> Option<usize> {
 	size.trim().parse().ok()
 }
 
+/// Map a `fixed` crate schema type to its backing little-endian number format.
+///
+/// Fixed-point values are stored as the complete bit pattern of the backing
+/// integer, so generated clients read and write a plain little-endian number.
+/// `None` means the type is not a `FixedI*`/`FixedU*` spelling; `Some(Err)`
+/// reports a malformed fractional-bits parameter list.
+fn fixed_point_number_format(ty: &str) -> Option<Result<NumberFormat, String>> {
+	let (name, args) = parse_generic_args(ty)?;
+	let format = match name.as_str() {
+		"FixedI8" => NumberFormat::I8,
+		"FixedI16" => NumberFormat::I16,
+		"FixedI32" => NumberFormat::I32,
+		"FixedI64" => NumberFormat::I64,
+		"FixedI128" => NumberFormat::I128,
+		"FixedU8" => NumberFormat::U8,
+		"FixedU16" => NumberFormat::U16,
+		"FixedU32" => NumberFormat::U32,
+		"FixedU64" => NumberFormat::U64,
+		"FixedU128" => NumberFormat::U128,
+		_ => return None,
+	};
+
+	if args.len() != 1 {
+		return Some(Err(format!(
+			"`{ty}` requires exactly one fractional-bits parameter, for example `{name}<U16>`"
+		)));
+	}
+
+	Some(Ok(format))
+}
+
 /// Extract the simple type name from a `syn::Type`. Handles paths like
 /// `PodU64`, `Address`, `u8`, and arrays like `[u8; 32]`.
 pub fn type_to_string(ty: &syn::Type) -> String {
@@ -742,6 +784,77 @@ mod tests {
 	#[test]
 	fn maps_primitives() {
 		assert_eq!(mapped("u8"), NumberTypeNode::le(NumberFormat::U8).into());
+	}
+
+	#[test]
+	fn maps_float_types_to_backing_bit_pattern_integers() {
+		assert_eq!(mapped("f32"), NumberTypeNode::le(NumberFormat::U32).into());
+		assert_eq!(mapped("f64"), NumberTypeNode::le(NumberFormat::U64).into());
+		assert!(is_known_fixed_size_type("f32", &[]));
+		assert!(is_known_fixed_size_type("f64", &[]));
+
+		// Floats compose with the bounded collections.
+		assert!(is_known_fixed_size_type("Vec<f32, 4>", &[]));
+	}
+
+	#[test]
+	fn maps_fixed_point_types_to_backing_numbers() {
+		let cases = [
+			("FixedI8<U1>", NumberFormat::I8),
+			("FixedI16<U9>", NumberFormat::I16),
+			("FixedI32<U24>", NumberFormat::I32),
+			("FixedI64<U32>", NumberFormat::I64),
+			("FixedI128<U96>", NumberFormat::I128),
+			("FixedU8<U4>", NumberFormat::U8),
+			("FixedU16<U8>", NumberFormat::U16),
+			("FixedU32<U16>", NumberFormat::U32),
+			("FixedU64<U16>", NumberFormat::U64),
+			("FixedU128<U127>", NumberFormat::U128),
+		];
+
+		for (ty, format) in cases {
+			assert_eq!(
+				mapped(ty),
+				NumberTypeNode::le(format).into(),
+				"unexpected node for `{ty}`"
+			);
+		}
+	}
+
+	#[test]
+	fn fixed_point_elements_are_known_fixed_size() {
+		assert!(is_known_fixed_size_type("FixedU64<U16>", &[]));
+		assert!(is_known_fixed_size_type("FixedI8<U1>", &[]));
+
+		let vector = mapped("Vec<FixedU64<U16>, 4>");
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(
+			ArrayTypeNode::prefixed(
+				NumberTypeNode::le(NumberFormat::U64),
+				NumberTypeNode::le(NumberFormat::U16),
+			),
+			34,
+		)
+		.into();
+		assert_eq!(vector, expected);
+
+		let option = mapped("Option<FixedI32<U24>>");
+		let expected: TypeNode = OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(NumberFormat::I32).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U8).into(),
+		}
+		.into();
+		assert_eq!(option, expected);
+	}
+
+	#[test]
+	fn rejects_malformed_fixed_point_parameter_lists() {
+		let error = try_rust_type_to_codama("FixedU64<U16, U32>")
+			.expect_err("two fractional-bits parameters must be rejected");
+		assert!(error.contains("requires exactly one fractional-bits parameter"));
+
+		assert!(!is_known_fixed_size_type("FixedU64<U16, U32>", &[]));
+		assert!(!is_known_fixed_size_type("FixedU64", &[]));
 	}
 
 	#[test]

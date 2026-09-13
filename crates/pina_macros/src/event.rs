@@ -84,6 +84,10 @@ pub(crate) fn expand(
 
 	let derives = [syn::parse_quote!(#crate_path::pinapod::PinaPod)];
 
+	// Float fields must become pod fields before the `PinaPod` derive expands
+	// over the emitted struct.
+	schema::rewrite_float_fields(&mut item_struct, &crate_path);
+
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();
 	}

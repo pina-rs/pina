@@ -214,6 +214,9 @@ codama-nodes = { default-features = false, version = "0.13.1" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
+# Exact pin shared with `pinapod`. Fixed-point bit layouts are the schema
+# contract, so mixed `fixed` versions can never be allowed to coexist.
+fixed = { default-features = false, version = "=1.30.0" }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
