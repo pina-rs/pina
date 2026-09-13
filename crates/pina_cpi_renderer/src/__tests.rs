@@ -13,6 +13,8 @@ use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantValueNode;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::Docs;
+use codama_nodes::I16;
+use codama_nodes::I64;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionNode;
@@ -736,6 +738,32 @@ fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 		)],
 	);
 	assert!(render_program_to_files(&RootNode::new(rejected)).is_err());
+}
+
+#[test]
+fn renders_signed_integer_arguments() {
+	let program = program_node(
+		"signed",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"adjust",
+			numeric_discriminator(11),
+			vec![],
+			vec![
+				InstructionArgumentNode::new("delta", NumberTypeNode::le(I64)),
+				InstructionArgumentNode::new("step", NumberTypeNode::le(I16)),
+			],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("signed integers should render: {error}"));
+
+	assert!(page.contains("pub delta: i64,"));
+	assert!(page.contains("pub step: i16,"));
+	assert!(page.contains("self.delta.to_le_bytes()"));
+	assert!(page.contains("self.step.to_le_bytes()"));
+	// One discriminator byte plus both signed arguments.
+	assert!(page.contains("[0u8; 11]"));
 }
 
 #[test]
