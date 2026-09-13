@@ -4,6 +4,138 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.17.0](https://github.com/pina-rs/pina/releases/tag/v0.17.0) (2026-09-13)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Add an auto opt-in to the migrations config
+
+_Packages:_ _pina_abi_, _pina_cli_
+
+`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.
+
+The recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.
+
+Macros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.
+
+The `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)
+
+#### Generated Event Log Decoders
+
+_Packages:_ _pina_cli_, _pina_codama_renderer_
+
+Generated TypeScript, Dart, and Rust clients now carry the event read path. The Codama IDL renders each event's `[discriminator][migrationVersion][payload]` envelope, so generated decoders align with `Program data:` log records and enforce the current schema version with direction-aware errors.
+
+- TypeScript emits a per-program `events/logs.ts` entry point that decodes `Program data:` lines, projects historical bytes into the current shape when the checked-in migration manifest proves the transition is automatic, and reports `sourceVersion` plus `wasMigrated`.
+- Dart emits `events/` modules with the same decode, projection, and log parsing API; the upstream Dart renderer does not render event nodes.
+- The Rust client renders `events/` modules with strict decoding, a `try_from_bytes` that distinguishes stale from future versions, and a `project_from_bytes` that returns current bytes with their source version.
+- Manual transitions remain the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition.
+
+##### Breaking changes
+
+- `pina_cli`: the parsed event declaration gained the public `migratable` field, so `EventDeclaration` struct literals must set it, and `CodamaError` gained the `EventHistories` variant, so exhaustive matches must handle it.
+- `pina_codama_renderer`: `RenderConfig` gained the public `event_histories` field, so struct literals built without `..RenderConfig::default()` must set it.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #386](https://github.com/pina-rs/pina/pull/386) · _Closed issues:_ [#355](https://github.com/pina-rs/pina/issues/355)
+
+### Features
+
+#### Add the `floats` feature for float and fixed-point fields
+
+_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_
+
+The new `floats` feature on `pina` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields and fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Float fields convert to and from their bit pattern under the hood through the new `pina::PodF32`/`pina::PodF64` alignment-one pods, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods, mirroring pinapod's `fixed` feature that Pina now forwards; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.
+
+Every fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support; `pina_abi` sizes the new types for migration layout planning, and the macros rewrite float primitives to their pods before the `PinaPod` derive expands, since `ZcField` cannot be implemented for the foreign float primitives. The measured build cost is two extra `no_std` crates (`fixed`, `typenum`) compiled once, with the `pina` rlib byte-identical for programs that do not use the feature.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)
+
+#### Add an auto opt-in to the migrations config
+
+_Packages:_ _pina_, _pina_macros_
+
+`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.
+
+The recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.
+
+Macros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.
+
+The `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)
+
+#### Add a read-only versioned account view
+
+_Packages:_ _pina_, _pina_macros_
+
+Generated migratable accounts now expose `<Account>::try_from_bytes_versioned(bytes)`, which validates the exact stored representation named by the version envelope and borrows it immutably through the generated `<Account>Versioned` enum (one variant per historical version plus `Current`). The accessor never rewrites, resizes, clears, or requires a writable borrow, and it fails closed for foreign discriminators, unknown or future versions, malformed representations, and bytes that end inside the version envelope (`DataTooShort`). Historical account representations and their payload fields inherit the account's own visibility, so a private or `pub(crate)` account does not widen its API through the generated view; instruction and event histories stay private. This is the read path for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; callers must handle every stored representation explicitly, so migration remains the recommended fix whenever a writable touch is schedulable.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #385](https://github.com/pina-rs/pina/pull/385) · _Closed issues:_ [#364](https://github.com/pina-rs/pina/issues/364) · _Related issues:_ [#338](https://github.com/pina-rs/pina/issues/338)
+
+#### Preview Migration Costs in `pina migrations status`
+
+_Packages:_ _pina_cli_
+
+`pina migrations status` now prints a pre-deploy cost preview derived from the checked-in history and `pina profile`'s static SBF estimates. Per account contract it reports the current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the shared 6,960-lamports-per-grown-byte convention. Per instruction process it names the worst-case adjacent-step ladder a stale account can trigger, with the step count and a static CU estimate; the ladder model and CU model are printed so the numbers stay interpretable, and anything that cannot be estimated reports an explicit reason instead of a zero. The program-wide summary sizes both budgets deliberately and independently: it names the touching transaction funding the most rent (for `max_lamports`) and the one running the longest worst-case ladder (for `MAX_INLINE_STEPS`), because they need not be the same instruction, and quotes the same `max_lamports` remedy text as the `make` growth warning. A `writable`, non-signer process slot that names no checked-in account contract produces an explicit note instead of silently costing nothing.
+
+`pina migrations status --json` gained a `costPreview` object and now emits `{ "statuses": [...], "costPreview": {...} }`; each `MigrationStatus` field keeps its previous name and shape. `pina migrations check --json` still emits the status array unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #399](https://github.com/pina-rs/pina/pull/399) · _Closed issues:_ [#341](https://github.com/pina-rs/pina/issues/341)
+
+#### Document the migration cost preview in the bundled skill
+
+_Packages:_ _pina_skill_
+
+`references/migrations.md` now covers the `pina migrations status` cost preview: per-contract current size, day-one growth, and rent deficit at the shared 6,960-lamports-per-byte convention; per-instruction worst-case ladders bounded by `MAX_INLINE_STEPS` (8); and the program-wide summary that names the transaction funding the most rent and, independently, the one carrying the longest ladder. It records that the static CU figure sums `pina profile` estimates, excludes executor and runtime effects, prints `CU unavailable: <reason>` instead of a zero, and that only writable non-signer instruction slots join against account contracts, with unlinked slots producing an explicit note.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #402](https://github.com/pina-rs/pina/pull/402) · _Related issues:_ [#399](https://github.com/pina-rs/pina/issues/399)
+
+#### Add migration workflow guidance to the bundled skill
+
+_Packages:_ _pina_skill_
+
+The skill now ships `references/migrations.md`, an end-to-end operational checklist for the opt-in versioned ABI: the `[discriminator][schema version][payload]` envelope, per-contract and `[migrations].auto` opt-in, the `pina migrations make`/`check`/`status` loop, the checked-in manifest as macro policy source, automatic versus manual transitions, runtime migration and event provenance, read-only account handling, budget failures, and the legacy-adoption limit.
+
+`SKILL.md` routes migration work to the new reference and adds the invariants that keep it safe: run `make` after a schema change, never strip a recorded envelope, keep the manifest and generated clients in sync, and preserve published wire formats. The CLI reference documents the `cli-rust`, `cli-ts`, and `cli-dart` client ecosystems and the migration-aware generated code, and the project-setup reference documents the `[migrations]`, `[clients]`, and `build.rs` requirements.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #397](https://github.com/pina-rs/pina/pull/397)
+
+### Fixes
+
+- **pina**: **Upgrade pinapod to 0.3.2.** Bump the workspace `pinapod` dependency from 0.3.1 to 0.3.2 and refresh the pina_fuzz lock files. No pina source changes are required: pina re-exports and type-mentions the pinapod API, and 0.3.2 changes no public API. The release cuts generated compact validation to bounded plain arithmetic — vector element validation strides the payload once through the audited `from_raw_parts` slice pattern instead of re-deriving every element offset, one- and two-byte prefix tail ends and byte lengths use plain adds/multiplies licensed by a compile-time division-form capacity assertion, and one- and two-byte optional tail prefixes are read with a single bounds compare plus a constant-width decode. Four- and eight-byte prefixes keep the checked arithmetic, so lengths that saturate or exceed `usize` on 32-bit targets can never wrap a plain sum before the bounds check. Fixed-layout `validate_exact` takes a single length compare on the happy path. Measured on-chain: compact `validate` with dense non-trivial elements drops 5 compute units and every other measured instruction is unchanged; wire format, validation order, error variants, and error precedence are unchanged. One compile-time edge: schemas declaring a one- or two-byte-prefix vector whose `max * size_of::<T>()` exceeds `isize::MAX` now fail to compile instead of always failing validation at runtime. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #400](https://github.com/pina-rs/pina/pull/400)
+
+#### Name migration budget failures by their remedy
+
+_Packages:_ _pina_, _pina_cli_
+
+On-chain migration budget failures are now separately diagnosable. `MigrationWorkspaceExceeded` (`0xFFFF_FFF4`), `MigrationAccountGrowthExceeded` (`0xFFFF_FFF3`), and `MigrationLamportBudgetExceeded` (`0xFFFF_FFF2`) replace the single `MigrationBudgetExceeded` for the executor's workspace, realloc-growth, and rent-budget checks, and each variant's rustdoc names the constant that fixes the failure. `MigrationUnavailable` documents that its remedy is rebalancing a ladder that exceeds the account's generated `MAX_INLINE_STEPS`, and the legacy aggregate code stays at `0xFFFF_FFF5` so program binaries compiled before the split remain decodable. `pina migrations make` now quotes the shared `max_lamports` remedy in its growth warning, names the on-chain error it prevents, and warns separately when the cumulative worst-case growth a supported stale account walks across its inline ladder — not only one adjacent transition — exceeds the runtime's 10,240-byte per-instruction realloc cap.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #390](https://github.com/pina-rs/pina/pull/390) · _Closed issues:_ [#367](https://github.com/pina-rs/pina/issues/367) · _Related issues:_ [#341](https://github.com/pina-rs/pina/issues/341)
+
+#### Render signed integer instruction arguments
+
+_Packages:_ _pina_cpi_renderer_
+
+The CPI renderer rejected `i8`, `i16`, `i32`, `i64`, and `i128` instruction arguments with `unsupported argument format`, so a program whose instruction carried a signed value (a timestamp, delta, or offset) could not generate a CPI client at all, even though Pina maps those fields to `PodI8`-`PodI128` and the Dart renderer already rendered them.
+
+Signed formats now render as their native Rust types and share the two's-complement little-endian write used by the unsigned formats, so a negative value encodes to the bytes the program decodes. Floating point and `shortU16` arguments remain unsupported, and that rejection now names the supported formats. The Anchor fixture used by the CLI compile test carries an `i64` argument so the converter, renderer, and generated crate stay covered end to end.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #393](https://github.com/pina-rs/pina/pull/393)
+
+### Notes
+
+#### Clarify the supported migration version widths
+
+_Packages:_ _pina_cli_
+
+The migration version envelope accepts `u8`, `u16`, and `u32` only. Documentation now separates that setting from discriminator width, which does support `u64`, and a configuration test pins the rejection of `version-type = "u64"` with an error naming the supported widths.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #389](https://github.com/pina-rs/pina/pull/389) · _Closed issues:_ [#353](https://github.com/pina-rs/pina/issues/353)
+
 ## [0.16.0](https://github.com/pina-rs/pina/releases/tag/v0.16.0) (2026-09-12)
 
 Grouped release for `core`.

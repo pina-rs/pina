@@ -1,0 +1,1870 @@
+{
+	"schema_version": "0.6",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-13T20:09:50Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.17.0",
+		"pina_root": "0.0.7"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.17.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.17.0",
+			"members": [
+				"pina",
+				"pina_abi",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.7",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.7",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_abi",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_abi/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_abi",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.17.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/cpi-signed-integer-arguments.md",
+		".changeset/event-log-decoders.md",
+		".changeset/float-and-fixed-point-schema-fields.md",
+		".changeset/migration-cost-preview.md",
+		".changeset/migration-version-widths.md",
+		".changeset/migrations-auto-opt-in.md",
+		".changeset/pinapod-0.3.2.md",
+		".changeset/read-only-versioned-account-view.md",
+		".changeset/remedy-named-migration-errors.md",
+		".changeset/skill-migrations-cost-preview.md",
+		".changeset/skill-migrations.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/cpi-signed-integer-arguments.md",
+			"summary": "Render signed integer instruction arguments",
+			"details": "The CPI renderer rejected `i8`, `i16`, `i32`, `i64`, and `i128` instruction arguments with `unsupported argument format`, so a program whose instruction carried a signed value (a timestamp, delta, or offset) could not generate a CPI client at all, even though Pina maps those fields to `PodI8`-`PodI128` and the Dart renderer already rendered them.\n\nSigned formats now render as their native Rust types and share the two's-complement little-endian write used by the unsigned formats, so a negative value encodes to the bytes the program decodes. Floating point and `shortU16` arguments remain unsupported, and that rejection now names the supported formats. The Anchor fixture used by the CLI compile test carries an `i64` argument so the converter, renderer, and generated crate stay covered end to end.",
+			"targets": [
+				{
+					"id": "pina_cpi_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d18fa3e027f24791fff821cf02cdf54bbe67af83",
+						"short_sha": "d18fa3e",
+						"url": "https://github.com/pina-rs/pina/commit/d18fa3e027f24791fff821cf02cdf54bbe67af83",
+						"authored_at": "2026-09-13T16:02:27+01:00",
+						"committed_at": "2026-09-13T16:02:27+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#393",
+						"title": "fix(cpi): render signed integer instruction arguments",
+						"url": "https://github.com/pina-rs/pina/pull/393",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d18fa3e027f24791fff821cf02cdf54bbe67af83",
+						"short_sha": "d18fa3e",
+						"url": "https://github.com/pina-rs/pina/commit/d18fa3e027f24791fff821cf02cdf54bbe67af83",
+						"authored_at": "2026-09-13T16:02:27+01:00",
+						"committed_at": "2026-09-13T16:02:27+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#393",
+						"title": "fix(cpi): render signed integer instruction arguments",
+						"url": "https://github.com/pina-rs/pina/pull/393",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/event-log-decoders.md",
+			"summary": "Generated Event Log Decoders",
+			"details": "Generated TypeScript, Dart, and Rust clients now carry the event read path. The Codama IDL renders each event's `[discriminator][migrationVersion][payload]` envelope, so generated decoders align with `Program data:` log records and enforce the current schema version with direction-aware errors.\n\n- TypeScript emits a per-program `events/logs.ts` entry point that decodes `Program data:` lines, projects historical bytes into the current shape when the checked-in migration manifest proves the transition is automatic, and reports `sourceVersion` plus `wasMigrated`.\n- Dart emits `events/` modules with the same decode, projection, and log parsing API; the upstream Dart renderer does not render event nodes.\n- The Rust client renders `events/` modules with strict decoding, a `try_from_bytes` that distinguishes stale from future versions, and a `project_from_bytes` that returns current bytes with their source version.\n- Manual transitions remain the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition.\n\n##### Breaking changes\n\n- `pina_cli`: the parsed event declaration gained the public `migratable` field, so `EventDeclaration` struct literals must set it, and `CodamaError` gained the `EventHistories` variant, so exhaustive matches must handle it.\n- `pina_codama_renderer`: `RenderConfig` gained the public `event_histories` field, so struct literals built without `..RenderConfig::default()` must set it.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "13d1570963c90991320e395271d8905130f9b02a",
+						"short_sha": "13d1570",
+						"url": "https://github.com/pina-rs/pina/commit/13d1570963c90991320e395271d8905130f9b02a",
+						"authored_at": "2026-09-13T17:41:03+01:00",
+						"committed_at": "2026-09-13T17:41:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#386",
+						"title": "feat(clients)!: decode migration-aware events from logs",
+						"url": "https://github.com/pina-rs/pina/pull/386",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "13d1570963c90991320e395271d8905130f9b02a",
+						"short_sha": "13d1570",
+						"url": "https://github.com/pina-rs/pina/commit/13d1570963c90991320e395271d8905130f9b02a",
+						"authored_at": "2026-09-13T17:41:03+01:00",
+						"committed_at": "2026-09-13T17:41:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#386",
+						"title": "feat(clients)!: decode migration-aware events from logs",
+						"url": "https://github.com/pina-rs/pina/pull/386",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#355",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/355",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/float-and-fixed-point-schema-fields.md",
+			"summary": "Add the `floats` feature for float and fixed-point fields",
+			"details": "The new `floats` feature on `pina` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields and fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Float fields convert to and from their bit pattern under the hood through the new `pina::PodF32`/`pina::PodF64` alignment-one pods, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods, mirroring pinapod's `fixed` feature that Pina now forwards; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support; `pina_abi` sizes the new types for migration layout planning, and the macros rewrite float primitives to their pods before the `PinaPod` derive expands, since `ZcField` cannot be implemented for the foreign float primitives. The measured build cost is two extra `no_std` crates (`fixed`, `typenum`) compiled once, with the `pina` rlib byte-identical for programs that do not use the feature.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_abi",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"short_sha": "b9e7dc3",
+						"url": "https://github.com/pina-rs/pina/commit/b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"authored_at": "2026-09-13T20:58:16+01:00",
+						"committed_at": "2026-09-13T20:58:16+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#401",
+						"title": "chore(lints): remove accidentally committed rmeta artifacts",
+						"url": "https://github.com/pina-rs/pina/pull/401",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"short_sha": "b9e7dc3",
+						"url": "https://github.com/pina-rs/pina/commit/b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"authored_at": "2026-09-13T20:58:16+01:00",
+						"committed_at": "2026-09-13T20:58:16+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#401",
+						"title": "chore(lints): remove accidentally committed rmeta artifacts",
+						"url": "https://github.com/pina-rs/pina/pull/401",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#270",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/270",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/migration-cost-preview.md",
+			"summary": "Preview Migration Costs in `pina migrations status`",
+			"details": "`pina migrations status` now prints a pre-deploy cost preview derived from the checked-in history and `pina profile`'s static SBF estimates. Per account contract it reports the current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the shared 6,960-lamports-per-grown-byte convention. Per instruction process it names the worst-case adjacent-step ladder a stale account can trigger, with the step count and a static CU estimate; the ladder model and CU model are printed so the numbers stay interpretable, and anything that cannot be estimated reports an explicit reason instead of a zero. The program-wide summary sizes both budgets deliberately and independently: it names the touching transaction funding the most rent (for `max_lamports`) and the one running the longest worst-case ladder (for `MAX_INLINE_STEPS`), because they need not be the same instruction, and quotes the same `max_lamports` remedy text as the `make` growth warning. A `writable`, non-signer process slot that names no checked-in account contract produces an explicit note instead of silently costing nothing.\n\n`pina migrations status --json` gained a `costPreview` object and now emits `{ \"statuses\": [...], \"costPreview\": {...} }`; each `MigrationStatus` field keeps its previous name and shape. `pina migrations check --json` still emits the status array unchanged.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b56f93e4d2e98bc0f2c997b4155b8b7521623916",
+						"short_sha": "b56f93e",
+						"url": "https://github.com/pina-rs/pina/commit/b56f93e4d2e98bc0f2c997b4155b8b7521623916",
+						"authored_at": "2026-09-13T19:18:38+01:00",
+						"committed_at": "2026-09-13T19:18:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#399",
+						"title": "feat(cli): preview migration costs in status",
+						"url": "https://github.com/pina-rs/pina/pull/399",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b56f93e4d2e98bc0f2c997b4155b8b7521623916",
+						"short_sha": "b56f93e",
+						"url": "https://github.com/pina-rs/pina/commit/b56f93e4d2e98bc0f2c997b4155b8b7521623916",
+						"authored_at": "2026-09-13T19:18:38+01:00",
+						"committed_at": "2026-09-13T19:18:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#399",
+						"title": "feat(cli): preview migration costs in status",
+						"url": "https://github.com/pina-rs/pina/pull/399",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#341",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/341",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/migration-version-widths.md",
+			"summary": "Clarify the supported migration version widths",
+			"details": "The migration version envelope accepts `u8`, `u16`, and `u32` only. Documentation now separates that setting from discriminator width, which does support `u64`, and a configuration test pins the rejection of `version-type = \"u64\"` with an error naming the supported widths.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "640c978f07d5dd1fa4470c72f6166d10b4d3eb48",
+						"short_sha": "640c978",
+						"url": "https://github.com/pina-rs/pina/commit/640c978f07d5dd1fa4470c72f6166d10b4d3eb48",
+						"authored_at": "2026-09-13T14:45:05+01:00",
+						"committed_at": "2026-09-13T14:45:05+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#389",
+						"title": "docs(migrations): state the supported version envelope widths",
+						"url": "https://github.com/pina-rs/pina/pull/389",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "640c978f07d5dd1fa4470c72f6166d10b4d3eb48",
+						"short_sha": "640c978",
+						"url": "https://github.com/pina-rs/pina/commit/640c978f07d5dd1fa4470c72f6166d10b4d3eb48",
+						"authored_at": "2026-09-13T14:45:05+01:00",
+						"committed_at": "2026-09-13T14:45:05+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#389",
+						"title": "docs(migrations): state the supported version envelope widths",
+						"url": "https://github.com/pina-rs/pina/pull/389",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#353",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/353",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/migrations-auto-opt-in.md",
+			"summary": "Add an auto opt-in to the migrations config",
+			"details": "`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.\n\nThe recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.\n\nMacros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.\n\nThe `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_abi",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "254314629099ccd8e9398a5690e4f6109d744515",
+						"short_sha": "2543146",
+						"url": "https://github.com/pina-rs/pina/commit/254314629099ccd8e9398a5690e4f6109d744515",
+						"authored_at": "2026-09-13T20:53:24+01:00",
+						"committed_at": "2026-09-13T20:53:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#394",
+						"title": "feat(migrations)!: add an auto opt-in for contract kinds",
+						"url": "https://github.com/pina-rs/pina/pull/394",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "254314629099ccd8e9398a5690e4f6109d744515",
+						"short_sha": "2543146",
+						"url": "https://github.com/pina-rs/pina/commit/254314629099ccd8e9398a5690e4f6109d744515",
+						"authored_at": "2026-09-13T20:53:24+01:00",
+						"committed_at": "2026-09-13T20:53:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#394",
+						"title": "feat(migrations)!: add an auto opt-in for contract kinds",
+						"url": "https://github.com/pina-rs/pina/pull/394",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#363",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/363",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pinapod-0.3.2.md",
+			"summary": "Upgrade pinapod to 0.3.2",
+			"details": "Bump the workspace `pinapod` dependency from 0.3.1 to 0.3.2 and refresh the pina_fuzz lock files. No pina source changes are required: pina re-exports and type-mentions the pinapod API, and 0.3.2 changes no public API. The release cuts generated compact validation to bounded plain arithmetic — vector element validation strides the payload once through the audited `from_raw_parts` slice pattern instead of re-deriving every element offset, one- and two-byte prefix tail ends and byte lengths use plain adds/multiplies licensed by a compile-time division-form capacity assertion, and one- and two-byte optional tail prefixes are read with a single bounds compare plus a constant-width decode. Four- and eight-byte prefixes keep the checked arithmetic, so lengths that saturate or exceed `usize` on 32-bit targets can never wrap a plain sum before the bounds check. Fixed-layout `validate_exact` takes a single length compare on the happy path. Measured on-chain: compact `validate` with dense non-trivial elements drops 5 compute units and every other measured instruction is unchanged; wire format, validation order, error variants, and error precedence are unchanged. One compile-time edge: schemas declaring a one- or two-byte-prefix vector whose `max * size_of::<T>()` exceeds `isize::MAX` now fail to compile instead of always failing validation at runtime.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f0ee344ba27b23ae63da1496d0cbe3df38784c0d",
+						"short_sha": "f0ee344",
+						"url": "https://github.com/pina-rs/pina/commit/f0ee344ba27b23ae63da1496d0cbe3df38784c0d",
+						"authored_at": "2026-09-13T17:41:06+01:00",
+						"committed_at": "2026-09-13T17:41:06+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#400",
+						"title": "chore(deps): upgrade pinapod to 0.3.2",
+						"url": "https://github.com/pina-rs/pina/pull/400",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f0ee344ba27b23ae63da1496d0cbe3df38784c0d",
+						"short_sha": "f0ee344",
+						"url": "https://github.com/pina-rs/pina/commit/f0ee344ba27b23ae63da1496d0cbe3df38784c0d",
+						"authored_at": "2026-09-13T17:41:06+01:00",
+						"committed_at": "2026-09-13T17:41:06+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#400",
+						"title": "chore(deps): upgrade pinapod to 0.3.2",
+						"url": "https://github.com/pina-rs/pina/pull/400",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/read-only-versioned-account-view.md",
+			"summary": "Add a read-only versioned account view",
+			"details": "Generated migratable accounts now expose `<Account>::try_from_bytes_versioned(bytes)`, which validates the exact stored representation named by the version envelope and borrows it immutably through the generated `<Account>Versioned` enum (one variant per historical version plus `Current`). The accessor never rewrites, resizes, clears, or requires a writable borrow, and it fails closed for foreign discriminators, unknown or future versions, malformed representations, and bytes that end inside the version envelope (`DataTooShort`). Historical account representations and their payload fields inherit the account's own visibility, so a private or `pub(crate)` account does not widen its API through the generated view; instruction and event histories stay private. This is the read path for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; callers must handle every stored representation explicitly, so migration remains the recommended fix whenever a writable touch is schedulable.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "29b5c9630a28774078ae9577531d789c3445195d",
+						"short_sha": "29b5c96",
+						"url": "https://github.com/pina-rs/pina/commit/29b5c9630a28774078ae9577531d789c3445195d",
+						"authored_at": "2026-09-13T15:57:46+01:00",
+						"committed_at": "2026-09-13T15:57:46+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#385",
+						"title": "feat(migrations): add a read-only versioned account view",
+						"url": "https://github.com/pina-rs/pina/pull/385",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "29b5c9630a28774078ae9577531d789c3445195d",
+						"short_sha": "29b5c96",
+						"url": "https://github.com/pina-rs/pina/commit/29b5c9630a28774078ae9577531d789c3445195d",
+						"authored_at": "2026-09-13T15:57:46+01:00",
+						"committed_at": "2026-09-13T15:57:46+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#385",
+						"title": "feat(migrations): add a read-only versioned account view",
+						"url": "https://github.com/pina-rs/pina/pull/385",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#338",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/338",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#364",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/364",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/remedy-named-migration-errors.md",
+			"summary": "Name migration budget failures by their remedy",
+			"details": "On-chain migration budget failures are now separately diagnosable. `MigrationWorkspaceExceeded` (`0xFFFF_FFF4`), `MigrationAccountGrowthExceeded` (`0xFFFF_FFF3`), and `MigrationLamportBudgetExceeded` (`0xFFFF_FFF2`) replace the single `MigrationBudgetExceeded` for the executor's workspace, realloc-growth, and rent-budget checks, and each variant's rustdoc names the constant that fixes the failure. `MigrationUnavailable` documents that its remedy is rebalancing a ladder that exceeds the account's generated `MAX_INLINE_STEPS`, and the legacy aggregate code stays at `0xFFFF_FFF5` so program binaries compiled before the split remain decodable. `pina migrations make` now quotes the shared `max_lamports` remedy in its growth warning, names the on-chain error it prevents, and warns separately when the cumulative worst-case growth a supported stale account walks across its inline ladder — not only one adjacent transition — exceeds the runtime's 10,240-byte per-instruction realloc cap.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d24bb62581cd21f1fe60c3ee29c53646ad545a28",
+						"short_sha": "d24bb62",
+						"url": "https://github.com/pina-rs/pina/commit/d24bb62581cd21f1fe60c3ee29c53646ad545a28",
+						"authored_at": "2026-09-13T17:25:24+01:00",
+						"committed_at": "2026-09-13T17:25:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#390",
+						"title": "fix(migrations): name budget failures by their remedy",
+						"url": "https://github.com/pina-rs/pina/pull/390",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d24bb62581cd21f1fe60c3ee29c53646ad545a28",
+						"short_sha": "d24bb62",
+						"url": "https://github.com/pina-rs/pina/commit/d24bb62581cd21f1fe60c3ee29c53646ad545a28",
+						"authored_at": "2026-09-13T17:25:24+01:00",
+						"committed_at": "2026-09-13T17:25:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#390",
+						"title": "fix(migrations): name budget failures by their remedy",
+						"url": "https://github.com/pina-rs/pina/pull/390",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#341",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/341",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#367",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/367",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/skill-migrations-cost-preview.md",
+			"summary": "Document the migration cost preview in the bundled skill",
+			"details": "`references/migrations.md` now covers the `pina migrations status` cost preview: per-contract current size, day-one growth, and rent deficit at the shared 6,960-lamports-per-byte convention; per-instruction worst-case ladders bounded by `MAX_INLINE_STEPS` (8); and the program-wide summary that names the transaction funding the most rent and, independently, the one carrying the longest ladder. It records that the static CU figure sums `pina profile` estimates, excludes executor and runtime effects, prints `CU unavailable: <reason>` instead of a zero, and that only writable non-signer instruction slots join against account contracts, with unlinked slots producing an explicit note.",
+			"targets": [
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a7bf5934fc0e78dcf76c77b02460099db33670c1",
+						"short_sha": "a7bf593",
+						"url": "https://github.com/pina-rs/pina/commit/a7bf5934fc0e78dcf76c77b02460099db33670c1",
+						"authored_at": "2026-09-13T20:06:53+01:00",
+						"committed_at": "2026-09-13T20:06:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#402",
+						"title": "docs(skill): document the migration cost preview",
+						"url": "https://github.com/pina-rs/pina/pull/402",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a7bf5934fc0e78dcf76c77b02460099db33670c1",
+						"short_sha": "a7bf593",
+						"url": "https://github.com/pina-rs/pina/commit/a7bf5934fc0e78dcf76c77b02460099db33670c1",
+						"authored_at": "2026-09-13T20:06:53+01:00",
+						"committed_at": "2026-09-13T20:06:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#402",
+						"title": "docs(skill): document the migration cost preview",
+						"url": "https://github.com/pina-rs/pina/pull/402",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#399",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/399",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/skill-migrations.md",
+			"summary": "Add migration workflow guidance to the bundled skill",
+			"details": "The skill now ships `references/migrations.md`, an end-to-end operational checklist for the opt-in versioned ABI: the `[discriminator][schema version][payload]` envelope, per-contract and `[migrations].auto` opt-in, the `pina migrations make`/`check`/`status` loop, the checked-in manifest as macro policy source, automatic versus manual transitions, runtime migration and event provenance, read-only account handling, budget failures, and the legacy-adoption limit.\n\n`SKILL.md` routes migration work to the new reference and adds the invariants that keep it safe: run `make` after a schema change, never strip a recorded envelope, keep the manifest and generated clients in sync, and preserve published wire formats. The CLI reference documents the `cli-rust`, `cli-ts`, and `cli-dart` client ecosystems and the migration-aware generated code, and the project-setup reference documents the `[migrations]`, `[clients]`, and `build.rs` requirements.",
+			"targets": [
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0c26ba0a6cc5f69b142272ae4c953f3c25ad789",
+						"short_sha": "c0c26ba",
+						"url": "https://github.com/pina-rs/pina/commit/c0c26ba0a6cc5f69b142272ae4c953f3c25ad789",
+						"authored_at": "2026-09-13T16:18:03+01:00",
+						"committed_at": "2026-09-13T16:18:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#397",
+						"title": "docs(skill): teach the bundled skill the migration workflow",
+						"url": "https://github.com/pina-rs/pina/pull/397",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0c26ba0a6cc5f69b142272ae4c953f3c25ad789",
+						"short_sha": "c0c26ba",
+						"url": "https://github.com/pina-rs/pina/commit/c0c26ba0a6cc5f69b142272ae4c953f3c25ad789",
+						"authored_at": "2026-09-13T16:18:03+01:00",
+						"committed_at": "2026-09-13T16:18:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#397",
+						"title": "docs(skill): teach the bundled skill the migration workflow",
+						"url": "https://github.com/pina-rs/pina/pull/397",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.17.0](https://github.com/pina-rs/pina/releases/tag/v0.17.0) (2026-09-13)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Add an auto opt-in to the migrations config\n\n_Packages:_ _pina_abi_, _pina_cli_\n\n`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.\n\nThe recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.\n\nMacros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.\n\nThe `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)",
+							"#### Generated Event Log Decoders\n\n_Packages:_ _pina_cli_, _pina_codama_renderer_\n\nGenerated TypeScript, Dart, and Rust clients now carry the event read path. The Codama IDL renders each event's `[discriminator][migrationVersion][payload]` envelope, so generated decoders align with `Program data:` log records and enforce the current schema version with direction-aware errors.\n\n- TypeScript emits a per-program `events/logs.ts` entry point that decodes `Program data:` lines, projects historical bytes into the current shape when the checked-in migration manifest proves the transition is automatic, and reports `sourceVersion` plus `wasMigrated`.\n- Dart emits `events/` modules with the same decode, projection, and log parsing API; the upstream Dart renderer does not render event nodes.\n- The Rust client renders `events/` modules with strict decoding, a `try_from_bytes` that distinguishes stale from future versions, and a `project_from_bytes` that returns current bytes with their source version.\n- Manual transitions remain the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition.\n\n##### Breaking changes\n\n- `pina_cli`: the parsed event declaration gained the public `migratable` field, so `EventDeclaration` struct literals must set it, and `CodamaError` gained the `EventHistories` variant, so exhaustive matches must handle it.\n- `pina_codama_renderer`: `RenderConfig` gained the public `event_histories` field, so struct literals built without `..RenderConfig::default()` must set it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #386](https://github.com/pina-rs/pina/pull/386) · _Closed issues:_ [#355](https://github.com/pina-rs/pina/issues/355)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add the `floats` feature for float and fixed-point fields\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nThe new `floats` feature on `pina` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields and fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Float fields convert to and from their bit pattern under the hood through the new `pina::PodF32`/`pina::PodF64` alignment-one pods, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods, mirroring pinapod's `fixed` feature that Pina now forwards; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support; `pina_abi` sizes the new types for migration layout planning, and the macros rewrite float primitives to their pods before the `PinaPod` derive expands, since `ZcField` cannot be implemented for the foreign float primitives. The measured build cost is two extra `no_std` crates (`fixed`, `typenum`) compiled once, with the `pina` rlib byte-identical for programs that do not use the feature.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)",
+							"#### Add an auto opt-in to the migrations config\n\n_Packages:_ _pina_, _pina_macros_\n\n`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.\n\nThe recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.\n\nMacros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.\n\nThe `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)",
+							"#### Add a read-only versioned account view\n\n_Packages:_ _pina_, _pina_macros_\n\nGenerated migratable accounts now expose `<Account>::try_from_bytes_versioned(bytes)`, which validates the exact stored representation named by the version envelope and borrows it immutably through the generated `<Account>Versioned` enum (one variant per historical version plus `Current`). The accessor never rewrites, resizes, clears, or requires a writable borrow, and it fails closed for foreign discriminators, unknown or future versions, malformed representations, and bytes that end inside the version envelope (`DataTooShort`). Historical account representations and their payload fields inherit the account's own visibility, so a private or `pub(crate)` account does not widen its API through the generated view; instruction and event histories stay private. This is the read path for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; callers must handle every stored representation explicitly, so migration remains the recommended fix whenever a writable touch is schedulable.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #385](https://github.com/pina-rs/pina/pull/385) · _Closed issues:_ [#364](https://github.com/pina-rs/pina/issues/364) · _Related issues:_ [#338](https://github.com/pina-rs/pina/issues/338)",
+							"#### Preview Migration Costs in `pina migrations status`\n\n_Packages:_ _pina_cli_\n\n`pina migrations status` now prints a pre-deploy cost preview derived from the checked-in history and `pina profile`'s static SBF estimates. Per account contract it reports the current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the shared 6,960-lamports-per-grown-byte convention. Per instruction process it names the worst-case adjacent-step ladder a stale account can trigger, with the step count and a static CU estimate; the ladder model and CU model are printed so the numbers stay interpretable, and anything that cannot be estimated reports an explicit reason instead of a zero. The program-wide summary sizes both budgets deliberately and independently: it names the touching transaction funding the most rent (for `max_lamports`) and the one running the longest worst-case ladder (for `MAX_INLINE_STEPS`), because they need not be the same instruction, and quotes the same `max_lamports` remedy text as the `make` growth warning. A `writable`, non-signer process slot that names no checked-in account contract produces an explicit note instead of silently costing nothing.\n\n`pina migrations status --json` gained a `costPreview` object and now emits `{ \"statuses\": [...], \"costPreview\": {...} }`; each `MigrationStatus` field keeps its previous name and shape. `pina migrations check --json` still emits the status array unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #399](https://github.com/pina-rs/pina/pull/399) · _Closed issues:_ [#341](https://github.com/pina-rs/pina/issues/341)",
+							"#### Document the migration cost preview in the bundled skill\n\n_Packages:_ _pina_skill_\n\n`references/migrations.md` now covers the `pina migrations status` cost preview: per-contract current size, day-one growth, and rent deficit at the shared 6,960-lamports-per-byte convention; per-instruction worst-case ladders bounded by `MAX_INLINE_STEPS` (8); and the program-wide summary that names the transaction funding the most rent and, independently, the one carrying the longest ladder. It records that the static CU figure sums `pina profile` estimates, excludes executor and runtime effects, prints `CU unavailable: <reason>` instead of a zero, and that only writable non-signer instruction slots join against account contracts, with unlinked slots producing an explicit note.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #402](https://github.com/pina-rs/pina/pull/402) · _Related issues:_ [#399](https://github.com/pina-rs/pina/issues/399)",
+							"#### Add migration workflow guidance to the bundled skill\n\n_Packages:_ _pina_skill_\n\nThe skill now ships `references/migrations.md`, an end-to-end operational checklist for the opt-in versioned ABI: the `[discriminator][schema version][payload]` envelope, per-contract and `[migrations].auto` opt-in, the `pina migrations make`/`check`/`status` loop, the checked-in manifest as macro policy source, automatic versus manual transitions, runtime migration and event provenance, read-only account handling, budget failures, and the legacy-adoption limit.\n\n`SKILL.md` routes migration work to the new reference and adds the invariants that keep it safe: run `make` after a schema change, never strip a recorded envelope, keep the manifest and generated clients in sync, and preserve published wire formats. The CLI reference documents the `cli-rust`, `cli-ts`, and `cli-dart` client ecosystems and the migration-aware generated code, and the project-setup reference documents the `[migrations]`, `[clients]`, and `build.rs` requirements.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #397](https://github.com/pina-rs/pina/pull/397)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"- **pina**: **Upgrade pinapod to 0.3.2.** Bump the workspace `pinapod` dependency from 0.3.1 to 0.3.2 and refresh the pina_fuzz lock files. No pina source changes are required: pina re-exports and type-mentions the pinapod API, and 0.3.2 changes no public API. The release cuts generated compact validation to bounded plain arithmetic — vector element validation strides the payload once through the audited `from_raw_parts` slice pattern instead of re-deriving every element offset, one- and two-byte prefix tail ends and byte lengths use plain adds/multiplies licensed by a compile-time division-form capacity assertion, and one- and two-byte optional tail prefixes are read with a single bounds compare plus a constant-width decode. Four- and eight-byte prefixes keep the checked arithmetic, so lengths that saturate or exceed `usize` on 32-bit targets can never wrap a plain sum before the bounds check. Fixed-layout `validate_exact` takes a single length compare on the happy path. Measured on-chain: compact `validate` with dense non-trivial elements drops 5 compute units and every other measured instruction is unchanged; wire format, validation order, error variants, and error precedence are unchanged. One compile-time edge: schemas declaring a one- or two-byte-prefix vector whose `max * size_of::<T>()` exceeds `isize::MAX` now fail to compile instead of always failing validation at runtime.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #400](https://github.com/pina-rs/pina/pull/400)",
+							"#### Name migration budget failures by their remedy\n\n_Packages:_ _pina_, _pina_cli_\n\nOn-chain migration budget failures are now separately diagnosable. `MigrationWorkspaceExceeded` (`0xFFFF_FFF4`), `MigrationAccountGrowthExceeded` (`0xFFFF_FFF3`), and `MigrationLamportBudgetExceeded` (`0xFFFF_FFF2`) replace the single `MigrationBudgetExceeded` for the executor's workspace, realloc-growth, and rent-budget checks, and each variant's rustdoc names the constant that fixes the failure. `MigrationUnavailable` documents that its remedy is rebalancing a ladder that exceeds the account's generated `MAX_INLINE_STEPS`, and the legacy aggregate code stays at `0xFFFF_FFF5` so program binaries compiled before the split remain decodable. `pina migrations make` now quotes the shared `max_lamports` remedy in its growth warning, names the on-chain error it prevents, and warns separately when the cumulative worst-case growth a supported stale account walks across its inline ladder — not only one adjacent transition — exceeds the runtime's 10,240-byte per-instruction realloc cap.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #390](https://github.com/pina-rs/pina/pull/390) · _Closed issues:_ [#367](https://github.com/pina-rs/pina/issues/367) · _Related issues:_ [#341](https://github.com/pina-rs/pina/issues/341)",
+							"#### Render signed integer instruction arguments\n\n_Packages:_ _pina_cpi_renderer_\n\nThe CPI renderer rejected `i8`, `i16`, `i32`, `i64`, and `i128` instruction arguments with `unsupported argument format`, so a program whose instruction carried a signed value (a timestamp, delta, or offset) could not generate a CPI client at all, even though Pina maps those fields to `PodI8`-`PodI128` and the Dart renderer already rendered them.\n\nSigned formats now render as their native Rust types and share the two's-complement little-endian write used by the unsigned formats, so a negative value encodes to the bytes the program decodes. Floating point and `shortU16` arguments remain unsupported, and that rejection now names the supported formats. The Anchor fixture used by the CLI compile test carries an `i64` argument so the converter, renderer, and generated crate stay covered end to end.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #393](https://github.com/pina-rs/pina/pull/393)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Clarify the supported migration version widths\n\n_Packages:_ _pina_cli_\n\nThe migration version envelope accepts `u8`, `u16`, and `u32` only. Documentation now separates that setting from discriminator width, which does support `u64`, and a configuration test pins the rejection of `version-type = \"u64\"` with an error naming the supported widths.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #389](https://github.com/pina-rs/pina/pull/389) · _Closed issues:_ [#353](https://github.com/pina-rs/pina/issues/353)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.17.0](https://github.com/pina-rs/pina/releases/tag/v0.17.0) (2026-09-13)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Add an auto opt-in to the migrations config\n\n_Packages:_ _pina_abi_, _pina_cli_\n\n`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.\n\nThe recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.\n\nMacros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.\n\nThe `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)\n\n#### Generated Event Log Decoders\n\n_Packages:_ _pina_cli_, _pina_codama_renderer_\n\nGenerated TypeScript, Dart, and Rust clients now carry the event read path. The Codama IDL renders each event's `[discriminator][migrationVersion][payload]` envelope, so generated decoders align with `Program data:` log records and enforce the current schema version with direction-aware errors.\n\n- TypeScript emits a per-program `events/logs.ts` entry point that decodes `Program data:` lines, projects historical bytes into the current shape when the checked-in migration manifest proves the transition is automatic, and reports `sourceVersion` plus `wasMigrated`.\n- Dart emits `events/` modules with the same decode, projection, and log parsing API; the upstream Dart renderer does not render event nodes.\n- The Rust client renders `events/` modules with strict decoding, a `try_from_bytes` that distinguishes stale from future versions, and a `project_from_bytes` that returns current bytes with their source version.\n- Manual transitions remain the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition.\n\n##### Breaking changes\n\n- `pina_cli`: the parsed event declaration gained the public `migratable` field, so `EventDeclaration` struct literals must set it, and `CodamaError` gained the `EventHistories` variant, so exhaustive matches must handle it.\n- `pina_codama_renderer`: `RenderConfig` gained the public `event_histories` field, so struct literals built without `..RenderConfig::default()` must set it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #386](https://github.com/pina-rs/pina/pull/386) · _Closed issues:_ [#355](https://github.com/pina-rs/pina/issues/355)\n\n### Features\n\n#### Add the `floats` feature for float and fixed-point fields\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nThe new `floats` feature on `pina` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields and fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Float fields convert to and from their bit pattern under the hood through the new `pina::PodF32`/`pina::PodF64` alignment-one pods, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods, mirroring pinapod's `fixed` feature that Pina now forwards; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support; `pina_abi` sizes the new types for migration layout planning, and the macros rewrite float primitives to their pods before the `PinaPod` derive expands, since `ZcField` cannot be implemented for the foreign float primitives. The measured build cost is two extra `no_std` crates (`fixed`, `typenum`) compiled once, with the `pina` rlib byte-identical for programs that do not use the feature.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)\n\n#### Add an auto opt-in to the migrations config\n\n_Packages:_ _pina_, _pina_macros_\n\n`[migrations].auto` in `pina.toml` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` — manifest format 4 — and snapshots every contract of the listed kinds.\n\nThe recorded policy and its status reach the public API of two crates: `pina_abi`'s manifest type gains the `auto` field, and `pina_cli` gains new public fields (`Project::migration_auto`, `MakeMigrationsOutput::{auto, build_script}`, the `migrations` field on the account, instruction, and event IR), new error variants (`ProjectError::{InvalidMigrationAuto, UnknownMigrationKind}` and `MigrationError::{AutoPolicyChanged, EnvelopeRemoval, BuildScriptRerunMissing}`), renames the IR's `migratable` field to `migrations`, and changes the arity of `extract_migratable_events`.\n\nMacros now resolve opt-in as an explicit `migrations` token or the manifest's recorded policy, so a program with `auto = true` envelopes every contract without per-item annotations, while a contract that is not yet snapshotted still fails the build with the `pina migrations make` remedy. `migrations = false` overrides the policy for one contract and removing an envelope the manifest already records fails closed as a wire-format change. When a policy is recorded, `make` scaffolds an idempotent `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, reports the exact line instead of rewriting a hand-written build script, and `check` verifies the directive.\n\nThe `examples/migrations_program` example now uses `auto = true` and marks its relay payload `migrations = false`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #394](https://github.com/pina-rs/pina/pull/394) · _Closed issues:_ [#363](https://github.com/pina-rs/pina/issues/363)\n\n#### Add a read-only versioned account view\n\n_Packages:_ _pina_, _pina_macros_\n\nGenerated migratable accounts now expose `<Account>::try_from_bytes_versioned(bytes)`, which validates the exact stored representation named by the version envelope and borrows it immutably through the generated `<Account>Versioned` enum (one variant per historical version plus `Current`). The accessor never rewrites, resizes, clears, or requires a writable borrow, and it fails closed for foreign discriminators, unknown or future versions, malformed representations, and bytes that end inside the version envelope (`DataTooShort`). Historical account representations and their payload fields inherit the account's own visibility, so a private or `pub(crate)` account does not widen its API through the generated view; instruction and event histories stay private. This is the read path for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; callers must handle every stored representation explicitly, so migration remains the recommended fix whenever a writable touch is schedulable.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #385](https://github.com/pina-rs/pina/pull/385) · _Closed issues:_ [#364](https://github.com/pina-rs/pina/issues/364) · _Related issues:_ [#338](https://github.com/pina-rs/pina/issues/338)\n\n#### Preview Migration Costs in `pina migrations status`\n\n_Packages:_ _pina_cli_\n\n`pina migrations status` now prints a pre-deploy cost preview derived from the checked-in history and `pina profile`'s static SBF estimates. Per account contract it reports the current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the shared 6,960-lamports-per-grown-byte convention. Per instruction process it names the worst-case adjacent-step ladder a stale account can trigger, with the step count and a static CU estimate; the ladder model and CU model are printed so the numbers stay interpretable, and anything that cannot be estimated reports an explicit reason instead of a zero. The program-wide summary sizes both budgets deliberately and independently: it names the touching transaction funding the most rent (for `max_lamports`) and the one running the longest worst-case ladder (for `MAX_INLINE_STEPS`), because they need not be the same instruction, and quotes the same `max_lamports` remedy text as the `make` growth warning. A `writable`, non-signer process slot that names no checked-in account contract produces an explicit note instead of silently costing nothing.\n\n`pina migrations status --json` gained a `costPreview` object and now emits `{ \"statuses\": [...], \"costPreview\": {...} }`; each `MigrationStatus` field keeps its previous name and shape. `pina migrations check --json` still emits the status array unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #399](https://github.com/pina-rs/pina/pull/399) · _Closed issues:_ [#341](https://github.com/pina-rs/pina/issues/341)\n\n#### Document the migration cost preview in the bundled skill\n\n_Packages:_ _pina_skill_\n\n`references/migrations.md` now covers the `pina migrations status` cost preview: per-contract current size, day-one growth, and rent deficit at the shared 6,960-lamports-per-byte convention; per-instruction worst-case ladders bounded by `MAX_INLINE_STEPS` (8); and the program-wide summary that names the transaction funding the most rent and, independently, the one carrying the longest ladder. It records that the static CU figure sums `pina profile` estimates, excludes executor and runtime effects, prints `CU unavailable: <reason>` instead of a zero, and that only writable non-signer instruction slots join against account contracts, with unlinked slots producing an explicit note.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #402](https://github.com/pina-rs/pina/pull/402) · _Related issues:_ [#399](https://github.com/pina-rs/pina/issues/399)\n\n#### Add migration workflow guidance to the bundled skill\n\n_Packages:_ _pina_skill_\n\nThe skill now ships `references/migrations.md`, an end-to-end operational checklist for the opt-in versioned ABI: the `[discriminator][schema version][payload]` envelope, per-contract and `[migrations].auto` opt-in, the `pina migrations make`/`check`/`status` loop, the checked-in manifest as macro policy source, automatic versus manual transitions, runtime migration and event provenance, read-only account handling, budget failures, and the legacy-adoption limit.\n\n`SKILL.md` routes migration work to the new reference and adds the invariants that keep it safe: run `make` after a schema change, never strip a recorded envelope, keep the manifest and generated clients in sync, and preserve published wire formats. The CLI reference documents the `cli-rust`, `cli-ts`, and `cli-dart` client ecosystems and the migration-aware generated code, and the project-setup reference documents the `[migrations]`, `[clients]`, and `build.rs` requirements.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #397](https://github.com/pina-rs/pina/pull/397)\n\n### Fixes\n\n- **pina**: **Upgrade pinapod to 0.3.2.** Bump the workspace `pinapod` dependency from 0.3.1 to 0.3.2 and refresh the pina_fuzz lock files. No pina source changes are required: pina re-exports and type-mentions the pinapod API, and 0.3.2 changes no public API. The release cuts generated compact validation to bounded plain arithmetic — vector element validation strides the payload once through the audited `from_raw_parts` slice pattern instead of re-deriving every element offset, one- and two-byte prefix tail ends and byte lengths use plain adds/multiplies licensed by a compile-time division-form capacity assertion, and one- and two-byte optional tail prefixes are read with a single bounds compare plus a constant-width decode. Four- and eight-byte prefixes keep the checked arithmetic, so lengths that saturate or exceed `usize` on 32-bit targets can never wrap a plain sum before the bounds check. Fixed-layout `validate_exact` takes a single length compare on the happy path. Measured on-chain: compact `validate` with dense non-trivial elements drops 5 compute units and every other measured instruction is unchanged; wire format, validation order, error variants, and error precedence are unchanged. One compile-time edge: schemas declaring a one- or two-byte-prefix vector whose `max * size_of::<T>()` exceeds `isize::MAX` now fail to compile instead of always failing validation at runtime.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #400](https://github.com/pina-rs/pina/pull/400)\n#### Name migration budget failures by their remedy\n\n_Packages:_ _pina_, _pina_cli_\n\nOn-chain migration budget failures are now separately diagnosable. `MigrationWorkspaceExceeded` (`0xFFFF_FFF4`), `MigrationAccountGrowthExceeded` (`0xFFFF_FFF3`), and `MigrationLamportBudgetExceeded` (`0xFFFF_FFF2`) replace the single `MigrationBudgetExceeded` for the executor's workspace, realloc-growth, and rent-budget checks, and each variant's rustdoc names the constant that fixes the failure. `MigrationUnavailable` documents that its remedy is rebalancing a ladder that exceeds the account's generated `MAX_INLINE_STEPS`, and the legacy aggregate code stays at `0xFFFF_FFF5` so program binaries compiled before the split remain decodable. `pina migrations make` now quotes the shared `max_lamports` remedy in its growth warning, names the on-chain error it prevents, and warns separately when the cumulative worst-case growth a supported stale account walks across its inline ladder — not only one adjacent transition — exceeds the runtime's 10,240-byte per-instruction realloc cap.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #390](https://github.com/pina-rs/pina/pull/390) · _Closed issues:_ [#367](https://github.com/pina-rs/pina/issues/367) · _Related issues:_ [#341](https://github.com/pina-rs/pina/issues/341)\n\n#### Render signed integer instruction arguments\n\n_Packages:_ _pina_cpi_renderer_\n\nThe CPI renderer rejected `i8`, `i16`, `i32`, `i64`, and `i128` instruction arguments with `unsupported argument format`, so a program whose instruction carried a signed value (a timestamp, delta, or offset) could not generate a CPI client at all, even though Pina maps those fields to `PodI8`-`PodI128` and the Dart renderer already rendered them.\n\nSigned formats now render as their native Rust types and share the two's-complement little-endian write used by the unsigned formats, so a negative value encodes to the bytes the program decodes. Floating point and `shortU16` arguments remain unsupported, and that rejection now names the supported formats. The Anchor fixture used by the CLI compile test carries an `i64` argument so the converter, renderer, and generated crate stay covered end to end.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #393](https://github.com/pina-rs/pina/pull/393)\n\n### Notes\n\n#### Clarify the supported migration version widths\n\n_Packages:_ _pina_cli_\n\nThe migration version envelope accepts `u8`, `u16`, and `u32` only. Documentation now separates that setting from discriminator width, which does support `u64`, and a configuration test pins the rejection of `version-type = \"u64\"` with an error naming the supported widths.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #389](https://github.com/pina-rs/pina/pull/389) · _Closed issues:_ [#353](https://github.com/pina-rs/pina/issues/353)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
