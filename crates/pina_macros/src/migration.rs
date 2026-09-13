@@ -1714,6 +1714,52 @@ mod tests {
 	}
 
 	#[test]
+	fn read_manifest_at_reports_unreadable_manifest_paths() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let item = item_struct("State");
+
+		// A directory at the manifest path fails every read except `NotFound`,
+		// so the remedy is reported instead of a silent "no policy".
+		let path = temp.path().join(pina_abi::MANIFEST_PATH);
+		std::fs::create_dir_all(&path)
+			.unwrap_or_else(|error| panic!("create manifest directory: {error}"));
+
+		let error =
+			read_manifest_at(&item, temp.path()).expect_err("a directory cannot be a manifest");
+		let message = error.to_string();
+		assert!(message.contains("could not be read"), "message: {message}");
+		assert!(
+			message.contains("pina migrations make"),
+			"message: {message}"
+		);
+		assert!(
+			message.contains(&path.display().to_string()),
+			"message: {message}"
+		);
+	}
+
+	#[test]
+	fn read_manifest_at_rejects_manifests_that_are_not_utf8_documents() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let item = item_struct("State");
+
+		// `read_manifest_at` never decodes UTF-8 itself, so garbage bytes fail
+		// inside `decode_manifest` and are reported as an invalid document.
+		let path = write_manifest(temp.path(), &[0xFF, 0xFE, b'{', b'}']);
+		let garbage =
+			read_manifest_at(&item, temp.path()).expect_err("invalid UTF-8 cannot be a manifest");
+		let message = garbage.to_string();
+		assert!(
+			message.contains("invalid migration manifest"),
+			"message: {message}"
+		);
+		assert!(
+			message.contains(&path.display().to_string()),
+			"message: {message}"
+		);
+	}
+
+	#[test]
 	fn enabled_declarations_require_the_manifest_file() {
 		let item = item_struct("State");
 		let program_dir = std::path::Path::new("program-root");
