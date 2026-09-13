@@ -193,12 +193,7 @@ pub(crate) fn emit_dart_event_modules(
 	for facts in &events {
 		let snake = facts.name.to_snake_case();
 		let path = events_dir.join(format!("{snake}.dart"));
-		let source = event_module(&program_pascal, facts).map_err(|message| {
-			CodamaError::DartClient {
-				path: path.clone(),
-				source: message.into(),
-			}
-		})?;
+		let source = event_module(&program_pascal, facts);
 		needs_pod_helper |= source.contains("getPinaPodBooleanDecoder");
 		std::fs::write(&path, source).map_err(|source| {
 			CodamaError::DartClient {
@@ -376,7 +371,7 @@ fn events_barrel(program_pascal: &str, events: &[EventFacts<'_>], exports: &[Str
 }
 
 /// The per-event module.
-fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> Result<String, String> {
+fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	let pascal = &facts.pascal;
 	let camel = lower_camel(pascal);
 	let class_name = format!("{pascal}Event");
@@ -473,7 +468,7 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> Result<String, 
 	));
 	lines.push("\t}".to_owned());
 	lines.push("\tvar cursor = 0;".to_owned());
-	lines.push(decode_field_reads(facts)?);
+	lines.push(decode_field_reads(facts));
 	let arguments = facts
 		.fields
 		.iter()
@@ -539,11 +534,11 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> Result<String, 
 	}
 	lines.push("}".to_owned());
 
-	Ok(lines.join("\n") + "\n")
+	lines.join("\n") + "\n"
 }
 
 /// The generated field reads plus the version guard.
-fn decode_field_reads(facts: &EventFacts<'_>) -> Result<String, String> {
+fn decode_field_reads(facts: &EventFacts<'_>) -> String {
 	let mut lines = String::new();
 	for (index, field) in facts.fields.iter().enumerate() {
 		let decoder = &field.decoder;
@@ -552,11 +547,8 @@ fn decode_field_reads(facts: &EventFacts<'_>) -> Result<String, String> {
 			"\tfinal (v{index}, c{index}) = {decoder}.read(data, cursor);"
 		);
 		let _ = writeln!(lines, "\tcursor = c{index};");
-		if field.kind == DartFieldKind::Version {
-			let envelope = facts
-				.envelope
-				.as_ref()
-				.ok_or_else(|| "version field without an envelope".to_owned())?;
+		// A `migrationVersion` field only exists on envelope events.
+		if let (DartFieldKind::Version, Some(envelope)) = (&field.kind, facts.envelope.as_ref()) {
 			let expected = envelope.version;
 			let stale = "the log predates this client; project it through the checked-in event \
 			             history or decode it with a client generated from the schema that wrote \
@@ -592,7 +584,7 @@ fn decode_field_reads(facts: &EventFacts<'_>) -> Result<String, String> {
 			let _ = writeln!(lines, "\t}}");
 		}
 	}
-	Ok(lines)
+	lines
 }
 
 /// The normalization API for one migration-aware event.
@@ -1161,7 +1153,36 @@ fn lower_camel(pascal: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+	use codama_nodes::ArrayTypeNode;
+	use codama_nodes::BooleanTypeNode;
+	use codama_nodes::BytesTypeNode;
+	use codama_nodes::ConstantDiscriminatorNode;
+	use codama_nodes::ConstantValueNode;
+	use codama_nodes::DefaultValueStrategy;
+	use codama_nodes::DefinedTypeLinkNode;
+	use codama_nodes::DefinedTypeNode;
+	use codama_nodes::DiscriminatorNode;
+	use codama_nodes::EventNode;
+	use codama_nodes::FixedCountNode;
+	use codama_nodes::FixedSizeTypeNode;
+	use codama_nodes::Number;
+	use codama_nodes::NumberFormat;
+	use codama_nodes::NumberTypeNode;
+	use codama_nodes::NumberValueNode;
+	use codama_nodes::OptionTypeNode;
+	use codama_nodes::PrefixedCountNode;
+	use codama_nodes::ProgramNode;
+	use codama_nodes::PublicKeyTypeNode;
+	use codama_nodes::RemainderCountNode;
 	use codama_nodes::RootNode;
+	use codama_nodes::SizeDiscriminatorNode;
+	use codama_nodes::SizePrefixTypeNode;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::StringValueNode;
+	use codama_nodes::StructFieldTypeNode;
+	use codama_nodes::StructTypeNode;
+	use codama_nodes::TypeNode;
+	use codama_nodes::ValueNode;
 
 	use super::*;
 
@@ -1196,6 +1217,641 @@ mod tests {
 		}
 	}
 
+	fn test_program() -> ProgramNode {
+		ProgramNode::new("eventsProgram", "11111111111111111111111111111111")
+	}
+
+	fn number(format: NumberFormat) -> TypeNode {
+		TypeNode::Number(NumberTypeNode::le(format))
+	}
+
+	fn plain_field(name: &str, r#type: TypeNode) -> StructFieldTypeNode {
+		StructFieldTypeNode::new(name, r#type)
+	}
+
+	fn event_number_field(name: &str, format: NumberFormat, value: Number) -> StructFieldTypeNode {
+		let mut field = StructFieldTypeNode::new(name, number(format));
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode { number: value })));
+		field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+		field
+	}
+
+	fn event_discriminator(format: NumberFormat, value: Number) -> DiscriminatorNode {
+		DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(format),
+				NumberValueNode { number: value },
+			),
+			0,
+		))
+	}
+
+	fn envelope_event(name: &str, version_format: NumberFormat, version: Number) -> EventNode {
+		let data = StructTypeNode::new(vec![
+			event_number_field(
+				"discriminator",
+				NumberFormat::U8,
+				Number::UnsignedInteger(4),
+			),
+			event_number_field("migrationVersion", version_format, version),
+			plain_field("value", number(NumberFormat::U64)),
+		]);
+		let mut event = EventNode::new(name, data);
+		event.discriminators = vec![event_discriminator(
+			NumberFormat::U8,
+			Number::UnsignedInteger(4),
+		)];
+		event
+	}
+
+	fn fixed(inner: TypeNode, size: usize) -> TypeNode {
+		TypeNode::FixedSize(FixedSizeTypeNode::<TypeNode>::new(inner, size))
+	}
+
+	#[test]
+	fn dart_fields_cover_every_supported_node_type() {
+		let mut program = test_program();
+		program
+			.defined_types
+			.push(DefinedTypeNode::new("Amount", number(NumberFormat::U64)));
+		let data = StructTypeNode::new(vec![
+			plain_field("u8", number(NumberFormat::U8)),
+			plain_field("i8", number(NumberFormat::I8)),
+			plain_field("u16", number(NumberFormat::U16)),
+			plain_field("i16", number(NumberFormat::I16)),
+			plain_field("u32", number(NumberFormat::U32)),
+			plain_field("i32", number(NumberFormat::I32)),
+			plain_field("u64", number(NumberFormat::U64)),
+			plain_field("i64", number(NumberFormat::I64)),
+			plain_field("u128", number(NumberFormat::U128)),
+			plain_field("i128", number(NumberFormat::I128)),
+			plain_field(
+				"flag",
+				TypeNode::Boolean(BooleanTypeNode::new(NumberTypeNode::le(NumberFormat::U8))),
+			),
+			plain_field("owner", TypeNode::PublicKey(PublicKeyTypeNode::new())),
+			plain_field("raw", fixed(TypeNode::Bytes(BytesTypeNode::new()), 8)),
+			plain_field(
+				"label",
+				fixed(
+					TypeNode::SizePrefix(SizePrefixTypeNode::<TypeNode>::new(
+						StringTypeNode::utf8(),
+						NumberTypeNode::le(NumberFormat::U8),
+					)),
+					33,
+				),
+			),
+			plain_field(
+				"tags",
+				fixed(
+					TypeNode::Array(ArrayTypeNode::new(
+						number(NumberFormat::U8),
+						PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U16)),
+					)),
+					6,
+				),
+			),
+			plain_field(
+				"pair",
+				fixed(
+					TypeNode::Array(ArrayTypeNode::new(
+						number(NumberFormat::U8),
+						FixedCountNode::new(2),
+					)),
+					2,
+				),
+			),
+			plain_field(
+				"maybe",
+				fixed(
+					TypeNode::Option(OptionTypeNode {
+						fixed: Some(true),
+						item: Box::new(number(NumberFormat::U8)),
+						prefix: NumberTypeNode::le(NumberFormat::U8).into(),
+					}),
+					2,
+				),
+			),
+			plain_field(
+				"maybe16",
+				fixed(
+					TypeNode::Option(OptionTypeNode {
+						fixed: Some(true),
+						item: Box::new(number(NumberFormat::U8)),
+						prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+					}),
+					3,
+				),
+			),
+			plain_field(
+				"maybe32",
+				fixed(
+					TypeNode::Option(OptionTypeNode {
+						fixed: Some(true),
+						item: Box::new(number(NumberFormat::U8)),
+						prefix: NumberTypeNode::le(NumberFormat::U32).into(),
+					}),
+					5,
+				),
+			),
+			plain_field(
+				"items",
+				TypeNode::Array(ArrayTypeNode::new(
+					number(NumberFormat::U16),
+					FixedCountNode::new(3),
+				)),
+			),
+			plain_field("amount", TypeNode::Link(DefinedTypeLinkNode::new("Amount"))),
+			plain_field("sized", fixed(number(NumberFormat::U8), 1)),
+		]);
+		let (fields, imports) =
+			dart_fields(&data, None, &program).unwrap_or_else(|error| panic!("fields: {error}"));
+		assert_eq!(fields.len(), 22);
+
+		let field = |name: &str| {
+			fields
+				.iter()
+				.find(|field| field.name == name)
+				.unwrap_or_else(|| panic!("field `{name}` must exist"))
+		};
+		assert_eq!(field("u8").ty, "int");
+		assert_eq!(field("i8").decoder, "getI8Decoder()");
+		assert_eq!(field("i16").decoder, "getI16Decoder()");
+		assert_eq!(field("u32").decoder, "getU32Decoder()");
+		assert_eq!(field("i32").decoder, "getI32Decoder()");
+		assert_eq!((field("u64").ty.as_str(), field("u64").size), ("BigInt", 8));
+		assert_eq!(field("i64").decoder, "getI64Decoder()");
+		assert_eq!(field("u128").decoder, "getU128Decoder()");
+		assert_eq!(field("i128").ty, "BigInt");
+		assert_eq!(field("flag").decoder, "getPinaPodBooleanDecoder()");
+		assert_eq!(
+			(field("owner").ty.as_str(), field("owner").size),
+			("Address", 32)
+		);
+		assert_eq!(field("raw").decoder, "fixDecoderSize(getBytesDecoder(), 8)");
+		assert_eq!(field("label").ty, "String");
+		assert!(
+			field("label")
+				.decoder
+				.contains("addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder())")
+		);
+		assert_eq!(field("tags").ty, "List<int>");
+		assert!(
+			field("tags")
+				.decoder
+				.contains("PrefixedArraySize(getU16Decoder())")
+		);
+		assert!(field("pair").decoder.contains("FixedArraySize(2)"));
+		assert!(field("maybe").decoder.contains("getNullableDecoder<int>"));
+		assert_eq!(field("maybe").ty, "int?");
+		assert_eq!(field("maybe16").size, 3);
+		assert_eq!(field("maybe32").size, 5);
+		assert_eq!(field("items").ty, "List<int>");
+		assert!(field("items").decoder.contains("FixedArraySize(3)"));
+		assert_eq!(field("amount").decoder, "getU64Decoder()");
+		assert_eq!(field("sized").decoder, "fixDecoderSize(getU8Decoder(), 1)");
+
+		assert!(imports.addresses);
+		assert!(imports.core);
+		assert!(imports.data_structures);
+		assert!(imports.numbers);
+		assert!(imports.strings);
+		assert!(imports.pod_helpers);
+	}
+
+	#[test]
+	fn event_module_renders_imports_for_every_supported_family() {
+		let mut program = test_program();
+		program
+			.defined_types
+			.push(DefinedTypeNode::new("Amount", number(NumberFormat::U64)));
+		let data = StructTypeNode::new(vec![
+			plain_field("owner", TypeNode::PublicKey(PublicKeyTypeNode::new())),
+			plain_field(
+				"label",
+				fixed(
+					TypeNode::SizePrefix(SizePrefixTypeNode::<TypeNode>::new(
+						StringTypeNode::utf8(),
+						NumberTypeNode::le(NumberFormat::U8),
+					)),
+					33,
+				),
+			),
+			plain_field(
+				"flag",
+				TypeNode::Boolean(BooleanTypeNode::new(NumberTypeNode::le(NumberFormat::U8))),
+			),
+			plain_field("raw", fixed(TypeNode::Bytes(BytesTypeNode::new()), 4)),
+			plain_field(
+				"items",
+				TypeNode::Array(ArrayTypeNode::new(
+					number(NumberFormat::U64),
+					FixedCountNode::new(2),
+				)),
+			),
+		]);
+		let mut event = EventNode::new("richEvent", data);
+		event.discriminators = vec![event_discriminator(
+			NumberFormat::U8,
+			Number::UnsignedInteger(9),
+		)];
+		let histories = EventClientHistoryIndex::default();
+		let facts = event_facts(&event, &program, &histories)
+			.unwrap_or_else(|error| panic!("facts: {error}"))
+			.unwrap_or_else(|| panic!("event facts"));
+		let module = event_module("EventsProgram", &facts);
+
+		assert!(module.contains("package:solana_kit_addresses"), "{module}");
+		assert!(
+			module.contains("package:solana_kit_codecs_strings"),
+			"{module}"
+		);
+		assert!(
+			module.contains("package:solana_kit_codecs_data_structures"),
+			"{module}"
+		);
+		assert!(
+			module.contains("package:solana_kit_codecs_core"),
+			"{module}"
+		);
+		assert!(
+			module.contains("package:solana_kit_codecs_numbers"),
+			"{module}"
+		);
+		assert!(
+			module.contains("import '../pina_pod_codecs.dart';"),
+			"{module}"
+		);
+	}
+
+	#[test]
+	fn dart_field_rejects_unsupported_shapes() {
+		let program = test_program();
+		let mut imports = DartImports::default();
+		let option = |fixed_flag: Option<bool>, item: TypeNode, prefix: NumberFormat| {
+			TypeNode::Option(OptionTypeNode {
+				fixed: fixed_flag,
+				item: Box::new(item),
+				prefix: NumberTypeNode::le(prefix).into(),
+			})
+		};
+		let unsupported = [
+			number(NumberFormat::F32),
+			TypeNode::String(StringTypeNode::utf8()),
+			TypeNode::Bytes(BytesTypeNode::new()),
+			fixed(number(NumberFormat::U8), 2),
+			fixed(
+				TypeNode::Array(ArrayTypeNode::new(
+					number(NumberFormat::U8),
+					RemainderCountNode::new(),
+				)),
+				4,
+			),
+			TypeNode::Array(ArrayTypeNode::new(
+				number(NumberFormat::U8),
+				RemainderCountNode::new(),
+			)),
+			TypeNode::Array(ArrayTypeNode::new(
+				number(NumberFormat::U8),
+				PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U16)),
+			)),
+			option(None, number(NumberFormat::U8), NumberFormat::U8),
+			option(Some(true), number(NumberFormat::U8), NumberFormat::U64),
+			TypeNode::Link(DefinedTypeLinkNode::new("Missing")),
+		];
+		for node in &unsupported {
+			assert!(
+				dart_field(node, &program, &mut imports, 0).is_none(),
+				"node {node:?} must be unsupported"
+			);
+		}
+		assert!(dart_field(&number(NumberFormat::U8), &program, &mut imports, 9).is_none());
+	}
+
+	#[test]
+	fn event_facts_reject_non_struct_events() {
+		let mut event = EventNode::new("badEvent", BytesTypeNode::new());
+		event.discriminators = vec![event_discriminator(
+			NumberFormat::U8,
+			Number::UnsignedInteger(4),
+		)];
+		let histories = EventClientHistoryIndex::default();
+		assert!(matches!(
+			event_facts(&event, &test_program(), &histories),
+			Ok(None)
+		));
+		// The envelope reader also rejects non-struct data on its own.
+		assert!(envelope_facts(&event).is_none());
+	}
+
+	#[test]
+	fn envelope_facts_require_numeric_unsigned_versions() {
+		let mut events = Vec::new();
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("4"))));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("1"))));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type =
+				Box::new(TypeNode::Number(NumberTypeNode::le(NumberFormat::F32)));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::Number(NumberValueNode::new(-1_i8))));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields.truncate(1);
+		}
+		events.push(event);
+
+		for event in &events {
+			let label = format!("event `{}`", event.name.as_ref());
+			assert!(envelope_facts(event).is_none(), "{label} has no envelope");
+		}
+
+		// The version field appearing before the discriminator is not an envelope.
+		let mut reordered =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = reordered.data.as_mut() {
+			data.fields.swap(0, 1);
+		}
+		assert!(envelope_facts(&reordered).is_none());
+
+		// Unrelated defaulted fields are skipped while scanning the envelope.
+		let mut skipped =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = skipped.data.as_mut() {
+			let mut note = event_number_field("note", NumberFormat::U8, Number::UnsignedInteger(7));
+			note.default_value_strategy = None;
+			data.fields.insert(1, note);
+		}
+		assert!(envelope_facts(&skipped).is_some());
+
+		for (format, width) in [(NumberFormat::U16, 2), (NumberFormat::U32, 4)] {
+			let event = envelope_event("valueChanged", format, Number::UnsignedInteger(1));
+			let envelope =
+				envelope_facts(&event).unwrap_or_else(|| panic!("width {width} envelope"));
+			assert_eq!(envelope.version, 1);
+			assert_eq!(envelope.version_bytes, width);
+		}
+	}
+
+	#[test]
+	fn constant_discriminator_widths_and_rejections() {
+		for (format, value, width) in [
+			(NumberFormat::U8, Number::UnsignedInteger(4), 1),
+			(NumberFormat::U16, Number::UnsignedInteger(0x0102), 2),
+			(NumberFormat::U32, Number::UnsignedInteger(0x0102_0304), 4),
+			(
+				NumberFormat::U64,
+				Number::UnsignedInteger(0x0102_0304_0506_0708),
+				8,
+			),
+		] {
+			let mut event =
+				envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+			event.discriminators = vec![event_discriminator(format, value)];
+			let (_, found) =
+				constant_discriminator(&event).unwrap_or_else(|| panic!("width {width} must map"));
+			assert_eq!(found, width);
+		}
+
+		let mut invalid = Vec::new();
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Size(SizeDiscriminatorNode::new(4))];
+		invalid.push(event);
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::U8),
+				ValueNode::String(StringValueNode::new("4")),
+			),
+			0,
+		))];
+		invalid.push(event);
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				StringTypeNode::utf8(),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		invalid.push(event);
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::F32),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		invalid.push(event);
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::U8),
+				ValueNode::Number(NumberValueNode::new(-4_i8)),
+			),
+			0,
+		))];
+		invalid.push(event);
+
+		for event in &invalid {
+			let label = format!("event `{}`", event.name.as_ref());
+			assert!(
+				constant_discriminator(event).is_none(),
+				"{label} has no discriminator"
+			);
+		}
+	}
+
+	#[test]
+	fn wide_versions_use_the_shared_little_endian_helpers() {
+		let event = envelope_event(
+			"valueChanged",
+			NumberFormat::U16,
+			Number::UnsignedInteger(2),
+		);
+		let mut histories = EventClientHistoryIndex::default();
+		histories.insert_for_test(history());
+		let program = test_program();
+		let facts = event_facts(&event, &program, &histories)
+			.unwrap_or_else(|error| panic!("facts: {error}"))
+			.unwrap_or_else(|| panic!("event facts"));
+		let module = event_module("EventsProgram", &facts);
+		assert!(module.contains("readLittleEndian(data,"), "{module}");
+		assert!(module.contains("writeLittleEndian("), "{module}");
+
+		let support = support_module("EventsProgram", std::slice::from_ref(&facts));
+		assert!(support.contains("int readLittleEndian("), "{support}");
+		assert!(
+			support.contains("Uint8List writeLittleEndian("),
+			"{support}"
+		);
+	}
+
+	#[test]
+	fn emit_reports_unrenderable_events() {
+		let mut root = read_idl("events_program.json");
+		if let TypeNode::Struct(data) = root.program.events[0].data.as_mut() {
+			data.fields[1].r#type = Box::new(TypeNode::String(StringTypeNode::utf8()));
+		}
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		let error = emit_dart_event_modules(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect_err("unsupported fields must fail generation");
+		assert!(
+			error.to_string().contains("does not support yet"),
+			"{error}"
+		);
+
+		let mut root = read_idl("events_program.json");
+		for event in &mut root.program.events {
+			event.discriminators.clear();
+		}
+		let error = emit_dart_event_modules(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect_err("events without discriminators must fail generation");
+		assert!(
+			error.to_string().contains("no constant discriminator"),
+			"{error}"
+		);
+	}
+
+	#[test]
+	fn emit_reports_io_failures() {
+		let root = read_idl("events_program.json");
+		let histories = EventClientHistoryIndex::default();
+
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		std::fs::write(generated.join("events"), b"file").expect("blocked events path");
+		assert!(
+			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			"a blocked events directory must fail"
+		);
+
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(generated.join("events/event_log.dart")).expect("blocked support");
+		assert!(
+			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			"a blocked support module must fail"
+		);
+
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(generated.join("events/my_event.dart")).expect("blocked event");
+		assert!(
+			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			"a blocked event module must fail"
+		);
+
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(generated.join("events/events.dart")).expect("blocked barrel");
+		assert!(
+			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			"a blocked barrel must fail"
+		);
+	}
+
+	#[test]
+	fn register_program_barrel_handles_missing_and_unreadable_paths() {
+		// Root paths have no file name to anchor the barrel.
+		register_program_barrel(Path::new("/"))
+			.unwrap_or_else(|error| panic!("root path: {error}"));
+
+		// A generated directory without a renderer barrel is left alone.
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		register_program_barrel(&generated).unwrap_or_else(|error| panic!("no barrel: {error}"));
+
+		// A directory where the barrel should be fails the read.
+		std::fs::create_dir_all(generated.join("events_program.dart")).expect("blocked barrel");
+		assert!(register_program_barrel(&generated).is_err());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn register_program_barrel_reports_unwritable_barrels() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		let barrel = generated.join("events_program.dart");
+		std::fs::write(&barrel, "export 'accounts/accounts.dart';\n").expect("barrel");
+		std::fs::set_permissions(&barrel, std::fs::Permissions::from_mode(0o444))
+			.expect("read-only barrel");
+
+		let result = register_program_barrel(&generated);
+		std::fs::set_permissions(&barrel, std::fs::Permissions::from_mode(0o644))
+			.expect("restore barrel");
+		assert!(result.is_err(), "a read-only barrel must fail");
+	}
+
+	#[test]
+	fn name_helpers_handle_empty_names() {
+		assert_eq!(lower_camel(""), "");
+		assert_eq!(snake_to_camel(""), "");
+	}
+
 	#[test]
 	fn emits_projection_for_migration_aware_events() {
 		let root = read_idl("migrations_program.json");
@@ -1205,8 +1861,7 @@ mod tests {
 		let facts = event_facts(&root.program.events[0], &root.program, &histories)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
-		let module =
-			event_module(&program, &facts).unwrap_or_else(|error| panic!("module: {error}"));
+		let module = event_module(&program, &facts);
 
 		for expected in [
 			"class ValueChangedEventEvent {",
@@ -1242,8 +1897,7 @@ mod tests {
 		let facts = event_facts(&root.program.events[0], &root.program, &histories)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
-		let module =
-			event_module(&program, &facts).unwrap_or_else(|error| panic!("module: {error}"));
+		let module = event_module(&program, &facts);
 
 		assert!(module.contains("class MyEventEvent extends EventsProgramEvent {"));
 		assert!(module.contains("Uint8List label;"));
@@ -1305,16 +1959,11 @@ mod tests {
 
 	#[test]
 	fn unsupported_field_types_report_the_field() {
-		let root = read_idl("events_program.json");
-		let mut root = root;
-		let event = &mut root.program.events[0];
-		// Replace the first payload field with an enum link the emitter cannot map.
-		let TypeNode::Struct(data) = event.data.as_mut() else {
-			panic!("struct event");
-		};
-		data.fields[1].r#type = Box::new(TypeNode::Link(codama_nodes::DefinedTypeLinkNode::new(
-			"Missing",
-		)));
+		let mut root = read_idl("events_program.json");
+		if let TypeNode::Struct(data) = root.program.events[0].data.as_mut() {
+			// Replace the first payload field with a link the emitter cannot map.
+			data.fields[1].r#type = Box::new(TypeNode::Link(DefinedTypeLinkNode::new("Missing")));
+		}
 		let program = root.program.clone();
 		let event = root.program.events.remove(0);
 		let histories = EventClientHistoryIndex::default();
@@ -1399,22 +2048,19 @@ mod tests {
 
 	#[test]
 	fn boolean_event_fields_request_the_shared_helper() {
-		let root = read_idl("events_program.json");
-		let mut root = root;
-		let TypeNode::Struct(data) = root.program.events[0].data.as_mut() else {
-			panic!("struct event");
-		};
-		data.fields[1].r#type = Box::new(TypeNode::Boolean(codama_nodes::BooleanTypeNode::new(
-			codama_nodes::NumberTypeNode::le(codama_nodes::NumberFormat::U8),
-		)));
+		let mut root = read_idl("events_program.json");
+		if let TypeNode::Struct(data) = root.program.events[0].data.as_mut() {
+			data.fields[1].r#type = Box::new(TypeNode::Boolean(BooleanTypeNode::new(
+				NumberTypeNode::le(NumberFormat::U8),
+			)));
+		}
 		let program = root.program.clone();
 		let event = root.program.events.remove(0);
 		let histories = EventClientHistoryIndex::default();
 		let facts = event_facts(&event, &program, &histories)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
-		let module =
-			event_module("EventsProgram", &facts).unwrap_or_else(|error| panic!("module: {error}"));
+		let module = event_module("EventsProgram", &facts);
 		assert!(module.contains("getPinaPodBooleanDecoder"));
 		assert!(module.contains("import '../pina_pod_codecs.dart';"));
 	}

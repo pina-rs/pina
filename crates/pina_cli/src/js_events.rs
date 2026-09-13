@@ -636,7 +636,18 @@ fn lower_camel(pascal: &str) -> String {
 mod tests {
 	use std::path::PathBuf;
 
+	use codama_nodes::ConstantDiscriminatorNode;
+	use codama_nodes::ConstantValueNode;
+	use codama_nodes::DefaultValueStrategy;
+	use codama_nodes::NumberTypeNode;
+	use codama_nodes::NumberValueNode;
+	use codama_nodes::PublicKeyTypeNode;
 	use codama_nodes::RootNode;
+	use codama_nodes::SizeDiscriminatorNode;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::StringValueNode;
+	use codama_nodes::StructFieldTypeNode;
+	use codama_nodes::StructTypeNode;
 
 	use super::*;
 
@@ -670,6 +681,333 @@ mod tests {
 				}],
 			}],
 		}
+	}
+
+	fn number_field(name: &str, format: NumberFormat, number: Number) -> StructFieldTypeNode {
+		let mut field =
+			StructFieldTypeNode::new(name, TypeNode::Number(NumberTypeNode::le(format)));
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode { number })));
+		field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+		field
+	}
+
+	fn constant_discriminator(format: NumberFormat, number: Number) -> DiscriminatorNode {
+		DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(NumberTypeNode::le(format), NumberValueNode { number }),
+			0,
+		))
+	}
+
+	fn envelope_event(name: &str, version_format: NumberFormat, version: Number) -> EventNode {
+		let data = StructTypeNode::new(vec![
+			number_field(
+				"discriminator",
+				NumberFormat::U8,
+				Number::UnsignedInteger(4),
+			),
+			number_field("migrationVersion", version_format, version),
+			number_field("value", NumberFormat::U64, Number::UnsignedInteger(0)),
+		]);
+		let mut event = EventNode::new(name, data);
+		event.discriminators = vec![constant_discriminator(
+			NumberFormat::U8,
+			Number::UnsignedInteger(4),
+		)];
+		event
+	}
+
+	fn write_index(generated: &Path) {
+		let events = generated.join("events");
+		std::fs::create_dir_all(&events).expect("events dir");
+		std::fs::write(events.join("index.ts"), "export * from \"./myEvent\";\n")
+			.expect("index file");
+	}
+
+	#[test]
+	fn emits_nothing_when_no_event_has_a_discriminator() {
+		let mut root = read_idl("events_program.json");
+		for event in &mut root.program.events {
+			event.discriminators.clear();
+		}
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		write_index(&generated);
+
+		emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect("no renderable events is not an error");
+		assert!(!generated.join("events/logs.ts").exists());
+	}
+
+	#[test]
+	fn module_index_failures_propagate() {
+		let root = read_idl("events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		// A directory where the barrel index should be makes the read fail after
+		// the log module itself was written.
+		std::fs::create_dir_all(generated.join("events/index.ts")).expect("blocked index");
+
+		let error = emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect_err("an unreadable index must fail");
+		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
+		assert!(generated.join("events/logs.ts").exists());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn module_index_write_failures_propagate() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let root = read_idl("events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		write_index(&generated);
+		let index = generated.join("events/index.ts");
+		std::fs::set_permissions(&index, std::fs::Permissions::from_mode(0o444))
+			.expect("read-only index");
+
+		let error = emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect_err("a read-only index must fail");
+		// Restore permissions so the temporary directory can be removed.
+		std::fs::set_permissions(&index, std::fs::Permissions::from_mode(0o644))
+			.expect("restore index");
+		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
+	}
+
+	#[test]
+	fn events_without_a_discriminator_are_skipped() {
+		let mut root = read_idl("events_program.json");
+		root.program.events[0].discriminators.clear();
+
+		let module = event_log_module(
+			"events_program",
+			&root.program.events,
+			&EventClientHistoryIndex::default(),
+		)
+		.unwrap_or_else(|| panic!("one renderable event keeps the module"));
+		assert!(module.contains("MyOtherEventEvent"));
+		assert!(!module.contains("MyEventEvent"));
+	}
+
+	#[test]
+	fn migratable_events_without_history_emit_a_current_only_decoder() {
+		let root = read_idl("migrations_program.json");
+		let module = event_log_module(
+			"migrations_program",
+			&root.program.events,
+			&EventClientHistoryIndex::default(),
+		)
+		.unwrap_or_else(|| panic!("the migration event must emit a log module"));
+
+		assert!(module.contains("carries no checked-in migration history"));
+		assert!(module.contains("written by a different schema; regenerate this client"));
+		assert!(!module.contains("PROJECTION_STEPS"));
+	}
+
+	#[test]
+	fn event_facts_require_numeric_unsigned_constants() {
+		let mut events = Vec::new();
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Size(SizeDiscriminatorNode::new(4))];
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::U8),
+				ValueNode::String(StringValueNode::new("4")),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				StringTypeNode::utf8(),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::F32),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::U8),
+				ValueNode::Number(NumberValueNode::new(-4_i8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let histories = EventClientHistoryIndex::default();
+		for event in &events {
+			let label = format!("event `{}`", event.name.as_ref());
+			assert!(
+				event_facts(event, &histories).is_none(),
+				"{label} has no facts"
+			);
+		}
+	}
+
+	#[test]
+	fn event_facts_require_a_numeric_unsigned_envelope() {
+		let mut events = Vec::new();
+
+		// Non-struct event data has no envelope at all.
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.data = Box::new(TypeNode::Bytes(codama_nodes::BytesTypeNode::new()));
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("4"))));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("1"))));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type =
+				Box::new(TypeNode::Number(NumberTypeNode::le(NumberFormat::F32)));
+		}
+		events.push(event);
+
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::Number(NumberValueNode::new(-1_i8))));
+		}
+		events.push(event);
+
+		// A discriminator constant is required for an envelope.
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		event.discriminators.clear();
+		events.push(event);
+
+		// The version field must exist.
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields.truncate(1);
+		}
+		events.push(event);
+
+		// The version field appearing before the discriminator is not an envelope.
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields.swap(0, 1);
+		}
+		events.push(event);
+
+		let histories = EventClientHistoryIndex::default();
+		for event in &events {
+			let label = format!("event `{}`", event.name.as_ref());
+			let facts = event_facts(event, &histories);
+			assert!(
+				facts.is_none() || facts.and_then(|facts| facts.envelope).is_none(),
+				"{label} must not produce an envelope",
+			);
+		}
+
+		// Unrelated defaulted fields are skipped while scanning the envelope.
+		let mut event =
+			envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			let mut note = number_field("note", NumberFormat::U8, Number::UnsignedInteger(7));
+			note.default_value_strategy = None;
+			data.fields.insert(1, note);
+		}
+		let facts = event_facts(&event, &histories)
+			.unwrap_or_else(|| panic!("skipped fields keep the envelope"));
+		assert!(facts.envelope.is_some());
+	}
+
+	#[test]
+	fn event_discriminator_widths_map_to_their_byte_lengths() {
+		let histories = EventClientHistoryIndex::default();
+		for (format, number, width) in [
+			(NumberFormat::U8, Number::UnsignedInteger(4), 1),
+			(NumberFormat::U16, Number::UnsignedInteger(0x0102), 2),
+			(NumberFormat::U32, Number::UnsignedInteger(0x0102_0304), 4),
+			(
+				NumberFormat::U64,
+				Number::UnsignedInteger(0x0102_0304_0506_0708),
+				8,
+			),
+		] {
+			let mut event =
+				envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+			event.discriminators = vec![constant_discriminator(format, number)];
+			let facts = event_facts(&event, &histories)
+				.unwrap_or_else(|| panic!("discriminator width {width} must map"));
+			assert_eq!(facts.discriminator.len(), width);
+		}
+	}
+
+	#[test]
+	fn name_helpers_handle_empty_names() {
+		assert_eq!(lower_camel(""), "");
 	}
 
 	#[test]

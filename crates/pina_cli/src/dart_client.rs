@@ -1171,6 +1171,32 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn event_module_emission_failures_propagate() {
+		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+		let source = std::fs::read_to_string(workspace.join("codama/idls/events_program.json"))
+			.expect("events IDL should be readable");
+		let mut root: RootNode = serde_json::from_str(&source).expect("events IDL should decode");
+		for event in &mut root.program.events {
+			event.discriminators.clear();
+		}
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let idl = temporary.path().join("events_program.json");
+		std::fs::write(&idl, serde_json::to_string(&root).expect("serialize IDL"))
+			.expect("IDL should be writable");
+		let generated = temporary.path().join("lib/src/generated/events_program");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+
+		let error = harden_generated_dart_clients(
+			temporary.path(),
+			&["events_program".to_owned()],
+			&[idl],
+			&[],
+		)
+		.expect_err("an event without a discriminator must fail");
+		assert!(matches!(error, CodamaError::DartClient { .. }));
+	}
+
+	#[test]
 	fn accepts_supported_pinapod_semantics() {
 		let value = serde_json::json!({
 			"kind": "structTypeNode",

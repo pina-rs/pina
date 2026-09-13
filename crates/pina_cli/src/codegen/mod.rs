@@ -1119,8 +1119,11 @@ mod tests {
 			accounts: vec![],
 			instructions: vec![],
 			events: vec![
-				event(Vec::new()),
-				event(vec![crate::ir::MIGRATABLE_DOC_MARKER.to_owned()]),
+				event(vec!["Tracked value changes.".to_owned()]),
+				event(vec![
+					"Versioned value changes.".to_owned(),
+					crate::ir::MIGRATABLE_DOC_MARKER.to_owned(),
+				]),
 			],
 			errors: vec![],
 			pdas: vec![],
@@ -1173,7 +1176,15 @@ mod tests {
 			json.pointer("/program/events/1/discriminators/1/constant/value/number"),
 			Some(&serde_json::json!(1)),
 		);
-		// Hidden markers never leak into the rendered docs.
+		// Event docs survive while hidden migration markers never leak.
+		assert_eq!(
+			json.pointer("/program/events/0/docs/0"),
+			Some(&serde_json::json!("Tracked value changes.")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/docs/0"),
+			Some(&serde_json::json!("Versioned value changes.")),
+		);
 		assert!(!json.to_string().contains("pina:migratable"));
 		assert!(json.get("versions").is_none());
 		assert!(!json.to_string().contains("transition"));

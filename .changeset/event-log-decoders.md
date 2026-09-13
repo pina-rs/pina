@@ -1,6 +1,6 @@
 ---
-pina_cli: feat
-pina_codama_renderer: feat
+pina_cli: breaking
+pina_codama_renderer: breaking
 ---
 
 # Generated Event Log Decoders
@@ -11,3 +11,8 @@ Generated TypeScript, Dart, and Rust clients now carry the event read path. The 
 - Dart emits `events/` modules with the same decode, projection, and log parsing API; the upstream Dart renderer does not render event nodes.
 - The Rust client renders `events/` modules with strict decoding, a `try_from_bytes` that distinguishes stale from future versions, and a `project_from_bytes` that returns current bytes with their source version.
 - Manual transitions remain the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition.
+
+## Breaking changes
+
+- `pina_cli`: the parsed event declaration gained the public `migratable` field, so `EventDeclaration` struct literals must set it, and `CodamaError` gained the `EventHistories` variant, so exhaustive matches must handle it.
+- `pina_codama_renderer`: `RenderConfig` gained the public `event_histories` field, so struct literals built without `..RenderConfig::default()` must set it.

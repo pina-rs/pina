@@ -1103,6 +1103,26 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn event_log_emission_failures_propagate() {
+		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+		let idl = workspace.join("codama/idls/events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		std::fs::create_dir_all(&generated).expect("generated dir");
+		// Blocking the events path makes the generated log module unwritable.
+		std::fs::write(generated.join("events"), b"file").expect("blocked events path");
+
+		let error = harden_generated_clients(
+			temporary.path(),
+			&["events_program".to_owned()],
+			&[idl],
+			&[],
+		)
+		.expect_err("an unwritable events module must fail");
+		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
+	}
+
+	#[test]
 	fn hardens_generated_codec_boundaries() {
 		let source = r#"/** generated */
 import { fixEncoderSize } from "@solana/kit";

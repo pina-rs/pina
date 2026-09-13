@@ -13,6 +13,7 @@ use codama_nodes::EventNode;
 use codama_nodes::HasKind as _;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
+use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
 use heck::ToShoutySnakeCase as _;
@@ -108,7 +109,7 @@ pub(crate) fn render_event_page(
 		})
 		.collect::<Result<Vec<_>>>()?;
 
-	let envelope = event_migration_envelope(event, discriminator.as_ref());
+	let envelope = event_migration_envelope(data_type, discriminator.as_ref());
 
 	let mut field_lines = Vec::new();
 	for doc_line in render_docs(&event.docs, 0) {
@@ -754,12 +755,9 @@ pub(crate) fn event_discriminator_bytes(event: &EventNode) -> Option<Vec<u8>> {
 }
 
 fn event_migration_envelope(
-	event: &EventNode,
+	data_type: &StructTypeNode,
 	discriminator: Option<&DiscriminatorInfo>,
 ) -> Option<EventEnvelope> {
-	let TypeNode::Struct(data_type) = event.data.as_ref() else {
-		return None;
-	};
 	let mut fields = data_type.fields.iter().filter_map(|field| {
 		let default_value = field.default_value.as_ref().as_ref()?;
 		let kind = match field.name.as_ref() {
