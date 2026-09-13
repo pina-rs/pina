@@ -2012,10 +2012,24 @@ mod __pinapod_compact_CompactState {
                     }
                 }
             };
+            let _ = const {
+                if !(core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>() == 0
+                    || 4 as usize
+                        <= isize::MAX as usize
+                            / core::mem::size_of::<
+                                <u64 as pina::pinapod::ZcField>::Pod,
+                            >())
+                {
+                    {
+                        ::core::panicking::panic_fmt(
+                            format_args!(
+                                "compact vector maximum byte size must fit isize",
+                            ),
+                        );
+                    }
+                }
+            };
             Self::validate_storage_len(data.len())?;
-            if data.len() < core::mem::size_of::<CompactStateHeader>() {
-                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
-            }
             let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
             <CompactStateHeader as pina::pinapod::ZcValidate>::validate_ref(__hdr)?;
             let mut __tail_offset = core::mem::size_of::<CompactStateHeader>();
@@ -2029,17 +2043,19 @@ mod __pinapod_compact_CompactState {
             if __elem_size == 0 {
                 return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
-            let __byte_len = __pinapod_checked_mul(__values_len, __elem_size)?;
-            let __tail_end = __pinapod_checked_add(__tail_offset, __byte_len)?;
+            let __byte_len = __values_len
+                * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            let __tail_end = __tail_offset + __byte_len;
             let __tail = data
                 .get(__tail_offset..__tail_end)
                 .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
-            for __i in 0..__values_len {
-                let __elem_offset = __pinapod_checked_mul(__i, __elem_size)?;
-                let __elem = unsafe {
-                    &*(__tail.as_ptr().add(__elem_offset)
-                        as *const <u64 as pina::pinapod::ZcField>::Pod)
-                };
+            let __elems = unsafe {
+                core::slice::from_raw_parts(
+                    __tail.as_ptr() as *const <u64 as pina::pinapod::ZcField>::Pod,
+                    __values_len,
+                )
+            };
+            for __elem in __elems {
                 <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
                     __elem,
                 )?;
