@@ -8,6 +8,7 @@
 	clippy::too_many_arguments
 )]
 
+pub mod events;
 pub mod instructions;
 pub mod programs;
 

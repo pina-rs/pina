@@ -576,6 +576,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
+	let mut event_histories = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
 		let name_override = plan.override_idl_names.then_some(example.as_str());
 		let idl = generate_idl(program_path, name_override).map_err(|source| {
@@ -600,19 +601,32 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			}
 		})?;
 		idl_paths.push(idl_path);
+		event_histories.push(crate::client_events::read_histories(program_path).map_err(
+			|message| {
+				CodamaError::EventHistories {
+					example: example.clone(),
+					path: program_path.clone(),
+					message,
+				}
+			},
+		)?);
 	}
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
 		let settings = plan.generation[&ClientLanguage::Rust];
-		let render_config = RenderConfig {
-			mode: rust_render_mode(settings.mode),
-			scaffold: settings.scaffold,
-			..RenderConfig::default()
-		};
 
-		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
+		for (index, (example, idl_path)) in examples.iter().zip(idl_paths.iter()).enumerate() {
 			let crate_dir = plan.rust_out.join(example);
 			validate_render_target(&crate_dir)?;
+			let render_config = RenderConfig {
+				mode: rust_render_mode(settings.mode),
+				scaffold: settings.scaffold,
+				event_histories: event_histories
+					.get(index)
+					.map(crate::client_events::EventClientHistoryIndex::renderer_histories)
+					.unwrap_or_default(),
+				..RenderConfig::default()
+			};
 			render_rust_client(idl_path, &crate_dir, &render_config)?;
 		}
 	}
@@ -641,7 +655,12 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
-		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
+		harden_generated_clients(
+			&plan.typescript_out,
+			&examples,
+			&idl_paths,
+			&event_histories,
+		)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -654,7 +673,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
-		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
+		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths, &event_histories)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
 	}
 

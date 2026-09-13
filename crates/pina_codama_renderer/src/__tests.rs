@@ -1358,7 +1358,7 @@ fn renders_untrusted_multiline_text_as_valid_rust() {
 	account_root.program.accounts[0]
 		.docs
 		.push("Account documentation.\npub const INJECTED: bool = true;");
-	let account_files = render_program_to_files(&account_root)
+	let account_files = render_program_to_files(&account_root, &[])
 		.unwrap_or_else(|error| panic!("render failed: {error}"));
 	let account_source = account_files
 		.get(Path::new("accounts/counter_state.rs"))
@@ -1371,7 +1371,7 @@ fn renders_untrusted_multiline_text_as_valid_rust() {
 	let mut error_root = load_fixture_root("custom_errors_program");
 	error_root.program.errors[0].message =
 		"bad message\n)]\npub const INJECTED: bool = true;".to_string();
-	let error_files = render_program_to_files(&error_root)
+	let error_files = render_program_to_files(&error_root, &[])
 		.unwrap_or_else(|error| panic!("render failed: {error}"));
 	let error_path = format!("errors/{}.rs", snake(error_root.program.name.as_ref()));
 	let error_source = error_files
@@ -1570,4 +1570,94 @@ fn rejects_dangling_symlinked_generated_directory() {
 
 	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
 	assert!(!dangling_target.exists());
+}
+
+#[test]
+fn renders_event_modules_with_envelope_and_projection() {
+	let root = load_fixture_root("migrations_program");
+	let histories = vec![EventMigrationHistory {
+		rust_name: "ValueChangedEvent".to_owned(),
+		discriminator: vec![4],
+		current_version: 1,
+		steps: vec![EventProjectionStep {
+			from: 0,
+			to: 1,
+			automatic: true,
+			source_payload_size: 8,
+			destination_payload_size: 10,
+			moves: vec![EventFieldMove {
+				source_offset: 0,
+				destination_offset: 0,
+				size: 8,
+			}],
+		}],
+	}];
+	let files = render_program_to_files(&root, &histories)
+		.unwrap_or_else(|error| panic!("event render: {error}"));
+
+	let root_mod = files
+		.get(Path::new("mod.rs"))
+		.unwrap_or_else(|| panic!("root module must exist"));
+	assert!(root_mod.contains("pub mod events;"));
+
+	let module = files
+		.get(Path::new("events/mod.rs"))
+		.unwrap_or_else(|| panic!("events module barrel must exist"));
+	assert!(module.contains("pub use self::r#value_changed_event::*;"));
+
+	let page = files
+		.get(Path::new("events/value_changed_event.rs"))
+		.unwrap_or_else(|| panic!("event module must exist"));
+	for expected in [
+		"pub struct ValueChangedEvent {",
+		"pub discriminator: u8,",
+		"pub migration_version: u8,",
+		"pub value: u64,",
+		"pub memo: u16,",
+		"pub const VALUE_CHANGED_EVENT_DISCRIMINATOR: u8 = 4u8;",
+		"pub const VALUE_CHANGED_EVENT_MIGRATION_VERSION: u8 = 1u8;",
+		"pub fn from_bytes(data: &[u8])",
+		"pub fn try_from_bytes(",
+		"pub enum ValueChangedEventVersionError",
+		"pub fn project_from_bytes(",
+		"pub struct ProjectedValueChangedEvent",
+		"pub const fn source_version(&self) -> u8",
+		"pub const fn was_migrated(&self) -> bool",
+		"const VALUE_CHANGED_EVENT_PROJECTION_STEPS",
+		"\t(0, 1, true, 8, 10, &[(0, 0, 8)]),",
+		"event migration version mismatch: expected 1",
+	] {
+		assert!(page.contains(expected), "missing `{expected}` in:\n{page}");
+	}
+}
+
+#[test]
+fn renders_event_modules_without_history_as_current_only_decoders() {
+	let root = load_fixture_root("events_program");
+	let files =
+		render_program_to_files(&root, &[]).unwrap_or_else(|error| panic!("event render: {error}"));
+
+	let page = files
+		.get(Path::new("events/my_event.rs"))
+		.unwrap_or_else(|| panic!("event module must exist"));
+	assert!(page.contains("pub struct MyEvent {"));
+	assert!(page.contains("pub discriminator: u8,"));
+	assert!(page.contains("pub fn from_bytes(data: &[u8])"));
+	assert!(!page.contains("pub fn project_from_bytes("));
+	assert!(!page.contains("MIGRATION_VERSION"));
+}
+
+#[test]
+fn event_discriminator_bytes_require_a_constant_node() {
+	let mut root = load_fixture_root("events_program");
+	for event in &mut root.program.events {
+		event.discriminators.clear();
+	}
+	let files =
+		render_program_to_files(&root, &[]).unwrap_or_else(|error| panic!("event render: {error}"));
+	let page = files
+		.get(Path::new("events/my_event.rs"))
+		.unwrap_or_else(|| panic!("event module must exist"));
+	assert!(!page.contains("MY_EVENT_DISCRIMINATOR"));
+	assert!(!page.contains("pub fn try_from_bytes("));
 }

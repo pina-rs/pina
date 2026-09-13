@@ -96,9 +96,10 @@ export function identifyMigrationsProgramEvent(
 	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MigrationsProgramEvent {
 	const data = "data" in event ? event.data : event;
-	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
-		return MigrationsProgramEvent.ValueChangedEvent;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(4), 0) &&
+		containsBytes(data, getU8Encoder().encode(1), 1)
+	) return MigrationsProgramEvent.ValueChangedEvent;
 	throw new Error(
 		"The provided event could not be identified as a migrationsProgram event.",
 	);

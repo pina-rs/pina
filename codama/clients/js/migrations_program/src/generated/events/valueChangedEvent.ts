@@ -18,9 +18,15 @@ import {
 	getU16Encoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR = 4;
 
@@ -28,7 +34,18 @@ export function getValueChangedEventEventDiscriminatorBytes(): ReadonlyUint8Arra
 	return getU8Encoder().encode(VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR);
 }
 
-export type ValueChangedEventEvent = { value: bigint; memo: number };
+export const VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR2 = 1;
+
+export function getValueChangedEventEventDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR2);
+}
+
+export type ValueChangedEventEvent = {
+	discriminator: number;
+	migrationVersion: number;
+	value: bigint;
+	memo: number;
+};
 
 export type ValueChangedEventEventArgs = {
 	value: number | bigint;
@@ -39,20 +56,33 @@ export type ValueChangedEventEventArgs = {
 export function getValueChangedEventEventEncoder(): FixedSizeEncoder<
 	ValueChangedEventEventArgs
 > {
-	return getStructEncoder([["value", getU64Encoder()], [
-		"memo",
-		getU16Encoder(),
-	]]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["value", getU64Encoder()],
+			["memo", getU16Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 4, migrationVersion: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link ValueChangedEventEvent} event data. */
 export function getValueChangedEventEventDecoder(): FixedSizeDecoder<
 	ValueChangedEventEvent
 > {
-	return getStructDecoder([["value", getU64Decoder()], [
-		"memo",
-		getU16Decoder(),
-	]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(1, getU8Decoder())],
+		["value", getU64Decoder()],
+		["memo", getU16Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link ValueChangedEventEvent} event data. */
@@ -75,6 +105,11 @@ export function parseValueChangedEventEvent(
 			data,
 			getU8Encoder().encode(VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR),
 			0,
+		) &&
+		containsBytes(
+			data,
+			getU8Encoder().encode(VALUE_CHANGED_EVENT_EVENT_DISCRIMINATOR2),
+			1,
 		)
 	) return getValueChangedEventEventDecoder().decode(data);
 	throw new Error(

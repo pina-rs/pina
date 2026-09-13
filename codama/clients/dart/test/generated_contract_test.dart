@@ -6,6 +6,7 @@ import 'package:pina_codama_clients/account_realloc_program.dart'
     show Sample, getSampleDecoder, getSampleEncoder;
 import 'package:pina_codama_clients/compact_accounts_program.dart'
     show Journal, getJournalDecoder, getJournalEncoder;
+import 'package:pina_codama_clients/events_program.dart' as events_program;
 import 'package:pina_codama_clients/migrations_program.dart'
     as migrations_program;
 import 'package:pina_codama_clients/profile_program.dart';
@@ -446,6 +447,165 @@ void main() {
       expect(omitted.accounts![4].role, AccountRole.writable);
     });
   });
+
+  group('generated event log decoders', () {
+    test('enforce the current envelope on a fetched record', () {
+      final decoded = migrations_program.decodeValueChangedEventEvent(
+        _valueChangedEventBytes(1, BigInt.from(42), 7),
+      );
+      expect(decoded.discriminator, 4);
+      expect(decoded.migrationVersion, 1);
+      expect(decoded.value, BigInt.from(42));
+      expect(decoded.memo, 7);
+
+      expect(
+        () => migrations_program.decodeValueChangedEventEvent(
+          _valueChangedEventBytes(2, BigInt.from(42), 7),
+        ),
+        throwsA(_rangeErrorContaining('upgrade this client')),
+      );
+      // A stale record that still has the current length reaches the version
+      // check; a shorter record fails the exact-length check first.
+      final stale = _valueChangedEventBytes(1, BigInt.from(42), 7)..[1] = 0;
+      expect(
+        () => migrations_program.decodeValueChangedEventEvent(stale),
+        throwsA(_rangeErrorContaining('migration version mismatch')),
+      );
+      expect(
+        () => migrations_program.decodeValueChangedEventEvent(
+          _valueChangedEventBytes(0, BigInt.from(42), 0),
+        ),
+        throwsA(
+          _rangeErrorContaining('expected exactly 12 bytes, received 10'),
+        ),
+      );
+    });
+
+    test('project a log written at an older version', () {
+      // Version zero carried only the u64 payload; projection zero-fills memo.
+      final normalized = migrations_program.normalizeValueChangedEventEvent(
+        _valueChangedEventBytes(0, BigInt.from(42), 0),
+      );
+
+      expect(normalized.name, 'valueChangedEvent');
+      expect(normalized.sourceVersion, 0);
+      expect(normalized.wasMigrated, isTrue);
+      expect(normalized.data.value, BigInt.from(42));
+      expect(normalized.data.memo, 0);
+      expect(normalized.data.migrationVersion, 1);
+
+      final current = migrations_program.normalizeValueChangedEventEvent(
+        _valueChangedEventBytes(1, BigInt.from(42), 7),
+      );
+      expect(current.sourceVersion, 1);
+      expect(current.wasMigrated, isFalse);
+      expect(current.data.memo, 7);
+    });
+
+    test('fail closed for future, truncated, and foreign records', () {
+      expect(
+        () => migrations_program.normalizeValueChangedEventEvent(
+          _valueChangedEventBytes(2, BigInt.from(42), 7),
+        ),
+        throwsA(_rangeErrorContaining('newer program; upgrade this client')),
+      );
+      expect(
+        () => migrations_program.normalizeValueChangedEventEvent(
+          Uint8List.fromList([4, 0, 1, 2, 3]),
+        ),
+        throwsA(
+          _rangeErrorContaining('log length does not match the v0 schema'),
+        ),
+      );
+      final foreign = _valueChangedEventBytes(0, BigInt.from(42), 0)..[0] = 9;
+      expect(
+        () => migrations_program.normalizeValueChangedEventEvent(foreign),
+        throwsA(_rangeErrorContaining('event discriminator')),
+      );
+      expect(
+        () => migrations_program.normalizeValueChangedEventEvent(
+          Uint8List.fromList([4]),
+        ),
+        throwsA(_rangeErrorContaining('too short')),
+      );
+    });
+
+    test('decode Program data log lines through the program parser', () {
+      final historical =
+          'Program data: '
+          '${base64.encode(_valueChangedEventBytes(0, BigInt.from(7), 0))}';
+      final parsed = migrations_program.parseValueChangedEventEventFromLog(
+        historical,
+      );
+      expect(parsed, isNotNull);
+      expect(parsed!.sourceVersion, 0);
+      expect(parsed.wasMigrated, isTrue);
+      expect(parsed.data.value, BigInt.from(7));
+
+      expect(
+        migrations_program.parseValueChangedEventEventFromLog('nope'),
+        isNull,
+      );
+      expect(
+        migrations_program.parseValueChangedEventEventFromLog(
+          'Program data: ${base64.encode(const [9, 1, 0])}',
+        ),
+        isNull,
+      );
+
+      final discovered = migrations_program.parseMigrationsProgramEventsFromLogs(
+        [
+          'Program log: Instruction: Update',
+          'Program data: '
+              '${base64.encode(_valueChangedEventBytes(1, BigInt.from(5), 3))}',
+          'Program data: ${base64.encode(const [9, 1, 0])}',
+        ],
+      );
+      expect(discovered, hasLength(1));
+      expect(discovered.first.name, 'valueChangedEvent');
+    });
+
+    test('decode events that carry no version envelope', () {
+      final bytes = Uint8List(17);
+      bytes[0] = 1;
+      final view = ByteData.sublistView(bytes);
+      view.setUint64(1, 5, Endian.little);
+      final decoded = events_program.decodeMyEventEvent(bytes);
+      expect(decoded.discriminator, 1);
+      expect(decoded.data, BigInt.from(5));
+      expect(decoded.label, everyElement(0));
+
+      final log = 'Program data: ${base64.encode(bytes)}';
+      final parsed = events_program.parseMyEventEventFromLog(log);
+      expect(parsed, isNotNull);
+      expect(parsed!.name, 'myEvent');
+      expect(
+        events_program.parseEventsProgramEventsFromLogs([log]),
+        hasLength(1),
+      );
+    });
+  });
+}
+
+Uint8List _valueChangedEventBytes(int version, BigInt value, int memo) {
+  // Version zero carried only the u64 payload; later versions appended memo.
+  final data = Uint8List(version == 0 ? 10 : 12);
+  data[0] = 4;
+  data[1] = version;
+  final view = ByteData.sublistView(data);
+  view.setUint64(2, value.toInt(), Endian.little);
+  if (data.length == 12) {
+    view.setUint16(10, memo, Endian.little);
+  }
+  return data;
+}
+
+Matcher _rangeErrorContaining(String message) {
+  return isA<RangeError>().having(
+    (error) => error.toString(),
+    'message',
+    contains(message),
+  );
 }
 
 ProfileState _profile({String? name, List<BigInt>? tags}) {

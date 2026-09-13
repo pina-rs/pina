@@ -615,6 +615,34 @@
 					"fields": [
 						{
 							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 4
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "value",
 							"type": {
 								"kind": "numberTypeNode",
@@ -647,6 +675,22 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 4
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
 							}
 						}
 					}

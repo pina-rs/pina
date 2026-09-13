@@ -12,6 +12,7 @@ use codama_nodes::RootNode;
 pub use error::RenderError;
 pub use error::Result;
 use render::accounts::migration_envelope;
+use render::events::event_discriminator_bytes;
 use render::*;
 
 /// Configuration for rendering a Codama IDL into a client crate.
@@ -25,6 +26,62 @@ pub struct RenderConfig {
 	pub mode: RenderMode,
 	/// Create missing manifests and entrypoints around the generated folder. Defaults to `true`.
 	pub scaffold: bool,
+	/// Checked-in event histories that enable client-side projection.
+	///
+	/// The Codama IDL intentionally omits event history, so the CLI reads every
+	/// `migrations/manifest.json` and threads the facts here. Events without an
+	/// entry still get envelope enforcement; stale records then fail closed
+	/// with the reason. Defaults to an empty list.
+	pub event_histories: Vec<EventMigrationHistory>,
+}
+
+/// One adjacent event projection, payload-relative to the version envelope.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EventProjectionStep {
+	/// Source schema version.
+	pub from: u32,
+	/// Destination schema version.
+	pub to: u32,
+	/// Whether the checked-in transition is an automatic byte mapping.
+	pub automatic: bool,
+	/// Exact source payload size, excluding discriminator and version.
+	pub source_payload_size: usize,
+	/// Exact destination payload size, excluding discriminator and version.
+	pub destination_payload_size: usize,
+	/// Field byte moves from the source payload into the destination payload.
+	pub moves: Vec<EventFieldMove>,
+}
+
+/// One field's bytes moving between adjacent payload layouts.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EventFieldMove {
+	/// Payload-relative source offset.
+	pub source_offset: usize,
+	/// Payload-relative destination offset.
+	pub destination_offset: usize,
+	/// Moved byte count.
+	pub size: usize,
+}
+
+/// Checked-in history for one migration-aware event.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EventMigrationHistory {
+	/// Rust struct ident recorded in the manifest, for diagnostics.
+	pub rust_name: String,
+	/// Discriminator bytes as stored at offset zero.
+	pub discriminator: Vec<u8>,
+	/// Current schema version this history publishes.
+	pub current_version: u32,
+	/// Every adjacent transition in source order.
+	pub steps: Vec<EventProjectionStep>,
+}
+
+impl EventMigrationHistory {
+	/// Whether this history belongs to the event with `discriminator` bytes.
+	#[must_use]
+	pub fn matches(&self, discriminator: &[u8]) -> bool {
+		self.discriminator == discriminator
+	}
 }
 
 impl Default for RenderConfig {
@@ -34,6 +91,7 @@ impl Default for RenderConfig {
 			generated_folder: PathBuf::from("src/generated"),
 			mode: RenderMode::Auto,
 			scaffold: true,
+			event_histories: Vec::new(),
 		}
 	}
 }
@@ -97,7 +155,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	let generated_dir = validate_generated_dir(crate_dir, &config.generated_folder)?;
-	let files = render_program_to_files(root)?;
+	let files = render_program_to_files(root, &config.event_histories)?;
 	validate_generated_sources(&files)?;
 	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
@@ -222,7 +280,10 @@ pub fn render_program(
 	render_root_node(&root, crate_dir, config)
 }
 
-fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
+fn render_program_to_files(
+	root: &RootNode,
+	event_histories: &[EventMigrationHistory],
+) -> Result<BTreeMap<PathBuf, String>> {
 	let program = &root.program;
 	let compact_capacities = CompactCapacityIndex::read(program)?;
 	let public_defined_types = program
@@ -316,6 +377,27 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 				&primary_program_const,
 			)),
 		);
+	}
+
+	// Event files
+	if !program.events.is_empty() {
+		files.insert(
+			PathBuf::from("events/mod.rs"),
+			page(&render_events_mod(&program.events)),
+		);
+
+		for event in &program.events {
+			let discriminator = event_discriminator_bytes(event);
+			let history = discriminator.as_ref().and_then(|discriminator| {
+				event_histories
+					.iter()
+					.find(|history| history.matches(discriminator))
+			});
+			let filename = format!("events/{}.rs", snake(event.name.as_ref()));
+			let event_content = render_event_page(event, history)?;
+
+			files.insert(PathBuf::from(filename), page(&event_content));
+		}
 	}
 
 	// Type definitions
