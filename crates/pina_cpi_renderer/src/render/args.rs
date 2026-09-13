@@ -95,18 +95,20 @@ fn render_number_argument(
 		NumberFormat::U32 => ("u32", 4),
 		NumberFormat::U64 => ("u64", 8),
 		NumberFormat::U128 => ("u128", 16),
-		NumberFormat::I8
-		| NumberFormat::I16
-		| NumberFormat::I32
-		| NumberFormat::I64
-		| NumberFormat::I128
-		| NumberFormat::F32
-		| NumberFormat::F64
-		| NumberFormat::ShortU16 => {
+		NumberFormat::I8 => ("i8", 1),
+		NumberFormat::I16 => ("i16", 2),
+		NumberFormat::I32 => ("i32", 4),
+		NumberFormat::I64 => ("i64", 8),
+		NumberFormat::I128 => ("i128", 16),
+		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => {
 			return Err(RenderError::UnsupportedType {
 				context: context.to_string(),
 				kind: "numberTypeNode",
-				reason: format!("unsupported argument format `{:?}`", number_type.format),
+				reason: format!(
+					"unsupported argument format `{:?}`; supported formats are the native \
+					 little-endian integers u8-u128 and i8-i128",
+					number_type.format
+				),
 			});
 		}
 	};
@@ -467,7 +469,7 @@ mod tests {
 		assert!(render_argument("name", &StringTypeNode::utf8().into(), "test").is_err());
 		assert!(render_argument("name", &NumberTypeNode::be(U16).into(), "test").is_err());
 
-		for format in [I8, I16, I32, I64, I128, F32, F64, ShortU16] {
+		for format in [F32, F64, ShortU16] {
 			assert!(render_argument("name", &NumberTypeNode::le(format).into(), "test").is_err());
 		}
 
@@ -487,6 +489,11 @@ mod tests {
 			(U32, "u32", 4),
 			(U64, "u64", 8),
 			(U128, "u128", 16),
+			(I8, "i8", 1),
+			(I16, "i16", 2),
+			(I32, "i32", 4),
+			(I64, "i64", 8),
+			(I128, "i128", 16),
 		] {
 			let rendered = render_argument("someValue", &NumberTypeNode::le(format).into(), "test")
 				.unwrap_or_else(|error| panic!("number should render: {error}"));

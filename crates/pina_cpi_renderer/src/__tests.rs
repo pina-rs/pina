@@ -704,6 +704,47 @@ fn renders_public_key_bool_and_number_arguments() {
 }
 
 #[test]
+fn renders_signed_number_arguments() {
+	let program = program_node(
+		"registry",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"adjust",
+			numeric_discriminator(3),
+			vec![InstructionAccountNode::new("member", true, true)],
+			vec![
+				InstructionArgumentNode::new("delta8", NumberTypeNode::le(NumberFormat::I8)),
+				InstructionArgumentNode::new("delta16", NumberTypeNode::le(NumberFormat::I16)),
+				InstructionArgumentNode::new("delta32", NumberTypeNode::le(NumberFormat::I32)),
+				InstructionArgumentNode::new("delta64", NumberTypeNode::le(NumberFormat::I64)),
+				InstructionArgumentNode::new("delta128", NumberTypeNode::le(NumberFormat::I128)),
+			],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders: {error}"));
+
+	for (field, rust_type) in [
+		("delta8", "i8"),
+		("delta16", "i16"),
+		("delta32", "i32"),
+		("delta64", "i64"),
+		("delta128", "i128"),
+	] {
+		assert!(page.contains(&format!("pub {field}: {rust_type},")));
+	}
+
+	// Signed arguments use the same two's-complement little-endian write as the
+	// unsigned formats, so the offsets depend only on the declared widths.
+	assert!(page.contains("data[1..2].copy_from_slice(&self.delta8.to_le_bytes());"));
+	assert!(page.contains("data[2..4].copy_from_slice(&self.delta16.to_le_bytes());"));
+	assert!(page.contains("data[4..8].copy_from_slice(&self.delta32.to_le_bytes());"));
+	assert!(page.contains("data[8..16].copy_from_slice(&self.delta64.to_le_bytes());"));
+	assert!(page.contains("data[16..32].copy_from_slice(&self.delta128.to_le_bytes());"));
+	assert!(page.contains("[0u8; 32]"));
+}
+
+#[test]
 fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 	let program = program_node(
 		"keywords",

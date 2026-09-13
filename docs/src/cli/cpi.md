@@ -23,6 +23,8 @@ pina cpi --idl ./anchor-idl.json --output ./clients/anchor-cpi
 pina cpi --idl ./anchor-idl.json --output ./clients/anchor-cpi --mode update
 ```
 
+Instruction arguments may be little-endian native integers (`u8`-`u128` and `i8`-`i128`), booleans, public keys, fixed `u8` arrays, and PinaPod's bounded strings and vectors. Floating point, `shortU16`, and dynamic types are rejected before rendering.
+
 Codama roots are rendered natively. Raw Anchor IDLs are normalized with `@codama/nodes-from-anchor`, then passed to the same renderer. The output crate contains a validated `ProgramAccount` and direct struct-based calls exposing `.invoke()` and `.invoke_signed()`. Each call contains its account references and a typed `*Ix` field named `ix`; its `to_bytes()` output is passed as CPI data. Account and argument fields preserve their IDL documentation and are labelled with their role.
 
 The default `auto` mode creates missing scaffold files on initial generation and preserves them on updates. `create` fails if the target is nonempty, `update` fails if it is absent or empty, and `overwrite` removes the entire crate before generating it again. Use `--no-scaffold` when a workspace already supplies its own manifest and entrypoint.
