@@ -155,7 +155,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	let generated_dir = validate_generated_dir(crate_dir, &config.generated_folder)?;
-	let files = render_program_to_files(root, &config.event_histories)?;
+	let files = render_program_to_files_with_histories(root, &config.event_histories)?;
 	validate_generated_sources(&files)?;
 	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
@@ -280,7 +280,16 @@ pub fn render_program(
 	render_root_node(&root, crate_dir, config)
 }
 
-fn render_program_to_files(
+/// Render a program's files without checked-in event histories.
+///
+/// Kept for the fixture tests that exercise the renderer directly; production
+/// rendering goes through [`render_program_to_files_with_histories`].
+#[cfg(test)]
+fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
+	render_program_to_files_with_histories(root, &[])
+}
+
+fn render_program_to_files_with_histories(
 	root: &RootNode,
 	event_histories: &[EventMigrationHistory],
 ) -> Result<BTreeMap<PathBuf, String>> {

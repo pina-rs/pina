@@ -812,3 +812,440 @@ fn event_migration_envelope(
 		version_bytes,
 	})
 }
+
+#[cfg(test)]
+mod tests {
+	use std::path::Path;
+
+	use codama_nodes::BytesTypeNode;
+	use codama_nodes::ConstantDiscriminatorNode;
+	use codama_nodes::ConstantValueNode;
+	use codama_nodes::DiscriminatorNode;
+	use codama_nodes::NumberTypeNode;
+	use codama_nodes::NumberValueNode;
+	use codama_nodes::PublicKeyTypeNode;
+	use codama_nodes::RootNode;
+	use codama_nodes::SizeDiscriminatorNode;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::StringValueNode;
+	use codama_nodes::StructFieldTypeNode;
+	use codama_nodes::U8;
+
+	use super::*;
+	use crate::EventFieldMove;
+	use crate::EventProjectionStep;
+	use crate::render_program_to_files_with_histories;
+
+	fn load_fixture_root(name: &str) -> RootNode {
+		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../..")
+			.join("codama/idls")
+			.join(format!("{name}.json"));
+		let source = std::fs::read_to_string(&path)
+			.unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+		serde_json::from_str(&source)
+			.unwrap_or_else(|error| panic!("decode {}: {error}", path.display()))
+	}
+
+	#[test]
+	fn renders_event_modules_with_envelope_and_projection() {
+		let root = load_fixture_root("migrations_program");
+		let histories = vec![EventMigrationHistory {
+			rust_name: "ValueChangedEvent".to_owned(),
+			discriminator: vec![4],
+			current_version: 1,
+			steps: vec![EventProjectionStep {
+				from: 0,
+				to: 1,
+				automatic: true,
+				source_payload_size: 8,
+				destination_payload_size: 10,
+				moves: vec![EventFieldMove {
+					source_offset: 0,
+					destination_offset: 0,
+					size: 8,
+				}],
+			}],
+		}];
+		let files = render_program_to_files_with_histories(&root, &histories)
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+
+		let root_mod = files
+			.get(Path::new("mod.rs"))
+			.unwrap_or_else(|| panic!("root module must exist"));
+		assert!(root_mod.contains("pub mod events;"));
+
+		let module = files
+			.get(Path::new("events/mod.rs"))
+			.unwrap_or_else(|| panic!("events module barrel must exist"));
+		assert!(module.contains("pub use self::r#value_changed_event::*;"));
+
+		let page = files
+			.get(Path::new("events/value_changed_event.rs"))
+			.unwrap_or_else(|| panic!("event module must exist"));
+		for expected in [
+			"pub struct ValueChangedEvent {",
+			"pub discriminator: u8,",
+			"pub migration_version: u8,",
+			"pub value: u64,",
+			"pub memo: u16,",
+			"pub const VALUE_CHANGED_EVENT_DISCRIMINATOR: u8 = 4u8;",
+			"pub const VALUE_CHANGED_EVENT_MIGRATION_VERSION: u8 = 1u8;",
+			"pub fn from_bytes(data: &[u8])",
+			"pub fn try_from_bytes(",
+			"pub enum ValueChangedEventVersionError",
+			"pub fn project_from_bytes(",
+			"pub struct ProjectedValueChangedEvent",
+			"pub const fn source_version(&self) -> u8",
+			"pub const fn was_migrated(&self) -> bool",
+			"const VALUE_CHANGED_EVENT_PROJECTION_STEPS",
+			"\t(0, 1, true, 8, 10, &[(0, 0, 8)]),",
+			"event migration version mismatch: expected 1",
+		] {
+			assert!(page.contains(expected), "missing `{expected}` in:\n{page}");
+		}
+	}
+
+	#[test]
+	fn renders_event_modules_without_history_as_current_only_decoders() {
+		let root = load_fixture_root("events_program");
+		let files = render_program_to_files_with_histories(&root, &[])
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+
+		let page = files
+			.get(Path::new("events/my_event.rs"))
+			.unwrap_or_else(|| panic!("event module must exist"));
+		assert!(page.contains("pub struct MyEvent {"));
+		assert!(page.contains("pub discriminator: u8,"));
+		assert!(page.contains("pub fn from_bytes(data: &[u8])"));
+		assert!(!page.contains("pub fn project_from_bytes("));
+		assert!(!page.contains("MIGRATION_VERSION"));
+	}
+
+	#[test]
+	fn event_discriminator_bytes_require_a_constant_node() {
+		let mut root = load_fixture_root("events_program");
+		for event in &mut root.program.events {
+			event.discriminators.clear();
+		}
+		let files = render_program_to_files_with_histories(&root, &[])
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+		let page = files
+			.get(Path::new("events/my_event.rs"))
+			.unwrap_or_else(|| panic!("event module must exist"));
+		assert!(!page.contains("MY_EVENT_DISCRIMINATOR"));
+		assert!(!page.contains("pub fn try_from_bytes("));
+	}
+
+	fn event_number_field(name: &str, format: NumberFormat, number: Number) -> StructFieldTypeNode {
+		let mut field =
+			StructFieldTypeNode::new(name, TypeNode::Number(NumberTypeNode::le(format)));
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode { number })));
+		field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+		field
+	}
+
+	fn event_constant_discriminator(format: NumberFormat, number: Number) -> DiscriminatorNode {
+		DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(NumberTypeNode::le(format), NumberValueNode { number }),
+			0,
+		))
+	}
+
+	fn envelope_event(name: &str, version_format: NumberFormat, version: Number) -> EventNode {
+		let data = StructTypeNode::new(vec![
+			event_number_field("discriminator", U8, Number::UnsignedInteger(4)),
+			event_number_field("migrationVersion", version_format, version),
+			event_number_field("value", NumberFormat::U64, Number::UnsignedInteger(0)),
+		]);
+		let mut event = EventNode::new(name, data);
+		event.discriminators = vec![event_constant_discriminator(U8, Number::UnsignedInteger(4))];
+		event
+	}
+
+	fn drop_omitted_strategy(event: &mut EventNode) {
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			for field in &mut data.fields {
+				field.default_value_strategy = None;
+			}
+		}
+	}
+
+	#[test]
+	fn dropping_omitted_strategy_leaves_non_struct_events_alone() {
+		let mut event = EventNode::new("bytesEvent", BytesTypeNode::new());
+		drop_omitted_strategy(&mut event);
+		assert!(matches!(event.data.as_ref(), TypeNode::Bytes(_)));
+	}
+
+	fn envelope_history(automatic: bool) -> EventMigrationHistory {
+		EventMigrationHistory {
+			rust_name: "ValueChangedEvent".to_owned(),
+			discriminator: vec![4],
+			current_version: 1,
+			steps: vec![EventProjectionStep {
+				from: 0,
+				to: 1,
+				automatic,
+				source_payload_size: 8,
+				destination_payload_size: 10,
+				moves: vec![EventFieldMove {
+					source_offset: 0,
+					destination_offset: 0,
+					size: 8,
+				}],
+			}],
+		}
+	}
+
+	#[test]
+	fn renders_event_pages_with_every_envelope_width() {
+		let cases = [
+			(U8, Number::UnsignedInteger(1), "u8", "1u8"),
+			(NumberFormat::U16, Number::UnsignedInteger(2), "u16", "2u16"),
+			(NumberFormat::U32, Number::UnsignedInteger(4), "u32", "4u32"),
+			(NumberFormat::U64, Number::UnsignedInteger(8), "u64", "8u64"),
+		];
+		for (format, version, ty, literal) in cases {
+			let event = envelope_event("valueChanged", format, version);
+			let page = render_event_page(&event, Some(&envelope_history(true)))
+				.unwrap_or_else(|error| panic!("event render: {error}"));
+
+			assert!(
+				page.contains(&format!("{ty}::from_le_bytes")),
+				"missing {ty} read in:\n{page}"
+			);
+			assert!(
+				page.contains(&format!(
+					"_MIGRATION_VERSION: pina::Pod{}",
+					ty.to_uppercase()
+				)) || page.contains(&format!("_MIGRATION_VERSION: {ty} = {literal};")),
+				"missing version constant for {ty} in:\n{page}"
+			);
+		}
+	}
+
+	#[test]
+	fn renders_event_docs_on_the_struct_and_its_fields() {
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.docs = vec!["Tracks value changes.".to_owned()].into();
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].docs = vec!["Schema version.".to_owned()].into();
+		}
+		let page =
+			render_event_page(&event, None).unwrap_or_else(|error| panic!("event render: {error}"));
+
+		assert!(page.contains("/// Tracks value changes."), "{page}");
+		assert!(page.contains("/// Schema version."), "{page}");
+	}
+
+	#[test]
+	fn render_event_page_rejects_non_struct_events() {
+		let event = EventNode::new("badEvent", BytesTypeNode::new());
+		let error =
+			render_event_page(&event, None).expect_err("non-struct events have no fixed layout");
+		assert!(matches!(error, RenderError::UnsupportedType { .. }));
+	}
+
+	#[test]
+	fn event_envelopes_require_numeric_unsigned_defaults() {
+		let mut events = Vec::new();
+
+		// Discriminator field with a non-numeric type and a non-number default.
+		let mut event = envelope_event("stringType", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event = envelope_event("stringDefault", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[0].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("4"))));
+		}
+		events.push(event);
+
+		let mut event = envelope_event("migrationType", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type = Box::new(TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		}
+		events.push(event);
+
+		let mut event = envelope_event("migrationDefault", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::String(StringValueNode::new("1"))));
+		}
+		events.push(event);
+
+		// A 128-bit version or a signed default is not a Pina migration version.
+		let mut event = envelope_event(
+			"wideVersion",
+			NumberFormat::U128,
+			Number::UnsignedInteger(1),
+		);
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].r#type =
+				Box::new(TypeNode::Number(NumberTypeNode::le(NumberFormat::U128)));
+		}
+		events.push(event);
+
+		let mut event = envelope_event("signedVersion", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields[1].default_value =
+				Box::new(Some(ValueNode::Number(NumberValueNode::new(-1_i8))));
+		}
+		events.push(event);
+
+		// Envelope-shaped fields without a discriminator constant.
+		let mut event = envelope_event("missingDiscriminator", U8, Number::UnsignedInteger(1));
+		event.discriminators.clear();
+		events.push(event);
+
+		// A discriminator field with no migration version field.
+		let mut event = envelope_event("missingVersion", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields.truncate(1);
+		}
+		events.push(event);
+
+		// The version field appearing before the discriminator is not an envelope.
+		let mut event = envelope_event("reorderedVersion", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			data.fields.swap(0, 1);
+		}
+		events.push(event);
+
+		// Unrelated defaulted fields are skipped while scanning the envelope.
+		let mut event = envelope_event("unrelatedDefault", U8, Number::UnsignedInteger(1));
+		if let TypeNode::Struct(data) = event.data.as_mut() {
+			let mut note = event_number_field("note", U8, Number::UnsignedInteger(7));
+			note.default_value_strategy = None;
+			data.fields.insert(1, note);
+		}
+		// The envelope still parses; the skipped field only exercises the scan.
+		let parsed =
+			render_event_page(&event, None).unwrap_or_else(|error| panic!("event render: {error}"));
+		assert!(parsed.contains("MIGRATION_VERSION"), "{parsed}");
+
+		for event in &mut events {
+			drop_omitted_strategy(event);
+			let label = format!("event `{}`", event.name.as_ref());
+			let page = render_event_page(event, Some(&envelope_history(true)))
+				.unwrap_or_else(|error| panic!("event render: {error}"));
+			assert!(
+				!page.contains("MIGRATION_VERSION"),
+				"{label} must not render a version envelope:\n{page}",
+			);
+		}
+	}
+
+	#[test]
+	fn event_discriminator_bytes_cover_every_supported_width() {
+		for (format, number, expected) in [
+			(U8, Number::UnsignedInteger(4), vec![4]),
+			(
+				NumberFormat::U16,
+				Number::UnsignedInteger(0x0102),
+				vec![2, 1],
+			),
+			(
+				NumberFormat::U32,
+				Number::UnsignedInteger(0x0102_0304),
+				vec![4, 3, 2, 1],
+			),
+			(
+				NumberFormat::U64,
+				Number::UnsignedInteger(0x0102_0304_0506_0708),
+				vec![8, 7, 6, 5, 4, 3, 2, 1],
+			),
+		] {
+			let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+			event.discriminators = vec![event_constant_discriminator(format, number)];
+			assert_eq!(event_discriminator_bytes(&event), Some(expected));
+		}
+	}
+
+	#[test]
+	fn event_discriminator_bytes_reject_invalid_nodes() {
+		let mut events = Vec::new();
+
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Size(SizeDiscriminatorNode::new(4))];
+		events.push(event);
+
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(U8),
+				ValueNode::String(StringValueNode::new("4")),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				StringTypeNode::utf8(),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(NumberFormat::F32),
+				ValueNode::Number(NumberValueNode::new(4_u8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		event.discriminators = vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(
+				NumberTypeNode::le(U8),
+				ValueNode::Number(NumberValueNode::new(-4_i8)),
+			),
+			0,
+		))];
+		events.push(event);
+
+		for event in &events {
+			let label = format!("event `{}`", event.name.as_ref());
+			assert_eq!(
+				event_discriminator_bytes(event),
+				None,
+				"{label} must have no usable discriminator",
+			);
+		}
+	}
+
+	#[test]
+	fn event_projection_renders_manual_and_empty_histories() {
+		let event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+
+		let manual = envelope_history(false);
+		let page = render_event_page(&event, Some(&manual))
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+		assert!(
+			page.contains("(0, 1, false, 8, 10, &[(0, 0, 8)]),"),
+			"{page}"
+		);
+
+		let empty = EventMigrationHistory {
+			steps: Vec::new(),
+			..envelope_history(true)
+		};
+		let page = render_event_page(&event, Some(&empty))
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+		assert!(
+			!page.contains("historical_bytes_project_to_the_current_shape"),
+			"{page}"
+		);
+		assert!(page.contains("future_versions_fail_closed"), "{page}");
+	}
+}
