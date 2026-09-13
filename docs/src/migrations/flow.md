@@ -209,6 +209,23 @@ Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 
 
 That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
 
+### Reading without migrating
+
+Migration is a mutation, and the runtime forbids writes and resizes on a read-only account. A program that only reads a stale account therefore has no migration path in that instruction. Generated account code now offers a read-only alternative: `<Account>::try_from_bytes_versioned(bytes)` validates the exact representation named by the version envelope and borrows it immutably. It never rewrites, resizes, or clears anything, and it never requires a writable borrow; foreign discriminators, unknown versions, future versions, and malformed lengths all fail closed.
+
+The generated `<Account>Versioned` enum has one variant per historical version plus `Current`, so the caller must handle every stored representation:
+
+```rust,ignore
+let data = account.try_borrow()?;
+match State::try_from_bytes_versioned(&data)? {
+    StateVersioned::V0(view) => read_v0(view),
+    StateVersioned::V1(view) => read_v1(view),
+    StateVersioned::Current(view) => read_current(view),
+}
+```
+
+**This is a deliberate trade-off, not a replacement for migration.** A program that reads historical layouts must handle two (or more) representations in its business logic, which is exactly the branching the migration system exists to remove. Treat the view as the complement for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; the reserved `Migrate` instruction remains the primary fix. The accessor is generated only for accounts declared with `migrations`.
+
 ### Generated client helpers
 
 Generated clients turn that flow into a one-call routine. Next to each migratable account module the TypeScript, Dart, and Rust clients emit:

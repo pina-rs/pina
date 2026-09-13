@@ -44,6 +44,7 @@ pub(crate) fn expand(
 
 	// Extract configuration
 	let struct_name = item_struct.ident.clone();
+	let struct_visibility = item_struct.vis.clone();
 	let zc_name = format_ident!("{}Zc", struct_name);
 	let header_name = format_ident!("{}Header", struct_name);
 	let ref_name = format_ident!("{}Ref", struct_name);
@@ -283,7 +284,7 @@ pub(crate) fn expand(
 	});
 	let account_migration = match migration.as_ref() {
 		Some(migration) => {
-			match migration.account_implementation(&crate_path, &struct_name) {
+			match migration.account_implementation(&crate_path, &struct_name, &struct_visibility) {
 				Ok(implementation) => implementation,
 				Err(error) => return error.to_compile_error(),
 			}

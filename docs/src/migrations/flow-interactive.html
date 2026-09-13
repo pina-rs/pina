@@ -640,6 +640,8 @@ if let Some(state) = state {
 
 <div class="box info"><b>Why this is safe to expose.</b> Each account is checked to be owned by your program and writable before anything is inspected. The sweep only moves accounts forward through published transitions, validates each destination before committing the version, and aborts the instruction if anything fails after the first mutation. The payer only ever adds lamports, only the rent deficit, and only up to the <code class="inline">max_lamports</code> cap the developer sets; shrinking never moves lamports. And since each caller supplies its own payer, nobody can be made to fund someone else's migration.</div>
 
+<div class="box info"><b>Reading without migrating.</b> If the current transaction cannot make the account writable at all, generated code now offers a read-only view: <code class="inline">State::try_from_bytes_versioned(bytes)</code> validates the exact representation named by the envelope and returns the generated <code class="inline">StateVersioned</code> enum — one variant per historical version plus <code class="inline">Current</code>. It never writes, resizes, or needs a writable borrow, and foreign, unknown, future, or malformed bytes fail closed. This is a deliberate trade-off, not a replacement for migration: the caller must handle every stored representation in its logic, which is the branching migrations exist to remove. Prefer the sweep whenever a writable touch is schedulable.</div>
+
 <table>
 	<tr><th>Case</th><th>What the sweep does</th></tr>
 	<tr><td>Account absent (client omitted it or sent the program-address filler)</td><td>Skipped entirely; no validation, charge, or write</td></tr>
