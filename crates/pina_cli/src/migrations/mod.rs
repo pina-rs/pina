@@ -1,8 +1,8 @@
 //! Migrations CLI: schema diffing, transition generation, publication
 //! bookkeeping, and the disambiguation flow that ties them together.
 
-mod cost;
 mod build_script;
+mod cost;
 mod diff;
 mod ledger;
 mod prompt;
@@ -21,6 +21,9 @@ use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use build_script::BuildScriptStatus;
+use build_script::ensure_build_script;
+use build_script::verify_build_script;
 pub use cost::AccountCostPreview;
 pub use cost::InstructionCostPreview;
 pub use cost::InstructionLadder;
@@ -28,9 +31,6 @@ pub use cost::LadderCost;
 pub use cost::MigrationCostPreview;
 pub use cost::MostExpensiveTransaction;
 pub use cost::StaticCuEstimate;
-pub use build_script::BuildScriptStatus;
-use build_script::ensure_build_script;
-use build_script::verify_build_script;
 use diff::effective_source_schema;
 use diff::resolve_field_changes;
 pub use ledger::ReconcileOutput;
@@ -573,7 +573,6 @@ pub(crate) fn check_project_migrations(
 fn check_project_migrations_with_manifest(
 	project: &Project,
 ) -> Result<(Vec<MigrationStatus>, Option<MigrationManifest>), MigrationError> {
-	let current = scan_current_contracts(project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?;
 	// Verification follows the recorded policy because that is what macros
@@ -680,6 +679,8 @@ pub fn migration_status_report(start: &Path) -> Result<MigrationStatusReport, Mi
 		statuses,
 		cost_preview,
 	})
+}
+
 /// Read the recorded auto policy without running compatibility checks.
 ///
 /// IDL extraction needs the policy before it can assemble the IR, and the full
