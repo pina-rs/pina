@@ -271,14 +271,17 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 | Reorder, remove, or escalate an instruction slot | **Breaking**; create a new instruction discriminator                     |
 | Change the migration version width after release | **Breaking** for every migration-aware wire contract                     |
 
-Add `migrations` to an account, instruction, or event attribute to opt into a framework-owned version field. Pina places the field immediately after the discriminator. Set its width once for the program:
+Add `migrations` to an account, instruction, or event attribute to opt one contract into a framework-owned version field, or opt whole contract kinds in through `pina.toml`:
 
 ```toml
 [migrations]
 version-type = "u8"
+auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
 ```
 
-The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default. The width is program-wide and freezes at the first published release, so it is deliberately the narrowest set that covers any realistic migration history. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
+`auto` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy in `migrations/manifest.json` and snapshots every contract of the listed kinds. Macros read the policy from the manifest rather than `pina.toml`, so a new struct still fails the build with "run `pina migrations make`" until it has a snapshot. Once a policy is recorded, `make` also scaffolds a `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, so flipping the policy re-expands every contract without editing source. Add `migrations = false` to keep one contract out of an auto policy; removing an envelope the manifest already records is an error instead of a silent opt-out, because stripping an envelope is itself a wire-format change.
+
+Pina places the version field immediately after the discriminator. The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default. The width is program-wide and freezes at the first published release, so it is deliberately the narrowest set that covers any realistic migration history. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
 
 Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 

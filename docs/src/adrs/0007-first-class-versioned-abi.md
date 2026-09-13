@@ -26,6 +26,14 @@ pub struct Profile {
 }
 ```
 
+A program that wants every contract versioned should not have to repeat the annotation:
+
+```toml
+[migrations]
+version-type = "u8"
+auto = true # or a staged subset such as ["accounts", "events"]
+```
+
 The developer declares that a contract is migratable, but does not choose or maintain its version. The current Rust source describes the desired state. Pina owns version allocation, ABI snapshots, generated structural transitions, drift checks, and historical dispatch. A developer supplies code only when a schema diff cannot determine the intended value.
 
 ## Decision
@@ -50,6 +58,18 @@ Each account, instruction contract, and event advances independently. An instruc
 
 Existing unversioned data is not silently treated as version zero. Its first payload bytes may be a valid version by accident. Adoption requires an explicit legacy bridge or a new discriminator.
 
+### Auto opt-in policy
+
+A `[migrations].auto` list opts whole contract kinds in without per-item annotations. The vocabulary is exactly `accounts`, `events`, and `instructions`, and `auto = true` is sugar for all three. Unknown names, duplicates, and mixing the boolean with a kind list are configuration errors. Staging a subset is supported because the kinds carry different costs: an instruction envelope changes payload bytes and ripples into CPI call sites.
+
+The resolved policy is recorded in `migrations/manifest.json`, and the manifest remains the only policy source procedural macros consult. Macros must not read `pina.toml`: the manifest is the checked-in, hash-chained document that keeps builds deterministic and reproducible, and a proc macro does not re-expand when an unrelated toml file changes, so a toml read would leave stale expansions after a policy flip. `pina migrations make` therefore records the policy and snapshots every contract of the listed kinds, and a declaration without a snapshot still fails the build with the existing `pina migrations make` remedy.
+
+Per-item `migrations = false` overrides the global policy for one contract. Removing an envelope from a contract the manifest already records is an error rather than a silent opt-out, because stripping an envelope changes the wire format. The same rejection applies when a kind is dropped from `auto`. Recording an envelope removal as a deliberate migration is a future retirement flow; this ADR only fixes the fail-closed behavior.
+
+Enabling auto on an already-launched program is a bulk wire-format change: `make` records one history entry per newly enveloped contract. Existing live bytes of those contracts have no envelope, so the developer must treat the addition like any other deliberate wire-format change. For a new program it is simply the version-zero baseline.
+
+Because the macros read the manifest, a policy flip must re-expand contracts without a source edit. When a policy is recorded, `pina migrations make` scaffolds a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. Scaffolding is idempotent, never overwrites a hand-written build script, and reports the exact line to add when it cannot write safely; `pina migrations check` fails until the directive is present.
+
 ### Current IDL and ABI history
 
 The public IDL describes only the current program contract. For each opted-in account or instruction, it includes `migrationVersion` as an omitted constant and a constant discriminator at the byte immediately after the ordinary discriminator. Generated clients therefore write the current version without exposing it as an application argument, while an IDL captured from an older release continues to write its own frozen version. The IDL does not contain historical schemas or transition code; it is not the migration database.
@@ -71,7 +91,7 @@ The checked-in Pina ABI history records the physical information needed to recon
 
 Stable identity derives from contract kind and discriminator, not a Rust type name. Renaming a Rust type does not create a new on-chain identity.
 
-The ABI history comes from the same closed schema grammar used by Pina's macros. Format 3 records the `pinaPodV2` codec and a derived, payload-relative physical descriptor. Historical generated types assert their compiled fixed size or compact header, maximum size, and tail alignment against that descriptor. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod does not own Solana migration policy.
+The ABI history comes from the same closed schema grammar used by Pina's macros. Format 3 records the `pinaPodV2` codec and a derived, payload-relative physical descriptor. Format 4 records the `[migrations].auto` policy alongside it. Historical generated types assert their compiled fixed size or compact header, maximum size, and tail alignment against that descriptor. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod does not own Solana migration policy.
 
 Pina's ABI document has its own `formatVersion`, separate from every on-chain contract version. All readers decode the document into a generic envelope, reject future formats, and run Pina-owned adjacent format migrations before deserializing the current typed model. The ABI library also provides adjacent downgrade paths. A downgrade fails closed when an older format cannot represent the current document without information loss. Normal manifest writes always use the current format. An internal ABI-format upgrade therefore does not consume an account or instruction migration number, and old checked-in manifests remain buildable as long as Pina retains their adjacent document migrators.
 

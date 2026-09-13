@@ -10,6 +10,18 @@ An interactive version of this page is at [flow-interactive.html](./flow-interac
 
 ## Development-time flow
 
+### Opting in
+
+One contract opts in with the `migrations` token; a whole program opts in through `[migrations].auto`:
+
+```toml
+[migrations]
+version-type = "u8"
+auto = true # or ["accounts", "events", "instructions"], or a staged subset
+```
+
+`pina migrations make` records the policy in `migrations/manifest.json` and snapshots every contract of the listed kinds, so the manifest stays the checked-in source of truth that macros consult. A declaration the manifest does not record yet still fails the build with the `pina migrations make` remedy. Because a proc macro does not re-expand when `pina.toml` changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `make` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change.
+
 ```text
                  ┌──────────────────────────────┐
                  │ developer changes a struct,  │

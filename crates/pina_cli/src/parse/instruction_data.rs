@@ -15,7 +15,8 @@ pub struct InstructionStruct {
 	pub variant: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
-	pub migratable: bool,
+	/// The declaration's migration opt-in, before policy resolution.
+	pub migrations: super::MigrationOptIn,
 }
 
 /// Extract all `#[instruction(...)]` structs from a file.
@@ -43,7 +44,8 @@ pub fn extract_instruction_structs(file: &File) -> Result<Vec<InstructionStruct>
 
 		let fields = extract_named_fields(&item_struct.fields);
 		let docs = extract_docs(&item_struct.attrs);
-		let migratable = super::event_data::has_migrations_flag(&item_struct.attrs, "instruction");
+		let migrations = super::event_data::migrations_opt_in(&item_struct.attrs, "instruction")?
+			.unwrap_or_default();
 
 		result.push(InstructionStruct {
 			name: item_struct.ident.to_string(),
@@ -51,7 +53,7 @@ pub fn extract_instruction_structs(file: &File) -> Result<Vec<InstructionStruct>
 			variant,
 			fields,
 			docs,
-			migratable,
+			migrations,
 		});
 	}
 
@@ -210,5 +212,23 @@ mod tests {
 				.to_string()
 				.contains("`variant` must be a single identifier")
 		);
+	}
+
+	#[test]
+	fn non_boolean_migrations_values_are_rejected() {
+		let source = r#"
+			#[instruction(discriminator = CounterInstruction, migrations = "false")]
+			pub struct UpdateInstruction {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		let error = extract_instruction_structs(&file).expect_err("string must fail");
+		let message = error.to_string();
+		assert!(message.contains(r#""false""#), "message: {message}");
+		assert!(
+			message.contains("`instruction` schema"),
+			"message: {message}"
+		);
+		assert!(message.contains("not a boolean"), "message: {message}");
 	}
 }

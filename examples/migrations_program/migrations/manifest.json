@@ -1,7 +1,12 @@
 {
-	"formatVersion": 3,
+	"formatVersion": 4,
 	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
 	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
 	"contracts": {
 		"account:1:01": {
 			"identity": {

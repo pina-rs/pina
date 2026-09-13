@@ -7,6 +7,7 @@ use pina_abi::ContractKind;
 use pina_abi::DataSchema;
 use pina_abi::FieldSchema;
 use pina_abi::LayoutKind;
+use pina_abi::MigrationAuto;
 use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::ProcessAccount;
@@ -28,6 +29,13 @@ pub(super) struct CurrentContract {
 	pub(super) process: Option<ProcessContract>,
 }
 
+/// One source declaration that explicitly disabled migrations.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct CurrentOptOut {
+	pub(super) kind: ContractKind,
+	pub(super) rust_name: String,
+}
+
 pub(super) fn next_migration_version(
 	identity: &str,
 	current: u32,
@@ -47,13 +55,19 @@ pub(super) fn next_migration_version(
 pub(super) struct CurrentProgram {
 	pub(super) program_id: String,
 	pub(super) contracts: Vec<CurrentContract>,
+	/// Declarations that set `migrations = false` explicitly.
+	pub(super) opt_outs: Vec<CurrentOptOut>,
 }
 
-pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, MigrationError> {
+pub(super) fn scan_current_contracts(
+	project: &Project,
+	auto: &MigrationAuto,
+) -> Result<CurrentProgram, MigrationError> {
 	let (ir, files) =
-		parse::parse_program_with_sources(&project.program_dir, Some(&project.library_name))?;
+		parse::parse_program_with_sources(&project.program_dir, Some(&project.library_name), auto)?;
 	let mut discriminators = Vec::new();
 	let mut events = Vec::new();
+	let mut opt_outs = Vec::new();
 	for resolved in &files {
 		// The shared parser has already validated discriminator declarations in
 		// these exact syntax trees while assembling `ir`: the same pure
@@ -66,7 +80,9 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 		);
 		events.extend(parse::event_data::extract_migratable_events(
 			&resolved.file,
+			auto.contains(ContractKind::Event),
 		)?);
+		collect_opt_outs(&resolved.file, &mut opt_outs)?;
 	}
 	let discriminator_map = parse::build_discriminator_map(&discriminators);
 	let mut contracts = BTreeMap::new();
@@ -174,7 +190,40 @@ pub(super) fn scan_current_contracts(project: &Project) -> Result<CurrentProgram
 	Ok(CurrentProgram {
 		program_id: ir.public_key,
 		contracts: contracts.into_values().collect(),
+		opt_outs,
 	})
+}
+
+/// Collect every `migrations = false` declaration in one parsed file.
+fn collect_opt_outs(
+	file: &syn::File,
+	opt_outs: &mut Vec<CurrentOptOut>,
+) -> Result<(), MigrationError> {
+	for account in parse::account_state::extract_account_structs(file)? {
+		if account.migrations.is_disabled() {
+			opt_outs.push(CurrentOptOut {
+				kind: ContractKind::Account,
+				rust_name: account.name,
+			});
+		}
+	}
+	for instruction in parse::instruction_data::extract_instruction_structs(file)? {
+		if instruction.migrations.is_disabled() {
+			opt_outs.push(CurrentOptOut {
+				kind: ContractKind::Instruction,
+				rust_name: instruction.name,
+			});
+		}
+	}
+	for event in parse::event_data::extract_event_declarations(file)? {
+		if event.migrations.is_disabled() {
+			opt_outs.push(CurrentOptOut {
+				kind: ContractKind::Event,
+				rust_name: event.name,
+			});
+		}
+	}
+	Ok(())
 }
 
 pub(super) fn resolve_discriminator<'a>(
