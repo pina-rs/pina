@@ -558,7 +558,7 @@ mod tests {
 		assert_eq!(versioned.version(), 0);
 		match versioned {
 			CompactStateVersioned::V0(view) => assert_eq!(view.name(), "Ada"),
-			_ => panic!("expected the compact v0 representation"),
+			CompactStateVersioned::Current(_) => panic!("expected the compact v0 representation"),
 		}
 		assert_eq!(v0, snapshot, "reading a view must not mutate bytes");
 
@@ -582,7 +582,7 @@ mod tests {
 				assert_eq!(view.name(), "Ada");
 				assert!(view.tags().is_empty());
 			}
-			_ => panic!("expected the compact current representation"),
+			CompactStateVersioned::V0(_) => panic!("expected the compact current representation"),
 		}
 	}
 
@@ -698,5 +698,148 @@ mod tests {
 			read_through_trait::<State>(&stale),
 			Err(PinaProgramError::MigrationRequired.into()),
 		);
+	}
+}
+
+/// Compile-time and behavior coverage for generated views on non-public accounts.
+///
+/// The historical struct, its payload fields, and the versioned enum all inherit
+/// the account's visibility, so a private or `pub(crate)` account must not widen
+/// its API (or emit `private_interfaces` warnings) through the read path.
+#[cfg(test)]
+mod versioned_visibility {
+	use super::MigrationAccount;
+
+	mod crate_visible {
+		use pina::*;
+
+		use super::*;
+
+		#[account(discriminator = MigrationAccount::State, migrations)]
+		pub(crate) struct State {
+			pub(crate) authority: Address,
+			pub(crate) value: u64,
+			pub(crate) enabled: bool,
+			pub(crate) revision: u8,
+		}
+
+		#[test]
+		fn reads_historical_and_current_bytes() {
+			let mut historical = [0_u8; 43];
+			historical[0] = MigrationAccount::State as u8;
+			historical[1] = 1;
+			historical[42] = 1;
+
+			let versioned = State::try_from_bytes_versioned(&historical)
+				.unwrap_or_else(|error| panic!("view crate-visible v1: {error:?}"));
+			assert_eq!(versioned.version(), 1);
+			match versioned {
+				StateVersioned::V1(view) => assert!(bool::from(view.enabled)),
+				_ => panic!("expected the crate-visible v1 representation"),
+			}
+
+			let mut current = [0_u8; 44];
+			current[..43].copy_from_slice(&historical);
+			current[1] = 2;
+			let versioned = State::try_from_bytes_versioned(&current)
+				.unwrap_or_else(|error| panic!("view crate-visible current: {error:?}"));
+			assert_eq!(versioned.version(), 2);
+		}
+	}
+
+	mod module_private {
+		use pina::*;
+
+		use super::*;
+
+		#[account(discriminator = MigrationAccount::State, migrations)]
+		struct State {
+			authority: Address,
+			value: u64,
+			enabled: bool,
+			revision: u8,
+		}
+
+		#[test]
+		fn reads_historical_and_current_bytes() {
+			let mut historical = [0_u8; 42];
+			historical[0] = MigrationAccount::State as u8;
+			historical[1] = 0;
+			historical[34..42].copy_from_slice(&42_u64.to_le_bytes());
+
+			let versioned = State::try_from_bytes_versioned(&historical)
+				.unwrap_or_else(|error| panic!("view private v0: {error:?}"));
+			assert_eq!(versioned.version(), 0);
+			match versioned {
+				StateVersioned::V0(view) => assert_eq!(view.value.get(), 42),
+				_ => panic!("expected the private v0 representation"),
+			}
+
+			let mut current = [0_u8; 44];
+			current[0] = MigrationAccount::State as u8;
+			current[1] = 2;
+			current[42] = 1;
+			let versioned = State::try_from_bytes_versioned(&current)
+				.unwrap_or_else(|error| panic!("view private current: {error:?}"));
+			assert_eq!(versioned.version(), 2);
+			match versioned {
+				StateVersioned::Current(view) => assert!(bool::from(view.enabled)),
+				_ => panic!("expected the private current representation"),
+			}
+		}
+	}
+
+	mod crate_visible_compact {
+		use pina::*;
+
+		use super::*;
+
+		#[account(discriminator = MigrationAccount::CompactState, compact, migrations)]
+		pub(crate) struct CompactState {
+			pub(crate) name: String<4>,
+			pub(crate) tags: Vec<u16, 2>,
+		}
+
+		#[test]
+		fn reads_compact_historical_and_current_bytes() {
+			let historical = [
+				MigrationAccount::CompactState as u8,
+				0,
+				3,
+				b'A',
+				b'd',
+				b'a',
+				0xee,
+			];
+			let versioned = CompactState::try_from_bytes_versioned(&historical)
+				.unwrap_or_else(|error| panic!("view crate-visible compact v0: {error:?}"));
+			assert_eq!(versioned.version(), 0);
+			match versioned {
+				CompactStateVersioned::V0(view) => assert_eq!(view.name(), "Ada"),
+				CompactStateVersioned::Current(_) => {
+					panic!("expected the crate-visible compact v0 representation")
+				}
+			}
+
+			let current = [
+				MigrationAccount::CompactState as u8,
+				1,
+				3,
+				0,
+				0,
+				b'A',
+				b'd',
+				b'a',
+			];
+			let versioned = CompactState::try_from_bytes_versioned(&current)
+				.unwrap_or_else(|error| panic!("view crate-visible compact current: {error:?}"));
+			assert_eq!(versioned.version(), 1);
+			match versioned {
+				CompactStateVersioned::Current(view) => assert!(view.tags().is_empty()),
+				CompactStateVersioned::V0(_) => {
+					panic!("expected the crate-visible compact current representation")
+				}
+			}
+		}
 	}
 }

@@ -266,7 +266,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
-					false,
+					&syn::Visibility::Inherited,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -476,7 +476,8 @@ impl MigrationExpansion {
 			.iter()
 			.any(|version| version.schema.layout != LayoutKind::Fixed)
 		{
-			let implementation = self.variable_account_implementation(crate_path, struct_name)?;
+			let implementation =
+				self.variable_account_implementation(crate_path, struct_name, visibility)?;
 
 			return Ok(Some(quote! {
 				#implementation
@@ -538,7 +539,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
-					true,
+					visibility,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -797,8 +798,9 @@ impl MigrationExpansion {
 				///
 				/// # Errors
 				///
-				/// Returns `InvalidAccountData` when the discriminator is foreign or the bytes
-				/// are not one exact representation of the stored version, and
+				/// Returns `DataTooShort` when the bytes end inside the version envelope,
+				/// `InvalidAccountData` when the discriminator is foreign or the bytes are not
+				/// one exact representation of the stored version, and
 				/// `InvalidMigrationVersion` when the stored version is unknown to this program
 				/// or newer than its current schema.
 				pub fn try_from_bytes_versioned(
@@ -827,6 +829,7 @@ impl MigrationExpansion {
 		&self,
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
+		visibility: &syn::Visibility,
 	) -> syn::Result<proc_macro2::TokenStream> {
 		let versions = &self.history.versions;
 		let current = self.current_version;
@@ -862,7 +865,7 @@ impl MigrationExpansion {
 					version,
 					self.discriminator_bytes,
 					self.version_bytes(),
-					true,
+					visibility,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
@@ -1155,19 +1158,14 @@ fn historical_struct(
 	version: &pina_abi::SchemaVersion,
 	discriminator_bytes: u8,
 	version_bytes: usize,
-	expose_fields: bool,
+	visibility: &syn::Visibility,
 ) -> syn::Result<proc_macro2::TokenStream> {
 	let name = historical_struct_name(struct_name, version.version);
 	let discriminator_bytes = usize::from(discriminator_bytes);
-	// Account histories expose their payload fields (and the struct itself,
-	// which compact derives re-export their view through) so the generated
-	// versioned view can read one historical representation. Instruction and
-	// event histories stay private; only their internal migrators use them.
-	let (struct_visibility, field_visibility) = if expose_fields {
-		(quote!(pub), quote!(pub))
-	} else {
-		(quote!(), quote!())
-	};
+	// Account histories borrow the account's visibility so the generated
+	// versioned view can read their payload fields without widening the source
+	// account's API. Instruction and event histories stay private; only their
+	// internal migrators use them.
 	let fields = version
 		.schema
 		.fields
@@ -1180,7 +1178,7 @@ fn historical_struct(
 				)
 			})?;
 			let ty = abi_type_tokens(&field.rust_type, crate_path, struct_name)?;
-			Ok(quote!(#field_visibility #name: #ty))
+			Ok(quote!(#visibility #name: #ty))
 		})
 		.collect::<syn::Result<Vec<_>>>()?;
 	let (attribute, proof) = match version.schema.layout {
@@ -1265,7 +1263,7 @@ fn historical_struct(
 		#[doc(hidden)]
 		#[derive(#crate_path::pinapod::PinaPod)]
 		#attribute
-		#struct_visibility struct #name {
+		#visibility struct #name {
 			discriminator: [u8; #discriminator_bytes],
 			migration_version: [u8; #version_bytes],
 			#(#fields,)*
