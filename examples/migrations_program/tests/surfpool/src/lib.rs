@@ -209,8 +209,8 @@ fn reserved_migrate_instruction_shares_one_lamport_budget_across_slots() {
 		);
 		let error = rejection.expect_err("two growing migrations must exceed the shared budget");
 		assert!(
-			error.message().contains("fffffff5"),
-			"expected the migration budget error, got: {}",
+			error.message().contains("fffffff2"),
+			"expected the lamport budget error, got: {}",
 			error.message()
 		);
 		for state in [&state_a, &state_b] {
