@@ -249,6 +249,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				identity: &identity,
 				rust_name: "Update",
 				source: &source,
+				stale_ladder: &[&source],
 				renames: Vec::new(),
 				destination_version: 1,
 				destination: &source_schema,
@@ -282,6 +283,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				identity: &account,
 				rust_name: "State",
 				source: &account_source,
+				stale_ladder: &[&account_source],
 				renames: Vec::new(),
 				destination_version: 1,
 				destination: &destination,
@@ -1758,6 +1760,246 @@ fn growing_transitions_warn_about_rent_funding() {
 		warning.contains("lamport budget"),
 		"the warning names the budget to raise: {warning}"
 	);
+	// The warning must quote the same remedy the on-chain
+	// `MigrationLamportBudgetExceeded` documents, so the pre-deploy estimate
+	// and the runtime failure name the same constant.
+	assert!(
+		warning.contains(super::remedy::LAMPORT_BUDGET_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationLamportBudgetExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
+}
+
+#[test]
+fn oversized_growth_warns_about_the_runtime_realloc_cap() {
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let source = SchemaVersion {
+		version: 0,
+		schema_sha256: "irrelevant".to_owned(),
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		process_sha256: None,
+		transition: None,
+	};
+	// 2,000 u64 fields grow one transition by more than the runtime's 10 KiB
+	// per-instruction realloc cap.
+	let fields = (0..2_000)
+		.map(|index| (format!("field_{index}"), "u64".to_owned()))
+		.collect::<Vec<_>>();
+	let fields = fields
+		.iter()
+		.map(|(name, ty)| (name.as_str(), ty.as_str()))
+		.collect::<Vec<_>>();
+	let destination = schema(LayoutKind::Fixed, &fields);
+	let mut output = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"State",
+		&source,
+		&[&source],
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut output,
+	);
+
+	let warning = output
+		.data_warnings
+		.iter()
+		.find(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE"))
+		.unwrap_or_else(|| {
+			panic!(
+				"growth beyond the runtime cap must warn: {:?}",
+				output.data_warnings
+			)
+		});
+	assert!(
+		warning.contains(super::remedy::ACCOUNT_GROWTH_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationAccountGrowthExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
+	assert!(
+		warning.contains("in transition v0 to v1"),
+		"one adjacent hop keeps the single-transition wording: {warning}"
+	);
+	// The rent estimate still prints: an oversized transition needs both the
+	// budget and a rebalanced ladder.
+	assert!(
+		output
+			.data_warnings
+			.iter()
+			.any(|warning| warning.contains("lamports of rent exemption")),
+		"the rent warning must remain: {:?}",
+		output.data_warnings
+	);
+}
+
+/// A fixed schema of `count` trailing u64 fields, used to build individually
+/// sub-limit hops whose cumulative ladder crosses the runtime cap.
+fn growing_schema(count: usize) -> DataSchema {
+	let fields = (0..count)
+		.map(|index| (format!("field_{index}"), "u64".to_owned()))
+		.collect::<Vec<_>>();
+	let fields = fields
+		.iter()
+		.map(|(name, ty)| (name.as_str(), ty.as_str()))
+		.collect::<Vec<_>>();
+	schema(LayoutKind::Fixed, &fields)
+}
+
+/// Source text for [`growing_schema`] fields, prefixed with `value: u64`.
+fn growing_fields(count: usize) -> String {
+	let fields = (0..count)
+		.map(|index| format!("field_{index}: u64"))
+		.collect::<Vec<_>>();
+	if fields.is_empty() {
+		"value: u64".to_owned()
+	} else {
+		format!("value: u64, {}", fields.join(", "))
+	}
+}
+
+/// Each adjacent hop grows 6,000 bytes, under the 10,240-byte runtime cap on
+/// its own, but a v0 account walks two hops in one instruction and the
+/// executor measures both against the size captured before the ladder. The
+/// warning must use the cumulative worst case, not the adjacent hop.
+#[test]
+fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let version = |version: u32, fields: usize| {
+		SchemaVersion {
+			version,
+			schema_sha256: "irrelevant".to_owned(),
+			schema: growing_schema(fields),
+			process: None,
+			process_sha256: None,
+			transition: None,
+		}
+	};
+	let oldest = version(0, 0);
+	let adjacent = version(1, 750);
+	let destination = growing_schema(1_500);
+
+	// The adjacent hop alone stays under the runtime cap.
+	let mut adjacent_only = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"State",
+		&adjacent,
+		&[&adjacent],
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut adjacent_only,
+	);
+	assert!(
+		!adjacent_only
+			.data_warnings
+			.iter()
+			.any(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE")),
+		"one sub-limit hop must not warn: {:?}",
+		adjacent_only.data_warnings
+	);
+
+	// A v0 account walks both hops, so the cumulative growth crosses the cap.
+	let mut output = MakeMigrationsOutput::default();
+	warn_about_account_growth(
+		&identity,
+		"State",
+		&adjacent,
+		&[&oldest, &adjacent],
+		&destination,
+		MigrationVersionType::U8.bytes(),
+		&mut output,
+	);
+	let warning = output
+		.data_warnings
+		.iter()
+		.find(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE"))
+		.unwrap_or_else(|| {
+			panic!(
+				"cumulative growth must warn about the runtime cap: {:?}",
+				output.data_warnings
+			)
+		});
+	assert!(
+		warning.contains("grows from 2 to 12002 bytes across the 2-step inline ladder v0 to v2"),
+		"the warning quotes the cumulative ladder: {warning}"
+	);
+	assert!(
+		warning.contains(
+			"an intermediate version only resets the runtime cap when it migrates in a separate \
+			 transaction"
+		),
+		"the warning explains when intermediates help: {warning}"
+	);
+	assert!(
+		warning.contains(super::remedy::ACCOUNT_GROWTH_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationAccountGrowthExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
+}
+
+/// The same two sub-limit hops through a real `make` run: the caller must
+/// assemble the whole supported stale ladder, not only the adjacent schema.
+#[test]
+fn make_warns_when_a_stale_ladder_exceeds_the_runtime_cap_cumulatively() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	// v0 is 10 bytes; v1 adds 750 u64 fields (6,000 bytes), still under the cap.
+	write_state_source(&fixture, &growing_fields(750));
+	let first =
+		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("create v1 draft: {error:?}"));
+	assert!(
+		!first
+			.data_warnings
+			.iter()
+			.any(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE")),
+		"a single sub-limit hop must not warn: {:?}",
+		first.data_warnings
+	);
+
+	// Publish v1 so the next source appends v2 instead of replacing a draft.
+	publish_current(&fixture);
+	write_state_source(&fixture, &growing_fields(1_500));
+	let second =
+		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("create v2 draft: {error:?}"));
+	let warning = second
+		.data_warnings
+		.iter()
+		.find(|warning| warning.contains("MAX_PERMITTED_DATA_INCREASE"))
+		.unwrap_or_else(|| {
+			panic!(
+				"cumulative growth must warn about the runtime cap: {:?}",
+				second.data_warnings
+			)
+		});
+	assert!(
+		warning.contains("across the 2-step inline ladder v0 to v2"),
+		"the warning quotes the cumulative ladder: {warning}"
+	);
+	assert!(
+		warning.contains(
+			"an intermediate version only resets the runtime cap when it migrates in a separate \
+			 transaction"
+		),
+		"the warning explains when intermediates help: {warning}"
+	);
+	assert!(
+		warning.contains(super::remedy::ACCOUNT_GROWTH_REMEDY),
+		"the warning carries the shared remedy text: {warning}"
+	);
+	assert!(
+		warning.contains("MigrationAccountGrowthExceeded"),
+		"the warning names the on-chain error: {warning}"
+	);
 }
 
 #[test]
@@ -2365,6 +2607,7 @@ fn growth_warnings_only_apply_to_account_contracts() {
 		&identity,
 		"Update",
 		&source,
+		&[&source],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -2395,6 +2638,7 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 		&identity,
 		"State",
 		&source,
+		&[&source],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -2553,6 +2797,7 @@ fn create_transition_propagates_manual_layout_errors() {
 			identity: &identity,
 			rust_name: "Update",
 			source: &source,
+			stale_ladder: &[&source],
 			renames: vec![],
 			destination_version: 1,
 			destination: &destination,

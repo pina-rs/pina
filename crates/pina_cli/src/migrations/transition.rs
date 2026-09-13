@@ -23,6 +23,8 @@ use super::MigrationError;
 use super::diff::MoveDirection;
 use super::diff::automatic_direction;
 use super::diff::transition_mode;
+use super::remedy::ACCOUNT_GROWTH_REMEDY;
+use super::remedy::LAMPORT_BUDGET_REMEDY;
 use super::storage::write_atomic;
 use crate::project::Project;
 
@@ -31,6 +33,9 @@ pub(super) struct TransitionRequest<'a> {
 	pub(super) identity: &'a ContractIdentity,
 	pub(super) rust_name: &'a str,
 	pub(super) source: &'a SchemaVersion,
+	/// Every version a stale account may still hold while migrating inline to
+	/// this destination, oldest first; the adjacent source is the last entry.
+	pub(super) stale_ladder: &'a [&'a SchemaVersion],
 	pub(super) renames: Vec<pina_abi::RenameMapping>,
 	pub(super) destination_version: u32,
 	pub(super) destination: &'a DataSchema,
@@ -47,6 +52,7 @@ pub(super) fn create_transition(
 		identity,
 		rust_name,
 		source,
+		stale_ladder,
 		renames,
 		destination_version,
 		destination,
@@ -100,6 +106,7 @@ pub(super) fn create_transition(
 		identity,
 		rust_name,
 		source,
+		stale_ladder,
 		destination,
 		project.migration_version_type.bytes(),
 		output,
@@ -126,20 +133,72 @@ pub(super) fn create_transition(
 /// have been fixed since genesis, so this is a planning figure, not a quote.
 pub(crate) const RENT_EXEMPT_LAMPORTS_PER_BYTE: u64 = 6_960;
 
-/// Warn when a transition grows an account, because a stale account must
-/// fund the rent deficit from the migration payer inside the touching
-/// transaction. An undersized lamport budget makes those migrations fail
-/// with `MigrationBudgetExceeded` until the budget is raised.
-/// Warn when a transition grows an account, because a stale account must
-/// fund the rent deficit from the migration payer inside the touching
-/// transaction. An undersized lamport budget makes those migrations fail
-/// with `MigrationBudgetExceeded` until the budget is raised. Fixed
-/// layouts quote exact byte growth; compact layouts quote the exact
-/// worst-case growth the declared capacities imply.
+/// Maximum account growth the Solana runtime permits one top-level
+/// instruction to allocate, mirroring
+/// `pina::MAX_PERMITTED_DATA_INCREASE` / `pinocchio::account::MAX_PERMITTED_DATA_INCREASE`.
+///
+/// A transition growing an account by more than this cannot migrate inline;
+/// the executor rejects it with `MigrationAccountGrowthExceeded`.
+pub(crate) const MAX_PERMITTED_DATA_INCREASE: usize = 10 * 1024;
+
+/// Maximum adjacent transitions one inline ladder may walk, mirroring the
+/// `pina_macros`-generated `MAX_INLINE_STEPS` (`current.min(8)`).
+///
+/// A stale account further behind its program's current version cannot
+/// migrate inline and reports `MigrationUnavailable`; the ladder is the
+/// window of versions this warning must cover.
+pub(crate) const MAX_INLINE_STEPS: u32 = 8;
+
+/// Every version a stale account may still hold while migrating inline to
+/// `destination_version`, oldest first.
+///
+/// The generated `MAX_INLINE_STEPS` bounds the ladder at
+/// `destination_version.min(8)` adjacent steps, and the executor captures the
+/// account size before the first step, so each of these versions is a distinct
+/// starting point for the runtime growth check. Versions missing from the
+/// history are skipped so a malformed manifest produces fewer warnings
+/// instead of a panic.
+pub(super) fn supported_stale_ladder(
+	history: &ContractHistory,
+	destination_version: u32,
+) -> Vec<&SchemaVersion> {
+	let steps = destination_version.min(MAX_INLINE_STEPS);
+	let first = destination_version.saturating_sub(steps);
+
+	(first..destination_version)
+		.filter_map(|version| history.versions.get(version as usize))
+		.collect()
+}
+
+/// Largest allocation an inline ladder reaches from one stale version, and
+/// the stale version it starts from.
+struct WorstLadderGrowth {
+	from_version: u32,
+	from_size: usize,
+	peak: usize,
+}
+
+/// Warn when a growing account must fund rent or can exceed the runtime's
+/// per-instruction allocation cap.
+///
+/// Rent is funded per adjacent step from the migration payer, so the deficit
+/// quote stays on the adjacent transition; an undersized `max_lamports` fails
+/// the migration with `MigrationLamportBudgetExceeded` until the budget is
+/// raised. The runtime cap, however, is measured against the account size
+/// captured before the whole ladder: `MAX_INLINE_STEPS` lets a stale account
+/// walk several adjacent transitions in one instruction, so the warning
+/// evaluates the largest allocation reachable from every supported stale
+/// version, not only the adjacent hop. Growth beyond that cap fails with
+/// `MigrationAccountGrowthExceeded` however large the lamport budget is.
+/// Fixed layouts quote exact byte growth; compact layouts quote the exact
+/// worst-case growth the declared capacities imply. `adjacent` is the source
+/// of the new transition; `stale_ladder` lists the supported stale versions it
+/// walks from, oldest first.
 pub(super) fn warn_about_account_growth(
 	identity: &ContractIdentity,
 	rust_name: &str,
-	source: &SchemaVersion,
+	adjacent: &SchemaVersion,
+	stale_ladder: &[&SchemaVersion],
 	destination: &DataSchema,
 	version_bytes: usize,
 	output: &mut MakeMigrationsOutput,
@@ -148,43 +207,127 @@ pub(super) fn warn_about_account_growth(
 		return;
 	}
 	let header = usize::from(identity.discriminator_bytes) + version_bytes;
-	let Some((from_payload, to_payload)) = source
-		.schema
-		.maximum_payload_size()
-		.zip(destination.maximum_payload_size())
-	else {
-		return;
-	};
-	if to_payload <= from_payload {
-		return;
+	let destination_size = header.saturating_add(payload_size(destination));
+	let adjacent_size = header.saturating_add(payload_size(&adjacent.schema));
+	let compact = stale_ladder
+		.iter()
+		.any(|source| source.schema.layout == LayoutKind::Compact)
+		|| destination.layout == LayoutKind::Compact;
+
+	if destination_size > adjacent_size {
+		let growth = destination_size - adjacent_size;
+		let rent =
+			RENT_EXEMPT_LAMPORTS_PER_BYTE.saturating_mul(u64::try_from(growth).unwrap_or(u64::MAX));
+		let sizes = growth_descriptor(
+			compact,
+			adjacent_size,
+			destination_size,
+			&format!(
+				"in transition v{} to v{}",
+				adjacent.version,
+				adjacent.version + 1
+			),
+		);
+		output.data_warnings.push(format!(
+			"account `{rust_name}` {sizes}: a stale account funds roughly {rent} lamports of rent \
+			 exemption from the migration payer, so pass a signer or PDA payer and \
+			 {LAMPORT_BUDGET_REMEDY}; an undersized budget fails the migration with \
+			 `MigrationLamportBudgetExceeded`",
+		));
 	}
-	let growth = to_payload - from_payload;
-	let rent =
-		RENT_EXEMPT_LAMPORTS_PER_BYTE.saturating_mul(u64::try_from(growth).unwrap_or(u64::MAX));
-	let compact =
-		source.schema.layout == LayoutKind::Compact || destination.layout == LayoutKind::Compact;
-	let sizes = if compact {
-		format!(
-			"worst-case size grows from {} to {} bytes (compact capacity) in transition v{} to v{}",
-			header + from_payload,
-			header + to_payload,
-			source.version,
-			source.version + 1,
-		)
-	} else {
-		format!(
-			"grows from {} to {} bytes in transition v{} to v{}",
-			header + from_payload,
-			header + to_payload,
-			source.version,
-			source.version + 1,
-		)
+
+	let worst = worst_ladder_growth(header, adjacent, stale_ladder, destination);
+	if worst.peak.saturating_sub(worst.from_size) > MAX_PERMITTED_DATA_INCREASE {
+		// A worst case starting at the adjacent version is the single
+		// transition itself; anything older only exceeds the cap cumulatively,
+		// and intermediates reset it only across separate transactions.
+		let sizes = if worst.from_version == adjacent.version {
+			growth_descriptor(
+				compact,
+				worst.from_size,
+				worst.peak,
+				&format!(
+					"in transition v{} to v{}",
+					adjacent.version,
+					adjacent.version + 1
+				),
+			)
+		} else {
+			let steps = adjacent.version + 1 - worst.from_version;
+			growth_descriptor(
+				compact,
+				worst.from_size,
+				worst.peak,
+				&format!(
+					"across the {steps}-step inline ladder v{} to v{} (an intermediate version \
+					 only resets the runtime cap when it migrates in a separate transaction)",
+					worst.from_version,
+					adjacent.version + 1,
+				),
+			)
+		};
+		output.data_warnings.push(format!(
+			"account `{rust_name}` {sizes}: that exceeds the runtime's \
+			 `MAX_PERMITTED_DATA_INCREASE` ({MAX_PERMITTED_DATA_INCREASE} bytes) for a single \
+			 instruction, so {ACCOUNT_GROWTH_REMEDY}; the runtime fails the migration with \
+			 `MigrationAccountGrowthExceeded`",
+		));
+	}
+}
+
+/// Worst-case payload size for a schema.
+///
+/// Validated schemas always expose a size; an unmeasurable one saturates so an
+/// unexpected layout over-warns instead of silently under-warning.
+fn payload_size(schema: &DataSchema) -> usize {
+	schema.maximum_payload_size().unwrap_or(usize::MAX)
+}
+
+/// Largest allocation reachable from a supported stale version, walking to the
+/// destination. The executor compares each step's allocation against the size
+/// captured before the ladder, so a middle version can be the worst starting
+/// point even when the adjacent hop stays under the cap. The adjacent source
+/// seeds the search so a ladder without stored entries still checks its own
+/// transition.
+fn worst_ladder_growth(
+	header: usize,
+	adjacent: &SchemaVersion,
+	stale_ladder: &[&SchemaVersion],
+	destination: &DataSchema,
+) -> WorstLadderGrowth {
+	let destination_size = header.saturating_add(payload_size(destination));
+	let adjacent_size = header.saturating_add(payload_size(&adjacent.schema));
+	let mut worst = WorstLadderGrowth {
+		from_version: adjacent.version,
+		from_size: adjacent_size,
+		peak: adjacent_size.max(destination_size),
 	};
-	output.data_warnings.push(format!(
-		"account `{rust_name}` {sizes}: a stale account funds roughly {rent} lamports of rent \
-		 exemption from the migration payer, so size the invoking instruction's lamport budget \
-		 and pass a signer or PDA payer",
-	));
+	for (index, source) in stale_ladder.iter().enumerate() {
+		let from_size = header.saturating_add(payload_size(&source.schema));
+		let mut peak = from_size;
+		for later in &stale_ladder[index + 1..] {
+			peak = peak.max(header.saturating_add(payload_size(&later.schema)));
+		}
+		peak = peak.max(destination_size);
+		let growth = peak.saturating_sub(from_size);
+		if growth > worst.peak.saturating_sub(worst.from_size) {
+			worst = WorstLadderGrowth {
+				from_version: source.version,
+				from_size,
+				peak,
+			};
+		}
+	}
+	worst
+}
+
+/// Format the byte-growth clause shared by the rent and runtime-cap warnings.
+fn growth_descriptor(compact: bool, from: usize, to: usize, transition: &str) -> String {
+	if compact {
+		format!("worst-case size grows from {from} to {to} bytes (compact capacity) {transition}")
+	} else {
+		format!("grows from {from} to {to} bytes {transition}")
+	}
 }
 
 pub(super) fn process_transition(

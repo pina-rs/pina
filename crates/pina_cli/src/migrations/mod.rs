@@ -4,6 +4,7 @@
 mod diff;
 mod ledger;
 mod prompt;
+mod remedy;
 mod scan;
 mod storage;
 mod transition;
@@ -46,6 +47,7 @@ use storage::write_json_atomic;
 use transition::TransitionRequest;
 use transition::create_transition;
 use transition::refresh_draft_transition_hash;
+use transition::supported_stale_ladder;
 use transition::verify_transition_files;
 
 use crate::error::IdlError;
@@ -329,12 +331,14 @@ pub fn make_migrations_with_answers(
 						&mut prompts,
 					)?;
 					let effective = effective_source_schema(latest, &renames, &dropped)?;
+					let stale_ladder = supported_stale_ladder(history, next);
 					let transition = create_transition(
 						&project,
 						TransitionRequest {
 							identity: &history.identity,
 							rust_name: &history.rust_name,
 							source: &effective,
+							stale_ladder: &stale_ladder,
 							renames,
 							destination_version: next,
 							destination: &source.schema,
@@ -385,12 +389,14 @@ pub fn make_migrations_with_answers(
 							&mut prompts,
 						)?;
 						let effective = effective_source_schema(previous, &renames, &dropped)?;
+						let stale_ladder = supported_stale_ladder(history, latest_version);
 						let transition = create_transition(
 							&project,
 							TransitionRequest {
 								identity: &history.identity,
 								rust_name: &history.rust_name,
 								source: &effective,
+								stale_ladder: &stale_ladder,
 								renames,
 								destination_version: latest_version,
 								destination: &source.schema,

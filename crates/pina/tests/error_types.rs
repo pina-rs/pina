@@ -15,6 +15,26 @@ fn error_to_code(variant: PinaProgramError) -> u32 {
 /// in the top end of the u32 range (`0xFFFF_0000..=0xFFFF_FFFF`).
 #[test]
 fn error_codes_match_expected_discriminants() {
+	assert_eq!(
+		error_to_code(PinaProgramError::MigrationLamportBudgetExceeded),
+		0xFFFF_FFF2
+	);
+	assert_eq!(
+		error_to_code(PinaProgramError::MigrationAccountGrowthExceeded),
+		0xFFFF_FFF3
+	);
+	assert_eq!(
+		error_to_code(PinaProgramError::MigrationWorkspaceExceeded),
+		0xFFFF_FFF4
+	);
+	assert_eq!(
+		error_to_code(PinaProgramError::MigrationBudgetExceeded),
+		0xFFFF_FFF5
+	);
+	assert_eq!(
+		error_to_code(PinaProgramError::MigrationUnavailable),
+		0xFFFF_FFF6
+	);
 	assert_eq!(error_to_code(PinaProgramError::DataTooShort), 0xFFFF_FFFA);
 	assert_eq!(
 		error_to_code(PinaProgramError::InvalidAccountSize),
@@ -40,6 +60,11 @@ fn error_codes_match_expected_discriminants() {
 #[test]
 fn error_codes_are_in_reserved_range() {
 	let variants = [
+		PinaProgramError::MigrationLamportBudgetExceeded,
+		PinaProgramError::MigrationAccountGrowthExceeded,
+		PinaProgramError::MigrationWorkspaceExceeded,
+		PinaProgramError::MigrationBudgetExceeded,
+		PinaProgramError::MigrationUnavailable,
 		PinaProgramError::DataTooShort,
 		PinaProgramError::InvalidAccountSize,
 		PinaProgramError::InvalidTokenOwner,
@@ -57,10 +82,15 @@ fn error_codes_are_in_reserved_range() {
 	}
 }
 
-/// All six variants should have distinct error codes.
+/// Every variant should have a distinct error code.
 #[test]
 fn error_codes_are_unique() {
 	let codes: Vec<u32> = [
+		PinaProgramError::MigrationLamportBudgetExceeded,
+		PinaProgramError::MigrationAccountGrowthExceeded,
+		PinaProgramError::MigrationWorkspaceExceeded,
+		PinaProgramError::MigrationBudgetExceeded,
+		PinaProgramError::MigrationUnavailable,
 		PinaProgramError::DataTooShort,
 		PinaProgramError::InvalidAccountSize,
 		PinaProgramError::InvalidTokenOwner,
