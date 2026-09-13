@@ -68,21 +68,18 @@ pub(crate) fn expand(
 			Err(e) => return e.to_compile_error(),
 		};
 	let compact = compact.is_present();
-	let migration = if migrations.is_present() {
-		match MigrationExpansion::load(
-			&item_struct,
-			pina_abi::ContractKind::Account,
-			if compact {
-				pina_abi::LayoutKind::Compact
-			} else {
-				pina_abi::LayoutKind::Fixed
-			},
-		) {
-			Ok(value) => Some(value),
-			Err(error) => return error.to_compile_error(),
-		}
-	} else {
-		None
+	let migration = match crate::migration::expansion(
+		&item_struct,
+		pina_abi::ContractKind::Account,
+		if compact {
+			pina_abi::LayoutKind::Compact
+		} else {
+			pina_abi::LayoutKind::Fixed
+		},
+		migrations.map(crate::args::MigrationsArg::is_enabled),
+	) {
+		Ok(value) => value,
+		Err(error) => return error.to_compile_error(),
 	};
 	let migration_bytes = migration
 		.as_ref()

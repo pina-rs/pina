@@ -239,7 +239,51 @@ impl MigrationFixture {
 		fs::write(self.root.join("src/lib.rs"), source)
 			.unwrap_or_else(|error| panic!("update fixture source: {error}"));
 	}
+
+	/// Replace `[migrations]` with an explicit auto policy.
+	fn configure_auto(&self, auto: &str) {
+		fs::write(
+			self.root.join("pina.toml"),
+			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n{auto}"),
+		)
+		.unwrap_or_else(|error| panic!("write auto config: {error}"));
+	}
+
+	fn build_script(&self) -> PathBuf {
+		self.root.join("build.rs")
+	}
+
+	fn manifest(&self) -> serde_json::Value {
+		let source = fs::read_to_string(self.root.join("migrations/manifest.json"))
+			.unwrap_or_else(|error| panic!("read manifest: {error}"));
+		serde_json::from_str(&source).unwrap_or_else(|error| panic!("parse manifest: {error}"))
+	}
 }
+
+/// A program with one declaration of each kind and no per-item tokens.
+const AUTO_SOURCE: &str = r#"use pina::*;
+declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+#[discriminator]
+pub enum Kind { State = 1 }
+#[discriminator]
+pub enum Instructions { Update = 2 }
+#[discriminator]
+pub enum Events { Changed = 3 }
+#[account(discriminator = Kind::State)]
+pub struct State { value: u64 }
+#[instruction(discriminator = Instructions::Update)]
+pub struct UpdateInstruction { value: u64 }
+#[event(discriminator = Events::Changed)]
+pub struct ChangedEvent { value: u64 }
+pub fn process_instruction(
+	program_id: &Address,
+	accounts: &mut [AccountView],
+	data: &[u8],
+) -> ProgramResult {
+	let _ = (program_id, accounts, data);
+	Ok(())
+}
+"#;
 
 fn run(command: &mut Command) -> String {
 	let output = command
@@ -590,4 +634,156 @@ fn status_reports_an_unreadable_artifact_reason() {
 		.as_str()
 		.unwrap_or_else(|| panic!("unavailable estimate carries a reason"));
 	assert!(reason.contains("could not profile"), "reason: {reason}");
+}
+
+#[test]
+fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
+	let fixture = MigrationFixture::new(false);
+	fixture.configure_auto("auto = [\"accounts\", \"events\"]\n");
+	fixture.write_source(AUTO_SOURCE);
+
+	let made = run(&mut fixture.command("make"));
+	assert!(made.contains("Created account:1:01@0"), "stdout: {made}");
+	assert!(made.contains("Created event:1:03@0"), "stdout: {made}");
+	assert!(
+		made.contains("Auto policy: accounts, events"),
+		"stdout: {made}"
+	);
+	assert!(made.contains("Created"), "stdout: {made}");
+
+	// The policy is recorded in the manifest, not just in pina.toml.
+	let manifest = fixture.manifest();
+	assert_eq!(manifest["formatVersion"], 4);
+	assert_eq!(manifest["auto"], serde_json::json!(["accounts", "events"]));
+	assert!(manifest["contracts"].get("instruction:1:02").is_none());
+
+	// The scaffold is idempotent and the scaffolded directive is verified.
+	let directive = "cargo:rerun-if-changed=migrations/manifest.json";
+	let scaffold = fs::read_to_string(fixture.build_script())
+		.unwrap_or_else(|error| panic!("read scaffold: {error}"));
+	assert!(scaffold.contains(&format!("\"{directive}\"")), "{scaffold}");
+	run(&mut fixture.command("make"));
+	assert_eq!(
+		fs::read_to_string(fixture.build_script())
+			.unwrap_or_else(|error| panic!("read scaffold: {error}")),
+		scaffold,
+	);
+	run(&mut fixture.command("check"));
+
+	// Adding instructions to the policy requires `make` and records exactly one
+	// new envelope contract instead of rewriting the recorded ones.
+	fixture.configure_auto("auto = true\n");
+	let stale = run_failure(&mut fixture.command("check"));
+	assert!(
+		stale
+			.1
+			.contains("Run `pina migrations make` to record the policy flip"),
+		"stderr: {}",
+		stale.1
+	);
+	let flipped = run(&mut fixture.command("make"));
+	assert!(
+		flipped.contains("Created instruction:1:02@0"),
+		"stdout: {flipped}"
+	);
+	assert_eq!(
+		flipped.matches("Created ").count(),
+		1,
+		"only the newly enveloped contract is recorded: {flipped}"
+	);
+	run(&mut fixture.command("check"));
+}
+
+#[test]
+fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
+	let fixture = MigrationFixture::new(false);
+	fixture.configure_auto("auto = true\n");
+	fixture.write_source(AUTO_SOURCE);
+	run(&mut fixture.command("make"));
+
+	fixture.configure_auto("auto = [\"events\"]\n");
+	let dropped = run_failure(&mut fixture.command("make"));
+	assert!(
+		dropped
+			.1
+			.contains("Removing an envelope is a wire-format change"),
+		"stderr: {}",
+		dropped.1
+	);
+	assert!(dropped.1.contains("account:1:01"), "stderr: {}", dropped.1);
+	// The check gate reports the same condition without touching the manifest.
+	let checked = run_failure(&mut fixture.command("check"));
+	assert!(
+		checked.1.contains("pina.toml configures"),
+		"stderr: {}",
+		checked.1
+	);
+}
+
+#[test]
+fn migrations_false_on_a_recorded_contract_fails_make_and_check() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("make"));
+
+	fixture.write_source(&format!(
+		"use pina::*;\ndeclare_id!(\"{PROGRAM_ID}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+		 }}\n#[account(discriminator = Kind::State, migrations = false)]\nstruct State {{ value: \
+		 u64 }}\n"
+	));
+	let made = run_failure(&mut fixture.command("make"));
+	assert!(
+		made.1
+			.contains("Removing an envelope is a wire-format change"),
+		"stderr: {}",
+		made.1
+	);
+	assert!(
+		made.1.contains("must record deliberately"),
+		"stderr: {}",
+		made.1
+	);
+	let checked = run_failure(&mut fixture.command("check"));
+	assert!(
+		checked.1.contains("must record deliberately"),
+		"stderr: {}",
+		checked.1
+	);
+
+	// Removing the override restores the recorded contract unchanged.
+	fixture.write_source(&format!(
+		"use pina::*;\ndeclare_id!(\"{PROGRAM_ID}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+		 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ value: u64 }}\n"
+	));
+	run(&mut fixture.command("check"));
+}
+
+#[test]
+fn auto_policy_reports_an_undeclared_rerun_directive_instead_of_clobbering() {
+	let fixture = MigrationFixture::new(false);
+	fixture.configure_auto("auto = [\"accounts\"]\n");
+	fixture.write_source(AUTO_SOURCE);
+	let handwritten = "fn main() {\n\tprintln!(\"cargo:rustc-cfg=handwritten\");\n}\n";
+	fs::write(fixture.build_script(), handwritten)
+		.unwrap_or_else(|error| panic!("write hand-written build script: {error}"));
+
+	let made = run(&mut fixture.command("make"));
+	assert!(
+		made.contains("cargo:rerun-if-changed=migrations/manifest.json"),
+		"stdout: {made}"
+	);
+	assert_eq!(
+		fs::read_to_string(fixture.build_script())
+			.unwrap_or_else(|error| panic!("read build script: {error}")),
+		handwritten,
+		"a hand-written build script must never be clobbered",
+	);
+
+	let checked = run_failure(&mut fixture.command("check"));
+	assert!(
+		checked
+			.1
+			.contains("cargo:rerun-if-changed=migrations/manifest.json"),
+		"stderr: {}",
+		checked.1
+	);
 }

@@ -588,15 +588,29 @@ fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
 fn discovery_snapshots_accounts_instructions_events_and_processes() {
 	let fixture = migration_fixture();
 	std::fs::write(
+		fixture.root.join("pina.toml"),
+		"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\nauto = true\n",
+	)
+	.unwrap_or_else(|error| panic!("write auto policy: {error}"));
+	std::fs::write(
 		fixture.root.join("src/lib.rs"),
 		include_str!("../../../../examples/migrations_program/src/lib.rs"),
 	)
 	.unwrap_or_else(|error| panic!("write complete migration source: {error}"));
 	let project = Project::discover(&fixture.root)
 		.unwrap_or_else(|error| panic!("discover complete fixture: {error}"));
-	let current = scan_current_contracts(&project)
+	assert_eq!(project.migration_auto, MigrationAuto::all());
+	let current = scan_current_contracts(&project, &project.migration_auto)
 		.unwrap_or_else(|error| panic!("scan complete fixture: {error}"));
 	assert_eq!(current.contracts.len(), 5);
+	// The example's relay payload opts out explicitly; auto must not envelop it.
+	assert!(
+		current
+			.opt_outs
+			.iter()
+			.any(|opt_out| opt_out.rust_name == "RelayInstruction"),
+		"RelayInstruction must be reported as an explicit opt-out",
+	);
 	assert_eq!(
 		current
 			.contracts
@@ -623,6 +637,23 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 	let output = make_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("snapshot complete fixture: {error}"));
 	assert_eq!(output.created_contracts.len(), 5);
+	assert_eq!(output.auto, ["accounts", "instructions", "events"]);
+	assert!(matches!(
+		output.build_script,
+		Some(BuildScriptStatus::Created { .. })
+	));
+	let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+		.unwrap_or_else(|error| panic!("read recorded manifest: {error}"))
+		.expect("auto run writes a manifest");
+	assert_eq!(manifest.auto, MigrationAuto::all());
+	// A second run verifies the scaffold instead of rewriting it.
+	let unchanged = make_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("refresh auto fixture: {error}"));
+	assert!(matches!(
+		unchanged.build_script,
+		Some(BuildScriptStatus::Verified { .. })
+	));
+	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check auto fixture: {error}"));
 }
 
 #[test]
@@ -640,7 +671,7 @@ fn event_discovery_rejects_invalid_unresolved_and_duplicate_contracts() {
 		.unwrap_or_else(|error| panic!("write event source: {error}"));
 		let project = Project::discover(&fixture.root)
 			.unwrap_or_else(|error| panic!("discover event fixture: {error}"));
-		scan_current_contracts(&project)
+		scan_current_contracts(&project, &MigrationAuto::none())
 	};
 
 	let first = scan("#[event(migrations)] struct ValueEvent { value: u64 }")
@@ -2719,7 +2750,7 @@ fn scan_surfaces_the_parser_diagnostic_for_duplicate_account_identities() {
 			.unwrap_or_else(|error| panic!("write scan source: {error:?}"));
 		let project = Project::discover(&fixture.root)
 			.unwrap_or_else(|error| panic!("discover scan fixture: {error:?}"));
-		scan_current_contracts(&project)
+		scan_current_contracts(&project, &MigrationAuto::none())
 	};
 
 	// Colliding account or instruction identities are rejected by the program

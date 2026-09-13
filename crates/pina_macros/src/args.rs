@@ -15,6 +15,38 @@ use syn::Path;
 use syn::Type;
 use syn::ext::IdentExt;
 
+/// The `migrations` argument on a schema attribute.
+///
+/// Only a bare `migrations` token or a boolean literal is accepted. Darling's
+/// `bool` would also accept `migrations = "false"`, which the CLI scanner reads
+/// as an unspecified declaration; keeping the attribute strict keeps both
+/// readers in agreement about what the source says.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MigrationsArg {
+	/// A bare `migrations` token or `migrations = true`.
+	Enabled,
+	/// `migrations = false`.
+	Disabled,
+}
+
+impl MigrationsArg {
+	/// The explicit opt-in decision.
+	#[must_use]
+	pub(crate) const fn is_enabled(self) -> bool {
+		matches!(self, Self::Enabled)
+	}
+}
+
+impl FromMeta for MigrationsArg {
+	fn from_word() -> darling::Result<Self> {
+		Ok(Self::Enabled)
+	}
+
+	fn from_bool(value: bool) -> darling::Result<Self> {
+		Ok(if value { Self::Enabled } else { Self::Disabled })
+	}
+}
+
 /// Arguments for the `#[account(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct AccountArgs {
@@ -29,8 +61,11 @@ pub(crate) struct AccountArgs {
 	#[darling(default)]
 	pub(crate) compact: Flag,
 	/// Opt this account into generated ABI history and on-demand migration.
+	///
+	/// A bare `migrations` or `migrations = true` opts in; `migrations = false`
+	/// opts out and fails when the manifest already records the contract.
 	#[darling(default)]
-	pub(crate) migrations: Flag,
+	pub(crate) migrations: Option<MigrationsArg>,
 	/// Validate the generated account view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }
@@ -46,8 +81,11 @@ pub(crate) struct InstructionArgs {
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
 	/// Opt this instruction payload into generated ABI history.
+	///
+	/// A bare `migrations` or `migrations = true` opts in; `migrations = false`
+	/// opts out and fails when the manifest already records the contract.
 	#[darling(default)]
-	pub(crate) migrations: Flag,
+	pub(crate) migrations: Option<MigrationsArg>,
 	/// Validate the generated instruction view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }
@@ -63,8 +101,11 @@ pub(crate) struct EventArgs {
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
 	/// Opt this event into generated historical decoding.
+	///
+	/// A bare `migrations` or `migrations = true` opts in; `migrations = false`
+	/// opts out and fails when the manifest already records the contract.
 	#[darling(default)]
-	pub(crate) migrations: Flag,
+	pub(crate) migrations: Option<MigrationsArg>,
 	/// Validate the generated event view after structural decoding.
 	pub(crate) validate: Option<ValidationHook>,
 }
@@ -513,4 +554,77 @@ pub(crate) struct AccountsValidation {
 	pub(crate) data_len: Option<Expr>,
 	pub(crate) distinct_from: Option<Ident>,
 	pub(crate) error: Option<Expr>,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn account_meta(source: &str) -> AccountArgs {
+		let meta: syn::Meta =
+			syn::parse_str(source).unwrap_or_else(|error| panic!("parse account meta: {error}"));
+		AccountArgs::from_meta(&meta).unwrap_or_else(|error| panic!("account args: {error}"))
+	}
+
+	fn instruction_meta(source: &str) -> InstructionArgs {
+		let meta: syn::Meta = syn::parse_str(source)
+			.unwrap_or_else(|error| panic!("parse instruction meta: {error}"));
+		InstructionArgs::from_meta(&meta)
+			.unwrap_or_else(|error| panic!("instruction args: {error}"))
+	}
+
+	fn event_meta(source: &str) -> EventArgs {
+		let meta: syn::Meta =
+			syn::parse_str(source).unwrap_or_else(|error| panic!("parse event meta: {error}"));
+		EventArgs::from_meta(&meta).unwrap_or_else(|error| panic!("event args: {error}"))
+	}
+
+	#[test]
+	fn bare_migrations_token_still_opts_in() {
+		// The documented per-item spelling predates `migrations = true`, so the
+		// bare token must keep resolving to an explicit opt-in.
+		assert_eq!(
+			account_meta("account(discriminator = Kind::State, migrations)").migrations,
+			Some(MigrationsArg::Enabled)
+		);
+		assert_eq!(
+			instruction_meta("instruction(discriminator = Kind::Update, migrations)").migrations,
+			Some(MigrationsArg::Enabled)
+		);
+		assert_eq!(
+			event_meta("event(discriminator = Kind::Changed, migrations)").migrations,
+			Some(MigrationsArg::Enabled)
+		);
+	}
+
+	#[test]
+	fn migrations_boolean_literals_and_absence_are_distinct() {
+		assert_eq!(
+			account_meta("account(discriminator = Kind::State, migrations = true)").migrations,
+			Some(MigrationsArg::Enabled)
+		);
+		assert_eq!(
+			account_meta("account(discriminator = Kind::State, migrations = false)").migrations,
+			Some(MigrationsArg::Disabled)
+		);
+		assert_eq!(
+			account_meta("account(discriminator = Kind::State)").migrations,
+			None
+		);
+	}
+
+	#[test]
+	fn migrations_rejects_string_spellings_the_scanner_cannot_see() {
+		// `darling`'s `bool` also accepts `"true"`/`"false"`, but the CLI scanner
+		// only reads boolean literals. Accepting the string here would let the
+		// macro and `pina migrations make` disagree about the same declaration.
+		let meta: syn::Meta =
+			syn::parse_str(r#"account(discriminator = Kind::State, migrations = "false")"#)
+				.unwrap_or_else(|error| panic!("parse account meta: {error}"));
+		let error = AccountArgs::from_meta(&meta).expect_err("string booleans must not parse");
+		assert!(
+			error.to_string().contains("migrations"),
+			"unexpected message: {error}"
+		);
+	}
 }

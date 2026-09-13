@@ -11,6 +11,9 @@ use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
 use cargo_metadata::TargetKind;
 use clap::ValueEnum;
+use pina_abi::AUTO_KIND_NAMES;
+use pina_abi::ContractKind;
+use pina_abi::MigrationAuto;
 use pina_abi::MigrationVersionType;
 use serde::Deserialize;
 use serde::Serialize;
@@ -122,6 +125,11 @@ pub struct Project {
 	pub client_generation: BTreeMap<ClientLanguage, ClientGenerationConfig>,
 	/// Program-wide migration version encoding.
 	pub migration_version_type: MigrationVersionType,
+	/// Program-wide migration opt-in policy from `[migrations].auto`.
+	///
+	/// `pina migrations make` records this policy into the manifest, which is
+	/// the only policy source macros consult.
+	pub migration_auto: MigrationAuto,
 	/// Persisted disambiguation answers from `[migrations.answers]`.
 	pub migration_answers: MigrationsAnswersConfig,
 	#[serde(skip)]
@@ -153,6 +161,10 @@ struct LintsConfig(BTreeMap<String, String>);
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 struct MigrationsConfig {
 	version_type: MigrationVersionType,
+	/// Kinds automatically enveloped by `pina migrations make`. Accepts `true`
+	/// (every kind), `false`, or a list of kind names, so the raw TOML value is
+	/// resolved into [`MigrationAuto`] with actionable errors.
+	auto: Option<toml::Value>,
 	/// Persisted disambiguation answers consulted before `pina migrations
 	/// make` prompts; command-line flags override these per field.
 	#[serde(default)]
@@ -332,6 +344,12 @@ pub enum ProjectError {
 		"Invalid level `{level}` for lint `{name}` in [lints]; expected `allow`, `warn`, or `deny`"
 	)]
 	InvalidLintLevel { name: String, level: String },
+
+	#[error("Invalid `[migrations].auto` in pina.toml: {reason}")]
+	InvalidMigrationAuto { reason: String },
+
+	#[error("Unknown migration kind `{name}` in [migrations].auto; expected {AUTO_KIND_NAMES}")]
+	UnknownMigrationKind { name: String },
 }
 
 impl Project {
@@ -423,6 +441,7 @@ impl Project {
 			resolve_output_config_path(&root, "clients.output", &config.clients.output)?;
 		let client_generation = config.clients.resolved_generation(&clients_dir)?;
 		let lint_levels = resolve_lint_levels(config.lints.0)?;
+		let migration_auto = resolve_migration_auto(config.migrations.auto.as_ref())?;
 
 		Ok(Self {
 			program_dir,
@@ -435,6 +454,7 @@ impl Project {
 			clients: config.clients.languages,
 			client_generation,
 			migration_version_type: config.migrations.version_type,
+			migration_auto,
 			migration_answers: config.migrations.answers,
 			lint_levels,
 			root,
@@ -501,6 +521,7 @@ impl Project {
 			clients: clients_config.languages,
 			client_generation,
 			migration_version_type: MigrationVersionType::default(),
+			migration_auto: MigrationAuto::none(),
 			migration_answers: MigrationsAnswersConfig::default(),
 			lint_levels: BTreeMap::new(),
 			root,
@@ -563,6 +584,57 @@ fn resolve_lint_levels(
 		levels.insert(name, level);
 	}
 	Ok(levels)
+}
+
+/// Resolve `[migrations].auto` from its raw TOML value.
+///
+/// `true` is sugar for every kind, `false` clears the policy, and a list names
+/// kinds using the same plural spelling as [`ContractKind`]'s configuration
+/// name.
+fn resolve_migration_auto(value: Option<&toml::Value>) -> Result<MigrationAuto, ProjectError> {
+	let Some(value) = value else {
+		return Ok(MigrationAuto::none());
+	};
+
+	match value {
+		toml::Value::Boolean(true) => Ok(MigrationAuto::all()),
+		toml::Value::Boolean(false) => Ok(MigrationAuto::none()),
+		toml::Value::Array(entries) => resolve_migration_auto_entries(entries),
+		other => {
+			Err(ProjectError::InvalidMigrationAuto {
+				reason: format!(
+					"expected `true`, `false`, or a list of kind names; found {}",
+					other.type_str()
+				),
+			})
+		}
+	}
+}
+
+fn resolve_migration_auto_entries(entries: &[toml::Value]) -> Result<MigrationAuto, ProjectError> {
+	let mut auto = MigrationAuto::none();
+	for entry in entries {
+		let Some(name) = entry.as_str() else {
+			return Err(ProjectError::InvalidMigrationAuto {
+				reason: format!(
+					"expected only {AUTO_KIND_NAMES} in the list, but found {}; `auto = true` \
+					 already selects every kind and cannot be combined with a kind list",
+					entry.type_str()
+				),
+			});
+		};
+		let kind = ContractKind::from_config_name(name).ok_or_else(|| {
+			ProjectError::UnknownMigrationKind {
+				name: name.to_owned(),
+			}
+		})?;
+		if !auto.insert(kind) {
+			return Err(ProjectError::InvalidMigrationAuto {
+				reason: format!("duplicate kind `{name}`"),
+			});
+		}
+	}
+	Ok(auto)
 }
 
 fn resolve_output_config_path(
@@ -1179,5 +1251,99 @@ mode = "overwrite"
 		assert_eq!(GenerationMode::Create.as_str(), "create");
 		assert_eq!(GenerationMode::Update.as_str(), "update");
 		assert_eq!(GenerationMode::Overwrite.as_str(), "overwrite");
+	}
+
+	fn discover_with_migrations(root: &Path, migrations: &str) {
+		write_program(root, "counter");
+		fs::write(
+			root.join(CONFIG_FILE_NAME),
+			format!(
+				"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n{migrations}"
+			),
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+	}
+
+	fn auto_policy(config: &str) -> MigrationAuto {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		discover_with_migrations(temp.path(), config);
+		Project::discover(temp.path())
+			.unwrap_or_else(|error| panic!("discovery failed: {error}"))
+			.migration_auto
+	}
+
+	#[test]
+	fn migrations_auto_accepts_true_false_and_kind_lists() {
+		assert_eq!(auto_policy("auto = true\n"), MigrationAuto::all());
+		assert_eq!(auto_policy("auto = false\n"), MigrationAuto::none());
+		assert_eq!(auto_policy(""), MigrationAuto::none());
+
+		let mut staged = MigrationAuto::none();
+		staged.add(ContractKind::Account);
+		staged.add(ContractKind::Event);
+		assert_eq!(auto_policy("auto = [\"accounts\", \"events\"]\n"), staged);
+		assert_eq!(
+			auto_policy("auto = [\"instructions\", \"accounts\", \"events\"]\n"),
+			MigrationAuto::all()
+		);
+		assert!(auto_policy("auto = true\n").contains(ContractKind::Instruction));
+	}
+
+	#[test]
+	fn migrations_auto_rejects_unknown_kinds_with_the_valid_spellings() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		discover_with_migrations(temp.path(), "auto = [\"states\"]\n");
+
+		let error = Project::discover(temp.path()).expect_err("unknown kinds must fail closed");
+		assert!(
+			matches!(error, ProjectError::UnknownMigrationKind { ref name } if name == "states")
+		);
+		let message = error.to_string();
+		assert!(message.contains("accounts"), "message: {message}");
+		assert!(message.contains("events"), "message: {message}");
+		assert!(message.contains("instructions"), "message: {message}");
+	}
+
+	#[test]
+	fn migrations_auto_rejects_combined_lists_duplicates_and_other_shapes() {
+		for (config, expected) in [
+			(
+				"auto = [true]\n",
+				"expected only `accounts`, `events`, or `instructions` in the list, but found \
+				 boolean",
+			),
+			(
+				"auto = [\"accounts\", true]\n",
+				"`auto = true` already selects every kind and cannot be combined",
+			),
+			(
+				"auto = [\"accounts\", 3]\n",
+				"expected only `accounts`, `events`, or `instructions` in the list, but found \
+				 integer",
+			),
+			("auto = [\"accounts\", \"accounts\"]\n", "duplicate kind"),
+			(
+				"auto = \"accounts\"\n",
+				"expected `true`, `false`, or a list",
+			),
+			(
+				"auto = { accounts = true }\n",
+				"expected `true`, `false`, or a list",
+			),
+		] {
+			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+			discover_with_migrations(temp.path(), config);
+
+			let error =
+				Project::discover(temp.path()).expect_err("invalid auto shapes must fail closed");
+			assert!(
+				matches!(error, ProjectError::InvalidMigrationAuto { .. }),
+				"unexpected error for {config}: {error}"
+			);
+			assert!(
+				error.to_string().contains(expected),
+				"unexpected message for {config}: {error}"
+			);
+		}
 	}
 }

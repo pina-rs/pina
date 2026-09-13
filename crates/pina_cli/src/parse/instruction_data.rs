@@ -15,7 +15,8 @@ pub struct InstructionStruct {
 	pub variant: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
-	pub migratable: bool,
+	/// The declaration's migration opt-in, before policy resolution.
+	pub migrations: super::MigrationOptIn,
 }
 
 /// Extract all `#[instruction(...)]` structs from a file.
@@ -43,7 +44,8 @@ pub fn extract_instruction_structs(file: &File) -> Result<Vec<InstructionStruct>
 
 		let fields = extract_named_fields(&item_struct.fields);
 		let docs = extract_docs(&item_struct.attrs);
-		let migratable = super::event_data::has_migrations_flag(&item_struct.attrs, "instruction");
+		let migrations = super::event_data::migrations_opt_in(&item_struct.attrs, "instruction")
+			.unwrap_or_default();
 
 		result.push(InstructionStruct {
 			name: item_struct.ident.to_string(),
@@ -51,7 +53,7 @@ pub fn extract_instruction_structs(file: &File) -> Result<Vec<InstructionStruct>
 			variant,
 			fields,
 			docs,
-			migratable,
+			migrations,
 		});
 	}
 

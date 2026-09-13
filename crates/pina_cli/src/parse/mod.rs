@@ -30,16 +30,70 @@ use crate::ir::InstructionIr;
 use crate::ir::PdaIr;
 use crate::ir::ProgramIr;
 
+/// Per-item migration opt-in declared on a schema attribute.
+///
+/// The declaration is resolved against the manifest's auto policy, so the
+/// parser reports what the source said rather than the effective decision.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MigrationOptIn {
+	/// A bare `migrations` token or `migrations = true`.
+	Explicit,
+	/// No `migrations` argument; the manifest auto policy decides.
+	#[default]
+	Unspecified,
+	/// `migrations = false`; the auto policy does not apply.
+	Disabled,
+}
+
+impl MigrationOptIn {
+	/// Whether the declaration is migration-aware under an auto policy.
+	#[must_use]
+	pub fn is_enabled(self, auto: bool) -> bool {
+		match self {
+			Self::Explicit => true,
+			Self::Disabled => false,
+			Self::Unspecified => auto,
+		}
+	}
+
+	/// Whether the declaration explicitly disables migrations.
+	#[must_use]
+	pub fn is_disabled(self) -> bool {
+		matches!(self, Self::Disabled)
+	}
+}
+
 /// Parse a program crate directory and assemble a `ProgramIr`.
 ///
 /// Resolves all source files starting from `src/lib.rs`, following `mod`
 /// declarations to discover additional files. All discovered files are
 /// parsed and their contents merged for IDL extraction.
+///
+/// This applies no migration auto policy, so only declarations with an explicit
+/// `migrations` token are marked migration-aware. Policy-aware callers (for
+/// example [`crate::generate_idl`]) read the recorded policy from the manifest
+/// and use [`parse_program_with_auto`].
 pub fn parse_program(
 	program_path: &Path,
 	name_override: Option<&str>,
 ) -> Result<ProgramIr, IdlError> {
-	parse_program_with_sources(program_path, name_override).map(|(program, _)| program)
+	parse_program_with_auto(
+		program_path,
+		name_override,
+		&pina_abi::MigrationAuto::none(),
+	)
+}
+
+/// [`parse_program`] with an explicit migration auto policy.
+///
+/// The IR marks contracts as migration-aware when their declaration opts in
+/// explicitly or the manifest policy covers their kind.
+pub fn parse_program_with_auto(
+	program_path: &Path,
+	name_override: Option<&str>,
+	auto: &pina_abi::MigrationAuto,
+) -> Result<ProgramIr, IdlError> {
+	parse_program_with_sources(program_path, name_override, auto).map(|(program, _)| program)
 }
 
 /// Parse a program and retain the exact source snapshot used to construct it.
@@ -50,6 +104,7 @@ pub fn parse_program(
 pub(crate) fn parse_program_with_sources(
 	program_path: &Path,
 	name_override: Option<&str>,
+	auto: &pina_abi::MigrationAuto,
 ) -> Result<(ProgramIr, Vec<module_resolver::ResolvedFile>), IdlError> {
 	let cargo_toml = program_path.join("Cargo.toml");
 	let cargo_contents =
@@ -78,7 +133,11 @@ pub(crate) fn parse_program_with_sources(
 		return Err(IdlError::NoEntrypoint);
 	}
 
-	let program = assemble_program_ir_multi(&syn_files, name_override.unwrap_or(&package_name))?;
+	let program = assemble_program_ir_multi_with_auto(
+		&syn_files,
+		name_override.unwrap_or(&package_name),
+		auto,
+	)?;
 
 	Ok((program, resolved_files))
 }
@@ -90,6 +149,15 @@ pub(crate) fn parse_program_with_sources(
 pub fn assemble_program_ir_multi(
 	files: &[&syn::File],
 	program_name: &str,
+) -> Result<ProgramIr, IdlError> {
+	assemble_program_ir_multi_with_auto(files, program_name, &pina_abi::MigrationAuto::none())
+}
+
+/// [`assemble_program_ir_multi`] with an explicit migration auto policy.
+pub fn assemble_program_ir_multi_with_auto(
+	files: &[&syn::File],
+	program_name: &str,
+	auto: &pina_abi::MigrationAuto,
 ) -> Result<ProgramIr, IdlError> {
 	let mut all_disc_enums = Vec::new();
 	let mut all_account_structs = Vec::new();
@@ -177,6 +245,7 @@ pub fn assemble_program_ir_multi(
 		&dispatch,
 		&all_validation_props,
 		&pdas_ir,
+		auto,
 	)
 }
 
@@ -200,6 +269,7 @@ fn assemble_from_extracted(
 	dispatch: &[entrypoint::DispatchEntry],
 	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
+	auto: &pina_abi::MigrationAuto,
 ) -> Result<ProgramIr, IdlError> {
 	let discriminator_map = build_discriminator_map(disc_enums);
 
@@ -215,7 +285,10 @@ fn assemble_from_extracted(
 			)
 			.map(|disc_value| {
 				let mut docs = acct.docs.clone();
-				if acct.migratable {
+				if acct
+					.migrations
+					.is_enabled(auto.contains(pina_abi::ContractKind::Account))
+				{
 					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
 				}
 				debug_assert_eq!(
@@ -270,7 +343,7 @@ fn assemble_from_extracted(
 	}
 
 	let instructions = if dispatch.is_empty() {
-		build_accountless_instructions_from_structs(instruction_structs, &discriminator_map)?
+		build_accountless_instructions_from_structs(instruction_structs, &discriminator_map, auto)?
 	} else {
 		build_instructions_from_dispatch(
 			&discriminator_map,
@@ -279,6 +352,7 @@ fn assemble_from_extracted(
 			dispatch,
 			validation_props,
 			pdas_ir,
+			auto,
 		)?
 	};
 
@@ -302,6 +376,7 @@ fn assemble_from_extracted(
 fn build_accountless_instructions_from_structs(
 	instruction_structs: &[instruction_data::InstructionStruct],
 	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
+	auto: &pina_abi::MigrationAuto,
 ) -> Result<Vec<InstructionIr>, IdlError> {
 	instruction_structs
 		.iter()
@@ -314,7 +389,10 @@ fn build_accountless_instructions_from_structs(
 			)
 			.map(|discriminator| {
 				let mut docs = ix_struct.docs.clone();
-				if ix_struct.migratable {
+				if ix_struct
+					.migrations
+					.is_enabled(auto.contains(pina_abi::ContractKind::Instruction))
+				{
 					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
 				}
 				InstructionIr {
@@ -454,6 +532,7 @@ fn build_instructions_from_dispatch(
 	dispatch: &[entrypoint::DispatchEntry],
 	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
+	auto: &pina_abi::MigrationAuto,
 ) -> Result<Vec<InstructionIr>, IdlError> {
 	let mut instructions = Vec::with_capacity(dispatch.len());
 
@@ -492,7 +571,10 @@ fn build_instructions_from_dispatch(
 		)?;
 
 		let mut docs = ix_struct.docs.clone();
-		if ix_struct.migratable {
+		if ix_struct
+			.migrations
+			.is_enabled(auto.contains(pina_abi::ContractKind::Instruction))
+		{
 			docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
 		}
 		instructions.push(InstructionIr {
@@ -975,7 +1057,7 @@ mod tests {
 			variant: "Vault".to_owned(),
 			fields: Vec::new(),
 			docs: Vec::new(),
-			migratable: false,
+			migrations: MigrationOptIn::Explicit,
 			pda_name: Some("vault".to_owned()),
 		};
 
@@ -992,6 +1074,7 @@ mod tests {
 			&[],
 			&HashMap::new(),
 			&[],
+			&pina_abi::MigrationAuto::none(),
 		)
 		.expect_err("unresolved account PDA links must fail");
 

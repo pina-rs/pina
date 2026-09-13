@@ -6271,7 +6271,9 @@ dependencies = [
  "pina_abi",
  "proc-macro2",
  "quote",
+ "serde_json",
  "syn 3.0.5",
+ "tempfile",
 ]
 
 [[package]]

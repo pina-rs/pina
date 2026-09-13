@@ -2,6 +2,7 @@
 //! bookkeeping, and the disambiguation flow that ties them together.
 
 mod cost;
+mod build_script;
 mod diff;
 mod ledger;
 mod prompt;
@@ -27,6 +28,9 @@ pub use cost::LadderCost;
 pub use cost::MigrationCostPreview;
 pub use cost::MostExpensiveTransaction;
 pub use cost::StaticCuEstimate;
+pub use build_script::BuildScriptStatus;
+use build_script::ensure_build_script;
+use build_script::verify_build_script;
 use diff::effective_source_schema;
 use diff::resolve_field_changes;
 pub use ledger::ReconcileOutput;
@@ -38,6 +42,7 @@ pub use ledger::record_publication;
 use ledger::validate_ledger_for_manifest;
 use pina_abi::ContractHistory;
 use pina_abi::MANIFEST_PATH;
+use pina_abi::MigrationAuto;
 use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
@@ -46,6 +51,7 @@ use pina_abi::SchemaVersion;
 pub use prompt::DisambiguationQuestion;
 pub use prompt::MigrationAnswers;
 use prompt::PromptIo;
+use scan::CurrentOptOut;
 use scan::next_migration_version;
 use scan::scan_current_contracts;
 use scan::validate_program_configuration;
@@ -74,6 +80,11 @@ pub struct MakeMigrationsOutput {
 	pub manual_transitions: Vec<PathBuf>,
 	/// Data-loss warnings for removals the developer explicitly accepted.
 	pub data_warnings: Vec<String>,
+	/// Kinds recorded as automatically enveloped by this run.
+	pub auto: Vec<String>,
+	/// Build-script action taken for the recorded auto policy.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub build_script: Option<BuildScriptStatus>,
 }
 
 /// Current status of one migration-aware wire contract.
@@ -150,6 +161,34 @@ pub enum MigrationError {
 
 	#[error("Migration version encoding is frozen as {found}, but pina.toml configures {expected}")]
 	VersionTypeChanged { expected: String, found: String },
+
+	#[error(
+		"Migration auto policy is recorded as {found}, but pina.toml configures {expected}. Run \
+		 `pina migrations make` to record the policy flip."
+	)]
+	AutoPolicyChanged { expected: String, found: String },
+
+	#[error(
+		"{kind} `{name}` ({identity}) is recorded in the migration manifest but is no longer \
+		 migration-aware. Removing an envelope is a wire-format change that `pina migrations \
+		 make` must record deliberately; restore its migration coverage (a `migrations` token or \
+		 the matching `[migrations].auto` kind) or retire the contract deliberately."
+	)]
+	EnvelopeRemoval {
+		kind: String,
+		name: String,
+		identity: String,
+	},
+
+	#[error(
+		"Migration auto policy requires the exact line `{directive}` in {path}. Run `pina \
+		 migrations make` to scaffold a missing script, or add that line to the existing build \
+		 script."
+	)]
+	BuildScriptRerunMissing {
+		path: PathBuf,
+		directive: &'static str,
+	},
 
 	#[error(
 		"Instruction process `{name}` changed incompatibly under discriminator `{identity}`: \
@@ -280,12 +319,16 @@ pub fn make_migrations_with_answers(
 	let mut stdin_lock = stdin.lock();
 	let mut stdout_lock = stdout.lock();
 	let mut prompts = PromptIo::new(&mut stdin_lock, &mut stdout_lock, interactive);
-	let current = scan_current_contracts(&project)?;
+	// `make` records the policy configured in `pina.toml`; every later reader
+	// (macros, build, IDL) trusts only the manifest.
+	let auto = project.migration_auto.clone();
+	let current = scan_current_contracts(&project, &auto)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
 	let mut manifest = load_manifest(&manifest_path)?.unwrap_or_else(|| {
 		MigrationManifest::new(current.program_id.clone(), project.migration_version_type)
 	});
+	reject_opt_outs(&manifest, &current.opt_outs)?;
 	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
 	validate_program_configuration(&project, &current.program_id, &manifest)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
@@ -443,8 +486,14 @@ pub fn make_migrations_with_answers(
 		}
 	}
 
+	// A contract whose kind the policy no longer covers is an envelope removal,
+	// not a silent source deletion.
+	let dropped = auto.removed_since(&manifest.auto);
 	for (key, history) in &manifest.contracts {
 		if !seen.contains_key(key) {
+			if dropped.contains(&history.identity.kind) {
+				return Err(envelope_removal(history));
+			}
 			return Err(MigrationError::ContractRemoved {
 				kind: history.identity.kind.to_string(),
 				name: history.rust_name.clone(),
@@ -453,12 +502,58 @@ pub fn make_migrations_with_answers(
 		}
 	}
 
+	manifest.auto = auto;
 	manifest
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
 	write_json_atomic(&manifest_path, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
+	output.auto = manifest
+		.auto
+		.iter()
+		.map(|kind| kind.config_name().to_owned())
+		.collect();
+	if !manifest.auto.is_empty() {
+		output.build_script = Some(ensure_build_script(&project.program_dir)?);
+	}
 	Ok(output)
+}
+
+/// Reject an explicit `migrations = false` on a contract already recorded.
+fn reject_opt_outs(
+	manifest: &MigrationManifest,
+	opt_outs: &[CurrentOptOut],
+) -> Result<(), MigrationError> {
+	for opt_out in opt_outs {
+		let Ok(history) = manifest.contract_for_source(opt_out.kind, &opt_out.rust_name) else {
+			continue;
+		};
+		return Err(envelope_removal(history));
+	}
+	Ok(())
+}
+
+fn envelope_removal(history: &ContractHistory) -> MigrationError {
+	MigrationError::EnvelopeRemoval {
+		kind: history.identity.kind.to_string(),
+		name: history.rust_name.clone(),
+		identity: history.identity.key(),
+	}
+}
+
+/// Fail when the checked-in policy differs from `pina.toml`.
+fn validate_auto_policy(
+	project: &Project,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	if manifest.auto == project.migration_auto {
+		return Ok(());
+	}
+
+	Err(MigrationError::AutoPolicyChanged {
+		expected: project.migration_auto.to_string(),
+		found: manifest.auto.to_string(),
+	})
 }
 
 /// Verify source, snapshots, process contracts, and frozen transition code.
@@ -481,6 +576,14 @@ fn check_project_migrations_with_manifest(
 	let current = scan_current_contracts(project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?;
+	// Verification follows the recorded policy because that is what macros
+	// expanded against; a policy difference is reported below as a stale
+	// manifest that only `make` may refresh.
+	let auto = manifest.as_ref().map_or_else(
+		|| project.migration_auto.clone(),
+		|manifest| manifest.auto.clone(),
+	);
+	let current = scan_current_contracts(project, &auto)?;
 	if current.contracts.is_empty() && manifest.is_none() {
 		return Ok((Vec::new(), None));
 	}
@@ -491,9 +594,14 @@ fn check_project_migrations_with_manifest(
 			name: first.rust_name.clone(),
 		}
 	})?;
+	reject_opt_outs(&manifest, &current.opt_outs)?;
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
 	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
 	validate_program_configuration(project, &current.program_id, &manifest)?;
+	validate_auto_policy(project, &manifest)?;
+	if !manifest.auto.is_empty() {
+		verify_build_script(&project.program_dir)?;
+	}
 	manifest
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
@@ -572,6 +680,16 @@ pub fn migration_status_report(start: &Path) -> Result<MigrationStatusReport, Mi
 		statuses,
 		cost_preview,
 	})
+/// Read the recorded auto policy without running compatibility checks.
+///
+/// IDL extraction needs the policy before it can assemble the IR, and the full
+/// migration check runs afterwards. An unreadable or invalid manifest returns
+/// no policy here; the check that follows reports the real failure.
+pub(crate) fn manifest_auto_policy(program_dir: &Path) -> MigrationAuto {
+	load_manifest(&program_dir.join(MANIFEST_PATH))
+		.ok()
+		.flatten()
+		.map_or_else(MigrationAuto::none, |manifest| manifest.auto)
 }
 
 /// Verify history and return only the current constants needed by IDL codegen.

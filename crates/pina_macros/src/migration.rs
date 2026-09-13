@@ -37,38 +37,9 @@ impl MigrationExpansion {
 		item: &ItemStruct,
 		kind: ContractKind,
 		layout: LayoutKind,
+		manifest: &MigrationManifest,
+		program_dir: &std::path::Path,
 	) -> syn::Result<Self> {
-		let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
-			syn::Error::new_spanned(
-				item,
-				"could not locate Cargo manifest for migration-aware schema",
-			)
-		})?;
-		let program_dir = PathBuf::from(manifest_dir);
-		let path = program_dir.join(MANIFEST_PATH);
-		let source = std::fs::read(&path).map_err(|error| {
-			syn::Error::new_spanned(
-				item,
-				format!(
-					"{} is marked `migrations`, but {} could not be read ({error}); run `pina \
-					 migrations make`",
-					item.ident,
-					path.display()
-				),
-			)
-		})?;
-		let manifest: MigrationManifest = pina_abi::decode_manifest(&source).map_err(|error| {
-			syn::Error::new_spanned(
-				item,
-				format!("invalid migration manifest {}: {error}", path.display()),
-			)
-		})?;
-		manifest.validate().map_err(|error| {
-			syn::Error::new_spanned(
-				item,
-				format!("invalid migration manifest {}: {error}", path.display()),
-			)
-		})?;
 		let history = manifest
 			.contract_for_source(kind, &item.ident.to_string())
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
@@ -78,7 +49,7 @@ impl MigrationExpansion {
 		let source_schema = pina_abi::data_schema(item, layout)
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
 		verify_source_schema(item, &source_schema, &current.schema)?;
-		verify_transition_files(item, &program_dir, history)?;
+		verify_transition_files(item, program_dir, history)?;
 		let current_version = current.version;
 		let discriminator_bytes = history.identity.discriminator_bytes;
 		let discriminator_value = history
@@ -1094,6 +1065,141 @@ impl MigrationExpansion {
 
 const MAX_INLINE_STEPS: u16 = 8;
 
+/// Resolve whether one schema declaration opts into ABI history.
+///
+/// The checked-in manifest is the only policy source: an explicit per-item
+/// `migrations = false` wins over the recorded auto policy, and a missing
+/// manifest means no auto policy exists yet. A `migrations = false` on a
+/// contract the manifest already records is rejected because stripping an
+/// envelope is itself a wire-format change.
+pub(crate) fn resolve_opt_in(
+	item: &ItemStruct,
+	kind: ContractKind,
+	declared: Option<bool>,
+	manifest: Option<&MigrationManifest>,
+) -> syn::Result<bool> {
+	match declared {
+		Some(false) => {
+			if manifest.is_some_and(|manifest| {
+				manifest
+					.contract_for_source(kind, &item.ident.to_string())
+					.is_ok()
+			}) {
+				return Err(syn::Error::new_spanned(
+					item,
+					format!(
+						"`migrations = false` on `{}` would remove an envelope the migration \
+						 manifest already records; removing an envelope is a wire-format change \
+						 that `pina migrations make` must record deliberately. Keep the contract \
+						 migration-aware or retire its history first",
+						item.ident
+					),
+				));
+			}
+			Ok(false)
+		}
+		Some(true) => Ok(true),
+		None => Ok(manifest.is_some_and(|manifest| manifest.auto.contains(kind))),
+	}
+}
+
+/// Read and validate the checked-in manifest for a migration-aware schema.
+///
+/// Returns `None` in place of the manifest when the program has no manifest
+/// yet. The program directory is always returned so callers can name the
+/// expected path in diagnostics.
+pub(crate) fn read_manifest(
+	item: &ItemStruct,
+) -> syn::Result<(Option<MigrationManifest>, PathBuf)> {
+	let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
+		syn::Error::new_spanned(
+			item,
+			"could not locate Cargo manifest for migration-aware schema",
+		)
+	})?;
+	let program_dir = PathBuf::from(manifest_dir);
+	let manifest = read_manifest_at(item, &program_dir)?;
+	Ok((manifest, program_dir))
+}
+
+/// Read and validate `migrations/manifest.json` under `program_dir`.
+fn read_manifest_at(
+	item: &ItemStruct,
+	program_dir: &std::path::Path,
+) -> syn::Result<Option<MigrationManifest>> {
+	let path = program_dir.join(MANIFEST_PATH);
+	let source = match std::fs::read(&path) {
+		Ok(source) => source,
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+		Err(error) => {
+			return Err(syn::Error::new_spanned(
+				item,
+				format!(
+					"{} is opted into migrations, but {} could not be read ({error}); run `pina \
+					 migrations make`",
+					item.ident,
+					path.display()
+				),
+			));
+		}
+	};
+	let manifest: MigrationManifest = pina_abi::decode_manifest(&source).map_err(|error| {
+		syn::Error::new_spanned(
+			item,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+	manifest.validate().map_err(|error| {
+		syn::Error::new_spanned(
+			item,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+	Ok(Some(manifest))
+}
+
+/// Resolve opt-in from the manifest policy and load the contract history.
+///
+/// Declarations covered by the manifest's auto policy resolve exactly like an
+/// explicit `migrations` token, so a new contract still fails the build with
+/// the `pina migrations make` remedy until it has a snapshot.
+pub(crate) fn expansion(
+	item: &ItemStruct,
+	kind: ContractKind,
+	layout: LayoutKind,
+	declared: Option<bool>,
+) -> syn::Result<Option<MigrationExpansion>> {
+	let (manifest, program_dir) = read_manifest(item)?;
+	let Some(manifest) = resolve_manifest(item, kind, declared, manifest, &program_dir)? else {
+		return Ok(None);
+	};
+	MigrationExpansion::load(item, kind, layout, &manifest, &program_dir).map(Some)
+}
+
+/// Resolve the opt-in and require a manifest when the declaration is enabled.
+fn resolve_manifest(
+	item: &ItemStruct,
+	kind: ContractKind,
+	declared: Option<bool>,
+	manifest: Option<MigrationManifest>,
+	program_dir: &std::path::Path,
+) -> syn::Result<Option<MigrationManifest>> {
+	if !resolve_opt_in(item, kind, declared, manifest.as_ref())? {
+		return Ok(None);
+	}
+
+	manifest.map(Some).ok_or_else(|| {
+		syn::Error::new_spanned(
+			item,
+			format!(
+				"{} is opted into migrations, but {} does not exist; run `pina migrations make`",
+				item.ident,
+				program_dir.join(MANIFEST_PATH).display()
+			),
+		)
+	})
+}
+
 fn verify_transition_files(
 	item: &ItemStruct,
 	program_dir: &std::path::Path,
@@ -1384,4 +1490,272 @@ fn verify_source_schema(
 			item.ident
 		),
 	))
+}
+
+#[cfg(test)]
+mod tests {
+	use pina_abi::ContractIdentity;
+	use pina_abi::ContractKind;
+	use pina_abi::MigrationAuto;
+	use pina_abi::MigrationManifest;
+	use pina_abi::MigrationVersionType;
+	use pina_abi::SchemaVersion;
+	use tempfile::TempDir;
+
+	use super::*;
+
+	fn manifest_for(
+		item: &ItemStruct,
+		kind: ContractKind,
+		auto: MigrationAuto,
+	) -> MigrationManifest {
+		let schema = pina_abi::data_schema(item, LayoutKind::Fixed)
+			.unwrap_or_else(|error| panic!("test schema: {error}"));
+		let identity = ContractIdentity::try_new(kind, 1, 1)
+			.unwrap_or_else(|error| panic!("test identity: {error}"));
+		let key = identity.key();
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		manifest.auto = auto;
+		let history = ContractHistory {
+			identity,
+			rust_name: item.ident.to_string(),
+			versions: vec![SchemaVersion {
+				version: 0,
+				schema_sha256: schema.sha256(),
+				schema,
+				process: None,
+				process_sha256: None,
+				transition: None,
+			}],
+		};
+		manifest.contracts.insert(key, history);
+		manifest
+	}
+
+	fn item_struct(name: &str) -> ItemStruct {
+		syn::parse_str(&format!("struct {name} {{ value: u64 }}"))
+			.unwrap_or_else(|error| panic!("test item: {error}"))
+	}
+
+	#[test]
+	fn explicit_token_opts_in_for_every_kind() {
+		for kind in ContractKind::ALL {
+			assert!(
+				resolve_opt_in(&item_struct("State"), kind, Some(true), None)
+					.unwrap_or_else(|error| panic!("explicit opt-in: {error}")),
+			);
+		}
+	}
+
+	#[test]
+	fn manifest_auto_policy_opts_in_unannotated_declarations() {
+		for kind in ContractKind::ALL {
+			let item = item_struct("State");
+			let manifest = manifest_for(&item, kind, MigrationAuto::all());
+			assert!(
+				resolve_opt_in(&item, kind, None, Some(&manifest))
+					.unwrap_or_else(|error| panic!("auto opt-in: {error}")),
+			);
+
+			// A policy for another kind leaves this declaration opted out.
+			let other = ContractKind::ALL
+				.into_iter()
+				.find(|candidate| *candidate != kind)
+				.unwrap_or_else(|| panic!("a second kind exists"));
+			let mut policy = MigrationAuto::none();
+			policy.add(other);
+			let manifest = manifest_for(&item, kind, policy);
+			assert!(
+				!resolve_opt_in(&item, kind, None, Some(&manifest))
+					.unwrap_or_else(|error| panic!("uncovered kind: {error}")),
+			);
+		}
+	}
+
+	#[test]
+	fn missing_manifest_has_no_auto_policy() {
+		assert!(
+			!resolve_opt_in(&item_struct("State"), ContractKind::Account, None, None)
+				.unwrap_or_else(|error| panic!("absent policy: {error}")),
+		);
+	}
+
+	#[test]
+	fn disabled_override_wins_over_auto_and_is_rejected_once_recorded() {
+		for kind in ContractKind::ALL {
+			let item = item_struct("State");
+			let manifest = manifest_for(&item, kind, MigrationAuto::all());
+
+			// Not recorded: the explicit override stands even under auto.
+			let other = item_struct("Other");
+			assert!(
+				!resolve_opt_in(&other, kind, Some(false), Some(&manifest))
+					.unwrap_or_else(|error| panic!("explicit opt-out: {error}")),
+			);
+
+			// Recorded: removing the envelope is a deliberate wire-format change.
+			let error = resolve_opt_in(&item, kind, Some(false), Some(&manifest))
+				.expect_err("a recorded contract cannot opt out silently");
+			let message = error.to_string();
+			assert!(
+				message.contains("wire-format change"),
+				"unexpected message: {message}"
+			);
+			assert!(
+				message.contains("must record deliberately"),
+				"unexpected message: {message}"
+			);
+		}
+	}
+
+	#[test]
+	fn manifest_records_do_not_opt_in_uncovered_kinds() {
+		let item = item_struct("State");
+		let manifest = manifest_for(&item, ContractKind::Instruction, MigrationAuto::none());
+		// Auto does not cover accounts, so an unannotated account stays out even
+		// though the manifest holds another contract.
+		assert!(
+			!resolve_opt_in(&item, ContractKind::Account, None, Some(&manifest))
+				.unwrap_or_else(|error| panic!("uncovered account: {error}")),
+		);
+	}
+
+	fn write_manifest(program_dir: &std::path::Path, source: &[u8]) -> PathBuf {
+		let path = program_dir.join(pina_abi::MANIFEST_PATH);
+		let parent = path
+			.parent()
+			.unwrap_or_else(|| panic!("manifest path has a parent directory"));
+		std::fs::create_dir_all(parent)
+			.unwrap_or_else(|error| panic!("create manifest directory: {error}"));
+		std::fs::write(&path, source).unwrap_or_else(|error| panic!("write manifest: {error}"));
+		path
+	}
+
+	fn encode(manifest: &MigrationManifest) -> Vec<u8> {
+		pina_abi::encode_manifest_for_format(manifest, pina_abi::MANIFEST_FORMAT_VERSION)
+			.unwrap_or_else(|error| panic!("encode manifest: {error}"))
+	}
+
+	#[test]
+	fn read_manifest_reports_the_absent_program_manifest() {
+		let item = item_struct("State");
+		let (manifest, program_dir) =
+			read_manifest(&item).unwrap_or_else(|error| panic!("read absent manifest: {error}"));
+
+		assert!(manifest.is_none());
+		assert_eq!(program_dir, PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+	}
+
+	#[test]
+	fn read_manifest_at_round_trips_the_recorded_auto_policy() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let item = item_struct("State");
+		let mut manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::all());
+		manifest.auto.add(ContractKind::Event);
+		write_manifest(temp.path(), &encode(&manifest));
+
+		let loaded = read_manifest_at(&item, temp.path())
+			.unwrap_or_else(|error| panic!("read manifest: {error}"))
+			.expect("a written manifest must be read");
+
+		assert_eq!(loaded.auto, manifest.auto);
+		assert_eq!(loaded.contracts.len(), 1);
+	}
+
+	#[test]
+	fn read_manifest_at_rejects_invalid_and_inconsistent_documents() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let item = item_struct("State");
+		assert!(
+			read_manifest_at(&item, temp.path())
+				.unwrap_or_else(|error| panic!("read absent manifest: {error}"))
+				.is_none()
+		);
+
+		// A future format is rejected before the typed model is read.
+		write_manifest(temp.path(), br#"{"formatVersion": 99}"#);
+		let future = read_manifest_at(&item, temp.path()).expect_err("future formats must fail");
+		assert!(
+			future.to_string().contains("invalid migration manifest"),
+			"unexpected message: {future}"
+		);
+
+		// A document whose contract key disagrees with its identity fails
+		// validation after a successful parse.
+		let mut value: serde_json::Value = serde_json::from_slice(&encode(&manifest_for(
+			&item,
+			ContractKind::Account,
+			MigrationAuto::all(),
+		)))
+		.unwrap_or_else(|error| panic!("manifest json: {error}"));
+		let contracts = value["contracts"]
+			.as_object_mut()
+			.unwrap_or_else(|| panic!("manifest contracts object"));
+		let history = contracts
+			.iter()
+			.next()
+			.map(|(key, history)| (key.clone(), history.clone()))
+			.unwrap_or_else(|| panic!("one recorded contract"));
+		contracts.remove(&history.0);
+		contracts.insert("account:9:09".to_owned(), history.1);
+		write_manifest(
+			temp.path(),
+			&serde_json::to_vec(&value).unwrap_or_else(|error| panic!("encode json: {error}")),
+		);
+
+		let inconsistent =
+			read_manifest_at(&item, temp.path()).expect_err("mismatched keys must fail");
+		assert!(
+			inconsistent
+				.to_string()
+				.contains("invalid migration manifest"),
+			"unexpected message: {inconsistent}"
+		);
+	}
+
+	#[test]
+	fn enabled_declarations_require_the_manifest_file() {
+		let item = item_struct("State");
+		let program_dir = std::path::Path::new("program-root");
+
+		// An unannotated declaration without a manifest has no policy to resolve.
+		assert!(
+			resolve_manifest(&item, ContractKind::Account, None, None, program_dir)
+				.unwrap_or_else(|error| panic!("absent manifest: {error}"))
+				.is_none()
+		);
+
+		// An explicit token still names the missing file and the remedy.
+		let error = resolve_manifest(&item, ContractKind::Account, Some(true), None, program_dir)
+			.expect_err("an enabled declaration requires a manifest");
+		let message = error.to_string();
+		assert!(message.contains("does not exist"), "message: {message}");
+		assert!(
+			message.contains("pina migrations make"),
+			"message: {message}"
+		);
+		assert!(
+			message.contains(
+				&program_dir
+					.join(pina_abi::MANIFEST_PATH)
+					.display()
+					.to_string()
+			),
+			"message: {message}"
+		);
+
+		// With a manifest, an auto-covered declaration resolves to it.
+		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::all());
+		assert!(
+			resolve_manifest(
+				&item,
+				ContractKind::Account,
+				None,
+				Some(manifest),
+				program_dir
+			)
+			.unwrap_or_else(|error| panic!("auto manifest: {error}"))
+			.is_some()
+		);
+	}
 }

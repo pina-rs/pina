@@ -16,7 +16,8 @@ pub struct AccountStruct {
 	pub variant: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
-	pub migratable: bool,
+	/// The declaration's migration opt-in, before policy resolution.
+	pub migrations: super::MigrationOptIn,
 	/// The name of the PDA declared for this account via `#[pda(...)]`.
 	pub pda_name: Option<String>,
 }
@@ -55,7 +56,8 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 			docs.push(COMPACT_ACCOUNT_DOC_MARKER.to_owned());
 		}
 		let pda_name = extract_pda_name(&item_struct.attrs, &item_struct.ident.to_string());
-		let migratable = super::event_data::has_migrations_flag(&item_struct.attrs, "account");
+		let migrations =
+			super::event_data::migrations_opt_in(&item_struct.attrs, "account").unwrap_or_default();
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
@@ -63,7 +65,7 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 			variant,
 			fields,
 			docs,
-			migratable,
+			migrations,
 			pda_name,
 		});
 	}

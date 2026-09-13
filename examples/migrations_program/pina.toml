@@ -3,6 +3,7 @@ program = "."
 
 [migrations]
 version-type = "u8"
+auto = true
 
 [clients]
 output = "clients"

@@ -233,6 +233,7 @@ fn run_migrations(command: MigrationCommands) {
 			for warning in &output.data_warnings {
 				println!("{} {warning}", "⚠".yellow().bold());
 			}
+			print_migration_notices(&output);
 			run_build(
 				project.clone(),
 				Vec::new(),
@@ -326,21 +327,22 @@ fn run_migrations(command: MigrationCommands) {
 				return;
 			}
 			println!("{} Updated {}", "✔".green(), escaped_path(&output.manifest));
-			for contract in output.created_contracts {
+			for contract in &output.created_contracts {
 				println!("Created {contract}@0");
 			}
-			for contract in output.advanced_versions {
+			for contract in &output.advanced_versions {
 				println!("Advanced {contract}");
 			}
-			for contract in output.updated_drafts {
+			for contract in &output.updated_drafts {
 				println!("Updated draft {contract}");
 			}
-			for path in output.manual_transitions {
-				println!("Manual migration required: {}", escaped_path(&path));
+			for path in &output.manual_transitions {
+				println!("Manual migration required: {}", escaped_path(path));
 			}
-			for warning in output.data_warnings {
+			for warning in &output.data_warnings {
 				println!("{} {warning}", "⚠".yellow().bold());
 			}
+			print_migration_notices(&output);
 		}
 		MigrationCommands::Check { project, json } => {
 			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
@@ -506,6 +508,32 @@ fn run_doctor(path: &Path, json: bool) {
 
 	if !report.is_usable() {
 		std::process::exit(1);
+	}
+}
+
+/// Print the auto-policy and build-script notices shared by `make` and `sync`.
+fn print_migration_notices(output: &pina_cli::migrations::MakeMigrationsOutput) {
+	use pina_cli::migrations::BuildScriptStatus;
+
+	if !output.auto.is_empty() {
+		println!("Auto policy: {}", output.auto.join(", "));
+	}
+	match &output.build_script {
+		Some(BuildScriptStatus::Created { path }) => {
+			println!(
+				"{} Created {} for migration-policy changes",
+				"✔".green(),
+				escaped_path(path)
+			);
+		}
+		Some(BuildScriptStatus::Manual { path, directive }) => {
+			println!(
+				"{} Add `{directive}` to {} so policy flips re-expand macros",
+				"⚠".yellow().bold(),
+				escaped_path(path)
+			);
+		}
+		_ => {}
 	}
 }
 

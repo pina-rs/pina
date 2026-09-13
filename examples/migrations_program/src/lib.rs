@@ -28,7 +28,7 @@ pub enum MigrationEvent {
 	ValueChanged = 4,
 }
 
-#[account(discriminator = MigrationAccount::State, migrations)]
+#[account(discriminator = MigrationAccount::State)]
 pub struct State {
 	pub authority: Address,
 	pub value: u64,
@@ -36,30 +36,30 @@ pub struct State {
 	pub revision: u8,
 }
 
-#[account(discriminator = MigrationAccount::ManualState, compact, migrations)]
+#[account(discriminator = MigrationAccount::ManualState, compact)]
 pub struct ManualState {
 	pub code: String<5>,
 }
 
-#[account(discriminator = MigrationAccount::CompactState, compact, migrations)]
+#[account(discriminator = MigrationAccount::CompactState, compact)]
 pub struct CompactState {
 	pub name: String<4>,
 	pub tags: Vec<u16, 2>,
 }
 
-#[instruction(discriminator = MigrationInstruction::Update, migrations)]
+#[instruction(discriminator = MigrationInstruction::Update)]
 pub struct UpdateInstruction {
 	pub value: u64,
 	pub memo: u16,
 }
 
-#[event(discriminator = MigrationEvent::ValueChanged, migrations)]
+#[event(discriminator = MigrationEvent::ValueChanged)]
 pub struct ValueChangedEvent {
 	pub value: u64,
 	pub memo: u16,
 }
 
-#[instruction(discriminator = MigrationInstruction::Relay)]
+#[instruction(discriminator = MigrationInstruction::Relay, migrations = false)]
 pub struct RelayInstruction {
 	pub value: u64,
 }

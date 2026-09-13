@@ -3,6 +3,7 @@
 use syn::File;
 use syn::Item;
 
+use super::MigrationOptIn;
 use super::discriminator::extract_discriminator_and_variant;
 use crate::error::IdlError;
 
@@ -16,7 +17,10 @@ pub struct EventStruct {
 }
 
 /// Extract only events opted into ABI history.
-pub fn extract_migratable_events(file: &File) -> Result<Vec<EventStruct>, IdlError> {
+///
+/// An event is migration-aware when its declaration carries the `migrations`
+/// token or `auto` covers events. `migrations = false` always wins.
+pub fn extract_migratable_events(file: &File, auto: bool) -> Result<Vec<EventStruct>, IdlError> {
 	let mut events = Vec::new();
 	for item in &file.items {
 		let Item::Struct(item_struct) = item else {
@@ -25,7 +29,10 @@ pub fn extract_migratable_events(file: &File) -> Result<Vec<EventStruct>, IdlErr
 		// Non-migratable events may use event-macro arguments that the ABI
 		// snapshot parser does not own (for example `validate(...)`). Ignore
 		// those declarations before parsing the narrower migration syntax.
-		if !has_migrations_flag(&item_struct.attrs, "event") {
+		let Some(opt_in) = migrations_opt_in(&item_struct.attrs, "event") else {
+			continue;
+		};
+		if !opt_in.is_enabled(auto) {
 			continue;
 		}
 		let (discriminator_enum, variant) =
@@ -43,17 +50,50 @@ pub fn extract_migratable_events(file: &File) -> Result<Vec<EventStruct>, IdlErr
 	Ok(events)
 }
 
-/// Return whether one schema attribute contains the bare `migrations` flag.
-pub(crate) fn has_migrations_flag(attrs: &[syn::Attribute], attribute: &str) -> bool {
-	attrs.iter().any(|attr| {
+/// Parse the `migrations`, `migrations = true`, or `migrations = false`
+/// argument from one schema attribute.
+///
+/// Returns `None` when the declaration does not carry `attribute` at all, so a
+/// bare struct in an auto-policy program is not mistaken for a declaration.
+pub(crate) fn migrations_opt_in(
+	attrs: &[syn::Attribute],
+	attribute: &str,
+) -> Option<MigrationOptIn> {
+	let mut opt_in = MigrationOptIn::Unspecified;
+	let mut found = false;
+	for attr in attrs {
 		if !attr.path().is_ident(attribute) {
-			return false;
+			continue;
 		}
-		attr.parse_args_with(
+		found = true;
+		let Ok(items) = attr.parse_args_with(
 			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-		)
-		.is_ok_and(|items| items.iter().any(|item| item.path().is_ident("migrations")))
-	})
+		) else {
+			continue;
+		};
+		for item in items {
+			match &item {
+				syn::Meta::Path(path) if path.is_ident("migrations") => {
+					opt_in = MigrationOptIn::Explicit;
+				}
+				syn::Meta::NameValue(value) if value.path.is_ident("migrations") => {
+					if let syn::Expr::Lit(syn::ExprLit {
+						lit: syn::Lit::Bool(value),
+						..
+					}) = &value.value
+					{
+						opt_in = if value.value {
+							MigrationOptIn::Explicit
+						} else {
+							MigrationOptIn::Disabled
+						};
+					}
+				}
+				_ => {}
+			}
+		}
+	}
+	found.then_some(opt_in)
 }
 
 #[cfg(test)]
@@ -72,12 +112,104 @@ mod tests {
 			"#,
 		)
 		.unwrap_or_else(|error| panic!("parse: {error}"));
-		let events =
-			extract_migratable_events(&file).unwrap_or_else(|error| panic!("extract: {error}"));
+		let events = extract_migratable_events(&file, false)
+			.unwrap_or_else(|error| panic!("extract: {error}"));
 
 		assert_eq!(events.len(), 1);
 		assert_eq!(events[0].name, "Current");
 		assert_eq!(events[0].schema.fields[0].rust_type, "u64");
+	}
+
+	#[test]
+	fn auto_policy_includes_unannotated_events_and_disabled_ones_stay_out() {
+		let file = syn::parse_file(
+			r#"
+				#[event(discriminator = Events::Current)]
+				struct Current { value: u64 }
+
+				#[event(discriminator = Events::Disabled, migrations = false)]
+				struct Disabled { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+		let events = extract_migratable_events(&file, true)
+			.unwrap_or_else(|error| panic!("extract: {error}"));
+
+		assert_eq!(events.len(), 1);
+		assert_eq!(events[0].name, "Current");
+		assert!(
+			extract_migratable_events(&file, false)
+				.unwrap_or_else(|error| panic!("extract: {error}"))
+				.is_empty()
+		);
+	}
+
+	#[test]
+	fn parses_every_migrations_argument_spelling() {
+		let file = syn::parse_file(
+			r#"
+				#[event(discriminator = Events::Bare, migrations)]
+				struct Bare { value: u64 }
+
+				#[event(discriminator = Events::True, migrations = true)]
+				struct True { value: u64 }
+
+				#[event(discriminator = Events::False, migrations = false)]
+				struct False { value: u64 }
+
+				#[event(discriminator = Events::None)]
+				struct None { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+		let states = file
+			.items
+			.iter()
+			.map(|item| {
+				match item {
+					Item::Struct(item_struct) => migrations_opt_in(&item_struct.attrs, "event"),
+					_ => None,
+				}
+			})
+			.collect::<Vec<_>>();
+
+		assert_eq!(
+			states,
+			[
+				Some(MigrationOptIn::Explicit),
+				Some(MigrationOptIn::Explicit),
+				Some(MigrationOptIn::Disabled),
+				// The attribute exists but has no `migrations` argument, so the
+				// auto policy decides rather than the declaration.
+				Some(MigrationOptIn::Unspecified),
+			]
+		);
+	}
+
+	#[test]
+	fn absent_schema_attributes_have_no_opt_in() {
+		let file = syn::parse_file(
+			r#"
+				struct Plain { value: u64 }
+
+				#[account(discriminator = Kind::State)]
+				struct State { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+
+		let states = file
+			.items
+			.iter()
+			.filter_map(|item| {
+				match item {
+					Item::Struct(item_struct) => migrations_opt_in(&item_struct.attrs, "event"),
+					_ => None,
+				}
+			})
+			.collect::<Vec<_>>();
+
+		assert!(states.is_empty());
 	}
 
 	#[test]
@@ -93,8 +225,8 @@ mod tests {
 		)
 		.unwrap_or_else(|error| panic!("parse: {error}"));
 
-		let events =
-			extract_migratable_events(&file).unwrap_or_else(|error| panic!("extract: {error}"));
+		let events = extract_migratable_events(&file, false)
+			.unwrap_or_else(|error| panic!("extract: {error}"));
 		assert!(events.is_empty());
 	}
 
@@ -129,9 +261,8 @@ pub struct EventDeclaration {
 	pub variant: String,
 	pub fields: Vec<crate::ir::FieldIr>,
 	pub docs: Vec<String>,
-	/// Whether the declaration carries the `migrations` flag, which puts the
-	/// version envelope between the discriminator and the payload.
-	pub migratable: bool,
+	/// The declaration's migration opt-in, before policy resolution.
+	pub migrations: MigrationOptIn,
 }
 
 /// Extract every `#[event]` struct, regardless of its event-macro arguments.
@@ -157,7 +288,7 @@ pub fn extract_event_declarations(file: &File) -> Result<Vec<EventDeclaration>, 
 			variant,
 			fields: super::account_state::extract_named_fields(&item_struct.fields),
 			docs: super::doc_comments::extract_docs(&item_struct.attrs),
-			migratable: has_migrations_flag(&item_struct.attrs, "event"),
+			migrations: migrations_opt_in(&item_struct.attrs, "event").unwrap_or_default(),
 		});
 	}
 	Ok(events)

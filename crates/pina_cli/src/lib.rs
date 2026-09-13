@@ -47,7 +47,7 @@ pub use crate::cpi::generate_cpi_crate_from_reader_with_config;
 use crate::error::IdlError;
 pub use crate::init::init_project;
 pub use crate::init::print_next_steps;
-use crate::parse::parse_program;
+use crate::parse::parse_program_with_auto;
 pub use crate::project::GenerationMode;
 
 /// Generate a Codama IDL `RootNode` from a Pina program crate.
@@ -59,7 +59,10 @@ pub fn generate_idl(
 	program_path: &Path,
 	name_override: Option<&str>,
 ) -> Result<RootNode, IdlError> {
-	let ir = parse_program(program_path, name_override)?;
+	// The manifest is the checked-in policy source, so IDL discovery marks the
+	// same contracts the macros enveloped.
+	let auto = migrations::manifest_auto_policy(program_path);
+	let ir = parse_program_with_auto(program_path, name_override, &auto)?;
 	let needs_migration_constants = ir.accounts.iter().any(ir::AccountIr::is_migratable)
 		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable)
 		|| ir.events.iter().any(ir::EventIr::is_migratable);

@@ -19,6 +19,32 @@ pub struct Profile {
 
 Pina inserts the version after the existing discriminator. Version `0` is the first captured shape. The source code never declares a version number.
 
+## Opt whole kinds in
+
+A program that wants every contract versioned can opt in by kind instead of annotating each declaration:
+
+```toml
+[migrations]
+version-type = "u8"
+auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
+```
+
+`auto` accepts `true` (every kind), `false` (the default), or a list of `accounts`, `events`, and `instructions`; any other name is a configuration error. Staging a subset is meaningful because the kinds have different costs: instruction envelopes change payload bytes and ripple into CPI call sites, so `auto = ["accounts", "events"]` is a useful middle step.
+
+`pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. The manifest is the single source of truth for macros: they never read `pina.toml`, because a proc macro does not re-expand when an unrelated toml file changes. A struct that is not yet snapshotted still fails the build with the existing "run `pina migrations make`" error, so the workflow is unchanged.
+
+Because the policy lives in the manifest, flipping it re-expands every contract without a source edit. When a policy is recorded, `make` scaffolds a `build.rs` containing:
+
+```rust
+fn main() {
+	println!("cargo:rerun-if-changed=migrations/manifest.json");
+}
+```
+
+The scaffold is idempotent and never overwrites an existing hand-written build script; `make` prints the exact line to add instead, and `pina migrations check` fails until it is present.
+
+Per-item `migrations = false` keeps one contract out of an auto policy. Removing the envelope from a contract the manifest already records is an error rather than a silent opt-out: stripping an envelope is a wire-format change, so the build fails with the contract identity and the required remedy. Dropping a kind from `[migrations].auto` is rejected the same way. Enabling auto on an already-launched program inserts an envelope into every contract of the listed kinds — one recorded history entry per contract through `make` — while a new program simply captures that baseline.
+
 ## Capture a draft
 
 Run the migration generator after the source ABI changes:
@@ -162,6 +188,8 @@ When the exact planned inputs cannot be reproduced (for example a cleaned build 
 `formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.
 
 Manifest format 3 freezes the PinaPod codec plus payload-relative fixed offsets and compact header, prefix, capacity, tail-order, and alignment metadata. Pina derives that descriptor from its closed field grammar and rejects a stored descriptor that disagrees. Historical manifest format 2 documents are upgraded by deriving and rehashing this metadata; a format 3 manifest can downgrade to format 2 only through the matching inverse converter.
+
+Manifest format 4 records the `[migrations].auto` policy. A format 3 document upgrades with no policy; a format 4 document can downgrade to format 3 only after the policy is cleared, because format 3 cannot represent it.
 
 Publication-ledger format 3 adds the recoverable pending deployment record. Format 2 ledgers upgrade with no pending deployment. A format 3 ledger can downgrade to format 2 only when no deployment is pending.
 

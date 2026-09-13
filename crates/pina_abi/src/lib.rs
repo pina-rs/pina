@@ -5,11 +5,15 @@
 //! different interpretations of the same Rust schema.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use quote::ToTokens as _;
 use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
+use serde::Serializer;
+use serde::ser::SerializeSeq as _;
 use sha2::Digest as _;
 use sha2::Sha256;
 
@@ -23,7 +27,10 @@ pub const PUBLICATIONS_PATH: &str = "migrations/publications.json";
 ///
 /// This version belongs to Pina's checked-in ABI document. It is independent
 /// from every user contract's on-chain migration version.
-pub const MANIFEST_FORMAT_VERSION: u32 = 3;
+///
+/// Format 4 records the `[migrations].auto` policy that opts whole contract
+/// kinds into ABI history.
+pub const MANIFEST_FORMAT_VERSION: u32 = 4;
 
 /// Current serialization format for publication receipts.
 pub const PUBLICATION_FORMAT_VERSION: u32 = 3;
@@ -108,6 +115,34 @@ pub enum ContractKind {
 }
 
 impl ContractKind {
+	/// Every kind in stable configuration order.
+	pub const ALL: [Self; 3] = [Self::Account, Self::Instruction, Self::Event];
+
+	/// Stable `[migrations].auto` spelling for this kind.
+	///
+	/// The configuration spelling is plural because one entry selects a whole
+	/// contract kind, while the manifest keeps the singular [`Self::as_str`]
+	/// identity spelling.
+	#[must_use]
+	pub const fn config_name(self) -> &'static str {
+		match self {
+			Self::Account => "accounts",
+			Self::Instruction => "instructions",
+			Self::Event => "events",
+		}
+	}
+
+	/// Resolve one `[migrations].auto` entry.
+	#[must_use]
+	pub fn from_config_name(name: &str) -> Option<Self> {
+		match name {
+			"accounts" => Some(Self::Account),
+			"instructions" => Some(Self::Instruction),
+			"events" => Some(Self::Event),
+			_ => None,
+		}
+	}
+
 	/// Stable manifest spelling.
 	#[must_use]
 	pub const fn as_str(self) -> &'static str {
@@ -116,6 +151,134 @@ impl ContractKind {
 			Self::Instruction => "instruction",
 			Self::Event => "event",
 		}
+	}
+}
+
+/// Valid `[migrations].auto` kind names, rendered for error messages.
+pub const AUTO_KIND_NAMES: &str = "`accounts`, `events`, or `instructions`";
+
+/// Program-wide opt-in policy that envelopes whole contract kinds.
+///
+/// The policy is recorded in the migration manifest, which is the only source
+/// procedural macros consult. It serializes as a sorted array of the same
+/// plural kind names accepted by `[migrations].auto` in `pina.toml`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MigrationAuto {
+	kinds: BTreeSet<ContractKind>,
+}
+
+impl MigrationAuto {
+	/// An empty policy that leaves opting in to each declaration.
+	#[must_use]
+	pub fn none() -> Self {
+		Self::default()
+	}
+
+	/// A policy that envelopes accounts, instructions, and events.
+	#[must_use]
+	pub fn all() -> Self {
+		Self {
+			kinds: ContractKind::ALL.into_iter().collect(),
+		}
+	}
+
+	/// Whether the policy envelopes no kind.
+	#[must_use]
+	pub fn is_empty(&self) -> bool {
+		self.kinds.is_empty()
+	}
+
+	/// Whether the policy envelopes `kind`.
+	#[must_use]
+	pub fn contains(&self, kind: ContractKind) -> bool {
+		self.kinds.contains(&kind)
+	}
+
+	/// Add `kind` to the policy, returning whether it was newly inserted.
+	pub fn insert(&mut self, kind: ContractKind) -> bool {
+		self.kinds.insert(kind)
+	}
+
+	/// Add `kind` to the policy without reporting duplicates.
+	pub fn add(&mut self, kind: ContractKind) {
+		self.kinds.insert(kind);
+	}
+
+	/// Every kind in the policy, in stable order.
+	pub fn iter(&self) -> impl Iterator<Item = ContractKind> + '_ {
+		self.kinds.iter().copied()
+	}
+
+	/// Kinds that this policy drops relative to `previous`.
+	pub fn removed_since(&self, previous: &Self) -> Vec<ContractKind> {
+		previous.kinds.difference(&self.kinds).copied().collect()
+	}
+}
+
+impl std::fmt::Display for MigrationAuto {
+	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut names = self.kinds.iter().map(|kind| kind.config_name());
+		match names.next() {
+			Some(first) => formatter.write_str(first)?,
+			None => return formatter.write_str("none"),
+		}
+		for name in names {
+			write!(formatter, ", {name}")?;
+		}
+		Ok(())
+	}
+}
+
+impl Serialize for MigrationAuto {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let mut sequence = serializer.serialize_seq(Some(self.kinds.len()))?;
+		for kind in &self.kinds {
+			sequence.serialize_element(kind.config_name())?;
+		}
+		sequence.end()
+	}
+}
+
+impl<'de> Deserialize<'de> for MigrationAuto {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		struct AutoVisitor;
+
+		impl<'de> serde::de::Visitor<'de> for AutoVisitor {
+			type Value = MigrationAuto;
+
+			fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				formatter.write_str("an array of migration kind names")
+			}
+
+			fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+			where
+				A: serde::de::SeqAccess<'de>,
+			{
+				let mut auto = MigrationAuto::none();
+				while let Some(name) = sequence.next_element::<String>()? {
+					let kind = ContractKind::from_config_name(&name).ok_or_else(|| {
+						serde::de::Error::custom(format!(
+							"unknown migration kind `{name}` in auto policy; expected \
+							 {AUTO_KIND_NAMES}"
+						))
+					})?;
+					if !auto.insert(kind) {
+						return Err(serde::de::Error::custom(format!(
+							"duplicate migration kind `{name}` in auto policy"
+						)));
+					}
+				}
+				Ok(auto)
+			}
+		}
+
+		deserializer.deserialize_seq(AutoVisitor)
 	}
 }
 
@@ -723,13 +886,13 @@ impl ContractHistory {
 						.fields
 						.iter()
 						.map(|field| field.name.as_str())
-						.collect::<std::collections::BTreeSet<_>>();
+						.collect::<BTreeSet<_>>();
 					let destination_fields = version
 						.schema
 						.fields
 						.iter()
 						.map(|field| field.name.as_str())
-						.collect::<std::collections::BTreeSet<_>>();
+						.collect::<BTreeSet<_>>();
 					for rename in &transition.renames {
 						if !previous_fields.contains(rename.from.as_str()) {
 							return Err(format!(
@@ -813,6 +976,9 @@ pub struct MigrationManifest {
 	pub format_version: u32,
 	pub program_id: String,
 	pub version_type: MigrationVersionType,
+	/// Kinds whose declarations are enveloped without a per-item token.
+	#[serde(default, skip_serializing_if = "MigrationAuto::is_empty")]
+	pub auto: MigrationAuto,
 	pub contracts: BTreeMap<String, ContractHistory>,
 }
 
@@ -824,6 +990,7 @@ impl MigrationManifest {
 			format_version: MANIFEST_FORMAT_VERSION,
 			program_id,
 			version_type,
+			auto: MigrationAuto::none(),
 			contracts: BTreeMap::new(),
 		}
 	}
@@ -836,6 +1003,14 @@ impl MigrationManifest {
 				self.format_version
 			));
 		}
+		self.validate_contracts()
+	}
+
+	/// Validate every contract independently of the document format.
+	///
+	/// Adjacent format converters validate intermediate documents whose
+	/// `formatVersion` is intentionally older than [`MANIFEST_FORMAT_VERSION`].
+	fn validate_contracts(&self) -> Result<(), String> {
 		for (key, history) in &self.contracts {
 			if *key != history.identity.key() {
 				return Err(format!(
@@ -866,7 +1041,7 @@ impl MigrationManifest {
 			.filter(|history| history.identity.kind == kind && history.rust_name == rust_name);
 		let found = matches.next().ok_or_else(|| {
 			format!(
-				"{kind} `{rust_name}` is marked `migrations` but has no snapshot; run `pina \
+				"{kind} `{rust_name}` is opted into migrations but has no snapshot; run `pina \
 				 migrations make`"
 			)
 		})?;
@@ -1348,6 +1523,7 @@ fn upgrade_manifest_document(
 	match version {
 		1 => migrate_manifest_v1_to_v2(value),
 		2 => migrate_manifest_v2_to_v3(value),
+		3 => migrate_manifest_v3_to_v4(value),
 		_ => {
 			Err(format!(
 				"no Pina ABI migration is available from manifest format {version}"
@@ -1361,6 +1537,7 @@ fn downgrade_manifest_document(
 	value: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
 	match version {
+		4 => migrate_manifest_v4_to_v3(value),
 		3 => migrate_manifest_v3_to_v2(value),
 		2 => migrate_manifest_v2_to_v1(value),
 		_ => {
@@ -1369,6 +1546,45 @@ fn downgrade_manifest_document(
 			))
 		}
 	}
+}
+
+/// Format 4 records the program-wide `[migrations].auto` policy. Format 3
+/// readers would reject the unknown `auto` key, so the format version moves
+/// with the new field.
+fn migrate_manifest_v3_to_v4(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
+	if let Some(auto) = root.get("auto")
+		&& !auto.as_array().is_some_and(Vec::is_empty)
+	{
+		return Err("migration manifest format 3 unexpectedly records an auto policy".to_owned());
+	}
+	root.insert(
+		"formatVersion".to_owned(),
+		serde_json::Value::from(MANIFEST_FORMAT_VERSION),
+	);
+	Ok(value)
+}
+
+fn migrate_manifest_v4_to_v3(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
+	if root
+		.get("auto")
+		.and_then(serde_json::Value::as_array)
+		.is_some_and(|kinds| !kinds.is_empty())
+	{
+		return Err(
+			"migration manifest format 4 cannot downgrade while an auto policy is recorded; clear \
+			 `[migrations].auto` and rerun `pina migrations make`"
+				.to_owned(),
+		);
+	}
+	root.remove("auto");
+	root.insert("formatVersion".to_owned(), serde_json::Value::from(3));
+	Ok(value)
 }
 
 /// Format 1 stored one immutable instruction process on the contract history.
@@ -1446,7 +1662,9 @@ fn migrate_manifest_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json:
 }
 
 fn migrate_manifest_v2_to_v1(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
-	let current = migrate_manifest_v2_to_v3(value.clone())?;
+	// Validate the format 2 content through every adjacent upgrade so the typed
+	// check always runs against the current model.
+	let current = migrate_manifest_v3_to_v4(migrate_manifest_v2_to_v3(value.clone())?)?;
 	let manifest: MigrationManifest = serde_json::from_value(current)
 		.map_err(|error| format!("invalid upgraded migration manifest format 2: {error}"))?;
 	manifest.validate()?;
@@ -1654,7 +1872,7 @@ fn migrate_manifest_v2_to_v3(mut value: serde_json::Value) -> Result<serde_json:
 fn migrate_manifest_v3_to_v2(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
 	let manifest: MigrationManifest = serde_json::from_value(value.clone())
 		.map_err(|error| format!("invalid migration manifest format 3: {error}"))?;
-	manifest.validate()?;
+	manifest.validate_contracts()?;
 	let root = value
 		.as_object_mut()
 		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
@@ -2732,6 +2950,7 @@ mod tests {
 			format_version: MANIFEST_FORMAT_VERSION,
 			program_id: "program".to_owned(),
 			version_type: MigrationVersionType::U8,
+			auto: MigrationAuto::none(),
 			contracts: BTreeMap::from([(
 				key.clone(),
 				ContractHistory {
@@ -2957,6 +3176,7 @@ mod tests {
 			format_version: MANIFEST_FORMAT_VERSION,
 			program_id: "program".to_owned(),
 			version_type: MigrationVersionType::U8,
+			auto: MigrationAuto::none(),
 			contracts: BTreeMap::from([(
 				key,
 				ContractHistory {
@@ -3117,6 +3337,89 @@ mod tests {
 	}
 
 	#[test]
+	fn auto_policy_serializes_the_config_spelling_and_rejects_unknown_kinds() {
+		let mut auto = MigrationAuto::none();
+		auto.add(ContractKind::Event);
+		auto.add(ContractKind::Account);
+
+		let encoded = serde_json::to_string(&auto).unwrap();
+		// BTreeSet iteration keeps the recorded policy in stable kind order.
+		assert_eq!(encoded, r#"["accounts","events"]"#);
+		assert_eq!(
+			serde_json::from_str::<MigrationAuto>(&encoded).unwrap(),
+			auto
+		);
+		assert_eq!(auto.to_string(), "accounts, events");
+		assert!(MigrationAuto::all().contains(ContractKind::Instruction));
+		assert!(MigrationAuto::none().is_empty());
+		// `removed_since` reports the kinds the later policy dropped.
+		assert_eq!(
+			auto.removed_since(&MigrationAuto::all()),
+			vec![ContractKind::Instruction]
+		);
+		assert!(MigrationAuto::all().removed_since(&auto).is_empty());
+
+		let unknown = serde_json::from_str::<MigrationAuto>(r#"["states"]"#).unwrap_err();
+		assert!(
+			unknown
+				.to_string()
+				.contains("unknown migration kind `states`")
+		);
+		let duplicate =
+			serde_json::from_str::<MigrationAuto>(r#"["accounts","accounts"]"#).unwrap_err();
+		assert!(duplicate.to_string().contains("duplicate migration kind"));
+
+		for kind in ContractKind::ALL {
+			assert_eq!(
+				ContractKind::from_config_name(kind.config_name()),
+				Some(kind)
+			);
+			// The manifest keeps the singular identity spelling.
+			assert_ne!(kind.config_name(), kind.as_str());
+		}
+		assert_eq!(ContractKind::from_config_name("account"), None);
+	}
+
+	#[test]
+	fn manifest_format_four_records_auto_and_downgrades_only_when_cleared() {
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		manifest.auto.add(ContractKind::Account);
+		manifest.auto.add(ContractKind::Instruction);
+		manifest.auto.add(ContractKind::Event);
+
+		let current = encode_manifest_for_format(&manifest, MANIFEST_FORMAT_VERSION).unwrap();
+		let value: serde_json::Value = serde_json::from_slice(&current).unwrap();
+		assert_eq!(value["formatVersion"], MANIFEST_FORMAT_VERSION);
+		assert_eq!(
+			value["auto"],
+			serde_json::json!(["accounts", "instructions", "events"])
+		);
+		assert_eq!(decode_manifest(&current).unwrap(), manifest);
+
+		// Removing the field from the current document decodes as no policy.
+		let mut without_auto = value.clone();
+		without_auto.as_object_mut().unwrap().remove("auto");
+		assert_eq!(
+			decode_manifest(&serde_json::to_vec(&without_auto).unwrap())
+				.unwrap()
+				.auto,
+			MigrationAuto::none()
+		);
+
+		// A recorded policy cannot be downgraded away.
+		let error = encode_manifest_for_format(&manifest, 3).unwrap_err();
+		assert!(error.contains("cannot downgrade while an auto policy is recorded"));
+
+		let mut cleared = manifest.clone();
+		cleared.auto = MigrationAuto::none();
+		let downgraded = encode_manifest_for_format(&cleared, 3).unwrap();
+		let downgraded_value: serde_json::Value = serde_json::from_slice(&downgraded).unwrap();
+		assert_eq!(downgraded_value["formatVersion"], 3);
+		assert!(downgraded_value.get("auto").is_none());
+		assert_eq!(decode_manifest(&downgraded).unwrap(), cleared);
+	}
+
+	#[test]
 	fn current_manifest_rejects_unknown_fields() {
 		let mut value = serde_json::to_value(MigrationManifest::new(
 			"program".to_owned(),
@@ -3145,6 +3448,7 @@ mod tests {
 			format_version: MANIFEST_FORMAT_VERSION,
 			program_id: "program".to_owned(),
 			version_type: MigrationVersionType::U8,
+			auto: MigrationAuto::none(),
 			contracts: BTreeMap::from([(
 				key,
 				ContractHistory {
@@ -3257,6 +3561,7 @@ mod tests {
 			format_version: MANIFEST_FORMAT_VERSION,
 			program_id: "program".to_owned(),
 			version_type: MigrationVersionType::U8,
+			auto: MigrationAuto::none(),
 			contracts: BTreeMap::from([(
 				key,
 				ContractHistory {

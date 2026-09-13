@@ -25,5 +25,9 @@ proc-macro2 = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full"] }
 
+[dev-dependencies]
+serde_json = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
 [lints]
 workspace = true
