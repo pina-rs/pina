@@ -30,6 +30,11 @@
 					"type": "u64"
 				},
 				{
+					"name": "delta",
+					"docs": ["Signed adjustment applied after the value is stored."],
+					"type": "i64"
+				},
+				{
 					"name": "owner",
 					"docs": ["New owner address."],
 					"type": "pubkey"

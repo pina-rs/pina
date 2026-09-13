@@ -157,6 +157,9 @@ fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {
 	assert!(instruction.contains("Instruction argument `value`."));
 	assert!(instruction.contains("New counter value."));
 	assert!(instruction.contains("pub value: u64"));
+	assert!(instruction.contains("Instruction argument `delta`."));
+	assert!(instruction.contains("Signed adjustment applied after the value is stored."));
+	assert!(instruction.contains("pub delta: i64"));
 	assert!(instruction.contains("pub owner: &'argument Address"));
 	assert!(instruction.contains("pub ix: SetValueIx<'argument>"));
 	assert!(instruction.contains("pub struct SetValueIx<'argument>"));
