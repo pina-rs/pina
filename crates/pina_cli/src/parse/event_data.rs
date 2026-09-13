@@ -1,5 +1,6 @@
 //! Extraction of migration-aware event data schemas.
 
+use quote::ToTokens as _;
 use syn::File;
 use syn::Item;
 
@@ -29,7 +30,7 @@ pub fn extract_migratable_events(file: &File, auto: bool) -> Result<Vec<EventStr
 		// Non-migratable events may use event-macro arguments that the ABI
 		// snapshot parser does not own (for example `validate(...)`). Ignore
 		// those declarations before parsing the narrower migration syntax.
-		let Some(opt_in) = migrations_opt_in(&item_struct.attrs, "event") else {
+		let Some(opt_in) = migrations_opt_in(&item_struct.attrs, "event")? else {
 			continue;
 		};
 		if !opt_in.is_enabled(auto) {
@@ -54,11 +55,14 @@ pub fn extract_migratable_events(file: &File, auto: bool) -> Result<Vec<EventStr
 /// argument from one schema attribute.
 ///
 /// Returns `None` when the declaration does not carry `attribute` at all, so a
-/// bare struct in an auto-policy program is not mistaken for a declaration.
+/// bare struct in an auto-policy program is not mistaken for a declaration. A
+/// known `migrations` argument with a non-boolean value is an error: silently
+/// reading it as unspecified would let the auto policy envelop a declaration
+/// that never validly opted in (or out).
 pub(crate) fn migrations_opt_in(
 	attrs: &[syn::Attribute],
 	attribute: &str,
-) -> Option<MigrationOptIn> {
+) -> Result<Option<MigrationOptIn>, IdlError> {
 	let mut opt_in = MigrationOptIn::Unspecified;
 	let mut found = false;
 	for attr in attrs {
@@ -77,23 +81,31 @@ pub(crate) fn migrations_opt_in(
 					opt_in = MigrationOptIn::Explicit;
 				}
 				syn::Meta::NameValue(value) if value.path.is_ident("migrations") => {
-					if let syn::Expr::Lit(syn::ExprLit {
-						lit: syn::Lit::Bool(value),
-						..
-					}) = &value.value
-					{
-						opt_in = if value.value {
-							MigrationOptIn::Explicit
-						} else {
-							MigrationOptIn::Disabled
-						};
+					match &value.value {
+						syn::Expr::Lit(syn::ExprLit {
+							lit: syn::Lit::Bool(literal),
+							..
+						}) => {
+							opt_in = if literal.value {
+								MigrationOptIn::Explicit
+							} else {
+								MigrationOptIn::Disabled
+							};
+						}
+						other => {
+							return Err(IdlError::Other(format!(
+								"`migrations = {}` on a `{attribute}` schema is not a boolean; \
+								 use `migrations`, `migrations = true`, or `migrations = false`",
+								other.to_token_stream()
+							)));
+						}
 					}
 				}
 				_ => {}
 			}
 		}
 	}
-	found.then_some(opt_in)
+	Ok(found.then_some(opt_in))
 }
 
 #[cfg(test)]
@@ -167,7 +179,9 @@ mod tests {
 			.iter()
 			.map(|item| {
 				match item {
-					Item::Struct(item_struct) => migrations_opt_in(&item_struct.attrs, "event"),
+					Item::Struct(item_struct) => {
+						migrations_opt_in(&item_struct.attrs, "event").unwrap_or_default()
+					}
 					_ => None,
 				}
 			})
@@ -203,13 +217,47 @@ mod tests {
 			.iter()
 			.filter_map(|item| {
 				match item {
-					Item::Struct(item_struct) => migrations_opt_in(&item_struct.attrs, "event"),
+					Item::Struct(item_struct) => {
+						migrations_opt_in(&item_struct.attrs, "event")
+							.ok()
+							.flatten()
+					}
 					_ => None,
 				}
 			})
 			.collect::<Vec<_>>();
 
 		assert!(states.is_empty());
+	}
+
+	#[test]
+	fn non_boolean_migrations_values_are_rejected() {
+		let file = syn::parse_file(
+			r#"
+				#[event(discriminator = Events::Stale, migrations = "false")]
+				struct Stale { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+
+		// The value is invalid rather than merely disabled, so the error fires
+		// whatever the auto policy would decide.
+		let error = extract_migratable_events(&file, false).expect_err("string must fail");
+		let message = error.to_string();
+		assert!(message.contains(r#""false""#), "message: {message}");
+		assert!(message.contains("`event` schema"), "message: {message}");
+		assert!(message.contains("not a boolean"), "message: {message}");
+		assert!(extract_migratable_events(&file, true).is_err());
+
+		let item: syn::ItemStruct = syn::parse_str(
+			"#[event(discriminator = Events::Pinned, migrations = 1)] struct Pinned { value: u64 }",
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+		let pinned = migrations_opt_in(&item.attrs, "event").expect_err("integer must fail");
+		assert!(
+			pinned.to_string().contains("not a boolean"),
+			"message: {pinned}"
+		);
 	}
 
 	#[test]
@@ -288,7 +336,7 @@ pub fn extract_event_declarations(file: &File) -> Result<Vec<EventDeclaration>, 
 			variant,
 			fields: super::account_state::extract_named_fields(&item_struct.fields),
 			docs: super::doc_comments::extract_docs(&item_struct.attrs),
-			migrations: migrations_opt_in(&item_struct.attrs, "event").unwrap_or_default(),
+			migrations: migrations_opt_in(&item_struct.attrs, "event")?.unwrap_or_default(),
 		});
 	}
 	Ok(events)

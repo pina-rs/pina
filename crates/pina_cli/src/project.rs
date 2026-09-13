@@ -615,13 +615,28 @@ fn resolve_migration_auto_entries(entries: &[toml::Value]) -> Result<MigrationAu
 	let mut auto = MigrationAuto::none();
 	for entry in entries {
 		let Some(name) = entry.as_str() else {
-			return Err(ProjectError::InvalidMigrationAuto {
-				reason: format!(
-					"expected only {AUTO_KIND_NAMES} in the list, but found {}; `auto = true` \
-					 already selects every kind and cannot be combined with a kind list",
-					entry.type_str()
-				),
-			});
+			let reason = match entry {
+				// A `true` entry means the developer combined both spellings.
+				toml::Value::Boolean(true) => {
+					format!(
+						"`auto = true` already selects every kind, so it cannot be combined with \
+						 a kind list; list only {AUTO_KIND_NAMES}"
+					)
+				}
+				toml::Value::Boolean(false) => {
+					format!(
+						"`false` is not a kind name; write `auto = false` to disable the policy, \
+						 or list {AUTO_KIND_NAMES}"
+					)
+				}
+				other => {
+					format!(
+						"expected only {AUTO_KIND_NAMES} in the list; found {}",
+						other.type_str()
+					)
+				}
+			};
+			return Err(ProjectError::InvalidMigrationAuto { reason });
 		};
 		let kind = ContractKind::from_config_name(name).ok_or_else(|| {
 			ProjectError::UnknownMigrationKind {
@@ -1309,17 +1324,21 @@ mode = "overwrite"
 		for (config, expected) in [
 			(
 				"auto = [true]\n",
-				"expected only `accounts`, `events`, or `instructions` in the list, but found \
-				 boolean",
+				"`auto = true` already selects every kind, so it cannot be combined with a kind \
+				 list",
 			),
 			(
 				"auto = [\"accounts\", true]\n",
-				"`auto = true` already selects every kind and cannot be combined",
+				"`auto = true` already selects every kind, so it cannot be combined with a kind \
+				 list",
+			),
+			(
+				"auto = [false]\n",
+				"`false` is not a kind name; write `auto = false` to disable the policy",
 			),
 			(
 				"auto = [\"accounts\", 3]\n",
-				"expected only `accounts`, `events`, or `instructions` in the list, but found \
-				 integer",
+				"expected only `accounts`, `events`, or `instructions` in the list; found integer",
 			),
 			("auto = [\"accounts\", \"accounts\"]\n", "duplicate kind"),
 			(

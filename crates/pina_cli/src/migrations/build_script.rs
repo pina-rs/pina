@@ -99,8 +99,19 @@ pub(super) fn verify_build_script(program_dir: &Path) -> Result<(), MigrationErr
 }
 
 /// Whether a build script prints the manifest rerun directive.
+///
+/// Deliberately conservative: the directive must sit inside a single-line
+/// `println!`/`print!` call and outside a line comment, which is the only
+/// spelling that unambiguously reaches cargo. Spellings that split the call
+/// across lines, build the string at runtime, or route it through another
+/// macro are reported as manual work, so verification never accepts a
+/// directive cargo cannot see.
 fn emits_rerun(source: &str) -> bool {
-	source.lines().any(|line| line.contains(RERUN_LITERAL))
+	source.lines().any(|line| {
+		// Anything after `//` on the line cannot emit the directive.
+		let code = line.split_once("//").map_or(line, |(code, _comment)| code);
+		code.contains(RERUN_LITERAL) && (code.contains("println!(") || code.contains("print!("))
+	})
 }
 
 #[cfg(test)]
@@ -176,5 +187,62 @@ mod tests {
 				.unwrap_or_else(|error| panic!("inspect build script: {error}")),
 			BuildScriptStatus::Manual { .. }
 		));
+	}
+
+	#[test]
+	fn dead_string_and_commented_invocations_do_not_verify() {
+		let (_temp, root) = program_dir();
+		let path = root.join(BUILD_SCRIPT_PATH);
+		std::fs::write(
+			&path,
+			"fn main() {\n\tlet _ = \"cargo:rerun-if-changed=migrations/manifest.json\";\n\t// \
+			 println!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n",
+		)
+		.unwrap_or_else(|error| panic!("write build script: {error}"));
+
+		// A dead string never reaches cargo, and a commented-out `println!` is
+		// equally inert, so both must stay manual instead of verifying.
+		assert!(matches!(
+			ensure_build_script(&root)
+				.unwrap_or_else(|error| panic!("inspect build script: {error}")),
+			BuildScriptStatus::Manual { .. }
+		));
+		assert!(matches!(
+			verify_build_script(&root),
+			Err(MigrationError::BuildScriptRerunMissing { .. })
+		));
+		assert_eq!(
+			std::fs::read_to_string(&path)
+				.unwrap_or_else(|error| panic!("read build script: {error}")),
+			"fn main() {\n\tlet _ = \"cargo:rerun-if-changed=migrations/manifest.json\";\n\t// \
+			 println!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n",
+		);
+	}
+
+	#[test]
+	fn multiline_rerun_spellings_are_reported_as_manual() {
+		let (_temp, root) = program_dir();
+		let handwritten = r#"fn main() {
+	println!(
+		"cargo:rerun-if-changed=migrations/manifest.json"
+	);
+}
+"#;
+		std::fs::write(root.join(BUILD_SCRIPT_PATH), handwritten)
+			.unwrap_or_else(|error| panic!("write build script: {error}"));
+
+		// The heuristic only recognizes single-line invocations; a multi-line
+		// spelling is reported as manual so the exact line is still required.
+		let status = ensure_build_script(&root)
+			.unwrap_or_else(|error| panic!("inspect build script: {error}"));
+		let BuildScriptStatus::Manual { directive, .. } = status else {
+			panic!("a multi-line spelling must not verify");
+		};
+		assert_eq!(directive, RERUN_DIRECTIVE);
+		assert_eq!(
+			std::fs::read_to_string(root.join(BUILD_SCRIPT_PATH))
+				.unwrap_or_else(|error| panic!("read build script: {error}")),
+			handwritten,
+		);
 	}
 }

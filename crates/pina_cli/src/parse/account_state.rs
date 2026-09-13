@@ -56,8 +56,8 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 			docs.push(COMPACT_ACCOUNT_DOC_MARKER.to_owned());
 		}
 		let pda_name = extract_pda_name(&item_struct.attrs, &item_struct.ident.to_string());
-		let migrations =
-			super::event_data::migrations_opt_in(&item_struct.attrs, "account").unwrap_or_default();
+		let migrations = super::event_data::migrations_opt_in(&item_struct.attrs, "account")?
+			.unwrap_or_default();
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
@@ -190,5 +190,22 @@ mod tests {
 
 		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
 		assert_eq!(accounts[0].variant, "Counter");
+	}
+
+	#[test]
+	fn non_boolean_migrations_values_are_rejected() {
+		let file = syn::parse_file(
+			r#"
+				#[account(discriminator = Kind::State, migrations = "false")]
+				pub struct State { pub value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		let error = extract_account_structs(&file).expect_err("string must fail");
+		let message = error.to_string();
+		assert!(message.contains(r#""false""#), "message: {message}");
+		assert!(message.contains("`account` schema"), "message: {message}");
+		assert!(message.contains("not a boolean"), "message: {message}");
 	}
 }

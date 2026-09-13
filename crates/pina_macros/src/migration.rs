@@ -1103,11 +1103,13 @@ pub(crate) fn resolve_opt_in(
 	}
 }
 
-/// Read and validate the checked-in manifest for a migration-aware schema.
+/// Read and validate the checked-in manifest for a schema declaration.
 ///
-/// Returns `None` in place of the manifest when the program has no manifest
-/// yet. The program directory is always returned so callers can name the
-/// expected path in diagnostics.
+/// The manifest is read for every schema declaration because the recorded
+/// auto policy decides whether an unannotated declaration opts in. Returns
+/// `None` in place of the manifest when the program has no manifest yet. The
+/// program directory is always returned so callers can name the expected path
+/// in diagnostics.
 pub(crate) fn read_manifest(
 	item: &ItemStruct,
 ) -> syn::Result<(Option<MigrationManifest>, PathBuf)> {
@@ -1132,11 +1134,14 @@ fn read_manifest_at(
 		Ok(source) => source,
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
 		Err(error) => {
+			// This fires before the opt-in is resolved, so the message must
+			// not claim that the declaration opted into anything.
 			return Err(syn::Error::new_spanned(
 				item,
 				format!(
-					"{} is opted into migrations, but {} could not be read ({error}); run `pina \
-					 migrations make`",
+					"`{}` cannot resolve its migration policy because {} could not be read \
+					 ({error}); repair the file, or delete it if the program should not opt into \
+					 migrations (`pina migrations make` regenerates it)",
 					item.ident,
 					path.display()
 				),
@@ -1719,7 +1724,8 @@ mod tests {
 		let item = item_struct("State");
 
 		// A directory at the manifest path fails every read except `NotFound`,
-		// so the remedy is reported instead of a silent "no policy".
+		// so the resolution failure is reported instead of a silent "no
+		// policy". The message must not claim that `State` opted into anything.
 		let path = temp.path().join(pina_abi::MANIFEST_PATH);
 		std::fs::create_dir_all(&path)
 			.unwrap_or_else(|error| panic!("create manifest directory: {error}"));
@@ -1727,6 +1733,10 @@ mod tests {
 		let error =
 			read_manifest_at(&item, temp.path()).expect_err("a directory cannot be a manifest");
 		let message = error.to_string();
+		assert!(
+			message.contains("cannot resolve its migration policy"),
+			"message: {message}"
+		);
 		assert!(message.contains("could not be read"), "message: {message}");
 		assert!(
 			message.contains("pina migrations make"),
@@ -1736,6 +1746,7 @@ mod tests {
 			message.contains(&path.display().to_string()),
 			"message: {message}"
 		);
+		assert!(!message.contains("is opted into migrations"));
 	}
 
 	#[test]
