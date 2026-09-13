@@ -27,6 +27,7 @@
 - [Core Concepts](./core-concepts.md)
 - [Declarative Validation](./validation.md)
 - [How ABI Migrations Flow](./migrations/flow.md)
+- [Migrate to automatic migrations](./migrations/automatic-migrations.md)
 - [Migrate to PinaPod v0.2](./migrations/pinapod-v0.2.md)
 - [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
 - [Migrate to safe token loaders](./migrations/safe-token-loaders.md)
