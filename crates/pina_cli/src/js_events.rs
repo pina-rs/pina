@@ -178,12 +178,6 @@ fn decoder_module(
 	facts: &EventFacts<'_>,
 ) -> String {
 	let shouting = shouting_snake(name);
-	let discriminator_bytes = facts
-		.discriminator
-		.iter()
-		.map(u8::to_string)
-		.collect::<Vec<_>>()
-		.join(", ");
 	let discriminator_len = facts.discriminator.len();
 
 	if let (Some(envelope), Some(history)) = (&facts.envelope, facts.history) {
@@ -193,7 +187,6 @@ fn decoder_module(
 			type_name,
 			decoder,
 			&shouting,
-			&discriminator_bytes,
 			discriminator_len,
 			envelope,
 			history,
@@ -227,7 +220,7 @@ fn decoder_module(
  */
 export function normalize{pascal}Event(
 	data: ReadonlyUint8Array | Uint8Array,
-): {type_name} {{
+): Decoded{pascal}Event {{
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = get{pascal}EventDiscriminatorBytes();
 	if (bytes.length < {header_size}) {{
@@ -236,7 +229,7 @@ export function normalize{pascal}Event(
 		);
 	}}
 	for (let index = 0; index < {discriminator_len}; index += 1) {{
-		if (bytes[index] !== [{discriminator_bytes}][index]) {{
+		if (bytes[index] !== discriminatorBytes[index]) {{
 			throw new RangeError(
 				'the provided data does not match the "{type_name}" event discriminator.',
 			);
@@ -280,7 +273,6 @@ fn projected_decoder_module(
 	type_name: &str,
 	decoder: &str,
 	shouting: &str,
-	discriminator_bytes: &str,
 	discriminator_len: usize,
 	envelope: &EventEnvelope,
 	history: &EventClientHistory,
@@ -375,7 +367,7 @@ export function normalize{pascal}Event(
 		);
 	}}
 	for (let index = 0; index < {discriminator_len}; index += 1) {{
-		if (bytes[index] !== [{discriminator_bytes}][index]) {{
+		if (bytes[index] !== discriminatorBytes[index]) {{
 			throw new RangeError(
 				'the provided data does not match the "{type_name}" event discriminator.',
 			);
@@ -716,8 +708,13 @@ mod tests {
 		.unwrap_or_else(|| panic!("events must emit a log module"));
 
 		assert!(module.contains("export function normalizeMyEventEvent("));
+		assert!(module.contains("): DecodedMyEventEvent {"));
+		assert!(module.contains(
+			"return { name: \"myEvent\", data: getMyEventEventDecoder().decode(bytes) };"
+		));
 		assert!(module.contains("export function parseMyOtherEventEventFromLog("));
 		assert!(module.contains("getMyEventEventDiscriminatorBytes"));
+		assert!(module.contains("bytes[index] !== discriminatorBytes[index]"));
 		assert!(module.contains("parseEventsProgramEventsFromLogs("));
 		assert!(!module.contains("wasMigrated"));
 		assert!(!module.contains("PROJECTION_STEPS"));

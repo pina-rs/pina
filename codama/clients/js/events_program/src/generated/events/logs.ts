@@ -26,7 +26,7 @@ import {
  */
 export function normalizeMyEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): MyEventEvent {
+): DecodedMyEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getMyEventEventDiscriminatorBytes();
 	if (bytes.length < 1) {
@@ -35,7 +35,7 @@ export function normalizeMyEventEvent(
 		);
 	}
 	for (let index = 0; index < 1; index += 1) {
-		if (bytes[index] !== [1][index]) {
+		if (bytes[index] !== discriminatorBytes[index]) {
 			throw new RangeError(
 				'the provided data does not match the "MyEventEvent" event discriminator.',
 			);
@@ -76,7 +76,7 @@ export function parseMyEventEventFromLog(
  */
 export function normalizeMyOtherEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): MyOtherEventEvent {
+): DecodedMyOtherEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getMyOtherEventEventDiscriminatorBytes();
 	if (bytes.length < 1) {
@@ -85,7 +85,7 @@ export function normalizeMyOtherEventEvent(
 		);
 	}
 	for (let index = 0; index < 1; index += 1) {
-		if (bytes[index] !== [2][index]) {
+		if (bytes[index] !== discriminatorBytes[index]) {
 			throw new RangeError(
 				'the provided data does not match the "MyOtherEventEvent" event discriminator.',
 			);

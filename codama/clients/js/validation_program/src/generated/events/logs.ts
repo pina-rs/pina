@@ -21,7 +21,7 @@ import {
  */
 export function normalizePolicyCheckedEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): PolicyCheckedEvent {
+): DecodedPolicyCheckedEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getPolicyCheckedEventDiscriminatorBytes();
 	if (bytes.length < 1) {
@@ -30,7 +30,7 @@ export function normalizePolicyCheckedEvent(
 		);
 	}
 	for (let index = 0; index < 1; index += 1) {
-		if (bytes[index] !== [1][index]) {
+		if (bytes[index] !== discriminatorBytes[index]) {
 			throw new RangeError(
 				'the provided data does not match the "PolicyCheckedEvent" event discriminator.',
 			);

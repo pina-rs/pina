@@ -72,7 +72,7 @@ export function normalizeValueChangedEventEvent(
 		);
 	}
 	for (let index = 0; index < 1; index += 1) {
-		if (bytes[index] !== [4][index]) {
+		if (bytes[index] !== discriminatorBytes[index]) {
 			throw new RangeError(
 				'the provided data does not match the "ValueChangedEventEvent" event discriminator.',
 			);
