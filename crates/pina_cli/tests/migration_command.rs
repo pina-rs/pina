@@ -1,14 +1,146 @@
 //! End-to-end CLI coverage for migration lifecycle output.
 
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use object::Architecture;
+use object::BinaryFormat;
+use object::Endianness;
+use object::SectionKind;
+use object::SymbolFlags;
+use object::SymbolKind;
+use object::SymbolScope;
+use object::write::Object;
+use object::write::Symbol;
+use object::write::SymbolSection;
 use sha2::Digest as _;
 use sha2::Sha256;
 use tempfile::TempDir;
 
 const PROGRAM_ID: &str = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
+
+/// A migration-aware program with one account and one instruction process.
+///
+/// The account slot is named `state`, so the cost preview links
+/// `UpdateInstruction` to the `State` account contract.
+fn migratable_program_source(account_fields: &str, instruction_fields: &str) -> String {
+	format!(
+		r#"use pina::*;
+
+declare_id!("{PROGRAM_ID}");
+
+#[discriminator]
+enum AccountKind {{
+	State = 1,
+}}
+
+#[discriminator]
+enum InstructionKind {{
+	Update = 2,
+}}
+
+#[account(discriminator = AccountKind::State, migrations)]
+struct State {{ {account_fields} }}
+
+#[instruction(discriminator = InstructionKind::Update, migrations)]
+struct UpdateInstruction {{ {instruction_fields} }}
+
+#[derive(Accounts)]
+struct UpdateAccounts<'a> {{
+	#[pina(validate(signer))]
+	authority: &'a AccountView,
+	state: Option<&'a mut AccountView>,
+	#[pina(validate(signer))]
+	migration_payer: Option<&'a mut AccountView>,
+	system_program: Option<&'a AccountView>,
+}}
+
+impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {{
+	fn process(self, _data: &[u8]) -> ProgramResult {{
+		Ok(())
+	}}
+}}
+
+pub struct FixtureProgram;
+
+impl CpiProgramId for FixtureProgram {{
+	const ID: Address = ID;
+}}
+
+#[cfg(feature = "bpf-entrypoint")]
+pub mod entrypoint {{
+	use super::*;
+
+	nostd_entrypoint!(process_instruction);
+
+	pub fn process_instruction(
+		program_id: &Address,
+		accounts: &mut [AccountView],
+		data: &[u8],
+	) -> ProgramResult {{
+		let instruction: InstructionKind = parse_instruction(program_id, &ID, data)?;
+		match instruction {{
+			InstructionKind::Update => {{
+				UpdateAccounts::try_from((program_id, accounts))?.process(data)
+			}}
+		}}
+	}}
+}}
+"#
+	)
+}
+
+/// Build a minimal SBF ELF whose named symbols carry the profile's CU estimate.
+///
+/// Each 8-byte `.text` unit costs one CU, so a symbol's size is its estimate.
+fn build_sbf_elf(symbols: &[(&str, u64, u64)]) -> Vec<u8> {
+	let mut object = Object::new(BinaryFormat::Elf, Architecture::Sbf, Endianness::Little);
+	let section = object.add_section(Vec::new(), b".text".to_vec(), SectionKind::Text);
+	let text_size = symbols
+		.iter()
+		.map(|(_, offset, size)| offset.saturating_add(*size))
+		.max()
+		.unwrap_or(0);
+	object.set_section_data(section, vec![0_u8; text_size as usize], 8);
+
+	for &(name, offset, size) in symbols {
+		object.add_symbol(Symbol {
+			name: name.as_bytes().to_vec(),
+			value: offset,
+			size,
+			kind: SymbolKind::Text,
+			scope: SymbolScope::Dynamic,
+			weak: false,
+			section: SymbolSection::Section(section),
+			flags: SymbolFlags::None,
+		});
+	}
+
+	object
+		.write()
+		.unwrap_or_else(|error| panic!("failed to write ELF: {error}"))
+}
+
+/// The artifact path `pina migrations status` profiles for a fixture.
+///
+/// The fixture pins `CARGO_TARGET_DIR` to its own `target` directory, so this
+/// never collides with an ambient target directory such as llvm-cov's.
+fn sbf_artifact_path(root: &Path) -> PathBuf {
+	root.join("target")
+		.join("deploy")
+		.join("migration_command_fixture.so")
+}
+
+/// Write bytes to the artifact path `pina migrations status` profiles.
+fn write_sbf_artifact(root: &Path, bytes: &[u8]) -> PathBuf {
+	let path = sbf_artifact_path(root);
+	fs::create_dir_all(path.parent().expect("artifact path has a parent"))
+		.unwrap_or_else(|error| panic!("create artifact directory: {error}"));
+	fs::write(&path, bytes).unwrap_or_else(|error| panic!("write fixture artifact: {error}"));
+	path
+}
 
 struct MigrationFixture {
 	_temporary: TempDir,
@@ -26,7 +158,7 @@ impl MigrationFixture {
 		fs::write(
 			root.join("Cargo.toml"),
 			"[package]\nname = \"migration-command-fixture\"\nversion = \"0.0.0\"\nedition = \
-			 \"2024\"\n[lib]\npath = \"src/lib.rs\"\n",
+			 \"2024\"\n[lib]\nname = \"migration_command_fixture\"\npath = \"src/lib.rs\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write fixture manifest: {error}"));
 		fs::write(
@@ -59,6 +191,7 @@ impl MigrationFixture {
 	fn command(&self, operation: &str) -> Command {
 		let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 		command
+			.env("CARGO_TARGET_DIR", self.root.join("target"))
 			.arg("migrations")
 			.arg(operation)
 			.arg("--project")
@@ -100,6 +233,11 @@ impl MigrationFixture {
 			),
 		)
 		.unwrap_or_else(|error| panic!("update fixture source: {error}"));
+	}
+
+	fn write_source(&self, source: &str) {
+		fs::write(self.root.join("src/lib.rs"), source)
+			.unwrap_or_else(|error| panic!("update fixture source: {error}"));
 	}
 }
 
@@ -285,5 +423,156 @@ fn status_reports_projects_without_migration_aware_contracts() {
 	assert!(output.contains("No migration-aware contracts."));
 
 	let json = run(fixture.command("status").arg("--json"));
-	assert_eq!(json.trim(), "[]");
+	let report: serde_json::Value =
+		serde_json::from_str(&json).unwrap_or_else(|error| panic!("parse status JSON: {error}"));
+	assert_eq!(report["statuses"], serde_json::json!([]));
+	assert_eq!(
+		report["costPreview"]["mostExpensive"]["status"],
+		"unavailable"
+	);
+}
+
+/// Advance the fixture to an account v0->v1 and instruction v0->v1 history,
+/// then write a synthetic SBF artifact whose transition functions carry 10 CU
+/// (State) and 20 CU (UpdateInstruction).
+fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
+	let fixture = MigrationFixture::new(true);
+	fixture.write_source(&migratable_program_source("value: u64", "value: u64"));
+	run(&mut fixture.command("make"));
+	fixture.publish(true);
+	fixture.write_source(&migratable_program_source(
+		"value: u64, enabled: bool",
+		"value: u64, memo: u16",
+	));
+	let advanced = run(&mut fixture.command("make"));
+	assert!(
+		advanced.contains("Advanced account:1:01@1"),
+		"stdout: {advanced}"
+	);
+	assert!(
+		advanced.contains("Advanced instruction:1:02@1"),
+		"stdout: {advanced}"
+	);
+	let artifact = write_sbf_artifact(
+		&fixture.root,
+		&build_sbf_elf(&[
+			(
+				"_ZN9my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+				0,
+				80,
+			),
+			(
+				"_ZN9my_crate42__pina_update_instruction_instruction_migrations8v0_to_v17migrate17h1111E",
+				80,
+				160,
+			),
+		]),
+	);
+
+	(fixture, artifact)
+}
+
+#[test]
+fn status_previews_costs_and_json_agrees_with_human_output() {
+	let (fixture, artifact) = advanced_cost_fixture();
+	let human = run(&mut fixture.command("status"));
+	let json = run(fixture.command("status").arg("--json"));
+	let report: serde_json::Value =
+		serde_json::from_str(&json).unwrap_or_else(|error| panic!("parse status JSON: {error}"));
+	let preview = &report["costPreview"];
+
+	// The existing status schema stays in place next to the new cost section.
+	assert_eq!(report["statuses"].as_array().map(Vec::len), Some(2));
+	assert_eq!(report["statuses"][0]["rustName"], "State");
+	assert_eq!(preview["artifact"], artifact.to_string_lossy().as_ref());
+
+	// Per contract: 10 -> 11 bytes, one grown byte, 6,960 lamports of rent.
+	let state = &preview["contracts"][0];
+	assert_eq!(state["rustName"], "State");
+	assert_eq!(state["currentSizeBytes"], 11);
+	assert_eq!(state["dayOneGrowthBytes"], 1);
+	assert_eq!(state["dayOneRentDeficitLamports"], 6_960);
+	assert_eq!(state["worstCaseLadder"]["fromVersion"], 0);
+	assert_eq!(state["worstCaseLadder"]["toVersion"], 1);
+	assert_eq!(state["worstCaseLadder"]["steps"], 1);
+	assert_eq!(state["worstCaseLadder"]["staticCu"]["estimatedCu"], 10);
+
+	// Per instruction: the `state` slot links the process to the account.
+	let instruction = &preview["instructions"][0];
+	assert_eq!(instruction["rustName"], "UpdateInstruction");
+	assert_eq!(instruction["ladders"][0]["accountRustName"], "State");
+	assert_eq!(instruction["ladders"][0]["steps"], 1);
+	assert_eq!(instruction["totalSteps"], 1);
+	assert_eq!(instruction["totalRentDeficitLamports"], 6_960);
+	assert_eq!(instruction["staticCu"]["estimatedCu"], 10);
+
+	// Program-wide: one touching transaction names the same figures.
+	let summary = &preview["mostExpensive"];
+	assert_eq!(summary["status"], "identified");
+	assert_eq!(summary["instructionRustName"], "UpdateInstruction");
+	assert_eq!(summary["steps"], 1);
+	assert_eq!(summary["rentDeficitLamports"], 6_960);
+	assert_eq!(summary["staticCu"]["estimatedCu"], 10);
+
+	// Human output quotes every JSON figure the developer must act on.
+	for expected in [
+		"account State: 11 bytes now; a day-one account grows 1 bytes and funds ~6960 lamports",
+		"worst-case ladder v0->v1 (1 step(s), ~6960 lamports, 10 CU static)",
+		"instruction UpdateInstruction v1: 1 ladder(s), 1 step(s), ~6960 lamports, 10 CU static",
+		"Most expensive touching transaction: UpdateInstruction (1 ladder(s), 1 step(s), ~6960 \
+		 lamports, 10 CU static)",
+		"Funding: raise the program's lamport budget",
+	] {
+		assert!(
+			human.contains(expected),
+			"missing {expected:?} in:\n{human}"
+		);
+	}
+}
+
+#[test]
+fn status_says_cu_is_unavailable_without_an_artifact() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("make"));
+	fixture.publish(true);
+	fixture.write_fields("value: u64, enabled: bool");
+	run(&mut fixture.command("make"));
+
+	let human = run(&mut fixture.command("status"));
+	let json = run(fixture.command("status").arg("--json"));
+	let report: serde_json::Value =
+		serde_json::from_str(&json).unwrap_or_else(|error| panic!("parse status JSON: {error}"));
+	let estimate = &report["costPreview"]["contracts"][0]["worstCaseLadder"]["staticCu"];
+
+	assert_eq!(estimate["status"], "unavailable");
+	let reason = estimate["reason"]
+		.as_str()
+		.unwrap_or_else(|| panic!("unavailable estimate carries a reason"));
+	assert!(reason.contains("not found"), "reason: {reason}");
+	assert!(human.contains("CU unavailable: compiled SBF artifact not found"));
+	assert!(
+		human.contains("Most expensive touching transaction: unavailable"),
+		"stdout: {human}"
+	);
+}
+
+#[test]
+fn status_reports_an_unreadable_artifact_reason() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("make"));
+	fixture.publish(true);
+	fixture.write_fields("value: u64, enabled: bool");
+	run(&mut fixture.command("make"));
+	write_sbf_artifact(&fixture.root, b"not an ELF");
+
+	let json = run(fixture.command("status").arg("--json"));
+	let report: serde_json::Value =
+		serde_json::from_str(&json).unwrap_or_else(|error| panic!("parse status JSON: {error}"));
+	let estimate = &report["costPreview"]["contracts"][0]["worstCaseLadder"]["staticCu"];
+
+	assert_eq!(estimate["status"], "unavailable");
+	let reason = estimate["reason"]
+		.as_str()
+		.unwrap_or_else(|| panic!("unavailable estimate carries a reason"));
+	assert!(reason.contains("could not profile"), "reason: {reason}");
 }

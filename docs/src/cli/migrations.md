@@ -36,6 +36,63 @@ When a transition grows an account, `make` prints the estimated rent deficit (ab
 
 Commit the manifest, publication ledger, and transition files. Do not generate them during a build.
 
+## Preview deployment costs
+
+`pina migrations status` ends with a cost preview derived from the checked-in history and, when the compiled SBF artifact exists, from `pina profile`'s static per-function estimates. It reports:
+
+- per account contract: current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the same 6,960-lamports-per-grown-byte convention the `make` warning uses;
+- per instruction process: the worst-case adjacent-step ladder a stale account the process names can trigger, with the step count, the rent that ladder funds, and a static CU estimate;
+- one program-wide "most expensive touching transaction" summary so `max_lamports` and `MAX_INLINE_STEPS` can be sized deliberately.
+
+The output names the ladder model: the oldest version within `MAX_INLINE_STEPS` (8) of current, climbing one adjacent transition per step. When the history has more than eight transitions, the quoted ladder starts partway up and a note explains that a version-0 account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
+
+Two models keep the numbers interpretable. Rent reuses `RENT_EXEMPT_LAMPORTS_PER_BYTE` from the `make` warning, and the CU estimate sums `pina profile`'s static estimates for the generated adjacent `migrate` functions, so it excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. An artifact that has not been built, cannot be parsed, or lacks a transition function makes the CU figure print an explicit `CU unavailable: ...` reason instead of a zero. Instruction processes link to account contracts by account-slot name, so a slot that does not match an account's Rust name contributes no ladder.
+
+`--json` emits the status array unchanged under `statuses` plus the additive cost section:
+
+```json
+{
+	"statuses": [
+		{
+			"identity": "account:1:01",
+			"kind": "account",
+			"rustName": "State",
+			"currentVersion": 2
+		}
+	],
+	"costPreview": {
+		"rentLamportsPerByte": 6960,
+		"maxInlineSteps": 8,
+		"ladderModel": "the oldest version within MAX_INLINE_STEPS (8) of the current version, ...",
+		"cuModel": "sum of `pina profile` static estimates for the generated adjacent `migrate` functions, ...",
+		"artifact": "target/deploy/my_program.so",
+		"contracts": [
+			{
+				"identity": "account:1:01",
+				"currentSizeBytes": 44,
+				"dayOneGrowthBytes": 2,
+				"dayOneRentDeficitLamports": 13920
+			}
+		],
+		"instructions": [
+			{
+				"identity": "instruction:1:00",
+				"totalSteps": 2,
+				"totalRentDeficitLamports": 13920
+			}
+		],
+		"mostExpensive": {
+			"status": "identified",
+			"instructionRustName": "UpdateInstruction",
+			"steps": 2,
+			"rentDeficitLamports": 13920
+		}
+	}
+}
+```
+
+A figure that cannot be estimated serializes as `{ "status": "unavailable", "reason": "..." }`; `pina migrations check --json` still emits only the status array.
+
 ## Disambiguate renames
 
 A field that disappears while another field of the same type appears is ambiguous: a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations make` refuses to guess:
@@ -110,10 +167,10 @@ An ABI document upgrade does not consume an on-chain migration version.
 
 ## Commands
 
-| Command                  | Result                                                        |
-| ------------------------ | ------------------------------------------------------------- |
-| `pina migrations make`   | Capture source changes and create or refresh one draft        |
-| `pina migrations check`  | Fail on source, schema, process, transition, or version drift |
-| `pina migrations status` | Show each current version and its publication state           |
+| Command                  | Result                                                         |
+| ------------------------ | -------------------------------------------------------------- |
+| `pina migrations make`   | Capture source changes and create or refresh one draft         |
+| `pina migrations check`  | Fail on source, schema, process, transition, or version drift  |
+| `pina migrations status` | Show each current version, its publication state, and the cost |
 
 Add `--json` for machine-readable output. Add `--project <DIR>` to select a program from another directory.

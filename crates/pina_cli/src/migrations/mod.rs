@@ -1,6 +1,7 @@
 //! Migrations CLI: schema diffing, transition generation, publication
 //! bookkeeping, and the disambiguation flow that ties them together.
 
+mod cost;
 mod diff;
 mod ledger;
 mod prompt;
@@ -19,6 +20,13 @@ use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use cost::AccountCostPreview;
+pub use cost::InstructionCostPreview;
+pub use cost::InstructionLadder;
+pub use cost::LadderCost;
+pub use cost::MigrationCostPreview;
+pub use cost::MostExpensiveTransaction;
+pub use cost::StaticCuEstimate;
 use diff::effective_source_schema;
 use diff::resolve_field_changes;
 pub use ledger::ReconcileOutput;
@@ -79,6 +87,17 @@ pub struct MigrationStatus {
 	pub published: bool,
 	pub publication_pending: bool,
 	pub schema_sha256: String,
+}
+
+/// `pina migrations status` output: per-contract state plus the cost preview.
+///
+/// The `statuses` list keeps the exact `MigrationStatus` shape `check --json`
+/// emits, and `costPreview` is the additive pre-deploy cost section.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MigrationStatusReport {
+	pub statuses: Vec<MigrationStatus>,
+	pub cost_preview: MigrationCostPreview,
 }
 
 /// Current version constants required to serialize the latest public IDL.
@@ -451,11 +470,19 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 pub(crate) fn check_project_migrations(
 	project: &Project,
 ) -> Result<Vec<MigrationStatus>, MigrationError> {
+	Ok(check_project_migrations_with_manifest(project)?.0)
+}
+
+/// [`check_project_migrations`] keeping the validated manifest for the cost
+/// preview, so a status report does not load and validate history twice.
+fn check_project_migrations_with_manifest(
+	project: &Project,
+) -> Result<(Vec<MigrationStatus>, Option<MigrationManifest>), MigrationError> {
 	let current = scan_current_contracts(project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?;
 	if current.contracts.is_empty() && manifest.is_none() {
-		return Ok(Vec::new());
+		return Ok((Vec::new(), None));
 	}
 	let manifest = manifest.ok_or_else(|| {
 		let first = &current.contracts[0];
@@ -521,12 +548,30 @@ pub(crate) fn check_project_migrations(
 			});
 		}
 	}
-	Ok(statuses)
+	Ok((statuses, Some(manifest)))
 }
 
 /// Return migration status after applying every build-time compatibility check.
 pub fn migration_status(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	check_migrations(start)
+}
+
+/// Return migration status plus the pre-deploy cost preview.
+///
+/// The preview derives from the same validated history and, when the compiled
+/// SBF artifact exists, from `pina profile`'s static per-function estimates.
+/// A missing or unparsable artifact turns every CU figure into an explicit
+/// `unavailable` reason rather than a zero.
+pub fn migration_status_report(start: &Path) -> Result<MigrationStatusReport, MigrationError> {
+	let project = Project::discover(start)?;
+	let (statuses, manifest) = check_project_migrations_with_manifest(&project)?;
+	let source = cost::load_profile_source(&project, manifest.as_ref());
+	let cost_preview = cost::build_cost_preview(manifest.as_ref(), &source);
+
+	Ok(MigrationStatusReport {
+		statuses,
+		cost_preview,
+	})
 }
 
 /// Verify history and return only the current constants needed by IDL codegen.
