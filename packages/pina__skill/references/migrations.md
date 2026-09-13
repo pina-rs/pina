@@ -58,13 +58,13 @@ Run from the program directory:
 ```sh
 pina migrations make      # snapshot source changes and generate adjacent transitions
 pina migrations check     # non-mutating build/CI gate; the same drift checks `pina build` enforces
-pina migrations status    # current version and publication state per contract
+pina migrations status    # version + publication state per contract, plus a cost preview
 pina migrations sync      # make -> build -> generate for unambiguous changes
 ```
 
 - `make` writes `migrations/manifest.json`, `migrations/publications.json`, and `migrations/transitions/<contract>/vN_to_vM.rs`, then prints any manual transition paths and growth warnings. It replaces an unpublished draft in place; once the version appears in a publication receipt or a pending deployment it appends the next version instead.
-- `check` fails on source drift, a missing snapshot, an unfinished or hash-changed transition, a changed published schema, a version-width mismatch, or a missing build-script rerun directive.
-- `status` prints `kind name vN (draft|published|publication pending)` and confirms the history is consistent; it runs the same checks as `check`. Growth and rent figures are not part of `status`: `make` prints the estimated deficit per growing transition (about 6,960 lamports per grown byte), and `inspect` prints them per pending hop.
+- `check` fails on source drift, a missing snapshot, an unfinished or hash-changed transition, a changed published schema, a version-width mismatch, or a missing build-script rerun directive. `check --json` stays a status-only array.
+- `status` runs the same drift checks as `check`, prints `kind name vN (draft|published|publication pending)`, and ends with the cost preview below. `status --json` keeps the status array unchanged under `statuses` and adds a `costPreview` object.
 - `pina migrations inspect <ADDRESS> [--url <RPC>] [--json]` reads one on-chain account and reports its stored version against the manifest plus the pending adjacent hops with byte sizes and approximate rent delta. It exits non-zero when the account is stale or from the future.
 - `pina migrations reconcile [--abandon]` resolves an ambiguous pending deployment. Do not start a different deployment while one is pending.
 - `pina test --compatibility` consumes the checked-in historical fixtures. Commit the manifest, publication ledger, and transition files; never generate them during a build.
@@ -77,6 +77,18 @@ pina migrations make --assume-removed value   # discard them; the new field star
 ```
 
 Answers persist in `[migrations.answers]` in `pina.toml` (`rename = ["value:points"]`, `assume-removed = []`), so fresh clones and CI replay a local decision. With `--json`, `--no-interactive`, or no terminal, an unanswered question is a hard failure: the question array prints on stdout, the human-readable error on stderr, exit status 1.
+
+## Cost preview
+
+`pina migrations status` ends with a static planning estimate, never a quote. It derives from the checked-in manifest and, when present, `pina profile`'s per-symbol estimates of the compiled SBF artifact, and it prints the two models alongside the figures so they stay interpretable:
+
+- Per account contract: current size (compact schemas quote their declared capacity), the bytes a version-0 day-one account grows, and that growth's rent deficit at the same ~6,960 lamports per grown byte the `make` warning uses.
+- Per instruction process: the worst-case ladder a stale account it names can trigger — the oldest version within `MAX_INLINE_STEPS` (8) of current, one adjacent transition per step — with its step count, rent, and static CU estimate. A history with more than eight transitions quotes a ladder that starts partway up and adds a note that a day-one account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
+- Program-wide: the touching transaction funding the most rent (size `max_lamports` from it) and, independently, the instruction with the longest worst-case ladder (size `MAX_INLINE_STEPS` from it). They need not be the same instruction, and each names its own.
+
+The static CU figure sums `pina profile`'s estimates of the generated `vN_to_vM` `migrate` functions and excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. It is never a misleading zero: a missing or unprofilable artifact, or a transition symbol without an estimate, prints `CU unavailable: <reason>` instead. A figure that cannot be estimated serializes as `{ "status": "unavailable", "reason": "..." }`.
+
+Instruction processes link to account contracts by account-slot name, and only a writable, non-signer slot can hold an account the executor migrates. A writable, non-signer slot that names no checked-in account contract produces an explicit note — the symptom of a renamed account or a slot typo; signer and read-only slots are skipped without noise. A note also flags any single step whose growth exceeds `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes).
 
 ## Source of truth: the manifest
 
