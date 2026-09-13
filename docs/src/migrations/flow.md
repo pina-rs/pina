@@ -229,6 +229,101 @@ if (stateNeedsMigration(data)) {
 
 `migrateIfNeeded` — fetching, checking, and migrating in one call over an RPC handle — is designed in [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md).
 
+## The sweep instruction
+
+A typed reader refuses a stale account: `as_account`, `as_account_mut`, and `validate_account_data` all inspect the version envelope and return `MigrationRequired` for anything older than the program's current schema. The refusal happens wherever the handler loads the account, and it does not care whether the account was passed writable or read-only. Migration itself does care: `MigrateAccount` asserts writability and program ownership before it inspects a single byte, because the executor may rewrite, resize, and fund the account. An instruction that treats a migratable account as read-only therefore has no way to bring it current, and keeps failing until some other transaction migrates the account once. The **sweep instruction** is that other transaction: one instruction whose only job is putting migratable accounts in a writable position and running the executor on each.
+
+### The instruction
+
+Write one sweep per program with its own discriminator. Every migratable account appears as an optional, writable view, the payer funding growth appears once, and the system program the rent transfers invoke is declared:
+
+```rust,ignore
+#[discriminator]
+pub enum SwapInstruction {
+	Swap = 0,
+	SweepAccounts = 1,
+}
+
+#[derive(Accounts)]
+pub struct SweepAccounts<'a> {
+	/// Writable signer funding every rent deficit, usually the fee payer.
+	#[pina(validate(signer))]
+	pub payer: Option<&'a mut AccountView>,
+	/// The system program every growth transfer invokes.
+	pub system_program: &'a AccountView,
+	/// Every migratable account this program owns, writable and optional.
+	pub state: Option<&'a mut AccountView>,
+	pub profile: Option<&'a mut AccountView>,
+	pub vault: Option<&'a mut AccountView>,
+}
+
+impl<'a> ProcessAccountInfos<'a> for SweepAccounts<'a> {
+	fn process(self, _data: &[u8]) -> ProgramResult {
+		let SweepAccounts {
+			payer,
+			system_program,
+			state,
+			profile,
+			vault,
+		} = self;
+		system_program.assert_address(&system::ID)?;
+		let payer = payer.map(|account| &*account);
+
+		if let Some(state) = state {
+			MigrateAccount {
+				account: state,
+				payer,
+				program_id: &ID,
+				max_lamports: MAX_MIGRATION_LAMPORTS,
+			}
+			.invoke::<State>()?;
+		}
+		// The same call for profile and vault: one independent invoke each.
+
+		Ok(())
+	}
+}
+```
+
+The handler is a straight line of independent calls. Each `invoke::<T>()` is complete on its own: it validates the account, plans the adjacent transitions, and commits the current version. An absent account arrives as `None` and the call is skipped, so nothing is validated, charged, or written for it. A missing middle slot still needs the program-address filler the account parser expects; trailing absent slots can be omitted.
+
+The payer must be writable and a transaction signer, or a PDA signing through `invoke_signed`. `max_lamports` caps what one call may transfer from it, so a sweep pays at most the sum of its calls' caps — set each one deliberately.
+
+### The client sends it first
+
+Prepend the sweep, then send the real instruction in the same transaction:
+
+```text
+[sweep(state, profile, payer), swap(...)]
+```
+
+First, not last: instructions run in order and any failure aborts the whole transaction. The real instruction loads the stale account and fails with `MigrationRequired`, so a sweep placed after it never runs. The sweep can carry every account the transaction might touch; the real instruction then observes current bytes, or the whole transaction — migrations included — rolls back. A sweep sent alone, with no business instruction, is a maintenance transaction that pre-migrates accounts ahead of future use. That standalone form is the only trailing sweep worth sending.
+
+### What happens per account
+
+| Account state    | What the sweep call does                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Absent           | Skipped by the handler; nothing is validated, charged, or written                                                                                                      |
+| Already current  | Ownership, writability, and discriminator checks, a version-envelope inspection and current-layout validation; no writes, no rent, no CPI — safe to send speculatively |
+| Stale, same size | Planned from the exact historical layout, rewritten in place, destination validated, current version committed                                                         |
+| Stale, growing   | The payer transfers only the rent deficit for the size the step needs, capped by `max_lamports`; the account is resized, rewritten, and the version committed          |
+| Stale, shrinking | Rewritten and shrunk; every lamport stays in the account, there is no refund today                                                                                     |
+| Any step fails   | The instruction fails and the transaction rolls back, including sweeps that already completed in the same instruction                                                  |
+
+The failures are sharp and in front of the first mutation:
+
+- a growing step with no payer fails with `MigrationRequired`; a deficit above `max_lamports` fails with `MigrationBudgetExceeded` — the account stays stale, nothing is half-migrated;
+- a read-only or foreign-owned account fails the writability or ownership assertion before the version is even read, and a wrong discriminator fails with `InvalidAccountData`;
+- a version newer than the program's current schema fails with `InvalidMigrationVersion` instead of guessing at the layout.
+
+### Why it is safe to expose
+
+Every account is owner-checked and writability-checked before anything is inspected. Transition planning validates the exact historical shape and accepts only adjacent steps the published history proves; the destination representation is validated before the current version marker is committed, and an invariant failure after the first byte or lamport moves aborts the instruction instead of returning an error the caller could catch. The payer can only add lamports — the deficit, never more than `max_lamports` — and shrinking never moves lamports at all. Because each caller supplies the payer it wants to charge, a sweep cannot spend an account its sender did not offer: nobody can be made to fund someone else's migration.
+
+### Forward compatibility
+
+The reserved `Migrate` instruction above is the framework-owned instance of this pattern. `MigrateContext` runs the same `[payer, systemProgram, …accounts]` layout through the same `MigrateAccount` executor, and `run_optional` treats a slot holding the program address — or an index past the end of the list — as absent, so it is also a sweep. Generated clients emit a `Migrate` composer and the per-account `needsMigration` checks, so the standard sweep needs no hand-composed metas; the one-call `migrateIfNeeded` wrapper is tracked in #339. A hand-written sweep stays compatible with that route because it drives the same executor and produces exactly the same account state. Prefer it when the handler needs policy the generated route does not carry — extra gates, per-account caps, or a different payer rule — and prefer the reserved instruction when it does not.
+
 ## The four scenarios
 
 ### 1. Current client → current program (the hot path)
