@@ -319,7 +319,10 @@ fn assemble_from_extracted(
 			)
 			.map(|discriminator| {
 				let mut docs = event.docs.clone();
-				if event.migratable {
+				if event
+					.migrations
+					.is_enabled(auto.contains(pina_abi::ContractKind::Event))
+				{
 					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
 				}
 				crate::ir::EventIr {

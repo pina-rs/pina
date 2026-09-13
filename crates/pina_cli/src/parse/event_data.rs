@@ -247,9 +247,9 @@ mod tests {
 
 		assert_eq!(events.len(), 2);
 		assert_eq!(events[0].name, "Current");
-		assert!(events[0].migratable);
+		assert_eq!(events[0].migrations, MigrationOptIn::Explicit);
 		assert_eq!(events[1].name, "Ephemeral");
-		assert!(!events[1].migratable);
+		assert_eq!(events[1].migrations, MigrationOptIn::Unspecified);
 	}
 }
 
