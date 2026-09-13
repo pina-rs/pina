@@ -342,8 +342,7 @@ fn run_migrations(command: MigrationCommands) {
 				println!("{} {warning}", "⚠".yellow().bold());
 			}
 		}
-		MigrationCommands::Check { project, json }
-		| MigrationCommands::Status { project, json } => {
+		MigrationCommands::Check { project, json } => {
 			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
 			if json {
 				print_json(&statuses);
@@ -353,20 +352,22 @@ fn run_migrations(command: MigrationCommands) {
 				println!("No migration-aware contracts.");
 				return;
 			}
-			for status in statuses {
-				let publication = if status.publication_pending {
-					"publication pending"
-				} else if status.published {
-					"published"
-				} else {
-					"draft"
-				};
-				println!(
-					"{} {} v{} ({publication})",
-					status.kind, status.rust_name, status.current_version
-				);
-			}
+			print_migration_statuses(&statuses);
 			println!("{} Migration history is consistent", "✔".green());
+		}
+		MigrationCommands::Status { project, json } => {
+			let report = unwrap_or_exit(pina_cli::migrations::migration_status_report(&project));
+			if json {
+				print_json(&report);
+				return;
+			}
+			if report.statuses.is_empty() {
+				println!("No migration-aware contracts.");
+			} else {
+				print_migration_statuses(&report.statuses);
+				println!("{} Migration history is consistent", "✔".green());
+			}
+			print_migration_cost_preview(&report.cost_preview);
 		}
 		MigrationCommands::Reconcile {
 			project,
@@ -1535,7 +1536,136 @@ mod tests {
 	use super::escaped_path;
 	use super::escaped_text;
 	use super::prepare_and_confirm_record;
+	use super::print_migration_cost_preview;
 	use super::publication_record_error;
+	use super::render_static_cu;
+
+	#[test]
+	fn cost_preview_renderer_covers_every_state() {
+		use pina_cli::migrations::AccountCostPreview;
+		use pina_cli::migrations::InstructionCostPreview;
+		use pina_cli::migrations::InstructionLadder;
+		use pina_cli::migrations::LadderCost;
+		use pina_cli::migrations::MigrationCostPreview;
+		use pina_cli::migrations::MostExpensiveTransaction;
+		use pina_cli::migrations::StaticCuEstimate;
+
+		let estimated = StaticCuEstimate::Estimated {
+			estimated_cu: 10,
+			model: "model".to_owned(),
+		};
+		let unavailable = StaticCuEstimate::Unavailable {
+			reason: "no artifact".to_owned(),
+		};
+		assert_eq!(render_static_cu(&estimated), "10 CU static");
+		assert_eq!(render_static_cu(&unavailable), "CU unavailable");
+
+		let ladder = LadderCost {
+			from_version: 0,
+			to_version: 1,
+			steps: 1,
+			day_one: true,
+			rent_deficit_lamports: 6_960,
+			static_cu: estimated.clone(),
+		};
+		let preview = MigrationCostPreview {
+			rent_lamports_per_byte: 6_960,
+			max_inline_steps: 8,
+			ladder_model: "model".to_owned(),
+			cu_model: "cu model".to_owned(),
+			artifact: None,
+			lamport_budget_remedy: "raise the program's lamport budget".to_owned(),
+			account_growth_remedy: "keep every released version".to_owned(),
+			contracts: vec![
+				AccountCostPreview {
+					identity: "account:1:01".to_owned(),
+					rust_name: "State".to_owned(),
+					current_version: 1,
+					transition_count: 1,
+					current_size_bytes: 11,
+					day_one_growth_bytes: 1,
+					day_one_rent_deficit_lamports: 6_960,
+					worst_case_ladder: Some(ladder.clone()),
+					notes: vec!["note".to_owned()],
+				},
+				AccountCostPreview {
+					identity: "account:1:02".to_owned(),
+					rust_name: "EmptyState".to_owned(),
+					current_version: 0,
+					transition_count: 0,
+					current_size_bytes: 10,
+					day_one_growth_bytes: 0,
+					day_one_rent_deficit_lamports: 0,
+					worst_case_ladder: None,
+					notes: Vec::new(),
+				},
+			],
+			instructions: vec![
+				InstructionCostPreview {
+					identity: "instruction:1:00".to_owned(),
+					rust_name: "UpdateInstruction".to_owned(),
+					current_version: 1,
+					ladders: vec![InstructionLadder {
+						account_identity: "account:1:01".to_owned(),
+						account_rust_name: "State".to_owned(),
+						ladder,
+					}],
+					total_steps: 1,
+					total_rent_deficit_lamports: 6_960,
+					static_cu: estimated,
+					notes: Vec::new(),
+				},
+				InstructionCostPreview {
+					identity: "instruction:1:01".to_owned(),
+					rust_name: "RelayInstruction".to_owned(),
+					current_version: 1,
+					ladders: vec![InstructionLadder {
+						account_identity: "account:1:02".to_owned(),
+						account_rust_name: "EmptyState".to_owned(),
+						ladder: LadderCost {
+							from_version: 0,
+							to_version: 1,
+							steps: 1,
+							day_one: true,
+							rent_deficit_lamports: 6_960,
+							static_cu: unavailable.clone(),
+						},
+					}],
+					total_steps: 1,
+					total_rent_deficit_lamports: 6_960,
+					static_cu: unavailable,
+					notes: vec!["unlinked".to_owned()],
+				},
+			],
+			most_expensive: MostExpensiveTransaction::Identified {
+				instruction_identity: "instruction:1:00".to_owned(),
+				instruction_rust_name: "UpdateInstruction".to_owned(),
+				account_ladders: 1,
+				steps: 1,
+				rent_deficit_lamports: 6_960,
+				static_cu: StaticCuEstimate::Estimated {
+					estimated_cu: 10,
+					model: "model".to_owned(),
+				},
+				max_steps_instruction_identity: "instruction:1:01".to_owned(),
+				max_steps_instruction_rust_name: "RelayInstruction".to_owned(),
+				max_steps: 4,
+				model: "model".to_owned(),
+			},
+		};
+		print_migration_cost_preview(&preview);
+
+		// The empty preview takes the early return that names nothing to estimate.
+		let empty = MigrationCostPreview {
+			contracts: Vec::new(),
+			instructions: Vec::new(),
+			most_expensive: MostExpensiveTransaction::Unavailable {
+				reason: "none".to_owned(),
+			},
+			..preview
+		};
+		print_migration_cost_preview(&empty);
+	}
 
 	#[test]
 	fn escapes_control_characters_in_confirmation_paths() {
@@ -1714,6 +1844,168 @@ mod tests {
 			error,
 			pina_cli::verification::VerifyError::UnsupportedRecordHost { .. }
 		));
+	}
+}
+
+fn print_migration_statuses(statuses: &[pina_cli::migrations::MigrationStatus]) {
+	for status in statuses {
+		let publication = if status.publication_pending {
+			"publication pending"
+		} else if status.published {
+			"published"
+		} else {
+			"draft"
+		};
+		println!(
+			"{} {} v{} ({publication})",
+			status.kind, status.rust_name, status.current_version
+		);
+	}
+}
+
+/// Render one static CU estimate; a missing estimate names itself and prints
+/// its reason once above the figures instead of on every ladder line.
+fn render_static_cu(estimate: &pina_cli::migrations::StaticCuEstimate) -> String {
+	match estimate {
+		pina_cli::migrations::StaticCuEstimate::Estimated { estimated_cu, .. } => {
+			format!("{estimated_cu} CU static")
+		}
+		pina_cli::migrations::StaticCuEstimate::Unavailable { .. } => "CU unavailable".to_owned(),
+	}
+}
+
+/// Collect every distinct reason a CU figure could not be estimated.
+fn static_cu_reasons(preview: &pina_cli::migrations::MigrationCostPreview) -> Vec<String> {
+	let estimate_reason = |estimate: &pina_cli::migrations::StaticCuEstimate,
+	                       reasons: &mut Vec<String>| {
+		if let pina_cli::migrations::StaticCuEstimate::Unavailable { reason } = estimate
+			&& !reasons.contains(reason)
+		{
+			reasons.push(reason.clone());
+		}
+	};
+	let mut reasons = Vec::new();
+	for contract in &preview.contracts {
+		if let Some(ladder) = &contract.worst_case_ladder {
+			estimate_reason(&ladder.static_cu, &mut reasons);
+		}
+	}
+	for instruction in &preview.instructions {
+		for ladder in &instruction.ladders {
+			estimate_reason(&ladder.ladder.static_cu, &mut reasons);
+		}
+		estimate_reason(&instruction.static_cu, &mut reasons);
+	}
+	if let pina_cli::migrations::MostExpensiveTransaction::Identified { static_cu, .. } =
+		&preview.most_expensive
+	{
+		estimate_reason(static_cu, &mut reasons);
+	}
+
+	reasons
+}
+
+fn print_most_expensive_transaction(transaction: &pina_cli::migrations::MostExpensiveTransaction) {
+	match transaction {
+		pina_cli::migrations::MostExpensiveTransaction::Identified {
+			instruction_rust_name,
+			account_ladders,
+			steps,
+			rent_deficit_lamports,
+			static_cu,
+			max_steps_instruction_rust_name,
+			max_steps,
+			..
+		} => {
+			println!(
+				"  Most expensive touching transaction: {instruction_rust_name} \
+				 ({account_ladders} ladder(s), {steps} step(s), ~{rent_deficit_lamports} \
+				 lamports, {})",
+				render_static_cu(static_cu)
+			);
+			println!(
+				"  Longest worst-case ladder: {max_steps_instruction_rust_name} ({max_steps} \
+				 step(s)); size `MAX_INLINE_STEPS` for this instruction"
+			);
+		}
+		pina_cli::migrations::MostExpensiveTransaction::Unavailable { reason } => {
+			println!("  Most expensive touching transaction: unavailable ({reason})");
+		}
+	}
+}
+
+/// Print the pre-deploy cost preview, mirroring the JSON field values.
+fn print_migration_cost_preview(preview: &pina_cli::migrations::MigrationCostPreview) {
+	println!();
+	println!(
+		"Cost preview (static planning estimate; rent ~{} lamports per grown byte)",
+		preview.rent_lamports_per_byte
+	);
+	println!("  Ladder model: {}", preview.ladder_model);
+	println!("  CU model: {}", preview.cu_model);
+	for reason in static_cu_reasons(preview) {
+		println!("  CU unavailable: {reason}");
+	}
+	if preview.contracts.is_empty() && preview.instructions.is_empty() {
+		println!("  No migration-aware account or instruction contracts to estimate.");
+		print_most_expensive_transaction(&preview.most_expensive);
+		return;
+	}
+	for contract in &preview.contracts {
+		print!(
+			"  account {}: {} bytes now; a day-one account grows {} bytes and funds ~{} lamports",
+			contract.rust_name,
+			contract.current_size_bytes,
+			contract.day_one_growth_bytes,
+			contract.day_one_rent_deficit_lamports
+		);
+		if let Some(ladder) = &contract.worst_case_ladder {
+			print!(
+				"; worst-case ladder v{}->v{} ({} step(s), ~{} lamports, {})",
+				ladder.from_version,
+				ladder.to_version,
+				ladder.steps,
+				ladder.rent_deficit_lamports,
+				render_static_cu(&ladder.static_cu)
+			);
+		}
+		println!();
+		for note in &contract.notes {
+			println!("    note: {note}");
+		}
+	}
+	for instruction in &preview.instructions {
+		println!(
+			"  instruction {} v{}: {} ladder(s), {} step(s), ~{} lamports, {}",
+			instruction.rust_name,
+			instruction.current_version,
+			instruction.ladders.len(),
+			instruction.total_steps,
+			instruction.total_rent_deficit_lamports,
+			render_static_cu(&instruction.static_cu)
+		);
+		for ladder in &instruction.ladders {
+			println!(
+				"    {} ({}) v{}->v{}: {} step(s), ~{} lamports, {}",
+				ladder.account_rust_name,
+				ladder.account_identity,
+				ladder.ladder.from_version,
+				ladder.ladder.to_version,
+				ladder.ladder.steps,
+				ladder.ladder.rent_deficit_lamports,
+				render_static_cu(&ladder.ladder.static_cu)
+			);
+		}
+		for note in &instruction.notes {
+			println!("    note: {note}");
+		}
+	}
+	print_most_expensive_transaction(&preview.most_expensive);
+	if matches!(
+		&preview.most_expensive,
+		pina_cli::migrations::MostExpensiveTransaction::Identified { .. }
+	) {
+		println!("  Funding: {}", preview.lamport_budget_remedy);
 	}
 }
 
