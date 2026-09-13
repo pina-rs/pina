@@ -17,6 +17,7 @@ use super::discriminator::render_omitted_value_constant;
 use super::helpers::pascal;
 use super::helpers::render_docs;
 use super::helpers::snake;
+use super::helpers::version_type_max;
 use super::seeds::render_constant_seed_expression;
 use super::seeds::render_variable_seed_parameter;
 use super::types::is_compact_tail;
@@ -493,6 +494,21 @@ pub(crate) fn render_needs_migration(envelope: &MigrationEnvelope) -> String {
 		envelope.module_name.to_shouty_snake_case()
 	);
 	let module = &envelope.module_name;
+
+	// A stored unsigned version is never below 0, and emitting the
+	// impossible comparison trips the deny-by-default
+	// `clippy::absurd_extreme_comparisons` in the generated crate.
+	// Version 0 can never be stale, so emit the constant result.
+	if envelope.version == 0 {
+		return format!(
+			"\n/// Whether raw account bytes are stale for this contract: the envelope names this \
+			 account's discriminator and carries a version older than\n/// [`{constant}`]. \
+			 Current or foreign bytes return false; decoding explains the difference.\n///\n/// \
+			 Version 0 is the initial version, so no bytes can ever be stale.\npub fn \
+			 {module}_needs_migration(_data: &[u8]) -> bool {{\n\tfalse\n}}\n"
+		);
+	}
+
 	let header = envelope.version_offset + envelope.version_bytes;
 	let version_end = header;
 	let mut conditions = Vec::new();
@@ -540,7 +556,14 @@ fn render_try_from_bytes(envelope: &MigrationEnvelope) -> String {
 		_ => "u8",
 	};
 	let version = envelope.version;
-	let version_plus_one = version + 1;
+	let version_max = version_type_max(envelope.version_bytes);
+	// Stored versions are unsigned, so a stored version can never compare
+	// below 0 or above its type maximum. Emitting those impossible arms
+	// trips the deny-by-default `clippy::absurd_extreme_comparisons` in
+	// the generated crate, so only reachable arms are emitted.
+	let stale_possible = version != 0;
+	let future_possible = version != version_max;
+	let version_plus_one = version.saturating_add(1);
 	let version_offset = envelope.version_offset;
 	let version_end = version_offset + envelope.version_bytes;
 	let module = &envelope.module_name;
@@ -634,20 +657,24 @@ fn render_try_from_bytes(envelope: &MigrationEnvelope) -> String {
 	));
 	lines.push(format!("\t\t\treturn Err({error_enum}::InvalidData);"));
 	lines.push("\t\t}".to_owned());
-	lines.push(format!(
-		"\t\tif account.migration_version < {version_constant} {{"
-	));
-	lines.push(format!(
-		"\t\t\treturn Err({error_enum}::Stale {{ stored: account.migration_version }});"
-	));
-	lines.push("\t\t}".to_owned());
-	lines.push(format!(
-		"\t\tif account.migration_version > {version_constant} {{"
-	));
-	lines.push(format!(
-		"\t\t\treturn Err({error_enum}::Future {{ stored: account.migration_version }});"
-	));
-	lines.push("\t\t}".to_owned());
+	if stale_possible {
+		lines.push(format!(
+			"\t\tif account.migration_version < {version_constant} {{"
+		));
+		lines.push(format!(
+			"\t\t\treturn Err({error_enum}::Stale {{ stored: account.migration_version }});"
+		));
+		lines.push("\t\t}".to_owned());
+	}
+	if future_possible {
+		lines.push(format!(
+			"\t\tif account.migration_version > {version_constant} {{"
+		));
+		lines.push(format!(
+			"\t\t\treturn Err({error_enum}::Future {{ stored: account.migration_version }});"
+		));
+		lines.push("\t\t}".to_owned());
+	}
 	lines.push("\t\tOk(account)".to_owned());
 	lines.push("\t}".to_owned());
 	lines.push("}".to_owned());
@@ -673,23 +700,28 @@ fn render_try_from_bytes(envelope: &MigrationEnvelope) -> String {
 	lines.push(String::new());
 	lines.push("\t#[test]".to_owned());
 	lines.push("\tfn stale_and_future_versions_are_distinguishable() {".to_owned());
-	lines.push(format!(
-		"\t\tlet error = {account}::try_from_bytes(&envelope(0 as \
-		 {version_type})).err().expect(\"a stale envelope must fail\");\n\t\tassert_eq!(error, \
-		 {error_enum}::Stale {{ stored: 0 }});"
-	));
-	lines.push(format!(
-		"\t\tassert_eq!({error_enum}::Stale {{ stored: 0 }}.to_string(), {stale_message:?});"
-	));
-	lines.push(format!(
-		"\t\tlet error = {account}::try_from_bytes(&envelope({version_plus_one} as \
-		 {version_type})).err().expect(\"a future envelope must fail\");\n\t\tassert_eq!(error, \
-		 {error_enum}::Future {{ stored: {version_plus_one} }});"
-	));
-	lines.push(format!(
-		"\t\tassert_eq!({error_enum}::Future {{ stored: {version_plus_one} }}.to_string(), \
-		 {future_message:?});"
-	));
+	if stale_possible {
+		lines.push(format!(
+			"\t\tlet error = {account}::try_from_bytes(&envelope(0 as \
+			 {version_type})).err().expect(\"a stale envelope must \
+			 fail\");\n\t\tassert_eq!(error, {error_enum}::Stale {{ stored: 0 }});"
+		));
+		lines.push(format!(
+			"\t\tassert_eq!({error_enum}::Stale {{ stored: 0 }}.to_string(), {stale_message:?});"
+		));
+	}
+	if future_possible {
+		lines.push(format!(
+			"\t\tlet error = {account}::try_from_bytes(&envelope({version_plus_one} as \
+			 {version_type})).err().expect(\"a future envelope must \
+			 fail\");\n\t\tassert_eq!(error, {error_enum}::Future {{ stored: {version_plus_one} \
+			 }});"
+		));
+		lines.push(format!(
+			"\t\tassert_eq!({error_enum}::Future {{ stored: {version_plus_one} }}.to_string(), \
+			 {future_message:?});"
+		));
+	}
 	lines.push(format!(
 		"\t\tassert!(\n\t\t\t{account}::try_from_bytes(&envelope({version} as \
 		 {version_type})).is_ok(),\n\t\t\t\"the current version must decode\",\n\t\t);"

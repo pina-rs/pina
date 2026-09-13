@@ -25,6 +25,7 @@ use super::discriminator::render_omitted_value_constant;
 use super::helpers::pascal;
 use super::helpers::render_docs;
 use super::helpers::snake;
+use super::helpers::version_type_max;
 use super::types::render_type_for_pod;
 use crate::EventMigrationHistory;
 use crate::error::RenderError;
@@ -329,6 +330,12 @@ fn render_try_from_bytes(
 ) -> Vec<String> {
 	let error_enum = format!("{event_name}VersionError");
 	let version_constant = format!("{}_MIGRATION_VERSION", event_name.to_shouty_snake_case());
+	// Stored versions are unsigned, so a stored version can never compare
+	// below 0 or above its type maximum. Emitting those impossible arms
+	// trips the deny-by-default `clippy::absurd_extreme_comparisons` in
+	// the generated crate, so only reachable arms are emitted.
+	let stale_possible = envelope.version != 0;
+	let future_possible = envelope.version != version_type_max(envelope.version_bytes);
 
 	let mut lines = Vec::new();
 	lines.push(format!("impl {event_name} {{"));
@@ -352,20 +359,24 @@ fn render_try_from_bytes(
 		lines.push(format!("\t\t\treturn Err({error_enum}::InvalidData);"));
 		lines.push("\t\t}".to_string());
 	}
-	lines.push(format!(
-		"\t\tif event.migration_version < {version_constant} {{"
-	));
-	lines.push(format!(
-		"\t\t\treturn Err({error_enum}::Stale {{ stored: event.migration_version }});"
-	));
-	lines.push("\t\t}".to_string());
-	lines.push(format!(
-		"\t\tif event.migration_version > {version_constant} {{"
-	));
-	lines.push(format!(
-		"\t\t\treturn Err({error_enum}::Future {{ stored: event.migration_version }});"
-	));
-	lines.push("\t\t}".to_string());
+	if stale_possible {
+		lines.push(format!(
+			"\t\tif event.migration_version < {version_constant} {{"
+		));
+		lines.push(format!(
+			"\t\t\treturn Err({error_enum}::Stale {{ stored: event.migration_version }});"
+		));
+		lines.push("\t\t}".to_string());
+	}
+	if future_possible {
+		lines.push(format!(
+			"\t\tif event.migration_version > {version_constant} {{"
+		));
+		lines.push(format!(
+			"\t\t\treturn Err({error_enum}::Future {{ stored: event.migration_version }});"
+		));
+		lines.push("\t\t}".to_string());
+	}
 	lines.push("\t\tOk(event)".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
@@ -1023,6 +1034,39 @@ mod tests {
 				"missing version constant for {ty} in:\n{page}"
 			);
 		}
+	}
+
+	#[test]
+	fn version_zero_events_omit_the_impossible_stale_arm() {
+		let event = envelope_event("valueChanged", U8, Number::UnsignedInteger(0));
+		let page =
+			render_event_page(&event, None).unwrap_or_else(|error| panic!("event render: {error}"));
+
+		// A stored unsigned version is never below 0, and emitting the
+		// impossible comparison trips the deny-by-default
+		// `clippy::absurd_extreme_comparisons` in the generated crate.
+		assert!(
+			!page.contains("< VALUE_CHANGED_MIGRATION_VERSION"),
+			"version 0 must not emit a stale arm:\n{page}"
+		);
+		assert!(page.contains("> VALUE_CHANGED_MIGRATION_VERSION"), "{page}");
+	}
+
+	#[test]
+	fn maximal_events_omit_the_impossible_future_arm() {
+		let event = envelope_event(
+			"valueChanged",
+			U8,
+			Number::UnsignedInteger(u64::from(u8::MAX)),
+		);
+		let page =
+			render_event_page(&event, None).unwrap_or_else(|error| panic!("event render: {error}"));
+
+		assert!(
+			!page.contains("> VALUE_CHANGED_MIGRATION_VERSION"),
+			"a maximal version must not emit a future arm:\n{page}"
+		);
+		assert!(page.contains("< VALUE_CHANGED_MIGRATION_VERSION"), "{page}");
 	}
 
 	#[test]

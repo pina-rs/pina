@@ -13,6 +13,7 @@ use codama_nodes::BytesTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
+use codama_nodes::DefaultValueStrategy;
 use codama_nodes::DefinedTypeLinkNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::DiscriminatorNode;
@@ -601,6 +602,95 @@ fn framework_owned_migration_versions_are_written_and_validated() {
 	)));
 	assert!(compact.contains(".migration_version(COMPACT_STATE_MIGRATION_VERSION)"));
 	assert!(compact.contains("if account.migration_version != COMPACT_STATE_MIGRATION_VERSION"));
+}
+
+/// A fixed account with a framework-owned `[discriminator][migrationVersion]`
+/// envelope at the given current version.
+fn migration_account(name: &str, version: u64) -> AccountNode {
+	fn omitted_number_field(name: &str, number: u64) -> StructFieldTypeNode {
+		let mut field = StructFieldTypeNode::new(name, TypeNode::Number(NumberTypeNode::le(U8)));
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode::new(number))));
+		field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+		field
+	}
+
+	AccountNode {
+		name: name.into(),
+		size: None,
+		docs: Docs::default(),
+		data: StructTypeNode::new(vec![
+			omitted_number_field("discriminator", 1),
+			omitted_number_field("migrationVersion", version),
+			StructFieldTypeNode::new("authority", TypeNode::PublicKey(PublicKeyTypeNode::new())),
+			StructFieldTypeNode::new(
+				"value",
+				TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+			),
+		])
+		.into(),
+		pda: None,
+		discriminators: vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(1u8)),
+			0,
+		))],
+	}
+}
+
+#[test]
+fn renders_version_zero_migrations_without_impossible_comparisons() {
+	let program = ProgramNode {
+		name: "freshProgram".into(),
+		public_key: "11111111111111111111111111111111".to_string(),
+		accounts: vec![migration_account("freshState", 0)],
+		instructions: vec![],
+		defined_types: vec![],
+		pdas: vec![],
+		errors: vec![],
+		events: vec![],
+		constants: vec![],
+		version: String::new(),
+		origin: None,
+		docs: Docs::default(),
+	};
+	let root = RootNode::new(program);
+
+	let output_dir = unique_temp_dir("pina-codama-render-version-zero");
+	let crate_dir = output_dir.join("fresh_program");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|e| panic!("render failed: {e}"));
+
+	let content = read_generated_file(&crate_dir, "accounts/fresh_state.rs");
+
+	// A stored unsigned version is never below 0, and emitting the
+	// impossible comparison trips the deny-by-default
+	// `clippy::absurd_extreme_comparisons` in the generated crate.
+	assert!(
+		!content.contains("< FRESH_STATE_MIGRATION_VERSION"),
+		"version 0 must not emit a stale arm:\n{content}"
+	);
+	assert!(
+		content.contains("> FRESH_STATE_MIGRATION_VERSION"),
+		"{content}"
+	);
+	assert!(
+		content.contains("pub fn fresh_state_needs_migration(_data: &[u8]) -> bool {"),
+		"{content}"
+	);
+	assert!(
+		content.contains("Version 0 is the initial version, so no bytes can ever be stale."),
+		"{content}"
+	);
+
+	// The embedded contract test pins the future and current envelopes only.
+	assert!(content.contains("a future envelope must fail"), "{content}");
+	assert!(
+		content.contains("the current version must decode"),
+		"{content}"
+	);
+	assert!(
+		!content.contains("a stale envelope must fail"),
+		"version 0 has no stale envelope to test:\n{content}"
+	);
 }
 
 #[test]
