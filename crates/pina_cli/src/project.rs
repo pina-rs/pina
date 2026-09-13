@@ -884,6 +884,32 @@ mode = "overwrite"
 	}
 
 	#[test]
+	fn config_rejects_u64_migration_version_width() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u64\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let error = Project::discover(temp.path())
+			.expect_err("the runtime implements only u8, u16, and u32 envelopes");
+		let message = error.to_string();
+
+		assert!(
+			message.contains("u64"),
+			"error names the rejected width: {message}"
+		);
+		for width in ["u8", "u16", "u32"] {
+			assert!(
+				message.contains(width),
+				"error lists the supported width `{width}`: {message}"
+			);
+		}
+	}
+
+	#[test]
 	fn config_rejects_absolute_and_parent_paths_for_every_path_field() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		write_program(temp.path(), "counter");

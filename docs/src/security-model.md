@@ -42,6 +42,8 @@ Add `migrations` to an account, instruction, or event attribute to opt into a fr
 version-type = "u8"
 ```
 
+The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default. The width is program-wide and freezes at the first published release, so it is deliberately the narrowest set that covers any realistic migration history. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
+
 Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 
 An old instruction can omit only newly appended optional accounts. Pina does not synthesize signers, writable privileges, PDAs, or required accounts. Any change to an existing process slot requires a new discriminator.
