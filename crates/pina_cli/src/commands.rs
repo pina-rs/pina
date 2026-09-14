@@ -1237,6 +1237,38 @@ enum SnapshotOutcome {
 	Saved(PathBuf),
 }
 
+/// Render the CLI surface as a normalized JSON document.
+fn render_cli_snapshot(view: SnapshotViewArg) -> Result<String, String> {
+	let command = <Cli as CommandFactory>::command();
+	let snapshot = monochange_snapshot::snapshot_from_clap(&command).view(match view {
+		SnapshotViewArg::Full => monochange_snapshot::SnapshotView::Full,
+		SnapshotViewArg::Light => monochange_snapshot::SnapshotView::Light,
+		SnapshotViewArg::Index => monochange_snapshot::SnapshotView::Index,
+	});
+
+	snapshot
+		.to_json()
+		.map_err(|error| format!("failed to render the CLI snapshot: {error}"))
+}
+
+/// Write `json` as the committed baseline under `directory`.
+///
+/// A partially written baseline would make every later diff misleading, so the
+/// file is replaced only once the full capture is on disk.
+fn save_cli_snapshot(json: &str, directory: &Path) -> Result<PathBuf, String> {
+	let path = directory.join(CLI_SNAPSHOT_FILE);
+	fs::create_dir_all(directory)
+		.map_err(|error| format!("failed to create {}: {error}", directory.display()))?;
+	AtomicWriteFile::open(&path)
+		.and_then(|mut file| {
+			file.write_all(json.as_bytes())?;
+			file.commit()
+		})
+		.map_err(|error| format!("failed to write {}: {error}", path.display()))?;
+
+	Ok(path)
+}
+
 /// Capture the CLI surface, printing it or writing it under `directory`.
 ///
 /// Kept separate from [`run_snapshot`] so the failure paths — rendering,
@@ -1247,35 +1279,12 @@ fn capture_cli_snapshot(
 	save: bool,
 	directory: &Path,
 ) -> Result<SnapshotOutcome, String> {
-	let command = <Cli as CommandFactory>::command();
-	let snapshot = monochange_snapshot::snapshot_from_clap(&command).view(match view {
-		SnapshotViewArg::Full => monochange_snapshot::SnapshotView::Full,
-		SnapshotViewArg::Light => monochange_snapshot::SnapshotView::Light,
-		SnapshotViewArg::Index => monochange_snapshot::SnapshotView::Index,
-	});
-	let json = snapshot
-		.to_json()
-		.map_err(|error| format!("failed to render the CLI snapshot: {error}"))?;
-
+	let json = render_cli_snapshot(view)?;
 	if !save {
 		return Ok(SnapshotOutcome::Printed(json));
 	}
 
-	let path = directory.join(CLI_SNAPSHOT_FILE);
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent)
-			.map_err(|error| format!("failed to create {}: {error}", parent.display()))?;
-	}
-	// A partially written baseline would make every later diff misleading, so
-	// the file is replaced only once the full capture is on disk.
-	AtomicWriteFile::open(&path)
-		.and_then(|mut file| {
-			file.write_all(json.as_bytes())?;
-			file.commit()
-		})
-		.map_err(|error| format!("failed to write {}: {error}", path.display()))?;
-
-	Ok(SnapshotOutcome::Saved(path))
+	save_cli_snapshot(&json, directory).map(SnapshotOutcome::Saved)
 }
 
 fn run_docs(topic: Option<&str>) {
@@ -1646,6 +1655,7 @@ mod tests {
 	use sha2::Sha256;
 	use tempfile::TempDir;
 
+	use super::CLI_SNAPSHOT_FILE;
 	use super::SnapshotOutcome;
 	use super::SnapshotViewArg;
 	use super::capture_cli_snapshot;
@@ -1655,6 +1665,7 @@ mod tests {
 	use super::prepare_and_confirm_record;
 	use super::print_migration_cost_preview;
 	use super::publication_record_error;
+	use super::render_cli_snapshot;
 	use super::render_static_cu;
 	use super::report_snapshot;
 
@@ -1970,11 +1981,7 @@ mod tests {
 			SnapshotViewArg::Light,
 			SnapshotViewArg::Index,
 		] {
-			let outcome = capture_cli_snapshot(view, false, Path::new("unused"))
-				.unwrap_or_else(|error| panic!("capture: {error}"));
-			let SnapshotOutcome::Printed(json) = outcome else {
-				panic!("an unsaved capture must print its JSON");
-			};
+			let json = render_cli_snapshot(view).unwrap_or_else(|error| panic!("render: {error}"));
 
 			// Every view names the tool and describes at least one command, so a
 			// silently empty or truncated capture cannot pass unnoticed.
@@ -1984,26 +1991,35 @@ mod tests {
 	}
 
 	#[test]
+	fn snapshot_unsaved_captures_print_instead_of_writing() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+
+		let outcome = capture_cli_snapshot(SnapshotViewArg::Index, false, temp.path())
+			.unwrap_or_else(|error| panic!("capture: {error}"));
+
+		assert_eq!(
+			outcome,
+			SnapshotOutcome::Printed(render_cli_snapshot(SnapshotViewArg::Index).unwrap())
+		);
+		// An unsaved capture must not leave a baseline behind.
+		assert!(!temp.path().join(CLI_SNAPSHOT_FILE).exists());
+	}
+
+	#[test]
 	fn snapshot_saving_writes_a_reusable_baseline() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
 
 		let outcome = capture_cli_snapshot(SnapshotViewArg::Index, true, temp.path())
 			.unwrap_or_else(|error| panic!("save: {error}"));
-		let SnapshotOutcome::Saved(path) = &outcome else {
-			panic!("a saved capture must report its path");
-		};
-
-		let written = fs::read_to_string(path)
-			.unwrap_or_else(|error| panic!("read baseline {}: {error}", path.display()));
+		let written = fs::read_to_string(temp.path().join(CLI_SNAPSHOT_FILE))
+			.unwrap_or_else(|error| panic!("read baseline: {error}"));
+		assert!(matches!(outcome, SnapshotOutcome::Saved(_)));
 		// The saved file must be the same document the printing path emits, or
 		// release automation would diff a baseline nobody can reproduce.
-		let SnapshotOutcome::Printed(printed) =
-			capture_cli_snapshot(SnapshotViewArg::Index, false, temp.path())
-				.unwrap_or_else(|error| panic!("capture: {error}"))
-		else {
-			panic!("an unsaved capture must print its JSON");
-		};
-		assert_eq!(written, printed);
+		assert_eq!(
+			written,
+			render_cli_snapshot(SnapshotViewArg::Index).unwrap()
+		);
 
 		// Re-saving over an existing baseline stays idempotent.
 		let again = capture_cli_snapshot(SnapshotViewArg::Index, true, temp.path())
