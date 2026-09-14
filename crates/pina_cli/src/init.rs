@@ -720,8 +720,6 @@ mod tests {
 		// Hyphenated name should produce CamelCase title.
 		assert!(lib.contains("MyCoolProgramInstruction"));
 
-		let test = fs::read_to_string(dir.path.join("tests/integration.rs"))
-			.unwrap_or_else(|err| panic!("expected integration.rs to be readable: {err}"));
 		// In-crate unit tests are the coverage path for cdylib programs.
 		assert!(lib.contains("#[cfg(test)]"));
 	}

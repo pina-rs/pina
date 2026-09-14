@@ -49,6 +49,12 @@ pub enum SizeProfile {
 	Production,
 	/// The production profile, keeping arithmetic overflow checks enabled.
 	ProductionWithOverflowChecks,
+	/// The production profile with LTO explicitly disabled.
+	///
+	/// LTO is turned off as a positive override rather than by leaving the
+	/// setting alone, so a manifest that declares `lto = "fat"` (which
+	/// `pina init` generates) is still overridden.
+	ProductionWithoutLto,
 	/// Leave the program's own release profile untouched.
 	None,
 }
@@ -56,12 +62,22 @@ pub enum SizeProfile {
 impl SizeProfile {
 	/// Whether fat LTO should be requested for this profile.
 	fn requests_lto(self) -> bool {
-		!matches!(self, Self::None)
+		matches!(self, Self::Production | Self::ProductionWithOverflowChecks)
+	}
+
+	/// Whether the profile disables LTO over a manifest that enables it.
+	fn forbids_lto(self) -> bool {
+		matches!(self, Self::ProductionWithoutLto)
 	}
 
 	/// Whether the profile wants overflow checks left enabled.
 	fn keeps_overflow_checks(self) -> bool {
 		matches!(self, Self::ProductionWithOverflowChecks)
+	}
+
+	/// Whether this profile writes any release overrides at all.
+	fn applies_overrides(self) -> bool {
+		!matches!(self, Self::None)
 	}
 }
 
@@ -390,12 +406,15 @@ fn publish_verified_build(
 /// `overflow-checks` is the caller's opt-in because disabling it changes
 /// arithmetic overflow from a panic into a wrap.
 fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
-	if matches!(options.size_profile, SizeProfile::None) {
+	if !options.size_profile.applies_overrides() {
 		return;
 	}
 
 	if options.size_profile.requests_lto() {
 		command.env("CARGO_PROFILE_RELEASE_LTO", "fat");
+	}
+	if options.size_profile.forbids_lto() {
+		command.env("CARGO_PROFILE_RELEASE_LTO", "false");
 	}
 	command
 		.env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1")
@@ -991,5 +1010,34 @@ mod tests {
 		let env = profile_env_for(SizeProfile::None);
 
 		assert!(env.is_empty());
+	}
+
+	#[test]
+	fn production_without_lto_disables_lto_and_keeps_the_rest() {
+		let env = profile_env_for(SizeProfile::ProductionWithoutLto);
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		// A manifest that declares `lto = "fat"` must still be overridden, so
+		// the profile sets it explicitly rather than omitting the variable.
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_LTO").as_deref(),
+			Some("false")
+		);
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_CODEGEN_UNITS").as_deref(),
+			Some("1")
+		);
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OPT_LEVEL").as_deref(),
+			Some("3")
+		);
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("false")
+		);
 	}
 }

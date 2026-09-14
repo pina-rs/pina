@@ -835,8 +835,11 @@ fn size_profile(
 ) -> pina_cli::build::SizeProfile {
 	use pina_cli::build::SizeProfile;
 
-	if no_size_profile || no_lto {
+	if no_size_profile {
 		return SizeProfile::None;
+	}
+	if no_lto {
+		return SizeProfile::ProductionWithoutLto;
 	}
 	if overflow_checks {
 		return SizeProfile::ProductionWithOverflowChecks;
@@ -2226,10 +2229,18 @@ mod size_profile_tests {
 	}
 
 	#[test]
-	fn opting_out_of_lto_or_the_profile_disables_every_override() {
-		// `--no-lto` only removes LTO; the rest of the profile is still a
-		// user-visible override, so both flags map to the untouched profile.
-		assert_eq!(size_profile(true, false, false), SizeProfile::None);
+	fn no_lto_keeps_the_rest_of_the_production_profile() {
+		// `--no-lto` drops LTO as a positive override so a manifest that sets
+		// `lto = "fat"` is still turned off; every other override stays.
+		assert_eq!(
+			size_profile(true, false, false),
+			SizeProfile::ProductionWithoutLto
+		);
+	}
+
+	#[test]
+	fn no_size_profile_skips_every_override() {
+		// `--no-size-profile` leaves the program's own release profile alone.
 		assert_eq!(size_profile(false, true, false), SizeProfile::None);
 	}
 }
