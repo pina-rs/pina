@@ -782,6 +782,24 @@ mod tests {
 	}
 
 	#[test]
+	fn missing_barrel_gets_a_fresh_logs_export() {
+		let root = read_idl("events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+
+		emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect("emit module");
+
+		let index = std::fs::read_to_string(generated.join("events/index.ts")).expect("index");
+		assert_eq!(index, "export * from \"./logs\";\n");
+	}
+
+	#[test]
 	fn existing_exports_survive_the_logs_barrel_patch() {
 		let root = read_idl("events_program.json");
 		let temporary = tempfile::tempdir().expect("temp dir");
