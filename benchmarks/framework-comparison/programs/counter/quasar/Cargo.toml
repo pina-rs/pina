@@ -1,0 +1,14 @@
+[package]
+name = "counter_quasar"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Pinned to the revision the published numbers were measured at.
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar", rev = "b0de7db4cd271654a2dcf78807dd865e98e0b339" }

@@ -4,15 +4,17 @@ Deployed program size determines rent, and rent is paid in SOL. A Pina program i
 
 ## Framework comparison
 
-Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2, `sbpf-linker` 0.1.8), `sbpf-solana-solana` target, equivalent program semantics (a single-instruction hello world, and a PDA counter with initialize/increment). "Most efficient" means the best configuration found across default, `--lto`, `--optimize-size`, and both together.
+Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2), `sbpf-solana-solana` target, equivalent program semantics — a single-instruction hello world, and a PDA counter with `initialize`/`increment`.
 
-| Framework                   | Hello world | Counter    | Best config                                       | Notes                                                                   |
-| --------------------------- | ----------- | ---------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
-| Quasar                      | 2,520       | 7,808      | `--lto`                                           | Custom compiler-builtins fork; workspace defaults to fat LTO            |
-| Pinocchio (hand-written)    | 3,056       | 6,800      | `--lto` / `--optimize-size`                       | Reference floor for a no-framework program                              |
-| **Pina**                    | **4,800**   | **12,392** | production profile (`lto=fat`, `codegen-units=1`) | `pina build` defaults                                                   |
-| Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,728      | `--lto`                                           | Full rewrite on pinocchio; its published 6.9 KB bench needs cdylib-only |
-| Anchor (v1, 1.2.0)          | 55,752      | 122,160    | v1 needs `--lto --optimize-size`                  | LTO _grows_ a v1 hello world                                            |
+| Framework                   | Hello world | Counter    |
+| --------------------------- | ----------- | ---------- |
+| Quasar                      | 2,520       | 7,808      |
+| Pinocchio (hand-written)    | 3,160       | 6,512      |
+| **Pina**                    | **4,680**   | **12,376** |
+| Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,696      |
+| Anchor (v1, 1.2.0)          | 55,752      | 122,160    |
+
+[Framework comparison](./framework-comparison.md) holds the generated version of this table together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than ten times the size of any of the others, and LTO makes it _larger_ rather than smaller.
 
 Pina's remaining gap to Pinocchio is mostly framework surface: derive-generated validation and dispatch, plus the entrypoint wrapper. With no derive and no logs the framework floor is 3,352 bytes against Pinocchio's 3,160 — 192 bytes.
 
