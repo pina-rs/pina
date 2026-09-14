@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/profile_program.dart';
 
 final class RemoveTagCommand extends Command<void> {
@@ -15,12 +14,14 @@ final class RemoveTagCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "The profile's authority. Must sign to prove ownership [default: payer]",
+        help:
+            "The profile's authority. Must sign to prove ownership [default: payer]",
       )
       ..addOption(
         'profile',
         mandatory: false,
-        help: "The profile PDA account (must already exist and be writable) [default: derived]",
+        help:
+            "The profile PDA account (must already exist and be writable) [default: derived]",
       );
   }
 

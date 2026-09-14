@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/transfer_sol_program.dart';
 
 final class DirectTransferCommand extends Command<void> {
@@ -15,7 +14,8 @@ final class DirectTransferCommand extends Command<void> {
       ..addOption(
         'sender',
         mandatory: false,
-        help: "The sender. Must be owned by this program, writable, and a signer [default: payer]",
+        help:
+            "The sender. Must be owned by this program, writable, and a signer [default: payer]",
       )
       ..addOption(
         'recipient',

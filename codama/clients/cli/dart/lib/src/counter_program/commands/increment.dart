@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/counter_program.dart';
 
 final class IncrementCommand extends Command<void> {
@@ -14,12 +13,14 @@ final class IncrementCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "The counter's authority. Must sign to prove ownership [default: payer]",
+        help:
+            "The counter's authority. Must sign to prove ownership [default: payer]",
       )
       ..addOption(
         'counter',
         mandatory: false,
-        help: "The counter PDA account (must already exist and be writable) [default: derived]",
+        help:
+            "The counter PDA account (must already exist and be writable) [default: derived]",
       );
   }
 

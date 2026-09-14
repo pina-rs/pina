@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/hello_solana_program.dart';
 
 final class HelloCommand extends Command<void> {
@@ -13,7 +12,8 @@ final class HelloCommand extends Command<void> {
     argParser..addOption(
       'user',
       mandatory: false,
-      help: "The user invoking the program. Must be a signer so we can trust the [default: payer]",
+      help:
+          "The user invoking the program. Must be a signer so we can trust the [default: payer]",
     );
   }
 

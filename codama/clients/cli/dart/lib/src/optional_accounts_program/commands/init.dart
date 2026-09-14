@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class InitCommand extends Command<void> {
@@ -17,7 +16,8 @@ final class InitCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "Pays for account creation and seeds the store PDA [default: payer]",
+        help:
+            "Pays for account creation and seeds the store PDA [default: payer]",
       )
       ..addOption(
         'store',

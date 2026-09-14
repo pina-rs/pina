@@ -43,7 +43,8 @@ const Map<int, String> _validationProgramErrorMessages = {
       'A check must contain exactly two different approval codes.',
   validationProgramErrorInvalidAccounts:
       'The validated account list violates a relationship between accounts.',
-  validationProgramErrorAmountOutsidePolicy: 'The amount does not fall inside the bounds stored in the policy account.',
+  validationProgramErrorAmountOutsidePolicy:
+      'The amount does not fall inside the bounds stored in the policy account.',
   validationProgramErrorInvalidEvent:
       'The event would describe an invalid policy check.',
 };

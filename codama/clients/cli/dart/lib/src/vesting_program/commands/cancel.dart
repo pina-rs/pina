@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/vesting_program.dart';
 
 final class CancelCommand extends Command<void> {

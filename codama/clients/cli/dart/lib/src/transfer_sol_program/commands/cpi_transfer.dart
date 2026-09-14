@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/transfer_sol_program.dart';
 
 final class CpiTransferCommand extends Command<void> {
@@ -17,7 +16,8 @@ final class CpiTransferCommand extends Command<void> {
       ..addOption(
         'sender',
         mandatory: false,
-        help: "The sender. Must be a signer and writable (lamports will be debited) [default: payer]",
+        help:
+            "The sender. Must be a signer and writable (lamports will be debited) [default: payer]",
       )
       ..addOption(
         'recipient',

@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/account_realloc_program.dart';
 
 final class ReallocCommand extends Command<void> {
@@ -17,7 +16,8 @@ final class ReallocCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "The sample authority. It pays rent on growth and receives excess rent on [default: payer]",
+        help:
+            "The sample authority. It pays rent on growth and receives excess rent on [default: payer]",
       )
       ..addOption('sample', mandatory: true, help: "The sample account");
   }

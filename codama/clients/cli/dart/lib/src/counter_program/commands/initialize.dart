@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/counter_program.dart';
 
 final class InitializeCommand extends Command<void> {
@@ -17,7 +16,8 @@ final class InitializeCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "The wallet creating the counter. Pays for account creation and becomes [default: payer]",
+        help:
+            "The wallet creating the counter. Pays for account creation and becomes [default: payer]",
       )
       ..addOption(
         'counter',

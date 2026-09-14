@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/compact_accounts_program.dart';
 
 final class ResizeCommand extends Command<void> {
@@ -18,7 +17,8 @@ final class ResizeCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "Funds growth and receives the rent refund from shrinking [default: payer]",
+        help:
+            "Funds growth and receives the rent refund from shrinking [default: payer]",
       )
       ..addOption(
         'journal',

@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/compact_accounts_program.dart';
 
 final class WriteCommand extends Command<void> {
@@ -16,7 +15,8 @@ final class WriteCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "Funds growth if a future write patch changes the encoded length [default: payer]",
+        help:
+            "Funds growth if a future write patch changes the encoded length [default: payer]",
       )
       ..addOption(
         'journal',

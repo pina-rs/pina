@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/compact_accounts_program.dart';
 
 final class RenameCommand extends Command<void> {
@@ -18,7 +17,8 @@ final class RenameCommand extends Command<void> {
       ..addOption(
         'authority',
         mandatory: false,
-        help: "Funds title growth and receives rent refunded by title shrinkage [default: payer]",
+        help:
+            "Funds title growth and receives rent refunded by title shrinkage [default: payer]",
       )
       ..addOption(
         'journal',
