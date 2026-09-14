@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,13 +11,10 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class UpdateRoleInstructionData {
-  const UpdateRoleInstructionData({
-    required this.permissions,
-  }) :
-      discriminator = 2;
+  const UpdateRoleInstructionData({required this.permissions})
+    : discriminator = 2;
 
   final int discriminator;
   final BigInt permissions;
@@ -46,29 +42,22 @@ Decoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'updateRole instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'updateRole instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (UpdateRoleInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(2),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      UpdateRoleInstructionData(
-      permissions: map['permissions']! as BigInt,
-      ),
+      UpdateRoleInstructionData(permissions: map['permissions']! as BigInt),
       newOffset,
     );
   }
@@ -93,8 +82,12 @@ Decoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataDecoder() {
   };
 }
 
-Codec<UpdateRoleInstructionData, UpdateRoleInstructionData> getUpdateRoleInstructionDataCodec() {
-  return combineCodec(getUpdateRoleInstructionDataEncoder(), getUpdateRoleInstructionDataDecoder());
+Codec<UpdateRoleInstructionData, UpdateRoleInstructionData>
+getUpdateRoleInstructionDataCodec() {
+  return combineCodec(
+    getUpdateRoleInstructionDataEncoder(),
+    getUpdateRoleInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [UpdateRole] instruction.
@@ -105,16 +98,14 @@ Instruction getUpdateRoleInstruction({
   required Address roleEntry,
   required BigInt permissions,
 }) {
-  final instructionData = UpdateRoleInstructionData(
-      permissions: permissions,
-  );
+  final instructionData = UpdateRoleInstructionData(permissions: permissions);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: admin, role: AccountRole.readonlySigner),
-    AccountMeta(address: registryConfig, role: AccountRole.readonly),
-    AccountMeta(address: roleEntry, role: AccountRole.writable),
+      AccountMeta(address: admin, role: AccountRole.readonlySigner),
+      AccountMeta(address: registryConfig, role: AccountRole.readonly),
+      AccountMeta(address: roleEntry, role: AccountRole.writable),
     ],
     data: getUpdateRoleInstructionDataEncoder().encode(instructionData),
   );

@@ -7,13 +7,18 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/account_realloc_program.dart';
 
 final class ReallocCommand extends Command<void> {
   ReallocCommand() {
     argParser
       ..addOption('len', mandatory: true, help: "len")
-      ..addOption('authority', mandatory: false, help: "The sample authority. It pays rent on growth and receives excess rent on [default: payer]")
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The sample authority. It pays rent on growth and receives excess rent on [default: payer]",
+      )
       ..addOption('sample', mandatory: true, help: "The sample account");
   }
 
@@ -21,7 +26,8 @@ final class ReallocCommand extends Command<void> {
   String get name => 'realloc';
 
   @override
-  String get description => "Resizes the complete account-data buffer to `len` bytes.  `len` must equal `Sample::projected_bytes` for an active value count.";
+  String get description =>
+      "Resizes the complete account-data buffer to `len` bytes.  `len` must equal `Sample::projected_bytes` for an active value count.";
 
   @override
   Future<void> run() async {

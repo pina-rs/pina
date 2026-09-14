@@ -9,8 +9,8 @@ const int escrowProgramErrorTokenAccountMismatch = 0x1; // 1
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _escrowProgramErrorMessages = {
-    escrowProgramErrorOfferKeyMismatch: '',
-    escrowProgramErrorTokenAccountMismatch: '',
+  escrowProgramErrorOfferKeyMismatch: '',
+  escrowProgramErrorTokenAccountMismatch: '',
 };
 
 /// Get the error message for a EscrowProgram program error code.

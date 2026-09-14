@@ -15,11 +15,11 @@ const int stakingRewardsProgramErrorInvalidPool = 0x4; // 4
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _stakingRewardsProgramErrorMessages = {
-    stakingRewardsProgramErrorInvalidAmount: '',
-    stakingRewardsProgramErrorPoolPaused: '',
-    stakingRewardsProgramErrorInsufficientBalance: '',
-    stakingRewardsProgramErrorUnauthorized: '',
-    stakingRewardsProgramErrorInvalidPool: '',
+  stakingRewardsProgramErrorInvalidAmount: '',
+  stakingRewardsProgramErrorPoolPaused: '',
+  stakingRewardsProgramErrorInsufficientBalance: '',
+  stakingRewardsProgramErrorUnauthorized: '',
+  stakingRewardsProgramErrorInvalidPool: '',
 };
 
 /// Get the error message for a StakingRewardsProgram program error code.

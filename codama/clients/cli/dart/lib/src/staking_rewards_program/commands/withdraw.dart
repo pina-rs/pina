@@ -7,18 +7,35 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/staking_rewards_program.dart';
 
 final class WithdrawCommand extends Command<void> {
   WithdrawCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption('user', mandatory: false, help: "The user account [default: payer]")
+      ..addOption(
+        'user',
+        mandatory: false,
+        help: "The user account [default: payer]",
+      )
       ..addOption('stake_mint', mandatory: true, help: "The stake_mint account")
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
-      ..addOption('position_state', mandatory: true, help: "The position_state account")
-      ..addOption('user_stake_ata', mandatory: true, help: "The user_stake_ata account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'position_state',
+        mandatory: true,
+        help: "The position_state account",
+      )
+      ..addOption(
+        'user_stake_ata',
+        mandatory: true,
+        help: "The user_stake_ata account",
+      )
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -36,9 +53,18 @@ final class WithdrawCommand extends Command<void> {
         : context.payerAddress;
     final stakeMint = pubkey('--stake-mint', results['stake_mint']! as String);
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
-    final positionState = pubkey('--position-state', results['position_state']! as String);
-    final userStakeAta = pubkey('--user-stake-ata', results['user_stake_ata']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+    final positionState = pubkey(
+      '--position-state',
+      results['position_state']! as String,
+    );
+    final userStakeAta = pubkey(
+      '--user-stake-ata',
+      results['user_stake_ata']! as String,
+    );
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final instruction = getWithdrawInstruction(
       programAddress: context.programAddress,

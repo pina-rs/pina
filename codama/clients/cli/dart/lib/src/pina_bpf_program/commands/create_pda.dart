@@ -7,13 +7,18 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/pina_bpf_program.dart';
 
 final class CreatePdaCommand extends Command<void> {
   CreatePdaCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('payer', mandatory: false, help: "The payer account [default: payer]")
+      ..addOption(
+        'payer',
+        mandatory: false,
+        help: "The payer account [default: payer]",
+      )
       ..addOption('state', mandatory: true, help: "The state account");
   }
 

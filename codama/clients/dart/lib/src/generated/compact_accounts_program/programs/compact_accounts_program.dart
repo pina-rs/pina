@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -12,22 +11,16 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
-
 /// The address of the CompactAccountsProgram program.
-const compactAccountsProgramProgramAddress = Address('85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn');
+const compactAccountsProgramProgramAddress = Address(
+  '85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn',
+);
 
 /// Known accounts for the CompactAccountsProgram program.
-enum CompactAccountsProgramAccount {
-  journal,
-}
+enum CompactAccountsProgramAccount { journal }
 
 /// Known instructions for the CompactAccountsProgram program.
-enum CompactAccountsProgramInstruction {
-  initialize,
-  resize,
-  write,
-  rename,
-}
+enum CompactAccountsProgramInstruction { initialize, resize, write, rename }
 
 /// Identifies the type of a CompactAccountsProgram instruction.
 CompactAccountsProgramInstruction identifyCompactAccountsProgramInstruction(
@@ -46,13 +39,10 @@ CompactAccountsProgramInstruction identifyCompactAccountsProgramInstruction(
     return CompactAccountsProgramInstruction.rename;
   }
 
-  throw SolanaError(
-    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
-    {
-      'instructionData': data,
-      'programName': 'compactAccountsProgram',
-    },
-  );
+  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
+    'instructionData': data,
+    'programName': 'compactAccountsProgram',
+  });
 }
 
 /// A parsed instruction from the CompactAccountsProgram program.
@@ -65,7 +55,7 @@ sealed class ParsedCompactAccountsProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedCompactAccountsProgramInstruction {
   const ParsedInitialize({required this.data})
-      : super(CompactAccountsProgramInstruction.initialize);
+    : super(CompactAccountsProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -73,7 +63,7 @@ final class ParsedInitialize extends ParsedCompactAccountsProgramInstruction {
 /// A parsed Resize instruction.
 final class ParsedResize extends ParsedCompactAccountsProgramInstruction {
   const ParsedResize({required this.data})
-      : super(CompactAccountsProgramInstruction.resize);
+    : super(CompactAccountsProgramInstruction.resize);
 
   final ResizeInstructionData data;
 }
@@ -81,7 +71,7 @@ final class ParsedResize extends ParsedCompactAccountsProgramInstruction {
 /// A parsed Write instruction.
 final class ParsedWrite extends ParsedCompactAccountsProgramInstruction {
   const ParsedWrite({required this.data})
-      : super(CompactAccountsProgramInstruction.write);
+    : super(CompactAccountsProgramInstruction.write);
 
   final WriteInstructionData data;
 }
@@ -89,7 +79,7 @@ final class ParsedWrite extends ParsedCompactAccountsProgramInstruction {
 /// A parsed Rename instruction.
 final class ParsedRename extends ParsedCompactAccountsProgramInstruction {
   const ParsedRename({required this.data})
-      : super(CompactAccountsProgramInstruction.rename);
+    : super(CompactAccountsProgramInstruction.rename);
 
   final RenameInstructionData data;
 }

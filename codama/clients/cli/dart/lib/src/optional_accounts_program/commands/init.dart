@@ -7,14 +7,23 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class InitCommand extends Command<void> {
   InitCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('authority', mandatory: false, help: "Pays for account creation and seeds the store PDA [default: payer]")
-      ..addOption('store', mandatory: true, help: "The store PDA account (must be empty — not yet created)");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "Pays for account creation and seeds the store PDA [default: payer]",
+      )
+      ..addOption(
+        'store',
+        mandatory: true,
+        help: "The store PDA account (must be empty — not yet created)",
+      );
   }
 
   @override

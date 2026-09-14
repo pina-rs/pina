@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/compact_accounts_program.dart';
 
 final class ResizeCommand extends Command<void> {
@@ -14,8 +15,16 @@ final class ResizeCommand extends Command<void> {
     argParser
       ..addOption('entry_count', mandatory: true, help: "entryCount")
       ..addOption('marker_count', mandatory: true, help: "markerCount")
-      ..addOption('authority', mandatory: false, help: "Funds growth and receives the rent refund from shrinking [default: payer]")
-      ..addOption('journal', mandatory: false, help: "The journal account [default: derived]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "Funds growth and receives the rent refund from shrinking [default: payer]",
+      )
+      ..addOption(
+        'journal',
+        mandatory: false,
+        help: "The journal account [default: derived]",
+      );
   }
 
   @override
@@ -34,11 +43,17 @@ final class ResizeCommand extends Command<void> {
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(
-          seeds: JournalSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
-    final entryCountValue = integer('--entry-count', results['entry_count']! as String);
-    final markerCountValue = integer('--marker-count', results['marker_count']! as String);
+            seeds: JournalSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
+    final entryCountValue = integer(
+      '--entry-count',
+      results['entry_count']! as String,
+    );
+    final markerCountValue = integer(
+      '--marker-count',
+      results['marker_count']! as String,
+    );
     final instruction = getResizeInstruction(
       programAddress: context.programAddress,
       authority: authority,

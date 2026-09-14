@@ -1,17 +1,12 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
-
 import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 
-
 @immutable
 class JournalSeeds {
-  const JournalSeeds({
-    required this.authority,
-  });
+  const JournalSeeds({required this.authority});
 
   final Address authority;
 }

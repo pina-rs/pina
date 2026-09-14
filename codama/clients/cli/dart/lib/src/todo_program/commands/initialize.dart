@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/todo_program.dart';
 
 final class InitializeCommand extends Command<void> {
@@ -14,7 +15,11 @@ final class InitializeCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('digest', mandatory: true, help: "digest")
-      ..addOption('owner', mandatory: false, help: "The owner account [default: payer]")
+      ..addOption(
+        'owner',
+        mandatory: false,
+        help: "The owner account [default: payer]",
+      )
       ..addOption('todo', mandatory: true, help: "The todo account");
   }
 

@@ -5,12 +5,12 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/events_program.dart';
 
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +21,7 @@ final class InitializeCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

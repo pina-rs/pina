@@ -5,14 +5,27 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class InspectCommand extends Command<void> {
   InspectCommand() {
     argParser
-      ..addOption('authority', mandatory: false, help: "The transaction fee payer; always required [default: payer]")
-      ..addOption('store', mandatory: true, help: "When present, must be the caller's store PDA")
-      ..addOption('witness', mandatory: false, help: "When present, must have signed the transaction [default: payer]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The transaction fee payer; always required [default: payer]",
+      )
+      ..addOption(
+        'store',
+        mandatory: true,
+        help: "When present, must be the caller's store PDA",
+      )
+      ..addOption(
+        'witness',
+        mandatory: false,
+        help: "When present, must have signed the transaction [default: payer]",
+      );
   }
 
   @override

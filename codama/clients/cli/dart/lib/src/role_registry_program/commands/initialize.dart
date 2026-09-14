@@ -7,14 +7,23 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/role_registry_program.dart';
 
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
-      ..addOption('registry_config', mandatory: true, help: "The registry_config account");
+      ..addOption(
+        'admin',
+        mandatory: false,
+        help: "The admin account [default: payer]",
+      )
+      ..addOption(
+        'registry_config',
+        mandatory: true,
+        help: "The registry_config account",
+      );
   }
 
   @override
@@ -30,7 +39,10 @@ final class InitializeCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
+    final registryConfig = pubkey(
+      '--registry-config',
+      results['registry_config']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

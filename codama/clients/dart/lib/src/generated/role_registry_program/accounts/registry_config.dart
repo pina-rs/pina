@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,15 +11,13 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class RegistryConfig {
   const RegistryConfig({
     required this.admin,
     required this.roleCount,
     required this.bump,
-  }) :
-      discriminator = 1;
+  }) : discriminator = 1;
 
   final int discriminator;
   final Address admin;
@@ -41,9 +38,9 @@ class RegistryConfig {
   int get hashCode => Object.hash(discriminator, admin, roleCount, bump);
 
   @override
-  String toString() => 'RegistryConfig(discriminator: $discriminator, admin: $admin, roleCount: $roleCount, bump: $bump)';
+  String toString() =>
+      'RegistryConfig(discriminator: $discriminator, admin: $admin, roleCount: $roleCount, bump: $bump)';
 }
-
 
 Encoder<RegistryConfig> getRegistryConfigEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -73,27 +70,22 @@ Decoder<RegistryConfig> getRegistryConfigDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'registryConfig account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'registryConfig account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (RegistryConfig, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
       RegistryConfig(
-      admin: map['admin']! as Address,
-      roleCount: map['roleCount']! as BigInt,
-      bump: map['bump']! as int,
+        admin: map['admin']! as Address,
+        roleCount: map['roleCount']! as BigInt,
+        bump: map['bump']! as int,
       ),
       newOffset,
     );

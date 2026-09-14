@@ -13,10 +13,10 @@ const int accountReallocProgramErrorAuthorityMismatch = 0xbcb; // 3019
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _accountReallocProgramErrorMessages = {
-    accountReallocProgramErrorAccountReallocExceedsLimit: '',
-    accountReallocProgramErrorAccountDuplicateReallocs: '',
-    accountReallocProgramErrorAccountDataTooSmall: '',
-    accountReallocProgramErrorAuthorityMismatch: '',
+  accountReallocProgramErrorAccountReallocExceedsLimit: '',
+  accountReallocProgramErrorAccountDuplicateReallocs: '',
+  accountReallocProgramErrorAccountDataTooSmall: '',
+  accountReallocProgramErrorAuthorityMismatch: '',
 };
 
 /// Get the error message for a AccountReallocProgram program error code.

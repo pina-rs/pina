@@ -7,21 +7,31 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/counter_program.dart';
 
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('authority', mandatory: false, help: "The wallet creating the counter. Pays for account creation and becomes [default: payer]")
-      ..addOption('counter', mandatory: true, help: "The counter PDA account (must be empty — not yet created)");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The wallet creating the counter. Pays for account creation and becomes [default: payer]",
+      )
+      ..addOption(
+        'counter',
+        mandatory: true,
+        help: "The counter PDA account (must be empty — not yet created)",
+      );
   }
 
   @override
   String get name => 'initialize';
 
   @override
-  String get description => "Instruction data for `Initialize`.  Contains the PDA bump seed so the client can pass a pre-computed bump (avoids the cost of `find_program_address` on-chain).";
+  String get description =>
+      "Instruction data for `Initialize`.  Contains the PDA bump seed so the client can pass a pre-computed bump (avoids the cost of `find_program_address` on-chain).";
 
   @override
   Future<void> run() async {
