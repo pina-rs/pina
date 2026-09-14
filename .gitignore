@@ -1,10 +1,9 @@
-crates/**/target
-/target
+# Build output. A single recursive rule covers the workspace, the top-level
+# `/target`, `programs/`, and every `examples/*/target` directory that nested
+# crates create when built from their own manifest.
+**/target
 /docs/book
-/programs/target
-**/lints/**/target
 **/lints/**/Cargo.lock
-**/security/**/target
 **/security/**/Cargo.lock
 /.helix
 /result
@@ -79,7 +78,6 @@ devenv.local.nix
 # Fuzz artifacts
 crates/pina_fuzz/fuzz/corpus/
 crates/pina_fuzz/fuzz/artifacts/
-crates/pina_fuzz/target/
 
 # Claude Code worktrees
 .claude/worktrees/
