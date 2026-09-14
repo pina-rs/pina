@@ -42,7 +42,8 @@ Feature flags:
 | `logs`           | Yes     | Enables static on-chain logging via `solana-program-log`     |
 | `verbose-logs`   | No      | Adds formatted diagnostics and caller locations              |
 | `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
-| `floats`         | No      | Enables `f32`/`f64` and fixed-point schema fields            |
+| `floats`         | No      | Enables `f32`/`f64` schema fields                            |
+| `fixed`          | No      | Enables fixed-point `FixedI*`/`FixedU*` schema fields        |
 | `validation`     | No      | Enables declarative, allocation-free application validation  |
 | `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
 | `memo`           | No      | Enables memo program helpers via `pina::memo`                |
@@ -56,7 +57,8 @@ Feature flags:
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
 - `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
-- `floats` enables `f32` and `f64` schema fields, stored as their bit pattern through `pina::PodF32` and `pina::PodF64`, and fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate that Pina re-exports as `pina::fixed`. It also enables `derive`.
+- `floats` enables IEEE-754 `f32` and `f64` schema fields, stored as their bit pattern through the `pina::PodF32` and `pina::PodF64` pods from `pinapod`. It also enables `derive`.
+- `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` schema fields from the pinned `fixed` crate, which Pina re-exports as `pina::fixed`. It also enables `derive`.
 - `validation` enables `PinaValidate` and `#[pina(validate(...))]` rules on accounts, instructions, events, and derived account lists. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. It logs a fixed message on each failure path without linking `core::fmt`. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `verbose-logs` adds formatted diagnostics and `file:line:column` caller locations to failure paths. Formatting pulls `core::fmt` into the deployed binary — roughly 2 KB on a hello world and 12 KB on a counter — so treat it as a debugging feature and leave it off for production deploys. See [Program size](./program-size.md).
@@ -133,7 +135,7 @@ The consuming program depends on the generated crate directly. This avoids coupl
 
 ## Pod types
 
-The `pina::pod` module re-exports PinaPod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
+The `pina::pod` module re-exports PinaPod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`), the IEEE-754 `PodF32` and `PodF64` (with the `floats` feature), and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
 
 <!-- {=podArithmeticDescription} -->
 

@@ -1,24 +1,26 @@
 # Float and Fixed-Point Fields
 
-Pina schemas can store fractional numbers two ways, both enabled by the optional `floats` feature:
+Pina schemas can store fractional numbers two ways, each behind its own optional feature:
 
-- native `f32` and `f64` fields, converted to and from their bit pattern under the hood, and
-- fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` types from the pinned [`fixed`](https://crates.io/crates/fixed) crate, re-exported as `pina::fixed`.
+- `floats` enables native `f32` and `f64` fields, converted to and from their bit pattern under the hood through the `PodF32`/`PodF64` pods that `pinapod` provides, and
+- `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` types from the pinned [`fixed`](https://crates.io/crates/fixed) crate, re-exported as `pina::fixed`.
 
 Both forms are stored as the complete bit pattern of a backing little-endian integer pod. Every bit pattern is a valid stored value, so zero-copy reads stay total and validation stays O(1) per field.
 
-Enable the feature in the program's `Cargo.toml`:
+The features are independent: enabling `floats` alone does not pull in the `fixed` crate, and enabling `fixed` alone does not provide `f32`/`f64` fields. Enable what the program actually stores:
 
 ```toml
 [dependencies]
-pina = { version = "...", features = ["floats"] }
+pina = { version = "...", features = ["floats"] } # f32/f64 fields
+pina = { version = "...", features = ["fixed"] } # FixedI*/FixedU* fields
+pina = { version = "...", features = ["floats", "fixed"] } # both
 ```
 
-The feature also enables `derive`, and it forwards pinapod's `fixed` support, so no extra dependency entries are needed.
+Either feature also enables `derive`, so no separate dependency entries are needed.
 
 ## Native float fields
 
-With `floats` enabled, declare `f32` and `f64` exactly like any other scalar. The generated zero-copy view converts through Pina's `PodF32` and `PodF64` storage pods, so accessors take and return native floats — the same ergonomics as `u32` fields converting through `PodU32`:
+With `floats` enabled, declare `f32` and `f64` exactly like any other scalar. The generated zero-copy view converts through `pinapod`'s `PodF32` and `PodF64` storage pods, so accessors take and return native floats — the same ergonomics as `u32` fields converting through `PodU32`:
 
 ```rust
 use pina::*;
@@ -42,7 +44,7 @@ Storage accessors convert automatically:
 - `state.temperature.set(-12.5)` stores `(-12.5f32).to_bits()` little-endian.
 - `state.temperature.get()` returns the decoded `f32`.
 - `Option<f32>` and `Vec<f32, N>` compose with the standard bounded-collection grammar.
-- Compact accounts accept `f32`/`f64` as inline header fields, and compact patches take native floats (`patch.bias(0.5)`). One caveat: compact patch values for _optional_ float fields use the pod spelling, `patch.maybe_bias(Some(PodF32::from(0.5)))`, because the underlying conversion trait cannot be implemented for the foreign `f32` primitive.
+- Compact accounts accept `f32`/`f64` as inline header fields, and compact patches take native floats. Both spellings work for optional fields: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` need no pod import, because `pinapod` implements the field mapping for the `f32` primitive itself.
 
 ## Fixed-point fields
 
@@ -110,10 +112,10 @@ Solana execution is deterministic across validators, but IEEE-754 does not make 
 
 ## Build impact
 
-Measured on this repository (`cargo build -p pina --release`, `no-default-features`):
+The two features have very different costs, which is part of why they are separate:
 
-- The `pina` rlib is byte-identical with and without `floats` (609,304 bytes in the measurement): pods that a program never uses are never linked, and the float pods themselves are four- and eight-byte wrappers.
-- The feature adds two `no_std` crates to the dependency graph — `fixed =1.30.0` and its only dependency `typenum`. Compiling them costs about 9.5 seconds once, and about 0.4 seconds on a cached rebuild.
+- **`floats` adds no crates.** `PodF32`/`PodF64` are four- and eight-byte wrappers in `pinapod`, which Pina already depends on. A program that enables the feature without using it links nothing extra, and the `pina` rlib stays byte-identical (609,304 bytes when measured).
+- **`fixed` adds two `no_std` crates** to the dependency graph — `fixed =1.30.0` and its only dependency `typenum`. Compiling them costs about 9.5 seconds once, and about 0.4 seconds on a cached rebuild. A program that only stores `f32`/`f64` fields can leave this out entirely.
 - The `fixed` crate is heavily generic: its own rlib is large (about 28 MB with debug metadata), but only the fixed-point types a program actually instantiates are monomorphized into the final SBF binary. A program that uses one `FixedU64<U16>` field pays for exactly that instantiation.
 - The exact `=1.30.0` pin is deliberate: Pina's generated code and pinapod's `ZcField` implementations expand against `fixed`'s type-level contracts, so mixed versions cannot be allowed to coexist. Pina re-exports the pinned instance as `pina::fixed`; derive your schema fields from that path and the version question disappears.
 

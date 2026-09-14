@@ -324,6 +324,14 @@ in
       description = "Verify `pina` builds with only the `floats` feature enabled.";
       binary = "bash";
     };
+    "build:pina:fixed-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo check -p pina --no-default-features --features fixed --locked
+      '';
+      description = "Verify `pina` builds with only the `fixed` feature enabled.";
+      binary = "bash";
+    };
     "build:pina:account-resize-only" = {
       exec = ''
         set -euo pipefail
@@ -347,6 +355,7 @@ in
         cargo check -p pina --no-default-features --features derive --locked
         build:pina:compact-only
         build:pina:floats-only
+        build:pina:fixed-only
         build:pina:account-resize-only
         build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
@@ -361,6 +370,7 @@ in
         build:pina:no-default-only
         build:pina:compact-only
         build:pina:floats-only
+        build:pina:fixed-only
         build:pina:account-resize-only
         build:pina:token-only
         build:pina:all-features
@@ -569,7 +579,15 @@ in
         set -euo pipefail
         cargo test -p pina --no-default-features --features floats --lib --test floats --locked
       '';
-      description = "Run float and fixed-point schema tests without unrelated optional features.";
+      description = "Run IEEE-754 float schema tests without unrelated optional features.";
+      binary = "bash";
+    };
+    "test:pina:fixed-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo test -p pina --no-default-features --features fixed --lib --test fixed --locked
+      '';
+      description = "Run fixed-point schema tests without unrelated optional features.";
       binary = "bash";
     };
     "test:pina:account-resize-only" = {
@@ -614,6 +632,7 @@ in
         test:pina:compact-only
         doc:pina:compact-only
         test:pina:floats-only
+        test:pina:fixed-only
         test:pina:account-resize-only
         test:pina:token-only
         test:pina:all-features

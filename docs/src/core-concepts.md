@@ -226,7 +226,7 @@ Optional signers are validated only when present (`if let Some(witness) = self.w
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are alignment-one byte-backed values that implement PinaPod's `ZcElem` and `ZcValidate` contracts.
+All types are alignment-one byte-backed values that implement PinaPod's `ZcElem` and `ZcValidate` contracts. The `floats` feature adds `PodF32` and `PodF64`, which store IEEE-754 bit patterns in four and eight bytes; they validate any bit pattern and decode an all-zero field as `+0.0`.
 
 <!-- {/podTypesTable} -->
 
