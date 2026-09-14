@@ -7771,6 +7771,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "security_11_admin_key_compromise_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_12_oracle_integrity_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -144,6 +144,8 @@ members = [
 	"security/08-pda-sharing/secure",
 	"security/09-closing-accounts/secure",
 	"security/10-sysvar-address-checking/secure",
+	"security/11-admin-key-compromise/secure",
+	"security/12-oracle-integrity/secure",
 ]
 
 exclude = [
@@ -159,6 +161,8 @@ exclude = [
 	"security/08-pda-sharing/insecure",
 	"security/09-closing-accounts/insecure",
 	"security/10-sysvar-address-checking/insecure",
+	"security/11-admin-key-compromise/insecure",
+	"security/12-oracle-integrity/insecure",
 ]
 
 [package]
