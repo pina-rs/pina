@@ -23,9 +23,9 @@ pub struct CreatePdaArgs {
 	/// The `payer` account [default: payer]
 	#[arg(long)]
 	payer: Option<String>,
-	/// The `state` account [default: derived]
+	/// The `state` account
 	#[arg(long)]
-	state: Option<String>,
+	state: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: CreatePdaArgs) -> Result<(), CliError> {
@@ -33,10 +33,7 @@ pub(crate) fn run(context: &CliContext, args: CreatePdaArgs) -> Result<(), CliEr
 		Some(value) => CliContext::pubkey("--payer", value)?,
 		None => context.payer_pubkey(),
 	};
-	let state = match &args.state {
-		Some(value) => CliContext::pubkey("--state", value)?,
-		None => Pubkey::find_program_address(&["state".as_bytes()], &context.program_address).0,
-	};
+	let state = CliContext::pubkey("--state", &args.state)?;
 	let data = CreatePdaInstructionData::new(|data| {
 		data.bump = args.bump;
 	})

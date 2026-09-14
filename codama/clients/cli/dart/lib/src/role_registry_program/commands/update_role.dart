@@ -11,21 +11,9 @@ final class UpdateRoleCommand extends Command<void> {
   UpdateRoleCommand() {
     argParser
       ..addOption('permissions', mandatory: true, help: "permissions")
-      ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
-      ..addOption(
-        'registry_config',
-        mandatory: true,
-        help: "The registry_config account",
-      )
-      ..addOption(
-        'role_entry',
-        mandatory: true,
-        help: "The role_entry account",
-      );
+      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
+      ..addOption('registry_config', mandatory: true, help: "The registry_config account")
+      ..addOption('role_entry', mandatory: true, help: "The role_entry account");
   }
 
   @override
@@ -41,15 +29,9 @@ final class UpdateRoleCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final registryConfig = pubkey(
-      '--registry-config',
-      results['registry_config']! as String,
-    );
+    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
     final roleEntry = pubkey('--role-entry', results['role_entry']! as String);
-    final permissionsValue = bigInteger(
-      '--permissions',
-      results['permissions']! as String,
-    );
+    final permissionsValue = bigInteger('--permissions', results['permissions']! as String);
     final instruction = getUpdateRoleInstruction(
       programAddress: context.programAddress,
       admin: admin,

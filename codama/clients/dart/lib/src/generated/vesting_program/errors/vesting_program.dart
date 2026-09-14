@@ -11,9 +11,9 @@ const int vestingProgramErrorAlreadyCancelled = 0x2; // 2
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _vestingProgramErrorMessages = {
-  vestingProgramErrorInvalidSchedule: '',
-  vestingProgramErrorClaimTooLarge: '',
-  vestingProgramErrorAlreadyCancelled: '',
+    vestingProgramErrorInvalidSchedule: '',
+    vestingProgramErrorClaimTooLarge: '',
+    vestingProgramErrorAlreadyCancelled: '',
 };
 
 /// Get the error message for a VestingProgram program error code.

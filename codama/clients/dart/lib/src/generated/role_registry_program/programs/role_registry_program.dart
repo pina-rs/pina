@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,13 +12,15 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the RoleRegistryProgram program.
-const roleRegistryProgramProgramAddress = Address(
-  '3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX',
-);
+const roleRegistryProgramProgramAddress = Address('3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX');
 
 /// Known accounts for the RoleRegistryProgram program.
-enum RoleRegistryProgramAccount { registryConfig, roleEntry }
+enum RoleRegistryProgramAccount {
+  registryConfig,
+  roleEntry,
+}
 
 /// Known instructions for the RoleRegistryProgram program.
 enum RoleRegistryProgramInstruction {
@@ -48,10 +51,13 @@ RoleRegistryProgramInstruction identifyRoleRegistryProgramInstruction(
     return RoleRegistryProgramInstruction.rotateAdmin;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'roleRegistryProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'roleRegistryProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the RoleRegistryProgram program.
@@ -64,7 +70,7 @@ sealed class ParsedRoleRegistryProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedRoleRegistryProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(RoleRegistryProgramInstruction.initialize);
+      : super(RoleRegistryProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -72,7 +78,7 @@ final class ParsedInitialize extends ParsedRoleRegistryProgramInstruction {
 /// A parsed AddRole instruction.
 final class ParsedAddRole extends ParsedRoleRegistryProgramInstruction {
   const ParsedAddRole({required this.data})
-    : super(RoleRegistryProgramInstruction.addRole);
+      : super(RoleRegistryProgramInstruction.addRole);
 
   final AddRoleInstructionData data;
 }
@@ -80,7 +86,7 @@ final class ParsedAddRole extends ParsedRoleRegistryProgramInstruction {
 /// A parsed UpdateRole instruction.
 final class ParsedUpdateRole extends ParsedRoleRegistryProgramInstruction {
   const ParsedUpdateRole({required this.data})
-    : super(RoleRegistryProgramInstruction.updateRole);
+      : super(RoleRegistryProgramInstruction.updateRole);
 
   final UpdateRoleInstructionData data;
 }
@@ -88,7 +94,7 @@ final class ParsedUpdateRole extends ParsedRoleRegistryProgramInstruction {
 /// A parsed DeactivateRole instruction.
 final class ParsedDeactivateRole extends ParsedRoleRegistryProgramInstruction {
   const ParsedDeactivateRole({required this.data})
-    : super(RoleRegistryProgramInstruction.deactivateRole);
+      : super(RoleRegistryProgramInstruction.deactivateRole);
 
   final DeactivateRoleInstructionData data;
 }
@@ -96,7 +102,7 @@ final class ParsedDeactivateRole extends ParsedRoleRegistryProgramInstruction {
 /// A parsed RotateAdmin instruction.
 final class ParsedRotateAdmin extends ParsedRoleRegistryProgramInstruction {
   const ParsedRotateAdmin({required this.data})
-    : super(RoleRegistryProgramInstruction.rotateAdmin);
+      : super(RoleRegistryProgramInstruction.rotateAdmin);
 
   final RotateAdminInstructionData data;
 }

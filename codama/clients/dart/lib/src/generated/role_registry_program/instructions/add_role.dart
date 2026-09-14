@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,13 +12,15 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class AddRoleInstructionData {
   const AddRoleInstructionData({
     required this.roleId,
     required this.permissions,
     required this.bump,
-  }) : discriminator = 1;
+  }) :
+      discriminator = 1;
 
   final int discriminator;
   final BigInt roleId;
@@ -53,15 +56,20 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'addRole instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'addRole instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (AddRoleInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -69,9 +77,9 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
 
     return (
       AddRoleInstructionData(
-        roleId: map['roleId']! as BigInt,
-        permissions: map['permissions']! as BigInt,
-        bump: map['bump']! as int,
+      roleId: map['roleId']! as BigInt,
+      permissions: map['permissions']! as BigInt,
+      bump: map['bump']! as int,
       ),
       newOffset,
     );
@@ -97,12 +105,8 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
   };
 }
 
-Codec<AddRoleInstructionData, AddRoleInstructionData>
-getAddRoleInstructionDataCodec() {
-  return combineCodec(
-    getAddRoleInstructionDataEncoder(),
-    getAddRoleInstructionDataDecoder(),
-  );
+Codec<AddRoleInstructionData, AddRoleInstructionData> getAddRoleInstructionDataCodec() {
+  return combineCodec(getAddRoleInstructionDataEncoder(), getAddRoleInstructionDataDecoder());
 }
 
 /// Creates a [AddRole] instruction.
@@ -118,19 +122,19 @@ Instruction getAddRoleInstruction({
   required int bump,
 }) {
   final instructionData = AddRoleInstructionData(
-    roleId: roleId,
-    permissions: permissions,
-    bump: bump,
+      roleId: roleId,
+      permissions: permissions,
+      bump: bump,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: admin, role: AccountRole.writableSigner),
-      AccountMeta(address: grantee, role: AccountRole.readonly),
-      AccountMeta(address: registryConfig, role: AccountRole.writable),
-      AccountMeta(address: roleEntry, role: AccountRole.writable),
-      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+    AccountMeta(address: admin, role: AccountRole.writableSigner),
+    AccountMeta(address: grantee, role: AccountRole.readonly),
+    AccountMeta(address: registryConfig, role: AccountRole.writable),
+    AccountMeta(address: roleEntry, role: AccountRole.writable),
+    AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getAddRoleInstructionDataEncoder().encode(instructionData),
   );

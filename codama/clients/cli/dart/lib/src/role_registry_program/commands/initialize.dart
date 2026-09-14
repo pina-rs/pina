@@ -13,16 +13,8 @@ final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
-      ..addOption(
-        'registry_config',
-        mandatory: false,
-        help: "The registry_config account [default: derived]",
-      );
+      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
+      ..addOption('registry_config', mandatory: true, help: "The registry_config account");
   }
 
   @override
@@ -38,12 +30,7 @@ final class InitializeCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final registryConfig = (results['registry_config'] as String?) != null
-        ? pubkey('--registry-config', results['registry_config']! as String)
-        : (await findRegistryConfigPda(
-            seeds: RegistryConfigSeeds(admin: admin),
-            programAddress: context.programAddress,
-          )).$1;
+    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

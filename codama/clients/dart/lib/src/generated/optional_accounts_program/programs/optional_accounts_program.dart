@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,16 +12,22 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the OptionalAccountsProgram program.
-const optionalAccountsProgramProgramAddress = Address(
-  'ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci',
-);
+const optionalAccountsProgramProgramAddress = Address('ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci');
 
 /// Known accounts for the OptionalAccountsProgram program.
-enum OptionalAccountsProgramAccount { storeState }
+enum OptionalAccountsProgramAccount {
+  storeState,
+}
 
 /// Known instructions for the OptionalAccountsProgram program.
-enum OptionalAccountsProgramInstruction { init, touch, inspect, note }
+enum OptionalAccountsProgramInstruction {
+  init,
+  touch,
+  inspect,
+  note,
+}
 
 /// Identifies the type of a OptionalAccountsProgram instruction.
 OptionalAccountsProgramInstruction identifyOptionalAccountsProgramInstruction(
@@ -39,10 +46,13 @@ OptionalAccountsProgramInstruction identifyOptionalAccountsProgramInstruction(
     return OptionalAccountsProgramInstruction.note;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'optionalAccountsProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'optionalAccountsProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the OptionalAccountsProgram program.
@@ -55,7 +65,7 @@ sealed class ParsedOptionalAccountsProgramInstruction {
 /// A parsed Init instruction.
 final class ParsedInit extends ParsedOptionalAccountsProgramInstruction {
   const ParsedInit({required this.data})
-    : super(OptionalAccountsProgramInstruction.init);
+      : super(OptionalAccountsProgramInstruction.init);
 
   final InitInstructionData data;
 }
@@ -63,7 +73,7 @@ final class ParsedInit extends ParsedOptionalAccountsProgramInstruction {
 /// A parsed Touch instruction.
 final class ParsedTouch extends ParsedOptionalAccountsProgramInstruction {
   const ParsedTouch({required this.data})
-    : super(OptionalAccountsProgramInstruction.touch);
+      : super(OptionalAccountsProgramInstruction.touch);
 
   final TouchInstructionData data;
 }
@@ -71,7 +81,7 @@ final class ParsedTouch extends ParsedOptionalAccountsProgramInstruction {
 /// A parsed Inspect instruction.
 final class ParsedInspect extends ParsedOptionalAccountsProgramInstruction {
   const ParsedInspect({required this.data})
-    : super(OptionalAccountsProgramInstruction.inspect);
+      : super(OptionalAccountsProgramInstruction.inspect);
 
   final InspectInstructionData data;
 }
@@ -79,14 +89,15 @@ final class ParsedInspect extends ParsedOptionalAccountsProgramInstruction {
 /// A parsed Note instruction.
 final class ParsedNote extends ParsedOptionalAccountsProgramInstruction {
   const ParsedNote({required this.data})
-    : super(OptionalAccountsProgramInstruction.note);
+      : super(OptionalAccountsProgramInstruction.note);
 
   final NoteInstructionData data;
 }
 
 /// Parses a OptionalAccountsProgram instruction.
-ParsedOptionalAccountsProgramInstruction
-parseOptionalAccountsProgramInstruction(Instruction instruction) {
+ParsedOptionalAccountsProgramInstruction parseOptionalAccountsProgramInstruction(
+  Instruction instruction,
+) {
   return switch (identifyOptionalAccountsProgramInstruction(
     instruction.data ?? Uint8List(0),
   )) {

@@ -10,21 +10,20 @@ import 'event_log.dart';
 
 /// Event record `MyEvent`.
 class MyEventEvent extends EventsProgramEvent {
-  const MyEventEvent({
-    required this.discriminator,
-    required this.data,
-    required this.label,
-  });
+	const MyEventEvent({
+		required this.discriminator,
+		required this.data,
+		required this.label,
+	});
 
-  final int discriminator;
-  final BigInt data;
-  final Uint8List label;
+	final int discriminator;
+	final BigInt data;
+	final Uint8List label;
 
-  @override
-  String get name => 'myEvent';
+	@override
+	String get name => 'myEvent';
 
-  String toString() =>
-      'MyEventEvent(discriminator: ${discriminator}, data: ${data}, label: ${label})';
+	String toString() => 'MyEventEvent(discriminator: ${discriminator}, data: ${data}, label: ${label})';
 }
 
 /// The discriminator this event is emitted under.
@@ -38,25 +37,21 @@ const myEventEventSize = 17;
 
 /// Decode one current-version `MyEvent` record.
 MyEventEvent decodeMyEventEvent(Uint8List data) {
-  if (data.length != myEventEventSize) {
-    throw RangeError(
-      'expected exactly ${myEventEventSize} bytes, received ${data.length}',
-    );
-  }
-  var cursor = 0;
-  final (v0, c0) = getU8Decoder().read(data, cursor);
-  cursor = c0;
-  if (v0 != 1) {
-    throw RangeError(
-      'the provided bytes do not match the "MyEvent" event discriminator',
-    );
-  }
-  final (v1, c1) = getU64Decoder().read(data, cursor);
-  cursor = c1;
-  final (v2, c2) = fixDecoderSize(getBytesDecoder(), 8).read(data, cursor);
-  cursor = c2;
+	if (data.length != myEventEventSize) {
+		throw RangeError('expected exactly ${myEventEventSize} bytes, received ${data.length}');
+	}
+	var cursor = 0;
+	final (v0, c0) = getU8Decoder().read(data, cursor);
+	cursor = c0;
+	if (v0 != 1) {
+		throw RangeError('the provided bytes do not match the "MyEvent" event discriminator');
+	}
+	final (v1, c1) = getU64Decoder().read(data, cursor);
+	cursor = c1;
+	final (v2, c2) = fixDecoderSize(getBytesDecoder(), 8).read(data, cursor);
+	cursor = c2;
 
-  return MyEventEvent(discriminator: v0, data: v1, label: v2);
+	return MyEventEvent(discriminator: v0, data: v1, label: v2);
 }
 
 /// A decoded `MyEvent` log record.
@@ -65,14 +60,14 @@ typedef DecodedMyEventEvent = MyEventEvent;
 /// Decode a `Program data:` log line, or return null when the line is not
 /// this event.
 MyEventEvent? parseMyEventEventFromLog(String log) {
-  final bytes = decodeProgramDataLog(log);
-  if (bytes == null || bytes.length < 1) {
-    return null;
-  }
-  for (var index = 0; index < 1; index++) {
-    if (bytes[index] != _myEventEventDiscriminatorBytes[index]) {
-      return null;
-    }
-  }
-  return decodeMyEventEvent(bytes);
+	final bytes = decodeProgramDataLog(log);
+	if (bytes == null || bytes.length < 1) {
+		return null;
+	}
+	for (var index = 0; index < 1; index++) {
+		if (bytes[index] != _myEventEventDiscriminatorBytes[index]) {
+			return null;
+		}
+	}
+	return decodeMyEventEvent(bytes);
 }

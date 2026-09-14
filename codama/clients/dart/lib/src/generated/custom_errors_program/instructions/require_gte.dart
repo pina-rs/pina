@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,11 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class RequireGteInstructionData {
-  const RequireGteInstructionData() : discriminator = 6;
+  const RequireGteInstructionData() :
+      discriminator = 6;
 
   final int discriminator;
 }
@@ -25,7 +28,9 @@ Encoder<RequireGteInstructionData> getRequireGteInstructionDataEncoder() {
 
   return transformEncoder(
     structEncoder,
-    (RequireGteInstructionData value) => <String, Object?>{'discriminator': 6},
+    (RequireGteInstructionData value) => <String, Object?>{
+      'discriminator': 6,
+    },
   );
 }
 
@@ -35,21 +40,31 @@ Decoder<RequireGteInstructionData> getRequireGteInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'requireGte instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'requireGte instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (RequireGteInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(6),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (RequireGteInstructionData(), newOffset);
+    return (
+      RequireGteInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -72,21 +87,25 @@ Decoder<RequireGteInstructionData> getRequireGteInstructionDataDecoder() {
   };
 }
 
-Codec<RequireGteInstructionData, RequireGteInstructionData>
-getRequireGteInstructionDataCodec() {
-  return combineCodec(
-    getRequireGteInstructionDataEncoder(),
-    getRequireGteInstructionDataDecoder(),
-  );
+Codec<RequireGteInstructionData, RequireGteInstructionData> getRequireGteInstructionDataCodec() {
+  return combineCodec(getRequireGteInstructionDataEncoder(), getRequireGteInstructionDataDecoder());
 }
 
 /// Creates a [RequireGte] instruction.
-Instruction getRequireGteInstruction({required Address programAddress}) {
-  final instructionData = RequireGteInstructionData();
+Instruction getRequireGteInstruction({
+  required Address programAddress,
+
+
+}) {
+  final instructionData = RequireGteInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getRequireGteInstructionDataEncoder().encode(instructionData),
   );
 }

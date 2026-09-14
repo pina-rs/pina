@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getCreatePdaInstructionAsync } from "../client";
+import { getCreatePdaInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -18,15 +18,15 @@ export const createPdaCommand = registerGlobals(new Command("create_pda"))
 	.description("createPda")
 	.requiredOption("--bump <bump>", "bump")
 	.option("--payer <payer>", "The `payer` account [default: payer]")
-	.option("--state <state>", "The `state` account [default: derived]")
+	.requiredOption("--state <state>", "The `state` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			payer: context.payer,
-			state: options.state,
+			state: pubkey("--state", options.state),
 		};
-		const instruction = await getCreatePdaInstructionAsync(
+		const instruction = getCreatePdaInstruction(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,10 +12,14 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class WriteInstructionData {
-  const WriteInstructionData({required this.index, required this.value})
-    : discriminator = 2;
+  const WriteInstructionData({
+    required this.index,
+    required this.value,
+  }) :
+      discriminator = 2;
 
   final int discriminator;
   final int index;
@@ -46,15 +51,20 @@ Decoder<WriteInstructionData> getWriteInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'write instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'write instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (WriteInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(2),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -62,8 +72,8 @@ Decoder<WriteInstructionData> getWriteInstructionDataDecoder() {
 
     return (
       WriteInstructionData(
-        index: map['index']! as int,
-        value: map['value']! as BigInt,
+      index: map['index']! as int,
+      value: map['value']! as BigInt,
       ),
       newOffset,
     );
@@ -89,12 +99,8 @@ Decoder<WriteInstructionData> getWriteInstructionDataDecoder() {
   };
 }
 
-Codec<WriteInstructionData, WriteInstructionData>
-getWriteInstructionDataCodec() {
-  return combineCodec(
-    getWriteInstructionDataEncoder(),
-    getWriteInstructionDataDecoder(),
-  );
+Codec<WriteInstructionData, WriteInstructionData> getWriteInstructionDataCodec() {
+  return combineCodec(getWriteInstructionDataEncoder(), getWriteInstructionDataDecoder());
 }
 
 /// Creates a [Write] instruction.
@@ -105,13 +111,16 @@ Instruction getWriteInstruction({
   required int index,
   required BigInt value,
 }) {
-  final instructionData = WriteInstructionData(index: index, value: value);
+  final instructionData = WriteInstructionData(
+      index: index,
+      value: value,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.writableSigner),
-      AccountMeta(address: journal, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.writableSigner),
+    AccountMeta(address: journal, role: AccountRole.writable),
     ],
     data: getWriteInstructionDataEncoder().encode(instructionData),
   );

@@ -12,17 +12,8 @@ final class WriteCommand extends Command<void> {
     argParser
       ..addOption('index', mandatory: true, help: "index")
       ..addOption('value', mandatory: true, help: "value")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "Funds growth if a future write patch changes the encoded length [default: payer]",
-      )
-      ..addOption(
-        'journal',
-        mandatory: false,
-        help: "The journal account [default: derived]",
-      );
+      ..addOption('authority', mandatory: false, help: "Funds growth if a future write patch changes the encoded length [default: payer]")
+      ..addOption('journal', mandatory: false, help: "The journal account [default: derived]");
   }
 
   @override
@@ -41,9 +32,9 @@ final class WriteCommand extends Command<void> {
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(
-            seeds: JournalSeeds(authority: authority),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: JournalSeeds(authority: authority),
+          programAddress: context.programAddress,
+        )).$1;
     final indexValue = integer('--index', results['index']! as String);
     final valueValue = bigInteger('--value', results['value']! as String);
     final instruction = getWriteInstruction(

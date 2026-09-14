@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getInitializePoolInstructionAsync } from "../client";
+import { getInitializePoolInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -22,10 +22,7 @@ export const initializePoolCommand = registerGlobals(
 	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--stake-mint <stakeMint>", "The `stake_mint` account")
 	.requiredOption("--reward-mint <rewardMint>", "The `reward_mint` account")
-	.option(
-		"--pool-state <poolState>",
-		"The `pool_state` account [default: derived]",
-	)
+	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption("--stake-vault <stakeVault>", "The `stake_vault` account")
 	.requiredOption("--reward-vault <rewardVault>", "The `reward_vault` account")
 	.requiredOption(
@@ -39,12 +36,12 @@ export const initializePoolCommand = registerGlobals(
 			admin: context.payer,
 			stakeMint: pubkey("--stake-mint", options.stakeMint),
 			rewardMint: pubkey("--reward-mint", options.rewardMint),
-			poolState: options.poolState,
+			poolState: pubkey("--pool-state", options.poolState),
 			stakeVault: pubkey("--stake-vault", options.stakeVault),
 			rewardVault: pubkey("--reward-vault", options.rewardVault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
-		const instruction = await getInitializePoolInstructionAsync(
+		const instruction = getInitializePoolInstruction(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

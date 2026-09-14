@@ -11,16 +11,8 @@ final class UpdateDigestCommand extends Command<void> {
   UpdateDigestCommand() {
     argParser
       ..addOption('digest', mandatory: true, help: "digest")
-      ..addOption(
-        'owner',
-        mandatory: false,
-        help: "The owner account [default: payer]",
-      )
-      ..addOption(
-        'todo',
-        mandatory: false,
-        help: "The todo account [default: derived]",
-      );
+      ..addOption('owner', mandatory: false, help: "The owner account [default: payer]")
+      ..addOption('todo', mandatory: false, help: "The todo account [default: derived]");
   }
 
   @override
@@ -39,9 +31,9 @@ final class UpdateDigestCommand extends Command<void> {
     final todo = (results['todo'] as String?) != null
         ? pubkey('--todo', results['todo']! as String)
         : (await findTodoPda(
-            seeds: TodoSeeds(owner: owner),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: TodoSeeds(owner: owner),
+          programAddress: context.programAddress,
+        )).$1;
     final digestValue = base58Bytes('--digest', results['digest']! as String);
     final instruction = getUpdateDigestInstruction(
       programAddress: context.programAddress,

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,16 +12,21 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the EventsProgram program.
-const eventsProgramProgramAddress = Address(
-  '2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy',
-);
+const eventsProgramProgramAddress = Address('2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy');
 
 /// Known instructions for the EventsProgram program.
-enum EventsProgramInstruction { initialize, testEvent, testEventCpi }
+enum EventsProgramInstruction {
+  initialize,
+  testEvent,
+  testEventCpi,
+}
 
 /// Identifies the type of a EventsProgram instruction.
-EventsProgramInstruction identifyEventsProgramInstruction(Uint8List data) {
+EventsProgramInstruction identifyEventsProgramInstruction(
+  Uint8List data,
+) {
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return EventsProgramInstruction.initialize;
   }
@@ -31,10 +37,13 @@ EventsProgramInstruction identifyEventsProgramInstruction(Uint8List data) {
     return EventsProgramInstruction.testEventCpi;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'eventsProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'eventsProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the EventsProgram program.
@@ -47,7 +56,7 @@ sealed class ParsedEventsProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedEventsProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(EventsProgramInstruction.initialize);
+      : super(EventsProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -55,7 +64,7 @@ final class ParsedInitialize extends ParsedEventsProgramInstruction {
 /// A parsed TestEvent instruction.
 final class ParsedTestEvent extends ParsedEventsProgramInstruction {
   const ParsedTestEvent({required this.data})
-    : super(EventsProgramInstruction.testEvent);
+      : super(EventsProgramInstruction.testEvent);
 
   final TestEventInstructionData data;
 }
@@ -63,7 +72,7 @@ final class ParsedTestEvent extends ParsedEventsProgramInstruction {
 /// A parsed TestEventCpi instruction.
 final class ParsedTestEventCpi extends ParsedEventsProgramInstruction {
   const ParsedTestEventCpi({required this.data})
-    : super(EventsProgramInstruction.testEventCpi);
+      : super(EventsProgramInstruction.testEventCpi);
 
   final TestEventCpiInstructionData data;
 }

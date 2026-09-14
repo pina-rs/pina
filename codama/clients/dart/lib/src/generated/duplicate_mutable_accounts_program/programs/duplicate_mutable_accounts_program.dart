@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,10 +12,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the DuplicateMutableAccountsProgram program.
-const duplicateMutableAccountsProgramProgramAddress = Address(
-  '4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH',
-);
+const duplicateMutableAccountsProgramProgramAddress = Address('4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH');
 
 /// Known instructions for the DuplicateMutableAccountsProgram program.
 enum DuplicateMutableAccountsProgramInstruction {
@@ -24,8 +24,9 @@ enum DuplicateMutableAccountsProgramInstruction {
 }
 
 /// Identifies the type of a DuplicateMutableAccountsProgram instruction.
-DuplicateMutableAccountsProgramInstruction
-identifyDuplicateMutableAccountsProgramInstruction(Uint8List data) {
+DuplicateMutableAccountsProgramInstruction identifyDuplicateMutableAccountsProgramInstruction(
+  Uint8List data,
+) {
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable;
   }
@@ -36,10 +37,13 @@ identifyDuplicateMutableAccountsProgramInstruction(Uint8List data) {
     return DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'duplicateMutableAccountsProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'duplicateMutableAccountsProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the DuplicateMutableAccountsProgram program.
@@ -50,49 +54,44 @@ sealed class ParsedDuplicateMutableAccountsProgramInstruction {
 }
 
 /// A parsed FailsDuplicateMutable instruction.
-final class ParsedFailsDuplicateMutable
-    extends ParsedDuplicateMutableAccountsProgramInstruction {
+final class ParsedFailsDuplicateMutable extends ParsedDuplicateMutableAccountsProgramInstruction {
   const ParsedFailsDuplicateMutable({required this.data})
-    : super(DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable);
+      : super(DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable);
 
   final FailsDuplicateMutableInstructionData data;
 }
 
 /// A parsed AllowsDuplicateMutable instruction.
-final class ParsedAllowsDuplicateMutable
-    extends ParsedDuplicateMutableAccountsProgramInstruction {
+final class ParsedAllowsDuplicateMutable extends ParsedDuplicateMutableAccountsProgramInstruction {
   const ParsedAllowsDuplicateMutable({required this.data})
-    : super(DuplicateMutableAccountsProgramInstruction.allowsDuplicateMutable);
+      : super(DuplicateMutableAccountsProgramInstruction.allowsDuplicateMutable);
 
   final AllowsDuplicateMutableInstructionData data;
 }
 
 /// A parsed AllowsDuplicateReadonly instruction.
-final class ParsedAllowsDuplicateReadonly
-    extends ParsedDuplicateMutableAccountsProgramInstruction {
+final class ParsedAllowsDuplicateReadonly extends ParsedDuplicateMutableAccountsProgramInstruction {
   const ParsedAllowsDuplicateReadonly({required this.data})
-    : super(DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly);
+      : super(DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly);
 
   final AllowsDuplicateReadonlyInstructionData data;
 }
 
 /// Parses a DuplicateMutableAccountsProgram instruction.
-ParsedDuplicateMutableAccountsProgramInstruction
-parseDuplicateMutableAccountsProgramInstruction(Instruction instruction) {
+ParsedDuplicateMutableAccountsProgramInstruction parseDuplicateMutableAccountsProgramInstruction(
+  Instruction instruction,
+) {
   return switch (identifyDuplicateMutableAccountsProgramInstruction(
     instruction.data ?? Uint8List(0),
   )) {
-    DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable =>
-      ParsedFailsDuplicateMutable(
-        data: parseFailsDuplicateMutableInstruction(instruction),
-      ),
-    DuplicateMutableAccountsProgramInstruction.allowsDuplicateMutable =>
-      ParsedAllowsDuplicateMutable(
-        data: parseAllowsDuplicateMutableInstruction(instruction),
-      ),
-    DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly =>
-      ParsedAllowsDuplicateReadonly(
-        data: parseAllowsDuplicateReadonlyInstruction(instruction),
-      ),
+    DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable => ParsedFailsDuplicateMutable(
+      data: parseFailsDuplicateMutableInstruction(instruction),
+    ),
+    DuplicateMutableAccountsProgramInstruction.allowsDuplicateMutable => ParsedAllowsDuplicateMutable(
+      data: parseAllowsDuplicateMutableInstruction(instruction),
+    ),
+    DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly => ParsedAllowsDuplicateReadonly(
+      data: parseAllowsDuplicateReadonlyInstruction(instruction),
+    ),
   };
 }

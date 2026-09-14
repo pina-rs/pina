@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,16 +12,21 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the AccountReallocProgram program.
-const accountReallocProgramProgramAddress = Address(
-  'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
-);
+const accountReallocProgramProgramAddress = Address('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS');
 
 /// Known accounts for the AccountReallocProgram program.
-enum AccountReallocProgramAccount { sample }
+enum AccountReallocProgramAccount {
+  sample,
+}
 
 /// Known instructions for the AccountReallocProgram program.
-enum AccountReallocProgramInstruction { initialize, realloc, realloc2 }
+enum AccountReallocProgramInstruction {
+  initialize,
+  realloc,
+  realloc2,
+}
 
 /// Identifies the type of a AccountReallocProgram instruction.
 AccountReallocProgramInstruction identifyAccountReallocProgramInstruction(
@@ -36,10 +42,13 @@ AccountReallocProgramInstruction identifyAccountReallocProgramInstruction(
     return AccountReallocProgramInstruction.realloc2;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'accountReallocProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'accountReallocProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the AccountReallocProgram program.
@@ -52,7 +61,7 @@ sealed class ParsedAccountReallocProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedAccountReallocProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(AccountReallocProgramInstruction.initialize);
+      : super(AccountReallocProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -60,7 +69,7 @@ final class ParsedInitialize extends ParsedAccountReallocProgramInstruction {
 /// A parsed Realloc instruction.
 final class ParsedRealloc extends ParsedAccountReallocProgramInstruction {
   const ParsedRealloc({required this.data})
-    : super(AccountReallocProgramInstruction.realloc);
+      : super(AccountReallocProgramInstruction.realloc);
 
   final ReallocInstructionData data;
 }
@@ -68,7 +77,7 @@ final class ParsedRealloc extends ParsedAccountReallocProgramInstruction {
 /// A parsed Realloc2 instruction.
 final class ParsedRealloc2 extends ParsedAccountReallocProgramInstruction {
   const ParsedRealloc2({required this.data})
-    : super(AccountReallocProgramInstruction.realloc2);
+      : super(AccountReallocProgramInstruction.realloc2);
 
   final Realloc2InstructionData data;
 }

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,19 +12,25 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the CounterProgram program.
-const counterProgramProgramAddress = Address(
-  'GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS',
-);
+const counterProgramProgramAddress = Address('GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS');
 
 /// Known accounts for the CounterProgram program.
-enum CounterProgramAccount { counterState }
+enum CounterProgramAccount {
+  counterState,
+}
 
 /// Known instructions for the CounterProgram program.
-enum CounterProgramInstruction { initialize, increment }
+enum CounterProgramInstruction {
+  initialize,
+  increment,
+}
 
 /// Identifies the type of a CounterProgram instruction.
-CounterProgramInstruction identifyCounterProgramInstruction(Uint8List data) {
+CounterProgramInstruction identifyCounterProgramInstruction(
+  Uint8List data,
+) {
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return CounterProgramInstruction.initialize;
   }
@@ -31,10 +38,13 @@ CounterProgramInstruction identifyCounterProgramInstruction(Uint8List data) {
     return CounterProgramInstruction.increment;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'counterProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'counterProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the CounterProgram program.
@@ -47,7 +57,7 @@ sealed class ParsedCounterProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedCounterProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(CounterProgramInstruction.initialize);
+      : super(CounterProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -55,7 +65,7 @@ final class ParsedInitialize extends ParsedCounterProgramInstruction {
 /// A parsed Increment instruction.
 final class ParsedIncrement extends ParsedCounterProgramInstruction {
   const ParsedIncrement({required this.data})
-    : super(CounterProgramInstruction.increment);
+      : super(CounterProgramInstruction.increment);
 
   final IncrementInstructionData data;
 }

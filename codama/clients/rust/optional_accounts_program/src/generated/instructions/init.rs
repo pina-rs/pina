@@ -22,14 +22,10 @@ pub struct Init {
 }
 
 impl Init {
-	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey, store: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			store: solana_pubkey::Pubkey::find_program_address(
-				&["store".as_bytes(), authority.as_ref()],
-				&crate::OPTIONAL_ACCOUNTS_PROGRAM_ID,
-			)
-			.0,
+			store,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

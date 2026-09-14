@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,19 +12,26 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the TodoProgram program.
-const todoProgramProgramAddress = Address(
-  'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd',
-);
+const todoProgramProgramAddress = Address('Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd');
 
 /// Known accounts for the TodoProgram program.
-enum TodoProgramAccount { todoState }
+enum TodoProgramAccount {
+  todoState,
+}
 
 /// Known instructions for the TodoProgram program.
-enum TodoProgramInstruction { initialize, toggleCompleted, updateDigest }
+enum TodoProgramInstruction {
+  initialize,
+  toggleCompleted,
+  updateDigest,
+}
 
 /// Identifies the type of a TodoProgram instruction.
-TodoProgramInstruction identifyTodoProgramInstruction(Uint8List data) {
+TodoProgramInstruction identifyTodoProgramInstruction(
+  Uint8List data,
+) {
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return TodoProgramInstruction.initialize;
   }
@@ -34,10 +42,13 @@ TodoProgramInstruction identifyTodoProgramInstruction(Uint8List data) {
     return TodoProgramInstruction.updateDigest;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'todoProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'todoProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the TodoProgram program.
@@ -50,7 +61,7 @@ sealed class ParsedTodoProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedTodoProgramInstruction {
   const ParsedInitialize({required this.data})
-    : super(TodoProgramInstruction.initialize);
+      : super(TodoProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
@@ -58,7 +69,7 @@ final class ParsedInitialize extends ParsedTodoProgramInstruction {
 /// A parsed ToggleCompleted instruction.
 final class ParsedToggleCompleted extends ParsedTodoProgramInstruction {
   const ParsedToggleCompleted({required this.data})
-    : super(TodoProgramInstruction.toggleCompleted);
+      : super(TodoProgramInstruction.toggleCompleted);
 
   final ToggleCompletedInstructionData data;
 }
@@ -66,7 +77,7 @@ final class ParsedToggleCompleted extends ParsedTodoProgramInstruction {
 /// A parsed UpdateDigest instruction.
 final class ParsedUpdateDigest extends ParsedTodoProgramInstruction {
   const ParsedUpdateDigest({required this.data})
-    : super(TodoProgramInstruction.updateDigest);
+      : super(TodoProgramInstruction.updateDigest);
 
   final UpdateDigestInstructionData data;
 }

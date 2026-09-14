@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class AddTagInstructionData {
-  const AddTagInstructionData({required this.tag}) : discriminator = 2;
+  const AddTagInstructionData({
+    required this.tag,
+  }) :
+      discriminator = 2;
 
   final int discriminator;
   final BigInt tag;
@@ -41,21 +46,31 @@ Decoder<AddTagInstructionData> getAddTagInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'addTag instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'addTag instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (AddTagInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(2),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (AddTagInstructionData(tag: map['tag']! as BigInt), newOffset);
+    return (
+      AddTagInstructionData(
+      tag: map['tag']! as BigInt,
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -78,12 +93,8 @@ Decoder<AddTagInstructionData> getAddTagInstructionDataDecoder() {
   };
 }
 
-Codec<AddTagInstructionData, AddTagInstructionData>
-getAddTagInstructionDataCodec() {
-  return combineCodec(
-    getAddTagInstructionDataEncoder(),
-    getAddTagInstructionDataDecoder(),
-  );
+Codec<AddTagInstructionData, AddTagInstructionData> getAddTagInstructionDataCodec() {
+  return combineCodec(getAddTagInstructionDataEncoder(), getAddTagInstructionDataDecoder());
 }
 
 /// Creates a [AddTag] instruction.
@@ -93,13 +104,15 @@ Instruction getAddTagInstruction({
   required Address profile,
   required BigInt tag,
 }) {
-  final instructionData = AddTagInstructionData(tag: tag);
+  final instructionData = AddTagInstructionData(
+      tag: tag,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
-      AccountMeta(address: profile, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    AccountMeta(address: profile, role: AccountRole.writable),
     ],
     data: getAddTagInstructionDataEncoder().encode(instructionData),
   );

@@ -39,9 +39,9 @@ import {
 } from "../accounts";
 import {
 	getIncrementInstructionAsync,
-	getInitializeInstructionAsync,
+	getInitializeInstruction,
 	type IncrementAsyncInput,
-	type InitializeAsyncInput,
+	type InitializeInput,
 	type ParsedIncrementInstruction,
 	type ParsedInitializeInstruction,
 	parseIncrementInstruction,
@@ -149,10 +149,8 @@ export type CounterProgramPluginAccounts = {
 
 export type CounterProgramPluginInstructions = {
 	initialize: (
-		input: InitializeAsyncInput,
-	) =>
-		& ReturnType<typeof getInitializeInstructionAsync>
-		& SelfPlanAndSendFunctions;
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 	increment: (
 		input: IncrementAsyncInput,
 	) =>
@@ -180,7 +178,7 @@ export function counterProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstruction(input),
 						),
 					increment: (input) =>
 						addSelfPlanAndSendFunctions(

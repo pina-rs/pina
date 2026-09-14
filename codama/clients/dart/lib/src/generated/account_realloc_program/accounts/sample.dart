@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -12,13 +13,15 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class Sample {
   const Sample({
     required this.bump,
     required this.authority,
     required this.values,
-  }) : discriminator = 1;
+  }) :
+      discriminator = 1;
 
   final int discriminator;
   final int bump;
@@ -39,25 +42,16 @@ class Sample {
   int get hashCode => Object.hash(discriminator, bump, authority, values);
 
   @override
-  String toString() =>
-      'Sample(discriminator: $discriminator, bump: $bump, authority: $authority, values: $values)';
+  String toString() => 'Sample(discriminator: $discriminator, bump: $bump, authority: $authority, values: $values)';
 }
+
 
 Encoder<Sample> getSampleEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('authority', getAddressEncoder()),
-    (
-      'values',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU64Encoder(), (BigInt value) => value),
-          size: PrefixedArraySize(getU16Encoder()),
-        ),
-        64,
-      ),
-    ),
+    ('values', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU64Encoder(), (BigInt value) => value), size: PrefixedArraySize(getU16Encoder())), 64)),
   ]);
 
   return transformEncoder(
@@ -76,56 +70,53 @@ Decoder<Sample> getSampleDecoder() {
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('authority', getAddressDecoder()),
-    (
-      'values',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU64Decoder(),
-          size: PrefixedArraySize(getU16Decoder()),
-        ),
-        getPinaPodBoundedCountDecoder(getU16Decoder(), 64),
-        64,
-      ),
-    ),
+    ('values', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU64Decoder(), size: PrefixedArraySize(getU16Decoder())), getPinaPodBoundedCountDecoder(getU16Decoder(), 64), 64)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'sample account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'sample account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Sample, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
       Sample(
-        bump: map['bump']! as int,
-        authority: map['authority']! as Address,
-        values: map['values']! as List<BigInt>,
+      bump: map['bump']! as int,
+      authority: map['authority']! as Address,
+      values: map['values']! as List<BigInt>,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<Sample>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
-    VariableSizeDecoder<Map<String, Object?>>() => VariableSizeDecoder<Sample>(
-      read: readTopLevel,
-      maxSize: structDecoder.maxSize,
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<Sample>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
+    VariableSizeDecoder<Map<String, Object?>>() =>
+      VariableSizeDecoder<Sample>(
+        read: readTopLevel,
+        maxSize: structDecoder.maxSize,
+      ),
   };
 }
 
