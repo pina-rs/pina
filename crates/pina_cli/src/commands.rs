@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use atomic_write_file::AtomicWriteFile;
 use clap::CommandFactory;
 use clap_complete::generate;
 use comfy_table::Table;
@@ -17,6 +18,7 @@ use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
 use crate::cli::MigrationCommands;
 use crate::cli::ProfileCommands;
+use crate::cli::SnapshotViewArg;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
 use crate::idl_command;
@@ -39,6 +41,7 @@ pub(crate) fn run(cli: Cli) {
 			);
 		}
 		Commands::Lint { project, fix } => run_lint(project, fix),
+		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
 		Commands::Generate {
 			project,
@@ -1191,6 +1194,58 @@ pub(crate) fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pr
 	}
 
 	println!("{json}");
+}
+
+/// Directory holding committed CLI-surface baselines.
+const CLI_SNAPSHOT_DIR: &str = ".monochange/cli-snapshots";
+
+/// File name of the committed `pina` CLI-surface baseline.
+const CLI_SNAPSHOT_FILE: &str = "pina.json";
+
+/// Print or save the normalized CLI-surface snapshot.
+///
+/// The capture comes from clap's own command metadata, so it stays in step
+/// with the parser instead of a hand-maintained list. Release automation reads
+/// the committed baseline and diffs it against a fresh capture to classify
+/// changes to the command surface.
+fn run_snapshot(view: SnapshotViewArg, save: bool) {
+	let command = <Cli as CommandFactory>::command();
+	let snapshot = monochange_snapshot::snapshot_from_clap(&command).view(match view {
+		SnapshotViewArg::Full => monochange_snapshot::SnapshotView::Full,
+		SnapshotViewArg::Light => monochange_snapshot::SnapshotView::Light,
+		SnapshotViewArg::Index => monochange_snapshot::SnapshotView::Index,
+	});
+	let json = match snapshot.to_json() {
+		Ok(json) => json,
+		Err(error) => {
+			eprintln!("failed to render the CLI snapshot: {error}");
+			std::process::exit(1);
+		}
+	};
+
+	if !save {
+		print!("{json}");
+		return;
+	}
+
+	let path = Path::new(CLI_SNAPSHOT_DIR).join(CLI_SNAPSHOT_FILE);
+	if let Some(parent) = path.parent()
+		&& let Err(error) = fs::create_dir_all(parent)
+	{
+		eprintln!("failed to create {}: {error}", parent.display());
+		std::process::exit(1);
+	}
+	// A partially written baseline would make every later diff misleading, so
+	// the file is replaced only once the full capture is on disk.
+	let write = AtomicWriteFile::open(&path).and_then(|mut file| {
+		file.write_all(json.as_bytes())?;
+		file.commit()
+	});
+	if let Err(error) = write {
+		eprintln!("failed to write {}: {error}", path.display());
+		std::process::exit(1);
+	}
+	println!("Wrote {}", path.display());
 }
 
 fn run_docs(topic: Option<&str>) {

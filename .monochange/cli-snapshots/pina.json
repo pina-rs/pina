@@ -1,0 +1,3175 @@
+{
+	"schema_version": "0.1",
+	"kind": "cli-surface",
+	"tool": {
+		"name": "pina",
+		"version": "0.17.0"
+	},
+	"provenance": {
+		"extractor": "clap",
+		"confidence": "high"
+	},
+	"standard_entrypoints": {
+		"help": {
+			"commands": [
+				[
+					"help"
+				]
+			],
+			"flags": [
+				"--help",
+				"-h"
+			]
+		},
+		"version": {
+			"commands": [
+				[
+					"version"
+				]
+			],
+			"flags": [
+				"--version",
+				"-V"
+			]
+		},
+		"snapshot": {
+			"commands": [
+				[
+					"snapshot"
+				]
+			],
+			"flags": [
+				"--snapshot"
+			]
+		}
+	},
+	"commands": [
+		{
+			"path": [
+				"build"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Build the current Pina program for SBF and generate its IDL",
+			"description": "Build the current Pina program for SBF and generate its IDL.\n\nDiscovers the nearest pina.toml or Cargo package, runs the release SBF build, publishes the program at target/deploy/<program>.so, and writes the Codama IDL to target/idl/<program>.json. With --verify, solana-verify performs a deterministic Docker build and Pina records its inputs and hash.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--features"
+					],
+					"canonical_name": "--features",
+					"hidden": false,
+					"global": false,
+					"summary": "Program features to enable in addition to bpf-entrypoint. Repeat or use commas",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--no-default-features"
+					],
+					"canonical_name": "--no-default-features",
+					"hidden": false,
+					"global": false,
+					"summary": "Disable the program crate's default features for the SBF build",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--verify"
+					],
+					"canonical_name": "--verify",
+					"hidden": false,
+					"global": false,
+					"summary": "Build deterministically with solana-verify and Docker instead of Cargo directly",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--solana-verify"
+					],
+					"canonical_name": "--solana-verify",
+					"hidden": false,
+					"global": false,
+					"summary": "solana-verify 0.5.1 executable. Pina does not install it automatically",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "solana-verify"
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"lint"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Run Pina's official security lints against the current program",
+			"description": "Run Pina's official security lints against the current program.\n\nDiscovers the nearest pina.toml or Cargo package, resolves the `pina_lint_driver` binary shipped next to this CLI on supported platforms, and runs cargo check with the driver as `RUSTC_WORKSPACE_WRAPPER`. Lint levels configured in the [lints] table of pina.toml are honored. Use --fix to apply machine-applicable suggestions; review every resulting source change.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--fix"
+					],
+					"canonical_name": "--fix",
+					"hidden": false,
+					"global": false,
+					"summary": "Apply machine-applicable lint suggestions to the working tree",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"migrations"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Create and verify checked-in ABI migrations",
+			"description": "Create and verify checked-in ABI migrations.\n\n`make` snapshots the current desired schema. It rewrites an unpublished draft in place and advances only after that version has been published. `check` is the non-mutating build/CI gate. `status` reports the same checks.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"commands": [
+				{
+					"path": [
+						"migrations",
+						"sync"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Runs make -> build -> generate in one step: the default loop for unambiguous changes. Refuses with the same question payloads as `make` when the diff needs a disambiguation answer",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover. Defaults to the current directory",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--rename"
+							],
+							"canonical_name": "--rename",
+							"hidden": false,
+							"global": false,
+							"summary": "Answer an ambiguous rename with `--rename from:to` to preserve the field's stored data. Repeatable",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--assume-removed"
+							],
+							"canonical_name": "--assume-removed",
+							"hidden": false,
+							"global": false,
+							"summary": "Acknowledge that a removed field's stored data is discarded. Repeatable",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--no-interactive"
+							],
+							"canonical_name": "--no-interactive",
+							"hidden": false,
+							"global": false,
+							"summary": "Never prompt, even on a terminal; unanswered questions fail",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								],
+								"default": "false"
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Print the machine-readable result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								],
+								"default": "false"
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"migrations",
+						"inspect"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Inspect one on-chain account's migration envelope against the checked-in manifest. Exits non-zero when the account is stale or from the future",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover. Defaults to the current directory",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--url"
+							],
+							"canonical_name": "--url",
+							"hidden": false,
+							"global": false,
+							"summary": "JSON-RPC endpoint to read the account from",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "http://127.0.0.1:8899"
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Print the machine-readable record",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								],
+								"default": "false"
+							}
+						}
+					],
+					"positionals": [
+						{
+							"name": "address",
+							"hidden": false,
+							"summary": "Base58 address of the account to inspect",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"migrations",
+						"make"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Snapshot source changes and generate the adjacent transition",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--rename"
+							],
+							"canonical_name": "--rename",
+							"hidden": false,
+							"global": false,
+							"summary": "Answer an ambiguous rename with `--rename from:to` to preserve the field's stored data. Repeatable",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--assume-removed"
+							],
+							"canonical_name": "--assume-removed",
+							"hidden": false,
+							"global": false,
+							"summary": "Acknowledge that a removed field's stored data is discarded. Repeatable",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--no-interactive"
+							],
+							"canonical_name": "--no-interactive",
+							"hidden": false,
+							"global": false,
+							"summary": "Never prompt for disambiguation, even on a terminal",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"migrations",
+						"check"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Fail if source, process contracts, or transition files drifted",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"migrations",
+						"status"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Show the current version and publication state of every contract",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"migrations",
+						"reconcile"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Inspect or abandon an ambiguous pending deployment",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--abandon"
+							],
+							"canonical_name": "--abandon",
+							"hidden": false,
+							"global": false,
+							"summary": "Convert the pending deployment into an abandoned receipt. The pinned versions stay frozen because the deployment may still have gone live",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"generate"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Generate configured clients for the current Pina program",
+			"description": "Generate configured clients for the current Pina program.\n\nDiscovers the project, refreshes its IDL, and generates only the selected client ecosystems. Repeat --client to override pina.toml. CPI-only and Rust-only generation do not invoke Node.js.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--client"
+					],
+					"canonical_name": "--client",
+					"hidden": false,
+					"global": false,
+					"summary": "Client ecosystem to generate. Repeat to override pina.toml",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"cpi",
+							"rust",
+							"typescript",
+							"dart",
+							"cli-rust",
+							"cli-ts",
+							"cli-dart"
+						]
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Override the configured client output directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--mode"
+					],
+					"canonical_name": "--mode",
+					"hidden": false,
+					"global": false,
+					"summary": "Override how existing client destinations are handled",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"auto",
+							"create",
+							"update",
+							"overwrite"
+						]
+					}
+				},
+				{
+					"names": [
+						"--no-scaffold"
+					],
+					"canonical_name": "--no-scaffold",
+					"hidden": false,
+					"global": false,
+					"summary": "Generate source files without package manifests or crate entrypoints",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--npx"
+					],
+					"canonical_name": "--npx",
+					"hidden": false,
+					"global": false,
+					"summary": "Executable used to invoke JavaScript or Dart renderers. Defaults to npx",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "npx"
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"cpi"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Generate a standalone Pina CPI crate from a Codama or Anchor IDL",
+			"description": "Generate a standalone Pina CPI crate from a Codama or Anchor IDL.\n\nCodama IDLs are rendered natively. Anchor IDLs are normalized through Codama before the same Pina renderer runs. Use --stdin when a Codama visitor needs to pass its current, potentially transformed root node.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--idl"
+					],
+					"canonical_name": "--idl",
+					"hidden": false,
+					"global": false,
+					"summary": "Codama or Anchor IDL file to render",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--stdin"
+					],
+					"canonical_name": "--stdin",
+					"hidden": false,
+					"global": false,
+					"summary": "Read a normalized Codama root-node IDL from standard input",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory to create as the standalone CPI crate",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--mode"
+					],
+					"canonical_name": "--mode",
+					"hidden": false,
+					"global": false,
+					"summary": "How to handle an existing output directory",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"auto",
+							"create",
+							"update",
+							"overwrite"
+						],
+						"default": "auto"
+					}
+				},
+				{
+					"names": [
+						"--no-scaffold"
+					],
+					"canonical_name": "--no-scaffold",
+					"hidden": false,
+					"global": false,
+					"summary": "Generate source files without Cargo.toml or src/lib.rs",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--npx"
+					],
+					"canonical_name": "--npx",
+					"hidden": false,
+					"global": false,
+					"summary": "Executable used to normalize Anchor IDLs. Defaults to npx",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "npx"
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"idl"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Generate, inspect, and publish canonical Codama IDLs",
+			"description": "Generate, inspect, and publish canonical Codama IDLs.\n\nBare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. The generate subcommand spells that action explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--path",
+						"-p"
+					],
+					"canonical_name": "--path",
+					"hidden": false,
+					"global": false,
+					"summary": "Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Write the JSON document to FILE instead of stdout",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--name",
+						"-n"
+					],
+					"canonical_name": "--name",
+					"hidden": false,
+					"global": false,
+					"summary": "Override the program name inferred from Cargo.toml",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--compact"
+					],
+					"canonical_name": "--compact",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit compact JSON instead of the default pretty-printed JSON",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--pretty"
+					],
+					"canonical_name": "--pretty",
+					"hidden": true,
+					"global": false,
+					"summary": "Preserve compatibility with the former explicit pretty-print flag",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			],
+			"commands": [
+				{
+					"path": [
+						"idl",
+						"generate"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Generate a Codama IDL from local Pina source",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--path",
+								"-p"
+							],
+							"canonical_name": "--path",
+							"hidden": false,
+							"global": false,
+							"summary": "Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--output",
+								"-o"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write the JSON document to FILE instead of stdout",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--name",
+								"-n"
+							],
+							"canonical_name": "--name",
+							"hidden": false,
+							"global": false,
+							"summary": "Override the program name inferred from Cargo.toml",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--compact"
+							],
+							"canonical_name": "--compact",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit compact JSON instead of the default pretty-printed JSON",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--pretty"
+							],
+							"canonical_name": "--pretty",
+							"hidden": true,
+							"global": false,
+							"summary": "Preserve compatibility with the former explicit pretty-print flag",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"idl",
+						"fetch"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Fetch a direct zlib/UTF-8 canonical on-chain IDL for a deployed program",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--cluster"
+							],
+							"canonical_name": "--cluster",
+							"hidden": false,
+							"global": false,
+							"summary": "Solana cluster moniker or HTTP(S) RPC URL. This is always explicit",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Deployed program address. Inferred from the local IDL when omitted",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the local project used for program ID inference",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--output",
+								"-o"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write the fetched IDL to FILE instead of stdout",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result envelope",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--npx"
+							],
+							"canonical_name": "--npx",
+							"hidden": false,
+							"global": false,
+							"summary": "npx-compatible runner for the pinned official package. May download version 0.9.0",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "npx"
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"idl",
+						"diff"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Compare a local IDL with canonical on-chain metadata",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--cluster"
+							],
+							"canonical_name": "--cluster",
+							"hidden": false,
+							"global": false,
+							"summary": "Solana cluster moniker or HTTP(S) RPC URL. This is always explicit",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Deployed program address. Inferred from the local IDL when omitted",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the local project used for IDL generation and discovery",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--file"
+							],
+							"canonical_name": "--file",
+							"hidden": false,
+							"global": false,
+							"summary": "Compare FILE instead of generating the local project IDL",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable comparison result",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--npx"
+							],
+							"canonical_name": "--npx",
+							"hidden": false,
+							"global": false,
+							"summary": "npx-compatible runner for the pinned official package. May download version 0.9.0",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "npx"
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"idl",
+						"publish"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Create or update the canonical on-chain IDL metadata account",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--cluster"
+							],
+							"canonical_name": "--cluster",
+							"hidden": false,
+							"global": false,
+							"summary": "Solana cluster moniker or HTTP(S) RPC URL. This is always explicit",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Deployed program address. Inferred from the local IDL when omitted",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the local project used for IDL generation and discovery",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--file"
+							],
+							"canonical_name": "--file",
+							"hidden": false,
+							"global": false,
+							"summary": "Publish FILE instead of generating the local project IDL",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--authority"
+							],
+							"canonical_name": "--authority",
+							"hidden": false,
+							"global": false,
+							"summary": "Upgrade-authority keypair for direct publication",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--payer"
+							],
+							"canonical_name": "--payer",
+							"hidden": false,
+							"global": false,
+							"summary": "Fee and rent payer keypair. Defaults to --authority",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--export"
+							],
+							"canonical_name": "--export",
+							"hidden": false,
+							"global": false,
+							"summary": "Export every planned transaction instead of submitting. Optionally use ADDRESS as a noop multisig authority",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": false,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--output",
+								"-o"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write every exported transaction to FILE instead of stdout",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--export-encoding"
+							],
+							"canonical_name": "--export-encoding",
+							"hidden": false,
+							"global": false,
+							"summary": "Encoding for an exported multisig transaction",
+							"value": {
+								"kind": "enum",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"enum_values": [
+									"base58",
+									"base64"
+								],
+								"default": "base64"
+							}
+						},
+						{
+							"names": [
+								"--yes"
+							],
+							"canonical_name": "--yes",
+							"hidden": false,
+							"global": false,
+							"summary": "Skip the interactive publication confirmation",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a machine-readable result envelope",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--priority-fee"
+							],
+							"canonical_name": "--priority-fee",
+							"hidden": false,
+							"global": false,
+							"summary": "Priority fee in micro-lamports per compute unit",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "100000"
+							}
+						},
+						{
+							"names": [
+								"--npx"
+							],
+							"canonical_name": "--npx",
+							"hidden": false,
+							"global": false,
+							"summary": "npx-compatible runner for the pinned official package. May download version 0.9.0",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "npx"
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"docs"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Read bundled Pina reference documentation in the terminal",
+			"description": "Read bundled Pina reference documentation in the terminal.\n\nRun without TOPIC to list every bundled topic. Set `PINA_TEMPLATES_DIR` to a directory containing `<topic>.t.md` files to override or add topics.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"positionals": [
+				{
+					"name": "topic",
+					"hidden": false,
+					"summary": "Topic to render. Omit to list bundled topics",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"init"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Initialize a new Pina program project",
+			"description": "Initialize a new Pina program project.\n\nCreates a buildable program scaffold with Pina dependencies, source layout, and a starter instruction. Existing scaffold files are preserved unless --force is supplied.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--path",
+						"-p"
+					],
+					"canonical_name": "--path",
+					"hidden": false,
+					"global": false,
+					"summary": "Target directory. Defaults to `./<name>`",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--force"
+					],
+					"canonical_name": "--force",
+					"hidden": false,
+					"global": false,
+					"summary": "Overwrite scaffold files that already exist",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			],
+			"positionals": [
+				{
+					"name": "name",
+					"hidden": false,
+					"summary": "Rust package name for the new program, for example `counter_program`",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"keys"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Inspect or synchronize the current program's identity",
+			"description": "Inspect or synchronize the current program's identity.\n\nRun without a subcommand to compare the source `declare_id!` with the conventional local keypair. `pina keys sync` explicitly updates only that string literal after validating an unambiguous declaration and keypair.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--path",
+						"-p"
+					],
+					"canonical_name": "--path",
+					"hidden": false,
+					"global": true,
+					"summary": "Inspect or synchronize a specific program crate. Defaults to the nearest project",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--keypair"
+					],
+					"canonical_name": "--keypair",
+					"hidden": false,
+					"global": true,
+					"summary": "Use KEYPAIR instead of `target/deploy/<program>-keypair.json`",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": true,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			],
+			"commands": [
+				{
+					"path": [
+						"keys",
+						"show"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Show the source and local keypair program IDs without changing files",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					}
+				},
+				{
+					"path": [
+						"keys",
+						"sync"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Update the source `declare_id!` from a validated local keypair",
+					"description": "Update the source `declare_id!` from a validated local keypair.\n\nIt fails before writing when the keypair is missing or malformed, the address is invalid, or source contains zero or multiple declarations.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					}
+				},
+				{
+					"path": [
+						"keys",
+						"new"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Generate a local keypair and synchronize the source program ID",
+					"description": "Generate a local keypair and synchronize the source program ID.\n\nExisting keypairs are preserved unless --force explicitly authorizes identity rotation. Platforms where private permissions cannot be guaranteed fail before creating secret material.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--force"
+							],
+							"canonical_name": "--force",
+							"hidden": false,
+							"global": false,
+							"summary": "Replace an existing keypair and rotate the source program ID",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"doctor"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Diagnose the current project and development toolchain",
+			"description": "Diagnose the current project and development toolchain.\n\nChecks project discovery, source identity, conventional artifact paths, and relevant Rust, Solana, Surfpool, and configured client tools. Missing required prerequisites or a project produce an unsuccessful exit.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--path",
+						"-p"
+					],
+					"canonical_name": "--path",
+					"hidden": false,
+					"global": false,
+					"summary": "Diagnose the nearest program package at or above DIR",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"completions"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Generate shell completion scripts",
+			"description": "Generate shell completion scripts.\n\nWrites the selected completion script to stdout so it can be redirected, sourced, or installed by a package manager without temporary files.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"positionals": [
+				{
+					"name": "shell",
+					"hidden": false,
+					"summary": "Shell whose completion script should be generated",
+					"value": {
+						"kind": "enum",
+						"required": true,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"bash",
+							"elvish",
+							"fish",
+							"powershell",
+							"zsh"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"test"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Test a Pina program with fast native tests or an isolated Surfpool instance",
+			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Project directory or a directory below it. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--unit"
+					],
+					"canonical_name": "--unit",
+					"hidden": false,
+					"global": false,
+					"summary": "Run native Rust and Mollusk tests without building SBF or starting Surfpool",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--compatibility"
+					],
+					"canonical_name": "--compatibility",
+					"hidden": false,
+					"global": false,
+					"summary": "Verify migration history, then expose historical fixtures to the complete Surfpool suite",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--filter",
+						"-f"
+					],
+					"canonical_name": "--filter",
+					"hidden": false,
+					"global": false,
+					"summary": "Run only tests whose names contain FILTER",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"dev"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Start a persistent Surfpool development network with SBF watch and redeploy",
+			"description": "Start a persistent Surfpool development network with SBF watch and redeploy.\n\nBuilds the current SBF artifact once, then delegates the persistent process, file watching, and redeployment to `surfpool start --watch`. The network is offline by default; opt into an upstream cluster or RPC URL explicitly.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Project directory or a directory below it. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--network"
+					],
+					"canonical_name": "--network",
+					"hidden": false,
+					"global": false,
+					"summary": "Fork from mainnet, devnet, or testnet instead of using the offline default",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"mainnet",
+							"devnet",
+							"testnet"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rpc-url"
+					],
+					"canonical_name": "--rpc-url",
+					"hidden": false,
+					"global": false,
+					"summary": "Fork from a credential-free HTTP(S) RPC URL with a host",
+					"description": "Fork from a credential-free HTTP(S) RPC URL with a host.\n\nUser information, query parameters, fragments, and control characters are rejected. Surfpool receives the URL in its child-process arguments, so never put a secret anywhere in the URL, including its host or path. Prefer `--network` when possible.",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--yes"
+					],
+					"canonical_name": "--yes",
+					"hidden": false,
+					"global": false,
+					"summary": "Allow Surfpool to create or update txtx.yml without prompting",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"profile"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Profile compute-unit costs in a compiled SBF program",
+			"description": "Profile compute-unit costs in a compiled SBF program.\n\nPerforms static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Project used for artifact discovery when PROGRAM.SO is omitted",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit machine-readable JSON instead of the text report",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Write the report to FILE instead of stdout",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			],
+			"positionals": [
+				{
+					"name": "path",
+					"hidden": false,
+					"summary": "Compiled SBF shared object. Omit to discover the current project's artifact",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			],
+			"commands": [
+				{
+					"path": [
+						"profile",
+						"compare"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Compare the current artifact against a saved baseline profile report",
+					"description": "Compare the current artifact against a saved baseline profile report.\n\nProfiles the current artifact, loads BASELINE (a report written by `pina profile --json` or a versioned baseline document), and prints a delta-oriented summary sorted by impact. Exits 2 when the total CU regression reaches both --fail-cu and --fail-percent; exit 1 is reserved for operational errors.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Project used for artifact discovery when PROGRAM.SO is omitted",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit a stable machine-readable comparison document",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--fail-cu"
+							],
+							"canonical_name": "--fail-cu",
+							"hidden": false,
+							"global": false,
+							"summary": "Absolute total-CU increase that fails the comparison",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "500"
+							}
+						},
+						{
+							"names": [
+								"--fail-percent"
+							],
+							"canonical_name": "--fail-percent",
+							"hidden": false,
+							"global": false,
+							"summary": "Percentage total-CU increase that fails the comparison. Both limits must be reached",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "10"
+							}
+						}
+					],
+					"positionals": [
+						{
+							"name": "baseline",
+							"hidden": false,
+							"summary": "Saved profile report used as the comparison baseline",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"name": "path",
+							"hidden": false,
+							"summary": "Compiled SBF shared object. Omit to discover the current project's artifact",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"verify"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Verify deployed programs and publish source-build records",
+			"description": "Verify deployed programs and publish source-build records.\n\nUses the official solana-verify 0.5.1 executable. `check` is read-only; `record` is the only subcommand that writes on-chain state. Remote submission and status use the mainnet verifier service.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--solana-verify"
+					],
+					"canonical_name": "--solana-verify",
+					"hidden": false,
+					"global": false,
+					"summary": "solana-verify 0.5.1 executable. Pina never installs it",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "solana-verify"
+					}
+				}
+			],
+			"commands": [
+				{
+					"path": [
+						"verify",
+						"check"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Compare a local SBF executable with a deployed program",
+					"description": "Compare a local SBF executable with a deployed program.\n\nUses solana-verify's trailing-zero-aware executable and deployed-program hashes. Exits 0 on a match, 2 on a mismatch, and 1 on an operational error.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Deployed program address",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--cluster"
+							],
+							"canonical_name": "--cluster",
+							"hidden": false,
+							"global": false,
+							"summary": "Solana cluster alias or HTTP(S) RPC URL. Always explicit",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--program"
+							],
+							"canonical_name": "--program",
+							"hidden": false,
+							"global": false,
+							"summary": "Local SBF executable. Conflicts with --project discovery",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--project",
+								"-p"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory used to discover the executable. Defaults to the current directory",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"verify",
+						"record"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Build from an immutable repository revision and record verification metadata",
+					"description": "Build from an immutable repository revision and record verification metadata.\n\nThis writes on-chain state after the official repository build matches the deployed executable. The authority signs and pays transaction fees because solana-verify 0.5.1 does not support a separate payer.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Deployed program address",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--cluster"
+							],
+							"canonical_name": "--cluster",
+							"hidden": false,
+							"global": false,
+							"summary": "Solana cluster alias or HTTP(S) RPC URL. Always explicit",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--build-record"
+							],
+							"canonical_name": "--build-record",
+							"hidden": false,
+							"global": false,
+							"summary": "Content-addressed record produced by `pina build --verify`",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--authority"
+							],
+							"canonical_name": "--authority",
+							"hidden": false,
+							"global": false,
+							"summary": "Upgrade-authority keypair. It also pays fees with solana-verify 0.5.1",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--export"
+							],
+							"canonical_name": "--export",
+							"hidden": false,
+							"global": false,
+							"summary": "Export without submitting. Optionally provide a public authority address",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": false,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--output"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write only the validated encoded transaction payload to FILE",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--export-encoding"
+							],
+							"canonical_name": "--export-encoding",
+							"hidden": false,
+							"global": false,
+							"summary": "Encoding for the exported transaction: base64 or base58",
+							"value": {
+								"kind": "enum",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"enum_values": [
+									"base64",
+									"base58"
+								]
+							}
+						},
+						{
+							"names": [
+								"--yes"
+							],
+							"canonical_name": "--yes",
+							"hidden": false,
+							"global": false,
+							"summary": "Confirm recording without an interactive prompt. Has no effect on export",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--acknowledge-mainnet"
+							],
+							"canonical_name": "--acknowledge-mainnet",
+							"hidden": false,
+							"global": false,
+							"summary": "Acknowledge submission to mainnet or an unknown remote endpoint",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"verify",
+						"submit"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Submit an existing on-chain verification record to the mainnet remote verifier",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Program address whose recorded build should be verified",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--uploader"
+							],
+							"canonical_name": "--uploader",
+							"hidden": false,
+							"global": false,
+							"summary": "Public address that uploaded the verification record",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"verify",
+						"status"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Read the mainnet remote-verifier status for a program",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--program-id"
+							],
+							"canonical_name": "--program-id",
+							"hidden": false,
+							"global": false,
+							"summary": "Program address to inspect",
+							"value": {
+								"kind": "string",
+								"required": true,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"deploy"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Deploy a compiled Pina program through the Solana CLI",
+			"description": "Deploy a compiled Pina program through the Solana CLI.\n\nResolves the program artifact from a Cargo program crate or an explicit --program path, validates every keypair, prints the complete plan, and invokes `solana program deploy`. A cluster or RPC URL is always required. Remote writes require confirmation or --yes; mainnet also requires --allow-mainnet. Custom remote URLs require the same acknowledgement because their cluster identity cannot be proven.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory used for pina.toml or Cargo metadata project discovery",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--program"
+					],
+					"canonical_name": "--program",
+					"hidden": false,
+					"global": false,
+					"summary": "Existing SBF shared object. Conflicts with --build",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--build"
+					],
+					"canonical_name": "--build",
+					"hidden": false,
+					"global": false,
+					"summary": "Run Pina's project-aware SBF build before final deployment planning",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--program-keypair"
+					],
+					"canonical_name": "--program-keypair",
+					"hidden": false,
+					"global": false,
+					"summary": "Keypair whose public key is the deployed program address",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--upgrade-authority"
+					],
+					"canonical_name": "--upgrade-authority",
+					"hidden": false,
+					"global": false,
+					"summary": "Keypair authorized to upgrade the deployed program",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--payer"
+					],
+					"canonical_name": "--payer",
+					"hidden": false,
+					"global": false,
+					"summary": "Keypair that pays the deployment transaction fees",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--cluster"
+					],
+					"canonical_name": "--cluster",
+					"hidden": false,
+					"global": false,
+					"summary": "Named cluster or explicit HTTP(S) RPC URL. No target is selected by default",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--dry-run"
+					],
+					"canonical_name": "--dry-run",
+					"hidden": false,
+					"global": false,
+					"summary": "Print the resolved deployment plan without building or deploying",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit the dry-run plan as JSON. Requires --dry-run",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--yes"
+					],
+					"canonical_name": "--yes",
+					"hidden": false,
+					"global": false,
+					"summary": "Skip the remote deployment confirmation prompt",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--allow-mainnet"
+					],
+					"canonical_name": "--allow-mainnet",
+					"hidden": false,
+					"global": false,
+					"summary": "Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--record-publication"
+					],
+					"canonical_name": "--record-publication",
+					"hidden": false,
+					"global": false,
+					"summary": "Record migration publication receipts even for loopback targets. Useful for exercising the full publication lifecycle against a local network such as Surfpool",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--remote-command"
+					],
+					"canonical_name": "--remote-command",
+					"hidden": false,
+					"global": false,
+					"summary": "Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`, `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"codama"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Run Codama IDL and client-generation workflows",
+			"description": "Run Codama IDL and client-generation workflows.\n\nUse the generate subcommand to extract every selected program IDL and render the corresponding Rust, JavaScript, and Dart clients.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"commands": [
+				{
+					"path": [
+						"codama",
+						"generate"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Generate IDLs and Rust, JavaScript, and Dart clients",
+					"description": "Generate IDLs and Rust, JavaScript, and Dart clients.\n\nDiscovers Pina programs below `EXAMPLES_DIR`, optionally filters them with repeatable --example arguments, writes IDLs, and renders all four client targets. The command fails when a requested example does not exist or a renderer exits unsuccessfully.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--examples-dir"
+							],
+							"canonical_name": "--examples-dir",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory containing Pina program crates. Defaults to `examples`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "examples"
+							}
+						},
+						{
+							"names": [
+								"--idls-dir"
+							],
+							"canonical_name": "--idls-dir",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory for generated Codama IDL JSON files. Defaults to `codama/idls`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "codama/idls"
+							}
+						},
+						{
+							"names": [
+								"--rust-out"
+							],
+							"canonical_name": "--rust-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory for generated Rust client crates. Defaults to `codama/clients/rust`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "codama/clients/rust"
+							}
+						},
+						{
+							"names": [
+								"--cpi-out"
+							],
+							"canonical_name": "--cpi-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory for generated CPI crates. Defaults to `codama/clients/cpi`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "codama/clients/cpi"
+							}
+						},
+						{
+							"names": [
+								"--js-out"
+							],
+							"canonical_name": "--js-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory for generated JavaScript client packages. Defaults to `codama/clients/js`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "codama/clients/js"
+							}
+						},
+						{
+							"names": [
+								"--dart-out"
+							],
+							"canonical_name": "--dart-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory for the generated Dart client package. Defaults to `codama/clients/dart`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "codama/clients/dart"
+							}
+						},
+						{
+							"names": [
+								"--cli-rust-out"
+							],
+							"canonical_name": "--cli-rust-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Output directory for generated Rust CLI crates. Omit to skip CLI generation",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--cli-ts-out"
+							],
+							"canonical_name": "--cli-ts-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Output directory for generated TypeScript CLI applications. Omit to skip CLI generation",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--cli-dart-out"
+							],
+							"canonical_name": "--cli-dart-out",
+							"hidden": false,
+							"global": false,
+							"summary": "Output directory for the generated Dart CLI package. Omit to skip CLI generation",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--example"
+							],
+							"canonical_name": "--example",
+							"hidden": false,
+							"global": false,
+							"summary": "Program name to generate. Repeat to select multiple programs. When omitted, every program below --examples-dir is generated",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--npx"
+							],
+							"canonical_name": "--npx",
+							"hidden": false,
+							"global": false,
+							"summary": "Executable used to invoke the Codama JavaScript renderers. Defaults to `npx`",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "npx"
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

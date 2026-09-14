@@ -90,6 +90,11 @@ type = "cargo"
 [package.pina_cli]
 path = "crates/pina_cli"
 type = "cargo"
+# Register the shipped binary so change classification diffs its command
+# surface against the committed baseline instead of reporting the package as
+# an unknown change. `cargo run` keeps the snapshot on the workspace's own
+# source rather than a stale installed CLI.
+cli = { name = "pina", snapshot = "cargo run --quiet --locked --package pina_cli --bin pina -- snapshot" }
 
 [package.pina_cli_renderer]
 path = "crates/pina_cli_renderer"
