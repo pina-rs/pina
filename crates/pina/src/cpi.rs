@@ -451,7 +451,7 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.allocate_and_initialize::<T, _>(signers, rent, initialize)
+		.allocate_and_initialize::<T, _>(BumpVerification::Proven, signers, rent, initialize)
 	}
 }
 
@@ -580,7 +580,8 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
-		verify_supplied_bump_address(self.account, self.seeds, self.owner, self.bump)?;
+		// One derivation inside the allocate path is this builder's whole
+		// verification, so nothing proves the bump before it.
 		PdaCreationTarget {
 			account: &mut *self.account,
 			payer: self.payer,
@@ -588,8 +589,23 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.allocate_and_initialize::<T, _>(signers, rent, initialize)
+		.allocate_and_initialize::<T, _>(
+			BumpVerification::DeriveAndCheck,
+			signers,
+			rent,
+			initialize,
+		)
 	}
+}
+
+/// How a creation builder proved that `seeds` plus `bump` describe `account`.
+#[derive(Copy, Clone)]
+enum BumpVerification {
+	/// A canonical search or explicit assertion already proved the bump.
+	Proven,
+	/// Derive the address from `seeds` plus `bump` and reject a mismatch;
+	/// this is the unchecked builder's whole verification.
+	DeriveAndCheck,
 }
 
 /// The account fields both PDA creation builders carry, once their
@@ -614,13 +630,14 @@ struct PdaCreationTarget<'account, 'address, 'seeds, 'seed> {
 impl PdaCreationTarget<'_, '_, '_, '_> {
 	/// Allocates the PDA and writes `T`'s discriminator.
 	///
-	/// Each builder establishes that its fields describe one proven PDA its own
-	/// way — [`canonical_pda`] by searching for the highest valid bump,
-	/// [`verify_supplied_bump_address`] by checking a single derivation — and
-	/// this performs the checked allocate plus initialization.
+	/// Each builder establishes that its fields describe one PDA its own way —
+	/// [`canonical_pda`] by searching for the highest valid bump,
+	/// [`BumpVerification::DeriveAndCheck`] by checking a single derivation —
+	/// and this performs the checked allocate plus initialization.
 	#[inline(always)]
 	fn allocate_and_initialize<T: PinaAccount, F>(
 		&mut self,
+		verification: BumpVerification,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
 		initialize: F,
@@ -633,52 +650,28 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 			return Err(ProgramError::AccountAlreadyInitialized);
 		}
 
-		AllocateAccountWithNonCanonicalBump {
+		let allocate = AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
 			space: size_of::<T::Zc>() as u64,
 			owner: self.owner,
 			seeds: self.seeds,
 			bump: self.bump,
+		};
+		match verification {
+			BumpVerification::Proven => {
+				allocate.invoke_signed_inner_validated(signers, rent)?;
+			}
+			BumpVerification::DeriveAndCheck => {
+				allocate.invoke_signed_inner(signers, rent)?;
+			}
 		}
-		.invoke_signed_inner_validated(signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
 		<T as PinaAccount>::initialize(&mut data, initialize)?;
 
 		Ok(())
 	}
-}
-
-/// Checks that `seeds` plus `bump` derive exactly `account`'s address.
-///
-/// One [`crate::create_program_address`] call replaces the canonical bump search,
-/// which costs roughly 9,000 additional compute units per creation. This
-/// proves the account sits at the address these seeds and this bump produce;
-/// it does not prove `bump` is the highest valid seed, so a non-canonical bump
-/// creates a second address for the same namespace.
-#[inline(always)]
-fn verify_supplied_bump_address(
-	account: &AccountView,
-	seeds: &[&[u8]],
-	owner: &Address,
-	bump: u8,
-) -> ProgramResult {
-	if seeds.len() >= MAX_SEEDS {
-		return Err(ProgramError::InvalidSeeds);
-	}
-
-	let bump_seed = [bump];
-	let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
-	derivation_seeds[..seeds.len()].copy_from_slice(seeds);
-	derivation_seeds[seeds.len()] = bump_seed.as_slice();
-	let expected = crate::create_program_address(&derivation_seeds[..=seeds.len()], owner)?;
-
-	if account.address() != &expected {
-		return Err(ProgramError::InvalidSeeds);
-	}
-
-	Ok(())
 }
 
 /// Creates and initializes a variable-length PDA-backed account.
