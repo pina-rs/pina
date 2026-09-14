@@ -83,14 +83,7 @@ pub(crate) fn validate_fixed_schema(
 		let native = &audited.native;
 		let pod = &audited.pod;
 
-		field_proofs.push(mapping_proof(
-			source,
-			native,
-			pod,
-			audited.rewritten.as_ref(),
-			audited.identity,
-			crate_path,
-		));
+		field_proofs.push(mapping_proof(source, native, pod, crate_path));
 		field_sizes.push(quote!(::core::mem::size_of::<#pod>()));
 	}
 
@@ -186,14 +179,7 @@ pub(crate) fn validate_compact_schema(
 
 				let source = &field.ty;
 				let pod = &audited.pod;
-				field_proofs.push(mapping_proof(
-					source,
-					&audited.native,
-					pod,
-					audited.rewritten.as_ref(),
-					audited.identity,
-					crate_path,
-				));
+				field_proofs.push(mapping_proof(source, &audited.native, pod, crate_path));
 				header_sizes.push(quote!(::core::mem::size_of::<#pod>()));
 			}
 			CompactField::String {
@@ -208,8 +194,6 @@ pub(crate) fn validate_compact_schema(
 					&source,
 					&audited.native,
 					&audited.pod,
-					audited.rewritten.as_ref(),
-					audited.identity,
 					crate_path,
 				));
 				header_sizes.push(if optional {
@@ -246,8 +230,6 @@ pub(crate) fn validate_compact_schema(
 					&element_source,
 					&element.native,
 					pod,
-					element.rewritten.as_ref(),
-					element.identity,
 					crate_path,
 				));
 				header_sizes.push(if optional {
@@ -565,28 +547,19 @@ fn mapping_proof(
 	source: &Type,
 	native: &proc_macro2::TokenStream,
 	pod: &proc_macro2::TokenStream,
-	rewritten: Option<&proc_macro2::TokenStream>,
-	identity: bool,
 	crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
-	// Float fields are rewritten to their alignment-one pods before the
-	// schema reaches the `PinaPod` derive, so the trait mapping must bind the
-	// rewritten type: `ZcField` is implemented for `pina::PodF32`/`PodF64`
-	// (local pods), never for the foreign `f32`/`f64` primitives.
-	let source_tokens = quote!(#source);
-	let derived = rewritten.unwrap_or(&source_tokens);
-	let identity_proof = identity.then(|| {
-		quote! { const _: fn(#source) -> #native = |value| value; }
-	});
-
+	// `pinapod` implements `ZcField` for every accepted field type, including
+	// the `f32`/`f64` primitives, so each field keeps its own spelling all the
+	// way to the derive.
 	quote! {
-		#identity_proof
+		const _: fn(#source) -> #native = |value| value;
 
 		const _: fn() = || {
 			fn assert_mapping<T: #crate_path::ZcField<Pod = #pod>>() {}
 			fn assert_storage<T: #crate_path::ZcElem>() {}
 
-			assert_mapping::<#derived>();
+			assert_mapping::<#source>();
 			assert_storage::<#pod>();
 		};
 
@@ -603,66 +576,6 @@ fn compact_supported_error(ty: &Type) -> syn::Error {
 		 fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, \
 		 N>`; `Option<T>` is supported inline when `T` has a fixed representation",
 	)
-}
-
-/// Replace float primitives with their Pina pods in the emitted schema.
-///
-/// The closed grammar classifies `f32`/`f64` fields to `PodF32`/`PodF64`
-/// storage, and the `PinaPod` derive expands over the emitted struct's field
-/// types. `ZcField` cannot be implemented for the foreign float primitives,
-/// so the derive must see the pod spellings; the mapping proofs above bind
-/// exactly these rewritten types.
-pub(crate) fn rewrite_float_fields(item: &mut ItemStruct, crate_path: &syn::Path) {
-	let Fields::Named(fields) = &mut item.fields else {
-		return;
-	};
-	for field in &mut fields.named {
-		rewrite_float_type(&mut field.ty, crate_path);
-	}
-}
-
-fn rewrite_float_type(ty: &mut Type, crate_path: &syn::Path) {
-	if replace_float_primitive(ty, crate_path) {
-		return;
-	}
-	match ty {
-		Type::Path(type_path) => {
-			let Some(segment) = type_path.path.segments.last_mut() else {
-				return;
-			};
-			let PathArguments::AngleBracketed(arguments) = &mut segment.arguments else {
-				return;
-			};
-			for argument in &mut arguments.args {
-				if let GenericArgument::Type(inner) = argument {
-					rewrite_float_type(inner, crate_path);
-				}
-			}
-		}
-		Type::Group(group) => rewrite_float_type(&mut group.elem, crate_path),
-		Type::Paren(paren) => rewrite_float_type(&mut paren.elem, crate_path),
-		_ => {}
-	}
-}
-
-fn replace_float_primitive(ty: &mut Type, crate_path: &syn::Path) -> bool {
-	let Type::Path(type_path) = ty else {
-		return false;
-	};
-	if type_path.qself.is_some() {
-		return false;
-	}
-	let Some(segment) = type_path.path.segments.last() else {
-		return false;
-	};
-	let pod = match (segment.ident.to_string().as_str(), &segment.arguments) {
-		("f32", PathArguments::None) => "PodF32",
-		("f64", PathArguments::None) => "PodF64",
-		_ => return false,
-	};
-	let pod = proc_macro2::Ident::new(pod, segment.ident.span());
-	*ty = syn::parse_quote!(#crate_path::#pod);
-	true
 }
 
 fn compact_prefix_proof(
@@ -697,24 +610,11 @@ fn compact_vec_proof(
 struct AuditedField {
 	native: proc_macro2::TokenStream,
 	pod: proc_macro2::TokenStream,
-	/// The source type with float primitives replaced by their Pina pods;
-	/// this is what the emitted schema carries and what the `ZcField` proof
-	/// must bind. `None` for every non-float field.
-	rewritten: Option<proc_macro2::TokenStream>,
-	/// Whether `fn(source) -> native` is a well-formed identity. Float
-	/// vectors skip it: the `Vec<T, N>` alias normalizes through
-	/// `T: ZcField`, so `Vec<f32, N>` is ill-formed in generated tokens.
-	identity: bool,
 }
 
 impl AuditedField {
 	fn new(native: proc_macro2::TokenStream, pod: proc_macro2::TokenStream) -> Self {
-		Self {
-			native,
-			pod,
-			rewritten: None,
-			identity: true,
-		}
+		Self { native, pod }
 	}
 }
 
@@ -982,45 +882,25 @@ fn classify_vec(
 	let Some(GenericArgument::Type(element)) = arguments.args.first() else {
 		return Err(unsupported(ty));
 	};
-	let element = classify_fixed_type(element, crate_path)?;
-	let element_native = element.native;
-	let element_is_float = element.rewritten.is_some();
-	let storage_element = element
-		.rewritten
-		.clone()
-		.unwrap_or_else(|| element_native.clone());
+	let element_native = classify_fixed_type(element, crate_path)?.native;
 	let capacity = literal_const_argument(arguments.args.iter().nth(1), ty, "vector capacity")?;
 	let prefix_size = if is_alias {
 		2
 	} else {
 		literal_prefix_argument(arguments.args.iter().nth(2), 2, ty)?
 	};
-
-	// Float vectors never spell the source element inside the `Vec` alias:
-	// `Vec<T, N>` normalizes through `T: ZcField`, which no float primitive
-	// implements. The storage spelling carries the pod element instead.
-	let (native, pod) = if element_is_float {
-		let storage = if is_alias {
-			quote!(#crate_path::Vec<#storage_element, #capacity>)
-		} else {
-			quote!(#crate_path::PodVec<#storage_element, #capacity, #prefix_size>)
-		};
-		(storage.clone(), storage)
+	// `pinapod`'s `Vec<T, N>` alias normalizes through `T: ZcField`, and that
+	// mapping exists for every accepted element type, so the alias can carry
+	// the element exactly as declared.
+	let native = if is_alias {
+		quote!(#crate_path::Vec<#element_native, #capacity>)
 	} else {
-		let native = if is_alias {
-			quote!(#crate_path::Vec<#element_native, #capacity>)
-		} else {
-			quote!(#crate_path::PodVec<#element_native, #capacity, #prefix_size>)
-		};
-		(native.clone(), native)
+		quote!(#crate_path::PodVec<#element_native, #capacity, #prefix_size>)
 	};
 
-	let rewritten = element_is_float.then(|| pod.clone());
 	Ok(AuditedField {
-		native,
-		pod,
-		rewritten,
-		identity: !element_is_float,
+		native: native.clone(),
+		pod: native,
 	})
 }
 
@@ -1048,15 +928,10 @@ fn classify_option(
 	let audited = classify_fixed_type(inner, crate_path)?;
 	let native_inner = audited.native;
 	let pod_inner = audited.pod;
-	let rewritten = audited
-		.rewritten
-		.map(|inner| quote!(::core::option::Option<#inner>));
 
 	Ok(AuditedField {
 		native: quote!(::core::option::Option<#native_inner>),
 		pod: quote!(#crate_path::PodOption<#pod_inner>),
-		rewritten,
-		identity: true,
 	})
 }
 
@@ -1074,8 +949,8 @@ fn classify_scalar(segment: &syn::PathSegment, crate_path: &syn::Path) -> Option
 		"bool" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodBool)),
 		// Float fields convert to and from their bit pattern under the hood;
 		// storage is the alignment-one `PodF32`/`PodF64` byte container.
-		"f32" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodF32)).with_rewrite(),
-		"f64" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodF64)).with_rewrite(),
+		"f32" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodF32)),
+		"f64" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodF64)),
 		_ => return None,
 	})
 }
@@ -1089,18 +964,6 @@ fn audited_direct_scalar(ident: &syn::Ident) -> AuditedField {
 
 fn audited_native_scalar(ident: &syn::Ident, pod: proc_macro2::TokenStream) -> AuditedField {
 	AuditedField::new(quote!(::core::primitive::#ident), pod)
-}
-
-impl AuditedField {
-	/// Marks a scalar field whose native type is a foreign float primitive:
-	/// the emitted schema stores the pod spelling, and the `ZcField` proof
-	/// binds the pod instead of the primitive.
-	fn with_rewrite(self) -> AuditedField {
-		Self {
-			rewritten: Some(self.pod.clone()),
-			..self
-		}
-	}
 }
 
 fn is_integer_literal(expr: &Expr) -> bool {
@@ -1298,78 +1161,46 @@ mod tests {
 		for (source, pod) in [("f32", "pina :: PodF32"), ("f64", "pina :: PodF64")] {
 			let audited = classify_spelled(source)
 				.unwrap_or_else(|error| panic!("`{source}` should classify: {error}"));
+			// The field keeps its own spelling; `pinapod` supplies the mapping.
+			assert_eq!(
+				audited.native.to_string(),
+				format!(":: core :: primitive :: {source}")
+			);
 			assert_eq!(audited.pod.to_string(), pod);
-			let rewritten = audited
-				.rewritten
-				.unwrap_or_else(|| panic!("`{source}` must record its rewritten pod type"));
-			assert_eq!(rewritten.to_string(), pod);
 		}
 	}
 
 	#[test]
 	fn classifies_floats_inside_collections() {
+		// `pinapod` implements `ZcField` for `f32`/`f64`, so the `Vec<T, N>`
+		// alias normalizes the element straight through.
 		let vector = classify_spelled("Vec<f32, 4>")
 			.unwrap_or_else(|error| panic!("float vector should classify: {error}"));
-		// The native spelling must itself be well-formed: the `Vec` alias
-		// normalizes through `T: ZcField`, so it carries the pod element.
 		assert_eq!(
 			vector.native.to_string(),
-			"pina :: Vec < pina :: PodF32 , 4 >"
+			"pina :: Vec < :: core :: primitive :: f32 , 4 >"
 		);
-		assert_eq!(vector.pod.to_string(), "pina :: Vec < pina :: PodF32 , 4 >");
-		assert!(!vector.identity, "float vectors skip the identity proof");
+		assert_eq!(
+			vector.pod.to_string(),
+			"pina :: Vec < :: core :: primitive :: f32 , 4 >"
+		);
 
+		// `Option<T>` stores the mapped pod payload, so the pod spelling names
+		// `PodF64` while the native spelling keeps the primitive.
 		let option = classify_spelled("Option<f64>")
 			.unwrap_or_else(|error| panic!("float option should classify: {error}"));
+		assert_eq!(
+			option.native.to_string(),
+			":: core :: option :: Option < :: core :: primitive :: f64 >"
+		);
 		assert_eq!(
 			option.pod.to_string(),
 			"pina :: PodOption < pina :: PodF64 >"
 		);
-		assert_eq!(
-			option
-				.rewritten
-				.expect("float option records its rewrite")
-				.to_string(),
-			":: core :: option :: Option < pina :: PodF64 >"
-		);
 	}
 
 	#[test]
-	fn rewrites_float_fields_in_emitted_schemas() {
-		let crate_path: syn::Path = syn::parse_quote!(pina);
-		let mut item: ItemStruct = syn::parse_quote! {
-			struct Mixed {
-				temperature: f32,
-				depth: f64,
-				count: u64,
-				values: Vec<f32, 2>,
-			}
-		};
-		super::rewrite_float_fields(&mut item, &crate_path);
-
-		let Fields::Named(fields) = &item.fields else {
-			panic!("named fields");
-		};
-		let rendered: Vec<String> = fields
-			.named
-			.iter()
-			.map(|field| field.ty.to_token_stream().to_string())
-			.collect();
-		assert_eq!(
-			rendered,
-			[
-				"pina :: PodF32",
-				"pina :: PodF64",
-				"u64",
-				// The user's own `Vec` spelling is preserved; only the float
-				// element is replaced by its pod.
-				"Vec < pina :: PodF32 , 2 >",
-			]
-		);
-	}
-
-	#[test]
-	fn float_schema_proofs_bind_the_rewritten_pod() {
+	fn float_schema_proofs_bind_the_native_spelling() {
 		let crate_path: syn::Path = syn::parse_quote!(pina);
 		let item: ItemStruct = syn::parse_quote! {
 			struct FloatState {

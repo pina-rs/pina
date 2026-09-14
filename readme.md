@@ -208,7 +208,8 @@ That last count-parity check is important because it catches silent extraction r
 | `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)   |
 | `logs`           | Yes     | Enables on-chain logging via `solana-program-log`            |
 | `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
-| `floats`         | No      | Enables `f32`/`f64` and fixed-point schema fields            |
+| `floats`         | No      | Enables `f32`/`f64` schema fields                            |
+| `fixed`          | No      | Enables fixed-point `FixedI*`/`FixedU*` schema fields        |
 | `validation`     | No      | Enables declarative, allocation-free application validation  |
 | `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
 | `memo`           | No      | Enables memo program helpers via `pina::memo`                |
@@ -224,7 +225,8 @@ That last count-parity check is important because it catches silent extraction r
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
 - `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
-- `floats` enables `f32` and `f64` schema fields, stored as their bit pattern through `pina::PodF32` and `pina::PodF64`, and fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate that Pina re-exports as `pina::fixed`. It also enables `derive`.
+- `floats` enables IEEE-754 `f32` and `f64` schema fields, stored as their bit pattern through the `pina::PodF32` and `pina::PodF64` pods from `pinapod`. It also enables `derive`.
+- `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` schema fields from the pinned `fixed` crate, which Pina re-exports as `pina::fixed`. It also enables `derive`.
 - `validation` enables `PinaValidate` and `#[pina(validate(...))]` rules on accounts, instructions, events, and derived account lists. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
@@ -733,7 +735,7 @@ Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solan
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are alignment-one byte-backed values that implement PinaPod's `ZcElem` and `ZcValidate` contracts.
+All types are alignment-one byte-backed values that implement PinaPod's `ZcElem` and `ZcValidate` contracts. The `floats` feature adds `PodF32` and `PodF64`, which store IEEE-754 bit patterns in four and eight bytes; they validate any bit pattern and decode an all-zero field as `+0.0`.
 
 <!-- {/podTypesTable} -->
 

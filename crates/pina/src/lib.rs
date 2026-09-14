@@ -30,6 +30,12 @@
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `compact` — enables compact account schemas, checked loaders, and typed
 //!   account APIs. This also enables `derive`.
+//! - `floats` — enables IEEE-754 `f32` and `f64` schema fields, stored as
+//!   their bit pattern through `PodF32` and `PodF64`. This also enables
+//!   `derive`.
+//! - `fixed` — enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` schema
+//!   fields from the pinned `fixed` crate, re-exported as `pina::fixed`. This
+//!   also enables `derive`.
 //! - `validation` — enables `PinaValidate` and declarative
 //!   `#[pina(validate(...))]` rules. This also enables `derive`.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
@@ -63,13 +69,13 @@ mod utils;
 #[cfg(kani)]
 mod verification;
 
-/// Re-export of the pinned [`fixed`] crate behind the `floats` feature.
+/// Re-export of the pinned [`fixed`] crate behind the `fixed` feature.
 ///
 /// Fixed-point schema fields must use this exact crate instance: `pinapod`
 /// pins `fixed =1.30.0`, and a `ZcField` implementation for a different
 /// `fixed` build does not exist. Deriving schemas over `pina::fixed` types
 /// removes the version-mismatch failure mode entirely.
-#[cfg(feature = "floats")]
+#[cfg(feature = "fixed")]
 pub use fixed;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
@@ -82,13 +88,6 @@ pub use pina_macros::*;
 /// manual trait implementations are outside that contract and must uphold
 /// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
-/// Alignment-one float storage for `f32` and `f64` schema fields.
-#[cfg(feature = "floats")]
-mod floats;
-#[cfg(feature = "floats")]
-pub use floats::PodF32;
-#[cfg(feature = "floats")]
-pub use floats::PodF64;
 /// Derives a validated zero-copy companion for a native schema.
 pub use pinapod::PinaPod;
 /// Zero-copy access for compact (variable-length) types.
@@ -111,6 +110,20 @@ pub use pinapod::ZcElem;
 pub use pinapod::ZcField;
 /// Validation trait for stored (pod) types.
 pub use pinapod::ZcValidate;
+/// Alignment-one storage for an IEEE-754 `f32` schema field.
+///
+/// A schema declares `f32`; Pina maps it to this pod so the field is stored
+/// as its little-endian bit pattern, and the generated accessors still take
+/// and return the native float.
+#[cfg(feature = "floats")]
+pub use pinapod::pod::PodF32;
+/// Alignment-one storage for an IEEE-754 `f64` schema field.
+///
+/// A schema declares `f64`; Pina maps it to this pod so the field is stored
+/// as its little-endian bit pattern, and the generated accessors still take
+/// and return the native float.
+#[cfg(feature = "floats")]
+pub use pinapod::pod::PodF64;
 /// Re-export of the [`pinocchio`] crate for low-level Solana program
 /// primitives.
 pub use pinocchio;
