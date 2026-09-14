@@ -121,6 +121,11 @@ fn ui_require_explicit_token_2022_extension_policy() {
 }
 
 #[test]
+fn ui_require_guarded_full_balance_drain() {
+	run_ui_tests("require_guarded_full_balance_drain");
+}
+
+#[test]
 fn ui_require_post_cpi_balance_reload() {
 	run_ui_tests("require_post_cpi_balance_reload");
 }

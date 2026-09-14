@@ -109,6 +109,20 @@ fn process_non_asset_assignment(raw_value: &mut u64, offset: u64) {
 	*raw_value += offset;
 }
 
+fn process_shift_left(balance: u64, offset: u32) -> u64 {
+	balance << offset
+	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
+}
+
+fn process_shift_right_assign(balance: &mut u64) {
+	*balance >>= 2;
+	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
+}
+
+fn process_non_asset_shift(raw_value: u64, offset: u32) -> u64 {
+	raw_value << offset
+}
+
 fn process_asset_replacement(balance: &mut u64, amount: u64) {
 	*balance = amount;
 }

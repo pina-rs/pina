@@ -21,6 +21,7 @@ pub mod require_checked_asset_arithmetic;
 pub mod require_consistent_token_program;
 pub mod require_explicit_discriminators_and_seed_namespaces;
 pub mod require_explicit_token_2022_extension_policy;
+pub mod require_guarded_full_balance_drain;
 pub mod require_idl_root_to_define_one_program_id;
 pub mod require_post_cpi_balance_reload;
 pub mod require_program_check_before_cpi;
