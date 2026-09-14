@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 146
 info:
   program: pina
   args:
@@ -24,6 +25,17 @@ Options:
 
       --no-default-features
           Disable the program crate's default features for the SBF build
+
+      --no-lto
+          Skip the default fat-LTO link for the deployed program
+
+      --no-size-profile
+          Skip the production release profile (LTO, codegen-units=1, opt-level=3)
+
+      --overflow-checks
+          Keep arithmetic overflow checks enabled in the production profile.
+          
+          By default `pina build` disables them so overflow wraps instead of panicking. Pass this flag when a program must fail loudly on overflow. It costs a small amount of size.
 
       --verify
           Build deterministically with solana-verify and Docker instead of Cargo directly

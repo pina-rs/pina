@@ -39,7 +39,8 @@ Feature flags:
 | Feature          | Default | Description                                                  |
 | ---------------- | ------- | ------------------------------------------------------------ |
 | `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)   |
-| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`            |
+| `logs`           | Yes     | Enables static on-chain logging via `solana-program-log`     |
+| `verbose-logs`   | No      | Adds formatted diagnostics and caller locations              |
 | `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
 | `floats`         | No      | Enables `f32`/`f64` and fixed-point schema fields            |
 | `validation`     | No      | Enables declarative, allocation-free application validation  |
@@ -57,7 +58,8 @@ Feature flags:
 - `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
 - `floats` enables `f32` and `f64` schema fields, stored as their bit pattern through `pina::PodF32` and `pina::PodF64`, and fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate that Pina re-exports as `pina::fixed`. It also enables `derive`.
 - `validation` enables `PinaValidate` and `#[pina(validate(...))]` rules on accounts, instructions, events, and derived account lists. It also enables `derive`.
-- `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
+- `logs` is useful during **initial development and debugging**, testing, and audits. It logs a fixed message on each failure path without linking `core::fmt`. Disable it when you want the smallest possible binary or completely silent runtime failures.
+- `verbose-logs` adds formatted diagnostics and `file:line:column` caller locations to failure paths. Formatting pulls `core::fmt` into the deployed binary — roughly 2 KB on a hello world and 12 KB on a counter — so treat it as a debugging feature and leave it off for production deploys. See [Program size](./program-size.md).
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
 - `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.

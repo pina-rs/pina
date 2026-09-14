@@ -84,6 +84,22 @@ pub(crate) enum Commands {
 		#[arg(long)]
 		no_default_features: bool,
 
+		/// Skip the default fat-LTO link for the deployed program.
+		#[arg(long)]
+		no_lto: bool,
+
+		/// Skip the production release profile (LTO, codegen-units=1, opt-level=3).
+		#[arg(long)]
+		no_size_profile: bool,
+
+		/// Keep arithmetic overflow checks enabled in the production profile.
+		///
+		/// By default `pina build` disables them so overflow wraps instead of
+		/// panicking. Pass this flag when a program must fail loudly on
+		/// overflow. It costs a small amount of size.
+		#[arg(long)]
+		overflow_checks: bool,
+
 		/// Build deterministically with solana-verify and Docker instead of Cargo directly.
 		#[arg(long)]
 		verify: bool,

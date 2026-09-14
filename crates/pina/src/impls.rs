@@ -24,6 +24,7 @@ use crate::Ref;
 use crate::RefMut;
 use crate::log;
 use crate::log_caller;
+use crate::log_failure;
 
 const SYSVAR_ID: Address = crate::address!("Sysvar1111111111111111111111111111111111111");
 
@@ -32,8 +33,9 @@ const SYSVAR_ID: Address = crate::address!("Sysvar111111111111111111111111111111
 #[track_caller]
 fn validate_signer(account: AccountView) -> ProgramResult {
 	if !account.is_signer() {
-		log!(
-			"address: {} is missing a required signature",
+		log_failure!(
+			"account is missing a required signature",
+			"address: {}",
 			account.address().as_ref()
 		);
 		log_caller();
@@ -47,8 +49,9 @@ fn validate_signer(account: AccountView) -> ProgramResult {
 #[track_caller]
 pub(crate) fn validate_writable(account: AccountView) -> ProgramResult {
 	if !account.is_writable() {
-		log!(
-			"address: {} has not been marked as writable",
+		log_failure!(
+			"account has not been marked as writable",
+			"address: {}",
 			account.address().as_ref()
 		);
 		log_caller();
@@ -62,7 +65,11 @@ pub(crate) fn validate_writable(account: AccountView) -> ProgramResult {
 #[track_caller]
 fn validate_executable(account: AccountView) -> ProgramResult {
 	if !account.executable() {
-		log!("address: {} is not executable", account.address().as_ref());
+		log_failure!(
+			"account is not executable",
+			"address: {}",
+			account.address().as_ref()
+		);
 		log_caller();
 
 		return Err(ProgramError::InvalidAccountData);
@@ -74,8 +81,9 @@ fn validate_executable(account: AccountView) -> ProgramResult {
 #[track_caller]
 fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
 	if account.data_len() != len {
-		log!(
-			"address: {} has an incorrect length",
+		log_failure!(
+			"account has an incorrect length",
+			"address: {}",
 			account.address().as_ref()
 		);
 		log_caller();
@@ -89,8 +97,9 @@ fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
 #[track_caller]
 fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResult {
 	if account.data_len() != len {
-		log!(
-			"address: {} has an invalid data length for the fixed account type",
+		log_failure!(
+			"account has an invalid data length for the fixed account type",
+			"address: {}",
 			account.address().as_ref()
 		);
 		log_caller();
@@ -104,7 +113,11 @@ fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResul
 #[track_caller]
 fn validate_empty(account: AccountView) -> ProgramResult {
 	if !account.is_data_empty() {
-		log!("address: {} is not empty", account.address().as_ref());
+		log_failure!(
+			"account is not empty",
+			"address: {}",
+			account.address().as_ref()
+		);
 		log_caller();
 
 		return Err(ProgramError::AccountAlreadyInitialized);
@@ -116,7 +129,11 @@ fn validate_empty(account: AccountView) -> ProgramResult {
 #[track_caller]
 fn validate_not_empty(account: AccountView) -> ProgramResult {
 	if account.is_data_empty() {
-		log!("address: {} is empty", account.address().as_ref());
+		log_failure!(
+			"account is empty",
+			"address: {}",
+			account.address().as_ref()
+		);
 		log_caller();
 
 		return Err(ProgramError::UninitializedAccount);
@@ -139,8 +156,9 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 	let data = account.try_borrow()?;
 
 	if !T::matches_discriminator(&data) {
-		log!(
-			"address: {} has invalid discriminator",
+		log_failure!(
+			"account has an invalid discriminator",
+			"address: {}",
 			account.address().as_ref()
 		);
 		log_caller();
@@ -151,8 +169,9 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 	#[cfg(not(feature = "validation"))]
 	{
 		if <T as crate::PinaPodFixed>::validate_exact(&data).is_err() {
-			log!(
-				"address: {} contains invalid zero-copy account data",
+			log_failure!(
+				"account contains invalid zero-copy account data",
+				"address: {}",
 				account.address().as_ref()
 			);
 			log_caller();
@@ -166,8 +185,9 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 	#[cfg(feature = "validation")]
 	{
 		let value = <T as crate::PinaPodFixed>::read_exact(&data).map_err(|_| {
-			log!(
-				"address: {} contains invalid zero-copy account data",
+			log_failure!(
+				"account contains invalid zero-copy account data",
+				"address: {}",
 				account.address().as_ref()
 			);
 			log_caller();
@@ -202,7 +222,8 @@ fn validate_owner(account: AccountView, owner: &Address) -> ProgramResult {
 	let account_owner = account.owner();
 
 	if account_owner.ne(owner) {
-		log!(
+		log_failure!(
+			"account has an invalid owner",
 			"address: {} has invalid owner: {}, required: {}",
 			account.address().as_ref(),
 			account_owner.as_ref(),
@@ -224,7 +245,8 @@ fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
 		return Ok(());
 	}
 
-	log!(
+	log_failure!(
+		"account has an invalid owner",
 		"address: {} has invalid owner: {}",
 		account.address().as_ref(),
 		account_owner.as_ref(),
@@ -240,7 +262,8 @@ fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
 		return Ok(());
 	}
 
-	log!(
+	log_failure!(
+		"account address is invalid",
 		"address: {} is invalid, expected: {}",
 		account.address().as_ref(),
 		addr.as_ref()
@@ -256,7 +279,11 @@ fn validate_addresses(account: AccountView, addresses: &[Address]) -> ProgramRes
 		return Ok(());
 	}
 
-	log!("address: {} is invalid", account.address().as_ref());
+	log_failure!(
+		"account address is invalid",
+		"address: {} is invalid",
+		account.address().as_ref()
+	);
 	log_caller();
 
 	Err(ProgramError::InvalidAccountData)
@@ -265,7 +292,8 @@ fn validate_addresses(account: AccountView, addresses: &[Address]) -> ProgramRes
 #[track_caller]
 fn validate_seeds(account: AccountView, seeds: &[&[u8]], program_id: &Address) -> ProgramResult {
 	let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
-		log!(
+		log_failure!(
+			"could not find a program address from the provided seeds",
 			"could not find program address from seeds with program id: {}",
 			program_id.as_ref()
 		);
@@ -278,7 +306,8 @@ fn validate_seeds(account: AccountView, seeds: &[&[u8]], program_id: &Address) -
 		return Ok(());
 	}
 
-	log!(
+	log_failure!(
+		"account address is invalid",
 		"address: {} is invalid, expected pda: {}",
 		account.address().as_ref(),
 		pda.as_ref()
@@ -297,10 +326,7 @@ fn validate_seeds_with_bump(
 	let pda = match crate::create_program_address(seeds, program_id) {
 		Ok(pda) => pda,
 		Err(_error) => {
-			log!(
-				"could not create pda for address: {}, with provided seeds and bump",
-				account.address().as_ref(),
-			);
+			log_failure!("could not create a PDA for the provided seeds and bump");
 			log_caller();
 
 			return Err(ProgramError::InvalidSeeds);
@@ -308,7 +334,8 @@ fn validate_seeds_with_bump(
 	};
 
 	if &pda != account.address() {
-		log!(
+		log_failure!(
+			"account address is invalid",
 			"address: {} is invalid, expected pda: {}",
 			account.address().as_ref(),
 			pda.as_ref()
@@ -328,7 +355,8 @@ fn validate_canonical_bump(
 	program_id: &Address,
 ) -> Result<u8, ProgramError> {
 	let Some((pda, bump)) = crate::try_find_program_address(seeds, program_id) else {
-		log!(
+		log_failure!(
+			"could not find a program address from the provided seeds",
 			"could not find program address from seeds with program id: {}",
 			program_id.as_ref()
 		);
@@ -341,7 +369,8 @@ fn validate_canonical_bump(
 		return Ok(bump);
 	}
 
-	log!(
+	log_failure!(
+		"account address is invalid",
 		"address: {} is invalid, expected pda: {}",
 		account.address().as_ref(),
 		pda.as_ref()
@@ -363,7 +392,8 @@ fn validate_associated_token_address(
 	let Some((ata_address, _bump)) =
 		crate::try_get_associated_token_address(wallet, mint, token_program)
 	else {
-		log!(
+		log_failure!(
+			"could not find the associated token address",
 			"could not find associated token address for wallet: {}, mint: {}",
 			wallet.as_ref(),
 			mint.as_ref(),
@@ -377,7 +407,8 @@ fn validate_associated_token_address(
 		return Ok(());
 	}
 
-	log!(
+	log_failure!(
+		"account is not the expected associated token address",
 		"address: {} is invalid, expected associated token address: {}",
 		account.address().as_ref(),
 		ata_address.as_ref()

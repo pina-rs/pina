@@ -47,6 +47,7 @@
 - [Codama Workflow](./codama-workflow.md)
 - [Examples](./examples.md)
 - [Compute-unit performance](./compute-unit-performance.md)
+- [Program size](./program-size.md)
 - [Tutorials]()
   - [Your First Program](./tutorials/first-program.md)
   - [Compact Accounts](./tutorials/compact-accounts.md)

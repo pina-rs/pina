@@ -11,7 +11,13 @@ description = "a solana and pinocchio smart contract framework"
 
 [features]
 default = ["logs", "derive"]
-logs = ["dep:solana-program-log"] # Enable logging for errors
+# Static, allocation-free diagnostics. Failure paths log a fixed message so
+# programs do not link `core::fmt`.
+logs = ["dep:solana-program-log"]
+# Adds formatted diagnostics and caller locations to failure paths. Implies
+# `logs`. Keep this off for deployed programs: `core::fmt` is the single
+# largest avoidable size cost in a Pina binary.
+verbose-logs = ["logs"]
 token = [
 	"dep:pinocchio-associated-token-account",
 	"dep:pinocchio-token",

@@ -1,11 +1,13 @@
-#[cfg(feature = "logs")]
+#[cfg(feature = "verbose-logs")]
 use core::panic::Location;
 
 use crate::Address;
 use crate::IntoDiscriminator;
 use crate::ProgramError;
 use crate::ProgramResult;
+#[cfg(feature = "verbose-logs")]
 use crate::log;
+use crate::log_verbose;
 
 /// Parses an instruction discriminator from the raw instruction data.
 ///
@@ -64,22 +66,33 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	// Get instruction for discriminator.
 	T::discriminator_from_bytes(data).map_err(|error| {
 		match error {
-			ProgramError::Custom(code) => {
-				#[cfg(feature = "logs")]
-				{
-					log!(
-						"parse_instruction: remapping ProgramError::Custom({}) to \
-						 InvalidInstructionData",
-						code
-					);
-				}
-				#[cfg(not(feature = "logs"))]
-				let _ = code;
-				ProgramError::InvalidInstructionData
-			}
+			ProgramError::Custom(code) => remap_custom_error(code),
 			error => error,
 		}
 	})
+}
+
+/// Maps a custom discriminator-parse error to `InvalidInstructionData`.
+///
+/// Outlined with `#[cold]` and `#[inline(never)]` deliberately. Inlining this
+/// error path changed how the compiler laid out the surrounding dispatch code
+/// and cost a measured 7 CU on `pina_bpf_program/hello`, even though the arm
+/// never runs for a valid discriminator. Keeping it as a separate cold
+/// function holds the hot path at its previous cost.
+#[cold]
+#[inline(never)]
+fn remap_custom_error(code: u32) -> ProgramError {
+	// The formatted detail stays behind `verbose-logs`, so the default build
+	// does not link `core::fmt` for this path.
+	#[cfg(feature = "verbose-logs")]
+	{
+		log!(
+			"parse_instruction: remapping ProgramError::Custom({}) to InvalidInstructionData",
+			code
+		);
+	}
+	let _ = code;
+	ProgramError::InvalidInstructionData
 }
 
 /// Asserts a boolean condition, logging `msg` and returning `err` on failure.
@@ -112,19 +125,21 @@ pub fn assert(v: bool, err: impl Into<ProgramError>, msg: &str) -> ProgramResult
 	if v {
 		Ok(())
 	} else {
-		#[cfg(not(feature = "logs"))]
+		#[cfg(any(not(feature = "logs"), not(feature = "verbose-logs")))]
 		let _ = msg;
 
-		log!("{}", msg);
+		log_verbose!("{}", msg);
 		log_caller();
 		Err(err.into())
 	}
 }
 
-/// Logs caller file/line/column when `logs` feature is enabled.
+/// Logs caller file/line/column when `verbose-logs` feature is enabled.
 ///
-/// Used internally by assertion helpers and account validation methods.
-#[cfg(feature = "logs")]
+/// Used internally by assertion helpers and account validation methods. The
+/// location format pulls in `core::fmt`, so it is part of the opt-in verbose
+/// diagnostics rather than the default failure path.
+#[cfg(feature = "verbose-logs")]
 #[track_caller]
 #[inline(always)]
 pub fn log_caller() {
@@ -137,8 +152,8 @@ pub fn log_caller() {
 	);
 }
 
-/// No-op variant used when the `logs` feature is disabled.
-#[cfg(not(feature = "logs"))]
+/// No-op variant used when the `verbose-logs` feature is disabled.
+#[cfg(not(feature = "verbose-logs"))]
 #[inline(always)]
 pub fn log_caller() {}
 
