@@ -66,24 +66,33 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	// Get instruction for discriminator.
 	T::discriminator_from_bytes(data).map_err(|error| {
 		match error {
-			ProgramError::Custom(code) => {
-				// Formatted detail only under `verbose-logs`; the default build
-				// keeps the failure path free of `core::fmt`.
-				#[cfg(feature = "verbose-logs")]
-				{
-					log!(
-						"parse_instruction: remapping ProgramError::Custom({}) to \
-						 InvalidInstructionData",
-						code
-					);
-				}
-				#[cfg(not(feature = "verbose-logs"))]
-				let _ = code;
-				ProgramError::InvalidInstructionData
-			}
+			ProgramError::Custom(code) => remap_custom_error(code),
 			error => error,
 		}
 	})
+}
+
+/// Maps a custom discriminator-parse error to `InvalidInstructionData`.
+///
+/// Outlined with `#[cold]` and `#[inline(never)]` deliberately. Inlining this
+/// error path changed how the compiler laid out the surrounding dispatch code
+/// and cost a measured 7 CU on `pina_bpf_program/hello`, even though the arm
+/// never runs for a valid discriminator. Keeping it as a separate cold
+/// function holds the hot path at its previous cost.
+#[cold]
+#[inline(never)]
+fn remap_custom_error(code: u32) -> ProgramError {
+	// The formatted detail stays behind `verbose-logs`, so the default build
+	// does not link `core::fmt` for this path.
+	#[cfg(feature = "verbose-logs")]
+	{
+		log!(
+			"parse_instruction: remapping ProgramError::Custom({}) to InvalidInstructionData",
+			code
+		);
+	}
+	let _ = code;
+	ProgramError::InvalidInstructionData
 }
 
 /// Asserts a boolean condition, logging `msg` and returning `err` on failure.
