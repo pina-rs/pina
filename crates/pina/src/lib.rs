@@ -338,10 +338,26 @@ macro_rules! log_verbose {
 	};
 }
 
-/// No-op variant of [`log_verbose!`] when `verbose-logs` is disabled.
+/// Logs a formatted message even when `verbose-logs` is disabled.
 ///
-/// Arguments are still evaluated so call sites keep identical semantics.
-#[cfg(not(feature = "verbose-logs"))]
+/// The contract is "always formats", so this arm deliberately keeps the
+/// formatted log rather than becoming a no-op: a call site that chose
+/// [`log_verbose!`] over [`log!`] wants the message in every build and pays
+/// for `core::fmt` in every build. Arguments are evaluated either way so call
+/// sites keep identical semantics.
+///
+/// When the `logs` feature is off there is no logger to write to, and the
+/// macro becomes a no-op that still evaluates its arguments.
+#[cfg(all(not(feature = "verbose-logs"), feature = "logs"))]
+#[macro_export]
+macro_rules! log_verbose {
+	($($arg:tt)*) => {
+		$crate::solana_program_log::log!($($arg)*);
+	};
+}
+
+/// No-op variant used when logging is compiled out entirely.
+#[cfg(not(feature = "logs"))]
 #[macro_export]
 macro_rules! log_verbose {
 	($($arg:tt)*) => {{
