@@ -158,7 +158,7 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 		self.authority.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.store,
 			payer: self.authority,
 			owner: &ID,

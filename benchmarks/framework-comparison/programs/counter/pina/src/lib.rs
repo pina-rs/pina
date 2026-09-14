@@ -57,7 +57,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.counter.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.counter,
 			payer: self.authority,
 			owner: &ID,

@@ -444,26 +444,228 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
-		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
-		{
-			return Err(ProgramError::AccountAlreadyInitialized);
-		}
-
-		AllocateAccountWithNonCanonicalBump {
-			account: self.account,
-			payer: self.payer,
-			space: size_of::<T::Zc>() as u64,
-			owner: self.owner,
-			seeds: self.seeds,
-			bump: self.bump,
-		}
-		.invoke_signed_inner_validated(signers, rent)?;
-
-		let mut data = self.account.try_borrow_mut()?;
-		<T as PinaAccount>::initialize(&mut data, initialize)?;
-
-		Ok(())
+		allocate_and_initialize_pda_account::<T, _>(
+			self.account,
+			self.payer,
+			self.owner,
+			self.seeds,
+			self.bump,
+			signers,
+			rent,
+			initialize,
+		)
 	}
+}
+
+/// Creates a PDA-backed program account at the address a caller-supplied bump
+/// derives, without proving that the bump is canonical, and initializes `T`'s
+/// discriminator.
+///
+/// This is the cheap sibling of [`CreateProgramAccountWithBump`]. It checks
+/// one derivation instead of searching for the highest valid bump, which is
+/// the difference between roughly 3,000 and 10,700 compute units per creation
+/// on a program with PDA seeds. Use it whenever several addresses for one seed
+/// namespace cannot cause harm — a per-authority counter, an escrow whose
+/// seeds already bind the parties.
+///
+/// Prefer [`CreateProgramAccountWithBump`] when the program, a CPI target, or
+/// an indexer derives the canonical address from `seeds` alone: a non-canonical
+/// bump creates a second valid address that canonical derivation will not
+/// find. Prefer [`CreateProgramAccount`] to derive the bump on-chain instead
+/// of accepting it from instruction data.
+///
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
+///
+/// Program IDs must stay consistent across derivation and verification.
+///
+/// When a bump is required, prefer canonical bump derivation.
+///
+/// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
+///
+/// # Errors
+///
+/// Returns `InvalidSeeds` when the supplied `bump` does not derive `account`'s
+/// address, and `AccountAlreadyInitialized` when the target storage is not
+/// zeroed. It also returns allocation and system-program CPI errors from the
+/// checked creation path.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Create a PDA-backed account from an instruction-supplied bump:
+/// let seeds: &[&[u8]] = &[b"counter", authority.address().as_ref()];
+/// CreateProgramAccountWithUncheckedBump {
+/// 	account: counter_account,
+/// 	payer,
+/// 	owner: &program_id,
+/// 	seeds,
+/// 	bump,
+/// }
+/// .invoke::<CounterState>()?;
+/// ```
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateProgramAccountWithUncheckedBump<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
+
+	/// Funding account that pays any required rent-exempt balance.
+	pub payer: &'account AccountView,
+
+	/// Program that owns the PDA and derives it from `seeds` and `bump`.
+	pub owner: &'address Address,
+
+	/// PDA seeds without the bump.
+	pub seeds: &'seeds [&'seed [u8]],
+
+	/// PDA bump to check against `account`'s address and append to `seeds`.
+	pub bump: u8,
+}
+
+impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
+	/// Creates the account at the supplied bump's address and the all-zero
+	/// default for every field other than the discriminator.
+	///
+	/// Use [`Self::invoke_with`] when any field requires a nonzero initial value.
+	#[inline(always)]
+	pub fn invoke<T: PinaAccount>(&mut self) -> ProgramResult {
+		self.invoke_with::<T>(|_| Ok(()))
+	}
+
+	/// Creates the account and configures its complete fixed representation in
+	/// one validated initialization pass.
+	#[inline(always)]
+	pub fn invoke_with<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_with::<T>(&[], initialize)
+	}
+
+	/// Creates the account with additional PDA signers and writes `T`'s
+	/// discriminator.
+	///
+	/// The target account signer is derived and supplied automatically.
+	#[inline(always)]
+	pub fn invoke_signed<T: PinaAccount>(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		self.invoke_signed_with::<T>(signers, |_| Ok(()))
+	}
+
+	/// Creates the account with additional PDA signers and configures its
+	/// complete fixed representation in one validated initialization pass.
+	#[inline(always)]
+	pub fn invoke_signed_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<T, _>(signers, None, initialize)
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_| Ok(()))
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner<T: PinaAccount, F>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+		initialize: F,
+	) -> ProgramResult
+	where
+		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	{
+		verify_supplied_bump_address(self.account, self.seeds, self.owner, self.bump)?;
+		allocate_and_initialize_pda_account::<T, _>(
+			self.account,
+			self.payer,
+			self.owner,
+			self.seeds,
+			self.bump,
+			signers,
+			rent,
+			initialize,
+		)
+	}
+}
+
+/// Allocates a PDA whose signer seeds are already proven and writes `T`'s
+/// discriminator.
+///
+/// Shared by the creation builders. Each one establishes that provenance its
+/// own way — [`canonical_pda`] by searching for the highest valid bump,
+/// [`verify_supplied_bump_address`] by checking a single derivation — and this
+/// performs the checked allocate plus initialization.
+#[inline(always)]
+fn allocate_and_initialize_pda_account<T: PinaAccount, F>(
+	account: &mut AccountView,
+	payer: &AccountView,
+	owner: &Address,
+	seeds: &[&[u8]],
+	bump: u8,
+	signers: &[Signer<'_, '_>],
+	rent: Option<Rent>,
+	initialize: F,
+) -> ProgramResult
+where
+	F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+{
+	if !account.is_data_empty() && account.try_borrow()?.iter().any(|byte| *byte != 0) {
+		return Err(ProgramError::AccountAlreadyInitialized);
+	}
+
+	AllocateAccountWithNonCanonicalBump {
+		account: &mut *account,
+		payer,
+		space: size_of::<T::Zc>() as u64,
+		owner,
+		seeds,
+		bump,
+	}
+	.invoke_signed_inner_validated(signers, rent)?;
+
+	let mut data = account.try_borrow_mut()?;
+	<T as PinaAccount>::initialize(&mut data, initialize)?;
+
+	Ok(())
+}
+
+/// Checks that `seeds` plus `bump` derive exactly `account`'s address.
+///
+/// One [`create_program_address`] call replaces the canonical bump search,
+/// which costs roughly 9,000 additional compute units per creation. This
+/// proves the account sits at the address these seeds and this bump produce;
+/// it does not prove `bump` is the highest valid seed, so a non-canonical bump
+/// creates a second address for the same namespace.
+#[inline(always)]
+fn verify_supplied_bump_address(
+	account: &AccountView,
+	seeds: &[&[u8]],
+	owner: &Address,
+	bump: u8,
+) -> ProgramResult {
+	if seeds.len() >= MAX_SEEDS {
+		return Err(ProgramError::InvalidSeeds);
+	}
+
+	let bump_seed = [bump];
+	let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
+	derivation_seeds[..seeds.len()].copy_from_slice(seeds);
+	derivation_seeds[seeds.len()] = bump_seed.as_slice();
+	let expected = crate::create_program_address(&derivation_seeds[..=seeds.len()], owner)?;
+
+	if account.address() != &expected {
+		return Err(ProgramError::InvalidSeeds);
+	}
+
+	Ok(())
 }
 
 /// Creates and initializes a variable-length PDA-backed account.
@@ -2265,6 +2467,115 @@ mod tests {
 		.invoke_signed_with_rent(&[], rent)
 		.unwrap_or_else(|error| panic!("allocate raw PDA: {error:?}"));
 		assert_eq!(result, (address, bump));
+	}
+
+	#[test]
+	fn unchecked_bump_creates_the_account_at_the_supplied_address() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"unchecked-pda"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive unchecked-pda address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view = stored.view();
+		CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent())
+		.unwrap_or_else(|error| panic!("create with unchecked bump: {error:?}"));
+		assert_eq!(stored.data[0], TestState::VALUE);
+	}
+
+	#[test]
+	fn unchecked_bump_accepts_a_bump_the_canonical_builder_rejects() {
+		// The behavioral difference between the two builders, spelled out: the
+		// lowest valid bump is not the canonical one, and the unchecked builder
+		// creates the account there because the derivation checks out.
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"non-canonical-seeds"];
+		let (canonical_address, canonical_bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive canonical address"));
+
+		let mut supplied = None;
+		for candidate in 0..=255_u8 {
+			let bump_seed = [candidate];
+			if crate::create_program_address(&[seeds[0], bump_seed.as_slice()], &owner).is_ok() {
+				supplied = Some(candidate);
+				break;
+			}
+		}
+		let bump = supplied.expect("at least one valid bump");
+		assert_ne!(bump, canonical_bump, "need a non-canonical bump");
+		let address =
+			crate::create_program_address(&[seeds[0], [bump].as_slice()], &owner).expect("address");
+
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored_unchecked = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut unchecked_view = stored_unchecked.view();
+		CreateProgramAccountWithUncheckedBump {
+			account: &mut unchecked_view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent())
+		.unwrap_or_else(|error| panic!("create at non-canonical bump: {error:?}"));
+		assert_eq!(stored_unchecked.data[0], TestState::VALUE);
+
+		// The canonical builder rejects the same setup: the supplied bump is
+		// not the canonical one for these seeds.
+		let mut stored_canonical = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut canonical_view = stored_canonical.view();
+		let rejected = CreateProgramAccountWithBump {
+			account: &mut canonical_view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(rejected, Err(ProgramError::InvalidSeeds));
+		assert!(
+			stored_canonical.data[..state_size]
+				.iter()
+				.all(|byte| *byte == 0)
+		);
+		assert_ne!(address, canonical_address);
+	}
+
+	#[test]
+	fn unchecked_bump_rejects_a_bump_that_does_not_derive_the_address() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"wrong-bump"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive wrong-bump address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view = stored.view();
+		let rejected = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump: bump ^ 1,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(rejected, Err(ProgramError::InvalidSeeds));
+		assert!(stored.data[..state_size].iter().all(|byte| *byte == 0));
 	}
 
 	#[test]

@@ -46,7 +46,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |       12,376 |          10,719 |          1,753 |              +90% |
+| Pina                        |       12,688 |           3,263 |          1,753 |              +95% |
 | Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
 | Quasar                      |        7,808 |           3,488 |            330 |              +20% |
 | Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |
@@ -61,9 +61,9 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 **The Pinocchio row is the floor.** It is hand-written `pinocchio` with no framework at all, and it is the number a framework has to justify. Pina's gap to it is the cost of derive-generated dispatch and validation.
 
-**Pina's `initialize` is the one number that looks like a defect rather than a design cost.** Creating the counter account costs 10,719 CU against Pinocchio's 1,490 for the same `create_account` CPI in the same instruction. The difference is [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs), which validates the PDA with `try_find_program_address` — a search over up to 256 candidate bumps — even though the caller has already supplied the canonical bump as an argument. That is about 9,200 CU, roughly 5% of the default 200,000 CU a non-builtin instruction is allocated, spent re-deriving a value the program was handed.
+**Pina's `initialize` was the one number that looked like a defect.** The first measurement of this page caught it at 10,719 CU against Pinocchio's 1,490 for the same `create_account` CPI: [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs) validated the PDA with a full canonical bump search although the caller had already supplied the bump. The counter now uses [`CreateProgramAccountWithUncheckedBump`](../crates/pina/src/cpi.rs), which checks one derivation instead of searching, and `initialize` measures 3,263 CU.
 
-Every PDA-creating example in this repository uses that helper, so the cost is not specific to the counter. Replacing the search with a single `create_program_address` when a bump is supplied would remove it, but that is a security-relevant change — canonicity is what the search proves — so it belongs in its own pull request rather than in the harness that measured it.
+The distinction between the two builders is the one to keep in mind when reading the row. The canonical builder proves the supplied bump is the highest valid one, so a seed namespace maps to exactly one address; the unchecked builder proves only that the supplied bump derives the account's address, which is about 9,200 CU cheaper per creation. A non-canonical bump creates a second valid address that canonical derivation will not find — harmless for a per-authority counter, wrong for a vault that another program derives by seed alone. Every PDA-creating example in this repository now uses the unchecked builder, which is why the row reads the way it does.
 
 ## Reproducing
 

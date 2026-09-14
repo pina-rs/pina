@@ -257,7 +257,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			)?;
 
 		// Create the pool state account
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.pool_state,
 			payer: self.admin,
 			owner: &ID,
@@ -322,7 +322,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		}
 
 		// Create the position account
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.position_state,
 			payer: self.user,
 			owner: &ID,

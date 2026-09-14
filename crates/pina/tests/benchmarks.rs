@@ -250,6 +250,17 @@ fn benchmark_pda_creation_validation_paths() {
 
 		black_box(valid);
 	});
+
+	// What `CreateProgramAccountWithUncheckedBump` pays instead: one
+	// derivation plus an address comparison, no canonical search.
+	bench("PDA creation validation (unchecked bump)", || {
+		let derived = black_box(create_program_address(
+			black_box(seeds_with_bump),
+			black_box(&SYSTEM_ID),
+		));
+		let valid = derived.is_ok_and(|address| address == expected_address);
+		black_box(valid);
+	});
 }
 
 // ---------------------------------------------------------------------------
