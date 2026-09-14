@@ -1,5 +1,6 @@
 ---
 pina: feat
+pina_lints: docs
 ---
 
 # Add a cheap PDA builder that skips the bump search
