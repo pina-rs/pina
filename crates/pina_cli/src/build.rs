@@ -33,6 +33,15 @@ pub struct BuildOptions {
 	pub project_dir: PathBuf,
 	pub features: Vec<String>,
 	pub no_default_features: bool,
+	/// Skip link-time optimization even when the program crate supports it.
+	pub no_lto: bool,
+	/// Skip the production release profile overrides.
+	pub no_size_profile: bool,
+	/// Enable `overflow-checks` in the production profile.
+	///
+	/// Disabled by default: turning it off lets arithmetic overflow wrap
+	/// instead of panicking, which is a behavior change, so callers opt in.
+	pub overflow_checks: bool,
 }
 
 /// Outputs produced by a deterministic Solana Verify build.
@@ -141,6 +150,9 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 		project_dir: start.to_path_buf(),
 		features: Vec::new(),
 		no_default_features: false,
+		no_lto: false,
+		no_size_profile: false,
+		overflow_checks: false,
 	})
 }
 
@@ -156,6 +168,9 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
 	check_migrations_for_build(&project)?;
+	if !options.no_lto {
+		warn_lto_unavailable(&project);
+	}
 	let manifest_path = project.program_dir.join("Cargo.toml");
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 	let features = options
@@ -174,6 +189,7 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.current_dir(&project.root)
 		.env("CARGO_TARGET_DIR", &project.target_dir)
 		.args(&args);
+	apply_size_profile(&mut command, options);
 
 	let status = command.status().map_err(|source| {
 		BuildError::RunCargo {
@@ -347,12 +363,45 @@ fn publish_verified_build(
 	})
 }
 
+/// Applies the production release profile to an SBF build command.
+///
+/// The SBF toolchain honors Cargo profile environment overrides, so setting
+/// them here gives every `pina build` the production profile without editing
+/// the program's manifest. `lto` and `codegen-units` are pure size wins;
+/// `overflow-checks` is the caller's opt-in because disabling it changes
+/// arithmetic overflow from a panic into a wrap.
+fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
+	if options.no_size_profile {
+		return;
+	}
+
+	if !options.no_lto {
+		command.env("CARGO_PROFILE_RELEASE_LTO", "fat");
+	}
+	command
+		.env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1")
+		.env("CARGO_PROFILE_RELEASE_OPT_LEVEL", "3")
+		.env(
+			"CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS",
+			if options.overflow_checks {
+				"true"
+			} else {
+				"false"
+			},
+		);
+}
+
 /// Arguments that delegate SBF compilation to the Agave `cargo-build-sbf`
 /// driver.
 ///
 /// The driver owns the SBF toolchain (platform-tools rustc and sbf-linker),
 /// produces artifacts whose relocations are applied correctly by the real
 /// runtimes, and honors `CARGO_TARGET_DIR` for its intermediate output.
+///
+/// Fat LTO is requested through the driver's `--lto` flag rather than
+/// `CARGO_PROFILE_RELEASE_LTO`: the SBF toolchain ignores profile overrides,
+/// and `--lto` only compiles when the program crate produces a cdylib without
+/// a second rlib/lib output, so [`library_supports_lto`] gates it.
 fn build_sbf_args(
 	project: &Project,
 	manifest_path: &Path,
@@ -373,7 +422,41 @@ fn build_sbf_args(
 		args.push(OsString::from("--no-default-features"));
 	}
 
+	if !options.no_lto && library_supports_lto(project) {
+		args.push(OsString::from("--lto"));
+	}
+
 	args
+}
+
+/// Whether the program crate can be linked with fat LTO.
+///
+/// rustc rejects `-C lto` when one invocation emits a cdylib together with a
+/// second lib/rlib output, so programs that also build as a Rust library for
+/// host-side tests must ship `crate-type = ["cdylib"]` (moving shared logic
+/// into a separate crate) before LTO applies.
+fn library_supports_lto(project: &Project) -> bool {
+	project
+		.library_crate_types
+		.iter()
+		.all(|crate_type| crate_type == "cdylib")
+}
+
+/// Report when a program crate gives up the default fat-LTO build.
+fn warn_lto_unavailable(project: &Project) {
+	if !project
+		.library_crate_types
+		.iter()
+		.any(|crate_type| crate_type != "cdylib")
+	{
+		return;
+	}
+	let crate_types = project.library_crate_types.join(", ");
+	eprintln!(
+		"warning: library crate-type [{crate_types}] precludes link-time optimization; deployed \
+		 programs built from `[\"cdylib\"]` only are typically 20-30% smaller. Move shared logic \
+		 into a separate crate, or pass --no-lto to silence this warning."
+	);
 }
 
 fn command_label(cargo: &OsStr, args: &[OsString]) -> String {
@@ -768,5 +851,130 @@ mod tests {
 
 		assert!(matches!(error, BuildError::SerializeIdl { .. }));
 		assert!(error.to_string().contains("counter"));
+	}
+
+	fn discover_fixture_with_crate_types(name: &str, crate_types: &str) -> (TempDir, Project) {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		fs::create_dir_all(temp.path().join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		fs::write(
+			temp.path().join("Cargo.toml"),
+			format!(
+				"[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \
+				 \"2024\"\n[lib]\ncrate-type = [{crate_types}]\npath = \"src/lib.rs\"\n"
+			),
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		fs::write(temp.path().join("src/lib.rs"), "")
+			.unwrap_or_else(|error| panic!("write source: {error}"));
+		let project = Project::discover(temp.path())
+			.unwrap_or_else(|error| panic!("discover fixture: {error}"));
+		(temp, project)
+	}
+
+	fn build_args_for(project: &Project, no_lto: bool) -> Vec<String> {
+		let manifest_path = project.program_dir.join("Cargo.toml");
+		let options = BuildOptions {
+			project_dir: project.root.clone(),
+			features: Vec::new(),
+			no_default_features: false,
+			no_lto,
+			no_size_profile: false,
+			overflow_checks: false,
+		};
+		build_sbf_args(project, &manifest_path, "bpf-entrypoint", &options)
+			.into_iter()
+			.map(|argument| argument.to_string_lossy().into_owned())
+			.collect()
+	}
+
+	#[test]
+	fn build_args_request_lto_for_cdylib_only_programs() {
+		let (_temp, project) =
+			discover_fixture_with_crate_types("lto-cdylib-fixture", "\"cdylib\"");
+
+		assert!(library_supports_lto(&project));
+		let args = build_args_for(&project, false);
+		assert!(args.contains(&"--lto".to_owned()));
+
+		let args = build_args_for(&project, true);
+		assert!(!args.contains(&"--lto".to_owned()));
+	}
+
+	#[test]
+	fn build_args_omit_lto_for_dual_crate_type_programs() {
+		let (_temp, project) =
+			discover_fixture_with_crate_types("lto-dual-fixture", "\"cdylib\", \"lib\"");
+
+		assert!(!library_supports_lto(&project));
+		let args = build_args_for(&project, false);
+		assert!(!args.contains(&"--lto".to_owned()));
+	}
+
+	fn profile_env_for(no_size_profile: bool, overflow_checks: bool) -> Vec<(String, String)> {
+		let options = BuildOptions {
+			project_dir: PathBuf::new(),
+			features: Vec::new(),
+			no_default_features: false,
+			no_lto: false,
+			no_size_profile,
+			overflow_checks,
+		};
+		let mut command = Command::new("cargo");
+		apply_size_profile(&mut command, &options);
+		command
+			.get_envs()
+			.map(|(key, value)| {
+				(
+					key.to_string_lossy().into_owned(),
+					value
+						.map(|value| value.to_string_lossy().into_owned())
+						.unwrap_or_default(),
+				)
+			})
+			.collect()
+	}
+
+	#[test]
+	fn size_profile_sets_lto_codegen_units_and_opt_level() {
+		let env = profile_env_for(false, false);
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		assert_eq!(lookup("CARGO_PROFILE_RELEASE_LTO").as_deref(), Some("fat"));
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_CODEGEN_UNITS").as_deref(),
+			Some("1")
+		);
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OPT_LEVEL").as_deref(),
+			Some("3")
+		);
+		// Overflow checks stay off unless the caller opts in.
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("false")
+		);
+	}
+
+	#[test]
+	fn overflow_checks_flag_restores_the_safety_check() {
+		let env = profile_env_for(false, true);
+		let overflow = env
+			.iter()
+			.find(|(name, _)| name == "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS")
+			.map(|(_, value)| value.clone());
+
+		assert_eq!(overflow.as_deref(), Some("true"));
+	}
+
+	#[test]
+	fn no_size_profile_leaves_every_override_unset() {
+		let env = profile_env_for(true, false);
+
+		assert!(env.is_empty());
 	}
 }

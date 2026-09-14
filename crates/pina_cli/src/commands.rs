@@ -27,6 +27,9 @@ pub(crate) fn run(cli: Cli) {
 			project,
 			features,
 			no_default_features,
+			no_lto,
+			no_size_profile,
+			overflow_checks,
 			verify,
 			solana_verify,
 		} => {
@@ -34,6 +37,9 @@ pub(crate) fn run(cli: Cli) {
 				project,
 				features,
 				no_default_features,
+				no_lto,
+				no_size_profile,
+				overflow_checks,
 				verify,
 				solana_verify,
 			);
@@ -237,6 +243,9 @@ fn run_migrations(command: MigrationCommands) {
 			run_build(
 				project.clone(),
 				Vec::new(),
+				false,
+				false,
+				false,
 				false,
 				false,
 				std::ffi::OsString::from("solana"),
@@ -826,6 +835,9 @@ fn run_build(
 	project: PathBuf,
 	features: Vec<String>,
 	no_default_features: bool,
+	no_lto: bool,
+	no_size_profile: bool,
+	overflow_checks: bool,
 	verify: bool,
 	solana_verify: std::ffi::OsString,
 ) {
@@ -833,6 +845,9 @@ fn run_build(
 		project_dir: project,
 		features,
 		no_default_features,
+		no_lto,
+		no_size_profile,
+		overflow_checks,
 	};
 	let output = if verify {
 		pina_cli::build::build_project_verified_with_options(

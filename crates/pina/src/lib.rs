@@ -190,6 +190,14 @@ pub use crate::traits::*;
 /// derivation.
 pub use crate::utils::*;
 
+/// Static replacement message for formatted diagnostics when `verbose-logs`
+/// is disabled.
+///
+/// Keeps the failure path identical across feature sets without linking
+/// `core::fmt`.
+pub const DETAIL_POINTER_MESSAGE: &str =
+	"pina: operation failed; enable the `verbose-logs` feature for details";
+
 /// Sets up a `no_std` Solana program entrypoint.
 ///
 /// This macro wires up the BPF entrypoint, disables the default allocator, and
@@ -223,11 +231,52 @@ macro_rules! nostd_entrypoint {
 	};
 }
 
+/// Logs a failure message with optional formatted detail.
+///
+/// The static `message` is always logged. The formatted `detail` is logged
+/// only with the `verbose-logs` feature, so the default build keeps a
+/// descriptive failure trail without linking `core::fmt`.
+///
+/// ```ignore
+/// log_failure!("address is missing a required signature", "address: {}", addr);
+/// ```
+///
+/// When the `logs` feature is disabled this is a no-op.
+#[cfg(feature = "logs")]
+#[macro_export]
+macro_rules! log_failure {
+	($message:literal) => {{
+		$crate::solana_program_log::logger::log_message($message.as_bytes());
+	}};
+	($message:literal, $($arg:tt)*) => {{
+		$crate::solana_program_log::logger::log_message($message.as_bytes());
+		// Arguments are evaluated in every feature configuration so the
+		// failure path behaves identically with and without `verbose-logs`.
+		#[allow(unused_variables)]
+		let __pina_failure_detail = ($($arg)*);
+		#[cfg(feature = "verbose-logs")]
+		{
+			$crate::solana_program_log::log!($($arg)*);
+		}
+		#[cfg(not(feature = "verbose-logs"))]
+		{
+			let _ = __pina_failure_detail;
+		}
+	}};
+}
+
+/// No-op variant of [`log_failure!`] when `logs` is disabled.
+#[cfg(not(feature = "logs"))]
+#[macro_export]
+macro_rules! log_failure {
+	($($arg:tt)*) => {{}};
+}
+
 /// Logs a message to the Solana runtime.
 ///
 /// Supports two forms:
 /// - `log!("simple string literal")` — works in all crates
-/// - `log!("format: {}", value)` — format-arg form
+/// - `log!("format: {}", value)` — format-arg form, requires `verbose-logs`
 ///
 /// # Limitations
 ///
@@ -237,6 +286,11 @@ macro_rules! nostd_entrypoint {
 /// Crates that only re-export pina without their own `solana-program-log`
 /// dependency will fail to resolve the macro path for the format arm.
 ///
+/// Without the `verbose-logs` feature the format-arg form logs a static
+/// message instead. Formatting pulls in `core::fmt`, which is the largest
+/// avoidable contributor to deployed program size; use [`log_verbose!`] for
+/// messages that are worth that cost in production builds.
+///
 /// When the `logs` feature is disabled this is a no-op that compiles to
 /// nothing.
 #[cfg(feature = "logs")]
@@ -245,9 +299,40 @@ macro_rules! log {
 	($msg:literal) => {
 		$crate::solana_program_log::logger::log_message($msg.as_bytes())
 	};
+	// Without `verbose-logs` the format arm collapses to a static message so
+	// `core::fmt` is not linked. The arguments are still evaluated to keep
+	// statement semantics identical between feature sets.
+	($($arg:tt)*) => {{
+		#[cfg(feature = "verbose-logs")]
+		{
+			$crate::solana_program_log::log!($($arg)*);
+		}
+		#[cfg(not(feature = "verbose-logs"))]
+		{
+			$crate::solana_program_log::logger::log_message(
+				$crate::DETAIL_POINTER_MESSAGE.as_bytes(),
+			);
+		}
+	}};
+}
+
+/// Logs a formatted message. Always formats, even without `verbose-logs`.
+///
+/// Use for developer-facing messages that are worth linking `core::fmt`.
+/// Prefer [`log!`] on failure paths inside deployed programs.
+#[cfg(feature = "verbose-logs")]
+#[macro_export]
+macro_rules! log_verbose {
 	($($arg:tt)*) => {
 		$crate::solana_program_log::log!($($arg)*);
 	};
+}
+
+/// No-op variant of [`log_verbose!`] when `verbose-logs` is disabled.
+#[cfg(not(feature = "verbose-logs"))]
+#[macro_export]
+macro_rules! log_verbose {
+	($($arg:tt)*) => {{}};
 }
 
 #[cfg(not(feature = "logs"))]

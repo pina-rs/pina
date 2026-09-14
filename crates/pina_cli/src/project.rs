@@ -118,6 +118,8 @@ pub struct Project {
 	pub package_name: String,
 	pub library_name: String,
 	pub library_source: PathBuf,
+	/// Crate types declared by the library target, in manifest order.
+	pub library_crate_types: Vec<String>,
 	pub target_dir: PathBuf,
 	pub idl_dir: PathBuf,
 	pub clients_dir: PathBuf,
@@ -429,7 +431,7 @@ impl Project {
 		let metadata = cargo_metadata(&root, Some(&manifest_path))?;
 		let package = package_for_manifest(&metadata, &manifest_path, &root)?;
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
-		let (library_name, library_source) = library_details(package)?;
+		let (library_name, library_source, library_crate_types) = library_details(package)?;
 		let idl_dir = config
 			.project
 			.idl_dir
@@ -448,6 +450,7 @@ impl Project {
 			package_name: package.name.to_string(),
 			library_name,
 			library_source,
+			library_crate_types,
 			idl_dir,
 			target_dir,
 			clients_dir,
@@ -503,7 +506,7 @@ impl Project {
 			});
 		};
 
-		let (library_name, library_source) = library_details(package)?;
+		let (library_name, library_source, library_crate_types) = library_details(package)?;
 		let root = program_dir.to_path_buf();
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
 		let clients_dir = root.join("clients");
@@ -515,6 +518,7 @@ impl Project {
 			package_name: package.name.to_string(),
 			library_name,
 			library_source,
+			library_crate_types,
 			idl_dir: target_dir.join("idl"),
 			target_dir,
 			clients_dir,
@@ -724,7 +728,7 @@ fn package_for_manifest<'a>(
 		})
 }
 
-fn library_details(package: &Package) -> Result<(String, PathBuf), ProjectError> {
+fn library_details(package: &Package) -> Result<(String, PathBuf, Vec<String>), ProjectError> {
 	let target = package
 		.targets
 		.iter()
@@ -743,6 +747,7 @@ fn library_details(package: &Package) -> Result<(String, PathBuf), ProjectError>
 	Ok((
 		target.name.clone(),
 		target.src_path.as_std_path().to_path_buf(),
+		target.crate_types.iter().map(ToString::to_string).collect(),
 	))
 }
 
