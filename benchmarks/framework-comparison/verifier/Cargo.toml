@@ -1,0 +1,22 @@
+[package]
+name = "framework_verifier"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# The verifier is a host-side tool: it loads a compiled SBF ELF into a Mollusk
+# VM and reports the compute units each instruction consumes. It never ships
+# on-chain, so it may allocate and link `std`.
+[workspace]
+
+[[bin]]
+name = "framework-verifier"
+path = "src/main.rs"
+
+[dependencies]
+mollusk-svm = { version = "0.14.0", default-features = false }
+solana-account = "4"
+solana-instruction = "3"
+solana-pubkey = "4"
+solana-sdk-ids = "3"
+solana-svm-log-collector = { version = "4.1.1", features = ["agave-unstable-api"] }

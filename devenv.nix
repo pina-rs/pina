@@ -860,6 +860,27 @@ in
       description = "Compare all example instruction CU, static CU, and program sizes against origin/main.";
       binary = "bash";
     };
+    "benchmark:frameworks" = {
+      exec = ''
+        set -euo pipefail
+        node "$DEVENV_ROOT/scripts/benchmark-frameworks.ts" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/framework-comparison" \
+          --update-doc
+      '';
+      description = "Rebuild the Pina, Pinocchio, Quasar and Anchor v2 fixtures, measure size and compute units, and refresh docs/src/framework-comparison.md.";
+      binary = "bash";
+    };
+    "benchmark:frameworks:check" = {
+      exec = ''
+        set -euo pipefail
+        node "$DEVENV_ROOT/scripts/benchmark-frameworks.ts" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/framework-comparison-check"
+      '';
+      description = "Measure the framework fixtures without rewriting the published tables.";
+      binary = "bash";
+    };
     "idl:generate" = {
       exec = ''
         set -euo pipefail

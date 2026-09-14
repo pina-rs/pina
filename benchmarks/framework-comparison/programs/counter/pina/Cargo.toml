@@ -1,0 +1,13 @@
+[package]
+name = "counter_pina"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pina = { path = "../../../../../crates/pina", features = ["logs", "derive"] }

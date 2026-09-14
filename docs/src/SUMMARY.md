@@ -48,6 +48,7 @@
 - [Examples](./examples.md)
 - [Compute-unit performance](./compute-unit-performance.md)
 - [Program size](./program-size.md)
+- [Framework comparison](./framework-comparison.md)
 - [Tutorials]()
   - [Your First Program](./tutorials/first-program.md)
   - [Compact Accounts](./tutorials/compact-accounts.md)
