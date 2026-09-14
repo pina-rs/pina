@@ -239,18 +239,21 @@ fn fetch_account_data_round_trips_through_http() {
 	assert_eq!(data, Some(vec![1, 2, 65]));
 
 	let request = server.join().expect("server thread");
+	// The request is decoded rather than substring-matched: a malformed body
+	// that happens to contain the method name must not pass this test.
+	let (headers, body) = request
+		.split_once("\r\n\r\n")
+		.unwrap_or_else(|| panic!("request has no header terminator: {request}"));
 	assert!(
-		request.starts_with("POST "),
-		"unexpected request: {request}"
+		headers.starts_with("POST "),
+		"unexpected request line: {headers}"
 	);
-	assert!(
-		request.contains("getAccountInfo"),
-		"request omits the method: {request}"
-	);
-	assert!(
-		request.contains(&address.to_string()),
-		"request omits the address: {request}"
-	);
+	let rpc: serde_json::Value = serde_json::from_str(body)
+		.unwrap_or_else(|error| panic!("request body is not JSON ({error}): {body}"));
+	assert_eq!(rpc["jsonrpc"], "2.0");
+	assert_eq!(rpc["method"], "getAccountInfo");
+	assert_eq!(rpc["params"][0], address.to_string());
+	assert_eq!(rpc["params"][1]["encoding"], "base64");
 }
 
 #[test]
