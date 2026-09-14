@@ -288,7 +288,7 @@ mod value_changed_event_projection_tests {
 		let future: u8 = 2;
 		let error = ValueChangedEvent::project_from_bytes(&record(future, &[]))
 			.err()
-			.expect("a 		 future version must fail");
+			.expect("a future version must fail");
 		assert_eq!(
 			error,
 			ValueChangedEventProjectionError::Unknown {

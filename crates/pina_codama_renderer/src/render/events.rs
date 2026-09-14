@@ -659,6 +659,10 @@ fn render_projection_tests(
 	let version_start = envelope.discriminator_bytes;
 	let projection_error = format!("{event_name}ProjectionError");
 	let first_step = history.steps.first();
+	// A saturating "next" version equals the current one when the current
+	// version is the largest its width can represent, so the generated
+	// future test would decode the current envelope and fail.
+	let future_possible = envelope.version != version_type_max(envelope.version_bytes);
 	let mut lines = Vec::new();
 
 	lines.push("#[cfg(test)]".to_string());
@@ -704,17 +708,37 @@ fn render_projection_tests(
 		lines.push(String::new());
 	}
 
-	lines.push("\t#[test]".to_string());
-	lines.push("\tfn future_versions_fail_closed() {".to_string());
-	lines.push(format!(
-		"\t\tlet future: {version_ty} = {next};\n\t\tlet error = \
-		 {event_name}::project_from_bytes(&record(future, &[]))\n\t\t\t.err()\n\t\t\t.expect(\"a 		 \
-		 future version must fail\");\n\t\tassert_eq!(error, {projection_error}::Unknown {{ \
-		 stored: u32::from(future) }});",
-		next = envelope.version.saturating_add(1),
-	));
-	lines.push("\t}".to_string());
-	lines.push(String::new());
+	if future_possible {
+		lines.push("\t#[test]".to_string());
+		lines.push("\tfn future_versions_fail_closed() {".to_string());
+		lines.push(format!(
+			"\t\tlet future: {version_ty} = {next};\n\t\tlet error = \
+			 {event_name}::project_from_bytes(&record(future, \
+			 &[]))\n\t\t\t.err()\n\t\t\t.expect(\"a future version must \
+			 fail\");\n\t\tassert_eq!(error, {projection_error}::Unknown {{ stored: \
+			 u32::from(future) }});",
+			next = envelope.version.saturating_add(1),
+		));
+		lines.push("\t}".to_string());
+		lines.push(String::new());
+	} else {
+		// No higher version exists, so the current maximum must decode as
+		// the current schema, matching `try_from_bytes`.
+		lines.push("\t#[test]".to_string());
+		lines.push("\tfn maximal_version_decodes_as_current() {".to_string());
+		lines.push(format!(
+			"\t\tlet projected = {event_name}::project_from_bytes(&record({version} as \
+			 {version_ty}, &[]))\n\t\t\t.unwrap_or_else(|error| panic!(\"project: {{error}}\"));",
+			version = envelope.version,
+		));
+		lines.push("\t\tassert!(!projected.was_migrated());".to_string());
+		lines.push(format!(
+			"\t\tassert_eq!(projected.source_version(), {version});",
+			version = envelope.version,
+		));
+		lines.push("\t}".to_string());
+		lines.push(String::new());
+	}
 	lines.push("\t#[test]".to_string());
 	lines.push("\tfn wrong_lengths_and_discriminators_fail_closed() {".to_string());
 	if let Some(step) = first_step {
@@ -1067,6 +1091,33 @@ mod tests {
 			"a maximal version must not emit a future arm:\n{page}"
 		);
 		assert!(page.contains("< VALUE_CHANGED_MIGRATION_VERSION"), "{page}");
+	}
+
+	#[test]
+	fn maximal_projection_versions_pin_the_current_decode() {
+		let event = envelope_event(
+			"valueChanged",
+			U8,
+			Number::UnsignedInteger(u64::from(u8::MAX)),
+		);
+		let page = render_event_page(&event, Some(&envelope_history(true)))
+			.unwrap_or_else(|error| panic!("event render: {error}"));
+
+		// A saturating "next" version would equal the current one, so the
+		// future test must be replaced by a current-decode assertion.
+		assert!(
+			!page.contains("future_versions_fail_closed"),
+			"a maximal version has no future envelope to test:\n{page}"
+		);
+		assert!(
+			page.contains("fn maximal_version_decodes_as_current()"),
+			"{page}"
+		);
+		assert!(
+			page.contains("assert!(!projected.was_migrated());"),
+			"{page}"
+		);
+		assert!(page.contains("record(255 as u8, &[])"), "{page}");
 	}
 
 	#[test]
