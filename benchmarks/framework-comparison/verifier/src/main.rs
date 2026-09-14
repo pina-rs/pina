@@ -107,7 +107,9 @@ fn main() {
 					&initialize_data,
 					vec![
 						AccountMeta::new(authority, true),
-						AccountMeta::new(counter, true),
+						// The counter is a PDA: the program signs for it through
+						// `invoke_signed`, so it is not a transaction signer.
+						AccountMeta::new(counter, false),
 						AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 					],
 				),

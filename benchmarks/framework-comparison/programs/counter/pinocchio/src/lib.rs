@@ -96,6 +96,9 @@ fn increment(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResul
 	// Read the stored state.
 	let (bump, count) = {
 		let data = counter.try_borrow()?;
+		if data.len() != COUNTER_SPACE as usize {
+			return Err(ProgramError::InvalidAccountData);
+		}
 		if data[0] != ACCOUNT_DISCRIMINATOR {
 			return Err(ProgramError::InvalidAccountData);
 		}

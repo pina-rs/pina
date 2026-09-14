@@ -3,7 +3,7 @@
 Two programs, built with four frameworks, measured two ways. Size decides what a deployment costs in rent; compute units decide how much of a transaction's budget the instruction spends. Both tables below are produced by one command:
 
 ```sh
-benchmark:frameworks
+devenv shell -- benchmark:frameworks
 ```
 
 That command rebuilds every program and rewrites the generated region of this page, so the published numbers cannot drift from the code that produced them.
@@ -46,10 +46,10 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |       12,376 |          10,719 |          1,753 |              +82% |
-| Pinocchio (hand-written)    |        6,784 |           1,488 |          1,724 |               +0% |
-| Quasar                      |        7,808 |           3,512 |            330 |              +15% |
-| Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +28% |
+| Pina                        |       12,376 |          10,719 |          1,753 |              +90% |
+| Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
+| Quasar                      |        7,808 |           3,488 |            330 |              +20% |
+| Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |
 
 <!-- END GENERATED: framework-comparison -->
 
@@ -61,7 +61,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 **The Pinocchio row is the floor.** It is hand-written `pinocchio` with no framework at all, and it is the number a framework has to justify. Pina's gap to it is the cost of derive-generated dispatch and validation.
 
-**Pina's `initialize` is the one number that looks like a defect rather than a design cost.** Creating the counter account costs 10,719 CU against Pinocchio's 1,488 for the same `create_account` CPI in the same instruction. The difference is [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs), which validates the PDA with `try_find_program_address` — a search over up to 256 candidate bumps — even though the caller has already supplied the canonical bump as an argument. Roughly 9,200 CU, about two thirds of a default 14,000 CU instruction budget, goes to re-deriving a value the program was handed.
+**Pina's `initialize` is the one number that looks like a defect rather than a design cost.** Creating the counter account costs 10,719 CU against Pinocchio's 1,490 for the same `create_account` CPI in the same instruction. The difference is [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs), which validates the PDA with `try_find_program_address` — a search over up to 256 candidate bumps — even though the caller has already supplied the canonical bump as an argument. About 9,200 CU, roughly two thirds of a default 14,000 CU instruction budget, goes to re-deriving a value the program was handed.
 
 Every PDA-creating example in this repository uses that helper, so the cost is not specific to the counter. Replacing the search with a single `create_program_address` when a bump is supplied would remove it, but that is a security-relevant change — canonicity is what the search proves — so it belongs in its own pull request rather than in the harness that measured it.
 
@@ -72,3 +72,5 @@ devenv shell -- benchmark:frameworks
 ```
 
 The command needs the Agave SBF toolchain (for `cargo build-sbf`) and network access on the first run, because the Quasar and Anchor v2 programs depend on pinned revisions of their upstream repositories. Both revisions are pinned in the fixture manifests, and each fixture is a standalone crate so those dependencies never enter the workspace lockfile.
+
+Regenerating rewrites the tables in whatever alignment the script emits, so follow it with `fix:format` to restore dprint's column alignment.

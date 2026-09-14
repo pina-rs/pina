@@ -13,7 +13,7 @@ devenv shell -- benchmark:frameworks
 - `programs/<program>/<framework>/` — one standalone crate per row of the table. Each declares its own `[workspace]` so the foreign framework revisions they pin stay out of the root workspace lockfile.
 - `verifier/` — a host-side Mollusk harness that loads a compiled `.so`, runs the instruction flow, and reports the charged compute units. It also proves the flow worked, so a fast number from a program that errors out can never be recorded as a result.
 
-`scripts/benchmark-frameworks.ts` drives both: it builds every fixture with `cargo build-sbf --lto` under one shared release profile, runs the verifier, and rewrites the generated region of the docs page.
+`scripts/benchmark-frameworks.ts` drives both: it builds every fixture with `cargo build-sbf --lto` under one shared release profile, runs the verifier, and rewrites the generated region of the docs page Both cargo invocations pass `--locked`, so what gets built is exactly what the committed lockfiles describe.
 
 ## Adding a framework or a program
 

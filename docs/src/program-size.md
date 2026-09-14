@@ -9,7 +9,7 @@ Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2), `sbpf-solana-sola
 | Framework                   | Hello world | Counter    |
 | --------------------------- | ----------- | ---------- |
 | Quasar                      | 2,520       | 7,808      |
-| Pinocchio (hand-written)    | 3,160       | 6,784      |
+| Pinocchio (hand-written)    | 3,160       | 6,512      |
 | **Pina**                    | **4,680**   | **12,376** |
 | Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,696      |
 | Anchor (v1, 1.2.0)          | 55,752      | 122,160    |

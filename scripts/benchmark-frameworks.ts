@@ -185,6 +185,7 @@ function buildVerifier(root: string, outputDir: string): string {
 		[
 			"build",
 			"--release",
+			"--locked",
 			"--manifest-path",
 			join(root, "benchmarks/framework-comparison/verifier/Cargo.toml"),
 			"--target-dir",
@@ -228,6 +229,10 @@ function buildProgram(
 			),
 			"--sbf-out-dir",
 			outDir,
+			// `cargo build-sbf` has no `--locked` of its own; the trailing
+			// arguments are forwarded to its inner `cargo build`.
+			"--",
+			"--locked",
 		],
 		{ cwd: root, env: RELEASE_PROFILE },
 	);
