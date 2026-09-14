@@ -33,15 +33,36 @@ pub struct BuildOptions {
 	pub project_dir: PathBuf,
 	pub features: Vec<String>,
 	pub no_default_features: bool,
-	/// Skip link-time optimization even when the program crate supports it.
-	pub no_lto: bool,
-	/// Skip the production release profile overrides.
-	pub no_size_profile: bool,
-	/// Enable `overflow-checks` in the production profile.
+	/// Release profile overrides applied to the SBF build.
+	pub size_profile: SizeProfile,
+}
+
+/// Release profile applied to a deployed program build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SizeProfile {
+	/// Fat LTO, `codegen-units = 1`, `opt-level = 3`, and overflow checks off.
 	///
-	/// Disabled by default: turning it off lets arithmetic overflow wrap
-	/// instead of panicking, which is a behavior change, so callers opt in.
-	pub overflow_checks: bool,
+	/// Overflow checks are disabled because the flag lets arithmetic overflow
+	/// wrap instead of panicking; use [`Self::ProductionWithOverflowChecks`]
+	/// when a program must fail loudly.
+	#[default]
+	Production,
+	/// The production profile, keeping arithmetic overflow checks enabled.
+	ProductionWithOverflowChecks,
+	/// Leave the program's own release profile untouched.
+	None,
+}
+
+impl SizeProfile {
+	/// Whether fat LTO should be requested for this profile.
+	fn requests_lto(self) -> bool {
+		!matches!(self, Self::None)
+	}
+
+	/// Whether the profile wants overflow checks left enabled.
+	fn keeps_overflow_checks(self) -> bool {
+		matches!(self, Self::ProductionWithOverflowChecks)
+	}
 }
 
 /// Outputs produced by a deterministic Solana Verify build.
@@ -150,9 +171,7 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 		project_dir: start.to_path_buf(),
 		features: Vec::new(),
 		no_default_features: false,
-		no_lto: false,
-		no_size_profile: false,
-		overflow_checks: false,
+		size_profile: SizeProfile::default(),
 	})
 }
 
@@ -168,7 +187,7 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
 	check_migrations_for_build(&project)?;
-	if !options.no_lto {
+	if options.size_profile.requests_lto() {
 		warn_lto_unavailable(&project);
 	}
 	let manifest_path = project.program_dir.join("Cargo.toml");
@@ -371,11 +390,11 @@ fn publish_verified_build(
 /// `overflow-checks` is the caller's opt-in because disabling it changes
 /// arithmetic overflow from a panic into a wrap.
 fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
-	if options.no_size_profile {
+	if matches!(options.size_profile, SizeProfile::None) {
 		return;
 	}
 
-	if !options.no_lto {
+	if options.size_profile.requests_lto() {
 		command.env("CARGO_PROFILE_RELEASE_LTO", "fat");
 	}
 	command
@@ -383,7 +402,7 @@ fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
 		.env("CARGO_PROFILE_RELEASE_OPT_LEVEL", "3")
 		.env(
 			"CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS",
-			if options.overflow_checks {
+			if options.size_profile.keeps_overflow_checks() {
 				"true"
 			} else {
 				"false"
@@ -422,7 +441,7 @@ fn build_sbf_args(
 		args.push(OsString::from("--no-default-features"));
 	}
 
-	if !options.no_lto && library_supports_lto(project) {
+	if options.size_profile.requests_lto() && library_supports_lto(project) {
 		args.push(OsString::from("--lto"));
 	}
 
@@ -872,15 +891,13 @@ mod tests {
 		(temp, project)
 	}
 
-	fn build_args_for(project: &Project, no_lto: bool) -> Vec<String> {
+	fn build_args_for(project: &Project, size_profile: SizeProfile) -> Vec<String> {
 		let manifest_path = project.program_dir.join("Cargo.toml");
 		let options = BuildOptions {
 			project_dir: project.root.clone(),
 			features: Vec::new(),
 			no_default_features: false,
-			no_lto,
-			no_size_profile: false,
-			overflow_checks: false,
+			size_profile,
 		};
 		build_sbf_args(project, &manifest_path, "bpf-entrypoint", &options)
 			.into_iter()
@@ -894,10 +911,10 @@ mod tests {
 			discover_fixture_with_crate_types("lto-cdylib-fixture", "\"cdylib\"");
 
 		assert!(library_supports_lto(&project));
-		let args = build_args_for(&project, false);
+		let args = build_args_for(&project, SizeProfile::Production);
 		assert!(args.contains(&"--lto".to_owned()));
 
-		let args = build_args_for(&project, true);
+		let args = build_args_for(&project, SizeProfile::None);
 		assert!(!args.contains(&"--lto".to_owned()));
 	}
 
@@ -907,18 +924,16 @@ mod tests {
 			discover_fixture_with_crate_types("lto-dual-fixture", "\"cdylib\", \"lib\"");
 
 		assert!(!library_supports_lto(&project));
-		let args = build_args_for(&project, false);
+		let args = build_args_for(&project, SizeProfile::Production);
 		assert!(!args.contains(&"--lto".to_owned()));
 	}
 
-	fn profile_env_for(no_size_profile: bool, overflow_checks: bool) -> Vec<(String, String)> {
+	fn profile_env_for(size_profile: SizeProfile) -> Vec<(String, String)> {
 		let options = BuildOptions {
 			project_dir: PathBuf::new(),
 			features: Vec::new(),
 			no_default_features: false,
-			no_lto: false,
-			no_size_profile,
-			overflow_checks,
+			size_profile,
 		};
 		let mut command = Command::new("cargo");
 		apply_size_profile(&mut command, &options);
@@ -937,7 +952,7 @@ mod tests {
 
 	#[test]
 	fn size_profile_sets_lto_codegen_units_and_opt_level() {
-		let env = profile_env_for(false, false);
+		let env = profile_env_for(SizeProfile::Production);
 		let lookup = |key: &str| {
 			env.iter()
 				.find(|(name, _)| name == key)
@@ -962,7 +977,7 @@ mod tests {
 
 	#[test]
 	fn overflow_checks_flag_restores_the_safety_check() {
-		let env = profile_env_for(false, true);
+		let env = profile_env_for(SizeProfile::ProductionWithOverflowChecks);
 		let overflow = env
 			.iter()
 			.find(|(name, _)| name == "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS")
@@ -972,8 +987,8 @@ mod tests {
 	}
 
 	#[test]
-	fn no_size_profile_leaves_every_override_unset() {
-		let env = profile_env_for(true, false);
+	fn size_profile_none_leaves_every_override_unset() {
+		let env = profile_env_for(SizeProfile::None);
 
 		assert!(env.is_empty());
 	}

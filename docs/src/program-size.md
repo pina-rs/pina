@@ -10,7 +10,7 @@ Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2, `sbpf-linker` 0.1.
 | --------------------------- | ----------- | ---------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
 | Quasar                      | 2,520       | 7,808      | `--lto`                                           | Custom compiler-builtins fork; workspace defaults to fat LTO            |
 | Pinocchio (hand-written)    | 3,056       | 6,800      | `--lto` / `--optimize-size`                       | Reference floor for a no-framework program                              |
-| **Pina**                    | **4,808**   | **12,400** | production profile (`lto=fat`, `codegen-units=1`) | `pina build` defaults                                                   |
+| **Pina**                    | **4,800**   | **12,392** | production profile (`lto=fat`, `codegen-units=1`) | `pina build` defaults                                                   |
 | Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,728      | `--lto`                                           | Full rewrite on pinocchio; its published 6.9 KB bench needs cdylib-only |
 | Anchor (v1, 1.2.0)          | 55,752      | 122,160    | v1 needs `--lto --optimize-size`                  | LTO _grows_ a v1 hello world                                            |
 
@@ -33,7 +33,7 @@ Failure paths are the largest avoidable cost. `log!("address: {} …", addr)` an
 | Build                                    | Hello world | Counter |
 | ---------------------------------------- | ----------- | ------- |
 | Formatted diagnostics (pre-0.17 default) | 8,680       | 37,472  |
-| Static diagnostics, `logs` on (default)  | 4,808       | 12,400  |
+| Static diagnostics, `logs` on (default)  | 4,800       | 12,392  |
 | `verbose-logs` on                        | 6,840       | 24,504  |
 | `logs` off entirely                      | 4,696       | 18,680  |
 

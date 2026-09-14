@@ -198,6 +198,20 @@ pub use crate::utils::*;
 pub const DETAIL_POINTER_MESSAGE: &str =
 	"pina: operation failed; enable the `verbose-logs` feature for details";
 
+/// Whether formatted diagnostics are compiled in.
+///
+/// Exported macros read this constant instead of testing
+/// `cfg(feature = "verbose-logs")` themselves, because a `cfg` written inside
+/// an exported macro is evaluated against the *calling* crate's features. The
+/// caller usually does not declare `verbose-logs`, which would make the
+/// condition fail to compile rather than simply evaluate to `false`.
+#[cfg(feature = "verbose-logs")]
+pub const VERBOSE_LOGS_ENABLED: bool = true;
+
+/// See [`VERBOSE_LOGS_ENABLED`] for why this is a constant.
+#[cfg(not(feature = "verbose-logs"))]
+pub const VERBOSE_LOGS_ENABLED: bool = false;
+
 /// Sets up a `no_std` Solana program entrypoint.
 ///
 /// This macro wires up the BPF entrypoint, disables the default allocator, and
@@ -250,26 +264,23 @@ macro_rules! log_failure {
 	}};
 	($message:literal, $($arg:tt)*) => {{
 		$crate::solana_program_log::logger::log_message($message.as_bytes());
-		// Arguments are evaluated in every feature configuration so the
-		// failure path behaves identically with and without `verbose-logs`.
-		#[allow(unused_variables)]
-		let __pina_failure_detail = ($($arg)*);
-		#[cfg(feature = "verbose-logs")]
-		{
+		if $crate::VERBOSE_LOGS_ENABLED {
 			$crate::solana_program_log::log!($($arg)*);
-		}
-		#[cfg(not(feature = "verbose-logs"))]
-		{
-			let _ = __pina_failure_detail;
+		} else {
+			let _ = ($($arg)*);
 		}
 	}};
 }
 
 /// No-op variant of [`log_failure!`] when `logs` is disabled.
+///
+/// Arguments are still evaluated so call sites keep identical semantics.
 #[cfg(not(feature = "logs"))]
 #[macro_export]
 macro_rules! log_failure {
-	($($arg:tt)*) => {{}};
+	($($arg:tt)*) => {{
+		let _ = ($($arg)*);
+	}};
 }
 
 /// Logs a message to the Solana runtime.
@@ -299,16 +310,15 @@ macro_rules! log {
 	($msg:literal) => {
 		$crate::solana_program_log::logger::log_message($msg.as_bytes())
 	};
-	// Without `verbose-logs` the format arm collapses to a static message so
-	// `core::fmt` is not linked. The arguments are still evaluated to keep
-	// statement semantics identical between feature sets.
+	// Without `verbose-logs` the format arm logs a static message so
+	// `core::fmt` is not linked. Arguments are still evaluated so call sites
+	// keep identical semantics and bindings stay used in every feature
+	// configuration.
 	($($arg:tt)*) => {{
-		#[cfg(feature = "verbose-logs")]
-		{
+		if $crate::VERBOSE_LOGS_ENABLED {
 			$crate::solana_program_log::log!($($arg)*);
-		}
-		#[cfg(not(feature = "verbose-logs"))]
-		{
+		} else {
+			let _ = ($($arg)*);
 			$crate::solana_program_log::logger::log_message(
 				$crate::DETAIL_POINTER_MESSAGE.as_bytes(),
 			);
@@ -329,16 +339,22 @@ macro_rules! log_verbose {
 }
 
 /// No-op variant of [`log_verbose!`] when `verbose-logs` is disabled.
+///
+/// Arguments are still evaluated so call sites keep identical semantics.
 #[cfg(not(feature = "verbose-logs"))]
 #[macro_export]
 macro_rules! log_verbose {
-	($($arg:tt)*) => {{}};
+	($($arg:tt)*) => {{
+		let _ = ($($arg)*);
+	}};
 }
 
 #[cfg(not(feature = "logs"))]
 #[macro_export]
 macro_rules! log {
-	($($arg:tt)*) => {};
+	($($arg:tt)*) => {{
+		let _ = ($($arg)*);
+	}};
 }
 
 /// Re-exports commonly used traits and helpers for instruction modules.

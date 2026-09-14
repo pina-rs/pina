@@ -5,7 +5,7 @@ pina_cli: feat
 
 # Reduce deployed program size by up to 67%
 
-Programs built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,808 bytes (−45%) and a PDA counter from 37,472 to 12,400 bytes (−67%).
+Programs built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,800 bytes (−45%) and a PDA counter from 37,472 to 12,392 bytes (−67%).
 
 Three changes produce that result.
 

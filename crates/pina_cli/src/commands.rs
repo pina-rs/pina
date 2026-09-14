@@ -37,9 +37,7 @@ pub(crate) fn run(cli: Cli) {
 				project,
 				features,
 				no_default_features,
-				no_lto,
-				no_size_profile,
-				overflow_checks,
+				size_profile(no_lto, no_size_profile, overflow_checks),
 				verify,
 				solana_verify,
 			);
@@ -244,9 +242,7 @@ fn run_migrations(command: MigrationCommands) {
 				project.clone(),
 				Vec::new(),
 				false,
-				false,
-				false,
-				false,
+				pina_cli::build::SizeProfile::default(),
 				false,
 				std::ffi::OsString::from("solana"),
 			);
@@ -831,13 +827,29 @@ fn exit_verify_error(error: pina_cli::verification::VerifyError) -> ! {
 	std::process::exit(error.exit_code());
 }
 
+/// Maps the build flags onto the release profile the SBF build uses.
+fn size_profile(
+	no_lto: bool,
+	no_size_profile: bool,
+	overflow_checks: bool,
+) -> pina_cli::build::SizeProfile {
+	use pina_cli::build::SizeProfile;
+
+	if no_size_profile || no_lto {
+		return SizeProfile::None;
+	}
+	if overflow_checks {
+		return SizeProfile::ProductionWithOverflowChecks;
+	}
+
+	SizeProfile::Production
+}
+
 fn run_build(
 	project: PathBuf,
 	features: Vec<String>,
 	no_default_features: bool,
-	no_lto: bool,
-	no_size_profile: bool,
-	overflow_checks: bool,
+	size_profile: pina_cli::build::SizeProfile,
 	verify: bool,
 	solana_verify: std::ffi::OsString,
 ) {
@@ -845,9 +857,7 @@ fn run_build(
 		project_dir: project,
 		features,
 		no_default_features,
-		no_lto,
-		no_size_profile,
-		overflow_checks,
+		size_profile,
 	};
 	let output = if verify {
 		pina_cli::build::build_project_verified_with_options(
@@ -2193,5 +2203,33 @@ mod inspect_command_tests {
 			..current
 		};
 		print_inspect_report(&unknown);
+	}
+}
+
+#[cfg(test)]
+mod size_profile_tests {
+	use pina_cli::build::SizeProfile;
+
+	use super::size_profile;
+
+	#[test]
+	fn default_flags_select_the_production_profile() {
+		assert_eq!(size_profile(false, false, false), SizeProfile::Production);
+	}
+
+	#[test]
+	fn overflow_checks_flag_keeps_the_check() {
+		assert_eq!(
+			size_profile(false, false, true),
+			SizeProfile::ProductionWithOverflowChecks
+		);
+	}
+
+	#[test]
+	fn opting_out_of_lto_or_the_profile_disables_every_override() {
+		// `--no-lto` only removes LTO; the rest of the profile is still a
+		// user-visible override, so both flags map to the untouched profile.
+		assert_eq!(size_profile(true, false, false), SizeProfile::None);
+		assert_eq!(size_profile(false, true, false), SizeProfile::None);
 	}
 }
