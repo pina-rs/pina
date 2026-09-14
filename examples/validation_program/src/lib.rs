@@ -248,7 +248,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.policy
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.policy,
 			payer: self.authority,
 			owner: &ID,

@@ -169,7 +169,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.counter,
 			payer: self.authority,
 			owner: &ID,

@@ -24,11 +24,7 @@ final class InitializePoolCommand extends Command<void> {
         mandatory: true,
         help: "The reward_mint account",
       )
-      ..addOption(
-        'pool_state',
-        mandatory: false,
-        help: "The pool_state account [default: derived]",
-      )
+      ..addOption('pool_state', mandatory: true, help: "The pool_state account")
       ..addOption(
         'stake_vault',
         mandatory: true,
@@ -64,12 +60,7 @@ final class InitializePoolCommand extends Command<void> {
       '--reward-mint',
       results['reward_mint']! as String,
     );
-    final poolState = (results['pool_state'] as String?) != null
-        ? pubkey('--pool-state', results['pool_state']! as String)
-        : (await findPoolPda(
-            seeds: PoolSeeds(stakeMint: stakeMint, rewardMint: rewardMint),
-            programAddress: context.programAddress,
-          )).$1;
+    final poolState = pubkey('--pool-state', results['pool_state']! as String);
     final stakeVault = pubkey(
       '--stake-vault',
       results['stake_vault']! as String,

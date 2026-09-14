@@ -20,8 +20,8 @@ final class InitializeCommand extends Command<void> {
       )
       ..addOption(
         'registry_config',
-        mandatory: false,
-        help: "The registry_config account [default: derived]",
+        mandatory: true,
+        help: "The registry_config account",
       );
   }
 
@@ -38,12 +38,10 @@ final class InitializeCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final registryConfig = (results['registry_config'] as String?) != null
-        ? pubkey('--registry-config', results['registry_config']! as String)
-        : (await findRegistryConfigPda(
-            seeds: RegistryConfigSeeds(admin: admin),
-            programAddress: context.programAddress,
-          )).$1;
+    final registryConfig = pubkey(
+      '--registry-config',
+      results['registry_config']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

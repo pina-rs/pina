@@ -32,10 +32,8 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
-	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { findStorePda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -103,94 +101,6 @@ export function getInitInstructionDataCodec(): FixedSizeCodec<
 		getInitInstructionDataEncoder(),
 		getInitInstructionDataDecoder(),
 	);
-}
-
-export type InitAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountStore extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	/** Pays for account creation and seeds the store PDA. */
-	authority: TransactionSigner<TAccountAuthority>;
-	/** The store PDA account (must be empty — not yet created). */
-	store?: Address<TAccountStore>;
-	/** The system program, required for the create-account CPI. */
-	systemProgram?: Address<TAccountSystemProgram>;
-	bump: InitInstructionDataArgs["bump"];
-};
-
-export async function getInitInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountStore extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address =
-		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: InitAsyncInput<
-		TAccountAuthority,
-		TAccountStore,
-		TAccountSystemProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): Promise<
-	InitInstruction<
-		TProgramAddress,
-		TAccountAuthority,
-		TAccountStore,
-		TAccountSystemProgram
-	>
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		store: { value: input.store ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.store.value) {
-		accounts.store.value = await findStorePda({
-			authority: getAddressFromResolvedInstructionAccount(
-				"authority",
-				accounts.authority.value,
-			),
-		}, { programAddress });
-	}
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("authority", accounts.authority),
-			getAccountMeta("store", accounts.store),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getInitInstructionDataEncoder().encode(
-			args as InitInstructionDataArgs,
-		),
-		programAddress,
-	} as InitInstruction<
-		TProgramAddress,
-		TAccountAuthority,
-		TAccountStore,
-		TAccountSystemProgram
-	>);
 }
 
 export type InitInput<

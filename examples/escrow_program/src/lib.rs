@@ -155,7 +155,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			)?;
 
 		// Create and initialize the escrow account atomically.
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.escrow,
 			payer: self.maker,
 			owner: &ID,

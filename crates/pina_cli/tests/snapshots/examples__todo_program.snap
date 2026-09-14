@@ -114,24 +114,7 @@ expression: idl
             "name": "todo",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "todo"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "owner",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "owner"
-                  }
-                }
-              ]
-            }
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",

@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getInitializeInstructionAsync } from "../client";
+import { getInitializeInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -18,18 +18,18 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
 	.requiredOption("--bump <bump>", "bump")
 	.option("--admin <admin>", "The `admin` account [default: payer]")
-	.option(
+	.requiredOption(
 		"--registry-config <registryConfig>",
-		"The `registry_config` account [default: derived]",
+		"The `registry_config` account",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			admin: context.payer,
-			registryConfig: options.registryConfig,
+			registryConfig: pubkey("--registry-config", options.registryConfig),
 		};
-		const instruction = await getInitializeInstructionAsync(
+		const instruction = getInitializeInstruction(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

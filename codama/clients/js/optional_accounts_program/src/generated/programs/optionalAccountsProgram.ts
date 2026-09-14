@@ -38,11 +38,11 @@ import {
 	type StoreStateArgs,
 } from "../accounts";
 import {
-	getInitInstructionAsync,
+	getInitInstruction,
 	getInspectInstruction,
 	getNoteInstruction,
 	getTouchInstruction,
-	type InitAsyncInput,
+	type InitInput,
 	type InspectInput,
 	type NoteInput,
 	type ParsedInitInstruction,
@@ -187,8 +187,8 @@ export type OptionalAccountsProgramPluginAccounts = {
 
 export type OptionalAccountsProgramPluginInstructions = {
 	init: (
-		input: InitAsyncInput,
-	) => ReturnType<typeof getInitInstructionAsync> & SelfPlanAndSendFunctions;
+		input: InitInput,
+	) => ReturnType<typeof getInitInstruction> & SelfPlanAndSendFunctions;
 	touch: (
 		input: TouchInput,
 	) => ReturnType<typeof getTouchInstruction> & SelfPlanAndSendFunctions;
@@ -221,7 +221,7 @@ export function optionalAccountsProgramProgram() {
 				},
 				instructions: {
 					init: (input) =>
-						addSelfPlanAndSendFunctions(client, getInitInstructionAsync(input)),
+						addSelfPlanAndSendFunctions(client, getInitInstruction(input)),
 					touch: (input) =>
 						addSelfPlanAndSendFunctions(client, getTouchInstruction(input)),
 					inspect: (input) =>

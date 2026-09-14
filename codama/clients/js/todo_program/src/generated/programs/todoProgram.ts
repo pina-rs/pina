@@ -38,10 +38,10 @@ import {
 	type TodoStateArgs,
 } from "../accounts";
 import {
-	getInitializeInstructionAsync,
+	getInitializeInstruction,
 	getToggleCompletedInstructionAsync,
 	getUpdateDigestInstructionAsync,
-	type InitializeAsyncInput,
+	type InitializeInput,
 	type ParsedInitializeInstruction,
 	type ParsedToggleCompletedInstruction,
 	type ParsedUpdateDigestInstruction,
@@ -166,10 +166,8 @@ export type TodoProgramPluginAccounts = {
 
 export type TodoProgramPluginInstructions = {
 	initialize: (
-		input: InitializeAsyncInput,
-	) =>
-		& ReturnType<typeof getInitializeInstructionAsync>
-		& SelfPlanAndSendFunctions;
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 	toggleCompleted: (
 		input: ToggleCompletedAsyncInput,
 	) =>
@@ -202,7 +200,7 @@ export function todoProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstruction(input),
 						),
 					toggleCompleted: (input) =>
 						addSelfPlanAndSendFunctions(

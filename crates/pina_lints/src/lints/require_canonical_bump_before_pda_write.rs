@@ -17,9 +17,12 @@ crate::declare_late_lint! {
 	/// ### Why is this bad?
 	///
 	/// Accepting an arbitrary valid bump can create multiple addresses for one
-	/// logical seed namespace and break uniqueness assumptions. Typed Pina PDA
-	/// creation builders validate canonicality internally and do not require
-	/// either assertion before invocation.
+	/// logical seed namespace and break uniqueness assumptions.
+	/// `CreateProgramAccountWithBump` and `CreateProgramAccount` validate
+	/// canonicality internally and do not require either assertion before
+	/// invocation. `CreateProgramAccountWithUncheckedBump` deliberately does
+	/// not: it checks that the supplied bump derives the account's address, so
+	/// use it only where several addresses per seed namespace are acceptable.
 	pub REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE,
 	Deny,
 	"explicit PDA bumps must be proven canonical before use"
@@ -65,8 +68,9 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 				);
 				diag.help(
 					"call `account.assert_canonical_bump(seeds, program_id)?` before using an \
-					 explicit bump in validation-only code, use `assert_seeds()`, or let a typed \
-					 creation builder validate the canonical bump",
+					 explicit bump in validation-only code, use `assert_seeds()`, or let \
+					 `CreateProgramAccountWithBump` validate the canonical bump; \
+					 `CreateProgramAccountWithUncheckedBump` skips that check on purpose",
 				);
 				diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 			});

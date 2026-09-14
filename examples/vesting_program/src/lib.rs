@@ -188,7 +188,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.vesting_state,
 			payer: self.admin,
 			owner: &ID,

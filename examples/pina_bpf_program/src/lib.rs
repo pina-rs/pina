@@ -168,7 +168,7 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 
 			self.payer.assert_signer()?.assert_writable()?;
 			self.system_program.assert_address(&system::ID)?;
-			CreateProgramAccountWithBump {
+			CreateProgramAccountWithUncheckedBump {
 				account: self.state,
 				payer: self.payer,
 				owner: &ID,

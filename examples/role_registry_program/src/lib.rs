@@ -177,7 +177,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.registry_config,
 			payer: self.admin,
 			owner: &ID,
@@ -219,7 +219,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let registry_address = *self.registry_config.address();
 		let grantee_address = *self.grantee.address();
 
-		CreateProgramAccountWithBump {
+		CreateProgramAccountWithUncheckedBump {
 			account: self.role_entry,
 			payer: self.admin,
 			owner: &ID,

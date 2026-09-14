@@ -9,7 +9,7 @@ PDA-backed counter program.
 <br>
 
 - PDA-seeded accounts with `#[account]` / `#[pda]`.
-- Atomic fixed-account initialization with `CreateProgramAccountWithBump::invoke_with`.
+- Atomic fixed-account initialization with `CreateProgramAccountWithUncheckedBump::invoke_with`.
 - Counter state mutation (`Initialize`, `Increment`).
 - One-pass `CounterState::load_pda_mut` validation for the typed state, stored bump, and PDA address.
 

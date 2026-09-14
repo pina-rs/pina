@@ -221,6 +221,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
 - **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
 - **Use `CreateProgramAccount` or `CreateCompactProgramAccount` for canonical PDA creation**; their explicit-bump variants also reject noncanonical bumps without separate seed assertions
+- **Reserve `CreateProgramAccountWithUncheckedBump` for seed namespaces that already bind uniqueness**; it checks the supplied bump derives the account's address but does not prove it canonical
 - **Keep `assert_seeds()` / `assert_canonical_bump()` for validation-only paths** that are not immediately followed by a checked creation builder
 - **Give each account type its own seed namespace** so PDAs cannot collide across account types
 

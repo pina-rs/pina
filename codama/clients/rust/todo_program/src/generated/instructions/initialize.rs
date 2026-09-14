@@ -19,14 +19,10 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(owner: solana_pubkey::Pubkey) -> Self {
+	pub fn new(owner: solana_pubkey::Pubkey, todo: solana_pubkey::Pubkey) -> Self {
 		Self {
 			owner,
-			todo: solana_pubkey::Pubkey::find_program_address(
-				&["todo".as_bytes(), owner.as_ref()],
-				&crate::TODO_PROGRAM_ID,
-			)
-			.0,
+			todo,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

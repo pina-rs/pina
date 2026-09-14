@@ -34,10 +34,10 @@ import {
 } from "@solana/program-client-core";
 import { getStateCodec, type State, type StateArgs } from "../accounts";
 import {
-	type CreatePdaAsyncInput,
+	type CreatePdaInput,
 	type ForwardRotateWithPdaAsyncInput,
 	type ForwardRotateWithSignerInput,
-	getCreatePdaInstructionAsync,
+	getCreatePdaInstruction,
 	getForwardRotateWithPdaInstructionAsync,
 	getForwardRotateWithSignerInstruction,
 	getHelloInstruction,
@@ -191,10 +191,8 @@ export type PinaBpfProgramPluginInstructions = {
 		& ReturnType<typeof getForwardRotateWithPdaInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	createPda: (
-		input: CreatePdaAsyncInput,
-	) =>
-		& ReturnType<typeof getCreatePdaInstructionAsync>
-		& SelfPlanAndSendFunctions;
+		input: CreatePdaInput,
+	) => ReturnType<typeof getCreatePdaInstruction> & SelfPlanAndSendFunctions;
 };
 
 export type PinaBpfProgramPluginPdas = {
@@ -228,10 +226,7 @@ export function pinaBpfProgramProgram() {
 							getForwardRotateWithPdaInstructionAsync(input),
 						),
 					createPda: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getCreatePdaInstructionAsync(input),
-						),
+						addSelfPlanAndSendFunctions(client, getCreatePdaInstruction(input)),
 				},
 				pdas: { state: findStatePda, authority: findAuthorityPda },
 				identifyAccount: identifyPinaBpfProgramAccount,
