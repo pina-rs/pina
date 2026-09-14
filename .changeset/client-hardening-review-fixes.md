@@ -3,7 +3,7 @@ pina_cli: fix
 pina_codama_renderer: fix
 ---
 
-# Preserve JS event barrels and fix maximal-version projection tests
+# Preserve JS event barrels and maximal-version tests
 
 The JavaScript event hardening read `events/index.ts` with `unwrap_or_default`, so an unwritable or invalid-UTF-8 barrel was treated as absent and the following write replaced it with the lone `./logs` export, silently dropping the other event exports. Only a missing barrel now counts as fresh generation; every other read failure surfaces as `CodamaError::HardenJavaScript` before anything is overwritten.
 
