@@ -7,6 +7,7 @@
 //! reports the source version so consumers can tell a projected event from an
 //! emitted one. Versions without a derivable projection fail closed.
 
+use std::io::ErrorKind;
 use std::path::Path;
 
 use codama_nodes::DiscriminatorNode;
@@ -58,7 +59,19 @@ pub(crate) fn emit_js_event_log_module(
 	})?;
 
 	let index_path = events_dir.join("index.ts");
-	let index = std::fs::read_to_string(&index_path).unwrap_or_default();
+	// Only a missing barrel means fresh generation. Treating every read
+	// failure as absent would clobber an existing barrel (dropping its other
+	// event exports) whenever the index is unwritable or not valid UTF-8.
+	let index = match std::fs::read_to_string(&index_path) {
+		Ok(index) => index,
+		Err(error) if error.kind() == ErrorKind::NotFound => String::new(),
+		Err(source) => {
+			return Err(CodamaError::HardenJavaScript {
+				path: index_path,
+				source,
+			});
+		}
+	};
 	if !index.contains("\"./logs\"") {
 		let patched = if index.is_empty() {
 			"export * from \"./logs\";\n".to_string()
@@ -766,6 +779,61 @@ mod tests {
 		.expect_err("an unreadable index must fail");
 		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
 		assert!(generated.join("events/logs.ts").exists());
+	}
+
+	#[test]
+	fn existing_exports_survive_the_logs_barrel_patch() {
+		let root = read_idl("events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		write_index(&generated);
+
+		emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect("emit module");
+
+		let index = std::fs::read_to_string(generated.join("events/index.ts")).expect("index");
+		assert!(
+			index.starts_with("export * from \"./logs\";\n"),
+			"the logs export must be prepended: {index}"
+		);
+		assert!(
+			index.contains("export * from \"./myEvent\";"),
+			"the pre-existing export must be retained: {index}"
+		);
+	}
+
+	#[test]
+	fn unreadable_index_errors_instead_of_replacing_the_barrel() {
+		let root = read_idl("events_program.json");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let generated = temporary.path().join("events_program/src/generated");
+		let events = generated.join("events");
+		std::fs::create_dir_all(&events).expect("events dir");
+		let index_path = events.join("index.ts");
+		// Invalid UTF-8 keeps the barrel writable, so only a propagated read
+		// error can stop the patch from clobbering the existing exports.
+		let original = b"\xff\xfeexport * from \"./myEvent\";\n";
+		std::fs::write(&index_path, original).expect("index file");
+
+		let error = emit_js_event_log_module(
+			&generated,
+			"events_program",
+			&EventClientHistoryIndex::default(),
+			&root,
+		)
+		.expect_err("an unreadable index must fail");
+		assert!(matches!(error, CodamaError::HardenJavaScript { .. }),);
+
+		let preserved = std::fs::read(&index_path).expect("index bytes");
+		assert_eq!(
+			preserved, original,
+			"the original barrel bytes must be untouched"
+		);
 	}
 
 	#[cfg(unix)]
