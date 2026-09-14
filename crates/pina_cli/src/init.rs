@@ -166,14 +166,30 @@ publish = false
 solana = "3.0.0"
 
 [lib]
-crate-type = ["cdylib", "lib"]
+# `cdylib` only. A second `lib`/`rlib` crate type makes rustc reject LTO for
+# the program, which costs 20-35% of deployed program size. Integration tests
+# exercise the real source with the `#[path = "../src/lib.rs"]` pattern in
+# `tests/integration.rs` instead of linking this crate.
+crate-type = ["cdylib"]
 
 [features]
 default = []
+# Enables formatted failure diagnostics and caller locations. Costs `core::fmt`
+# in the deployed binary; use it while debugging, not for production deploys.
+verbose-logs = ["pina/verbose-logs"]
 bpf-entrypoint = []
 
 [dependencies]
 pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
+
+# Production profile for the deployed program. `lto` and `codegen-units`
+# shrink the binary; `overflow-checks` is opt-in because disabling it turns
+# arithmetic overflow from a panic into a wrap.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+overflow-checks = false
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
@@ -290,6 +306,44 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {{
 	}}
 }}
 
+// Unit tests live here, next to the code they cover, so `cargo test --lib`
+// measures the real program source. The crate is `cdylib` only for LTO, and
+// Cargo still builds this test harness from `src/lib.rs`.
+#[cfg(test)]
+mod tests {{
+	use super::*;
+
+	/// The instruction discriminator is part of the wire format. Treat a
+	/// change here as a breaking change for deployed clients.
+	#[test]
+	fn instruction_discriminator_is_stable() {{
+		assert_eq!({program_title}Instruction::Initialize as u8, 0);
+	}}
+
+	#[test]
+	fn decodes_initialized_instruction() {{
+		let mut data = [0u8; InitializeInstruction::SIZE];
+		InitializeInstruction::initialize(&mut data, |args| {{
+			args.value = 7;
+			Ok(())
+		}})
+		.expect("initialize instruction storage");
+
+		let decoded = InitializeInstruction::try_from_bytes(&data)
+			.expect("decode initialized instruction");
+		assert_eq!(decoded.value, 7);
+	}}
+
+	#[test]
+	fn rejects_wrong_program_id() {{
+		let wrong_id: Address = [9u8; 32].into();
+		let data = [{program_title}Instruction::Initialize as u8];
+		let result = parse_instruction::<{program_title}Instruction>(&wrong_id, &ID, &data);
+
+		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
+	}}
+}}
+
 pub fn process_instruction(
 	program_id: &Address,
 	accounts: &mut [AccountView],
@@ -321,8 +375,17 @@ publish = false
 [workspace]
 
 [dependencies]
+# `pina` is required because this harness includes the program source, which
+# imports pina directly.
+pina = "{pina_version}"
 pina_test = "{pina_version}"
-program_under_test = {{ package = "{package_name}", path = "../.." }}
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+	'cfg(target_os, values("solana"))',
+	'cfg(feature, values("bpf-entrypoint"))',
+]
 "#
 	)
 }
@@ -338,42 +401,36 @@ nostd_entrypoint!(process_instruction);
 }
 
 fn integration_test_template(package_name: &str, program_title: &str) -> String {
-	let package_ident = package_name.replace('-', "_");
-	format!(
-		r#"use {package_ident}::*;
+	let _ = (package_name, program_title);
+	r#"//! Tests that need the compiled program artifact.
+//!
+//! The program crate is `cdylib` only so the deployed binary can use fat LTO.
+//! Cargo cannot link a `cdylib` into an integration test, which means this
+//! file cannot `use` the program's types. Two patterns cover that gap:
+//!
+//! 1. Behavioural coverage lives in `src/lib.rs` under `#[cfg(test)] mod
+//!    tests`, next to the code it exercises. Run it with `cargo test --lib`;
+//!    it measures coverage of the real program source.
+//! 2. On-chain behaviour lives in `tests/surfpool`, which `pina test` runs
+//!    against the built SBF artifact.
+//!
+//! Keep this file for anything that only needs the compiled artifact path.
 
-/// Smoke test: verify that the instruction discriminator is stable.
+/// Pina's build publishes the deploy artifact for `pina test`.
 #[test]
-fn instruction_discriminators_are_stable() {{
-	assert_eq!({program_title}Instruction::Initialize as u8, 0);
-}}
+fn deploy_artifact_path_is_conventional() {
+	let artifact = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("target/deploy")
+		.join(env!("CARGO_PKG_NAME"));
 
-/// Smoke test: parse_instruction rejects a mismatched program ID.
-#[test]
-fn parse_instruction_rejects_wrong_program_id() {{
-	let wrong_id: pina::Address = [9u8; 32].into();
-	let data = [{program_title}Instruction::Initialize as u8];
-	let result =
-		pina::parse_instruction::<{program_title}Instruction>(&wrong_id, &ID, &data);
-	assert!(matches!(result, Err(pina::ProgramError::IncorrectProgramId)));
-}}
-
-/// Fast native test for the client-facing instruction encoder.
-#[test]
-fn initialize_instruction_encodes_fields() {{
-	let mut data = [0u8; InitializeInstruction::SIZE];
-	InitializeInstruction::initialize(&mut data, |args| {{
-		args.value = 42;
-		Ok(())
-	}})
-	.expect("initialize instruction storage");
-
-	let decoded = InitializeInstruction::try_from_bytes(&data)
-		.expect("decode initialized instruction");
-	assert_eq!(decoded.value, 42);
-}}
+	assert!(
+		artifact.extension().is_none(),
+		"artifact base path is {}",
+		artifact.display()
+	);
+}
 "#
-	)
+	.to_owned()
 }
 
 fn surfpool_test_template() -> String {
@@ -383,8 +440,14 @@ use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 
-use program_under_test::ID;
-use program_under_test::InitializeInstruction;
+// The program crate is `cdylib` only (so the deployed binary can use fat LTO)
+// and cannot be linked as a dependency. Include its source instead: the
+// program id and instruction encoders below are the real ones.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+use program::ID;
+use program::InitializeInstruction;
 
 /// Deploy the real SBF artifact to an isolated, offline Surfnet.
 ///
@@ -494,10 +557,10 @@ mod tests {
 		assert!(surfpool_cargo.contains("name = \"my_program-surfpool-tests\""));
 		assert!(surfpool_cargo.contains("[workspace]"));
 		assert!(surfpool_cargo.contains(&format!("pina_test = \"{}\"", env!("CARGO_PKG_VERSION"))));
-		assert!(
-			surfpool_cargo
-				.contains("program_under_test = { package = \"my_program\", path = \"../..\" }")
-		);
+		// The harness includes the program source, so it depends on pina
+		// rather than on the cdylib program crate.
+		assert!(surfpool_cargo.contains(&format!("pina = \"{}\"", env!("CARGO_PKG_VERSION"))));
+		assert!(!surfpool_cargo.contains("program_under_test"));
 		assert!(!surfpool_cargo.contains("surfpool-sdk"));
 	}
 
@@ -546,9 +609,10 @@ mod tests {
 
 		let test = fs::read_to_string(dir.path.join("tests/integration.rs"))
 			.unwrap_or_else(|err| panic!("expected integration.rs to be readable: {err}"));
-		assert!(test.contains("use my_program::*;"));
-		assert!(test.contains("instruction_discriminators_are_stable"));
-		assert!(test.contains("initialize_instruction_encodes_fields"));
+		// Behavioural coverage lives in-crate because the crate is cdylib
+		// only; this file keeps only artifact-level assertions.
+		assert!(test.contains("cargo test --lib"));
+		assert!(test.contains("tests/surfpool"));
 	}
 
 	#[test]
@@ -656,10 +720,8 @@ mod tests {
 		// Hyphenated name should produce CamelCase title.
 		assert!(lib.contains("MyCoolProgramInstruction"));
 
-		let test = fs::read_to_string(dir.path.join("tests/integration.rs"))
-			.unwrap_or_else(|err| panic!("expected integration.rs to be readable: {err}"));
-		// The `use` import should use underscores (Rust ident).
-		assert!(test.contains("use my_cool_program::*;"));
+		// In-crate unit tests are the coverage path for cdylib programs.
+		assert!(lib.contains("#[cfg(test)]"));
 	}
 
 	#[test]
@@ -683,21 +745,17 @@ mod tests {
 				dependencies.get("pina_test").and_then(toml::Value::as_str),
 				Some(env!("CARGO_PKG_VERSION"))
 			);
-			let program = dependencies
-				.get("program_under_test")
-				.and_then(toml::Value::as_table)
-				.unwrap_or_else(|| panic!("program alias must be a table for {package_name}"));
+			// The harness includes the program source, so it depends on pina
+			// directly instead of linking the cdylib program crate.
 			assert_eq!(
-				program.get("package").and_then(toml::Value::as_str),
-				Some(package_name)
+				dependencies.get("pina").and_then(toml::Value::as_str),
+				Some(env!("CARGO_PKG_VERSION"))
 			);
-			assert_eq!(
-				program.get("path").and_then(toml::Value::as_str),
-				Some("../..")
-			);
+			assert!(dependencies.get("program_under_test").is_none());
 			let source = fs::read_to_string(dir.path.join("tests/surfpool/src/lib.rs"))
 				.unwrap_or_else(|err| panic!("read generated test for {package_name}: {err}"));
-			assert!(source.contains("use program_under_test::"));
+			assert!(source.contains("#[path = \"../../../src/lib.rs\"]"));
+			assert!(source.contains("use program::"));
 		}
 	}
 }

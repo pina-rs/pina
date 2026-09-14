@@ -1316,6 +1316,7 @@ mod tests {
 			package_name: "program".to_owned(),
 			library_name: "program".to_owned(),
 			library_source: root.join("src/lib.rs"),
+			library_crate_types: vec!["cdylib".to_owned(), "lib".to_owned()],
 			target_dir: root.join("target"),
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),

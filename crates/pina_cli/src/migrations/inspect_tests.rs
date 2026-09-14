@@ -224,35 +224,36 @@ fn parse_rpc_account_data_handles_success_null_and_errors() {
 /// assert the transport round-trips a real JSON-RPC request.
 #[test]
 fn fetch_account_data_round_trips_through_http() {
-	let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-	let port = listener.local_addr().expect("addr").port();
-	let server = std::thread::spawn(move || {
-		let (mut stream, _) = listener.accept().expect("accept");
-		let mut buffer = [0_u8; 2048];
-		let _ = stream.read(&mut buffer);
-		let body = serde_json::json!({
-			"jsonrpc": "2.0",
-			"result": { "value": { "data": ["AQJB", "base64"] } },
-			"id": 1
-		})
-		.to_string();
-		let response = format!(
-			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
-			 {}\r\nconnection: close\r\n\r\n{body}",
-			body.len()
-		);
-		stream
-			.write_all(response.as_bytes())
-			.expect("write response");
-	});
+	let body = serde_json::json!({
+		"jsonrpc": "2.0",
+		"result": { "value": { "data": ["AQJB", "base64"] } },
+		"id": 1
+	})
+	.to_string();
+	let (url, server) = serve_one_response(body);
 
 	use std::str::FromStr as _;
 	let address = solana_address::Address::from_str("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
 		.expect("valid address");
-	let data = fetch_account_data(&format!("http://127.0.0.1:{port}"), &address)
-		.expect("fetch over local http");
+	let data = fetch_account_data(&url, &address).expect("fetch over local http");
 	assert_eq!(data, Some(vec![1, 2, 65]));
-	server.join().expect("server thread");
+
+	let request = server.join().expect("server thread");
+	// The request is decoded rather than substring-matched: a malformed body
+	// that happens to contain the method name must not pass this test.
+	let (headers, body) = request
+		.split_once("\r\n\r\n")
+		.unwrap_or_else(|| panic!("request has no header terminator: {request}"));
+	assert!(
+		headers.starts_with("POST "),
+		"unexpected request line: {headers}"
+	);
+	let rpc: serde_json::Value = serde_json::from_str(body)
+		.unwrap_or_else(|error| panic!("request body is not JSON ({error}): {body}"));
+	assert_eq!(rpc["jsonrpc"], "2.0");
+	assert_eq!(rpc["method"], "getAccountInfo");
+	assert_eq!(rpc["params"][0], address.to_string());
+	assert_eq!(rpc["params"][1]["encoding"], "base64");
 }
 
 #[test]
@@ -293,35 +294,20 @@ fn run_inspect_wires_discovery_manifest_fetch_and_exit_codes() {
 	)
 	.expect("manifest");
 
-	let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-	let port = listener.local_addr().expect("addr").port();
-	let server = std::thread::spawn(move || {
-		let (mut stream, _) = listener.accept().expect("accept");
-		let mut buffer = [0_u8; 2048];
-		let _ = stream.read(&mut buffer);
-		let encoded = base64::engine::general_purpose::STANDARD.encode(account_bytes_for_server());
-		let body = serde_json::json!({
-			"jsonrpc": "2.0",
-			"result": { "value": { "data": [encoded, "base64"] } },
-			"id": 1
-		})
-		.to_string();
-		let response = format!(
-			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
-			 {}\r\nconnection: close\r\n\r\n{body}",
-			body.len()
-		);
-		stream.write_all(response.as_bytes()).expect("write");
-	});
+	let encoded = base64::engine::general_purpose::STANDARD.encode(account_bytes_for_server());
+	let body = serde_json::json!({
+		"jsonrpc": "2.0",
+		"result": { "value": { "data": [encoded, "base64"] } },
+		"id": 1
+	})
+	.to_string();
+	let (url, server) = serve_one_response(body);
 
-	let (report, exit) = match run_inspect(
-		&root,
-		"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-		&format!("http://127.0.0.1:{port}"),
-	) {
-		Ok(outcome) => outcome,
-		Err(error) => panic!("inspect runs: {error:?}"),
-	};
+	let (report, exit) =
+		match run_inspect(&root, "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS", &url) {
+			Ok(outcome) => outcome,
+			Err(error) => panic!("inspect runs: {error:?}"),
+		};
 	server.join().expect("server thread");
 	assert_eq!(report.state, InspectState::Stale);
 	assert_eq!(exit.code, 1);
@@ -346,6 +332,66 @@ fn account_bytes_for_server() -> Vec<u8> {
 	let mut data = vec![1_u8, 0];
 	data.resize(10, 0);
 	data
+}
+
+/// Serves exactly one HTTP response on loopback, returning its base URL and a
+/// handle that resolves to the request the client sent.
+///
+/// Both halves of the shutdown are load-bearing. The stream is half-closed
+/// before the socket drops so the client reads the response to its end, and
+/// the request is drained to EOF first because closing a socket that still
+/// holds unread bytes makes Windows answer with a TCP reset rather than a FIN,
+/// which discards the response mid-read (`WSAECONNRESET`, 10054).
+fn serve_one_response(body: String) -> (String, std::thread::JoinHandle<String>) {
+	let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+	let port = listener.local_addr().expect("addr").port();
+	let server = std::thread::spawn(move || {
+		let (mut stream, _) = listener.accept().expect("accept");
+		let request = read_http_request(&mut stream);
+		let response = format!(
+			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
+			 {}\r\nconnection: close\r\n\r\n{body}",
+			body.len()
+		);
+		stream
+			.write_all(response.as_bytes())
+			.expect("write response");
+		let _ = stream.shutdown(std::net::Shutdown::Write);
+		let mut sink = [0_u8; 512];
+		while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+		request
+	});
+	(format!("http://127.0.0.1:{port}"), server)
+}
+
+/// Reads one whole HTTP request: the headers, then the body they declare.
+fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+	let mut request = Vec::new();
+	let mut buffer = [0_u8; 512];
+	loop {
+		let read = match stream.read(&mut buffer) {
+			Ok(0) | Err(_) => break,
+			Ok(read) => read,
+		};
+		request.extend_from_slice(&buffer[..read]);
+		let Some(headers_end) = request.windows(4).position(|window| window == b"\r\n\r\n") else {
+			continue;
+		};
+		if request.len() >= headers_end + 4 + declared_content_length(&request[..headers_end]) {
+			break;
+		}
+	}
+	String::from_utf8_lossy(&request).into_owned()
+}
+
+/// Reads the `content-length` header, defaulting to zero when it is absent.
+fn declared_content_length(headers: &[u8]) -> usize {
+	String::from_utf8_lossy(headers)
+		.lines()
+		.filter_map(|line| line.split_once(':'))
+		.find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+		.and_then(|(_, value)| value.trim().parse().ok())
+		.unwrap_or(0)
 }
 
 #[test]
