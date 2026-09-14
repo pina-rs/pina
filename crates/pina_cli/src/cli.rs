@@ -272,6 +272,29 @@ pub(crate) enum Commands {
 		topic: Option<String>,
 	},
 
+	/// Print a normalized JSON snapshot of the CLI surface.
+	///
+	/// Release automation diffs the snapshot against the committed baseline at
+	/// `.monochange/cli-snapshots/pina.json` to classify changes to the
+	/// command surface, so a removed flag or a narrowed value set is reported
+	/// as a compatibility break instead of an unknown package change. Capture a
+	/// fresh baseline with `--save`.
+	#[command(
+		after_help = "Examples:\n  pina snapshot\n  pina snapshot --view index\n  pina snapshot \
+		              --save"
+	)]
+	Snapshot {
+		/// Snapshot detail: `full` keeps every description, `light` drops them,
+		/// and `index` keeps only the command and option skeleton.
+		#[arg(long, value_enum, default_value = "full", value_name = "VIEW")]
+		view: SnapshotViewArg,
+
+		/// Write the capture to `.monochange/cli-snapshots/pina.json` instead of
+		/// printing it.
+		#[arg(long)]
+		save: bool,
+	},
+
 	/// Initialize a new Pina program project.
 	///
 	/// Creates a buildable program scaffold with Pina dependencies, source
@@ -943,6 +966,18 @@ impl ExportArg {
 			Self::Authority(authority) => Some(authority),
 		}
 	}
+}
+
+/// Snapshot detail for the emitted CLI surface.
+///
+/// Mirrors the views release automation understands: `full` is the complete
+/// capture, `light` drops descriptions, and `index` keeps only the command and
+/// option skeleton.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum SnapshotViewArg {
+	Full,
+	Light,
+	Index,
 }
 
 /// Client ecosystems supported by project-aware generation.

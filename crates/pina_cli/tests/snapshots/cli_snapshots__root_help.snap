@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 139
 info:
   program: pina
   args:
@@ -29,6 +30,8 @@ Commands:
           Generate, inspect, and publish canonical Codama IDLs
   docs
           Read bundled Pina reference documentation in the terminal
+  snapshot
+          Print a normalized JSON snapshot of the CLI surface
   init
           Initialize a new Pina program project
   keys

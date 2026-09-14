@@ -5515,6 +5515,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_snapshot"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb1a5d4befce06c8611df4378d581a1421a6bb62facacbc829b2f99d8672875d"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "multiversion"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6212,6 +6223,7 @@ dependencies = [
  "http 1.5.0",
  "insta",
  "insta-cmd",
+ "monochange_snapshot",
  "object 0.40.0",
  "owo-colors",
  "pina_abi",

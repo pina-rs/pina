@@ -690,7 +690,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			let crate_dir = plan.cli_rust_out.join(example);
 			validate_generation_target(&crate_dir, settings)?;
 			let client_dir = plan.rust_out.join(example);
-			let client_path = format!("../../../rust/{example}");
+			let client_path = format!("../../rust/{example}");
 			let client_package = rust_client_package(&client_dir, example);
 			let render_config = CliRenderConfig {
 				mode: cli_render_mode(settings.mode),
@@ -1823,6 +1823,44 @@ mod tests {
 		assert!(
 			matches!(error, CodamaError::HardenJavaScript { .. }),
 			"unexpected error: {error}"
+		);
+	}
+
+	#[test]
+	fn generation_plan_renders_cli_rust_clients_from_fresh_idls() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp_root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp dir: {error}"));
+		let program =
+			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");
+		let mut plan = empty_plan("npx");
+		plan.idls_dir = temp_root.join("idls");
+		plan.rust_out = temp_root.join("rust");
+		plan.cli_rust_out = temp_root.join("cli-rust");
+		plan.programs = vec![("hello_solana_program".to_owned(), program)];
+		plan.clients.insert(ClientLanguage::CliRust);
+
+		let idl_paths =
+			generate_plan(&plan).unwrap_or_else(|error| panic!("generation failed: {error}"));
+		assert_eq!(
+			idl_paths,
+			vec![plan.idls_dir.join("hello_solana_program.json")]
+		);
+
+		// The scaffolded manifest pins the relative rust-client path, proving
+		// the CliRust loop rendered with the conventional `../../rust` target.
+		let manifest = std::fs::read_to_string(
+			plan.cli_rust_out
+				.join("hello_solana_program")
+				.join("Cargo.toml"),
+		)
+		.unwrap_or_else(|error| panic!("scaffolded manifest: {error}"));
+		assert!(
+			manifest.contains(
+				"hello-solana-program-client = { path = \"../../rust/hello_solana_program\" }",
+			),
+			"unexpected manifest:\n{manifest}"
 		);
 	}
 

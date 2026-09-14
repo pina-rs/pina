@@ -42,10 +42,10 @@ pub(crate) fn render_argument(
 		TypeNode::Number(number_type) => render_number_argument(&field, number_type, context),
 		TypeNode::Boolean(_) => {
 			Ok(RenderedArgument {
+				write: format!("data[{{offset}}] = u8::from(self.{field});"),
 				field,
 				rust_type: "bool".to_string(),
 				wire_size: 1,
-				write: "data[{offset}] = u8::from(self.{field});".to_string(),
 				borrows: false,
 				docs: Vec::new(),
 			})
@@ -482,6 +482,16 @@ mod tests {
 	}
 
 	#[test]
+	fn renders_boolean_arguments_with_the_field_interpolated() {
+		let rendered = render_argument("enabled", &BooleanTypeNode::default().into(), "test")
+			.unwrap_or_else(|error| panic!("boolean should render: {error}"));
+		assert_eq!(rendered.field, "enabled");
+		assert_eq!(rendered.rust_type, "bool");
+		assert_eq!(rendered.wire_size, 1);
+		assert_eq!(rendered.write, "data[{offset}] = u8::from(self.enabled);");
+	}
+
+	#[test]
 	fn renders_every_supported_argument_shape() {
 		for (format, rust_type, wire_size) in [
 			(U8, "u8", 1),
@@ -542,6 +552,17 @@ mod tests {
 			.unwrap_or_else(|error| panic!("PinaPod Vec<u8> should render: {error}"));
 		assert!(rendered.write.contains("{offset} + 2 + index"));
 		assert!(!rendered.write.contains("index * 1"));
+
+		let flags = ArrayTypeNode::prefixed(BooleanTypeNode::default(), NumberTypeNode::le(U8));
+		let flags = codama_nodes::FixedSizeTypeNode::new(flags, 6);
+		let rendered = render_argument("flags", &flags.into(), "test")
+			.unwrap_or_else(|error| panic!("PinaPod Vec<bool> should render: {error}"));
+		assert_eq!(rendered.rust_type, "&'argument [bool]");
+		// The vec renderer substitutes every `{item*}` placeholder before the
+		// final format, so only the caller-supplied `{offset}` placeholder
+		// remains for `render_argument_write`.
+		assert!(rendered.write.contains("u8::from(*value)"));
+		assert!(!rendered.write.contains("{item"));
 	}
 
 	#[test]

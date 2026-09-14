@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use atomic_write_file::AtomicWriteFile;
 use clap::CommandFactory;
 use clap_complete::generate;
 use comfy_table::Table;
@@ -17,6 +18,7 @@ use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
 use crate::cli::MigrationCommands;
 use crate::cli::ProfileCommands;
+use crate::cli::SnapshotViewArg;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
 use crate::idl_command;
@@ -39,6 +41,7 @@ pub(crate) fn run(cli: Cli) {
 			);
 		}
 		Commands::Lint { project, fix } => run_lint(project, fix),
+		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
 		Commands::Generate {
 			project,
@@ -1193,6 +1196,97 @@ pub(crate) fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pr
 	println!("{json}");
 }
 
+/// Directory holding committed CLI-surface baselines.
+const CLI_SNAPSHOT_DIR: &str = ".monochange/cli-snapshots";
+
+/// File name of the committed `pina` CLI-surface baseline.
+const CLI_SNAPSHOT_FILE: &str = "pina.json";
+
+/// Print or save the normalized CLI-surface snapshot.
+///
+/// The capture comes from clap's own command metadata, so it stays in step
+/// with the parser instead of a hand-maintained list. Release automation reads
+/// the committed baseline and diffs it against a fresh capture to classify
+/// changes to the command surface.
+fn run_snapshot(view: SnapshotViewArg, save: bool) {
+	let outcome = capture_cli_snapshot(view, save, Path::new(CLI_SNAPSHOT_DIR));
+	report_snapshot(&outcome);
+	if outcome.is_err() {
+		std::process::exit(1);
+	}
+}
+
+/// Report a snapshot result on the process streams.
+///
+/// Split from [`run_snapshot`] so every arm is exercised without ending the
+/// test process.
+fn report_snapshot(outcome: &Result<SnapshotOutcome, String>) {
+	match outcome {
+		Ok(SnapshotOutcome::Printed(json)) => print!("{json}"),
+		Ok(SnapshotOutcome::Saved(path)) => println!("Wrote {}", path.display()),
+		Err(error) => eprintln!("{error}"),
+	}
+}
+
+/// Result of a successful snapshot invocation.
+#[derive(Debug, PartialEq, Eq)]
+enum SnapshotOutcome {
+	/// The JSON document to print on stdout.
+	Printed(String),
+	/// The baseline file that was written.
+	Saved(PathBuf),
+}
+
+/// Render the CLI surface as a normalized JSON document.
+fn render_cli_snapshot(view: SnapshotViewArg) -> Result<String, String> {
+	let command = <Cli as CommandFactory>::command();
+	let snapshot = monochange_snapshot::snapshot_from_clap(&command).view(match view {
+		SnapshotViewArg::Full => monochange_snapshot::SnapshotView::Full,
+		SnapshotViewArg::Light => monochange_snapshot::SnapshotView::Light,
+		SnapshotViewArg::Index => monochange_snapshot::SnapshotView::Index,
+	});
+
+	snapshot
+		.to_json()
+		.map_err(|error| format!("failed to render the CLI snapshot: {error}"))
+}
+
+/// Write `json` as the committed baseline under `directory`.
+///
+/// A partially written baseline would make every later diff misleading, so the
+/// file is replaced only once the full capture is on disk.
+fn save_cli_snapshot(json: &str, directory: &Path) -> Result<PathBuf, String> {
+	let path = directory.join(CLI_SNAPSHOT_FILE);
+	fs::create_dir_all(directory)
+		.map_err(|error| format!("failed to create {}: {error}", directory.display()))?;
+	AtomicWriteFile::open(&path)
+		.and_then(|mut file| {
+			file.write_all(json.as_bytes())?;
+			file.commit()
+		})
+		.map_err(|error| format!("failed to write {}: {error}", path.display()))?;
+
+	Ok(path)
+}
+
+/// Capture the CLI surface, printing it or writing it under `directory`.
+///
+/// Kept separate from [`run_snapshot`] so the failure paths — rendering,
+/// directory creation, and the write itself — are exercised by tests without
+/// exiting the test process.
+fn capture_cli_snapshot(
+	view: SnapshotViewArg,
+	save: bool,
+	directory: &Path,
+) -> Result<SnapshotOutcome, String> {
+	let json = render_cli_snapshot(view)?;
+	if !save {
+		return Ok(SnapshotOutcome::Printed(json));
+	}
+
+	save_cli_snapshot(&json, directory).map(SnapshotOutcome::Saved)
+}
+
 fn run_docs(topic: Option<&str>) {
 	let Some(topic) = topic else {
 		println!("Bundled documentation topics:");
@@ -1554,19 +1648,26 @@ fn run_codama_generate(options: &pina_cli::CodamaGenerateOptions) {
 mod tests {
 	use std::fs;
 	use std::io::Cursor;
+	use std::path::Path;
 
 	use ed25519_dalek::SigningKey;
 	use sha2::Digest;
 	use sha2::Sha256;
 	use tempfile::TempDir;
 
+	use super::CLI_SNAPSHOT_FILE;
+	use super::SnapshotOutcome;
+	use super::SnapshotViewArg;
+	use super::capture_cli_snapshot;
 	use super::display_features;
 	use super::escaped_path;
 	use super::escaped_text;
 	use super::prepare_and_confirm_record;
 	use super::print_migration_cost_preview;
 	use super::publication_record_error;
+	use super::render_cli_snapshot;
 	use super::render_static_cu;
+	use super::report_snapshot;
 
 	#[test]
 	fn cost_preview_renderer_covers_every_state() {
@@ -1872,6 +1973,88 @@ mod tests {
 			error,
 			pina_cli::verification::VerifyError::UnsupportedRecordHost { .. }
 		));
+	}
+	#[test]
+	fn snapshot_printing_emits_the_captured_surface() {
+		for view in [
+			SnapshotViewArg::Full,
+			SnapshotViewArg::Light,
+			SnapshotViewArg::Index,
+		] {
+			let json = render_cli_snapshot(view).unwrap_or_else(|error| panic!("render: {error}"));
+
+			// Every view names the tool and describes at least one command, so a
+			// silently empty or truncated capture cannot pass unnoticed.
+			assert!(json.contains("\"name\": \"pina\""), "tool identity: {json}");
+			assert!(json.contains("\"commands\""), "command surface: {json}");
+		}
+	}
+
+	#[test]
+	fn snapshot_unsaved_captures_print_instead_of_writing() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+
+		let outcome = capture_cli_snapshot(SnapshotViewArg::Index, false, temp.path())
+			.unwrap_or_else(|error| panic!("capture: {error}"));
+
+		assert_eq!(
+			outcome,
+			SnapshotOutcome::Printed(render_cli_snapshot(SnapshotViewArg::Index).unwrap())
+		);
+		// An unsaved capture must not leave a baseline behind.
+		assert!(!temp.path().join(CLI_SNAPSHOT_FILE).exists());
+	}
+
+	#[test]
+	fn snapshot_saving_writes_a_reusable_baseline() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+
+		let outcome = capture_cli_snapshot(SnapshotViewArg::Index, true, temp.path())
+			.unwrap_or_else(|error| panic!("save: {error}"));
+		let written = fs::read_to_string(temp.path().join(CLI_SNAPSHOT_FILE))
+			.unwrap_or_else(|error| panic!("read baseline: {error}"));
+		assert!(matches!(outcome, SnapshotOutcome::Saved(_)));
+		// The saved file must be the same document the printing path emits, or
+		// release automation would diff a baseline nobody can reproduce.
+		assert_eq!(
+			written,
+			render_cli_snapshot(SnapshotViewArg::Index).unwrap()
+		);
+
+		// Re-saving over an existing baseline stays idempotent.
+		let again = capture_cli_snapshot(SnapshotViewArg::Index, true, temp.path())
+			.unwrap_or_else(|error| panic!("re-save: {error}"));
+		assert_eq!(again, outcome);
+	}
+
+	#[test]
+	fn snapshot_saving_reports_unwritable_baselines() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		// A file where the directory must be makes creation fail, which is the
+		// same shape as an unwritable checkout.
+		let blocked = temp.path().join("blocked");
+		fs::write(&blocked, b"file").unwrap_or_else(|error| panic!("write blocking file: {error}"));
+
+		let error = capture_cli_snapshot(SnapshotViewArg::Full, true, &blocked)
+			.expect_err("an unwritable baseline directory must fail");
+		assert!(
+			error.contains("failed to create") || error.contains("failed to write"),
+			"{error}"
+		);
+	}
+
+	#[test]
+	fn snapshot_reporting_covers_every_outcome() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+
+		// Printing, saving, and failing each take a distinct reporting arm; a
+		// panic here would mean one of them is unreachable.
+		let printed = Ok(SnapshotOutcome::Printed("{}".to_owned()));
+		report_snapshot(&printed);
+		let saved = Ok(SnapshotOutcome::Saved(temp.path().join("pina.json")));
+		report_snapshot(&saved);
+		let failed: Result<SnapshotOutcome, String> = Err("boom".to_owned());
+		report_snapshot(&failed);
 	}
 }
 

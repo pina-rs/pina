@@ -36,6 +36,17 @@ pub(crate) fn shouty(value: &str) -> String {
 	value.to_shouty_snake_case()
 }
 
+/// The largest value representable by a migration version of `version_bytes`
+/// little-endian unsigned bytes.
+pub(crate) fn version_type_max(version_bytes: usize) -> u64 {
+	match version_bytes {
+		2 => u64::from(u16::MAX),
+		4 => u64::from(u32::MAX),
+		8 => u64::MAX,
+		_ => u64::from(u8::MAX),
+	}
+}
+
 pub(crate) fn program_id_const_name(program_name: &str) -> String {
 	shouty(program_name) + "_ID"
 }

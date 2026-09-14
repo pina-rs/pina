@@ -30,6 +30,7 @@ fs2 = { workspace = true, default-features = true }
 getrandom = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 http = { workspace = true, default-features = true }
+monochange_snapshot = { workspace = true, default-features = true }
 owo-colors = { workspace = true, default-features = true }
 pina_abi = { workspace = true }
 pina_cli_renderer = { workspace = true, default-features = true }
