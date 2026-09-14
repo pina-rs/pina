@@ -652,7 +652,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 
 /// Checks that `seeds` plus `bump` derive exactly `account`'s address.
 ///
-/// One [`create_program_address`] call replaces the canonical bump search,
+/// One [`crate::create_program_address`] call replaces the canonical bump search,
 /// which costs roughly 9,000 additional compute units per creation. This
 /// proves the account sits at the address these seeds and this bump produce;
 /// it does not prove `bump` is the highest valid seed, so a non-canonical bump
