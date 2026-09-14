@@ -444,16 +444,14 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
-		allocate_and_initialize_pda_account::<T, _>(
-			self.account,
-			self.payer,
-			self.owner,
-			self.seeds,
-			self.bump,
-			signers,
-			rent,
-			initialize,
-		)
+		PdaCreationTarget {
+			account: &mut *self.account,
+			payer: self.payer,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.allocate_and_initialize::<T, _>(signers, rent, initialize)
 	}
 }
 
@@ -583,58 +581,73 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
 		verify_supplied_bump_address(self.account, self.seeds, self.owner, self.bump)?;
-		allocate_and_initialize_pda_account::<T, _>(
-			self.account,
-			self.payer,
-			self.owner,
-			self.seeds,
-			self.bump,
-			signers,
-			rent,
-			initialize,
-		)
+		PdaCreationTarget {
+			account: &mut *self.account,
+			payer: self.payer,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.allocate_and_initialize::<T, _>(signers, rent, initialize)
 	}
 }
 
-/// Allocates a PDA whose signer seeds are already proven and writes `T`'s
-/// discriminator.
-///
-/// Shared by the creation builders. Each one establishes that provenance its
-/// own way — [`canonical_pda`] by searching for the highest valid bump,
-/// [`verify_supplied_bump_address`] by checking a single derivation — and this
-/// performs the checked allocate plus initialization.
-#[inline(always)]
-fn allocate_and_initialize_pda_account<T: PinaAccount, F>(
-	account: &mut AccountView,
-	payer: &AccountView,
-	owner: &Address,
-	seeds: &[&[u8]],
+/// The account fields both PDA creation builders carry, once their
+/// verification step has proven them.
+struct PdaCreationTarget<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	account: &'account mut AccountView,
+
+	/// Funding account that pays any required rent-exempt balance.
+	payer: &'account AccountView,
+
+	/// Program that owns the PDA and derives it from `seeds` and `bump`.
+	owner: &'address Address,
+
+	/// PDA seeds without the bump.
+	seeds: &'seeds [&'seed [u8]],
+
+	/// PDA bump already verified against `account`'s address.
 	bump: u8,
-	signers: &[Signer<'_, '_>],
-	rent: Option<Rent>,
-	initialize: F,
-) -> ProgramResult
-where
-	F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
-{
-	if !account.is_data_empty() && account.try_borrow()?.iter().any(|byte| *byte != 0) {
-		return Err(ProgramError::AccountAlreadyInitialized);
+}
+
+impl PdaCreationTarget<'_, '_, '_, '_> {
+	/// Allocates the PDA and writes `T`'s discriminator.
+	///
+	/// Each builder establishes that its fields describe one proven PDA its own
+	/// way — [`canonical_pda`] by searching for the highest valid bump,
+	/// [`verify_supplied_bump_address`] by checking a single derivation — and
+	/// this performs the checked allocate plus initialization.
+	#[inline(always)]
+	fn allocate_and_initialize<T: PinaAccount, F>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+		initialize: F,
+	) -> ProgramResult
+	where
+		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
+		AllocateAccountWithNonCanonicalBump {
+			account: self.account,
+			payer: self.payer,
+			space: size_of::<T::Zc>() as u64,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.invoke_signed_inner_validated(signers, rent)?;
+
+		let mut data = self.account.try_borrow_mut()?;
+		<T as PinaAccount>::initialize(&mut data, initialize)?;
+
+		Ok(())
 	}
-
-	AllocateAccountWithNonCanonicalBump {
-		account: &mut *account,
-		payer,
-		space: size_of::<T::Zc>() as u64,
-		owner,
-		seeds,
-		bump,
-	}
-	.invoke_signed_inner_validated(signers, rent)?;
-
-	let mut data = account.try_borrow_mut()?;
-	<T as PinaAccount>::initialize(&mut data, initialize)?;
-
-	Ok(())
 }
 
 /// Checks that `seeds` plus `bump` derive exactly `account`'s address.
