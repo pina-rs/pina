@@ -4,7 +4,7 @@ error: explicit PDA bump used without first proving the canonical address
 LL |     account.assert_seeds_with_bump(seeds, program)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: call `account.assert_canonical_bump(seeds, program_id)?` before using an explicit bump in validation-only code, use `assert_seeds()`, or let a typed creation builder validate the canonical bump
+   = help: call `account.assert_canonical_bump(seeds, program_id)?` before using an explicit bump in validation-only code, use `assert_seeds()`, or let `CreateProgramAccountWithBump` validate the canonical bump; `CreateProgramAccountWithUncheckedBump` skips that check on purpose
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
    = note: `#[deny(require_canonical_bump_before_pda_write)]` on by default
 
