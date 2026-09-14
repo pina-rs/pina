@@ -5,7 +5,7 @@ pina_cli: feat
 pina_macros: feat
 ---
 
-# Add the `floats` feature for float and fixed-point schema fields
+# Add the `floats` feature for float schema fields
 
 The new `floats` feature on `pina` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields and fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Float fields convert to and from their bit pattern under the hood through the new `pina::PodF32`/`pina::PodF64` alignment-one pods, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods, mirroring pinapod's `fixed` feature that Pina now forwards; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.
 
