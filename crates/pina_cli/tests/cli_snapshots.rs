@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use insta_cmd::assert_cmd_snapshot;
+use tempfile::TempDir;
 
 fn workspace_root() -> &'static Path {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -958,4 +959,80 @@ fn codama_generate_invalid_argument_error_snapshot() {
 		.arg("generate")
 		.arg("--example");
 	assert_cmd_snapshot!("codama_generate_invalid_argument_error", command);
+}
+
+#[test]
+fn snapshot_command_prints_the_cli_surface() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["snapshot", "--view", "index"]);
+	let output = command.output().expect("run pina snapshot");
+	let stdout = String::from_utf8_lossy(&output.stdout);
+
+	assert!(
+		output.status.success(),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	// The document release automation diffs must name the tool and carry the
+	// command surface; capture the rest as a snapshot so a surface change is
+	// visible in review rather than silent.
+	assert!(stdout.contains("\"name\": \"pina\""), "{stdout}");
+	assert!(stdout.contains("\"commands\""), "{stdout}");
+}
+
+#[test]
+fn snapshot_save_writes_the_baseline_next_to_the_checkout() {
+	let project = TempDir::new().expect("temp dir");
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command
+		.current_dir(project.path())
+		.args(["snapshot", "--view", "index", "--save"]);
+	let output = command.output().expect("run pina snapshot --save");
+
+	assert!(
+		output.status.success(),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let baseline = project.path().join(".monochange/cli-snapshots/pina.json");
+	assert!(
+		baseline.is_file(),
+		"the baseline must be written: {}",
+		baseline.display()
+	);
+	let written = fs::read_to_string(&baseline).expect("read baseline");
+	assert!(written.contains("\"name\": \"pina\""), "{written}");
+}
+
+#[test]
+fn snapshot_save_reports_an_unwritable_baseline() {
+	let project = TempDir::new().expect("temp dir");
+	// A regular file where `.monochange` must be makes the save fail, so the
+	// command must report the failure and exit non-zero rather than passing.
+	fs::write(project.path().join(".monochange"), b"file").expect("write blocking file");
+
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command
+		.current_dir(project.path())
+		.args(["snapshot", "view", "--save"]);
+	let output = command.output().expect("run pina snapshot --save");
+
+	// `view` is not a subcommand or flag, so clap rejects it before the save.
+	assert!(!output.status.success());
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command
+		.current_dir(project.path())
+		.args(["snapshot", "--save"]);
+	let output = command.output().expect("run pina snapshot --save");
+	assert_eq!(
+		output.status.code(),
+		Some(1),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("failed to create") || stderr.contains("failed to write"),
+		"{stderr}"
+	);
 }
