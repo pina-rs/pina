@@ -4,6 +4,130 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.18.1](https://github.com/pina-rs/pina/releases/tag/v0.18.1) (2026-09-15)
+
+Grouped release for `core`.
+
+### Features
+
+#### Add admin-key and oracle security lessons and a drain lint
+
+_Packages:_ _pina_, _pina_cli_, _pina_lints_
+
+The security guide grows two lessons grounded in exploits from the last three years: `11-admin-key-compromise` (Raydium 2022, DEXX 2024, Drift 2026) shows a vault where one leaked key sweeps every lamport and redirects the program in a single signature, and rebuilds it with the containment real protocols shipped — a guardian-gated pause that cannot move funds, a per-window withdrawal cap on the Mango v4 `net_borrow_limit` shape, dual-control unpause, and two-phase authority rotation; `12-oracle-integrity` (Loopscale 2025, Makina 2026) shows a market whose price feed passes ownership checks yet still prices loans, because the configured oracle address is ignored and staleness is unchecked, and secures it with feed pinning plus a Clock-driven staleness bound. The research mapping every cited incident to its vulnerability class and mitigation lives in `security/incidents-2023-2026.md`.
+
+The lint catalog gains `require_guarded_full_balance_drain` (warn), which flags instruction handlers that can sweep an account's entire balance to a recipient with no pause, circuit-breaker, or close intent in sight — the exact shape the cited drains used — and `require_checked_asset_arithmetic` now also denies `<<`/`>>` and `<<=`/`>>=` on asset-named values with `checked_shl`/`checked_shr` suggestions, closing the shift-overflow family that broke Cetus. The new lint runs clean across every example and secure lesson, and fires on the new admin-key insecure fixture.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #416](https://github.com/pina-rs/pina/pull/416)
+
+#### Emit event records to the transaction log
+
+_Packages:_ _pina_, _pina_macros_, _pina_test_
+
+`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:
+
+```rust
+MyEvent::emit(|event| {
+	event.data = 5;
+	event.label = *b"hello\0\0\0";
+	Ok(())
+})?;
+```
+
+Generated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.
+
+`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.
+
+`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.
+
+`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.
+
+The Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.
+
+##### Compute units
+
+Emitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)
+
+### Fixes
+
+#### Build assertion messages without the formatting logger
+
+_Packages:_ _pina_
+
+`pina::assert` logged its message through the always-formatting `log_verbose!` arm, which assembles the message with a stack `Logger` buffer before writing it. When `verbose-logs` is off the failure path now hands the caller's `&str` straight to the log syscall, so the message reaches the log without an intermediate buffer. With `verbose-logs` on nothing changes: the formatted message and caller location are still written, and the built binary is byte-identical to before.
+
+The saving is small — a few hundred bytes in a program that actually reaches the path — because the logger never linked `core::fmt` in the first place. With `logs` enabled the message is still logged in every configuration; with `logs` off entirely nothing is logged, exactly as before. Only how the message is assembled changed.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)
+
+#### Respect manifest overflow checks in the size profile
+
+_Packages:_ _pina_cli_
+
+The default `SizeProfile::Production` sets `overflow-checks = false` as Cargo environment overrides, and environment overrides beat `[profile.release]` in a manifest. A program that deliberately set `overflow-checks = true` therefore had the setting silently replaced with wrapping arithmetic on its next `pina build`, turning a loud failure into a wrong result.
+
+`pina build` now reads `[profile.release].overflow-checks` from the workspace manifest that owns the build. An explicit `true` outranks the size profile: the checks stay enabled and the command warns that it gave up part of the profile. A silent manifest, or one that agrees with disabling the checks, behaves exactly as before. `--overflow-checks` still forces them on.
+
+`pina build --verify` no longer applies profile overrides at all. A verified artifact must stay reproducible from its recorded Git revision, and an override that exists only on the command line cannot be reproduced from that revision. Declare the profile under `[profile.release]` — the layout `pina init` writes — so the ordinary and verified backends compile the same artifact. Pina warns when a requested profile would make the two artifacts differ, naming the missing setting.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)
+
+#### Anchor transition symbols and report zero-cost migrations
+
+_Packages:_ _pina_cli_
+
+`pina migrations status` estimates a ladder's compute units by summing the transition functions recorded in an SBF profile. The symbol match accepted a transition name appearing anywhere in a mangled symbol, so an unrelated function whose name merely contained it was counted too, doubling the estimate. A transition that genuinely cost zero units was also reported as missing, replacing a real measurement with an "unavailable" reason.
+
+Matches now anchor to whole path components in both mangled and demangled spellings, and a present transition is tracked separately from its cost, so a zero-unit transition reports `0` instead of a missing-symbol error.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)
+
+#### Fetch full account data in `pina migrations inspect`
+
+_Packages:_ _pina_cli_
+
+`pina migrations inspect` requested account data with a zero-length JSON-RPC `dataSlice`. A spec-compliant RPC honors that slice and returns no bytes, so every existing account decoded as `UnknownContract` and the command exited `0` — a silent all-clear from the one check that is supposed to report stale or future account versions before a deployment.
+
+The command now requests the full account body, so the discriminator and version envelope decode as intended and the exit code reflects account state. The test server honors the requested slice instead of returning a canned body, and a regression test pins the zero-length response a slice-ignoring request would have received.
+
+The inspect request also gained a 30-second timeout so a stalled RPC endpoint fails with a message instead of blocking the command indefinitely.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)
+
+### Documentation
+
+#### Emit event records to the transaction log
+
+_Packages:_ _pina_skill_
+
+`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:
+
+```rust
+MyEvent::emit(|event| {
+	event.data = 5;
+	event.label = *b"hello\0\0\0";
+	Ok(())
+})?;
+```
+
+Generated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.
+
+`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.
+
+`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.
+
+`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.
+
+The Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.
+
+##### Compute units
+
+Emitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)
+
 ## [0.18.0](https://github.com/pina-rs/pina/releases/tag/v0.18.0) (2026-09-15)
 
 Grouped release for `core`.

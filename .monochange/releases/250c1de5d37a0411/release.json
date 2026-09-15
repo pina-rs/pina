@@ -1,0 +1,1308 @@
+{
+	"schema_version": "0.6",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-15T20:49:33Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.18.1",
+		"pina_root": "0.0.9"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.18.1",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.18.1",
+			"members": [
+				"pina",
+				"pina_abi",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.9",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.9",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_abi",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_abi/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_abi",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/admin-key-and-oracle-security-lessons.md",
+		".changeset/assert-logging-skips-formatting.md",
+		".changeset/build-profile-respects-manifest-overflow-checks.md",
+		".changeset/cost-estimate-anchors-transition-symbols.md",
+		".changeset/emit-event-log-records.md",
+		".changeset/migrations-inspect-fetches-full-account-data.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/admin-key-and-oracle-security-lessons.md",
+			"summary": "Add admin-key and oracle security lessons and a drain lint",
+			"details": "The security guide grows two lessons grounded in exploits from the last three years: `11-admin-key-compromise` (Raydium 2022, DEXX 2024, Drift 2026) shows a vault where one leaked key sweeps every lamport and redirects the program in a single signature, and rebuilds it with the containment real protocols shipped — a guardian-gated pause that cannot move funds, a per-window withdrawal cap on the Mango v4 `net_borrow_limit` shape, dual-control unpause, and two-phase authority rotation; `12-oracle-integrity` (Loopscale 2025, Makina 2026) shows a market whose price feed passes ownership checks yet still prices loans, because the configured oracle address is ignored and staleness is unchecked, and secures it with feed pinning plus a Clock-driven staleness bound. The research mapping every cited incident to its vulnerability class and mitigation lives in `security/incidents-2023-2026.md`.\n\nThe lint catalog gains `require_guarded_full_balance_drain` (warn), which flags instruction handlers that can sweep an account's entire balance to a recipient with no pause, circuit-breaker, or close intent in sight — the exact shape the cited drains used — and `require_checked_asset_arithmetic` now also denies `<<`/`>>` and `<<=`/`>>=` on asset-named values with `checked_shl`/`checked_shr` suggestions, closing the shift-overflow family that broke Cetus. The new lint runs clean across every example and secure lesson, and fires on the new admin-key insecure fixture.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8d746d5f9124062b5c8dc033775902be9d10ae00",
+						"short_sha": "8d746d5",
+						"url": "https://github.com/pina-rs/pina/commit/8d746d5f9124062b5c8dc033775902be9d10ae00",
+						"authored_at": "2026-09-15T16:24:01+01:00",
+						"committed_at": "2026-09-15T16:24:01+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#416",
+						"title": "feat(security): add admin-key and oracle lessons with drain and shift lints",
+						"url": "https://github.com/pina-rs/pina/pull/416",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8d746d5f9124062b5c8dc033775902be9d10ae00",
+						"short_sha": "8d746d5",
+						"url": "https://github.com/pina-rs/pina/commit/8d746d5f9124062b5c8dc033775902be9d10ae00",
+						"authored_at": "2026-09-15T16:24:01+01:00",
+						"committed_at": "2026-09-15T16:24:01+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#416",
+						"title": "feat(security): add admin-key and oracle lessons with drain and shift lints",
+						"url": "https://github.com/pina-rs/pina/pull/416",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/assert-logging-skips-formatting.md",
+			"summary": "Build assertion messages without the formatting logger",
+			"details": "`pina::assert` logged its message through the always-formatting `log_verbose!` arm, which assembles the message with a stack `Logger` buffer before writing it. When `verbose-logs` is off the failure path now hands the caller's `&str` straight to the log syscall, so the message reaches the log without an intermediate buffer. With `verbose-logs` on nothing changes: the formatted message and caller location are still written, and the built binary is byte-identical to before.\n\nThe saving is small — a few hundred bytes in a program that actually reaches the path — because the logger never linked `core::fmt` in the first place. With `logs` enabled the message is still logged in every configuration; with `logs` off entirely nothing is logged, exactly as before. Only how the message is assembled changed.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#414",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/414",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#418",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/418",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#421",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/421",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/build-profile-respects-manifest-overflow-checks.md",
+			"summary": "Respect manifest overflow checks in the size profile",
+			"details": "The default `SizeProfile::Production` sets `overflow-checks = false` as Cargo environment overrides, and environment overrides beat `[profile.release]` in a manifest. A program that deliberately set `overflow-checks = true` therefore had the setting silently replaced with wrapping arithmetic on its next `pina build`, turning a loud failure into a wrong result.\n\n`pina build` now reads `[profile.release].overflow-checks` from the workspace manifest that owns the build. An explicit `true` outranks the size profile: the checks stay enabled and the command warns that it gave up part of the profile. A silent manifest, or one that agrees with disabling the checks, behaves exactly as before. `--overflow-checks` still forces them on.\n\n`pina build --verify` no longer applies profile overrides at all. A verified artifact must stay reproducible from its recorded Git revision, and an override that exists only on the command line cannot be reproduced from that revision. Declare the profile under `[profile.release]` — the layout `pina init` writes — so the ordinary and verified backends compile the same artifact. Pina warns when a requested profile would make the two artifacts differ, naming the missing setting.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#414",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/414",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#418",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/418",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#421",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/421",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/cost-estimate-anchors-transition-symbols.md",
+			"summary": "Anchor transition symbols and report zero-cost migrations",
+			"details": "`pina migrations status` estimates a ladder's compute units by summing the transition functions recorded in an SBF profile. The symbol match accepted a transition name appearing anywhere in a mangled symbol, so an unrelated function whose name merely contained it was counted too, doubling the estimate. A transition that genuinely cost zero units was also reported as missing, replacing a real measurement with an \"unavailable\" reason.\n\nMatches now anchor to whole path components in both mangled and demangled spellings, and a present transition is tracked separately from its cost, so a zero-unit transition reports `0` instead of a missing-symbol error.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#414",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/414",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#418",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/418",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#421",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/421",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/emit-event-log-records.md",
+			"summary": "Emit event records to the transaction log",
+			"details": "`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:\n\n```rust\nMyEvent::emit(|event| {\n\tevent.data = 5;\n\tevent.label = *b\"hello\\0\\0\\0\";\n\tOk(())\n})?;\n```\n\nGenerated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.\n\n`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.\n\n`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.\n\n`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.\n\nThe Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.\n\n##### Compute units\n\nEmitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0a460a21ae1e1a0bff904f769d86a2280ecbe9c6",
+						"short_sha": "0a460a2",
+						"url": "https://github.com/pina-rs/pina/commit/0a460a21ae1e1a0bff904f769d86a2280ecbe9c6",
+						"authored_at": "2026-09-15T19:03:47+01:00",
+						"committed_at": "2026-09-15T19:03:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#423",
+						"title": "feat(events): emit validated event records to the transaction log",
+						"url": "https://github.com/pina-rs/pina/pull/423",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0a460a21ae1e1a0bff904f769d86a2280ecbe9c6",
+						"short_sha": "0a460a2",
+						"url": "https://github.com/pina-rs/pina/commit/0a460a21ae1e1a0bff904f769d86a2280ecbe9c6",
+						"authored_at": "2026-09-15T19:03:47+01:00",
+						"committed_at": "2026-09-15T19:03:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#423",
+						"title": "feat(events): emit validated event records to the transaction log",
+						"url": "https://github.com/pina-rs/pina/pull/423",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/migrations-inspect-fetches-full-account-data.md",
+			"summary": "Fetch full account data in `pina migrations inspect`",
+			"details": "`pina migrations inspect` requested account data with a zero-length JSON-RPC `dataSlice`. A spec-compliant RPC honors that slice and returns no bytes, so every existing account decoded as `UnknownContract` and the command exited `0` — a silent all-clear from the one check that is supposed to report stale or future account versions before a deployment.\n\nThe command now requests the full account body, so the discriminator and version envelope decode as intended and the exit code reflects account state. The test server honors the requested slice instead of returning a canned body, and a regression test pins the zero-length response a slice-ignoring request would have received.\n\nThe inspect request also gained a 30-second timeout so a stalled RPC endpoint fails with a message instead of blocking the command indefinitely.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"short_sha": "551c1c9",
+						"url": "https://github.com/pina-rs/pina/commit/551c1c9720350e223c6fd628225aff8a4cc6ae76",
+						"authored_at": "2026-09-15T20:39:38+01:00",
+						"committed_at": "2026-09-15T20:39:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#420",
+						"title": "fix(cli): repair the release-blocking findings from the security review",
+						"url": "https://github.com/pina-rs/pina/pull/420",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#414",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/414",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#418",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/418",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#421",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/421",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.18.1](https://github.com/pina-rs/pina/releases/tag/v0.18.1) (2026-09-15)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add admin-key and oracle security lessons and a drain lint\n\n_Packages:_ _pina_, _pina_cli_, _pina_lints_\n\nThe security guide grows two lessons grounded in exploits from the last three years: `11-admin-key-compromise` (Raydium 2022, DEXX 2024, Drift 2026) shows a vault where one leaked key sweeps every lamport and redirects the program in a single signature, and rebuilds it with the containment real protocols shipped — a guardian-gated pause that cannot move funds, a per-window withdrawal cap on the Mango v4 `net_borrow_limit` shape, dual-control unpause, and two-phase authority rotation; `12-oracle-integrity` (Loopscale 2025, Makina 2026) shows a market whose price feed passes ownership checks yet still prices loans, because the configured oracle address is ignored and staleness is unchecked, and secures it with feed pinning plus a Clock-driven staleness bound. The research mapping every cited incident to its vulnerability class and mitigation lives in `security/incidents-2023-2026.md`.\n\nThe lint catalog gains `require_guarded_full_balance_drain` (warn), which flags instruction handlers that can sweep an account's entire balance to a recipient with no pause, circuit-breaker, or close intent in sight — the exact shape the cited drains used — and `require_checked_asset_arithmetic` now also denies `<<`/`>>` and `<<=`/`>>=` on asset-named values with `checked_shl`/`checked_shr` suggestions, closing the shift-overflow family that broke Cetus. The new lint runs clean across every example and secure lesson, and fires on the new admin-key insecure fixture.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #416](https://github.com/pina-rs/pina/pull/416)",
+							"#### Emit event records to the transaction log\n\n_Packages:_ _pina_, _pina_macros_, _pina_test_\n\n`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:\n\n```rust\nMyEvent::emit(|event| {\n\tevent.data = 5;\n\tevent.label = *b\"hello\\0\\0\\0\";\n\tOk(())\n})?;\n```\n\nGenerated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.\n\n`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.\n\n`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.\n\n`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.\n\nThe Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.\n\n##### Compute units\n\nEmitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Build assertion messages without the formatting logger\n\n_Packages:_ _pina_\n\n`pina::assert` logged its message through the always-formatting `log_verbose!` arm, which assembles the message with a stack `Logger` buffer before writing it. When `verbose-logs` is off the failure path now hands the caller's `&str` straight to the log syscall, so the message reaches the log without an intermediate buffer. With `verbose-logs` on nothing changes: the formatted message and caller location are still written, and the built binary is byte-identical to before.\n\nThe saving is small — a few hundred bytes in a program that actually reaches the path — because the logger never linked `core::fmt` in the first place. With `logs` enabled the message is still logged in every configuration; with `logs` off entirely nothing is logged, exactly as before. Only how the message is assembled changed.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)",
+							"#### Respect manifest overflow checks in the size profile\n\n_Packages:_ _pina_cli_\n\nThe default `SizeProfile::Production` sets `overflow-checks = false` as Cargo environment overrides, and environment overrides beat `[profile.release]` in a manifest. A program that deliberately set `overflow-checks = true` therefore had the setting silently replaced with wrapping arithmetic on its next `pina build`, turning a loud failure into a wrong result.\n\n`pina build` now reads `[profile.release].overflow-checks` from the workspace manifest that owns the build. An explicit `true` outranks the size profile: the checks stay enabled and the command warns that it gave up part of the profile. A silent manifest, or one that agrees with disabling the checks, behaves exactly as before. `--overflow-checks` still forces them on.\n\n`pina build --verify` no longer applies profile overrides at all. A verified artifact must stay reproducible from its recorded Git revision, and an override that exists only on the command line cannot be reproduced from that revision. Declare the profile under `[profile.release]` — the layout `pina init` writes — so the ordinary and verified backends compile the same artifact. Pina warns when a requested profile would make the two artifacts differ, naming the missing setting.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)",
+							"#### Anchor transition symbols and report zero-cost migrations\n\n_Packages:_ _pina_cli_\n\n`pina migrations status` estimates a ladder's compute units by summing the transition functions recorded in an SBF profile. The symbol match accepted a transition name appearing anywhere in a mangled symbol, so an unrelated function whose name merely contained it was counted too, doubling the estimate. A transition that genuinely cost zero units was also reported as missing, replacing a real measurement with an \"unavailable\" reason.\n\nMatches now anchor to whole path components in both mangled and demangled spellings, and a present transition is tracked separately from its cost, so a zero-unit transition reports `0` instead of a missing-symbol error.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)",
+							"#### Fetch full account data in `pina migrations inspect`\n\n_Packages:_ _pina_cli_\n\n`pina migrations inspect` requested account data with a zero-length JSON-RPC `dataSlice`. A spec-compliant RPC honors that slice and returns no bytes, so every existing account decoded as `UnknownContract` and the command exited `0` — a silent all-clear from the one check that is supposed to report stale or future account versions before a deployment.\n\nThe command now requests the full account body, so the discriminator and version envelope decode as intended and the exit code reflects account state. The test server honors the requested slice instead of returning a canned body, and a regression test pins the zero-length response a slice-ignoring request would have received.\n\nThe inspect request also gained a 30-second timeout so a stalled RPC endpoint fails with a message instead of blocking the command indefinitely.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Emit event records to the transaction log\n\n_Packages:_ _pina_skill_\n\n`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:\n\n```rust\nMyEvent::emit(|event| {\n\tevent.data = 5;\n\tevent.label = *b\"hello\\0\\0\\0\";\n\tOk(())\n})?;\n```\n\nGenerated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.\n\n`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.\n\n`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.\n\n`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.\n\nThe Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.\n\n##### Compute units\n\nEmitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.18.1](https://github.com/pina-rs/pina/releases/tag/v0.18.1) (2026-09-15)\n\nGrouped release for `core`.\n\n### Features\n\n#### Add admin-key and oracle security lessons and a drain lint\n\n_Packages:_ _pina_, _pina_cli_, _pina_lints_\n\nThe security guide grows two lessons grounded in exploits from the last three years: `11-admin-key-compromise` (Raydium 2022, DEXX 2024, Drift 2026) shows a vault where one leaked key sweeps every lamport and redirects the program in a single signature, and rebuilds it with the containment real protocols shipped — a guardian-gated pause that cannot move funds, a per-window withdrawal cap on the Mango v4 `net_borrow_limit` shape, dual-control unpause, and two-phase authority rotation; `12-oracle-integrity` (Loopscale 2025, Makina 2026) shows a market whose price feed passes ownership checks yet still prices loans, because the configured oracle address is ignored and staleness is unchecked, and secures it with feed pinning plus a Clock-driven staleness bound. The research mapping every cited incident to its vulnerability class and mitigation lives in `security/incidents-2023-2026.md`.\n\nThe lint catalog gains `require_guarded_full_balance_drain` (warn), which flags instruction handlers that can sweep an account's entire balance to a recipient with no pause, circuit-breaker, or close intent in sight — the exact shape the cited drains used — and `require_checked_asset_arithmetic` now also denies `<<`/`>>` and `<<=`/`>>=` on asset-named values with `checked_shl`/`checked_shr` suggestions, closing the shift-overflow family that broke Cetus. The new lint runs clean across every example and secure lesson, and fires on the new admin-key insecure fixture.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #416](https://github.com/pina-rs/pina/pull/416)\n\n#### Emit event records to the transaction log\n\n_Packages:_ _pina_, _pina_macros_, _pina_test_\n\n`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:\n\n```rust\nMyEvent::emit(|event| {\n\tevent.data = 5;\n\tevent.label = *b\"hello\\0\\0\\0\";\n\tOk(())\n})?;\n```\n\nGenerated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.\n\n`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.\n\n`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.\n\n`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.\n\nThe Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.\n\n##### Compute units\n\nEmitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)\n\n### Fixes\n\n#### Build assertion messages without the formatting logger\n\n_Packages:_ _pina_\n\n`pina::assert` logged its message through the always-formatting `log_verbose!` arm, which assembles the message with a stack `Logger` buffer before writing it. When `verbose-logs` is off the failure path now hands the caller's `&str` straight to the log syscall, so the message reaches the log without an intermediate buffer. With `verbose-logs` on nothing changes: the formatted message and caller location are still written, and the built binary is byte-identical to before.\n\nThe saving is small — a few hundred bytes in a program that actually reaches the path — because the logger never linked `core::fmt` in the first place. With `logs` enabled the message is still logged in every configuration; with `logs` off entirely nothing is logged, exactly as before. Only how the message is assembled changed.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)\n\n#### Respect manifest overflow checks in the size profile\n\n_Packages:_ _pina_cli_\n\nThe default `SizeProfile::Production` sets `overflow-checks = false` as Cargo environment overrides, and environment overrides beat `[profile.release]` in a manifest. A program that deliberately set `overflow-checks = true` therefore had the setting silently replaced with wrapping arithmetic on its next `pina build`, turning a loud failure into a wrong result.\n\n`pina build` now reads `[profile.release].overflow-checks` from the workspace manifest that owns the build. An explicit `true` outranks the size profile: the checks stay enabled and the command warns that it gave up part of the profile. A silent manifest, or one that agrees with disabling the checks, behaves exactly as before. `--overflow-checks` still forces them on.\n\n`pina build --verify` no longer applies profile overrides at all. A verified artifact must stay reproducible from its recorded Git revision, and an override that exists only on the command line cannot be reproduced from that revision. Declare the profile under `[profile.release]` — the layout `pina init` writes — so the ordinary and verified backends compile the same artifact. Pina warns when a requested profile would make the two artifacts differ, naming the missing setting.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)\n\n#### Anchor transition symbols and report zero-cost migrations\n\n_Packages:_ _pina_cli_\n\n`pina migrations status` estimates a ladder's compute units by summing the transition functions recorded in an SBF profile. The symbol match accepted a transition name appearing anywhere in a mangled symbol, so an unrelated function whose name merely contained it was counted too, doubling the estimate. A transition that genuinely cost zero units was also reported as missing, replacing a real measurement with an \"unavailable\" reason.\n\nMatches now anchor to whole path components in both mangled and demangled spellings, and a present transition is tracked separately from its cost, so a zero-unit transition reports `0` instead of a missing-symbol error.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)\n\n#### Fetch full account data in `pina migrations inspect`\n\n_Packages:_ _pina_cli_\n\n`pina migrations inspect` requested account data with a zero-length JSON-RPC `dataSlice`. A spec-compliant RPC honors that slice and returns no bytes, so every existing account decoded as `UnknownContract` and the command exited `0` — a silent all-clear from the one check that is supposed to report stale or future account versions before a deployment.\n\nThe command now requests the full account body, so the discriminator and version envelope decode as intended and the exit code reflects account state. The test server honors the requested slice instead of returning a canned body, and a regression test pins the zero-length response a slice-ignoring request would have received.\n\nThe inspect request also gained a 30-second timeout so a stalled RPC endpoint fails with a message instead of blocking the command indefinitely.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #420](https://github.com/pina-rs/pina/pull/420) · _Related issues:_ [#414](https://github.com/pina-rs/pina/issues/414), [#418](https://github.com/pina-rs/pina/issues/418), [#421](https://github.com/pina-rs/pina/issues/421)\n\n### Documentation\n\n#### Emit event records to the transaction log\n\n_Packages:_ _pina_skill_\n\n`#[event]` structs now generate an `emit` helper that writes a validated `[discriminator][schema version][payload]` record to the `Program data:` transaction log:\n\n```rust\nMyEvent::emit(|event| {\n\tevent.data = 5;\n\tevent.label = *b\"hello\\0\\0\\0\";\n\tOk(())\n})?;\n```\n\nGenerated Rust, TypeScript, and Dart clients already shipped decoders for those log lines, but nothing on chain produced them. Programs had to build the record bytes themselves and had no supported way to publish them, so an event type could be declared, validated, and generated into three clients while never reaching an indexer. `emit` closes that gap: it builds the record through the same generated `initialize` path that `try_from_bytes` validates, so an emitted record always decodes against the current schema, and it publishes the whole envelope as one `sol_log_data` slice so the base64 payload is decodable.\n\n`emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.\n\n`events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.\n\n`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.\n\nThe Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.\n\n##### Compute units\n\nEmitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #423](https://github.com/pina-rs/pina/pull/423)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
