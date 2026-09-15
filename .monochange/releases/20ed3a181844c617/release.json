@@ -1,0 +1,1719 @@
+{
+	"schema_version": "0.6",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-15T08:27:16Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.18.0",
+		"pina_root": "0.0.8"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.18.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.18.0",
+			"members": [
+				"pina",
+				"pina_abi",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.8",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.8",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_abi",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_abi/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_abi",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.18.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/cli-generate-scaffold-fixes.md",
+		".changeset/client-hardening-review-fixes.md",
+		".changeset/client-version-zero-stale-checks.md",
+		".changeset/cpi-boolean-argument-write.md",
+		".changeset/float-and-fixed-point-schema-fields.md",
+		".changeset/pda-builder-idl-analysis.md",
+		".changeset/pina-cli-size-profile.md",
+		".changeset/reduce-program-size.md",
+		".changeset/split-floats-and-fixed-features.md",
+		".changeset/unchecked-bump-pda-builder.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/cli-generate-scaffold-fixes.md",
+			"summary": "Repair cli-rust paths, TS event dirs, and the CPI pin",
+			"details": "The `cli-rust` scaffold referenced the generated rust client three directory levels up instead of two, so the rendered CLI crate could not resolve its client dependency. The TypeScript event log module now creates the `events` directory before writing `logs.ts` and treats a missing barrel file as empty instead of failing, which lets programs without events generate cleanly. The CPI crate scaffold pins `pina = \"0.17\"` instead of the stale `0.12` floor.\n\nA new `pina snapshot` command emits the normalized CLI-surface snapshot that release automation diffs against the committed baseline at `.monochange/cli-snapshots/pina.json`, and `pina_cli` is now registered as a CLI package so changes to a flag or value set are classified as compatibility findings instead of unknown package changes. Run `pina snapshot --save` after an intentional surface change.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/client-hardening-review-fixes.md",
+			"summary": "Preserve JS event barrels and maximal-version tests",
+			"details": "The JavaScript event hardening read `events/index.ts` with `unwrap_or_default`, so an unwritable or invalid-UTF-8 barrel was treated as absent and the following write replaced it with the lone `./logs` export, silently dropping the other event exports. Only a missing barrel now counts as fresh generation; every other read failure surfaces as `CodamaError::HardenJavaScript` before anything is overwritten.\n\nThe generated Rust projection tests built their future-version fixture with a saturating `version + 1`, which at a type's maximum version emitted the current version (or an overflowing literal for `u8`/`u16`/`u32` widths), so the generated crate failed to compile or its `future_versions_fail_closed` test failed. Events at the maximum representable version now emit `maximal_version_decodes_as_current` instead, matching `try_from_bytes`' classification of the true maximum as current.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/client-version-zero-stale-checks.md",
+			"summary": "Emit lint-clean migration checks for version-zero clients",
+			"details": "Generated Rust clients compared the stored `migrationVersion` against the current-version constant even when that constant was `0`, so the stale check `stored < 0` (and the equivalent comparison inside `{account}_needs_migration`) was always false and tripped the deny-by-default `clippy::absurd_extreme_comparisons` in any generated crate. The renderer now omits the impossible stale arm and emits the constant-false `needs_migration` body for version 0, and symmetrically omits the future arm when the current version equals its type maximum. Emitted semantics are unchanged — stale, future, and current envelopes are distinguished exactly as before — and the embedded contract tests now assert only the reachable cases, with version 0 pinning current versus future.",
+			"targets": [
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/cpi-boolean-argument-write.md",
+			"summary": "Interpolate the field name in boolean CPI argument writes",
+			"details": "The `TypeNode::Boolean` branch of `render_argument` built its write statement with a plain string, so the `{field}` placeholder reached the generated CPI source literally as `data[offset] = u8::from(self.{field});` and `pina cpi` aborted for every program with a boolean instruction argument because the emitted source failed to parse. The branch now formats the statement like every other scalar argument, escaping the `{offset}` placeholders so `render_argument_write` still substitutes the concrete offsets.",
+			"targets": [
+				{
+					"id": "pina_cpi_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c227547e08d565e41c556fdea9bbe26017922cf6",
+						"short_sha": "c227547",
+						"url": "https://github.com/pina-rs/pina/commit/c227547e08d565e41c556fdea9bbe26017922cf6",
+						"authored_at": "2026-09-14T11:40:57+01:00",
+						"committed_at": "2026-09-14T11:40:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#406",
+						"title": "fix(renderers): repair boolean CPI args, version-zero stale checks, and scaffolds",
+						"url": "https://github.com/pina-rs/pina/pull/406",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/float-and-fixed-point-schema-fields.md",
+			"summary": "Add the `floats` feature for float schema fields",
+			"details": "Fractional-field support arrives as two independent features. `floats` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields, and the separate `fixed` feature accepts fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Enable the feature that matches the stored field type: a schema using fixed-point types needs `fixed`, and `floats` alone will not compile it. Float fields convert to and from their bit pattern through `pina::PodF32`/`pina::PodF64`, which now come from `pinapod` rather than a Pina-local definition, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods through pinapod's `fixed` support; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support, and `pina_abi` sizes the new types for migration layout planning. `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly, which retires two macro workarounds: fields keep their declared spelling all the way to the `PinaPod` derive instead of being rewritten to pods first. The measured build cost is bounded by the feature a program enables — `fixed` alone pulls in `fixed` and `typenum`, and a program using neither compiles a `pina` rlib byte-identical to one built before the split.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_abi",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"short_sha": "b9e7dc3",
+						"url": "https://github.com/pina-rs/pina/commit/b9e7dc3196d393bddec280258bac487b16b7ff70",
+						"authored_at": "2026-09-13T20:58:16+01:00",
+						"committed_at": "2026-09-13T20:58:16+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#401",
+						"title": "chore(lints): remove accidentally committed rmeta artifacts",
+						"url": "https://github.com/pina-rs/pina/pull/401",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6ae23553b35c6f4139cee7462cab7cd757d44475",
+						"short_sha": "6ae2355",
+						"url": "https://github.com/pina-rs/pina/commit/6ae23553b35c6f4139cee7462cab7cd757d44475",
+						"authored_at": "2026-09-15T06:45:46+01:00",
+						"committed_at": "2026-09-15T06:45:46+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#415",
+						"title": "docs(changesets): correct the floats feature description",
+						"url": "https://github.com/pina-rs/pina/pull/415",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#270",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/270",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pda-builder-idl-analysis.md",
+			"summary": "Keep the unchecked PDA builder in the IDL account analysis",
+			"details": "The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_codama_renderer_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "47421f99eb082db0d75970db66eeaad366da547b",
+						"short_sha": "47421f9",
+						"url": "https://github.com/pina-rs/pina/commit/47421f99eb082db0d75970db66eeaad366da547b",
+						"authored_at": "2026-09-15T08:05:15+01:00",
+						"committed_at": "2026-09-15T08:05:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#414",
+						"title": "fix(cli): restore the PDA default the unchecked builder removed",
+						"url": "https://github.com/pina-rs/pina/pull/414",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "47421f99eb082db0d75970db66eeaad366da547b",
+						"short_sha": "47421f9",
+						"url": "https://github.com/pina-rs/pina/commit/47421f99eb082db0d75970db66eeaad366da547b",
+						"authored_at": "2026-09-15T08:05:15+01:00",
+						"committed_at": "2026-09-15T08:05:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#414",
+						"title": "fix(cli): restore the PDA default the unchecked builder removed",
+						"url": "https://github.com/pina-rs/pina/pull/414",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#411",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/411",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pina-cli-size-profile.md",
+			"summary": "`pina_cli` build types gain fields for the size profile",
+			"details": "`BuildOptions` replaces its `no_lto`, `no_size_profile`, and `overflow_checks` booleans with a single `size_profile: SizeProfile`. The new enum has `Production` (fat LTO, one codegen unit, overflow checks off), `ProductionWithoutLto` (the same profile with LTO turned off), `ProductionWithOverflowChecks`, and `None`. `Project` gains `library_crate_types`, which reports the crate types declared by the program's library target so callers can tell whether a program can be linked with LTO.\n\nBoth structs are exhaustively constructible through the public API, so existing struct literals must set the new fields. The CLI flags keep their names and meanings: `--overflow-checks` selects `ProductionWithOverflowChecks`, `--no-lto` selects `ProductionWithoutLto`, and `--no-size-profile` selects `None` and leaves the program's own release profile alone.\n\n`ProductionWithoutLto` exists because `--no-lto` has to disable LTO _as an override_. Leaving the setting untouched would let a program whose manifest declares `lto = \"fat\"` — which `pina init` generates — keep LTO enabled while the flag claimed to turn it off.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"short_sha": "8e136e2",
+						"url": "https://github.com/pina-rs/pina/commit/8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"authored_at": "2026-09-14T16:17:25+01:00",
+						"committed_at": "2026-09-14T16:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#407",
+						"title": "feat(pina): reduce deployed program size by up to 67%",
+						"url": "https://github.com/pina-rs/pina/pull/407",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"short_sha": "8e136e2",
+						"url": "https://github.com/pina-rs/pina/commit/8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"authored_at": "2026-09-14T16:17:25+01:00",
+						"committed_at": "2026-09-14T16:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#407",
+						"title": "feat(pina): reduce deployed program size by up to 67%",
+						"url": "https://github.com/pina-rs/pina/pull/407",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/reduce-program-size.md",
+			"summary": "Reduce deployed program size by up to 67%",
+			"details": "Programs built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,800 bytes (−45%) and a PDA counter from 37,472 to 12,392 bytes (−67%).\n\nThree changes produce that result.\n\nThe `logs` feature now writes a fixed message on every failure path instead of a formatted one. Formatting pulled `core::fmt` into every deployed binary, which cost far more than the message strings themselves. Formatted detail and `file:line:column` caller locations moved to the new opt-in `verbose-logs` feature, and the `log!` format arm collapses to a static pointer message when it is off. A new `log_failure!` macro handles the message-plus-detail shape used by the account validators, and `log_verbose!` covers call sites that want formatting in every build.\n\n`pina build` now applies the production release profile automatically: `lto = \"fat\"`, `codegen-units = 1`, `opt-level = 3`, and `overflow-checks = false`. These are passed as Cargo profile overrides so they apply regardless of how the program crate declares its types. `--no-size-profile` skips them, and `--overflow-checks` restores the panic-on-overflow behavior, which stays off by default because disabling it turns arithmetic overflow into a wrap.\n\n`lto` could not previously take effect on any program in this repository. A crate declaring `crate-type = [\"cdylib\", \"lib\"]` makes rustc reject `-C lto` for the whole build, and the toolchain dropped the profile setting silently. Program crates generated by `pina init` are now `cdylib` only, and the CLI warns when a dual crate-type program gives up LTO.\n\nTests keep full reach into the real program source. Behavioural tests live in `src/lib.rs` under `#[cfg(test)] mod tests`, which still compiles and still measures coverage on a cdylib-only crate. The generated Surfpool harness includes the program source with `#[path = \"../../../src/lib.rs\"] mod program;` so it can use the real instruction encoders and program ID. Verified on a freshly generated project: all tests pass and coverage reports against the real source rather than a second copy.\n\nThe framework's own floor is now within 6% of a hand-written Pinocchio program: 3,352 bytes against 3,160 with the same profile, once derivation and logging are removed. Remaining work in this area is not framework overhead.\n\nDocumentation gained a `Program size` chapter covering the framework comparison (Pina, Quasar, Pinocchio, Anchor v1, Anchor v2), what determines size, how to measure it, and the test patterns that keep coverage while programs stay cdylib-only. `docs/sbpf-linker-evaluation.md` records the `sbpf-linker` build-path evaluation, including a pre-existing defect in the repository's `bpfel-unknown-none` `build-bpf` alias, which produces artifacts that load and report success while logging empty strings.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"short_sha": "8e136e2",
+						"url": "https://github.com/pina-rs/pina/commit/8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"authored_at": "2026-09-14T16:17:25+01:00",
+						"committed_at": "2026-09-14T16:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#407",
+						"title": "feat(pina): reduce deployed program size by up to 67%",
+						"url": "https://github.com/pina-rs/pina/pull/407",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"short_sha": "8e136e2",
+						"url": "https://github.com/pina-rs/pina/commit/8e136e28f13f5ac127a104ef0a30c8c6f4f55887",
+						"authored_at": "2026-09-14T16:17:25+01:00",
+						"committed_at": "2026-09-14T16:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#407",
+						"title": "feat(pina): reduce deployed program size by up to 67%",
+						"url": "https://github.com/pina-rs/pina/pull/407",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/split-floats-and-fixed-features.md",
+			"summary": "split `floats` and `fixed`, and source pods from pinapod",
+			"details": "The fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "major"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_abi",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "2b8bc8a9054dc3d6540cabb10f3d638786783f07",
+						"short_sha": "2b8bc8a",
+						"url": "https://github.com/pina-rs/pina/commit/2b8bc8a9054dc3d6540cabb10f3d638786783f07",
+						"authored_at": "2026-09-14T18:35:34+01:00",
+						"committed_at": "2026-09-14T18:35:34+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#409",
+						"title": "feat(pina): split the floats and fixed features",
+						"url": "https://github.com/pina-rs/pina/pull/409",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "2b8bc8a9054dc3d6540cabb10f3d638786783f07",
+						"short_sha": "2b8bc8a",
+						"url": "https://github.com/pina-rs/pina/commit/2b8bc8a9054dc3d6540cabb10f3d638786783f07",
+						"authored_at": "2026-09-14T18:35:34+01:00",
+						"committed_at": "2026-09-14T18:35:34+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#409",
+						"title": "feat(pina): split the floats and fixed features",
+						"url": "https://github.com/pina-rs/pina/pull/409",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/unchecked-bump-pda-builder.md",
+			"summary": "Add a cheap PDA builder that skips the bump search",
+			"details": "`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_renderer_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "625d03476052638c41f882294196d66d5f3fa918",
+						"short_sha": "625d034",
+						"url": "https://github.com/pina-rs/pina/commit/625d03476052638c41f882294196d66d5f3fa918",
+						"authored_at": "2026-09-14T23:11:20+01:00",
+						"committed_at": "2026-09-14T23:11:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#411",
+						"title": "feat(pina): add a PDA creation builder that skips the bump search",
+						"url": "https://github.com/pina-rs/pina/pull/411",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "625d03476052638c41f882294196d66d5f3fa918",
+						"short_sha": "625d034",
+						"url": "https://github.com/pina-rs/pina/commit/625d03476052638c41f882294196d66d5f3fa918",
+						"authored_at": "2026-09-14T23:11:20+01:00",
+						"committed_at": "2026-09-14T23:11:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#411",
+						"title": "feat(pina): add a PDA creation builder that skips the bump search",
+						"url": "https://github.com/pina-rs/pina/pull/411",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.18.0](https://github.com/pina-rs/pina/releases/tag/v0.18.0) (2026-09-15)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)",
+							"#### `pina_cli` build types gain fields for the size profile\n\n_Packages:_ _pina_cli_\n\n`BuildOptions` replaces its `no_lto`, `no_size_profile`, and `overflow_checks` booleans with a single `size_profile: SizeProfile`. The new enum has `Production` (fat LTO, one codegen unit, overflow checks off), `ProductionWithoutLto` (the same profile with LTO turned off), `ProductionWithOverflowChecks`, and `None`. `Project` gains `library_crate_types`, which reports the crate types declared by the program's library target so callers can tell whether a program can be linked with LTO.\n\nBoth structs are exhaustively constructible through the public API, so existing struct literals must set the new fields. The CLI flags keep their names and meanings: `--overflow-checks` selects `ProductionWithOverflowChecks`, `--no-lto` selects `ProductionWithoutLto`, and `--no-size-profile` selects `None` and leaves the program's own release profile alone.\n\n`ProductionWithoutLto` exists because `--no-lto` has to disable LTO _as an override_. Leaving the setting untouched would let a program whose manifest declares `lto = \"fat\"` — which `pina init` generates — keep LTO enabled while the flag claimed to turn it off.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add the `floats` feature for float schema fields\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nFractional-field support arrives as two independent features. `floats` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields, and the separate `fixed` feature accepts fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Enable the feature that matches the stored field type: a schema using fixed-point types needs `fixed`, and `floats` alone will not compile it. Float fields convert to and from their bit pattern through `pina::PodF32`/`pina::PodF64`, which now come from `pinapod` rather than a Pina-local definition, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods through pinapod's `fixed` support; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support, and `pina_abi` sizes the new types for migration layout planning. `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly, which retires two macro workarounds: fields keep their declared spelling all the way to the `PinaPod` derive instead of being rewritten to pods first. The measured build cost is bounded by the feature a program enables — `fixed` alone pulls in `fixed` and `typenum`, and a program using neither compiles a `pina` rlib byte-identical to one built before the split.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)",
+							"#### Reduce deployed program size by up to 67%\n\n_Packages:_ _pina_, _pina_cli_\n\nPrograms built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,800 bytes (−45%) and a PDA counter from 37,472 to 12,392 bytes (−67%).\n\nThree changes produce that result.\n\nThe `logs` feature now writes a fixed message on every failure path instead of a formatted one. Formatting pulled `core::fmt` into every deployed binary, which cost far more than the message strings themselves. Formatted detail and `file:line:column` caller locations moved to the new opt-in `verbose-logs` feature, and the `log!` format arm collapses to a static pointer message when it is off. A new `log_failure!` macro handles the message-plus-detail shape used by the account validators, and `log_verbose!` covers call sites that want formatting in every build.\n\n`pina build` now applies the production release profile automatically: `lto = \"fat\"`, `codegen-units = 1`, `opt-level = 3`, and `overflow-checks = false`. These are passed as Cargo profile overrides so they apply regardless of how the program crate declares its types. `--no-size-profile` skips them, and `--overflow-checks` restores the panic-on-overflow behavior, which stays off by default because disabling it turns arithmetic overflow into a wrap.\n\n`lto` could not previously take effect on any program in this repository. A crate declaring `crate-type = [\"cdylib\", \"lib\"]` makes rustc reject `-C lto` for the whole build, and the toolchain dropped the profile setting silently. Program crates generated by `pina init` are now `cdylib` only, and the CLI warns when a dual crate-type program gives up LTO.\n\nTests keep full reach into the real program source. Behavioural tests live in `src/lib.rs` under `#[cfg(test)] mod tests`, which still compiles and still measures coverage on a cdylib-only crate. The generated Surfpool harness includes the program source with `#[path = \"../../../src/lib.rs\"] mod program;` so it can use the real instruction encoders and program ID. Verified on a freshly generated project: all tests pass and coverage reports against the real source rather than a second copy.\n\nThe framework's own floor is now within 6% of a hand-written Pinocchio program: 3,352 bytes against 3,160 with the same profile, once derivation and logging are removed. Remaining work in this area is not framework overhead.\n\nDocumentation gained a `Program size` chapter covering the framework comparison (Pina, Quasar, Pinocchio, Anchor v1, Anchor v2), what determines size, how to measure it, and the test patterns that keep coverage while programs stay cdylib-only. `docs/sbpf-linker-evaluation.md` records the `sbpf-linker` build-path evaluation, including a pre-existing defect in the repository's `bpfel-unknown-none` `build-bpf` alias, which produces artifacts that load and report success while logging empty strings.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)",
+							"#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)",
+							"#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_macros_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Repair cli-rust paths, TS event dirs, and the CPI pin\n\n_Packages:_ _pina_cli_\n\nThe `cli-rust` scaffold referenced the generated rust client three directory levels up instead of two, so the rendered CLI crate could not resolve its client dependency. The TypeScript event log module now creates the `events` directory before writing `logs.ts` and treats a missing barrel file as empty instead of failing, which lets programs without events generate cleanly. The CPI crate scaffold pins `pina = \"0.17\"` instead of the stale `0.12` floor.\n\nA new `pina snapshot` command emits the normalized CLI-surface snapshot that release automation diffs against the committed baseline at `.monochange/cli-snapshots/pina.json`, and `pina_cli` is now registered as a CLI package so changes to a flag or value set are classified as compatibility findings instead of unknown package changes. Run `pina snapshot --save` after an intentional surface change.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)",
+							"#### Preserve JS event barrels and maximal-version tests\n\n_Packages:_ _pina_cli_, _pina_codama_renderer_\n\nThe JavaScript event hardening read `events/index.ts` with `unwrap_or_default`, so an unwritable or invalid-UTF-8 barrel was treated as absent and the following write replaced it with the lone `./logs` export, silently dropping the other event exports. Only a missing barrel now counts as fresh generation; every other read failure surfaces as `CodamaError::HardenJavaScript` before anything is overwritten.\n\nThe generated Rust projection tests built their future-version fixture with a saturating `version + 1`, which at a type's maximum version emitted the current version (or an overflowing literal for `u8`/`u16`/`u32` widths), so the generated crate failed to compile or its `future_versions_fail_closed` test failed. Events at the maximum representable version now emit `maximal_version_decodes_as_current` instead, matching `try_from_bytes`' classification of the true maximum as current.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)",
+							"- **pina_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)",
+							"#### Emit lint-clean migration checks for version-zero clients\n\n_Packages:_ _pina_codama_renderer_\n\nGenerated Rust clients compared the stored `migrationVersion` against the current-version constant even when that constant was `0`, so the stale check `stored < 0` (and the equivalent comparison inside `{account}_needs_migration`) was always false and tripped the deny-by-default `clippy::absurd_extreme_comparisons` in any generated crate. The renderer now omits the impossible stale arm and emits the constant-false `needs_migration` body for version 0, and symmetrically omits the future arm when the current version equals its type maximum. Emitted semantics are unchanged — stale, future, and current envelopes are distinguished exactly as before — and the embedded contract tests now assert only the reachable cases, with version 0 pinning current versus future.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)",
+							"- **pina_cpi_renderer**: **Interpolate the field name in boolean CPI argument writes.** The `TypeNode::Boolean` branch of `render_argument` built its write statement with a plain string, so the `{field}` placeholder reached the generated CPI source literally as `data[offset] = u8::from(self.{field});` and `pina cpi` aborted for every program with a boolean instruction argument because the emitted source failed to parse. The branch now formats the statement like every other scalar argument, escaping the `{offset}` placeholders so `render_argument_write` still substitutes the concrete offsets.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_lints_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_abi_, _pina_cli_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)",
+							"- **pina_codama_renderer_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)",
+							"#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_codama_renderer_cli_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.18.0](https://github.com/pina-rs/pina/releases/tag/v0.18.0) (2026-09-15)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)\n\n#### `pina_cli` build types gain fields for the size profile\n\n_Packages:_ _pina_cli_\n\n`BuildOptions` replaces its `no_lto`, `no_size_profile`, and `overflow_checks` booleans with a single `size_profile: SizeProfile`. The new enum has `Production` (fat LTO, one codegen unit, overflow checks off), `ProductionWithoutLto` (the same profile with LTO turned off), `ProductionWithOverflowChecks`, and `None`. `Project` gains `library_crate_types`, which reports the crate types declared by the program's library target so callers can tell whether a program can be linked with LTO.\n\nBoth structs are exhaustively constructible through the public API, so existing struct literals must set the new fields. The CLI flags keep their names and meanings: `--overflow-checks` selects `ProductionWithOverflowChecks`, `--no-lto` selects `ProductionWithoutLto`, and `--no-size-profile` selects `None` and leaves the program's own release profile alone.\n\n`ProductionWithoutLto` exists because `--no-lto` has to disable LTO _as an override_. Leaving the setting untouched would let a program whose manifest declares `lto = \"fat\"` — which `pina init` generates — keep LTO enabled while the flag claimed to turn it off.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)\n\n### Features\n\n#### Add the `floats` feature for float schema fields\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nFractional-field support arrives as two independent features. `floats` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields, and the separate `fixed` feature accepts fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Enable the feature that matches the stored field type: a schema using fixed-point types needs `fixed`, and `floats` alone will not compile it. Float fields convert to and from their bit pattern through `pina::PodF32`/`pina::PodF64`, which now come from `pinapod` rather than a Pina-local definition, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods through pinapod's `fixed` support; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.\n\nEvery fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support, and `pina_abi` sizes the new types for migration layout planning. `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly, which retires two macro workarounds: fields keep their declared spelling all the way to the `PinaPod` derive instead of being rewritten to pods first. The measured build cost is bounded by the feature a program enables — `fixed` alone pulls in `fixed` and `typenum`, and a program using neither compiles a `pina` rlib byte-identical to one built before the split.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)\n\n#### Reduce deployed program size by up to 67%\n\n_Packages:_ _pina_, _pina_cli_\n\nPrograms built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,800 bytes (−45%) and a PDA counter from 37,472 to 12,392 bytes (−67%).\n\nThree changes produce that result.\n\nThe `logs` feature now writes a fixed message on every failure path instead of a formatted one. Formatting pulled `core::fmt` into every deployed binary, which cost far more than the message strings themselves. Formatted detail and `file:line:column` caller locations moved to the new opt-in `verbose-logs` feature, and the `log!` format arm collapses to a static pointer message when it is off. A new `log_failure!` macro handles the message-plus-detail shape used by the account validators, and `log_verbose!` covers call sites that want formatting in every build.\n\n`pina build` now applies the production release profile automatically: `lto = \"fat\"`, `codegen-units = 1`, `opt-level = 3`, and `overflow-checks = false`. These are passed as Cargo profile overrides so they apply regardless of how the program crate declares its types. `--no-size-profile` skips them, and `--overflow-checks` restores the panic-on-overflow behavior, which stays off by default because disabling it turns arithmetic overflow into a wrap.\n\n`lto` could not previously take effect on any program in this repository. A crate declaring `crate-type = [\"cdylib\", \"lib\"]` makes rustc reject `-C lto` for the whole build, and the toolchain dropped the profile setting silently. Program crates generated by `pina init` are now `cdylib` only, and the CLI warns when a dual crate-type program gives up LTO.\n\nTests keep full reach into the real program source. Behavioural tests live in `src/lib.rs` under `#[cfg(test)] mod tests`, which still compiles and still measures coverage on a cdylib-only crate. The generated Surfpool harness includes the program source with `#[path = \"../../../src/lib.rs\"] mod program;` so it can use the real instruction encoders and program ID. Verified on a freshly generated project: all tests pass and coverage reports against the real source rather than a second copy.\n\nThe framework's own floor is now within 6% of a hand-written Pinocchio program: 3,352 bytes against 3,160 with the same profile, once derivation and logging are removed. Remaining work in this area is not framework overhead.\n\nDocumentation gained a `Program size` chapter covering the framework comparison (Pina, Quasar, Pinocchio, Anchor v1, Anchor v2), what determines size, how to measure it, and the test patterns that keep coverage while programs stay cdylib-only. `docs/sbpf-linker-evaluation.md` records the `sbpf-linker` build-path evaluation, including a pre-existing defect in the repository's `bpfel-unknown-none` `build-bpf` alias, which produces artifacts that load and report success while logging empty strings.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)\n\n#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)\n\n#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_macros_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)\n\n### Fixes\n\n#### Repair cli-rust paths, TS event dirs, and the CPI pin\n\n_Packages:_ _pina_cli_\n\nThe `cli-rust` scaffold referenced the generated rust client three directory levels up instead of two, so the rendered CLI crate could not resolve its client dependency. The TypeScript event log module now creates the `events` directory before writing `logs.ts` and treats a missing barrel file as empty instead of failing, which lets programs without events generate cleanly. The CPI crate scaffold pins `pina = \"0.17\"` instead of the stale `0.12` floor.\n\nA new `pina snapshot` command emits the normalized CLI-surface snapshot that release automation diffs against the committed baseline at `.monochange/cli-snapshots/pina.json`, and `pina_cli` is now registered as a CLI package so changes to a flag or value set are classified as compatibility findings instead of unknown package changes. Run `pina snapshot --save` after an intentional surface change.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)\n\n#### Preserve JS event barrels and maximal-version tests\n\n_Packages:_ _pina_cli_, _pina_codama_renderer_\n\nThe JavaScript event hardening read `events/index.ts` with `unwrap_or_default`, so an unwritable or invalid-UTF-8 barrel was treated as absent and the following write replaced it with the lone `./logs` export, silently dropping the other event exports. Only a missing barrel now counts as fresh generation; every other read failure surfaces as `CodamaError::HardenJavaScript` before anything is overwritten.\n\nThe generated Rust projection tests built their future-version fixture with a saturating `version + 1`, which at a type's maximum version emitted the current version (or an overflowing literal for `u8`/`u16`/`u32` widths), so the generated crate failed to compile or its `future_versions_fail_closed` test failed. Events at the maximum representable version now emit `maximal_version_decodes_as_current` instead, matching `try_from_bytes`' classification of the true maximum as current.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)\n\n- **pina_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)\n#### Emit lint-clean migration checks for version-zero clients\n\n_Packages:_ _pina_codama_renderer_\n\nGenerated Rust clients compared the stored `migrationVersion` against the current-version constant even when that constant was `0`, so the stale check `stored < 0` (and the equivalent comparison inside `{account}_needs_migration`) was always false and tripped the deny-by-default `clippy::absurd_extreme_comparisons` in any generated crate. The renderer now omits the impossible stale arm and emits the constant-false `needs_migration` body for version 0, and symmetrically omits the future arm when the current version equals its type maximum. Emitted semantics are unchanged — stale, future, and current envelopes are distinguished exactly as before — and the embedded contract tests now assert only the reachable cases, with version 0 pinning current versus future.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)\n\n- **pina_cpi_renderer**: **Interpolate the field name in boolean CPI argument writes.** The `TypeNode::Boolean` branch of `render_argument` built its write statement with a plain string, so the `{field}` placeholder reached the generated CPI source literally as `data[offset] = u8::from(self.{field});` and `pina cpi` aborted for every program with a boolean instruction argument because the emitted source failed to parse. The branch now formats the statement like every other scalar argument, escaping the `{offset}` placeholders so `render_argument_write` still substitutes the concrete offsets.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)\n\n### Documentation\n\n#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_lints_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)\n\n### Notes\n\n#### split `floats` and `fixed`, and source pods from pinapod\n\n_Packages:_ _pina_abi_, _pina_cli_\n\nThe fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.\n\n`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.\n\nThat upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.\n\nThe feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)\n\n- **pina_codama_renderer_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)\n#### Add a cheap PDA builder that skips the bump search\n\n_Packages:_ _pina_codama_renderer_cli_\n\n`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.\n\nThe trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}

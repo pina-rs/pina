@@ -4,6 +4,170 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.18.0](https://github.com/pina-rs/pina/releases/tag/v0.18.0) (2026-09-15)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### split `floats` and `fixed`, and source pods from pinapod
+
+_Packages:_ _pina_
+
+The fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.
+
+`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.
+
+That upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.
+
+The feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)
+
+#### `pina_cli` build types gain fields for the size profile
+
+_Packages:_ _pina_cli_
+
+`BuildOptions` replaces its `no_lto`, `no_size_profile`, and `overflow_checks` booleans with a single `size_profile: SizeProfile`. The new enum has `Production` (fat LTO, one codegen unit, overflow checks off), `ProductionWithoutLto` (the same profile with LTO turned off), `ProductionWithOverflowChecks`, and `None`. `Project` gains `library_crate_types`, which reports the crate types declared by the program's library target so callers can tell whether a program can be linked with LTO.
+
+Both structs are exhaustively constructible through the public API, so existing struct literals must set the new fields. The CLI flags keep their names and meanings: `--overflow-checks` selects `ProductionWithOverflowChecks`, `--no-lto` selects `ProductionWithoutLto`, and `--no-size-profile` selects `None` and leaves the program's own release profile alone.
+
+`ProductionWithoutLto` exists because `--no-lto` has to disable LTO _as an override_. Leaving the setting untouched would let a program whose manifest declares `lto = "fat"` — which `pina init` generates — keep LTO enabled while the flag claimed to turn it off.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)
+
+### Features
+
+#### Add the `floats` feature for float schema fields
+
+_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_
+
+Fractional-field support arrives as two independent features. `floats` lets `#[account]`, `#[instruction]`, and `#[event]` schemas accept `f32` and `f64` fields, and the separate `fixed` feature accepts fixed-point `FixedI*<Frac>`/`FixedU*<Frac>` fields. Enable the feature that matches the stored field type: a schema using fixed-point types needs `fixed`, and `floats` alone will not compile it. Float fields convert to and from their bit pattern through `pina::PodF32`/`pina::PodF64`, which now come from `pinapod` rather than a Pina-local definition, so generated accessors take and return native floats exactly like `u32` fields do through `PodU32`. Fixed-point fields map to their backing little-endian integer pods through pinapod's `fixed` support; Pina re-exports the exact pinned `fixed =1.30.0` instance as `pina::fixed`, so schemas never face a version-mismatch failure mode and users need no separate dependency.
+
+Every fractional field is stored as the complete bit pattern of its backing little-endian integer, so all bit patterns are valid stored values, validation stays total, and zeroed payload reads as value zero with the typed discriminator still guarding account identity. Generated Codama clients describe float and fixed-point fields as their backing integers, keeping every Rust, TypeScript, and Dart client working without float codec support, and `pina_abi` sizes the new types for migration layout planning. `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly, which retires two macro workarounds: fields keep their declared spelling all the way to the `PinaPod` derive instead of being rewritten to pods first. The measured build cost is bounded by the feature a program enables — `fixed` alone pulls in `fixed` and `typenum`, and a program using neither compiles a `pina` rlib byte-identical to one built before the split.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #401](https://github.com/pina-rs/pina/pull/401) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)
+
+#### Reduce deployed program size by up to 67%
+
+_Packages:_ _pina_, _pina_cli_
+
+Programs built with `pina build` are now substantially smaller. On the reference fixtures a hello world drops from 8,680 to 4,800 bytes (−45%) and a PDA counter from 37,472 to 12,392 bytes (−67%).
+
+Three changes produce that result.
+
+The `logs` feature now writes a fixed message on every failure path instead of a formatted one. Formatting pulled `core::fmt` into every deployed binary, which cost far more than the message strings themselves. Formatted detail and `file:line:column` caller locations moved to the new opt-in `verbose-logs` feature, and the `log!` format arm collapses to a static pointer message when it is off. A new `log_failure!` macro handles the message-plus-detail shape used by the account validators, and `log_verbose!` covers call sites that want formatting in every build.
+
+`pina build` now applies the production release profile automatically: `lto = "fat"`, `codegen-units = 1`, `opt-level = 3`, and `overflow-checks = false`. These are passed as Cargo profile overrides so they apply regardless of how the program crate declares its types. `--no-size-profile` skips them, and `--overflow-checks` restores the panic-on-overflow behavior, which stays off by default because disabling it turns arithmetic overflow into a wrap.
+
+`lto` could not previously take effect on any program in this repository. A crate declaring `crate-type = ["cdylib", "lib"]` makes rustc reject `-C lto` for the whole build, and the toolchain dropped the profile setting silently. Program crates generated by `pina init` are now `cdylib` only, and the CLI warns when a dual crate-type program gives up LTO.
+
+Tests keep full reach into the real program source. Behavioural tests live in `src/lib.rs` under `#[cfg(test)] mod tests`, which still compiles and still measures coverage on a cdylib-only crate. The generated Surfpool harness includes the program source with `#[path = "../../../src/lib.rs"] mod program;` so it can use the real instruction encoders and program ID. Verified on a freshly generated project: all tests pass and coverage reports against the real source rather than a second copy.
+
+The framework's own floor is now within 6% of a hand-written Pinocchio program: 3,352 bytes against 3,160 with the same profile, once derivation and logging are removed. Remaining work in this area is not framework overhead.
+
+Documentation gained a `Program size` chapter covering the framework comparison (Pina, Quasar, Pinocchio, Anchor v1, Anchor v2), what determines size, how to measure it, and the test patterns that keep coverage while programs stay cdylib-only. `docs/sbpf-linker-evaluation.md` records the `sbpf-linker` build-path evaluation, including a pre-existing defect in the repository's `bpfel-unknown-none` `build-bpf` alias, which produces artifacts that load and report success while logging empty strings.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #407](https://github.com/pina-rs/pina/pull/407)
+
+#### Add a cheap PDA builder that skips the bump search
+
+_Packages:_ _pina_
+
+`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.
+
+The trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)
+
+#### split `floats` and `fixed`, and source pods from pinapod
+
+_Packages:_ _pina_macros_
+
+The fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.
+
+`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.
+
+That upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.
+
+The feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)
+
+### Fixes
+
+#### Repair cli-rust paths, TS event dirs, and the CPI pin
+
+_Packages:_ _pina_cli_
+
+The `cli-rust` scaffold referenced the generated rust client three directory levels up instead of two, so the rendered CLI crate could not resolve its client dependency. The TypeScript event log module now creates the `events` directory before writing `logs.ts` and treats a missing barrel file as empty instead of failing, which lets programs without events generate cleanly. The CPI crate scaffold pins `pina = "0.17"` instead of the stale `0.12` floor.
+
+A new `pina snapshot` command emits the normalized CLI-surface snapshot that release automation diffs against the committed baseline at `.monochange/cli-snapshots/pina.json`, and `pina_cli` is now registered as a CLI package so changes to a flag or value set are classified as compatibility findings instead of unknown package changes. Run `pina snapshot --save` after an intentional surface change.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)
+
+#### Preserve JS event barrels and maximal-version tests
+
+_Packages:_ _pina_cli_, _pina_codama_renderer_
+
+The JavaScript event hardening read `events/index.ts` with `unwrap_or_default`, so an unwritable or invalid-UTF-8 barrel was treated as absent and the following write replaced it with the lone `./logs` export, silently dropping the other event exports. Only a missing barrel now counts as fresh generation; every other read failure surfaces as `CodamaError::HardenJavaScript` before anything is overwritten.
+
+The generated Rust projection tests built their future-version fixture with a saturating `version + 1`, which at a type's maximum version emitted the current version (or an overflowing literal for `u8`/`u16`/`u32` widths), so the generated crate failed to compile or its `future_versions_fail_closed` test failed. Events at the maximum representable version now emit `maximal_version_decodes_as_current` instead, matching `try_from_bytes`' classification of the true maximum as current.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)
+
+- **pina_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)
+
+#### Emit lint-clean migration checks for version-zero clients
+
+_Packages:_ _pina_codama_renderer_
+
+Generated Rust clients compared the stored `migrationVersion` against the current-version constant even when that constant was `0`, so the stale check `stored < 0` (and the equivalent comparison inside `{account}_needs_migration`) was always false and tripped the deny-by-default `clippy::absurd_extreme_comparisons` in any generated crate. The renderer now omits the impossible stale arm and emits the constant-false `needs_migration` body for version 0, and symmetrically omits the future arm when the current version equals its type maximum. Emitted semantics are unchanged — stale, future, and current envelopes are distinguished exactly as before — and the embedded contract tests now assert only the reachable cases, with version 0 pinning current versus future.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)
+
+- **pina_cpi_renderer**: **Interpolate the field name in boolean CPI argument writes.** The `TypeNode::Boolean` branch of `render_argument` built its write statement with a plain string, so the `{field}` placeholder reached the generated CPI source literally as `data[offset] = u8::from(self.{field});` and `pina cpi` aborted for every program with a boolean instruction argument because the emitted source failed to parse. The branch now formats the statement like every other scalar argument, escaping the `{offset}` placeholders so `render_argument_write` still substitutes the concrete offsets. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #406](https://github.com/pina-rs/pina/pull/406)
+
+### Documentation
+
+#### Add a cheap PDA builder that skips the bump search
+
+_Packages:_ _pina_lints_
+
+`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.
+
+The trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)
+
+### Notes
+
+#### split `floats` and `fixed`, and source pods from pinapod
+
+_Packages:_ _pina_abi_, _pina_cli_
+
+The fractional-field support is now two independent features. `floats` enables IEEE-754 `f32` and `f64` schema fields, and `fixed` enables fixed-point `FixedI*<Frac>` and `FixedU*<Frac>` fields from the pinned `fixed` crate. Previously one feature covered both, which forced every float program to compile `fixed` and `typenum` for types it never used.
+
+`PodF32` and `PodF64` now come from `pinapod` 0.3.3 rather than a Pina-local definition, and `pinapod` implements the schema-field mapping for the `f32` and `f64` primitives directly. Pina re-exports both pods, so `pina::PodF32`, `pina::PodF64`, and `pina::pod::PodF32` keep working unchanged.
+
+That upstream mapping removes two workarounds this crate no longer needs. The macros previously rewrote float field types to their pod spellings before the `PinaPod` derive expanded, and skipped the identity proof for float vectors, because the generated `Vec<T, N>` alias normalizes through a trait implementation that did not exist for the float primitives. Fields now keep their declared spelling all the way to the derive. The same mapping also fixes optional float values in generated compact patches: `patch.maybe_bias(Some(0.5))` and `patch.maybe_bias(None)` both work without importing a pod, where the pod spelling was previously required.
+
+The feature split is a breaking change for programs that enabled `floats` for fixed-point fields only, or the reverse. Add the feature that matches the stored field type. `PodF32` and `PodF64` are additionally distinct types from the Pina-local definitions they replace, so code naming `pina::PodF32` in a type position now binds to pinapod's struct. Wire formats, validation order, and error variants are unchanged, and both families still store the complete bit pattern of their backing little-endian integer.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #409](https://github.com/pina-rs/pina/pull/409)
+
+- **pina_codama_renderer_cli**: **Keep the unchecked PDA builder in the IDL account analysis.** The typed creation-builder allowlist that classifies instruction accounts as PDAs did not include `CreateProgramAccountWithUncheckedBump`, so handlers using it lost their PDA classification: the generated IDL dropped the account's `pdaValueNode` default and the JavaScript client stopped emitting its `…InstructionAsync` builder. The builder is now recognized, and the affected IDLs and clients are regenerated. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #414](https://github.com/pina-rs/pina/pull/414) · _Related issues:_ [#411](https://github.com/pina-rs/pina/issues/411)
+
+#### Add a cheap PDA builder that skips the bump search
+
+_Packages:_ _pina_codama_renderer_cli_
+
+`CreateProgramAccountWithUncheckedBump` creates a PDA-backed account by checking one derivation: that the supplied bump derives exactly the account's address. `CreateProgramAccountWithBump` instead proves the bump is canonical by searching for the highest valid bump, which costs roughly 9,200 additional compute units per creation — the measured counter `initialize` falls from 10,719 to 3,263 CU on the new builder.
+
+The trade-off is deliberate and visible in the name. A non-canonical bump derives a second valid address for the same seed namespace, so canonical derivation elsewhere will not find the account. That is harmless for a per-authority counter and wrong for a vault another program derives by seed alone, which is why the canonical builder keeps its contract and the security examples keep using it. The `require_canonical_bump_before_pda_write` lint documents which builder proves what, and the examples now use the unchecked builder.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #411](https://github.com/pina-rs/pina/pull/411)
+
 ## [0.17.0](https://github.com/pina-rs/pina/releases/tag/v0.17.0) (2026-09-13)
 
 Grouped release for `core`.
