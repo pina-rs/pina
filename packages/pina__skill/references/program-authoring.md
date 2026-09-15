@@ -7,7 +7,7 @@ Use Pina's macros for their specific wire contracts:
 - `#[discriminator]` defines explicit discriminator bytes.
 - `#[account]` creates discriminator-first, validated zero-copy account storage.
 - `#[instruction]` creates typed instruction data with a discriminator-first wire layout.
-- `#[event]` creates typed event data.
+- `#[event]` creates typed event data and generates an `emit` helper that writes it to the `Program data:` transaction log.
 - `#[error]` maps program errors without an ad hoc conversion layer.
 - `#[pda]` defines PDA constructors and seed helpers.
 - `#[derive(Accounts)]` converts the ordered account slice into a typed instruction account set.
@@ -219,6 +219,28 @@ Important cases:
 - Validate the exact sysvar address before reading sysvar data.
 - Reject duplicate mutable aliases unless the instruction explicitly supports them.
 - Bind an authority signer to the authority stored in program state.
+
+## Emitting events
+
+`#[event]` generates an `emit` helper alongside `try_from_bytes`. Emit through it rather than building record bytes by hand:
+
+```rust
+TransferEvent::emit(|event| {
+	event.amount = amount;
+	event.authority = *authority;
+	Ok(())
+})?;
+```
+
+`emit` builds the `[discriminator][schema version][payload]` record through the same generated `initialize` path that `try_from_bytes` validates, then writes it to the `Program data:` transaction log that the generated Rust, TypeScript, and Dart decoders read. Propagate its error with `?`: a failed emission is a bug worth surfacing, not a record worth dropping.
+
+Emission needs Pina's `logs` feature, which is on by default. A program that disables default features must add it explicitly, or `emit` returns `ProgramError::UnsupportedSysvar`:
+
+```toml
+pina = { version = "...", features = ["logs", "derive"] }
+```
+
+Emission is a log write. It does not affect program state or transaction success, and the runtime caps total log output per transaction, so keep emitted records small and avoid emitting inside loops that scale with untrusted input.
 
 ## PDAs
 
