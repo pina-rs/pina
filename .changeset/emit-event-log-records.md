@@ -1,5 +1,8 @@
 ---
 pina: feat
+pina_macros: feat
+pina_test: feat
+pina_skill: docs
 ---
 
 # Emit event records to the transaction log
@@ -19,3 +22,7 @@ Generated Rust, TypeScript, and Dart clients already shipped decoders for those 
 `emit` requires Pina's `logs` feature. A build without it returns `ProgramError::UnsupportedSysvar` rather than dropping the record, so a misconfigured program fails loudly instead of appearing to emit.
 
 `events_program` now emits through this helper, and its Surfpool suite asserts that each instruction produces exactly one decodable `Program data:` record and that the generated client reconstructs the configured field values. The example enables the `logs` feature, which it previously lacked.
+
+`pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.
+
+The Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.
