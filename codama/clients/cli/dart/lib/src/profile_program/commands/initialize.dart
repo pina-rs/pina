@@ -23,8 +23,9 @@ final class InitializeCommand extends Command<void> {
       )
       ..addOption(
         'profile',
-        mandatory: true,
-        help: "The profile PDA account (must be empty — not yet created)",
+        mandatory: false,
+        help:
+            "The profile PDA account (must be empty — not yet created) [default: derived]",
       );
   }
 
@@ -42,7 +43,12 @@ final class InitializeCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final profile = pubkey('--profile', results['profile']! as String);
+    final profile = (results['profile'] as String?) != null
+        ? pubkey('--profile', results['profile']! as String)
+        : (await findProfilePda(
+            seeds: ProfileSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final nameValue = results['name']! as String;
     final bioValue = results['bio']! as String;

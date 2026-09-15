@@ -21,8 +21,9 @@ final class InitCommand extends Command<void> {
       )
       ..addOption(
         'store',
-        mandatory: true,
-        help: "The store PDA account (must be empty — not yet created)",
+        mandatory: false,
+        help:
+            "The store PDA account (must be empty — not yet created) [default: derived]",
       );
   }
 
@@ -39,7 +40,12 @@ final class InitCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final store = pubkey('--store', results['store']! as String);
+    final store = (results['store'] as String?) != null
+        ? pubkey('--store', results['store']! as String)
+        : (await findStorePda(
+            seeds: StoreSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitInstruction(
       programAddress: context.programAddress,

@@ -21,8 +21,9 @@ final class InitializeCommand extends Command<void> {
       )
       ..addOption(
         'counter',
-        mandatory: true,
-        help: "The counter PDA account (must be empty — not yet created)",
+        mandatory: false,
+        help:
+            "The counter PDA account (must be empty — not yet created) [default: derived]",
       );
   }
 
@@ -40,7 +41,12 @@ final class InitializeCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final counter = pubkey('--counter', results['counter']! as String);
+    final counter = (results['counter'] as String?) != null
+        ? pubkey('--counter', results['counter']! as String)
+        : (await findCounterPda(
+            seeds: CounterSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

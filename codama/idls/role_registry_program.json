@@ -194,7 +194,24 @@
 						"name": "registryConfig",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "registryConfig"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "admin",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "admin"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

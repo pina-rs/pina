@@ -23,9 +23,9 @@ pub struct InitializeArgs {
 	/// The `admin` account [default: payer]
 	#[arg(long)]
 	admin: Option<String>,
-	/// The `registry_config` account
+	/// The `registry_config` account [default: derived]
 	#[arg(long)]
-	registry_config: String,
+	registry_config: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
@@ -33,7 +33,16 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		Some(value) => CliContext::pubkey("--admin", value)?,
 		None => context.payer_pubkey(),
 	};
-	let registry_config = CliContext::pubkey("--registry_config", &args.registry_config)?;
+	let registry_config = match &args.registry_config {
+		Some(value) => CliContext::pubkey("--registry_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["registry".as_bytes(), admin.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let data = InitializeInstructionData::new(|data| {
 		data.bump = args.bump;
 	})

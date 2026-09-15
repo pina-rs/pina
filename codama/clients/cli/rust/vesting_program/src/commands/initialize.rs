@@ -37,9 +37,9 @@ pub struct InitializeArgs {
 	/// The `mint` account
 	#[arg(long)]
 	mint: String,
-	/// The `vesting_state` account
+	/// The `vesting_state` account [default: derived]
 	#[arg(long)]
-	vesting_state: String,
+	vesting_state: Option<String>,
 	/// The `vault` account
 	#[arg(long)]
 	vault: String,
@@ -55,7 +55,21 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 	};
 	let beneficiary = CliContext::pubkey("--beneficiary", &args.beneficiary)?;
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
-	let vesting_state = CliContext::pubkey("--vesting_state", &args.vesting_state)?;
+	let vesting_state = match &args.vesting_state {
+		Some(value) => CliContext::pubkey("--vesting_state", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&[
+					"vesting".as_bytes(),
+					admin.as_ref(),
+					beneficiary.as_ref(),
+					mint.as_ref(),
+				],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = InitializeInstructionData::new(|data| {

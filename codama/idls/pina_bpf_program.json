@@ -270,7 +270,14 @@
 						"name": "state",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "state"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

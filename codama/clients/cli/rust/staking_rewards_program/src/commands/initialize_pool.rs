@@ -29,9 +29,9 @@ pub struct InitializePoolArgs {
 	/// The `reward_mint` account
 	#[arg(long)]
 	reward_mint: String,
-	/// The `pool_state` account
+	/// The `pool_state` account [default: derived]
 	#[arg(long)]
-	pool_state: String,
+	pool_state: Option<String>,
 	/// The `stake_vault` account
 	#[arg(long)]
 	stake_vault: String,
@@ -50,7 +50,16 @@ pub(crate) fn run(context: &CliContext, args: InitializePoolArgs) -> Result<(), 
 	};
 	let stake_mint = CliContext::pubkey("--stake_mint", &args.stake_mint)?;
 	let reward_mint = CliContext::pubkey("--reward_mint", &args.reward_mint)?;
-	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
+	let pool_state = match &args.pool_state {
+		Some(value) => CliContext::pubkey("--pool_state", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["pool".as_bytes(), stake_mint.as_ref(), reward_mint.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let stake_vault = CliContext::pubkey("--stake_vault", &args.stake_vault)?;
 	let reward_vault = CliContext::pubkey("--reward_vault", &args.reward_vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
