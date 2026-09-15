@@ -16,6 +16,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 pub use solana_account::Account;
 use solana_client::client_error::ClientError;
 pub use solana_instruction::AccountMeta;
@@ -28,11 +30,12 @@ use solana_message::v1;
 ///
 /// A v1 message states its compute unit limit, loaded accounts data size
 /// limit, heap size, and priority fee directly instead of routing them through
-/// compute-budget instructions, and the runtime reads an absent value as zero.
-/// Build one from [`default_v1_config`] and override only what a test needs.
+/// compute-budget instructions. Build one from [`default_v1_config`] to match
+/// legacy behavior and override only what a test needs.
 pub use solana_message::v1::TransactionConfig as V1TransactionConfig;
 pub use solana_pubkey::Pubkey;
 pub use solana_rent::Rent;
+use solana_rpc_client::api::request::RpcRequest;
 use solana_rpc_client::rpc_client::SerializableTransaction;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
@@ -52,10 +55,11 @@ pub const DEFAULT_V1_LOADED_ACCOUNTS_DATA_SIZE_LIMIT: u32 = 64 * 1024 * 1024;
 
 /// The compute budget a v1 transaction needs to behave like a legacy one.
 ///
-/// V1 leaves every field absent, and an absent limit means zero, so a message
-/// built from [`V1TransactionConfig::empty`] fails immediately. This applies
-/// the runtime's legacy defaults so a test can switch transaction versions
-/// without also reasoning about compute budgets.
+/// Legacy and v0 transactions declare their limits with compute-budget
+/// instructions, and the runtime supplies a default when none are present. V1
+/// moves those limits into the message, so a transaction that wants the same
+/// budget has to state it. This applies the runtime's legacy defaults so a
+/// test can switch transaction versions without reasoning about compute.
 #[must_use]
 pub const fn default_v1_config() -> V1TransactionConfig {
 	V1TransactionConfig::empty()
@@ -704,28 +708,59 @@ impl OfflineSurfnet {
 	) -> Result<Vec<String>, TestError> {
 		let instruction = Instruction::new_with_bytes(program_id, data, accounts);
 		let transaction = self.v1_transaction(instruction, config)?;
-		let simulation = self
+		let encoding = BASE64_STANDARD.encode(v1_wire_bytes(&transaction)?);
+		let response: serde_json::Value = self
 			.inner
 			.rpc_client()
-			.simulate_transaction(&transaction)
+			.send(
+				RpcRequest::SimulateTransaction,
+				serde_json::json!([encoding, { "encoding": "base64", "sigVerify": false }]),
+			)
 			.map_err(|error| test_error("simulate v1 program instruction", error))?;
+		let logs = response
+			.pointer("/value/logs")
+			.and_then(serde_json::Value::as_array)
+			.map(|entries| {
+				entries
+					.iter()
+					.filter_map(serde_json::Value::as_str)
+					.map(str::to_owned)
+					.collect::<Vec<_>>()
+			})
+			.unwrap_or_default();
 
-		Ok(simulation.value.logs.unwrap_or_default())
+		if let Some(error) = response.pointer("/value/err").filter(|err| !err.is_null()) {
+			return Err(test_error(
+				"simulate v1 program instruction",
+				format_args!("{error}\n{}", logs.join("\n")),
+			));
+		}
+
+		Ok(logs)
 	}
 
-	/// Submit and confirm a signed v1 transaction.
+	/// Submit a signed v1 transaction.
 	///
 	/// # Errors
 	///
-	/// Returns an error when submission or confirmation fails.
+	/// Returns an error when submission fails.
 	pub fn send_v1_transaction(
 		&self,
 		transaction: &VersionedTransaction,
 	) -> Result<Signature, TestError> {
-		self.inner
+		let encoding = BASE64_STANDARD.encode(v1_wire_bytes(transaction)?);
+		let signature: String = self
+			.inner
 			.rpc_client()
-			.send_and_confirm_transaction(transaction)
-			.map_err(execution_error)
+			.send(
+				RpcRequest::SendTransaction,
+				serde_json::json!([encoding, { "encoding": "base64" }]),
+			)
+			.map_err(execution_error)?;
+
+		signature
+			.parse()
+			.map_err(|error| test_error("parse v1 transaction signature", error))
 	}
 
 	/// Deploy an SBF artifact directly at its declared program address.
@@ -1079,6 +1114,29 @@ fn rpc_listener_is_closed(url: &str) -> bool {
 		Ok(_) => false,
 		Err(error) => error.kind() == std::io::ErrorKind::ConnectionRefused,
 	}
+}
+
+/// Encode a signed v1 transaction in the format the runtime deserializes.
+///
+/// A v1 message has no serde representation — the serialization contract is
+/// `wincode`, so the RPC client's `Serialize`-based transport would send bytes
+/// no node can parse. Encoding the message and appending the header-sized
+/// signature array produces the wire form, which callers then submit
+/// base64-encoded.
+fn v1_wire_bytes(transaction: &VersionedTransaction) -> Result<Vec<u8>, TestError> {
+	let VersionedMessage::V1(message) = &transaction.message else {
+		return Err(test_error(
+			"encode v1 transaction",
+			"transaction message is not v1",
+		));
+	};
+
+	let mut wire = VersionedMessage::V1(message.clone()).serialize();
+	for signature in &transaction.signatures {
+		wire.extend_from_slice(signature.as_ref());
+	}
+
+	Ok(wire)
 }
 
 fn record_compute_units(
