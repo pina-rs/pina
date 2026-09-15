@@ -73,6 +73,10 @@ jobs:
             rust:
               - crates/**
               - examples/**
+              # The root package (`pina_root`) is the workspace root itself, so
+              # its sources sit here rather than under a `pina_root/` directory.
+              - src/**
+              - tests/**
               - Cargo.toml
               - Cargo.lock
               - rust-toolchain.toml
