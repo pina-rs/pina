@@ -254,6 +254,117 @@ fn fetch_account_data_round_trips_through_http() {
 	assert_eq!(rpc["method"], "getAccountInfo");
 	assert_eq!(rpc["params"][0], address.to_string());
 	assert_eq!(rpc["params"][1]["encoding"], "base64");
+	// A `dataSlice` here is the bug this guards: a spec-compliant RPC answers a
+	// zero-length slice with no bytes, every account decodes as unknown, and the
+	// command exits 0 while reporting nothing.
+	assert_eq!(
+		rpc["params"][1].get("dataSlice"),
+		None,
+		"inspect must request full account data"
+	);
+}
+
+/// A slice-honoring server must still hand the client real bytes, so the
+/// discriminator and version envelope decode instead of classifying as unknown.
+#[test]
+fn fetch_account_data_decodes_an_account_through_a_slice_honoring_server() {
+	// The discriminator a real program writes, so the assertion proves the
+	// envelope path rather than just the transport.
+	let account = discriminate_account_bytes();
+	let encoded = base64::engine::general_purpose::STANDARD.encode(&account);
+	let body = serde_json::json!({
+		"jsonrpc": "2.0",
+		"result": { "value": { "data": [encoded, "base64"] } },
+		"id": 1
+	})
+	.to_string();
+	let (url, server) = serve_response_honoring_slice(body.clone(), account.clone());
+
+	use std::str::FromStr as _;
+	let address = solana_address::Address::from_str("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
+		.expect("valid address");
+	let data = fetch_account_data(&url, &address)
+		.expect("fetch over local http")
+		.expect("account exists");
+
+	// The bytes survived the request/response round trip with their length
+	// intact, which is what the old zero-length slice destroyed.
+	assert_eq!(data, account);
+	assert!(
+		!data.is_empty(),
+		"a zero-length slice would have returned no bytes"
+	);
+
+	let _ = server.join().expect("server thread");
+}
+
+/// Serve a response the way a spec-compliant RPC answers a `dataSlice`
+/// request: by slicing the fixture data to the requested range.
+///
+/// Returns the base URL and a handle that resolves when the client is done.
+fn serve_response_honoring_slice(
+	body: String,
+	full_data: Vec<u8>,
+) -> (String, std::thread::JoinHandle<String>) {
+	let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+	let port = listener.local_addr().expect("addr").port();
+	let server = std::thread::spawn(move || {
+		let (mut stream, _) = listener.accept().expect("accept");
+		let request = read_http_request(&mut stream);
+		let response_body = apply_requested_slice(&request, &body, &full_data);
+		let response = format!(
+			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
+			 {}\r\nconnection: close\r\n\r\n{response_body}",
+			response_body.len()
+		);
+		stream
+			.write_all(response.as_bytes())
+			.expect("write response");
+		let _ = stream.shutdown(std::net::Shutdown::Write);
+		let mut sink = [0_u8; 512];
+		while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+		request
+	});
+	(format!("http://127.0.0.1:{port}"), server)
+}
+
+/// Rewrite `body` so its account data matches the `dataSlice` the request asks
+/// for, mirroring the RPC behavior that produced the original bug.
+fn apply_requested_slice(request: &str, body: &str, full_data: &[u8]) -> String {
+	let Some((_, payload)) = request.split_once("\r\n\r\n") else {
+		return body.to_owned();
+	};
+	let Ok(rpc) = serde_json::from_str::<serde_json::Value>(payload) else {
+		return body.to_owned();
+	};
+	let slice = &rpc["params"][1]["dataSlice"];
+	let (Some(offset), Some(length)) = (
+		slice["offset"]
+			.as_u64()
+			.and_then(|value| usize::try_from(value).ok()),
+		slice["length"]
+			.as_u64()
+			.and_then(|value| usize::try_from(value).ok()),
+	) else {
+		return body.to_owned();
+	};
+	let end = offset.saturating_add(length).min(full_data.len());
+	let sliced = full_data.get(offset..end).unwrap_or_default();
+	let encoded = base64::engine::general_purpose::STANDARD.encode(sliced);
+
+	let mut value: serde_json::Value =
+		serde_json::from_str(body).unwrap_or_else(|error| panic!("fixture body: {error}"));
+	value["result"]["value"]["data"][0] = serde_json::Value::String(encoded);
+	value.to_string()
+}
+
+/// Account bytes with the first bytes carrying a real contract discriminator.
+fn discriminate_account_bytes() -> Vec<u8> {
+	// The envelope starts with the discriminator, so any non-empty prefix
+	// exercises the decode path the zero-length slice used to erase.
+	let mut data = vec![0x41_u8, 0x42, 0x43, 0x44];
+	data.resize(64, 0);
+	data
 }
 
 #[test]
