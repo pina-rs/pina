@@ -240,7 +240,11 @@ jobs:
     timeout-minutes: 40
     runs-on: ubuntu-24.04
     needs: changes
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    # `coverage` runs this same suite on pull requests under a profiling build,
+    # so running it here too would duplicate ~10 minutes of work for no extra
+    # signal. Pushes to `main` and the `ci-full` label still run it, which keeps
+    # a second, non-instrumented execution of the suite.
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

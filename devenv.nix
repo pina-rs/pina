@@ -411,6 +411,9 @@ in
       description = "Run workspace tests, compile fuzz targets, and verify npm packages.";
       binary = "bash";
     };
+    # NOTE: `test:all` and `coverage:all` must cover the same packages. `test:all`
+    # is the post-merge and `ci-full` tier; `coverage:all` is the pull request
+    # gate. Adding a suite to one belongs in the other.
     "build:pina-test" = {
       exec = ''
         set -euo pipefail
@@ -985,25 +988,42 @@ in
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        # Ensure cargo-expand is available for macrotest expansion snapshots.
+        if ! command -v cargo-expand &>/dev/null; then
+          cargo install --locked --version 1.0.111 cargo-expand
+        fi
         mkdir -p "$DEVENV_ROOT/target/coverage"
         rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
+        # This suite is the pull request's Rust gate, so it covers every package
+        # `test:all` covers: `pina_abi` is tested nowhere else, and `pina_root`
+        # hosts the root integration suites (`tests/ui.rs`, `tests/expand.rs`,
+        # `tests/compute_units.rs`) that exercise the proc-macro API.
         cargo llvm-cov \
           --all-features \
           --locked \
           -p pina \
+          -p pina_abi \
           -p pina_cli \
           -p pina_cli_renderer \
           -p pina_codama_renderer \
           -p pina_cpi_renderer \
           -p pina_lints \
+          -p pina_root \
           -p prop_amm_program \
           -p profile_program \
           -p profile-program-client \
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
         coverage:pina-test
+        cargo check \
+          --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
+          --all-targets \
+          --locked
+        pnpm run check:scripts
+        pnpm run test:compute-units
+        test:npm-packages
       '';
-      description = "Run focused Rust and generated-client coverage and generate an lcov report.";
+      description = "Run the full test suite under coverage and generate lcov reports.";
       binary = "bash";
     };
     "coverage:pina-test" = {

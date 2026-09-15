@@ -1,7 +1,6 @@
 name: "coverage"
 permissions:
   contents: read
-  id-token: write
 on:
   push:
     branches:
@@ -15,15 +14,66 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# Coverage is telemetry, not a merge gate: it re-runs the same suite the `test`
-# job already covers on pull requests under a profiling build. It therefore
-# only runs on `main` after merge; label a pull request `ci-full` to run it
-# before merging.
+# This job is the pull request's Rust gate. It runs the complete suite that the
+# `test` job used to run, under a profiling build, and publishes a patch
+# coverage status. `test` now covers the post-merge and `ci-full` tiers, so a
+# pull request pays for one job instead of two. The two must stay equivalent:
+# `coverage:all` is a superset of `test:all`, and any suite added to one
+# belongs in the other.
+#
+# Gating mirrors the `test` job it replaced: the suite only carries signal when
+# Rust, script, or toolchain inputs change, and this is a required status check,
+# so it is filtered with a job-level condition rather than workflow-level
+# `paths:`. A workflow that never runs leaves its check in "Expected" and blocks
+# merging, while a skipped job reports success.
 jobs:
+  changes:
+    name: detect changes
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      covered: ${{ steps.filter.outputs.covered_any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: classify changed paths
+        id: filter
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files_yaml: |
+            covered:
+              - crates/**
+              - examples/**
+              - scripts/**
+              - codama/**
+              - Cargo.toml
+              - Cargo.lock
+              - rust-toolchain.toml
+              - package.json
+              - pnpm-lock.yaml
+              - pnpm-workspace.yaml
+              - tsconfig.json
+              - tsconfig.scripts.json
+              - devenv.nix
+              - devenv.lock
+              - devenv.yaml
+              - .github/actions/devenv/**
+
   coverage:
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+    needs: changes
+    # The status functions are required: without one, a skipped `changes`
+    # dependency (pushes to `main`) would skip this job too.
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.covered == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
