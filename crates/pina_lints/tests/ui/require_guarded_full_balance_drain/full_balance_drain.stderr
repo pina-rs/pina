@@ -1,5 +1,5 @@
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:46:2
+  --> $DIR/full_balance_drain.rs:50:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -10,7 +10,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
    = note: `#[warn(require_guarded_full_balance_drain)]` on by default
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:54:2
+  --> $DIR/full_balance_drain.rs:58:2
    |
 LL |     vault.send(&ID, balance, recipient)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -19,4 +19,14 @@ LL |     vault.send(&ID, balance, recipient)?;
    = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
-warning: 2 warnings emitted
+warning: an instruction path can sweep an account's entire balance in one call
+  --> $DIR/full_balance_drain.rs:119:2
+   |
+LL |     vault.send_owned(&ID, amount, recipient)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
+   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+warning: 3 warnings emitted
