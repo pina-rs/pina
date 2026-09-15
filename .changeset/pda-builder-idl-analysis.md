@@ -1,5 +1,6 @@
 ---
 pina_cli: fix
+pina_codama_renderer_cli: none
 ---
 
 # Keep the unchecked PDA builder in the IDL account analysis
