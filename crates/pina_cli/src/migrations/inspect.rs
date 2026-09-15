@@ -9,6 +9,7 @@
 
 use std::path::Path;
 use std::str::FromStr;
+use std::time::Duration;
 
 use base64::Engine as _;
 use pina_abi::ContractHistory;
@@ -116,24 +117,35 @@ pub enum InspectError {
 	Project(#[from] crate::project::ProjectError),
 }
 
+/// How long one inspect RPC request may take, end to end.
+///
+/// `ureq` 3 sets no global timeout by default, so a stalled endpoint would
+/// otherwise block the command forever.
+pub(crate) const RPC_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Fetch the raw account data for `address` over JSON-RPC.
 ///
 /// Split from the pure decode logic so tests can exercise the transport
 /// against a local HTTP endpoint.
+///
+/// The request asks for the account's full data: a `dataSlice` would make a
+/// spec-compliant RPC answer with an empty payload, which decodes to no
+/// discriminator and silently classifies every account as
+/// [`InspectState::UnknownContract`].
 pub fn fetch_account_data(rpc_url: &str, address: &Address) -> Result<Option<Vec<u8>>, String> {
 	let body = serde_json::json!({
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "getAccountInfo",
-		"params": [
-			address.to_string(),
-			{ "encoding": "base64", "dataSlice": { "offset": 0, "length": 0 } }
-		]
+		"params": [address.to_string(), { "encoding": "base64" }]
 	});
 	let mut response = ureq::post(rpc_url)
+		.config()
+		.timeout_global(Some(RPC_TIMEOUT))
+		.build()
 		.header("content-type", "application/json")
 		.send_json(&body)
-		.map_err(|error| error.to_string())?;
+		.map_err(|error| format!("RPC request failed within {RPC_TIMEOUT:?}: {error}"))?;
 	let text = response
 		.body_mut()
 		.read_to_string()

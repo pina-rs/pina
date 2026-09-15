@@ -593,16 +593,18 @@ fn estimate_ladder_cu(
 	for to in from_version.saturating_add(1)..=current_version {
 		let from = to - 1;
 		let step = format!("v{from}_to_v{to}");
-		let step_cu = profile
-			.functions
-			.iter()
-			.filter(|function| {
-				matches_transition_function(&function.name, &module, &step)
-					&& function.name.contains("migrate")
-			})
-			.map(|function| function.estimated_cu)
-			.fold(0_u64, u64::saturating_add);
-		if step_cu == 0 {
+		let mut found = false;
+		let mut step_cu = 0_u64;
+		for function in profile.functions.iter().filter(|function| {
+			matches_transition_function(&function.name, &module, &step)
+				&& function.name.contains("migrate")
+		}) {
+			// A transition that genuinely costs zero still exists, so its
+			// presence is tracked separately from its estimate.
+			found = true;
+			step_cu = step_cu.saturating_add(function.estimated_cu);
+		}
+		if !found {
 			missing.push(step);
 		}
 		estimated_cu = estimated_cu.saturating_add(step_cu);
@@ -628,11 +630,67 @@ fn estimate_ladder_cu(
 /// Rust mangles every path component with a length prefix (`8v0_to_v1`), which
 /// keeps a search for `v0_to_v1` from matching the prefix of `v0_to_v12`.
 /// Demangled or hand-written symbols separate components instead.
+///
+/// Each form must match a whole component: a symbol that merely embeds the step
+/// (a suffix, a longer name, or a differently prefixed component) is a different
+/// function and must not contribute to the estimate.
 fn matches_transition_function(name: &str, module: &str, step: &str) -> bool {
 	if !name.contains(module) {
 		return false;
 	}
-	name.contains(&format!("{}{step}", step.len())) || name.contains(&format!("::{step}::"))
+	if name.starts_with("_ZN") {
+		return legacy_mangled_walk_contains(name, module, step);
+	}
+	// Demangled: the module must be a whole component directly before the step,
+	// either at the start of the name or after another component's `::`.
+	let sequence = format!("{module}::{step}::");
+	name.starts_with(&sequence) || name.contains(&format!("::{sequence}"))
+}
+
+/// Whether the legacy `_ZN…E` mangled symbol spells `step` as one of its path
+/// components.
+///
+/// Each component is prefixed with its decimal length, so the walk reads a
+/// count, takes exactly that many bytes, and compares. That makes the match
+/// exact even where a boundary heuristic would be fooled: inside
+/// `13foo8v0_to_v1` the bytes `8v0_to_v1` follow a non-digit, but the walk
+/// consumes `foo8v0_to_v1` as the single component it is.
+fn legacy_mangled_walk_contains(name: &str, module: &str, step: &str) -> bool {
+	let Some(mut rest) = name.strip_prefix("_ZN") else {
+		return false;
+	};
+	let mut previous_component: Option<&str> = None;
+
+	loop {
+		let digits = rest.len().saturating_sub(
+			rest.trim_start_matches(|character: char| character.is_ascii_digit())
+				.len(),
+		);
+		if digits == 0 {
+			// Not a component start: the terminator, a hash tail, or a
+			// hand-truncated symbol. Either way the step was not seen.
+			return false;
+		}
+		let (count, after) = rest.split_at(digits);
+		let Ok(length) = count.parse::<usize>() else {
+			return false;
+		};
+		let Some(component) = after.get(..length) else {
+			// The declared component runs past the end of the symbol.
+			return false;
+		};
+		// The step only counts when it sits directly after the migration
+		// module, so a non-migration component that merely contains the
+		// module text cannot smuggle its cost into the estimate.
+		if previous_component == Some(module) && component == step {
+			return true;
+		}
+		previous_component = Some(component);
+		rest = &after[length..];
+		if rest.is_empty() {
+			return false;
+		}
+	}
 }
 
 /// Test-only helpers used by the cost tests to build histories and profiles.

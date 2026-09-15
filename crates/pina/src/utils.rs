@@ -7,6 +7,7 @@ use crate::ProgramError;
 use crate::ProgramResult;
 #[cfg(feature = "verbose-logs")]
 use crate::log;
+#[cfg(feature = "verbose-logs")]
 use crate::log_verbose;
 
 /// Parses an instruction discriminator from the raw instruction data.
@@ -99,6 +100,11 @@ fn remap_custom_error(code: u32) -> ProgramError {
 ///
 /// Intended for compact guard checks inside instruction handlers.
 ///
+/// The message is logged in every build that enables `logs`. With
+/// `verbose-logs` it goes through the formatted logger together with the
+/// caller location; without it the raw string is written with a single
+/// `sol_log_` syscall over the caller's own slice.
+///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
 /// All APIs in this section are designed for on-chain determinism.
 ///
@@ -125,13 +131,39 @@ pub fn assert(v: bool, err: impl Into<ProgramError>, msg: &str) -> ProgramResult
 	if v {
 		Ok(())
 	} else {
-		#[cfg(any(not(feature = "logs"), not(feature = "verbose-logs")))]
-		let _ = msg;
+		#[cfg(feature = "verbose-logs")]
+		{
+			log_verbose!("{}", msg);
+		}
+		#[cfg(not(feature = "verbose-logs"))]
+		{
+			log_raw(msg);
+		}
 
-		log_verbose!("{}", msg);
 		log_caller();
 		Err(err.into())
 	}
+}
+
+/// Writes a caller-supplied string to the log without formatting.
+///
+/// The message is borrowed from the call site, so this lowers to a single
+/// `sol_log_` syscall over an already-materialized slice instead of building a
+/// formatted message through [`log_verbose!`].
+#[cfg(all(feature = "logs", not(feature = "verbose-logs")))]
+#[inline(always)]
+fn log_raw(msg: &str) {
+	solana_program_log::logger::log_message(msg.as_bytes());
+}
+
+/// No-op variant used when logging is compiled out entirely.
+///
+/// The message argument is still consumed so call sites keep identical
+/// semantics across feature combinations.
+#[cfg(not(feature = "logs"))]
+#[inline(always)]
+fn log_raw(msg: &str) {
+	let _ = msg;
 }
 
 /// Logs caller file/line/column when `verbose-logs` feature is enabled.

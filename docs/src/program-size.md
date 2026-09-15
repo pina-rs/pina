@@ -78,6 +78,10 @@ overflow-checks = false
 
 `overflow-checks = false` lets arithmetic overflow wrap instead of panicking, which is why it is opt-in. Use `pina build --overflow-checks` when a program must fail loudly. `pina build --no-size-profile` skips every override.
 
+An explicit `overflow-checks = true` in the workspace release profile outranks the size profile. Cargo profile environment variables beat `[profile.release]`, so without that precedence rule `pina build` would silently turn the manifest's opt-in into wrapping arithmetic. When the manifest opts in, `pina build` keeps the checks on, warns, and gives up only that part of the profile.
+
+Deterministic verified builds (`pina build --verify`) never apply profile overrides. A verified artifact has to stay reproducible from its recorded Git revision, and an override that exists only on the command line cannot be reproduced by anyone rebuilding that revision. Declare the profile under `[profile.release]` in the workspace manifest — as `pina init` does — so the ordinary and verified backends agree. Pina warns when a requested size profile would make the two artifacts differ.
+
 ### 4. Dependency features
 
 Only enable what the program uses. `token`, `memo`, and `compact` each pull in their own dependencies. An unused dependency is removed entirely by the linker, so optional features save build time more than binary size — but a `token` program that also links `pinocchio-token-2022` pays for both.

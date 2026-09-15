@@ -68,17 +68,19 @@ fn vesting_program_client_has_expected_contract_shape() {
 
 	let mut state_bytes = vec![0u8; client::generated::accounts::VestingState::LEN];
 	{
-		let state = client::generated::accounts::VestingState::initialize(&mut state_bytes)
-			.expect("vesting state storage should initialize");
-		state.admin = admin;
-		state.beneficiary = beneficiary;
-		state.mint = mint;
-		state.total_amount.set(1_000);
-		state.start_ts.set(2_000);
-		state.cliff_ts.set(2_100);
-		state.end_ts.set(3_000);
-		state.cancelled.set(false);
-		state.bump = 9;
+		let state =
+			client::generated::accounts::VestingState::initialize(&mut state_bytes, |state| {
+				state.admin = admin;
+				state.beneficiary = beneficiary;
+				state.mint = mint;
+				state.total_amount.set(1_000);
+				state.start_ts.set(2_000);
+				state.cliff_ts.set(2_100);
+				state.end_ts.set(3_000);
+				state.cancelled.set(false);
+				state.bump = 9;
+			})
+			.unwrap_or_else(|error| panic!("vesting state storage should initialize: {error:?}"));
 	}
 	let parsed_state = client::generated::accounts::VestingState::from_bytes(&state_bytes)
 		.expect("vesting state storage should validate");
