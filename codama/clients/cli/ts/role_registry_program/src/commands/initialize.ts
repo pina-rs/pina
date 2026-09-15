@@ -27,7 +27,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			admin: context.payer,
-			registryConfig: options.registryConfig,
+			registryConfig: options.registryConfig === undefined
+				? undefined
+				: pubkey("--registry-config", options.registryConfig),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

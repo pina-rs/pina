@@ -36,7 +36,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			name: options.name,
 			bio: options.bio,
 			authority: context.payer,
-			profile: options.profile,
+			profile: options.profile === undefined
+				? undefined
+				: pubkey("--profile", options.profile),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

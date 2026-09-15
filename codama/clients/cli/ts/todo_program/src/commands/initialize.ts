@@ -26,7 +26,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			bump: smallInteger("--bump", options.bump),
 			digest: base58("--digest", options.digest),
 			owner: context.payer,
-			todo: options.todo,
+			todo: options.todo === undefined
+				? undefined
+				: pubkey("--todo", options.todo),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

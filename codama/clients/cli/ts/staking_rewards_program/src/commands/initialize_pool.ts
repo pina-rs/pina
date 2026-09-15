@@ -39,7 +39,9 @@ export const initializePoolCommand = registerGlobals(
 			admin: context.payer,
 			stakeMint: pubkey("--stake-mint", options.stakeMint),
 			rewardMint: pubkey("--reward-mint", options.rewardMint),
-			poolState: options.poolState,
+			poolState: options.poolState === undefined
+				? undefined
+				: pubkey("--pool-state", options.poolState),
 			stakeVault: pubkey("--stake-vault", options.stakeVault),
 			rewardVault: pubkey("--reward-vault", options.rewardVault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),

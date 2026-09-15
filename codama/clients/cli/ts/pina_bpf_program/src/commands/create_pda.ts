@@ -24,7 +24,9 @@ export const createPdaCommand = registerGlobals(new Command("create_pda"))
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			payer: context.payer,
-			state: options.state,
+			state: options.state === undefined
+				? undefined
+				: pubkey("--state", options.state),
 		};
 		const instruction = await getCreatePdaInstructionAsync(
 			...[input],

@@ -44,7 +44,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			admin: context.payer,
 			beneficiary: pubkey("--beneficiary", options.beneficiary),
 			mint: pubkey("--mint", options.mint),
-			vestingState: options.vestingState,
+			vestingState: options.vestingState === undefined
+				? undefined
+				: pubkey("--vesting-state", options.vestingState),
 			vault: pubkey("--vault", options.vault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
