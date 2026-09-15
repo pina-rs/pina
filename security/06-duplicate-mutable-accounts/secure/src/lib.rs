@@ -3,6 +3,7 @@
 //! This program verifies that the signer owns the source balance and that the
 //! source and destination accounts are distinct before processing a transfer.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

@@ -3,6 +3,7 @@
 //! This program calls `assert_empty()` before creating accounts, preventing
 //! reinitialization of existing accounts.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

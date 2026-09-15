@@ -2,6 +2,7 @@
 //!
 //! Demonstrates float fields in account data plus an authority-gated update.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

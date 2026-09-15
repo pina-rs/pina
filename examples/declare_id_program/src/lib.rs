@@ -3,6 +3,7 @@
 //! Anchor's test validates that a program-id mismatch is rejected. In pina,
 //! that check occurs in `parse_instruction`.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

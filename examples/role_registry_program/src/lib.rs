@@ -6,6 +6,7 @@
 //! - update role permissions
 //! - deactivate or rotate administrative control
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

@@ -20,6 +20,7 @@
 //! | `AddTag`        | Append a tag to the profile's tag list.      |
 //! | `RemoveTag`     | Remove the tag at the given index.           |
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

@@ -2,6 +2,7 @@
 //!
 //! This program keeps ownership and byte-layout validation in one loader.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

@@ -4,6 +4,7 @@
 //! entries, markers, and optional note. Mutations use one atomic patch that
 //! plans rent adjustment, reallocation, and validated encoding together.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![allow(unused_qualifications)]
 #![no_std]

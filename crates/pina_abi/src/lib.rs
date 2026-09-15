@@ -4,6 +4,7 @@
 //! routines. This prevents migration checks from depending on two subtly
 //! different interpretations of the same Rust schema.
 
+#![allow(missing_docs)]
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::PathBuf;

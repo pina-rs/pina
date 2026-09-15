@@ -7,6 +7,7 @@
 //! - `#[account]` validates stored state after initialization and loading.
 //! - `#[event]` validates an event before the program can emit or transport it.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

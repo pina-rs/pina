@@ -2,6 +2,7 @@
 
 pub use pinocchio_token_2022::*;
 
+/// SPL Token-2022 state re-exports with pina compatibility aliases.
 pub mod state {
 	pub use pinocchio_token_2022::state::*;
 

@@ -13,6 +13,7 @@
 //!
 //! When invoked, this program simply logs "Hello, Solana!".
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

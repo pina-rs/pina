@@ -301,6 +301,13 @@ cargo-workspaces = { version = "0.4.2" }
 hyperfine = { version = "1.19.0" }
 
 [workspace.lints.rust]
+# Docstring coverage: every public item reachable from a crate root must be
+# documented. Applies to every workspace member that inherits these lints.
+# Generated Codama clients do not inherit them and are excluded by default;
+# the security lessons and the example programs carry a crate-level allow
+# until their surfaces are documented.
+missing_docs = "warn"
+
 # Group lints
 rust_2021_compatibility = { level = "warn", priority = -1 }
 rust_2024_compatibility = { level = "warn", priority = -1 }

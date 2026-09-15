@@ -23,6 +23,7 @@
 //! - **Custom error types** — `#[error]` macro for program-specific errors with
 //!   automatic `ProgramError::Custom` conversion.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

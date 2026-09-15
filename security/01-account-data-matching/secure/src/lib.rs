@@ -3,6 +3,7 @@
 //! This program verifies that accounts passed in the transaction match the
 //! addresses stored in the on-chain escrow state.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

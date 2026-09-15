@@ -4,6 +4,7 @@
 //! validating that an "external program" account matches an expected program
 //! ID before executing cross-program logic.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 
