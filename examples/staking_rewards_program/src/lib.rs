@@ -355,50 +355,45 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		// with `InvalidSeeds` before its idempotent branch.
 		self.user_stake_ata.assert_writable()?;
 
-		// Validate pool and position state
-		let (staked_amount, reward_debt, total_staked) = {
-			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
-
-			if pool_state.paused.get() {
-				return Err(StakingError::PoolPaused.into());
-			}
-
-			if amount == 0 {
-				return Err(StakingError::InvalidAmount.into());
-			}
-
-			assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
-			assert_position_access(*self.pool_state, *self.user, &position_state)?;
-
-			(
-				position_state.staked_amount.get(),
-				position_state.reward_debt.get(),
-				pool_state.total_staked.get(),
-			)
-		};
-
-		// Calculate updated amounts
-		let next_staked = staked_amount
-			.checked_add(amount)
-			.ok_or(ProgramError::ArithmeticOverflow)?;
-		let total_staked = total_staked
-			.checked_add(amount)
-			.ok_or(ProgramError::ArithmeticOverflow)?;
-
-		// Update position state
+		// Validate pool and position state, then write through the same guards.
+		// Reloading each account immutably first would validate it twice. Both
+		// guards are released before the ATA CPI below.
+		let pool_handle = *self.pool_state;
+		let user_handle = *self.user;
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount.set(next_staked);
-		position_state.reward_debt.set(
-			reward_debt
-				.checked_add(amount)
-				.ok_or(ProgramError::ArithmeticOverflow)?,
-		);
-		drop(position_state);
-
-		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked.set(total_staked);
+
+		if pool_state.paused.get() {
+			return Err(StakingError::PoolPaused.into());
+		}
+
+		if amount == 0 {
+			return Err(StakingError::InvalidAmount.into());
+		}
+
+		assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
+		assert_position_access(pool_handle, user_handle, &position_state)?;
+
+		let next_staked = position_state
+			.staked_amount
+			.get()
+			.checked_add(amount)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		let next_reward_debt = position_state
+			.reward_debt
+			.get()
+			.checked_add(amount)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		let next_total_staked = pool_state
+			.total_staked
+			.get()
+			.checked_add(amount)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		position_state.staked_amount.set(next_staked);
+		position_state.reward_debt.set(next_reward_debt);
+		pool_state.total_staked.set(next_total_staked);
+		drop(position_state);
 		drop(pool_state);
 
 		// Ensure user's stake ATA exists
@@ -437,42 +432,36 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		// Validate pool and position state
-		let (staked_amount, total_staked) = {
-			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+		// Validate pool and position state, then write through the same guards.
+		// Reloading each account immutably first would validate it twice.
+		let pool_handle = *self.pool_state;
+		let user_handle = *self.user;
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 
-			if pool_state.paused.get() {
-				return Err(StakingError::PoolPaused.into());
-			}
+		if pool_state.paused.get() {
+			return Err(StakingError::PoolPaused.into());
+		}
 
-			if amount == 0 {
-				return Err(StakingError::InvalidAmount.into());
-			}
+		if amount == 0 {
+			return Err(StakingError::InvalidAmount.into());
+		}
 
-			assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
-			assert_position_access(*self.pool_state, *self.user, &position_state)?;
+		assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
+		assert_position_access(pool_handle, user_handle, &position_state)?;
 
-			(
-				position_state.staked_amount.get(),
-				pool_state.total_staked.get(),
-			)
-		};
+		let staked_amount = position_state.staked_amount.get();
+		let total_staked = pool_state.total_staked.get();
 
 		if amount > staked_amount {
 			return Err(StakingError::InsufficientBalance.into());
 		}
 
-		// Update position state
-		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount.set(
 			staked_amount
 				.checked_sub(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
 		);
-
-		// Update pool state
-		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked.set(
 			total_staked
 				.checked_sub(amount)
@@ -499,32 +488,30 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		// with `InvalidSeeds` before its idempotent branch.
 		self.user_reward_ata.assert_writable()?;
 
-		// Validate pool and position state
-		let (pending_rewards, reward_index) = {
-			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+		// Validate pool and position state, then update through the same position
+		// guard. Reloading it immutably first would validate it twice.
+		let pool_handle = *self.pool_state;
+		let user_handle = *self.user;
+		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 
-			if pool_state.paused.get() {
-				return Err(StakingError::PoolPaused.into());
-			}
+		if pool_state.paused.get() {
+			return Err(StakingError::PoolPaused.into());
+		}
 
-			assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
-			assert_position_access(*self.pool_state, *self.user, &position_state)?;
-
-			(
-				position_state.pending_rewards.get(),
-				pool_state.reward_index.get(),
-			)
-		};
+		assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
+		assert_position_access(pool_handle, user_handle, &position_state)?;
 
 		// Calculate and update pending rewards
-		let next_pending = pending_rewards
-			.checked_add(reward_index)
+		let next_pending = position_state
+			.pending_rewards
+			.get()
+			.checked_add(pool_state.reward_index.get())
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.pending_rewards.set(next_pending);
 		drop(position_state);
+		drop(pool_state);
 
 		// Ensure user's reward ATA exists
 		associated_token_account::instructions::CreateIdempotent {
