@@ -639,9 +639,12 @@ fn matches_transition_function(name: &str, module: &str, step: &str) -> bool {
 		return false;
 	}
 	if name.starts_with("_ZN") {
-		return legacy_mangled_walk_contains(name, step);
+		return legacy_mangled_walk_contains(name, module, step);
 	}
-	has_delimited_component(name, step)
+	// Demangled: the module must be a whole component directly before the step,
+	// either at the start of the name or after another component's `::`.
+	let sequence = format!("{module}::{step}::");
+	name.starts_with(&sequence) || name.contains(&format!("::{sequence}"))
 }
 
 /// Whether the legacy `_ZN…E` mangled symbol spells `step` as one of its path
@@ -652,10 +655,11 @@ fn matches_transition_function(name: &str, module: &str, step: &str) -> bool {
 /// exact even where a boundary heuristic would be fooled: inside
 /// `13foo8v0_to_v1` the bytes `8v0_to_v1` follow a non-digit, but the walk
 /// consumes `foo8v0_to_v1` as the single component it is.
-fn legacy_mangled_walk_contains(name: &str, step: &str) -> bool {
+fn legacy_mangled_walk_contains(name: &str, module: &str, step: &str) -> bool {
 	let Some(mut rest) = name.strip_prefix("_ZN") else {
 		return false;
 	};
+	let mut previous_component: Option<&str> = None;
 
 	loop {
 		let digits = rest.len().saturating_sub(
@@ -675,22 +679,18 @@ fn legacy_mangled_walk_contains(name: &str, step: &str) -> bool {
 			// The declared component runs past the end of the symbol.
 			return false;
 		};
-		if component == step {
+		// The step only counts when it sits directly after the migration
+		// module, so a non-migration component that merely contains the
+		// module text cannot smuggle its cost into the estimate.
+		if previous_component == Some(module) && component == step {
 			return true;
 		}
+		previous_component = Some(component);
 		rest = &after[length..];
 		if rest.is_empty() {
 			return false;
 		}
 	}
-}
-
-/// Whether `name` contains `::step::` as a complete path component.
-///
-/// The surrounding `::` delimit the component in a demangled symbol, so a plain
-/// search cannot match a longer neighbour such as `v0_to_v12`.
-fn has_delimited_component(name: &str, step: &str) -> bool {
-	name.contains(&format!("::{step}::"))
 }
 
 /// Test-only helpers used by the cost tests to build histories and profiles.

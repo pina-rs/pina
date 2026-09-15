@@ -405,9 +405,33 @@ fn a_rejected_match_near_the_end_terminates_the_search() {
 		module,
 		"v0_to_v1"
 	));
-	// A rejected occurrence early in a long name is followed by a real match.
+}
+
+#[test]
+fn the_module_must_be_a_whole_component_before_the_step() {
+	let module = "__pina_state_account_migrations";
+
+	// A non-migration component that contains the module text cannot lend its
+	// cost to the estimate, even when the real step follows it.
+	assert!(!matches_transition_function(
+		"_ZN8my_crate41xx__pina_state_account_migrationsyy8v0_to_v1migrateE",
+		module,
+		"v0_to_v1"
+	));
+	// The demangled form demands the same adjacency.
+	assert!(!matches_transition_function(
+		"my_crate::xx__pina_state_account_migrationsyy::v0_to_v1::migrate",
+		module,
+		"v0_to_v1"
+	));
+	// The real adjacency still matches in both spellings.
 	assert!(matches_transition_function(
-		"_ZN8my_crate31__pina_state_account_migrations18v0_to_v1_migration8v0_to_v1migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations8v0_to_v1migrateE",
+		module,
+		"v0_to_v1"
+	));
+	assert!(matches_transition_function(
+		"my_crate::__pina_state_account_migrations::v0_to_v1::migrate",
 		module,
 		"v0_to_v1"
 	));

@@ -512,7 +512,7 @@ fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
 				80,
 			),
 			(
-				"_ZN9my_crate48__pina_update_instruction_instruction_migrations8v0_to_v17migrate17h1111E",
+				"_ZN8my_crate48__pina_update_instruction_instruction_migrations8v0_to_v17migrate17h1111E",
 				80,
 				160,
 			),

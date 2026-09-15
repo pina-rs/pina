@@ -455,6 +455,7 @@ fn warn_manifest_overflow_checks() {
 struct DeclaredReleaseProfile {
 	lto: Option<bool>,
 	codegen_units: Option<u32>,
+	opt_level: Option<u32>,
 	overflow_checks: Option<bool>,
 }
 
@@ -488,6 +489,10 @@ fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
 			.get("codegen-units")
 			.and_then(toml::Value::as_integer)
 			.and_then(|value| u32::try_from(value).ok()),
+		opt_level: release
+			.get("opt-level")
+			.and_then(toml::Value::as_integer)
+			.and_then(|value| u32::try_from(value).ok()),
 		overflow_checks: release
 			.get("overflow-checks")
 			.and_then(toml::Value::as_bool),
@@ -515,6 +520,7 @@ fn verified_profile_divergence(
 	// Cargo's release defaults filling in whatever the manifest leaves unset.
 	let verified_lto = declared.lto.unwrap_or(false);
 	let verified_codegen_units = declared.codegen_units.unwrap_or(16);
+	let verified_opt_level = declared.opt_level.unwrap_or(3);
 	let verified_overflow_checks = declared.overflow_checks.unwrap_or(false);
 	let ordinary_lto = if size_profile.requests_lto() {
 		true
@@ -531,6 +537,9 @@ fn verified_profile_divergence(
 	}
 	if verified_codegen_units != 1 {
 		return Some("its `codegen-units` setting");
+	}
+	if verified_opt_level != 3 {
+		return Some("its `opt-level` setting");
 	}
 	if verified_lto != ordinary_lto {
 		return Some("its `lto` setting");
@@ -1290,6 +1299,7 @@ mod tests {
 			DeclaredReleaseProfile {
 				lto: Some(true),
 				codegen_units: Some(1),
+				opt_level: None,
 				overflow_checks: Some(false),
 			}
 		);
@@ -1304,6 +1314,7 @@ mod tests {
 				DeclaredReleaseProfile {
 					lto: Some(true),
 					codegen_units: Some(1),
+					opt_level: Some(3),
 					overflow_checks: Some(false),
 				},
 				SizeProfile::Production,
@@ -1330,6 +1341,7 @@ mod tests {
 				DeclaredReleaseProfile {
 					lto: Some(true),
 					codegen_units: Some(1),
+					opt_level: Some(3),
 					overflow_checks: Some(true),
 				},
 				SizeProfile::Production,
@@ -1354,6 +1366,7 @@ mod tests {
 				DeclaredReleaseProfile {
 					lto: Some(true),
 					codegen_units: Some(1),
+					opt_level: Some(3),
 					overflow_checks: Some(false),
 				},
 				SizeProfile::ProductionWithoutLto,
@@ -1374,6 +1387,26 @@ mod tests {
 		assert!(
 			verified_profile_divergence(declared, SizeProfile::Production).is_some(),
 			"fat LTO requested but the manifest disables it"
+		);
+	}
+
+	#[test]
+	fn a_non_default_opt_level_diverges_from_the_profile() {
+		// The profile compiles at opt-level 3; a manifest pinned to `2` builds
+		// the verified artifact with different codegen.
+		let (_temp, project) = discover_workspace_fixture(
+			"opt-level-fixture",
+			"[profile.release]\nlto = \"fat\"\ncodegen-units = 1\nopt-level = 2\noverflow-checks \
+			 = false\n",
+		);
+
+		assert_eq!(
+			verified_profile_divergence(
+				declared_release_profile(&project),
+				SizeProfile::Production
+			)
+			.is_some(),
+			true
 		);
 	}
 
