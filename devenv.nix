@@ -982,6 +982,9 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$PWD/.cache/home"
+        fi
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
