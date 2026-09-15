@@ -1,6 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 146
+assertion_line: 147
 info:
   program: pina
   args:
@@ -35,10 +35,12 @@ Options:
       --overflow-checks
           Keep arithmetic overflow checks enabled in the production profile.
           
-          By default `pina build` disables them so overflow wraps instead of panicking. Pass this flag when a program must fail loudly on overflow. It costs a small amount of size.
+          By default `pina build` disables them so overflow wraps instead of panicking, unless the workspace manifest sets `overflow-checks = true`, which the profile respects. Pass this flag when a program must fail loudly on overflow. It costs a small amount of size.
 
       --verify
-          Build deterministically with solana-verify and Docker instead of Cargo directly
+          Build deterministically with solana-verify and Docker instead of Cargo directly.
+          
+          The size profile is not applied to a verified build: the artifact has to stay reproducible from its recorded Git revision, so the profile must be declared under `[profile.release]` in the workspace manifest.
 
       --solana-verify <COMMAND>
           solana-verify 0.5.1 executable. Pina does not install it automatically

@@ -95,12 +95,18 @@ pub(crate) enum Commands {
 		/// Keep arithmetic overflow checks enabled in the production profile.
 		///
 		/// By default `pina build` disables them so overflow wraps instead of
-		/// panicking. Pass this flag when a program must fail loudly on
-		/// overflow. It costs a small amount of size.
+		/// panicking, unless the workspace manifest sets
+		/// `overflow-checks = true`, which the profile respects. Pass this flag
+		/// when a program must fail loudly on overflow. It costs a small amount
+		/// of size.
 		#[arg(long)]
 		overflow_checks: bool,
 
 		/// Build deterministically with solana-verify and Docker instead of Cargo directly.
+		///
+		/// The size profile is not applied to a verified build: the artifact has
+		/// to stay reproducible from its recorded Git revision, so the profile
+		/// must be declared under `[profile.release]` in the workspace manifest.
 		#[arg(long)]
 		verify: bool,
 

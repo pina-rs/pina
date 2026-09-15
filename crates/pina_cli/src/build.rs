@@ -224,7 +224,7 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.current_dir(&project.root)
 		.env("CARGO_TARGET_DIR", &project.target_dir)
 		.args(&args);
-	apply_size_profile(&mut command, options);
+	apply_size_profile(&mut command, options, manifest_overflow_checks(&project));
 
 	let status = command.status().map_err(|source| {
 		BuildError::RunCargo {
@@ -310,6 +310,7 @@ pub fn build_project_verified_with_options(
 ) -> Result<VerifiedBuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
 	check_migrations_for_build(&project)?;
+	warn_verified_profile_divergence(&project, options.size_profile);
 	let features = options
 		.features
 		.iter()
@@ -403,9 +404,19 @@ fn publish_verified_build(
 /// The SBF toolchain honors Cargo profile environment overrides, so setting
 /// them here gives every `pina build` the production profile without editing
 /// the program's manifest. `lto` and `codegen-units` are pure size wins;
-/// `overflow-checks` is the caller's opt-in because disabling it changes
+/// `overflow-checks` is a semantic switch because disabling it turns
 /// arithmetic overflow from a panic into a wrap.
-fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
+///
+/// `manifest_overflow_checks` is the value the workspace release profile
+/// declares. Environment overrides beat `[profile.release]` in the manifest, so
+/// a program that explicitly opts into overflow checks keeps them: the profile
+/// may only disable the check when the manifest expresses no opinion, or agrees
+/// with disabling it.
+fn apply_size_profile(
+	command: &mut Command,
+	options: &BuildOptions,
+	manifest_overflow_checks: Option<bool>,
+) {
 	if !options.size_profile.applies_overrides() {
 		return;
 	}
@@ -416,17 +427,124 @@ fn apply_size_profile(command: &mut Command, options: &BuildOptions) {
 	if options.size_profile.forbids_lto() {
 		command.env("CARGO_PROFILE_RELEASE_LTO", "false");
 	}
+	let overflow_checks =
+		options.size_profile.keeps_overflow_checks() || manifest_overflow_checks == Some(true);
+	if overflow_checks && !options.size_profile.keeps_overflow_checks() {
+		warn_manifest_overflow_checks();
+	}
 	command
 		.env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1")
 		.env("CARGO_PROFILE_RELEASE_OPT_LEVEL", "3")
 		.env(
 			"CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS",
-			if options.size_profile.keeps_overflow_checks() {
-				"true"
-			} else {
-				"false"
-			},
+			if overflow_checks { "true" } else { "false" },
 		);
+}
+
+/// Report that the manifest's overflow-check opt-in outranks the size profile.
+fn warn_manifest_overflow_checks() {
+	eprintln!(
+		"warning: the release profile sets `overflow-checks = true`, so `pina build` keeps \
+		 arithmetic overflow checks enabled and gives up the size profile's `overflow-checks = \
+		 false` override. Pass `--no-size-profile` to leave the profile untouched, or drop the \
+		 manifest setting to accept the size win."
+	);
+}
+
+/// Release-profile settings declared by the manifest that owns the build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct DeclaredReleaseProfile {
+	lto: Option<bool>,
+	codegen_units: Option<u32>,
+	overflow_checks: Option<bool>,
+}
+
+/// Read `[profile.release]` from the workspace manifest that owns the build.
+///
+/// Cargo applies `[profile]` tables from the workspace root manifest only, so
+/// that is the file consulted. A missing file, table, or key all mean the
+/// manifest expresses no opinion, which lets the size profile choose.
+fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
+	let manifest_path = project.workspace_root().ok().map_or_else(
+		|| project.program_dir.join("Cargo.toml"),
+		|root| root.join("Cargo.toml"),
+	);
+	let Some(release) = std::fs::read_to_string(manifest_path)
+		.ok()
+		.and_then(|text| toml::from_str::<toml::Value>(&text).ok())
+		.and_then(|manifest| manifest.get("profile")?.get("release").cloned())
+	else {
+		return DeclaredReleaseProfile::default();
+	};
+
+	DeclaredReleaseProfile {
+		lto: release.get("lto").and_then(|value| {
+			match value {
+				toml::Value::Boolean(enabled) => Some(*enabled),
+				toml::Value::String(name) => Some(name != "off" && name != "false"),
+				_ => None,
+			}
+		}),
+		codegen_units: release
+			.get("codegen-units")
+			.and_then(toml::Value::as_integer)
+			.and_then(|value| u32::try_from(value).ok()),
+		overflow_checks: release
+			.get("overflow-checks")
+			.and_then(toml::Value::as_bool),
+	}
+}
+
+/// Read `[profile.release].overflow-checks` from the manifest that owns the
+/// build.
+fn manifest_overflow_checks(project: &Project) -> Option<bool> {
+	declared_release_profile(project).overflow_checks
+}
+
+/// Describe why a verified build cannot carry the requested size profile.
+///
+/// Solana Verify rebuilds from the recorded Git revision, so a verified
+/// artifact is only reproducible when the profile it was built with is declared
+/// in the committed manifest. Pina therefore never injects profile overrides
+/// into a verified build: an override absent from the manifest would make the
+/// verified artifact differ from the one `pina build` deploys, and on-chain
+/// verification of that deployment would fail.
+fn verified_profile_divergence(
+	declared: DeclaredReleaseProfile,
+	size_profile: SizeProfile,
+) -> Option<&'static str> {
+	if !size_profile.applies_overrides() {
+		return None;
+	}
+	if declared.overflow_checks == Some(true) {
+		return Some(
+			"the manifest sets `overflow-checks = true`, which the size profile disables for an \
+			 ordinary build",
+		);
+	}
+	if declared.codegen_units != Some(1) {
+		return Some("the manifest does not set `codegen-units = 1`");
+	}
+	if size_profile.requests_lto() && declared.lto != Some(true) {
+		return Some("the manifest does not enable fat LTO");
+	}
+
+	None
+}
+
+/// Warn when a verified build will not match the ordinary deploy artifact.
+fn warn_verified_profile_divergence(project: &Project, size_profile: SizeProfile) {
+	let declared = declared_release_profile(project);
+	if let Some(reason) = verified_profile_divergence(declared, size_profile) {
+		eprintln!(
+			"warning: `pina build --verify` does not apply the size profile because a verified \
+			 artifact must stay reproducible from its recorded Git revision, and {reason}. The \
+			 verified artifact will differ from the artifact an ordinary `pina build` deploys. \
+			 Declare the settings under `[profile.release]` in the workspace manifest (as `pina \
+			 init` does) so both backends shrink, or build without `--verify` and accept the \
+			 difference."
+		);
+	}
 }
 
 /// Arguments that delegate SBF compilation to the Agave `cargo-build-sbf`
@@ -948,6 +1066,13 @@ mod tests {
 	}
 
 	fn profile_env_for(size_profile: SizeProfile) -> Vec<(String, String)> {
+		profile_env_with_manifest(size_profile, None)
+	}
+
+	fn profile_env_with_manifest(
+		size_profile: SizeProfile,
+		manifest_overflow_checks: Option<bool>,
+	) -> Vec<(String, String)> {
 		let options = BuildOptions {
 			project_dir: PathBuf::new(),
 			features: Vec::new(),
@@ -955,7 +1080,7 @@ mod tests {
 			size_profile,
 		};
 		let mut command = Command::new("cargo");
-		apply_size_profile(&mut command, &options);
+		apply_size_profile(&mut command, &options, manifest_overflow_checks);
 		command
 			.get_envs()
 			.map(|(key, value)| {
@@ -1039,5 +1164,205 @@ mod tests {
 			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
 			Some("false")
 		);
+	}
+
+	#[test]
+	fn manifest_overflow_checks_opt_in_outranks_the_size_profile() {
+		let env = profile_env_with_manifest(SizeProfile::Production, Some(true));
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		// The manifest explicitly asks for overflow checks, so the profile keeps
+		// them on: env overrides beat `[profile.release]`, and silently wrapping
+		// arithmetic the manifest opted into would be a semantic change.
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("true")
+		);
+		// The pure size knobs still apply.
+		assert_eq!(lookup("CARGO_PROFILE_RELEASE_LTO").as_deref(), Some("fat"));
+	}
+
+	#[test]
+	fn manifest_overflow_checks_opt_out_matches_the_size_profile() {
+		let env = profile_env_with_manifest(SizeProfile::Production, Some(false));
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("false")
+		);
+	}
+
+	#[test]
+	fn silent_manifest_leaves_the_size_profile_in_charge() {
+		let env = profile_env_with_manifest(SizeProfile::Production, None);
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("false")
+		);
+	}
+
+	#[test]
+	fn explicit_overflow_checks_flag_still_wins_over_a_silent_manifest() {
+		let env = profile_env_with_manifest(SizeProfile::ProductionWithOverflowChecks, Some(false));
+		let lookup = |key: &str| {
+			env.iter()
+				.find(|(name, _)| name == key)
+				.map(|(_, value)| value.clone())
+		};
+
+		assert_eq!(
+			lookup("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS").as_deref(),
+			Some("true")
+		);
+	}
+
+	#[test]
+	fn manifest_overflow_checks_reads_the_workspace_release_profile() {
+		let (_temp, project) = discover_workspace_fixture(
+			"overflow-manifest-fixture",
+			"[profile.release]\noverflow-checks = true\n",
+		);
+
+		assert_eq!(manifest_overflow_checks(&project), Some(true));
+	}
+
+	#[test]
+	fn manifest_overflow_checks_ignores_a_program_local_release_profile() {
+		let (_temp, project) = discover_workspace_fixture("overflow-program-fixture", "");
+		// Cargo applies `[profile]` tables from the workspace root only, so a
+		// program-local table must not be mistaken for a manifest opt-in.
+		fs::write(
+			project.program_dir.join("Cargo.toml"),
+			"[package]\nname = \"overflow-program-fixture\"\nversion = \"0.0.0\"\nedition = \
+			 \"2024\"\n[lib]\ncrate-type = [\"cdylib\"]\npath = \
+			 \"src/lib.rs\"\n\n[profile.release]\noverflow-checks = true\n",
+		)
+		.unwrap_or_else(|error| panic!("write program manifest: {error}"));
+
+		assert_eq!(manifest_overflow_checks(&project), None);
+	}
+
+	#[test]
+	fn manifest_overflow_checks_is_none_without_a_release_profile() {
+		let (_temp, project) = discover_workspace_fixture("silent-manifest-fixture", "");
+
+		assert_eq!(manifest_overflow_checks(&project), None);
+	}
+
+	#[test]
+	fn declared_profile_reads_every_size_setting() {
+		let (_temp, project) = discover_workspace_fixture(
+			"declared-profile-fixture",
+			"[profile.release]\nlto = \"fat\"\ncodegen-units = 1\noverflow-checks = false\n",
+		);
+
+		assert_eq!(
+			declared_release_profile(&project),
+			DeclaredReleaseProfile {
+				lto: Some(true),
+				codegen_units: Some(1),
+				overflow_checks: Some(false),
+			}
+		);
+	}
+
+	#[test]
+	fn verified_build_diverges_when_the_manifest_lacks_the_size_profile() {
+		// The manifest `pina init` writes declares the whole profile, so a
+		// verified build reproduces the ordinary artifact.
+		assert_eq!(
+			verified_profile_divergence(
+				DeclaredReleaseProfile {
+					lto: Some(true),
+					codegen_units: Some(1),
+					overflow_checks: Some(false),
+				},
+				SizeProfile::Production,
+			),
+			None
+		);
+
+		// A silent manifest cannot reproduce the production profile.
+		assert!(
+			verified_profile_divergence(DeclaredReleaseProfile::default(), SizeProfile::Production)
+				.is_some()
+		);
+
+		// `--no-size-profile` never diverges: it asks for the manifest as-is.
+		assert_eq!(
+			verified_profile_divergence(DeclaredReleaseProfile::default(), SizeProfile::None),
+			None
+		);
+
+		// A manifest that keeps overflow checks on diverges, because the
+		// ordinary build honours the manifest while a size profile would not.
+		assert!(
+			verified_profile_divergence(
+				DeclaredReleaseProfile {
+					lto: Some(true),
+					codegen_units: Some(1),
+					overflow_checks: Some(true),
+				},
+				SizeProfile::Production,
+			)
+			.is_some()
+		);
+	}
+
+	#[test]
+	fn lto_string_off_is_not_treated_as_enabled() {
+		let (_temp, project) = discover_workspace_fixture(
+			"lto-off-fixture",
+			"[profile.release]\nlto = \"off\"\ncodegen-units = 1\noverflow-checks = false\n",
+		);
+
+		let declared = declared_release_profile(&project);
+		assert_eq!(declared.lto, Some(false));
+		assert!(
+			verified_profile_divergence(declared, SizeProfile::Production).is_some(),
+			"fat LTO requested but the manifest disables it"
+		);
+	}
+
+	/// Build a workspace whose root manifest carries `extra_manifest` and whose
+	/// single member is a cdylib program.
+	fn discover_workspace_fixture(name: &str, extra_manifest: &str) -> (TempDir, Project) {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let program_dir = temp.path().join("program");
+		fs::create_dir_all(program_dir.join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		fs::write(
+			temp.path().join("Cargo.toml"),
+			format!("[workspace]\nmembers = [\"program\"]\nresolver = \"2\"\n\n{extra_manifest}"),
+		)
+		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
+		fs::write(
+			program_dir.join("Cargo.toml"),
+			format!(
+				"[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \
+				 \"2024\"\n[lib]\ncrate-type = [\"cdylib\"]\npath = \"src/lib.rs\"\n"
+			),
+		)
+		.unwrap_or_else(|error| panic!("write program manifest: {error}"));
+		fs::write(program_dir.join("src/lib.rs"), "")
+			.unwrap_or_else(|error| panic!("write source: {error}"));
+		let project = Project::discover(&program_dir)
+			.unwrap_or_else(|error| panic!("discover fixture: {error}"));
+		(temp, project)
 	}
 }

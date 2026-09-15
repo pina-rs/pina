@@ -90,6 +90,8 @@ pina build --verify --features logs --no-default-features
 
 Pina forwards only its validated feature selection to Solana Verify. It intentionally offers no raw Cargo, Docker, image, or shell-argument passthrough.
 
+A verified build does not apply the size profile. Solana Verify rebuilds from the recorded Git revision, so the inputs that shape the artifact have to live in the committed source; an override supplied only through environment variables or CLI flags is invisible to anyone reproducing that revision, which would make the verified hash unreproducible. Declare the profile under `[profile.release]` in the workspace manifest — the layout `pina init` generates — so both backends compile identically. When a requested size profile would make the two artifacts differ, `pina build --verify` warns and names the missing setting.
+
 Solana Verify 0.5.1 is supported on Linux and macOS when a compatible executable and Docker runtime are available. Native Windows and FreeBSD execution fail before source staging; use a supported Linux environment instead.
 
 Project discovery uses the nearest ancestor `pina.toml`. Existing projects without that file fall back to Cargo metadata; an ambiguous workspace root fails with the candidate package names instead of guessing.
