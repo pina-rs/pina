@@ -357,6 +357,87 @@ fn transition_matching_requires_the_exact_step() {
 }
 
 #[test]
+fn transition_matching_ignores_steps_embedded_in_longer_names() {
+	let module = "__pina_state_account_migrations";
+
+	// A component whose *count* continues a longer number is a different
+	// function: `18v0_to_v1_migration` contains `8v0_to_v1` but is not the
+	// `v0_to_v1` transition.
+	assert!(!matches_transition_function(
+		"_ZN8my_crate33__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
+		module,
+		"v0_to_v1"
+	));
+	// A longer component that merely starts with the step text.
+	assert!(!matches_transition_function(
+		"_ZN8my_crate33__pina_state_account_migrations9v0_to_v12migrateE",
+		module,
+		"v0_to_v1"
+	));
+	// Demangled neighbour: `::` delimits, so the longer name cannot match.
+	assert!(!matches_transition_function(
+		"my_crate::__pina_state_account_migrations::v0_to_v12::migrate",
+		module,
+		"v0_to_v1"
+	));
+	// The exact forms still match.
+	assert!(matches_transition_function(
+		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+		module,
+		"v0_to_v1"
+	));
+	assert!(matches_transition_function(
+		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrateE",
+		module,
+		"v0_to_v1"
+	));
+}
+
+#[test]
+fn a_zero_cost_transition_is_estimated_rather_than_reported_missing() {
+	let manifest = manifest(vec![account_history(
+		1,
+		"State",
+		vec![fixed_schema(40), fixed_schema(41)],
+	)]);
+	// The transition exists but its measured cost is zero.
+	let source = profile_source(&[(
+		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+		0,
+	)]);
+	let preview = build_cost_preview(Some(&manifest), &source);
+	let ladder = ladder_of(&preview);
+
+	assert_eq!(
+		estimated_cu(&ladder.static_cu),
+		0,
+		"a present zero-cost transition is still an estimate"
+	);
+}
+
+#[test]
+fn a_decoy_symbol_does_not_satisfy_a_missing_transition() {
+	let manifest = manifest(vec![account_history(
+		1,
+		"State",
+		vec![fixed_schema(40), fixed_schema(41)],
+	)]);
+	// Only a decoy that embeds the step in a longer component is present, so
+	// the real transition is missing and the estimate must say so.
+	let source = profile_source(&[(
+		"_ZN8my_crate33__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
+		500,
+	)]);
+	let preview = build_cost_preview(Some(&manifest), &source);
+	let ladder = ladder_of(&preview);
+
+	assert!(
+		matches!(ladder.static_cu, StaticCuEstimate::Unavailable { .. }),
+		"a decoy symbol must not stand in for the real transition"
+	);
+}
+
+#[test]
 fn missing_transition_function_reports_the_missing_step() {
 	let manifest = manifest(vec![account_history(
 		1,

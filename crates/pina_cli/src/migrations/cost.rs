@@ -593,16 +593,18 @@ fn estimate_ladder_cu(
 	for to in from_version.saturating_add(1)..=current_version {
 		let from = to - 1;
 		let step = format!("v{from}_to_v{to}");
-		let step_cu = profile
-			.functions
-			.iter()
-			.filter(|function| {
-				matches_transition_function(&function.name, &module, &step)
-					&& function.name.contains("migrate")
-			})
-			.map(|function| function.estimated_cu)
-			.fold(0_u64, u64::saturating_add);
-		if step_cu == 0 {
+		let mut found = false;
+		let mut step_cu = 0_u64;
+		for function in profile.functions.iter().filter(|function| {
+			matches_transition_function(&function.name, &module, &step)
+				&& function.name.contains("migrate")
+		}) {
+			// A transition that genuinely costs zero still exists, so its
+			// presence is tracked separately from its estimate.
+			found = true;
+			step_cu = step_cu.saturating_add(function.estimated_cu);
+		}
+		if !found {
 			missing.push(step);
 		}
 		estimated_cu = estimated_cu.saturating_add(step_cu);
@@ -628,11 +630,52 @@ fn estimate_ladder_cu(
 /// Rust mangles every path component with a length prefix (`8v0_to_v1`), which
 /// keeps a search for `v0_to_v1` from matching the prefix of `v0_to_v12`.
 /// Demangled or hand-written symbols separate components instead.
+///
+/// Each form must match a whole component: a symbol that merely embeds the step
+/// (a suffix, a longer name, or a differently prefixed component) is a different
+/// function and must not contribute to the estimate.
 fn matches_transition_function(name: &str, module: &str, step: &str) -> bool {
 	if !name.contains(module) {
 		return false;
 	}
-	name.contains(&format!("{}{step}", step.len())) || name.contains(&format!("::{step}::"))
+	has_mangled_component(name, &format!("{}{step}", step.len()))
+		|| has_delimited_component(name, step)
+}
+
+/// Whether `name` contains `component` as a complete mangled path component.
+///
+/// Legacy mangling prefixes each component with its decimal length, so
+/// `9v0_to_v12` spells the component `v0_to_v12` and that prefix also pins the
+/// component's exact extent: a longer neighbour is spelled with a longer count.
+/// The prefix is only a component boundary when it does not continue a longer
+/// number, which is what stops the `8v0_to_v1` inside `18v0_to_v1_migration`
+/// from satisfying a request for `v0_to_v1`.
+fn has_mangled_component(name: &str, component: &str) -> bool {
+	let mut offset = 0;
+	while let Some(index) = name.get(offset..).and_then(|rest| rest.find(component)) {
+		let start = offset.saturating_add(index);
+		let before_ok = name
+			.get(..start)
+			.and_then(|prefix| prefix.chars().next_back())
+			.is_none_or(|character| !character.is_ascii_digit());
+		if before_ok {
+			return true;
+		}
+		offset = start.saturating_add(1);
+		if offset >= name.len() {
+			break;
+		}
+	}
+
+	false
+}
+
+/// Whether `name` contains `::step::` as a complete path component.
+///
+/// The surrounding `::` delimit the component in a demangled symbol, so a plain
+/// search cannot match a longer neighbour such as `v0_to_v12`.
+fn has_delimited_component(name: &str, step: &str) -> bool {
+	name.contains(&format!("::{step}::"))
 }
 
 /// Test-only helpers used by the cost tests to build histories and profiles.
