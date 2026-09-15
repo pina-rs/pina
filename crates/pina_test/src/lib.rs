@@ -22,15 +22,46 @@ pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
 use solana_message::Message;
+use solana_message::VersionedMessage;
+use solana_message::v1;
+/// The compute budget a v1 transaction carries inside its message.
+///
+/// A v1 message states its compute unit limit, loaded accounts data size
+/// limit, heap size, and priority fee directly instead of routing them through
+/// compute-budget instructions, and the runtime reads an absent value as zero.
+/// Build one from [`default_v1_config`] and override only what a test needs.
+pub use solana_message::v1::TransactionConfig as V1TransactionConfig;
 pub use solana_pubkey::Pubkey;
 pub use solana_rent::Rent;
+use solana_rpc_client::rpc_client::SerializableTransaction;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
 use solana_transaction::Transaction;
+use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 use surfpool_sdk::cheatcodes::builders::SetAccount;
+
+/// Compute unit limit that matches the runtime's legacy default.
+pub const DEFAULT_V1_COMPUTE_UNIT_LIMIT: u32 = 200_000;
+
+/// Loaded accounts data size limit matching the runtime's legacy default of
+/// 64 MiB. A v1 message that omits this value loads no account data.
+pub const DEFAULT_V1_LOADED_ACCOUNTS_DATA_SIZE_LIMIT: u32 = 64 * 1024 * 1024;
+
+/// The compute budget a v1 transaction needs to behave like a legacy one.
+///
+/// V1 leaves every field absent, and an absent limit means zero, so a message
+/// built from [`V1TransactionConfig::empty`] fails immediately. This applies
+/// the runtime's legacy defaults so a test can switch transaction versions
+/// without also reasoning about compute budgets.
+#[must_use]
+pub const fn default_v1_config() -> V1TransactionConfig {
+	V1TransactionConfig::empty()
+		.with_compute_unit_limit(DEFAULT_V1_COMPUTE_UNIT_LIMIT)
+		.with_loaded_accounts_data_size_limit(DEFAULT_V1_LOADED_ACCOUNTS_DATA_SIZE_LIMIT)
+}
 
 static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
 const TEST_PAYER_SEED: [u8; 32] = [0xA5; 32];
@@ -374,6 +405,65 @@ impl ProgramTest {
 		)
 	}
 
+	/// Build and sign a v1 transaction addressed to the deployed program.
+	///
+	/// Use this to prove a program accepts the v1 wire format, or to carry an
+	/// instruction whose data does not fit a legacy transaction's 1,232-byte
+	/// limit.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, or
+	/// signing fails.
+	pub fn v1_transaction(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		config: V1TransactionConfig,
+	) -> Result<VersionedTransaction, TestError> {
+		self.surfnet
+			.v1_transaction(self.instruction(data, accounts), config)
+	}
+
+	/// Simulate a v1 transaction and return the program log lines it produced.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, or simulation fails.
+	pub fn simulate_v1_logs(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		config: V1TransactionConfig,
+	) -> Result<Vec<String>, TestError> {
+		self.surfnet
+			.simulate_v1_logs(self.program_id, data, accounts, config)
+	}
+
+	/// Submit and confirm one instruction as a v1 transaction.
+	///
+	/// Records compute units for the benchmark harness exactly like
+	/// [`Self::send`], so a v1 path is measured rather than skipped.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, submission, or
+	/// confirmation fails.
+	pub fn send_v1(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		config: V1TransactionConfig,
+	) -> Result<Signature, TestError> {
+		self.surfnet.send_program_v1_instruction(
+			self.program_id,
+			self.benchmark_program.as_deref(),
+			data,
+			accounts,
+			config,
+		)
+	}
+
 	/// Submit and confirm one instruction with the payer and additional signers.
 	///
 	/// The payer is always the transaction fee payer and first signer. Callers
@@ -566,6 +656,78 @@ impl OfflineSurfnet {
 		self.inner.payer().pubkey()
 	}
 
+	/// Build and sign a v1 transaction for one instruction.
+	///
+	/// The message carries its compute budget inline and appends signatures
+	/// after the message, so a v1 transaction can hold up to
+	/// [`solana_message::v1::MAX_TRANSACTION_SIZE`] bytes — more than three
+	/// times a legacy transaction — at the cost of address lookup tables,
+	/// which v1 does not support.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, or
+	/// signing fails.
+	pub fn v1_transaction(
+		&self,
+		instruction: Instruction,
+		config: V1TransactionConfig,
+	) -> Result<VersionedTransaction, TestError> {
+		let rpc = self.inner.rpc_client();
+		let payer = self.inner.payer();
+		let blockhash = rpc
+			.get_latest_blockhash()
+			.map_err(|error| test_error("fetch latest blockhash", error))?;
+		let message = v1::Message::try_compile_with_config(
+			&payer.pubkey(),
+			&[instruction],
+			blockhash,
+			config,
+		)
+		.map_err(|error| test_error("compile v1 transaction message", error))?;
+		let signers: Vec<&dyn Signer> = vec![payer];
+		VersionedTransaction::try_new(VersionedMessage::V1(message), &signers)
+			.map_err(|error| test_error("sign v1 program transaction", error))
+	}
+
+	/// Simulate a v1 transaction for one instruction and return its logs.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, or simulation fails.
+	pub fn simulate_v1_logs(
+		&self,
+		program_id: Pubkey,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		config: V1TransactionConfig,
+	) -> Result<Vec<String>, TestError> {
+		let instruction = Instruction::new_with_bytes(program_id, data, accounts);
+		let transaction = self.v1_transaction(instruction, config)?;
+		let simulation = self
+			.inner
+			.rpc_client()
+			.simulate_transaction(&transaction)
+			.map_err(|error| test_error("simulate v1 program instruction", error))?;
+
+		Ok(simulation.value.logs.unwrap_or_default())
+	}
+
+	/// Submit and confirm a signed v1 transaction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when submission or confirmation fails.
+	pub fn send_v1_transaction(
+		&self,
+		transaction: &VersionedTransaction,
+	) -> Result<Signature, TestError> {
+		self.inner
+			.rpc_client()
+			.send_and_confirm_transaction(transaction)
+			.map_err(execution_error)
+	}
+
 	/// Deploy an SBF artifact directly at its declared program address.
 	///
 	/// # Errors
@@ -661,6 +823,35 @@ impl OfflineSurfnet {
 			.flatten();
 
 		self.send_instruction_with_signers_inner(instruction, signers, record)
+	}
+
+	/// Build, optionally measure, and submit one instruction as a v1 transaction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, signing,
+	/// submission, or confirmation fails.
+	fn send_program_v1_instruction(
+		&self,
+		program_id: Pubkey,
+		benchmark_program: Option<&str>,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		config: V1TransactionConfig,
+	) -> Result<Signature, TestError> {
+		let instruction = Instruction::new_with_bytes(program_id, data, accounts);
+		let transaction = self.v1_transaction(instruction, config)?;
+
+		if let (Some(program), Some(discriminator)) = (benchmark_program, data.first().copied()) {
+			record_compute_units(
+				&self.inner.rpc_client(),
+				&transaction,
+				program,
+				discriminator,
+			)?;
+		}
+
+		self.send_v1_transaction(&transaction)
 	}
 
 	fn send_instruction_with_signers_inner(
@@ -892,7 +1083,7 @@ fn rpc_listener_is_closed(url: &str) -> bool {
 
 fn record_compute_units(
 	rpc: &solana_rpc_client::rpc_client::RpcClient,
-	transaction: &Transaction,
+	transaction: &impl SerializableTransaction,
 	program: &str,
 	discriminator: u8,
 ) -> Result<(), TestError> {
