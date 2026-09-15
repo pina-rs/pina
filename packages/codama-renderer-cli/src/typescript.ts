@@ -369,7 +369,15 @@ function renderCommand(instruction: InstructionModel): string {
 				inputEntries.push(`\t\t${account.camel}: context.payer,`);
 				break;
 			case "pda":
-				inputEntries.push(`\t\t${account.camel}: options.${account.camel},`);
+				// A supplied address must be a valid base58 account, and only an
+				// absent flag may fall through to deriving the PDA. Testing for
+				// undefined rather than truthiness keeps `--state ""` an error
+				// instead of silently deriving.
+				inputEntries.push(
+					`\t\t${account.camel}: options.${account.camel} === undefined ? undefined : pubkey(${
+						JSON.stringify(optionFlag(account.snake))
+					}, options.${account.camel}),`,
+				);
 				break;
 			default:
 				inputEntries.push(

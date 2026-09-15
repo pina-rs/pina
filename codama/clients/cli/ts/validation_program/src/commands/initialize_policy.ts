@@ -38,7 +38,9 @@ export const initializePolicyCommand = registerGlobals(
 				options.requiredApprovals,
 			),
 			authority: context.payer,
-			policy: options.policy,
+			policy: options.policy === undefined
+				? undefined
+				: pubkey("--policy", options.policy),
 		};
 		const instruction = await getInitializePolicyInstructionAsync(
 			...[input],

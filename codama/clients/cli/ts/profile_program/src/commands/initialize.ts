@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getInitializeInstruction } from "../client";
+import { getInitializeInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -25,9 +25,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		"--authority <authority>",
 		"The wallet creating the profile. Pays for account creation and becomes [default: payer]",
 	)
-	.requiredOption(
+	.option(
 		"--profile <profile>",
-		"The profile PDA account (must be empty — not yet created)",
+		"The profile PDA account (must be empty — not yet created) [default: derived]",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
@@ -36,9 +36,11 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			name: options.name,
 			bio: options.bio,
 			authority: context.payer,
-			profile: pubkey("--profile", options.profile),
+			profile: options.profile === undefined
+				? undefined
+				: pubkey("--profile", options.profile),
 		};
-		const instruction = getInitializeInstruction(
+		const instruction = await getInitializeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

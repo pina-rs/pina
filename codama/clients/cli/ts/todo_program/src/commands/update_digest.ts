@@ -24,7 +24,9 @@ export const updateDigestCommand = registerGlobals(new Command("update_digest"))
 		const input = {
 			digest: base58("--digest", options.digest),
 			owner: context.payer,
-			todo: options.todo,
+			todo: options.todo === undefined
+				? undefined
+				: pubkey("--todo", options.todo),
 		};
 		const instruction = await getUpdateDigestInstructionAsync(
 			...[input],

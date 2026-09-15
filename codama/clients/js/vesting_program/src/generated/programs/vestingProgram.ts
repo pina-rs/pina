@@ -42,8 +42,8 @@ import {
 	type ClaimInput,
 	getCancelInstruction,
 	getClaimInstruction,
-	getInitializeInstruction,
-	type InitializeInput,
+	getInitializeInstructionAsync,
+	type InitializeAsyncInput,
 	parseCancelInstruction,
 	parseClaimInstruction,
 	type ParsedCancelInstruction,
@@ -166,8 +166,10 @@ export type VestingProgramPluginAccounts = {
 
 export type VestingProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	claim: (
 		input: ClaimInput,
 	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
@@ -196,7 +198,7 @@ export function vestingProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					claim: (input) =>
 						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),

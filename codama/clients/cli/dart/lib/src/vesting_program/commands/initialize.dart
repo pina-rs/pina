@@ -30,8 +30,8 @@ final class InitializeCommand extends Command<void> {
       ..addOption('mint', mandatory: true, help: "The mint account")
       ..addOption(
         'vesting_state',
-        mandatory: true,
-        help: "The vesting_state account",
+        mandatory: false,
+        help: "The vesting_state account [default: derived]",
       )
       ..addOption('vault', mandatory: true, help: "The vault account")
       ..addOption(
@@ -59,10 +59,16 @@ final class InitializeCommand extends Command<void> {
       results['beneficiary']! as String,
     );
     final mint = pubkey('--mint', results['mint']! as String);
-    final vestingState = pubkey(
-      '--vesting-state',
-      results['vesting_state']! as String,
-    );
+    final vestingState = (results['vesting_state'] as String?) != null
+        ? pubkey('--vesting-state', results['vesting_state']! as String)
+        : (await findVestingPda(
+            seeds: VestingSeeds(
+              admin: admin,
+              beneficiary: beneficiary,
+              mint: mint,
+            ),
+            programAddress: context.programAddress,
+          )).$1;
     final vault = pubkey('--vault', results['vault']! as String);
     final tokenProgram = pubkey(
       '--token-program',

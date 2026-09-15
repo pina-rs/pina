@@ -29,7 +29,9 @@ export const renameCommand = registerGlobals(new Command("rename"))
 			titleLen: smallInteger("--title-len", options.titleLen),
 			title: base58("--title", options.title),
 			authority: context.payer,
-			journal: options.journal,
+			journal: options.journal === undefined
+				? undefined
+				: pubkey("--journal", options.journal),
 		};
 		const instruction = await getRenameInstructionAsync(
 			...[input],

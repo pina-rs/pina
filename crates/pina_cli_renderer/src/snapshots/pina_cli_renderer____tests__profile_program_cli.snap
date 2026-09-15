@@ -135,9 +135,9 @@ pub struct InitializeArgs {
 	/// The wallet creating the profile. Pays for account creation and becomes the authority whose address seeds the PDA [default: payer]
 	#[arg(long)]
 	authority: Option<String>,
-	/// The profile PDA account (must be empty — not yet created)
+	/// The profile PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
-	profile: String,
+	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
@@ -145,7 +145,14 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		Some(value) => CliContext::pubkey("--authority", value)?,
 		None => context.payer_pubkey(),
 	};
-	let profile = CliContext::pubkey("--profile", &args.profile)?;
+	let profile = match &args.profile {
+		Some(value) => CliContext::pubkey("--profile", value)?,
+		None => Pubkey::find_program_address(
+			&["profile".as_bytes(), authority.as_ref()],
+			&context.program_address,
+		)
+		.0,
+	};
 	let mut invalid: Option<String> = None;
 	let data = InitializeInstructionData::new(|data| {
 		data.bump = args.bump;

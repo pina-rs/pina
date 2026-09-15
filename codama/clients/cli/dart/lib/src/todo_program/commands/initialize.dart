@@ -19,7 +19,11 @@ final class InitializeCommand extends Command<void> {
         mandatory: false,
         help: "The owner account [default: payer]",
       )
-      ..addOption('todo', mandatory: true, help: "The todo account");
+      ..addOption(
+        'todo',
+        mandatory: false,
+        help: "The todo account [default: derived]",
+      );
   }
 
   @override
@@ -35,7 +39,12 @@ final class InitializeCommand extends Command<void> {
     final owner = (results['owner'] as String?) != null
         ? pubkey('--owner', results['owner']! as String)
         : context.payerAddress;
-    final todo = pubkey('--todo', results['todo']! as String);
+    final todo = (results['todo'] as String?) != null
+        ? pubkey('--todo', results['todo']! as String)
+        : (await findTodoPda(
+            seeds: TodoSeeds(owner: owner),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final digestValue = base58Bytes('--digest', results['digest']! as String);
     final instruction = getInitializeInstruction(

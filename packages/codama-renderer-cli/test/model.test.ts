@@ -32,11 +32,10 @@ describe("extractCliModel", () => {
 		]);
 
 		const counter = initialize.accounts[1]!;
-		// The IDLs no longer carry PDA default derivations, so the CLI takes
-		// the counter address as an ordinary required argument instead of
-		// deriving it from the seeds.
 		expect(counter.resolution).toEqual({
-			resolution: "required",
+			resolution: "pda",
+			pascal: "Counter",
+			seeds: [{ seed: "account", account: "authority" }],
 		});
 		const system = initialize.accounts[2]!;
 		expect(system.resolution).toEqual({

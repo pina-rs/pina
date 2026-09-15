@@ -29,7 +29,9 @@ export const resizeCommand = registerGlobals(new Command("resize"))
 			entryCount: smallInteger("--entry-count", options.entryCount),
 			markerCount: smallInteger("--marker-count", options.markerCount),
 			authority: context.payer,
-			journal: options.journal,
+			journal: options.journal === undefined
+				? undefined
+				: pubkey("--journal", options.journal),
 		};
 		const instruction = await getResizeInstructionAsync(
 			...[input],

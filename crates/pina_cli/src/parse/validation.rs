@@ -62,6 +62,7 @@ const KNOWN_ADDRESSES: &[(&str, &str)] = &[
 const PDA_CREATION_BUILDERS: &[&str] = &[
 	"CreateProgramAccount",
 	"CreateProgramAccountWithBump",
+	"CreateProgramAccountWithUncheckedBump",
 	"CreateCompactProgramAccount",
 	"CreateCompactProgramAccountWithBump",
 ];

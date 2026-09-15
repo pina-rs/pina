@@ -35,7 +35,9 @@ export const forwardRotateWithPdaCommand = registerGlobals(
 			bump: smallInteger("--bump", options.bump),
 			newAuthority: pubkey("--new-authority", options.newAuthority),
 			oracle: pubkey("--oracle", options.oracle),
-			authority: options.authority,
+			authority: options.authority === undefined
+				? undefined
+				: pubkey("--authority", options.authority),
 			propAmmProgram: pubkey("--prop-amm-program", options.propAmmProgram),
 		};
 		const instruction = await getForwardRotateWithPdaInstructionAsync(

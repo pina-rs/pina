@@ -52,7 +52,7 @@ describe("renderTypeScript", () => {
 		]);
 
 		const initialize = files.get("src/commands/initialize.ts")!;
-		expect(initialize).toContain("getInitializeInstruction(");
+		expect(initialize).toContain("getInitializeInstructionAsync");
 		expect(initialize).toContain('.requiredOption("--bump <bump>"');
 		expect(initialize).toContain("context.payer");
 

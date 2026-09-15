@@ -24,7 +24,9 @@ export const toggleCompletedCommand = registerGlobals(
 		const context = await CliContext.create(options);
 		const input = {
 			owner: context.payer,
-			todo: options.todo,
+			todo: options.todo === undefined
+				? undefined
+				: pubkey("--todo", options.todo),
 		};
 		const instruction = await getToggleCompletedInstructionAsync(
 			...[input],

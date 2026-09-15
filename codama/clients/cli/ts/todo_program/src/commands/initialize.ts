@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getInitializeInstruction } from "../client";
+import { getInitializeInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -19,16 +19,18 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--digest <digest>", "digest")
 	.option("--owner <owner>", "The `owner` account [default: payer]")
-	.requiredOption("--todo <todo>", "The `todo` account")
+	.option("--todo <todo>", "The `todo` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			digest: base58("--digest", options.digest),
 			owner: context.payer,
-			todo: pubkey("--todo", options.todo),
+			todo: options.todo === undefined
+				? undefined
+				: pubkey("--todo", options.todo),
 		};
-		const instruction = getInitializeInstruction(
+		const instruction = await getInitializeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

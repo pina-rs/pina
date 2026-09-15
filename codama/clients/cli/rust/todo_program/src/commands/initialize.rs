@@ -25,9 +25,9 @@ pub struct InitializeArgs {
 	/// The `owner` account [default: payer]
 	#[arg(long)]
 	owner: Option<String>,
-	/// The `todo` account
+	/// The `todo` account [default: derived]
 	#[arg(long)]
-	todo: String,
+	todo: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
@@ -36,7 +36,16 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		Some(value) => CliContext::pubkey("--owner", value)?,
 		None => context.payer_pubkey(),
 	};
-	let todo = CliContext::pubkey("--todo", &args.todo)?;
+	let todo = match &args.todo {
+		Some(value) => CliContext::pubkey("--todo", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["todo".as_bytes(), owner.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let data = InitializeInstructionData::new(|data| {
 		data.bump = args.bump;
 		data.digest = digest;
