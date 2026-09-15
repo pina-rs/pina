@@ -509,17 +509,31 @@ fn verified_profile_divergence(
 	if !size_profile.applies_overrides() {
 		return None;
 	}
-	if declared.overflow_checks == Some(true) {
-		return Some(
-			"the manifest sets `overflow-checks = true`, which the size profile disables for an \
-			 ordinary build",
-		);
+
+	// What each backend would build. The ordinary build applies the profile on
+	// top of the manifest; the verified build gets the manifest as-is, with
+	// Cargo's release defaults filling in whatever the manifest leaves unset.
+	let verified_lto = declared.lto.unwrap_or(false);
+	let verified_codegen_units = declared.codegen_units.unwrap_or(16);
+	let verified_overflow_checks = declared.overflow_checks.unwrap_or(false);
+	let ordinary_lto = if size_profile.requests_lto() {
+		true
+	} else if size_profile.forbids_lto() {
+		false
+	} else {
+		declared.lto.unwrap_or(false)
+	};
+	let ordinary_overflow_checks =
+		size_profile.keeps_overflow_checks() || declared.overflow_checks == Some(true);
+
+	if verified_overflow_checks != ordinary_overflow_checks {
+		return Some("its `overflow-checks` setting");
 	}
-	if declared.codegen_units != Some(1) {
-		return Some("the manifest does not set `codegen-units = 1`");
+	if verified_codegen_units != 1 {
+		return Some("its `codegen-units` setting");
 	}
-	if size_profile.requests_lto() && declared.lto != Some(true) {
-		return Some("the manifest does not enable fat LTO");
+	if verified_lto != ordinary_lto {
+		return Some("its `lto` setting");
 	}
 
 	None
@@ -531,11 +545,11 @@ fn warn_verified_profile_divergence(project: &Project, size_profile: SizeProfile
 	if let Some(reason) = verified_profile_divergence(declared, size_profile) {
 		eprintln!(
 			"warning: `pina build --verify` does not apply the size profile because a verified \
-			 artifact must stay reproducible from its recorded Git revision, and {reason}. The \
-			 verified artifact will differ from the artifact an ordinary `pina build` deploys. \
-			 Declare the settings under `[profile.release]` in the workspace manifest (as `pina \
-			 init` does) so both backends shrink, or build without `--verify` and accept the \
-			 difference."
+			 artifact must stay reproducible from its recorded Git revision, so the verified \
+			 build keeps {reason} from the workspace manifest. The verified artifact will differ \
+			 from the artifact an ordinary `pina build` deploys. Declare the settings under \
+			 `[profile.release]` in the workspace manifest (as `pina init` does) so both backends \
+			 shrink, or build without `--verify` and accept the difference."
 		);
 	}
 }
@@ -1309,9 +1323,9 @@ mod tests {
 			None
 		);
 
-		// A manifest that keeps overflow checks on diverges, because the
-		// ordinary build honours the manifest while a size profile would not.
-		assert!(
+		// A manifest that keeps overflow checks on agrees with the ordinary
+		// build, which honours the manifest over the profile's override.
+		assert_eq!(
 			verified_profile_divergence(
 				DeclaredReleaseProfile {
 					lto: Some(true),
@@ -1319,6 +1333,30 @@ mod tests {
 					overflow_checks: Some(true),
 				},
 				SizeProfile::Production,
+			),
+			None
+		);
+
+		// The `--overflow-checks` flag turns checks on for the ordinary build
+		// even under a silent manifest, so the verified build diverges.
+		assert!(
+			verified_profile_divergence(
+				DeclaredReleaseProfile::default(),
+				SizeProfile::ProductionWithOverflowChecks
+			)
+			.is_some()
+		);
+
+		// `--no-lto` turns LTO off for the ordinary build even when the
+		// manifest enables it, so the verified build diverges.
+		assert!(
+			verified_profile_divergence(
+				DeclaredReleaseProfile {
+					lto: Some(true),
+					codegen_units: Some(1),
+					overflow_checks: Some(false),
+				},
+				SizeProfile::ProductionWithoutLto,
 			)
 			.is_some()
 		);

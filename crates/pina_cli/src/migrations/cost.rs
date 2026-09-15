@@ -638,36 +638,51 @@ fn matches_transition_function(name: &str, module: &str, step: &str) -> bool {
 	if !name.contains(module) {
 		return false;
 	}
-	has_mangled_component(name, &format!("{}{step}", step.len()))
-		|| has_delimited_component(name, step)
+	if name.starts_with("_ZN") {
+		return legacy_mangled_walk_contains(name, step);
+	}
+	has_delimited_component(name, step)
 }
 
-/// Whether `name` contains `component` as a complete mangled path component.
+/// Whether the legacy `_ZN…E` mangled symbol spells `step` as one of its path
+/// components.
 ///
-/// Legacy mangling prefixes each component with its decimal length, so
-/// `9v0_to_v12` spells the component `v0_to_v12` and that prefix also pins the
-/// component's exact extent: a longer neighbour is spelled with a longer count.
-/// The prefix is only a component boundary when it does not continue a longer
-/// number, which is what stops the `8v0_to_v1` inside `18v0_to_v1_migration`
-/// from satisfying a request for `v0_to_v1`.
-fn has_mangled_component(name: &str, component: &str) -> bool {
-	let mut offset = 0;
-	while let Some(index) = name.get(offset..).and_then(|rest| rest.find(component)) {
-		let start = offset.saturating_add(index);
-		let before_ok = name
-			.get(..start)
-			.and_then(|prefix| prefix.chars().next_back())
-			.is_none_or(|character| !character.is_ascii_digit());
-		if before_ok {
+/// Each component is prefixed with its decimal length, so the walk reads a
+/// count, takes exactly that many bytes, and compares. That makes the match
+/// exact even where a boundary heuristic would be fooled: inside
+/// `13foo8v0_to_v1` the bytes `8v0_to_v1` follow a non-digit, but the walk
+/// consumes `foo8v0_to_v1` as the single component it is.
+fn legacy_mangled_walk_contains(name: &str, step: &str) -> bool {
+	let Some(mut rest) = name.strip_prefix("_ZN") else {
+		return false;
+	};
+
+	loop {
+		let digits = rest.len().saturating_sub(
+			rest.trim_start_matches(|character: char| character.is_ascii_digit())
+				.len(),
+		);
+		if digits == 0 {
+			// Not a component start: the terminator, a hash tail, or a
+			// hand-truncated symbol. Either way the step was not seen.
+			return false;
+		}
+		let (count, after) = rest.split_at(digits);
+		let Ok(length) = count.parse::<usize>() else {
+			return false;
+		};
+		let Some(component) = after.get(..length) else {
+			// The declared component runs past the end of the symbol.
+			return false;
+		};
+		if component == step {
 			return true;
 		}
-		offset = start.saturating_add(1);
-		if offset >= name.len() {
-			break;
+		rest = &after[length..];
+		if rest.is_empty() {
+			return false;
 		}
 	}
-
-	false
 }
 
 /// Whether `name` contains `::step::` as a complete path component.

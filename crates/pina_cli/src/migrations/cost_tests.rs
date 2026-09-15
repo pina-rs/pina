@@ -278,16 +278,16 @@ fn ladder_cu_sums_mangled_transition_functions() {
 	)]);
 	let source = profile_source(&[
 		(
-			"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+			"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 			10,
 		),
 		(
-			"_ZN8my_crate33__pina_state_account_migrations8v1_to_v27migrate17h1111E",
+			"_ZN8my_crate31__pina_state_account_migrations8v1_to_v27migrate17h1111E",
 			20,
 		),
 		// Same module and step but not the transition function, so it is ignored.
 		(
-			"_ZN8my_crate33__pina_state_account_migrations8v1_to_v27plan17h2222E",
+			"_ZN8my_crate31__pina_state_account_migrations8v1_to_v27plan17h2222E",
 			5_000,
 		),
 	]);
@@ -333,14 +333,14 @@ fn transition_matching_requires_the_exact_step() {
 	let module = "__pina_state_account_migrations";
 
 	assert!(matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations9v0_to_v12migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations9v0_to_v12migrateE",
 		module,
 		"v0_to_v12"
 	));
 	// The length prefix on each mangled path component stops `v0_to_v12` from
 	// satisfying a request for `v0_to_v1`.
 	assert!(!matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations9v0_to_v12migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations9v0_to_v12migrateE",
 		module,
 		"v0_to_v1"
 	));
@@ -364,13 +364,13 @@ fn transition_matching_ignores_steps_embedded_in_longer_names() {
 	// function: `18v0_to_v1_migration` contains `8v0_to_v1` but is not the
 	// `v0_to_v1` transition.
 	assert!(!matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
+		"_ZN8my_crate31__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
 		module,
 		"v0_to_v1"
 	));
 	// A longer component that merely starts with the step text.
 	assert!(!matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations9v0_to_v12migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations9v0_to_v12migrateE",
 		module,
 		"v0_to_v1"
 	));
@@ -382,12 +382,12 @@ fn transition_matching_ignores_steps_embedded_in_longer_names() {
 	));
 	// The exact forms still match.
 	assert!(matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+		"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 		module,
 		"v0_to_v1"
 	));
 	assert!(matches_transition_function(
-		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrateE",
 		module,
 		"v0_to_v1"
 	));
@@ -398,16 +398,30 @@ fn a_rejected_match_near_the_end_terminates_the_search() {
 	let module = "__pina_state_account_migrations";
 
 	// The only occurrence continues a longer count and sits at the very end of
-	// the name, so the search must reject it and stop rather than walking past
-	// the end of the string.
+	// the name, so the walk must reject it and stop rather than reading a
+	// component that runs past the end of the string.
 	assert!(!matches_transition_function(
-		"__pina_state_account_migrations18v0_to_v1",
+		"_ZN8my_crate31__pina_state_account_migrations18v0_to_v1",
 		module,
 		"v0_to_v1"
 	));
 	// A rejected occurrence early in a long name is followed by a real match.
 	assert!(matches_transition_function(
-		"__pina_state_account_migrations18v0_to_v1_migration8v0_to_v1migrateE",
+		"_ZN8my_crate31__pina_state_account_migrations18v0_to_v1_migration8v0_to_v1migrateE",
+		module,
+		"v0_to_v1"
+	));
+}
+
+#[test]
+fn a_component_merely_containing_the_step_text_does_not_match() {
+	let module = "__pina_state_account_migrations";
+
+	// One component is literally named `foo8v0_to_v1` (length 12). The bytes
+	// `8v0_to_v1` inside it follow a non-digit, but the component walk consumes
+	// the whole length-prefixed name, so it is not the transition function.
+	assert!(!matches_transition_function(
+		"_ZN8my_crate31__pina_state_account_migrations12foo8v0_to_v1migrateE",
 		module,
 		"v0_to_v1"
 	));
@@ -422,7 +436,7 @@ fn a_zero_cost_transition_is_estimated_rather_than_reported_missing() {
 	)]);
 	// The transition exists but its measured cost is zero.
 	let source = profile_source(&[(
-		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+		"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 		0,
 	)]);
 	let preview = build_cost_preview(Some(&manifest), &source);
@@ -445,7 +459,7 @@ fn a_decoy_symbol_does_not_satisfy_a_missing_transition() {
 	// Only a decoy that embeds the step in a longer component is present, so
 	// the real transition is missing and the estimate must say so.
 	let source = profile_source(&[(
-		"_ZN8my_crate33__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
+		"_ZN8my_crate31__pina_state_account_migrations18v0_to_v1_migrationmigrateE",
 		500,
 	)]);
 	let preview = build_cost_preview(Some(&manifest), &source);
@@ -465,7 +479,7 @@ fn missing_transition_function_reports_the_missing_step() {
 		vec![fixed_schema(40), fixed_schema(41), fixed_schema(42)],
 	)]);
 	let source = profile_source(&[(
-		"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+		"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 		10,
 	)]);
 	let preview = build_cost_preview(Some(&manifest), &source);
@@ -775,7 +789,7 @@ fn serialized_preview_uses_additive_camel_case_keys() {
 	let preview = build_cost_preview(
 		Some(&manifest),
 		&profile_source(&[(
-			"_ZN8my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+			"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 			12,
 		)]),
 	);
