@@ -1339,6 +1339,31 @@ mod tests {
 		);
 	}
 
+	#[test]
+	fn warning_paths_run_for_both_opt_in_and_divergence() {
+		// The printers are reached only when a warning fires, so exercise both
+		// so the guidance text is covered and cannot rot.
+		warn_manifest_overflow_checks();
+
+		let (_temp, project) = discover_workspace_fixture("warn-fixture", "");
+		warn_verified_profile_divergence(&project, SizeProfile::Production);
+
+		// A conforming manifest stays quiet rather than warning.
+		let (_conforming, conforming) = discover_workspace_fixture(
+			"quiet-fixture",
+			"[profile.release]\nlto = \"fat\"\ncodegen-units = 1\noverflow-checks = false\n",
+		);
+		assert_eq!(
+			verified_profile_divergence(
+				declared_release_profile(&conforming),
+				SizeProfile::Production
+			),
+			None
+		);
+		warn_verified_profile_divergence(&conforming, SizeProfile::Production);
+		warn_verified_profile_divergence(&conforming, SizeProfile::None);
+	}
+
 	/// Build a workspace whose root manifest carries `extra_manifest` and whose
 	/// single member is a cdylib program.
 	fn discover_workspace_fixture(name: &str, extra_manifest: &str) -> (TempDir, Project) {
