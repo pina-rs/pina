@@ -6368,6 +6368,7 @@ dependencies = [
 name = "pina_test"
 version = "0.18.0"
 dependencies = [
+ "base64 0.23.1",
  "serde_json",
  "solana-account 4.3.2",
  "solana-address 2.6.1",

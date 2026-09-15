@@ -16,21 +16,77 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 pub use solana_account::Account;
 use solana_client::client_error::ClientError;
 pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
 use solana_message::Message;
+use solana_message::VersionedMessage;
+use solana_message::v1;
+/// The compute budget a transaction carries inside its message.
+///
+/// A v1 message states its compute unit limit, loaded accounts data size
+/// limit, heap size, and priority fee directly instead of routing them through
+/// compute-budget instructions. Build one from [`default_budget`] to match
+/// legacy behavior and override only what a test needs.
+pub use solana_message::v1::TransactionConfig;
 pub use solana_pubkey::Pubkey;
 pub use solana_rent::Rent;
+use solana_rpc_client::api::request::RpcRequest;
+use solana_rpc_client::rpc_client::SerializableTransaction;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
 use solana_transaction::Transaction;
+use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 use surfpool_sdk::cheatcodes::builders::SetAccount;
+
+/// Compute unit limit that matches the runtime's legacy default.
+pub const DEFAULT_COMPUTE_UNIT_LIMIT: u32 = 200_000;
+
+/// Loaded accounts data size limit matching the runtime's legacy default of
+/// 64 MiB.
+pub const DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT: u32 = 64 * 1024 * 1024;
+
+/// The compute budget a transaction needs to behave like a legacy one.
+///
+/// Legacy and v0 transactions declare their limits with compute-budget
+/// instructions, and the runtime supplies a default when none are present. V1
+/// moves those limits into the message, so a transaction that wants the same
+/// budget has to state it. This applies the runtime's legacy defaults so a
+/// test can switch formats without reasoning about compute.
+#[must_use]
+pub const fn default_budget() -> TransactionConfig {
+	TransactionConfig::empty()
+		.with_compute_unit_limit(DEFAULT_COMPUTE_UNIT_LIMIT)
+		.with_loaded_accounts_data_size_limit(DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT)
+}
+
+/// What one simulated transaction produced.
+struct SimulationOutcome {
+	/// Program log lines, in the order the runtime wrote them.
+	logs: Vec<String>,
+	/// Compute units the simulation charged.
+	units: Option<u64>,
+	/// Why the transaction failed, when it did.
+	error: Option<serde_json::Value>,
+}
+
+/// The transaction format a test submits.
+#[derive(Clone, Debug)]
+pub enum TransactionFormat {
+	/// The original format. The compute budget comes from compute-budget
+	/// instructions the payer adds, and the message is limited to 1,232 bytes.
+	Legacy,
+	/// SIMD-0385. The compute budget is inline in the message, which raises
+	/// the limit to 4,096 bytes but drops address lookup tables.
+	V1(TransactionConfig),
+}
 
 static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
 const TEST_PAYER_SEED: [u8; 32] = [0xA5; 32];
@@ -391,6 +447,65 @@ impl ProgramTest {
 			.simulate_program_logs(self.program_id, data, accounts)
 	}
 
+	/// Build and sign a transaction addressed to the deployed program.
+	///
+	/// Use this to prove a program accepts a wire format, or to carry an
+	/// instruction whose data does not fit
+	/// [`TransactionFormat::Legacy`]'s 1,232-byte limit.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, or
+	/// signing fails.
+	pub fn sign_transaction(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		format: &TransactionFormat,
+	) -> Result<VersionedTransaction, TestError> {
+		self.surfnet
+			.sign_transaction(self.instruction(data, accounts), format)
+	}
+
+	/// Simulate a transaction and return the program log lines it produced.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, or simulation fails.
+	pub fn simulate_transaction_logs(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		format: &TransactionFormat,
+	) -> Result<Vec<String>, TestError> {
+		self.surfnet
+			.simulate_transaction_logs(self.program_id, data, accounts, format)
+	}
+
+	/// Submit one instruction in `format` and confirm it.
+	///
+	/// Records compute units for the benchmark harness exactly like
+	/// [`Self::send`], so a non-legacy path is measured rather than skipped.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, submission, or
+	/// confirmation fails.
+	pub fn send_transaction(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		format: &TransactionFormat,
+	) -> Result<Signature, TestError> {
+		self.surfnet.send_program_transaction(
+			self.program_id,
+			self.benchmark_program.as_deref(),
+			data,
+			accounts,
+			format,
+		)
+	}
+
 	/// Submit and confirm one instruction with the payer and additional signers.
 	///
 	/// The payer is always the transaction fee payer and first signer. Callers
@@ -583,6 +698,8 @@ impl OfflineSurfnet {
 		self.inner.payer().pubkey()
 	}
 
+	/// Build and sign a v1 transaction for one instruction.
+	///
 	/// Simulate one instruction addressed to `program_id` and return its logs.
 	///
 	/// The transaction is never submitted, so a failing program still yields
@@ -602,8 +719,10 @@ impl OfflineSurfnet {
 		let blockhash = rpc
 			.get_latest_blockhash()
 			.map_err(|error| test_error("fetch latest blockhash", error))?;
-		let instruction = Instruction::new_with_bytes(program_id, data, accounts);
-		let message = Message::new(&[instruction], Some(&payer.pubkey()));
+		let message = Message::new(
+			&[Instruction::new_with_bytes(program_id, data, accounts)],
+			Some(&payer.pubkey()),
+		);
 		let mut transaction = Transaction::new_unsigned(message);
 		transaction
 			.try_sign(&[payer], blockhash)
@@ -613,6 +732,176 @@ impl OfflineSurfnet {
 			.map_err(|error| test_error("simulate program instruction", error))?;
 
 		Ok(simulation.value.logs.unwrap_or_default())
+	}
+
+	/// The message carries its compute budget inline and appends signatures
+	/// after the message, so a v1 transaction can hold up to
+	/// [`solana_message::v1::MAX_TRANSACTION_SIZE`] bytes — more than three
+	/// times a legacy transaction — at the cost of address lookup tables,
+	/// which v1 does not support.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, or
+	/// signing fails.
+	pub fn sign_transaction(
+		&self,
+		instruction: Instruction,
+		format: &TransactionFormat,
+	) -> Result<VersionedTransaction, TestError> {
+		let rpc = self.inner.rpc_client();
+		let payer = self.inner.payer();
+		let blockhash = rpc
+			.get_latest_blockhash()
+			.map_err(|error| test_error("fetch latest blockhash", error))?;
+		let message = match format {
+			TransactionFormat::Legacy => {
+				VersionedMessage::Legacy(Message::new(&[instruction], Some(&payer.pubkey())))
+			}
+			TransactionFormat::V1(config) => {
+				VersionedMessage::V1(
+					v1::Message::try_compile_with_config(
+						&payer.pubkey(),
+						&[instruction],
+						blockhash,
+						*config,
+					)
+					.map_err(|error| test_error("compile transaction message", error))?,
+				)
+			}
+		};
+		let signers: Vec<&dyn Signer> = vec![payer];
+		VersionedTransaction::try_new(message, &signers)
+			.map_err(|error| test_error("sign program transaction", error))
+	}
+
+	/// Simulate a transaction and return the program log lines it produced.
+	///
+	/// # Errors
+	///
+	/// Returns an error when message construction, signing, or simulation
+	/// fails, or when the simulated transaction fails.
+	pub fn simulate_transaction_logs(
+		&self,
+		program_id: Pubkey,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		format: &TransactionFormat,
+	) -> Result<Vec<String>, TestError> {
+		let SimulationOutcome {
+			logs,
+			units: _,
+			error,
+		} = self.simulate(
+			Instruction::new_with_bytes(program_id, data, accounts),
+			format,
+		)?;
+
+		if let Some(error) = error {
+			return Err(test_error(
+				"simulate program instruction",
+				format_args!("{error}\n{}", logs.join("\n")),
+			));
+		}
+
+		Ok(logs)
+	}
+
+	/// Simulate a transaction, returning its logs, consumed compute units, and
+	/// the failure when the runtime rejected it.
+	///
+	/// V1 has no serde representation, so its transactions are submitted in
+	/// their own wire form through a generic request; the other formats use the
+	/// typed client.
+	fn simulate(
+		&self,
+		instruction: Instruction,
+		format: &TransactionFormat,
+	) -> Result<SimulationOutcome, TestError> {
+		let transaction = self.sign_transaction(instruction, format)?;
+
+		if let VersionedMessage::V1(_) = &transaction.message {
+			let encoding = BASE64_STANDARD.encode(wire_bytes(&transaction)?);
+			let response: serde_json::Value = self
+				.inner
+				.rpc_client()
+				.send(
+					RpcRequest::SimulateTransaction,
+					serde_json::json!([
+						encoding,
+						{ "encoding": "base64", "sigVerify": false },
+					]),
+				)
+				.map_err(|error| test_error("simulate program instruction", error))?;
+
+			return Ok(SimulationOutcome {
+				logs: logs(&response),
+				units: units(&response),
+				error: simulation_error(&response),
+			});
+		}
+
+		let simulation = self
+			.inner
+			.rpc_client()
+			.simulate_transaction(&transaction)
+			.map_err(|error| test_error("simulate program instruction", error))?;
+
+		Ok(SimulationOutcome {
+			logs: simulation.value.logs.unwrap_or_default(),
+			units: simulation.value.units_consumed,
+			error: simulation.value.err.map(|error| serde_json::json!(error)),
+		})
+	}
+
+	/// Submit a signed transaction.
+	///
+	/// V1 is submitted in its own wire form because it has no serde
+	/// representation for the typed client to encode.
+	///
+	/// # Errors
+	///
+	/// Returns an error when submission fails.
+	pub fn submit_transaction(
+		&self,
+		transaction: &VersionedTransaction,
+	) -> Result<Signature, TestError> {
+		match &transaction.message {
+			VersionedMessage::V1(_) => {
+				let encoding = BASE64_STANDARD.encode(wire_bytes(transaction)?);
+				let signature: String = self
+					.inner
+					.rpc_client()
+					.send(
+						RpcRequest::SendTransaction,
+						serde_json::json!([encoding, { "encoding": "base64" }]),
+					)
+					.map_err(execution_error)?;
+				let signature = signature
+					.parse()
+					.map_err(|error| test_error("parse transaction signature", error))?;
+
+				if !self
+					.inner
+					.rpc_client()
+					.confirm_transaction(&signature)
+					.map_err(|error| test_error("confirm transaction", error))?
+				{
+					return Err(test_error(
+						"confirm transaction",
+						"the transaction was not confirmed",
+					));
+				}
+
+				Ok(signature)
+			}
+			_ => {
+				self.inner
+					.rpc_client()
+					.send_and_confirm_transaction(transaction)
+					.map_err(execution_error)
+			}
+		}
 	}
 
 	/// Deploy an SBF artifact directly at its declared program address.
@@ -710,6 +999,47 @@ impl OfflineSurfnet {
 			.flatten();
 
 		self.send_instruction_with_signers_inner(instruction, signers, record)
+	}
+
+	/// Build, optionally measure, and submit one instruction as a v1 transaction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, message compilation, signing,
+	/// submission, or confirmation fails.
+	fn send_program_transaction(
+		&self,
+		program_id: Pubkey,
+		benchmark_program: Option<&str>,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+		format: &TransactionFormat,
+	) -> Result<Signature, TestError> {
+		let transaction = self.sign_transaction(
+			Instruction::new_with_bytes(program_id, data, accounts.clone()),
+			format,
+		)?;
+
+		if let (Some(program), Some(discriminator)) = (benchmark_program, data.first().copied()) {
+			let SimulationOutcome {
+				logs, units, error, ..
+			} = self.simulate(
+				Instruction::new_with_bytes(program_id, data, accounts),
+				format,
+			)?;
+			if let Some(error) = error {
+				return Err(test_error(
+					"simulate program instruction",
+					format_args!("{error}\n{}", logs.join("\n")),
+				));
+			}
+			let compute_units = units.ok_or_else(|| {
+				test_error("record compute units", "simulation omitted compute units")
+			})?;
+			record_units(program, discriminator, compute_units)?;
+		}
+
+		self.submit_transaction(&transaction)
 	}
 
 	fn send_instruction_with_signers_inner(
@@ -939,9 +1269,71 @@ fn rpc_listener_is_closed(url: &str) -> bool {
 	}
 }
 
+/// Encode a signed v1 transaction in the format the runtime deserializes.
+///
+/// A v1 message has no serde representation — the serialization contract is
+/// `wincode`, so the RPC client's `Serialize`-based transport would send bytes
+/// no node can parse. Encoding the message and appending the header-sized
+/// signature array produces the wire form, which callers then submit
+/// base64-encoded.
+fn logs(response: &serde_json::Value) -> Vec<String> {
+	response
+		.pointer("/value/logs")
+		.and_then(serde_json::Value::as_array)
+		.map(|entries| {
+			entries
+				.iter()
+				.filter_map(serde_json::Value::as_str)
+				.map(str::to_owned)
+				.collect::<Vec<_>>()
+		})
+		.unwrap_or_default()
+}
+
+fn units(response: &serde_json::Value) -> Option<u64> {
+	response
+		.pointer("/value/unitsConsumed")
+		.and_then(serde_json::Value::as_u64)
+}
+
+fn simulation_error(response: &serde_json::Value) -> Option<serde_json::Value> {
+	response
+		.pointer("/value/err")
+		.filter(|error| !error.is_null())
+		.cloned()
+}
+
+/// Encode a signed v1 transaction in the format the runtime deserializes.
+///
+/// A v1 message has no serde representation — its serialization contract is
+/// `wincode` — so the typed client's `Serialize`-based transport would send
+/// bytes no node can parse. The message and the header-sized signature array
+/// are concatenated here instead, and the result is submitted base64-encoded.
+fn wire_bytes(transaction: &VersionedTransaction) -> Result<Vec<u8>, TestError> {
+	let VersionedMessage::V1(message) = &transaction.message else {
+		return Err(test_error(
+			"encode v1 transaction",
+			"transaction message is not v1",
+		));
+	};
+
+	let mut wire = VersionedMessage::V1(message.clone()).serialize();
+	for signature in &transaction.signatures {
+		wire.extend_from_slice(signature.as_ref());
+	}
+
+	Ok(wire)
+}
+
+/// Record one measured compute-unit figure for the benchmark harness.
+fn record_units(program: &str, discriminator: u8, compute_units: u64) -> Result<(), TestError> {
+	write_compute_units(program, discriminator, compute_units)
+}
+
+/// Record the compute units a legacy-encoded transaction consumed.
 fn record_compute_units(
 	rpc: &solana_rpc_client::rpc_client::RpcClient,
-	transaction: &Transaction,
+	transaction: &impl SerializableTransaction,
 	program: &str,
 	discriminator: u8,
 ) -> Result<(), TestError> {
@@ -955,6 +1347,19 @@ fn record_compute_units(
 		.value
 		.units_consumed
 		.ok_or_else(|| test_error("record compute units", "simulation omitted compute units"))?;
+
+	drop(output);
+	write_compute_units(program, discriminator, compute_units)
+}
+
+fn write_compute_units(
+	program: &str,
+	discriminator: u8,
+	compute_units: u64,
+) -> Result<(), TestError> {
+	let Some(output) = std::env::var_os("PINA_CU_RECORD_FILE") else {
+		return Ok(());
+	};
 	let record = serde_json::json!({
 		"program": program,
 		"discriminator": discriminator,
@@ -1055,6 +1460,44 @@ mod tests {
 		assert_eq!(error.operation(), "deploy");
 		assert_eq!(error.message(), "missing artifact");
 		assert_eq!(error.to_string(), "deploy: missing artifact");
+	}
+
+	/// A v1 transaction carries instruction data that cannot fit a legacy one.
+	///
+	/// This is the property an example built for the larger limit depends on:
+	/// the same signed transaction that v1 accepts is too large for the 1,232
+	/// bytes a legacy transaction allows, and the wire form round-trips so a
+	/// node reconstructs the signed message exactly.
+	#[test]
+	fn wire_bytes_exceed_the_legacy_limit_and_round_trip() {
+		let payer = Keypair::new_from_array(TEST_PAYER_SEED);
+		let mut data = vec![0_u8; 3_000];
+		data[0] = 7;
+		let instruction = Instruction::new_with_bytes(Pubkey::new_unique(), &data, Vec::new());
+		let message = v1::Message::try_compile_with_config(
+			&payer.pubkey(),
+			&[instruction],
+			solana_hash::Hash::default(),
+			default_budget(),
+		)
+		.unwrap_or_else(|error| panic!("compile an oversized v1 message: {error}"));
+		let signers: Vec<&dyn Signer> = vec![&payer];
+		let transaction = VersionedTransaction::try_new(VersionedMessage::V1(message), &signers)
+			.unwrap_or_else(|error| panic!("sign an oversized v1 transaction: {error}"));
+
+		let wire = wire_bytes(&transaction)
+			.unwrap_or_else(|error| panic!("encode v1 wire bytes: {error}"));
+		assert!(
+			1_232 < wire.len() && wire.len() <= solana_message::v1::MAX_TRANSACTION_SIZE,
+			"{} bytes must exceed the legacy limit and fit the v1 one",
+			wire.len()
+		);
+
+		let encoded = BASE64_STANDARD.encode(&wire);
+		let decoded = BASE64_STANDARD
+			.decode(&encoded)
+			.unwrap_or_else(|error| panic!("base64 survives the round trip: {error}"));
+		assert_eq!(decoded, wire);
 	}
 
 	#[test]
