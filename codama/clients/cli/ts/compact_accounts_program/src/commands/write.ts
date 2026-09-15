@@ -29,7 +29,9 @@ export const writeCommand = registerGlobals(new Command("write"))
 			index: smallInteger("--index", options.index),
 			value: bigInteger("--value", options.value),
 			authority: context.payer,
-			journal: options.journal,
+			journal: options.journal === undefined
+				? undefined
+				: pubkey("--journal", options.journal),
 		};
 		const instruction = await getWriteInstructionAsync(
 			...[input],

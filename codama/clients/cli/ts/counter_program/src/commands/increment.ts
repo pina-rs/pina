@@ -30,7 +30,9 @@ export const incrementCommand = registerGlobals(new Command("increment"))
 		const context = await CliContext.create(options);
 		const input = {
 			authority: context.payer,
-			counter: options.counter,
+			counter: options.counter === undefined
+				? undefined
+				: pubkey("--counter", options.counter),
 		};
 		const instruction = await getIncrementInstructionAsync(
 			...[input],

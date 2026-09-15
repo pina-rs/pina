@@ -34,7 +34,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			entryCount: smallInteger("--entry-count", options.entryCount),
 			markerCount: smallInteger("--marker-count", options.markerCount),
 			authority: context.payer,
-			journal: options.journal,
+			journal: options.journal === undefined
+				? undefined
+				: pubkey("--journal", options.journal),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

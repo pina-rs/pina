@@ -32,7 +32,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			authority: context.payer,
-			counter: options.counter,
+			counter: options.counter === undefined
+				? undefined
+				: pubkey("--counter", options.counter),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

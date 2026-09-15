@@ -30,7 +30,9 @@ export const initCommand = registerGlobals(new Command("init"))
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			authority: context.payer,
-			store: options.store,
+			store: options.store === undefined
+				? undefined
+				: pubkey("--store", options.store),
 		};
 		const instruction = await getInitInstructionAsync(
 			...[input],

@@ -30,7 +30,9 @@ export const addTagCommand = registerGlobals(new Command("add_tag"))
 		const input = {
 			tag: bigInteger("--tag", options.tag),
 			authority: context.payer,
-			profile: options.profile,
+			profile: options.profile === undefined
+				? undefined
+				: pubkey("--profile", options.profile),
 		};
 		const instruction = await getAddTagInstructionAsync(
 			...[input],

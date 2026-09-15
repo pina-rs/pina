@@ -30,7 +30,9 @@ export const removeTagCommand = registerGlobals(new Command("remove_tag"))
 		const input = {
 			index: bigInteger("--index", options.index),
 			authority: context.payer,
-			profile: options.profile,
+			profile: options.profile === undefined
+				? undefined
+				: pubkey("--profile", options.profile),
 		};
 		const instruction = await getRemoveTagInstructionAsync(
 			...[input],

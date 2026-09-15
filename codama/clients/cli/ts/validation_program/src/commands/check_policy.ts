@@ -32,7 +32,9 @@ export const checkPolicyCommand = registerGlobals(new Command("check_policy"))
 			memo: options.memo,
 			approvals: base58Vec("--approvals", options.approvals),
 			authority: context.payer,
-			policy: options.policy,
+			policy: options.policy === undefined
+				? undefined
+				: pubkey("--policy", options.policy),
 			audit: pubkey("--audit", options.audit),
 		};
 		const instruction = await getCheckPolicyInstructionAsync(
