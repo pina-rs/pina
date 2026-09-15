@@ -241,7 +241,9 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   test:
-    timeout-minutes: 40
+    # `test:all` sweeps every workspace member, so allow the same headroom as
+    # the `program-e2e` job.
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: changes
     # `coverage` runs this same suite on pull requests under a profiling build,

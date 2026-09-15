@@ -391,8 +391,17 @@ in
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
         fi
-        # The root Cargo.toml names a package (pina_root), so plain `cargo
-        # test` only covers it; member crates are tested explicitly.
+        # Two tiers. The workspace sweep reaches every member with its default
+        # features: the generated clients under `codama/`, `pina`'s
+        # integration suites, the examples, and the security crates. It cannot
+        # go stale the way the old hand-maintained `-p` list did, which never
+        # compiled a generated client's `tests/` directory. `--all-features`
+        # stays package-scoped because workspace-wide it would enable
+        # `bpf-entrypoint` on every example, and the host linker then rejects
+        # the duplicated `entrypoint` symbol when `pina_root` links several
+        # example programs into one test binary (macOS ld tolerates the
+        # duplicates; Linux rust-lld does not).
+        cargo test --workspace --locked
         cargo test --all-features --locked
         cargo test --locked --all-features \
           -p pina_abi \

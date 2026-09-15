@@ -51,7 +51,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - `devenv shell` — enter the dev environment
 - `install:all` — install pinned cargo binaries and external tools
 - `cargo build --all-features` — build the workspace
-- `cargo test` — run the default test suite
+- `cargo test --workspace --all-features` — run every workspace member's tests, including the generated clients under `codama/` (plain `cargo test` covers only `pina_root`, because the root manifest names that package)
 - `devenv --profile kani shell -- test:kani` — run all bit-precise Kani proof harnesses
 - `devenv --profile kani shell -- test:kani:quick` — run fast arithmetic, parser, compact-sizing, fixed-layout, and CPI proofs
 - `devenv --profile kani shell -- test:kani:compact` — run bounded compact-layout state-machine proofs

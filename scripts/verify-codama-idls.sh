@@ -176,7 +176,11 @@ for manifest in "${CLIENT_MANIFESTS[@]}"; do
 	CLIENT_ARGS+=("-p" "$package_name")
 done
 
-cargo check --locked "${CLIENT_ARGS[@]}"
+# `--all-targets` is what makes this a real check on the committed clients:
+# a bare `cargo check` compiles only the library, so a regenerated account or
+# instruction signature that no longer matches a client's `tests/` directory
+# still passes generation and only fails later in the workspace test run.
+cargo check --locked --all-targets "${CLIENT_ARGS[@]}"
 
 echo "Testing generated CLI client crates..."
 CLI_ARGS=()
