@@ -394,6 +394,26 @@ fn transition_matching_ignores_steps_embedded_in_longer_names() {
 }
 
 #[test]
+fn a_rejected_match_near_the_end_terminates_the_search() {
+	let module = "__pina_state_account_migrations";
+
+	// The only occurrence continues a longer count and sits at the very end of
+	// the name, so the search must reject it and stop rather than walking past
+	// the end of the string.
+	assert!(!matches_transition_function(
+		"__pina_state_account_migrations18v0_to_v1",
+		module,
+		"v0_to_v1"
+	));
+	// A rejected occurrence early in a long name is followed by a real match.
+	assert!(matches_transition_function(
+		"__pina_state_account_migrations18v0_to_v1_migration8v0_to_v1migrateE",
+		module,
+		"v0_to_v1"
+	));
+}
+
+#[test]
 fn a_zero_cost_transition_is_estimated_rather_than_reported_missing() {
 	let manifest = manifest(vec![account_history(
 		1,

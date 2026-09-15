@@ -1340,6 +1340,24 @@ mod tests {
 	}
 
 	#[test]
+	fn lto_named_modes_count_as_enabled() {
+		// A named LTO mode other than the disabling spellings means LTO is on,
+		// so the manifest already reproduces that part of the profile. A
+		// malformed value never reaches here: `cargo metadata` rejects it while
+		// the project is discovered.
+		let (_named, named) = discover_workspace_fixture(
+			"lto-named-fixture",
+			"[profile.release]\nlto = \"thin\"\ncodegen-units = 1\noverflow-checks = false\n",
+		);
+		assert_eq!(declared_release_profile(&named).lto, Some(true));
+		assert_eq!(
+			verified_profile_divergence(declared_release_profile(&named), SizeProfile::Production),
+			None,
+			"a named LTO mode and matching knobs reproduce the production profile"
+		);
+	}
+
+	#[test]
 	fn warning_paths_run_for_both_opt_in_and_divergence() {
 		// The printers are reached only when a warning fires, so exercise both
 		// so the guidance text is covered and cannot rot.
