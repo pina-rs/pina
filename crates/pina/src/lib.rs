@@ -343,6 +343,11 @@ macro_rules! log {
 ///
 /// Use for developer-facing messages that are worth linking `core::fmt`.
 /// Prefer [`log!`] on failure paths inside deployed programs.
+///
+/// [`crate::assert`] is the one framework failure path that does *not*
+/// use this macro in default builds: it writes its raw message straight to
+/// the log instead of building a formatted one, so a program that only calls
+/// `assert` keeps its failure diagnostics on the cheaper path.
 #[cfg(feature = "verbose-logs")]
 #[macro_export]
 macro_rules! log_verbose {
