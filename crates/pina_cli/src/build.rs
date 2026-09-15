@@ -224,7 +224,7 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.current_dir(&project.root)
 		.env("CARGO_TARGET_DIR", &project.target_dir)
 		.args(&args);
-	apply_size_profile(&mut command, options, manifest_overflow_checks(&project));
+	apply_size_profile(&mut command, options, declared_release_profile(&project));
 
 	let status = command.status().map_err(|source| {
 		BuildError::RunCargo {
@@ -407,15 +407,14 @@ fn publish_verified_build(
 /// `overflow-checks` is a semantic switch because disabling it turns
 /// arithmetic overflow from a panic into a wrap.
 ///
-/// `manifest_overflow_checks` is the value the workspace release profile
-/// declares. Environment overrides beat `[profile.release]` in the manifest, so
-/// a program that explicitly opts into overflow checks keeps them: the profile
-/// may only disable the check when the manifest expresses no opinion, or agrees
-/// with disabling it.
+/// `declared` is what the workspace release profile already says. Environment
+/// overrides beat `[profile.release]`, so a program that explicitly opts into
+/// overflow checks keeps them: the profile may only disable the check when the
+/// manifest expresses no opinion about it, or agrees with disabling it.
 fn apply_size_profile(
 	command: &mut Command,
 	options: &BuildOptions,
-	manifest_overflow_checks: Option<bool>,
+	declared: DeclaredReleaseProfile,
 ) {
 	if !options.size_profile.applies_overrides() {
 		return;
@@ -428,7 +427,7 @@ fn apply_size_profile(
 		command.env("CARGO_PROFILE_RELEASE_LTO", "false");
 	}
 	let overflow_checks =
-		options.size_profile.keeps_overflow_checks() || manifest_overflow_checks == Some(true);
+		options.size_profile.keeps_overflow_checks() || declared.overflow_checks == Some(true);
 	if overflow_checks && !options.size_profile.keeps_overflow_checks() {
 		warn_manifest_overflow_checks();
 	}
@@ -493,12 +492,6 @@ fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
 			.get("overflow-checks")
 			.and_then(toml::Value::as_bool),
 	}
-}
-
-/// Read `[profile.release].overflow-checks` from the manifest that owns the
-/// build.
-fn manifest_overflow_checks(project: &Project) -> Option<bool> {
-	declared_release_profile(project).overflow_checks
 }
 
 /// Describe why a verified build cannot carry the requested size profile.
@@ -1079,8 +1072,12 @@ mod tests {
 			no_default_features: false,
 			size_profile,
 		};
+		let declared = DeclaredReleaseProfile {
+			overflow_checks: manifest_overflow_checks,
+			..DeclaredReleaseProfile::default()
+		};
 		let mut command = Command::new("cargo");
-		apply_size_profile(&mut command, &options, manifest_overflow_checks);
+		apply_size_profile(&mut command, &options, declared);
 		command
 			.get_envs()
 			.map(|(key, value)| {
@@ -1238,7 +1235,10 @@ mod tests {
 			"[profile.release]\noverflow-checks = true\n",
 		);
 
-		assert_eq!(manifest_overflow_checks(&project), Some(true));
+		assert_eq!(
+			declared_release_profile(&project).overflow_checks,
+			Some(true)
+		);
 	}
 
 	#[test]
@@ -1254,14 +1254,14 @@ mod tests {
 		)
 		.unwrap_or_else(|error| panic!("write program manifest: {error}"));
 
-		assert_eq!(manifest_overflow_checks(&project), None);
+		assert_eq!(declared_release_profile(&project).overflow_checks, None);
 	}
 
 	#[test]
 	fn manifest_overflow_checks_is_none_without_a_release_profile() {
 		let (_temp, project) = discover_workspace_fixture("silent-manifest-fixture", "");
 
-		assert_eq!(manifest_overflow_checks(&project), None);
+		assert_eq!(declared_release_profile(&project).overflow_checks, None);
 	}
 
 	#[test]
