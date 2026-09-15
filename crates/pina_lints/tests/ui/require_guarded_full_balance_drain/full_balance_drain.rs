@@ -138,10 +138,92 @@ fn process_unrelated_call(
 	recipient: &mut AccountView,
 	state: &CapState,
 ) -> Result<(), ()> {
-	state.assert_within_window_cap()?;
 	state.touch()?;
 
 	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A guard confined to one branch does not dominate a drain on another path.
+fn process_branch_local_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	enabled: bool,
+) -> Result<(), ()> {
+	if enabled {
+		state.assert_within_window_cap()?;
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A guard that runs after the sweep cannot make the sweep safe.
+fn process_guard_after_drain(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	vault.send_owned(&ID, vault.lamports(), recipient)?;
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+
+	state.assert_within_window_cap()?;
+
+	Ok(())
+}
+
+// An early-return guard in the condition runs on every path that reaches the
+// drain, so it suppresses the warning.
+fn process_early_return_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().is_err() {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// A guard inside a loop body may never run, so it does not dominate.
+fn process_loop_body_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	for _ in 0..1 {
+		state.assert_within_window_cap()?;
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A close call on a different account does not make this drain safe.
+fn process_other_account_close(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	other: &mut AccountView,
+) -> Result<(), ()> {
+	other.zeroed()?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A close that runs after the sweep does not make the sweep safe.
+fn process_close_after_drain(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+) -> Result<(), ()> {
+	vault.send_owned(&ID, vault.lamports(), recipient)?;
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+
+	vault.zeroed()?;
+
+	Ok(())
 }
 
 fn non_handler_sweep(vault: &mut AccountView, recipient: &mut AccountView) -> Result<(), ()> {

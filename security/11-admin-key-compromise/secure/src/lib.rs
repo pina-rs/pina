@@ -140,6 +140,14 @@ impl<'a> ProcessAccountInfos<'a> for SweepAccounts<'a> {
 		let mut config = self.config.as_account_mut::<VaultConfig>(&ID)?;
 		self.authority.assert_address(&config.authority)?;
 
+		// The sweep allowance belongs to this configuration's vault. Without
+		// this binding any authority could spend its allowance against any
+		// program-owned account: `send_owned` proves program ownership, not
+		// membership in this configuration.
+		if config.vault != *self.vault.address() {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
 		assert_live(config.paused.get())?;
 
 		// Start a fresh circuit-breaker window when the current one elapsed.
