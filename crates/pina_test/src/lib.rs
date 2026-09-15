@@ -1275,12 +1275,13 @@ mod tests {
 			solana_hash::Hash::default(),
 			default_v1_config(),
 		)
-		.expect("compile an oversized v1 message");
+		.unwrap_or_else(|error| panic!("compile an oversized v1 message: {error}"));
 		let signers: Vec<&dyn Signer> = vec![&payer];
 		let transaction = VersionedTransaction::try_new(VersionedMessage::V1(message), &signers)
-			.expect("sign an oversized v1 transaction");
+			.unwrap_or_else(|error| panic!("sign an oversized v1 transaction: {error}"));
 
-		let wire = v1_wire_bytes(&transaction).expect("encode v1 wire bytes");
+		let wire = v1_wire_bytes(&transaction)
+			.unwrap_or_else(|error| panic!("encode v1 wire bytes: {error}"));
 		assert!(
 			1_232 < wire.len() && wire.len() <= solana_message::v1::MAX_TRANSACTION_SIZE,
 			"{} bytes must exceed the legacy limit and fit the v1 one",
@@ -1290,7 +1291,7 @@ mod tests {
 		let encoded = BASE64_STANDARD.encode(&wire);
 		let decoded = BASE64_STANDARD
 			.decode(&encoded)
-			.expect("base64 survives the round trip");
+			.unwrap_or_else(|error| panic!("base64 survives the round trip: {error}"));
 		assert_eq!(decoded, wire);
 	}
 
