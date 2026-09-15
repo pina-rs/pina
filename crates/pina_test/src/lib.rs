@@ -1257,6 +1257,43 @@ mod tests {
 		assert_eq!(error.to_string(), "deploy: missing artifact");
 	}
 
+	/// A v1 transaction carries instruction data that cannot fit a legacy one.
+	///
+	/// This is the property an example built for the larger limit depends on:
+	/// the same signed transaction that v1 accepts is too large for the 1,232
+	/// bytes a legacy transaction allows, and the wire form round-trips so a
+	/// node reconstructs the signed message exactly.
+	#[test]
+	fn v1_wire_bytes_exceed_the_legacy_limit_and_round_trip() {
+		let payer = Keypair::new_from_array(TEST_PAYER_SEED);
+		let mut data = vec![0_u8; 3_000];
+		data[0] = 7;
+		let instruction = Instruction::new_with_bytes(Pubkey::new_unique(), &data, Vec::new());
+		let message = v1::Message::try_compile_with_config(
+			&payer.pubkey(),
+			&[instruction],
+			solana_hash::Hash::default(),
+			default_v1_config(),
+		)
+		.expect("compile an oversized v1 message");
+		let signers: Vec<&dyn Signer> = vec![&payer];
+		let transaction = VersionedTransaction::try_new(VersionedMessage::V1(message), &signers)
+			.expect("sign an oversized v1 transaction");
+
+		let wire = v1_wire_bytes(&transaction).expect("encode v1 wire bytes");
+		assert!(
+			1_232 < wire.len() && wire.len() <= solana_message::v1::MAX_TRANSACTION_SIZE,
+			"{} bytes must exceed the legacy limit and fit the v1 one",
+			wire.len()
+		);
+
+		let encoded = BASE64_STANDARD.encode(&wire);
+		let decoded = BASE64_STANDARD
+			.decode(&encoded)
+			.expect("base64 survives the round trip");
+		assert_eq!(decoded, wire);
+	}
+
 	#[test]
 	fn historical_fixtures_preserve_golden_bytes_and_account_metas() {
 		let address = Pubkey::new_unique();
