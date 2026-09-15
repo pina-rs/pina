@@ -54,6 +54,7 @@
 
 mod cpi;
 mod error;
+mod event;
 mod impls;
 pub mod introspection;
 mod migration;
@@ -192,6 +193,8 @@ pub use solana_program_log::log_cu_usage;
 pub use crate::cpi::*;
 /// Built-in framework error types.
 pub use crate::error::*;
+/// On-chain event emission to the transaction log.
+pub use crate::event::*;
 /// Version envelopes and generated account-migration runtime contracts.
 pub use crate::migration::*;
 /// PDA (Program Derived Address) derivation and verification functions.

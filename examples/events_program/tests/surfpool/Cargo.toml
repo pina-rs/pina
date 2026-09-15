@@ -5,5 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
+base64 = { workspace = true, default-features = true }
 pina_test = { workspace = true }
 program_under_test = { package = "events_program", path = "../.." }

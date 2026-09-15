@@ -129,9 +129,11 @@ pub(crate) fn expand(
 		}
 		None => None,
 	};
+	let emit_helper = generate_emit_helper(&crate_path);
 	let implementations = quote! {
 		impl #struct_name {
 			#view_helpers
+			#emit_helper
 		}
 
 		impl #crate_path::HasDiscriminator for #struct_name {
@@ -150,5 +152,45 @@ pub(crate) fn expand(
 		#item_struct
 		#schema_proofs
 		#implementations
+	}
+}
+
+/// Generate the `emit` helper for one event struct.
+///
+/// The record is built through the same generated [`initialize`] used by
+/// `try_from_bytes`, so emission writes the discriminant, any migration
+/// version envelope, and the payload through one validated path. Callers
+/// cannot emit a record that the generated decoders would reject.
+///
+/// [`initialize`]: https://docs.rs/pina/latest/pina/
+fn generate_emit_helper(crate_path: &syn::Path) -> proc_macro2::TokenStream {
+	quote! {
+		/// Build this event's complete record and emit it to the transaction log.
+		///
+		/// This is the on-chain producer for the `Program data:` records that
+		/// generated Rust, TypeScript, and Dart clients decode. The record is
+		/// built by [`Self::initialize`], so it carries the discriminator and
+		/// any schema version envelope and passes the same structural and
+		/// application validation that [`Self::try_from_bytes`] enforces.
+		///
+		/// Emission is a log write, so an emitted event is observable to
+		/// clients but does not affect program state or transaction success.
+		///
+		/// # Errors
+		///
+		/// Returns the generated invalid-data error when the record has the
+		/// wrong length, the closure fails, or validation rejects the
+		/// completed representation.
+		pub fn emit(
+			initialize: impl FnOnce(
+				&mut <Self as #crate_path::PinaPodFixed>::Zc,
+			) -> Result<(), #crate_path::PinaPodError>,
+		) -> Result<(), #crate_path::ProgramError> {
+			let mut record = [0u8; Self::SIZE];
+			let _ = Self::initialize(&mut record, initialize)?;
+			#crate_path::emit_event(&record);
+
+			Ok(())
+		}
 	}
 }
