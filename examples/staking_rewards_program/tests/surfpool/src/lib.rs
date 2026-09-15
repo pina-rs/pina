@@ -254,6 +254,93 @@ fn vault_amount(account: &Account) -> u64 {
 	u64::from_le_bytes(account.data[64..72].try_into().expect("token amount"))
 }
 
+/// A deposit naming an account that is not the canonical ATA for its wallet and
+/// stake mint is rejected.
+///
+/// Every pina-side check passes: the pool, the position, and the mint agree, the
+/// account is writable, and the instruction payload is well formed. Only the
+/// address binding is wrong. The associated token program derives
+/// `[wallet, token_program, mint]` itself inside `CreateIdempotent` and rejects
+/// the mismatch before creating anything, which is the check the program now
+/// relies on instead of restating. This test pins that delegation.
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_a_non_canonical_stake_ata_on_deposit() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		// A valid ATA for a different wallet is not the canonical ATA for `admin`.
+		let other_wallet = Keypair::new_from_array([9; 32]).pubkey();
+		let wrong_ata = ata_of(&other_wallet, &stake_mint);
+
+		let error = program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&wrong_ata,
+				10,
+			))
+			.expect_err("reject a non-canonical stake ATA");
+		assert_eq!(error.operation(), "execute program instruction");
+		// Pin that the rejection came from the associated token program's own
+		// derivation rather than from an earlier pina check. Without this the
+		// test would pass even if the account failed for an unrelated reason.
+		let message = error.message();
+		assert!(
+			message.contains("Associated address does not match seed derivation")
+				|| message.contains("Provided seeds do not result in a valid address"),
+			"expected the ATA program to reject the address, got: {message}"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 #[test]
 #[ignore = "run with pina test"]
 fn pool_positions_and_stake_accounting() {

@@ -238,15 +238,15 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let args = InitializePolicyInstruction::try_from_bytes(data)?;
 		let authority = *self.authority.address();
 		let seeds = PolicyState::seeds(&authority);
-		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		// PDA derivation creates state, so it remains explicit lifecycle logic.
+		// The canonical search proves the account address, and comparing its bump
+		// to `args.bump` proves the supplied bump, which together imply what a
+		// second single-derivation `assert_seeds_with_bump` call would re-check.
 		let canonical_bump = self.policy.assert_canonical_bump(&seeds.as_slices(), &ID)?;
 		if canonical_bump != args.bump {
 			return Err(ProgramError::InvalidSeeds);
 		}
-		self.policy
-			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 
 		CreateProgramAccountWithUncheckedBump {
 			account: self.policy,
