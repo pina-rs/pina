@@ -372,9 +372,22 @@ pub struct MyEvent {
 	pub data: u64,
 	pub label: [u8; 8],
 }
+
+// Emit the event to the `Program data:` transaction log.
+MyEvent::emit(|event| {
+	event.data = 5;
+	event.label = *b"hello\0\0\0";
+	Ok(())
+})?;
 ```
 
-Pina events are native PinaPod schemas with explicit discriminators, like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
+Pina events are native PinaPod schemas with explicit discriminators, like accounts and instructions. The macro generates a validated `MyEventZc` storage view plus an `emit` helper. `emit` builds the `[discriminator][schema version][payload]` record through the same validated path as `try_from_bytes` and writes it to the transaction log as a `Program data:` line — the record the generated Rust, TypeScript, and Dart decoders read. Pina does not expose an object-representation `to_bytes()` method; use `emit` so the framework owns and initializes the output buffer.
+
+`emit` needs Pina's `logs` feature. Enable it in your program's manifest:
+
+```toml
+pina = { version = "...", features = ["logs", "derive"] }
+```
 
 See `examples/events` for the full parity port.
 
