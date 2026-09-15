@@ -86,7 +86,7 @@ pub use pina_macros::*;
 /// Re-export of the [`pinapod`] crate for advanced direct use.
 ///
 /// Pina's audited zero-copy contract is the closed field grammar enforced by
-/// [`account`], [`instruction`], and [`event`]. Direct `PinaPod` derives and
+/// [`account`], [`instruction`], and [`macro@event`]. Direct `PinaPod` derives and
 /// manual trait implementations are outside that contract and must uphold
 /// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
