@@ -174,13 +174,16 @@ fn generate_emit_helper(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 		/// application validation that [`Self::try_from_bytes`] enforces.
 		///
 		/// Emission is a log write, so an emitted event is observable to
-		/// clients but does not affect program state or transaction success.
+		/// clients but does not affect program state. Propagate the returned
+		/// error with `?`: a program built without the `logs` feature cannot
+		/// emit, and silently discarding the record hides that.
 		///
 		/// # Errors
 		///
 		/// Returns the generated invalid-data error when the record has the
 		/// wrong length, the closure fails, or validation rejects the
-		/// completed representation.
+		/// completed representation. Returns `UnsupportedSysvar` when the
+		/// `logs` feature is disabled.
 		pub fn emit(
 			initialize: impl FnOnce(
 				&mut <Self as #crate_path::PinaPodFixed>::Zc,
@@ -188,9 +191,8 @@ fn generate_emit_helper(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 		) -> Result<(), #crate_path::ProgramError> {
 			let mut record = [0u8; Self::SIZE];
 			let _ = Self::initialize(&mut record, initialize)?;
-			#crate_path::emit_event(&record);
 
-			Ok(())
+			#crate_path::emit_event(&record)
 		}
 	}
 }

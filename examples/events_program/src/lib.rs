@@ -100,6 +100,7 @@ pub enum EmittedEvent {
 /// Emission goes through the generated `emit` helper, so every record carries
 /// its discriminator, passes the event's validation rules, and reaches the
 /// `Program data:` log line that generated clients decode.
+#[allow(dead_code)]
 fn emit_program_event(instruction: EventsInstruction) -> ProgramResult {
 	match instruction {
 		EventsInstruction::Initialize => {

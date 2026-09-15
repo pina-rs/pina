@@ -76,6 +76,36 @@ fn event_instructions_emit_decodable_log_records() {
 	});
 }
 
+/// The emitted bytes decode through the generated client the way an indexer
+/// would: the record carries the discriminator and the same field values the
+/// program configured, so a consumer reconstructs the event without any
+/// program-side knowledge.
+#[test]
+#[ignore = "run with pina test"]
+fn generated_client_decodes_the_emitted_record() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let logs = program
+			.simulate_logs(&[EventsInstruction::Initialize as u8], Vec::new())
+			.expect("simulate event instruction");
+		let records = decoded_event_records(&logs);
+		let record = records
+			.first()
+			.unwrap_or_else(|| panic!("expected a `Program data:` record; logs: {logs:#?}"));
+
+		let event = generated_client::MyEvent::from_bytes(record)
+			.expect("the generated client decodes the emitted record");
+		assert_eq!(event.data.get(), 5);
+		assert_eq!(event.label, [b'h', b'e', b'l', b'l', b'o', 0, 0, 0]);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// Each event instruction succeeds against the real artifact and is
 /// repeatable (events are stateless log emissions).
 #[test]

@@ -19,16 +19,34 @@
 /// base64-decode the entire `Program data: ` remainder, so splitting one
 /// record across several slices makes it undecodable.
 ///
-/// When the `logs` feature is disabled this is a no-op.
+/// This function writes nothing when the `logs` feature is disabled. An event
+/// is a log record, so a program built without `logs` cannot emit one; the
+/// generated `emit` helper reports that configuration as an error instead of
+/// dropping the record silently.
+///
+/// # Errors
+///
+/// Returns [`crate::ProgramError::UnsupportedSysvar`] when the `logs` feature
+/// is disabled, because there is no log to write to.
 #[cfg(feature = "logs")]
 #[inline(always)]
-pub fn emit_event(record: &[u8]) {
-	crate::solana_program_log::log_data(&[record]);
+pub fn emit_event(record: &[u8]) -> Result<(), crate::ProgramError> {
+	solana_program_log::log_data(&[record]);
+
+	Ok(())
 }
 
-/// No-op variant of [`emit_event`] when `logs` is disabled.
+/// Emit one complete event record to the transaction log.
+///
+/// # Errors
+///
+/// Always fails with [`crate::ProgramError::UnsupportedSysvar`] when the
+/// `logs` feature is disabled. Enable the `logs` feature on `pina` to emit
+/// events.
 #[cfg(not(feature = "logs"))]
 #[inline(always)]
-pub fn emit_event(record: &[u8]) {
+pub fn emit_event(record: &[u8]) -> Result<(), crate::ProgramError> {
 	let _ = record;
+
+	Err(crate::ProgramError::UnsupportedSysvar)
 }
