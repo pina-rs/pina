@@ -100,7 +100,14 @@ impl<'a> ProcessAccountInfos<'a> for BorrowAccounts<'a> {
 			clock.unix_timestamp
 		};
 
-		if now - feed.updated_at.get() > MAX_STALENESS_SECONDS {
+		// A feed timestamped after the current slot is malformed, not fresh:
+		// plain subtraction would make the age negative and pass the bound,
+		// leaving the observation trusted until the Clock catches up.
+		let age = now
+			.checked_sub(feed.updated_at.get())
+			.ok_or(LendingError::StalePriceFeed)?;
+
+		if age > MAX_STALENESS_SECONDS {
 			return Err(LendingError::StalePriceFeed.into());
 		}
 

@@ -43,9 +43,11 @@ A user or co-signer has no on-chain window to notice, pause, or exit between the
 
 See [`secure/src/lib.rs`](secure/src/lib.rs). The same vault, rebuilt so no single key can drain it:
 
-- **Circuit breaker.** `sweep` moves at most the remaining allowance for the current withdrawal window (a cap plus a Clock-driven window reset, in the shape of Mango v4's per-bank net-borrow limits). The vault can never empty in one instruction.
+- **Circuit breaker with a reserve.** `sweep` moves at most the remaining allowance for the current withdrawal window (a cap plus a Clock-driven window reset, in the shape of Mango v4's per-bank net-borrow limits), and it must leave `VAULT_RESERVE` lamports behind. The reserve is what makes "the vault can never empty in one instruction" true at every balance: a cap stops binding once the vault holds less than the cap, so a small vault would otherwise still be drained outright and the account closed.
 - **Asymmetric pause.** A dedicated `guardian` key — able to pause the program, unable to sweep, rotate, or unpause alone — contains an in-progress key compromise. Unpausing requires dual control (guardian + authority), so neither leaked key can resume the program on its own.
-- **Two-phase rotation.** `propose_authority` records a candidate; the rotation only takes effect when the candidate itself signs `accept_authority` (the application-level equivalent of `SetAuthorityChecked`). One fooled signing ceremony can no longer hand the program to an attacker.
+- **Delayed, cancellable rotation.** `propose_authority` records a candidate and stamps `rotation_ready_at`; `accept_authority` requires that delay to have elapsed, and `cancel_authority` lets the current authority — or the guardian once paused — clear a pending rotation during the window.
+
+  The delay, not the second signature, is what contains a leaked key. Under this lesson's own threat model the attacker _is_ the authority, so they can sign both `propose_authority(new_authority = attacker)` and `accept_authority` themselves: a two-phase flow with no delay stops a single fooled signing ceremony (Radiant, Bybit) but not a stolen key. Requiring a delay between the two steps gives the honest keys a window to cancel or pause before control moves, the property Aave-style governance timelocks and Realms' hold-up time provide.
 
 The design rule the Solana Operational Security Standard states and this example follows: pause switches are risk-reducing only, and every privilege that can move funds must be bounded by state the program — not the signer — enforces.
 

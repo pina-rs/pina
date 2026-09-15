@@ -2,13 +2,17 @@
 //!
 //! The same vault, rebuilt so that no single key can drain it:
 //!
-//! - sweeps are bounded by an on-chain circuit breaker (cap per window)
+//! - sweeps are bounded by an on-chain circuit breaker (cap per window) and
+//!   must leave a permanent reserve behind
 //! - a dedicated guardian key can pause the program but cannot move funds
 //! - unpausing needs dual control (guardian + authority)
-//! - authority rotation is two-phase (propose, then accept)
+//! - authority rotation is two-phase (propose, then a delayed accept) and can
+//!   be cancelled during the delay
 //!
-//! A leaked authority key drains at most one window's cap before the guardian
-//! pauses the program; a leaked guardian key cannot move funds at all.
+//! A leaked authority key drains at most one window's cap and never empties
+//! the vault; a leaked guardian key cannot move funds at all. Rotation cannot
+//! take effect within one transaction, so an honest key always has a window to
+//! cancel it.
 
 #![no_std]
 
@@ -22,8 +26,17 @@ declare_id!("FWVbUoNj1iZGp9caFp1a6TxgrM5KjxmgHVRiSHFYyZuJ");
 /// Maximum lamports the circuit breaker lets out of the vault per window.
 const WITHDRAWAL_CAP: u64 = 1_000_000;
 
+/// Lamports the vault must always keep, so no window can empty it outright.
+const VAULT_RESERVE: u64 = 10_000;
+
 /// Length of one circuit-breaker window, in seconds.
 const WINDOW_SECONDS: i64 = 3_600;
+
+/// Delay between proposing an authority and accepting it, in seconds.
+///
+/// The window lets the guardian pause the program and the current authority
+/// cancel a rotation before it takes effect.
+const ROTATION_DELAY_SECONDS: i64 = 86_400;
 
 const CLOCK_SYSVAR_ID: Address = address!("SysvarC1ock11111111111111111111111111111111");
 
@@ -33,6 +46,8 @@ pub enum VaultError {
 	ProgramPaused = 0,
 	WithdrawalCapExhausted = 1,
 	NoPendingAuthority = 2,
+	RotationDelayPending = 3,
+	InsufficientVaultReserve = 4,
 }
 
 #[discriminator]
@@ -42,6 +57,7 @@ pub enum VaultInstruction {
 	Unpause = 2,
 	ProposeAuthority = 3,
 	AcceptAuthority = 4,
+	CancelAuthority = 5,
 }
 
 #[discriminator]
@@ -58,6 +74,7 @@ pub struct VaultConfig {
 	pub paused: bool,
 	pub window_start: i64,
 	pub withdrawn_in_window: u64,
+	pub rotation_ready_at: i64,
 }
 
 #[instruction(discriminator = VaultInstruction, variant = Sweep)]
@@ -74,6 +91,9 @@ pub struct ProposeAuthorityInstruction {}
 
 #[instruction(discriminator = VaultInstruction, variant = AcceptAuthority)]
 pub struct AcceptAuthorityInstruction {}
+
+#[instruction(discriminator = VaultInstruction, variant = CancelAuthority)]
+pub struct CancelAuthorityInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct SweepAccounts<'a> {
@@ -102,11 +122,19 @@ pub struct ProposeAuthorityAccounts<'a> {
 	pub authority: &'a AccountView,
 	pub new_authority: &'a AccountView,
 	pub config: &'a mut AccountView,
+	pub clock: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct AcceptAuthorityAccounts<'a> {
 	pub pending_authority: &'a AccountView,
+	pub config: &'a mut AccountView,
+	pub clock: &'a AccountView,
+}
+
+#[derive(Accounts, Debug)]
+pub struct CancelAuthorityAccounts<'a> {
+	pub authority: &'a AccountView,
 	pub config: &'a mut AccountView,
 }
 
@@ -169,7 +197,15 @@ impl<'a> ProcessAccountInfos<'a> for SweepAccounts<'a> {
 
 		assert_within_cap(remaining)?;
 
-		let amount = self.vault.lamports().min(remaining);
+		// A vault smaller than the cap would otherwise let one sweep empty it:
+		// the cap only binds when the balance exceeds it. Keeping a reserve
+		// makes "one instruction cannot empty the vault" true at every size,
+		// so a leaked key can never leave the account at zero and closed.
+		let balance = self.vault.lamports();
+		let available = balance
+			.checked_sub(VAULT_RESERVE)
+			.ok_or(VaultError::InsufficientVaultReserve)?;
+		let amount = available.min(remaining);
 
 		if amount == 0 {
 			return Err(VaultError::WithdrawalCapExhausted.into());
@@ -234,15 +270,26 @@ impl<'a> ProcessAccountInfos<'a> for ProposeAuthorityAccounts<'a> {
 
 		self.authority.assert_signer()?;
 		self.config.assert_not_empty()?.assert_writable()?;
+		self.clock.assert_sysvar(&CLOCK_SYSVAR_ID)?;
+
+		let now = {
+			let clock = sysvars::clock::Clock::from_account_view(self.clock)?;
+			clock.unix_timestamp
+		};
 
 		let mut config = self.config.as_account_mut::<VaultConfig>(&ID)?;
 		self.authority.assert_address(&config.authority)?;
 
-		// Phase one of a two-phase rotation: only record the candidate. The
-		// rotation takes effect when the candidate itself accepts, so one
-		// fooled signing ceremony cannot hand the program to an attacker.
+		// Phase one of a two-phase rotation: only record the candidate, with a
+		// delay before it can take effect so the guardian can pause and the
+		// current authority can cancel.
 		config.pending_authority = *self.new_authority.address();
 
+		let ready_at = now
+			.checked_add(ROTATION_DELAY_SECONDS)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		config.rotation_ready_at.set(ready_at);
 		Ok(())
 	}
 }
@@ -253,6 +300,12 @@ impl<'a> ProcessAccountInfos<'a> for AcceptAuthorityAccounts<'a> {
 
 		self.pending_authority.assert_signer()?;
 		self.config.assert_not_empty()?.assert_writable()?;
+		self.clock.assert_sysvar(&CLOCK_SYSVAR_ID)?;
+
+		let now = {
+			let clock = sysvars::clock::Clock::from_account_view(self.clock)?;
+			clock.unix_timestamp
+		};
 
 		let mut config = self.config.as_account_mut::<VaultConfig>(&ID)?;
 
@@ -263,9 +316,45 @@ impl<'a> ProcessAccountInfos<'a> for AcceptAuthorityAccounts<'a> {
 		self.pending_authority
 			.assert_address(&config.pending_authority)?;
 
+		// The delay is what gives the honest keys a reaction window; without
+		// it, a leaked authority key could propose and accept in one
+		// transaction and the two-phase flow would protect nothing.
+		if now < config.rotation_ready_at.get() {
+			return Err(VaultError::RotationDelayPending.into());
+		}
+
 		// Phase two: the proposed key proves control by signing.
 		config.authority = *self.pending_authority.address();
 		config.pending_authority = Address::new_from_array([0; ADDRESS_BYTES]);
+		config.rotation_ready_at.set(0);
+
+		Ok(())
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for CancelAuthorityAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = CancelAuthorityInstruction::try_from_bytes(data)?;
+
+		self.authority.assert_signer()?;
+		self.config.assert_not_empty()?.assert_writable()?;
+
+		let mut config = self.config.as_account_mut::<VaultConfig>(&ID)?;
+
+		// The current authority, or the guardian once paused, can cancel a
+		// rotation during its delay window.
+		let canceller = *self.authority.address();
+		let permitted =
+			canceller == config.authority || (config.paused.get() && canceller == config.guardian);
+
+		if !permitted {
+			return Err(ProgramError::MissingRequiredSignature);
+		}
+
+		self.authority.assert_address(&canceller)?;
+
+		config.pending_authority = Address::new_from_array([0; ADDRESS_BYTES]);
+		config.rotation_ready_at.set(0);
 
 		Ok(())
 	}
