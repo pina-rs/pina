@@ -1015,6 +1015,12 @@ in
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
         coverage:pina-test
+        # `tests/ui.rs` opts out of instrumentation, so the line above does not
+        # run it. Without this, the trybuild suite would run nowhere on a pull
+        # request: `test:all` only covers the post-merge and `ci-full` tiers.
+        # Running it here keeps it in the pull-request gate without putting its
+        # fixtures into the lcov report.
+        cargo test --locked -p pina_root --test ui
         cargo check \
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
           --all-targets \
