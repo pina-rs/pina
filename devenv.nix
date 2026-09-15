@@ -982,12 +982,6 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
-        # The fallback must stay absolute: rustc prints cargo-registry paths
-        # relative to the workspace when the registry lives inside it, and
-        # trybuild's `$CARGO` normalizer only rewrites the absolute
-        # `/registry/src/{name}-{hash}/` form, so the UI snapshots that mention
-        # `solana-address` mismatch. `$DEVENV_ROOT` is not guaranteed absolute.
-        export HOME="''${HOME:-$PWD/.cache/home}"
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
@@ -1018,17 +1012,20 @@ in
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
         coverage:pina-test
-        # `tests/ui.rs` opts out of instrumentation, so the run above skips it.
-        # Without this, the trybuild suite would run nowhere on a pull request:
-        # `test:all` only covers the post-merge and `ci-full` tiers. `--no-cfg-coverage`
-        # is what makes the opt-out effective here, since the plain `cargo test`
-        # this replaces inherits `cfg(coverage)` from the run above and the
-        # suite would skip again. The report is discarded: the suite is here to
-        # gate, not to contribute lines to lcov.
+        # `tests/ui.rs` opts out of instrumentation, so the instrumented run
+        # above skips it. This non-instrumented invocation keeps it in the
+        # pull-request gate without putting its fixtures into the lcov report.
+        #
+        # The registry is deliberately redirected outside the workspace for the
+        # same reason: trybuild's `$CARGO` normalizer only rewrites the absolute
+        # `/registry/src/{name}-{hash}/` form, and rustc renders a registry path
+        # under the workspace relative to the working directory — so two
+        # snapshots that mention `solana-address` mismatched on CI while passing
+        # locally, where the registry sits under `~/.cargo`.
         rm -rf "$DEVENV_ROOT/target/ui-llvm-cov-target"
-        CARGO_TARGET_DIR="$DEVENV_ROOT/target/ui-llvm-cov-target" cargo llvm-cov \
-          --no-cfg-coverage \
-          --no-report \
+        CARGO_TARGET_DIR="$DEVENV_ROOT/target/ui-llvm-cov-target" \
+          CARGO_HOME="''${CARGO_HOME:-/tmp/pina-ui-cargo-home}" \
+          cargo test \
           --locked \
           -p pina_root \
           --test ui
