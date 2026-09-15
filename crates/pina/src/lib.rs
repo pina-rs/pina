@@ -26,7 +26,8 @@
 //!
 //! ## Crate features
 //!
-//! - `logs` *(default)* — enables on-chain logging via `solana-program-log`.
+//! - `logs` *(default)* — enables on-chain logging via `solana-program-log`,
+//!   including [`emit_event`] and the generated `#[event]` `emit` helper.
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `compact` — enables compact account schemas, checked loaders, and typed
 //!   account APIs. This also enables `derive`.
