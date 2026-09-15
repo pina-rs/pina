@@ -579,7 +579,10 @@ pub trait MigratableAccount: HasMigrationVersion {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AccountMigrationOutcome<V> {
 	/// The account was already current and passed current-layout validation.
-	AlreadyCurrent { version: V },
+	AlreadyCurrent {
+		/// Current version read from the account.
+		version: V,
+	},
 
 	/// The account reached the generated current representation.
 	Migrated {

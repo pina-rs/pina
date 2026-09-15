@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

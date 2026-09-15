@@ -3,6 +3,7 @@
 //! Analyzes compiled `.so` ELF binaries to estimate per-function compute unit
 //! costs without requiring a running validator.
 
+#![allow(missing_docs)]
 pub mod compare;
 pub mod cost;
 pub mod elf;

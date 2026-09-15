@@ -4,6 +4,7 @@
 //! parity port focuses on the event type definitions and deterministic
 //! serialization/discriminator behavior in pina.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

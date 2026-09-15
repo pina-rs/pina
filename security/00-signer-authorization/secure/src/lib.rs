@@ -3,6 +3,7 @@
 //! This program verifies that the authority account signed the transaction
 //! before allowing any state mutation.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

@@ -32,6 +32,7 @@
 //! .unwrap_or_else(|error| panic!("render failed: {error}"));
 //! ```
 
+#![allow(missing_docs)]
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Component;

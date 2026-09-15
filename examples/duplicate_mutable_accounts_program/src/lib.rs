@@ -3,6 +3,7 @@
 //! Anchor enforces duplicate mutable account constraints in the account parser.
 //! In pina this check should be explicit in program logic.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

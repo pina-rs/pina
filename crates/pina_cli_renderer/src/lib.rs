@@ -6,6 +6,7 @@
 //! accounts, a `fetch` command per state account, and shared RPC, keypair, and
 //! send/simulate plumbing.
 
+#![allow(missing_docs)]
 mod emit;
 mod error;
 mod model;

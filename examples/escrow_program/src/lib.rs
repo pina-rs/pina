@@ -7,6 +7,7 @@
 //!    releases token A to the taker's ATA. The escrow is closed and rent is
 //!    returned to the maker.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

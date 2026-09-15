@@ -3,6 +3,7 @@
 //! This adaptation keeps the key behavior: deterministic custom error codes
 //! and explicit guard helpers that return those errors.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

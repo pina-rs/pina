@@ -14,6 +14,7 @@
 //! take effect within one transaction, so an honest key always has a window to
 //! cancel it.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

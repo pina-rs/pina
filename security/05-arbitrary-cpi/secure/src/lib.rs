@@ -3,6 +3,7 @@
 //! This program verifies the system program's address before performing
 //! a CPI transfer.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

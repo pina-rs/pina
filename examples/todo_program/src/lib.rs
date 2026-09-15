@@ -6,6 +6,7 @@
 //! - `ToggleCompleted`: flips the completion flag.
 //! - `UpdateDigest`: updates a fixed-size digest payload.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

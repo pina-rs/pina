@@ -21,6 +21,7 @@
 //! | `Initialize` | Create a new counter PDA for the signer. |
 //! | `Increment`  | Add 1 to the counter value.              |
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 
