@@ -507,12 +507,12 @@ fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
 		&fixture.root,
 		&build_sbf_elf(&[
 			(
-				"_ZN9my_crate33__pina_state_account_migrations8v0_to_v17migrate17h0000E",
+				"_ZN8my_crate31__pina_state_account_migrations8v0_to_v17migrate17h0000E",
 				0,
 				80,
 			),
 			(
-				"_ZN9my_crate42__pina_update_instruction_instruction_migrations8v0_to_v17migrate17h1111E",
+				"_ZN9my_crate48__pina_update_instruction_instruction_migrations8v0_to_v17migrate17h1111E",
 				80,
 				160,
 			),
