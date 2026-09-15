@@ -1,6 +1,7 @@
 ---
 pina: feat
 pina_cli: feat
+pina_lints: feat
 ---
 
 # Add incident-driven security lessons and the full-balance-drain lint
