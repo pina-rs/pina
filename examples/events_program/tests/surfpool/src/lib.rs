@@ -97,7 +97,7 @@ fn generated_client_decodes_the_emitted_record() {
 			.first()
 			.unwrap_or_else(|| panic!("expected a `Program data:` record; logs: {logs:#?}"));
 
-		let event = generated_client::MyEvent::from_bytes(record)
+		let event = generated_client::events::MyEvent::from_bytes(record)
 			.expect("the generated client decodes the emitted record");
 		assert_eq!(event.data.get(), 5);
 		assert_eq!(event.label, [b'h', b'e', b'l', b'l', b'o', 0, 0, 0]);
