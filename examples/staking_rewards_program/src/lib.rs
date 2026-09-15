@@ -239,22 +239,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.stake_vault
-			.assert_empty()?
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.pool_state.address(),
-				self.stake_mint.address(),
-				self.token_program.address(),
-			)?;
-		self.reward_vault
-			.assert_empty()?
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.pool_state.address(),
-				self.reward_mint.address(),
-				self.token_program.address(),
-			)?;
+		// The vault addresses are checked by the associated token program inside
+		// each `Create` CPI below, which derives the same
+		// `[wallet, token_program, mint]` seeds and rejects a mismatch with
+		// `InvalidSeeds` before it creates anything. Restating the derivation here
+		// would repeat a ~4,500 CU canonical bump search per vault.
+		self.stake_vault.assert_empty()?.assert_writable()?;
+		self.reward_vault.assert_empty()?.assert_writable()?;
 
 		// Create the pool state account
 		CreateProgramAccountWithUncheckedBump {
@@ -359,13 +350,10 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state.assert_not_empty()?;
 		self.position_state.assert_not_empty()?;
-		self.user_stake_ata
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.user.address(),
-				self.stake_mint.address(),
-				self.token_program.address(),
-			)?;
+		// The address check lives in the `CreateIdempotent` CPI below: the
+		// associated token program derives the same seeds and rejects a mismatch
+		// with `InvalidSeeds` before its idempotent branch.
+		self.user_stake_ata.assert_writable()?;
 
 		// Validate pool and position state
 		let (staked_amount, reward_debt, total_staked) = {
@@ -506,13 +494,10 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state.assert_not_empty()?;
 		self.position_state.assert_not_empty()?;
-		self.user_reward_ata
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.user.address(),
-				self.reward_mint.address(),
-				self.token_program.address(),
-			)?;
+		// The address check lives in the `CreateIdempotent` CPI below: the
+		// associated token program derives the same seeds and rejects a mismatch
+		// with `InvalidSeeds` before its idempotent branch.
+		self.user_reward_ata.assert_writable()?;
 
 		// Validate pool and position state
 		let (pending_rewards, reward_index) = {

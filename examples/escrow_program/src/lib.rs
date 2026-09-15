@@ -145,14 +145,10 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
-		self.vault
-			.assert_empty()?
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.escrow.address(),
-				self.mint_a.address(),
-				&token_program,
-			)?;
+		// The address check lives in the `Create` CPI below: the associated token
+		// program derives the same `[wallet, token_program, mint]` seeds and
+		// rejects a mismatch with `InvalidSeeds` before it creates anything.
+		self.vault.assert_empty()?.assert_writable()?;
 
 		// Create and initialize the escrow account atomically.
 		CreateProgramAccountWithUncheckedBump {
@@ -188,11 +184,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		.invoke()?;
 		let vault_before = self
 			.vault
-			.as_associated_token_account(
-				self.escrow.address(),
-				self.mint_a.address(),
-				&token_program,
-			)?
+			.as_token_account_for_program(&token_program)?
 			.amount();
 
 		// Transfer tokens to vault
@@ -208,11 +200,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		let vault_after = self
 			.vault
-			.as_associated_token_account(
-				self.escrow.address(),
-				self.mint_a.address(),
-				&token_program,
-			)?
+			.as_token_account_for_program(&token_program)?
 			.amount();
 		let received = vault_after
 			.checked_sub(vault_before)
@@ -314,13 +302,10 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 				&token_program,
 			)?
 			.amount();
-		self.maker_ata_b
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.maker.address(),
-				self.mint_b.address(),
-				&token_program,
-			)?;
+		// The address check lives in the `CreateIdempotent` CPI below: the
+		// associated token program derives the same seeds and rejects a mismatch
+		// with `InvalidSeeds` before its idempotent branch.
+		self.maker_ata_b.assert_writable()?;
 
 		// Create maker's token B account if needed
 		associated_token_account::instructions::CreateIdempotent {

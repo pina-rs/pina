@@ -179,14 +179,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vault
-			.assert_empty()?
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.vesting_state.address(),
-				self.mint.address(),
-				self.token_program.address(),
-			)?;
+		// The address check lives in the `Create` CPI below: the associated token
+		// program derives the same `[wallet, token_program, mint]` seeds and
+		// rejects a mismatch with `InvalidSeeds` before it creates anything.
+		self.vault.assert_empty()?.assert_writable()?;
 
 		CreateProgramAccountWithUncheckedBump {
 			account: self.vesting_state,
@@ -245,13 +241,10 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				self.mint.address(),
 				self.token_program.address(),
 			)?;
-		self.beneficiary_ata
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.beneficiary.address(),
-				self.mint.address(),
-				self.token_program.address(),
-			)?;
+		// The address check lives in the `CreateIdempotent` CPI below: the
+		// associated token program derives the same seeds and rejects a mismatch
+		// with `InvalidSeeds` before its idempotent branch.
+		self.beneficiary_ata.assert_writable()?;
 
 		let (admin, beneficiary, mint, cancelled, claimed_amount, total_amount) = {
 			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
