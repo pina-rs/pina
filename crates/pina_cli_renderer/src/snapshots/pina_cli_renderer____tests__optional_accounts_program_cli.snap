@@ -72,9 +72,9 @@ pub struct InitArgs {
 	/// Pays for account creation and seeds the store PDA [default: payer]
 	#[arg(long)]
 	authority: Option<String>,
-	/// The store PDA account (must be empty — not yet created)
+	/// The store PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
-	store: String,
+	store: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitArgs) -> Result<(), CliError> {
@@ -82,7 +82,14 @@ pub(crate) fn run(context: &CliContext, args: InitArgs) -> Result<(), CliError> 
 		Some(value) => CliContext::pubkey("--authority", value)?,
 		None => context.payer_pubkey(),
 	};
-	let store = CliContext::pubkey("--store", &args.store)?;
+	let store = match &args.store {
+		Some(value) => CliContext::pubkey("--store", value)?,
+		None => Pubkey::find_program_address(
+			&["store".as_bytes(), authority.as_ref()],
+			&context.program_address,
+		)
+		.0,
+	};
 	let data = InitInstructionData::new(|data| {
 		data.bump = args.bump;
 	})

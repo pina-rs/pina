@@ -127,9 +127,9 @@ pub struct InitializeArgs {
 	/// The wallet creating the counter. Pays for account creation and becomes the authority whose address seeds the PDA [default: payer]
 	#[arg(long)]
 	authority: Option<String>,
-	/// The counter PDA account (must be empty — not yet created)
+	/// The counter PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
-	counter: String,
+	counter: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
@@ -137,7 +137,14 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		Some(value) => CliContext::pubkey("--authority", value)?,
 		None => context.payer_pubkey(),
 	};
-	let counter = CliContext::pubkey("--counter", &args.counter)?;
+	let counter = match &args.counter {
+		Some(value) => CliContext::pubkey("--counter", value)?,
+		None => Pubkey::find_program_address(
+			&["counter".as_bytes(), authority.as_ref()],
+			&context.program_address,
+		)
+		.0,
+	};
 	let data = InitializeInstructionData::new(|data| {
 		data.bump = args.bump;
 	})
