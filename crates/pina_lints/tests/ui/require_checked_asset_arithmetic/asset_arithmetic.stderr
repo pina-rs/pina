@@ -71,4 +71,20 @@ LL |         value if balance - amount > 0 => value,
    |
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
-error: aborting due to 9 previous errors
+error: asset arithmetic can overflow, underflow, or silently saturate
+  --> $DIR/asset_arithmetic.rs:113:2
+   |
+LL |     balance << offset
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_shl` or `checked_shr` and return an explicit program error on failure
+
+error: asset arithmetic can overflow, underflow, or silently saturate
+  --> $DIR/asset_arithmetic.rs:118:2
+   |
+LL |     *balance >>= 2;
+   |     ^^^^^^^^^^^^^^
+   |
+   = help: use `checked_shl` or `checked_shr` and return an explicit program error on failure
+
+error: aborting due to 11 previous errors

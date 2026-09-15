@@ -110,7 +110,7 @@ mod tests {
 	#[test]
 	fn catalog_has_exactly_one_entry_per_pina_lint() {
 		let catalog = LintCatalog::global();
-		assert_eq!(catalog.entries.len(), 19);
+		assert_eq!(catalog.entries.len(), 20);
 
 		let mut names = catalog.names();
 		names.sort_unstable();
@@ -135,6 +135,7 @@ mod tests {
 				"deny_unused_account_borrow_guards",
 				"require_canonical_instruction_dispatch_for_idl",
 				"require_explicit_discriminators_and_seed_namespaces",
+				"require_guarded_full_balance_drain",
 				"require_idl_root_to_define_one_program_id",
 			]
 		);

@@ -13,8 +13,9 @@ use crate::shared;
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Rejects raw, saturating, and wrapping arithmetic on values whose names
-	/// indicate balances, amounts, prices, rewards, stakes, supply, or lamports.
+	/// Rejects raw, saturating, and wrapping arithmetic — including bit
+	/// shifts — on values whose names indicate balances, amounts, prices,
+	/// rewards, stakes, supply, or lamports.
 	///
 	/// ### Why is this bad?
 	///
@@ -49,14 +50,22 @@ fn looks_like_asset(expr: &Expr<'_>) -> bool {
 	})
 }
 
-fn lint(cx: &LateContext<'_>, span: rustc_span::Span) {
+fn lint(cx: &LateContext<'_>, span: rustc_span::Span, shift: bool) {
 	cx.lint(REQUIRE_CHECKED_ASSET_ARITHMETIC, |diag| {
 		diag.span(span);
 		diag.primary_message("asset arithmetic can overflow, underflow, or silently saturate");
-		diag.help(
-			"use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an \
-			 explicit program error on failure",
-		);
+
+		if shift {
+			diag.help(
+				"use `checked_shl` or `checked_shr` and return an explicit program error on \
+				 failure",
+			);
+		} else {
+			diag.help(
+				"use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an \
+				 explicit program error on failure",
+			);
+		}
 	});
 }
 
@@ -94,22 +103,28 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				&& (looks_like_asset(receiver)
 					|| args.iter().any(|argument| looks_like_asset(argument)))
 			{
-				lint(cx, expr.span);
+				lint(cx, expr.span, false);
 			}
 		}
 		ExprKind::Binary(operation, left, right) => {
 			visit_expr(cx, left);
 			visit_expr(cx, right);
+			let is_shift = matches!(
+				operation.node,
+				rustc_hir::BinOpKind::Shl | rustc_hir::BinOpKind::Shr
+			);
 			if cx.typeck_results().expr_ty_adjusted(left).is_integral()
-				&& matches!(
+				&& (matches!(
 					operation.node,
 					rustc_hir::BinOpKind::Add
 						| rustc_hir::BinOpKind::Sub
 						| rustc_hir::BinOpKind::Mul
 						| rustc_hir::BinOpKind::Div
-				) && (looks_like_asset(left) || looks_like_asset(right))
+						| rustc_hir::BinOpKind::Shl
+						| rustc_hir::BinOpKind::Shr
+				)) && (looks_like_asset(left) || looks_like_asset(right))
 			{
-				lint(cx, expr.span);
+				lint(cx, expr.span, is_shift);
 			}
 		}
 		ExprKind::Call(callee, args) => {
@@ -156,16 +171,22 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 		ExprKind::AssignOp(operation, left, right) => {
 			visit_expr(cx, left);
 			visit_expr(cx, right);
+			let is_shift = matches!(
+				operation.node,
+				rustc_hir::AssignOpKind::ShlAssign | rustc_hir::AssignOpKind::ShrAssign
+			);
 			if cx.typeck_results().expr_ty_adjusted(left).is_integral()
-				&& matches!(
+				&& (matches!(
 					operation.node,
 					rustc_hir::AssignOpKind::AddAssign
 						| rustc_hir::AssignOpKind::SubAssign
 						| rustc_hir::AssignOpKind::MulAssign
 						| rustc_hir::AssignOpKind::DivAssign
-				) && (looks_like_asset(left) || looks_like_asset(right))
+						| rustc_hir::AssignOpKind::ShlAssign
+						| rustc_hir::AssignOpKind::ShrAssign
+				)) && (looks_like_asset(left) || looks_like_asset(right))
 			{
-				lint(cx, expr.span);
+				lint(cx, expr.span, is_shift);
 			}
 		}
 		ExprKind::Index(base, index, _) => {
