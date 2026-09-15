@@ -982,9 +982,12 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
-        fi
+        # The fallback must stay absolute: rustc prints cargo-registry paths
+        # relative to the workspace when the registry lives inside it, and
+        # trybuild's `$CARGO` normalizer only rewrites the absolute
+        # `/registry/src/{name}-{hash}/` form, so the UI snapshots that mention
+        # `solana-address` mismatch. `$DEVENV_ROOT` is not guaranteed absolute.
+        export HOME="''${HOME:-$PWD/.cache/home}"
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
