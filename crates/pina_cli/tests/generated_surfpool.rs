@@ -49,12 +49,19 @@ fn initialized_project_executes_its_starter_instruction_on_surfpool() {
 	let surfpool_manifest = project.join("tests/surfpool/Cargo.toml");
 	let contents = fs::read_to_string(&surfpool_manifest)
 		.unwrap_or_else(|error| panic!("failed to read {}: {error}", surfpool_manifest.display()));
+	let pina_path = workspace_root().join("crates/pina");
 	let pina_test_path = workspace_root().join("crates/pina_test");
+	// The harness is its own workspace, so both of its dependencies have to be
+	// redirected at the checkout. Leaving `pina` on the crates.io requirement
+	// makes this test fail until the version under test is published, which is
+	// exactly the release pull request that needs it to pass.
 	let contents = contents
 		.lines()
 		.map(|line| {
 			if line.starts_with("pina_test = ") {
 				format!("pina_test = {{ path = \"{}\" }}", pina_test_path.display())
+			} else if line.starts_with("pina = ") {
+				format!("pina = {{ path = \"{}\" }}", pina_path.display())
 			} else {
 				line.to_owned()
 			}
