@@ -37,6 +37,15 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - A program or instruction that does not exist at the PR base is a new baseline, not an error. Missing measurements for code that does exist at the head are errors.
 - Add a focused case to `crates/pina/tests/benchmarks.rs` when changing a performance-sensitive host operation. Add a command to `scripts/benchmark-cli.ts` when introducing a representative CLI hot path.
 
+## Coverage
+
+- Patch coverage is a pull request gate with a **100% target** (`codecov.yml`). Every line a pull request adds or changes must be executed by a test, not merely present in a covered file. Add the test in the same pull request; do not defer it to a follow-up.
+- `coverage` is the pull request's Rust gate and `test` is the post-merge and `ci-full` tier. The two must stay equivalent: `coverage:all` is a superset of `test:all`, so a suite added to one belongs in the other. `pina_abi` is tested nowhere else, so removing it from either silently stops testing it.
+- Run `coverage:all` before pushing when a change touches Rust. It is the only way to see a patch-coverage failure before CI does, because the profiling build is not what `cargo test` runs.
+- Paths excluded from the patch target are listed in `codecov.yml`: `codama/clients` (verified by deterministic regeneration), `crates/pina_test`, and `examples` (exercised by real-runtime suites the coverage job cannot run). Excluded is not untested — those paths still need tests, they just do not gate on patch percentage. Adding a path to that list to clear a failure is not a fix.
+- The root package's `src/` and `tests/` are **not** ignored, so a change there gates on patch coverage. The stale `pina_root` entry in `codecov.yml` matches no file, because the package's code lives at the repository root rather than in a `pina_root/` directory.
+- Some suites cannot run under instrumentation: `trybuild` compares compiler output byte for byte, and `crates/pina_cli/tests/generated_surfpool.rs` and `pina_root`'s `tests/ui.rs` are excluded with `#![cfg(not(coverage))]` for that reason. Excluding a suite from coverage must not remove it from the pull request gate: `coverage:all` runs `tests/ui.rs` a second time without instrumentation so the trybuild snapshots still gate, and `crates/pina_cli/tests/generated_surfpool.rs` is covered by the `surfpool-examples` job.
+
 ## Common commands
 
 - `devenv shell` — enter the dev environment
