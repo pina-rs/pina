@@ -5,5 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+base64 = { workspace = true, default-features = true }
+generated_client = { package = "events_program-client", path = "../../../../codama/clients/rust/events_program" }
 pina_test = { workspace = true }
 program_under_test = { package = "events_program", path = "../.." }

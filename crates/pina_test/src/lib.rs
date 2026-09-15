@@ -374,6 +374,23 @@ impl ProgramTest {
 		)
 	}
 
+	/// Simulate one instruction without submitting it and return its logs.
+	///
+	/// Because the transaction is never sent, this reads the `Program data:`
+	/// records a program emitted even when it also returned an error.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, or simulation fails.
+	pub fn simulate_logs(
+		&self,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+	) -> Result<Vec<String>, TestError> {
+		self.surfnet
+			.simulate_program_logs(self.program_id, data, accounts)
+	}
+
 	/// Submit and confirm one instruction with the payer and additional signers.
 	///
 	/// The payer is always the transaction fee payer and first signer. Callers
@@ -564,6 +581,38 @@ impl OfflineSurfnet {
 	#[must_use]
 	pub fn payer(&self) -> Pubkey {
 		self.inner.payer().pubkey()
+	}
+
+	/// Simulate one instruction addressed to `program_id` and return its logs.
+	///
+	/// The transaction is never submitted, so a failing program still yields
+	/// the log lines it produced before the error.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, or simulation fails.
+	pub fn simulate_program_logs(
+		&self,
+		program_id: Pubkey,
+		data: &[u8],
+		accounts: Vec<AccountMeta>,
+	) -> Result<Vec<String>, TestError> {
+		let rpc = self.inner.rpc_client();
+		let payer = self.inner.payer();
+		let blockhash = rpc
+			.get_latest_blockhash()
+			.map_err(|error| test_error("fetch latest blockhash", error))?;
+		let instruction = Instruction::new_with_bytes(program_id, data, accounts);
+		let message = Message::new(&[instruction], Some(&payer.pubkey()));
+		let mut transaction = Transaction::new_unsigned(message);
+		transaction
+			.try_sign(&[payer], blockhash)
+			.map_err(|error| test_error("sign program transaction", error))?;
+		let simulation = rpc
+			.simulate_transaction(&transaction)
+			.map_err(|error| test_error("simulate program instruction", error))?;
+
+		Ok(simulation.value.logs.unwrap_or_default())
 	}
 
 	/// Deploy an SBF artifact directly at its declared program address.

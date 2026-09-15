@@ -18,6 +18,14 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - Pull request titles must follow Conventional Commits (e.g. `feat(loaders): preserve borrow guard lifetime`).
 - Never merge a `chore(release): prepare release` pull request. Release pull requests must remain open until Ifiok Jr. (`@ifiokjr`) explicitly decides to merge them himself.
 
+## Verify locally before pushing
+
+- Before pushing any branch, run every CI job that the change can trigger and confirm it passes on this machine. Do not push a branch whose CI you have not reproduced locally, unless Ifiok Jr. explicitly tells you to skip that step.
+- Reproduce the job with the same command CI uses rather than an approximation. `devenv shell -- <task>` matches the workflow step for most jobs; the SBF, Kani, and Surfpool tiers need their own wrappers. See [Testing and SBF builds](./docs/agents/testing-and-sbf.md) and [Git workflow](./docs/agents/git-workflow.md).
+- Account for the path filters that decide which jobs run. A change under `crates/**` or `examples/**` reaches the Surfpool workflow, the performance benchmarks, and the `pina` feature matrix; a change under `.github/**` reaches the workflow audit. When in doubt, run the superset: `lint:all`, `verify:security`, `test:all`, and `test:idl`.
+- A job that needs the SBF toolchain, Surfpool, or a network service still counts as reproducible locally. Build the artifact and run the tier instead of pushing and waiting for CI to tell you.
+- Treat a locally skipped or unverified job as a known failure, and say which jobs are unverified when you hand off the branch. Never describe a branch as ready while a job it can trigger is unproven.
+
 ## Benchmark maintenance
 
 - Before merging any pull request, wait for and read the consolidated performance benchmark comment. Do not merge while the report is missing, incomplete, or contains measurement errors.

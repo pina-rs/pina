@@ -26,7 +26,8 @@
 //!
 //! ## Crate features
 //!
-//! - `logs` *(default)* — enables on-chain logging via `solana-program-log`.
+//! - `logs` *(default)* — enables on-chain logging via `solana-program-log`,
+//!   including [`emit_event`] and the generated `#[event]` `emit` helper.
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `compact` — enables compact account schemas, checked loaders, and typed
 //!   account APIs. This also enables `derive`.
@@ -54,6 +55,7 @@
 
 mod cpi;
 mod error;
+mod event;
 mod impls;
 pub mod introspection;
 mod migration;
@@ -84,7 +86,7 @@ pub use pina_macros::*;
 /// Re-export of the [`pinapod`] crate for advanced direct use.
 ///
 /// Pina's audited zero-copy contract is the closed field grammar enforced by
-/// [`account`], [`instruction`], and [`event`]. Direct `PinaPod` derives and
+/// [`account`], [`instruction`], and [`macro@event`]. Direct `PinaPod` derives and
 /// manual trait implementations are outside that contract and must uphold
 /// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
@@ -192,6 +194,8 @@ pub use solana_program_log::log_cu_usage;
 pub use crate::cpi::*;
 /// Built-in framework error types.
 pub use crate::error::*;
+/// On-chain event emission to the transaction log.
+pub use crate::event::*;
 /// Version envelopes and generated account-migration runtime contracts.
 pub use crate::migration::*;
 /// PDA (Program Derived Address) derivation and verification functions.

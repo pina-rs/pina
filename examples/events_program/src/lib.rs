@@ -95,6 +95,40 @@ pub enum EmittedEvent {
 	MyOtherEvent([u8; MyOtherEvent::SIZE]),
 }
 
+/// Emit the event that corresponds to `instruction` to the transaction log.
+///
+/// Emission goes through the generated `emit` helper, so every record carries
+/// its discriminator, passes the event's validation rules, and reaches the
+/// `Program data:` log line that generated clients decode.
+#[allow(dead_code)]
+fn emit_program_event(instruction: EventsInstruction) -> ProgramResult {
+	match instruction {
+		EventsInstruction::Initialize => {
+			MyEvent::emit(|event| {
+				event.data.set(5);
+				event.label = LABEL_HELLO;
+				Ok(())
+			})
+		}
+
+		EventsInstruction::TestEvent => {
+			MyOtherEvent::emit(|event| {
+				event.data.set(6);
+				event.label = LABEL_BYE;
+				Ok(())
+			})
+		}
+
+		EventsInstruction::TestEventCpi => {
+			MyOtherEvent::emit(|event| {
+				event.data.set(7);
+				event.label = LABEL_CPI;
+				Ok(())
+			})
+		}
+	}
+}
+
 #[allow(dead_code)]
 fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 	match instruction {
@@ -146,8 +180,8 @@ pub mod entrypoint {
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: EventsInstruction = parse_instruction(program_id, &ID, data)?;
-		let _ = build_event(instruction);
-		Ok(())
+
+		emit_program_event(instruction)
 	}
 }
 

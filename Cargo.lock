@@ -3196,7 +3196,9 @@ dependencies = [
 name = "events_program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "base64 0.23.1",
  "events_program",
+ "events_program-client",
  "pina_test",
 ]
 
