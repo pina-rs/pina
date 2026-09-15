@@ -33,7 +33,22 @@ let account = account.as_token_account()?;
 let vault = vault.as_associated_token_account(wallet, mint, token_program)?;
 ```
 
-Keep `assert_owner()`, `assert_owners()`, and `assert_associated_token_address()` in validation-only paths that do not read token data.
+Keep `assert_owner()`, `assert_owners()`, and `assert_associated_token_address()` in validation-only paths that do not read token data and do not reach an ATA instruction.
+
+Delete an ATA address assertion that is immediately followed by `associated_token_account::instructions::Create` or `CreateIdempotent` on the same account. The associated token program derives the same `[wallet, token_program, mint]` seeds under its own program id and returns `InvalidSeeds` when they do not produce the named account, so the assertion repeats a canonical bump search worth roughly 4,500 compute units. `CreateIdempotent` runs that check before its idempotent branch, so it applies to existing accounts too.
+
+```rust
+// Before
+vault.assert_empty()?.assert_writable()?;
+vault.assert_associated_token_address(wallet, mint, token_program)?;
+associated_token_account::instructions::Create { account: vault, /* ... */ }.invoke()?;
+
+// After
+vault.assert_empty()?.assert_writable()?;
+associated_token_account::instructions::Create { account: vault, /* ... */ }.invoke()?;
+```
+
+Keep `assert_empty()` and `assert_writable()`: they enforce initialization state and runtime permissions, which no CPI restates.
 
 ## Pick the loader by program policy
 

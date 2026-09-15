@@ -117,6 +117,57 @@ fn rejects_valid_payloads_that_violate_loaded_policy_state() {
 	});
 }
 
+/// Find a valid, non-canonical bump for the policy seeds.
+///
+/// The canonical bump is the highest one that derives an address. A lower bump
+/// can still derive a valid off-curve address, and that is exactly the case a
+/// canonicality check exists to reject: the address is a real PDA, but it is not
+/// the one canonical derivation produces for these seeds.
+fn non_canonical_policy_address(
+	program_id: &Pubkey,
+	authority: &Pubkey,
+	canonical_bump: u8,
+) -> (Pubkey, u8) {
+	for bump in (0..canonical_bump).rev() {
+		let bump_seed = [bump];
+		if let Ok(address) = Pubkey::create_program_address(
+			&[POLICY_SEED, authority.as_ref(), &bump_seed],
+			program_id,
+		) {
+			return (address, bump);
+		}
+	}
+
+	panic!("no non-canonical bump derived an address below the canonical bump");
+}
+
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_a_non_canonical_bump() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let (_, canonical_bump) = policy_address(&program_id, &authority);
+		let (non_canonical, non_canonical_bump) =
+			non_canonical_policy_address(&program_id, &authority, canonical_bump);
+
+		// The instruction carries a bump that does derive the account it names,
+		// so only the canonicality rule can reject it.
+		let error = program
+			.send(
+				&initialize_data(non_canonical_bump, 100, 1_000),
+				initialize_accounts(authority, non_canonical),
+			)
+			.expect_err("reject a valid but non-canonical PDA bump");
+		assert_eq!(error.operation(), "execute program instruction");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 #[test]
 fn instruction_discriminators_remain_client_visible() {
 	assert_eq!(ValidationInstruction::InitializePolicy as u8, 0);
