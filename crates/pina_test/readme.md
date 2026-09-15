@@ -39,6 +39,19 @@ program.stop()?;
 
 The payer signs and submits by default; `send_with_signers` adds program-specific signers, and `TestError::operation` plus `TestError::message` make failure assertions readable without parsing display text. `OfflineSurfnet` remains available when a test needs to control deployment itself.
 
+## Submit a v1 transaction
+
+`send_v1`, `v1_transaction`, and `simulate_v1_logs` submit, build, and simulate the v1 transaction format, which raises the per-transaction limit from 1,232 to 4,096 bytes. A program receives resolved accounts and instruction data, so the wire format is invisible to it; use these when you want to prove that, or when an instruction's data does not fit a legacy transaction.
+
+```rust,ignore
+use pina_test::default_v1_config;
+
+program
+	.send_v1(&[ProcessBatch as u8], accounts, default_v1_config())?;
+```
+
+V1 carries its compute unit limit and loaded accounts data size limit inside the message instead of using compute-budget instructions. `default_v1_config` states the legacy defaults so a v1 transaction behaves like its legacy equivalent.
+
 ## Test historical compatibility
 
 Run `pina test --compatibility` to verify the checked-in migration history and run the complete Surfpool suite against the latest SBF artifact. `compatibility_mode()` returns `true` during that run. Use the signal to add expensive historical matrices without skipping current-flow tests.

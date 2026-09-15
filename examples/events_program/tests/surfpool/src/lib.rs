@@ -2,6 +2,7 @@
 
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
+use pina_test::default_v1_config;
 use program_under_test::EventsInstruction;
 use program_under_test::ID;
 
