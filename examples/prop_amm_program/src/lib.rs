@@ -166,12 +166,10 @@ impl<'a> ProcessAccountInfos<'a> for RotateAuthorityAccounts<'a> {
 
 		self.authority.assert_signer()?;
 
-		{
-			let oracle = self.oracle.as_account::<OracleState>(&ID)?;
-			assert_oracle_authority(*self.authority, &oracle.authority)?;
-		}
-
+		// One guard serves both the authority check and the write. Reloading the
+		// account immutably before the mutable load would validate it twice.
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
+		assert_oracle_authority(*self.authority, &oracle.authority)?;
 		oracle.authority = args.new_authority;
 
 		Ok(())

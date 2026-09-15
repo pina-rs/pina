@@ -252,22 +252,23 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 		self.registry_config.assert_not_empty()?;
 		self.role_entry.assert_not_empty()?;
 
+		// One guard serves both the preconditions and the write. Holding a guard
+		// across an immutable reload of the same account would validate it twice.
+		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+
 		{
 			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
-			let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
-
 			self.admin.assert_address(&registry_config.admin)?;
-
-			if !role_entry.active.get() {
-				return Err(RegistryError::RoleInactive.into());
-			}
-
-			if role_entry.registry != *self.registry_config.address() {
-				return Err(RegistryError::InvalidPermissions.into());
-			}
 		}
 
-		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+		if !role_entry.active.get() {
+			return Err(RegistryError::RoleInactive.into());
+		}
+
+		if role_entry.registry != *self.registry_config.address() {
+			return Err(RegistryError::InvalidPermissions.into());
+		}
+
 		role_entry.permissions = args.permissions;
 
 		Ok(())
@@ -280,22 +281,23 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 		self.registry_config.assert_not_empty()?;
 		self.role_entry.assert_not_empty()?;
 
+		// One guard serves both the preconditions and the write. An immutable
+		// reload of the same account before the mutable load validates it twice.
+		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+
 		{
 			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
-			let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
-
 			self.admin.assert_address(&registry_config.admin)?;
-
-			if role_entry.registry != *self.registry_config.address() {
-				return Err(RegistryError::InvalidPermissions.into());
-			}
-
-			if !role_entry.active.get() {
-				return Err(RegistryError::RoleInactive.into());
-			}
 		}
 
-		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+		if role_entry.registry != *self.registry_config.address() {
+			return Err(RegistryError::InvalidPermissions.into());
+		}
+
+		if !role_entry.active.get() {
+			return Err(RegistryError::RoleInactive.into());
+		}
+
 		role_entry.active.set(false);
 
 		Ok(())
@@ -307,12 +309,10 @@ impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.registry_config.assert_not_empty()?;
 
-		{
-			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
-			self.admin.assert_address(&registry_config.admin)?;
-		}
-
+		// One guard serves both the admin check and the write. Reloading the
+		// account immutably before the mutable load would validate it twice.
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
+		self.admin.assert_address(&registry_config.admin)?;
 		registry_config.admin = *self.new_admin.address();
 
 		Ok(())
