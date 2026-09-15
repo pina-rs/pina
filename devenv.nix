@@ -1015,12 +1015,20 @@ in
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
         coverage:pina-test
-        # `tests/ui.rs` opts out of instrumentation, so the line above does not
-        # run it. Without this, the trybuild suite would run nowhere on a pull
-        # request: `test:all` only covers the post-merge and `ci-full` tiers.
-        # Running it here keeps it in the pull-request gate without putting its
-        # fixtures into the lcov report.
-        cargo test --locked -p pina_root --test ui
+        # `tests/ui.rs` opts out of instrumentation, so the run above skips it.
+        # Without this, the trybuild suite would run nowhere on a pull request:
+        # `test:all` only covers the post-merge and `ci-full` tiers. `--no-cfg-coverage`
+        # is what makes the opt-out effective here, since the plain `cargo test`
+        # this replaces inherits `cfg(coverage)` from the run above and the
+        # suite would skip again. The report is discarded: the suite is here to
+        # gate, not to contribute lines to lcov.
+        rm -rf "$DEVENV_ROOT/target/ui-llvm-cov-target"
+        CARGO_TARGET_DIR="$DEVENV_ROOT/target/ui-llvm-cov-target" cargo llvm-cov \
+          --no-cfg-coverage \
+          --no-report \
+          --locked \
+          -p pina_root \
+          --test ui
         cargo check \
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
           --all-targets \
