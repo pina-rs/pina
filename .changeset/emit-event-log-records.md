@@ -26,3 +26,7 @@ Generated Rust, TypeScript, and Dart clients already shipped decoders for those 
 `pina_test::ProgramTest` gains `simulate_logs`, which simulates one instruction and returns the program log lines it produced. Assertions can now read `Program data:` records without a separate RPC dance, which is how the new example tests observe emission.
 
 The Pina skill documents the `emit` helper, its `logs` feature requirement, and the log-size constraint on emitted records.
+
+## Compute units
+
+Emitting costs compute that the broken behavior never spent: the three `events_program` instructions move from 60/61/61 CU to 298/298/297 CU, which is `sol_log_data` for a 17-byte record. `scripts/compute-unit-policy.json` records those as approved runtime totals. This needs sign-off: the increase is the feature working, not framework overhead, and no other example is affected.

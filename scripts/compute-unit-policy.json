@@ -27,7 +27,10 @@
 	"runtimeApprovedTotals": {
 		"token_loader_cu_program/legacy_ata_success": 7723,
 		"token_loader_cu_program/legacy_ata_wrong_address": 7638,
-		"token_loader_cu_program/token_2022_ata_success": 3224
+		"token_loader_cu_program/token_2022_ata_success": 3224,
+		"events_program/initialize": 298,
+		"events_program/testEvent": 298,
+		"events_program/testEventCpi": 297
 	},
 	"runtimeExpectedOutcomes": {
 		"token_loader_cu_program/explicit_owner_assert_then_load": true,
