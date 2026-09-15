@@ -190,14 +190,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			&token_program,
 		)?);
 		self.escrow.assert_empty()?.assert_writable()?;
-		self.vault
-			.assert_empty()?
-			.assert_writable()?
-			.assert_associated_token_address(
-				self.escrow.address(),
-				self.mint_a.address(),
-				self.token_program.address(),
-			)?;
+		self.vault.assert_empty()?.assert_writable()?;
 
 		// ... create accounts and transfer tokens ...
 		Ok(())
@@ -212,7 +205,7 @@ Key validation patterns:
 - `as_token_mint_for_program` accepts only a canonical token program, checks the mint owner, and parses its concrete layout.
 - `as_associated_token_account` checks the canonical token-program owner, derived address, stored current authority, and stored mint. The escrow separately owns any required state, delegate, close-authority, and Token-2022 extension policy.
 - `assert_empty` and `assert_writable` validate the initialization state and runtime permissions. The creation builder validates the canonical PDA itself.
-- `assert_associated_token_address` derives and checks the empty vault ATA address before creation.
+- `assert_empty` and `assert_writable` cover the vault, and the `Create` CPI that follows binds the address: the associated token program derives the same `[wallet, token_program, mint]` seeds and rejects a mismatch with `InvalidSeeds` before it creates anything. Keep an explicit `assert_associated_token_address` only on validation-only paths that never reach an ATA instruction.
 
 Validation methods return the same reference type they receive, so mutable chains stay mutable all the way to `as_account_mut()`.
 
