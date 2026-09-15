@@ -30,20 +30,6 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
-							"name": "migrationVersion",
-							"defaultValueStrategy": "omitted",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"defaultValue": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
 							"name": "authority",
 							"type": {
 								"kind": "publicKeyTypeNode"
@@ -97,22 +83,6 @@
 								"number": 1
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						}
 					}
 				]
 			},
@@ -125,20 +95,6 @@
 						{
 							"kind": "structFieldTypeNode",
 							"name": "discriminator",
-							"defaultValueStrategy": "omitted",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"defaultValue": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
-							"name": "migrationVersion",
 							"defaultValueStrategy": "omitted",
 							"type": {
 								"kind": "numberTypeNode",
@@ -184,22 +140,6 @@
 								"number": 2
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						}
 					}
 				]
 			},
@@ -225,20 +165,6 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
-							"name": "migrationVersion",
-							"defaultValueStrategy": "omitted",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"defaultValue": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
 							"name": "name",
 							"type": {
 								"kind": "preOffsetTypeNode",
@@ -256,7 +182,7 @@
 										"strategy": "preOffset",
 										"type": {
 											"kind": "preOffsetTypeNode",
-											"offset": 2,
+											"offset": 1,
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
@@ -286,7 +212,7 @@
 										"strategy": "preOffset",
 										"type": {
 											"kind": "preOffsetTypeNode",
-											"offset": 3,
+											"offset": 2,
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
@@ -314,22 +240,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 3
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
 							}
 						}
 					}
@@ -409,20 +319,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 2
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "value",
 						"type": {
 							"kind": "numberTypeNode",
@@ -454,22 +350,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 0
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 2
 							}
 						}
 					}
@@ -629,20 +509,6 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
-							"name": "migrationVersion",
-							"defaultValueStrategy": "omitted",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"defaultValue": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						},
-						{
-							"kind": "structFieldTypeNode",
 							"name": "value",
 							"type": {
 								"kind": "numberTypeNode",
@@ -675,22 +541,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 4
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
 							}
 						}
 					}

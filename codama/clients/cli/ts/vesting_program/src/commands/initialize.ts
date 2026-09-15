@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getInitializeInstruction } from "../client";
+import { getInitializeInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -24,9 +24,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--beneficiary <beneficiary>", "The `beneficiary` account")
 	.requiredOption("--mint <mint>", "The `mint` account")
-	.requiredOption(
+	.option(
 		"--vesting-state <vestingState>",
-		"The `vesting_state` account",
+		"The `vesting_state` account [default: derived]",
 	)
 	.requiredOption("--vault <vault>", "The `vault` account")
 	.requiredOption(
@@ -44,11 +44,11 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			admin: context.payer,
 			beneficiary: pubkey("--beneficiary", options.beneficiary),
 			mint: pubkey("--mint", options.mint),
-			vestingState: pubkey("--vesting-state", options.vestingState),
+			vestingState: options.vestingState,
 			vault: pubkey("--vault", options.vault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
-		const instruction = getInitializeInstruction(
+		const instruction = await getInitializeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

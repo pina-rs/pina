@@ -39,7 +39,6 @@ import {
 import {
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const STATE_DISCRIMINATOR = 1;
@@ -48,15 +47,8 @@ export function getStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(STATE_DISCRIMINATOR);
 }
 
-export const STATE_DISCRIMINATOR2 = 2;
-
-export function getStateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(STATE_DISCRIMINATOR2);
-}
-
 export type State = {
 	discriminator: number;
-	migrationVersion: number;
 	authority: Address;
 	value: bigint;
 	enabled: boolean;
@@ -75,13 +67,12 @@ export function getStateEncoder(): FixedSizeEncoder<StateArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["authority", getAddressEncoder()],
 			["value", getU64Encoder()],
 			["enabled", getBooleanEncoder()],
 			["revision", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 2 }),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -92,7 +83,6 @@ export function getStateDecoder(): FixedSizeDecoder<State> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
 		["authority", getAddressDecoder()],
 		["value", getU64Decoder()],
 		["enabled", getPinaPodBooleanDecoder()],
@@ -156,32 +146,4 @@ export async function fetchAllMaybeState(
 ): Promise<MaybeAccount<State>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeState(maybeAccount));
-}
-
-/** The account schema version this client was generated from. */
-export const STATE_MIGRATION_VERSION = 2;
-
-/**
- * Cheap envelope check for a fetched `State` account: `true` only when the
- * bytes name this account's discriminator and a migration version older than
- * this client's schema. Those are exactly the accounts
- * {@link getMigrateInstruction} can bring current; every other mismatch is
- * reported by the decoder when the account is decoded.
- *
- * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (stateNeedsMigration(data)) {
- * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ state: address, payer }).make());
- * }
- * ```
- */
-export function stateNeedsMigration(data: ReadonlyUint8Array): boolean {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] !== 1) {
-		return false;
-	}
-	return data[1]! < 2;
 }

@@ -14,14 +14,11 @@
 #[pinapod(compact)]
 pub struct CompactState {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub name: pina::String<4>,
 	pub tags: pina::Vec<u16, 2>,
 }
 
 pub const COMPACT_STATE_DISCRIMINATOR: u8 = 3u8;
-
-pub const COMPACT_STATE_MIGRATION_VERSION: u8 = 1u8;
 
 impl CompactState {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
@@ -32,7 +29,6 @@ impl CompactState {
 	) -> Result<usize, solana_program_error::ProgramError> {
 		patch
 			.discriminator(COMPACT_STATE_DISCRIMINATOR)
-			.migration_version(COMPACT_STATE_MIGRATION_VERSION)
 			.initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
@@ -45,19 +41,6 @@ impl CompactState {
 		if account.discriminator != COMPACT_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != COMPACT_STATE_MIGRATION_VERSION {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
 		Ok(account)
-	}
-}
-
-/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
-/// [`COMPACT_STATE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
-pub fn compact_state_needs_migration(data: &[u8]) -> bool {
-	data.len() >= 2 && data[0] == 3 && {
-		let mut version = [0_u8; 8];
-		version[..1].copy_from_slice(&data[1..2]);
-		u64::from_le_bytes(version) < 1
 	}
 }

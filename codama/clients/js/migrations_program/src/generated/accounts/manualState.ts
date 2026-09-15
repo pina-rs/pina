@@ -39,7 +39,6 @@ import {
 	getPinaPodBoundedStringDecoder,
 	getPinaPodBoundedStringEncoder,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 	getPinaPodUtf8Decoder,
 } from "../pinaPodCodecs";
 
@@ -49,17 +48,7 @@ export function getManualStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MANUAL_STATE_DISCRIMINATOR);
 }
 
-export const MANUAL_STATE_DISCRIMINATOR2 = 2;
-
-export function getManualStateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(MANUAL_STATE_DISCRIMINATOR2);
-}
-
-export type ManualState = {
-	discriminator: number;
-	migrationVersion: number;
-	code: string;
-};
+export type ManualState = { discriminator: number; code: string };
 
 export type ManualStateArgs = { code: string };
 
@@ -67,41 +56,31 @@ export type ManualStateArgs = { code: string };
 export function getManualStateEncoder(): Encoder<ManualStateArgs> {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], [
 			"code",
 			getPinaPodBoundedStringEncoder(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
 				5,
 			),
 		]]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 2 }),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
 /** Gets the decoder for {@link ManualState} account data. */
 export function getManualStateDecoder(): Decoder<ManualState> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				MANUAL_STATE_DISCRIMINATOR,
-				getU8Decoder(),
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(MANUAL_STATE_DISCRIMINATOR, getU8Decoder()),
+	], [
+		"code",
+		getPinaPodBoundedStringDecoder(
+			addDecoderSizePrefix(
+				getPinaPodUtf8Decoder(),
+				getPinaPodBoundedCountDecoder(getU8Decoder(), 5),
 			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
-		[
-			"code",
-			getPinaPodBoundedStringDecoder(
-				addDecoderSizePrefix(
-					getPinaPodUtf8Decoder(),
-					getPinaPodBoundedCountDecoder(getU8Decoder(), 5),
-				),
-				5,
-			),
-		],
-	]);
+			5,
+		),
+	]]);
 }
 
 /** Gets the codec for {@link ManualState} account data. */
@@ -160,32 +139,4 @@ export async function fetchAllMaybeManualState(
 ): Promise<MaybeAccount<ManualState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeManualState(maybeAccount));
-}
-
-/** The account schema version this client was generated from. */
-export const MANUAL_STATE_MIGRATION_VERSION = 2;
-
-/**
- * Cheap envelope check for a fetched `ManualState` account: `true` only when the
- * bytes name this account's discriminator and a migration version older than
- * this client's schema. Those are exactly the accounts
- * {@link getMigrateInstruction} can bring current; every other mismatch is
- * reported by the decoder when the account is decoded.
- *
- * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (manualStateNeedsMigration(data)) {
- * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ manualState: address, payer }).make());
- * }
- * ```
- */
-export function manualStateNeedsMigration(data: ReadonlyUint8Array): boolean {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] !== 2) {
-		return false;
-	}
-	return data[1]! < 2;
 }

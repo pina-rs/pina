@@ -14,13 +14,10 @@
 #[pinapod(compact)]
 pub struct ManualState {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub code: pina::String<5>,
 }
 
 pub const MANUAL_STATE_DISCRIMINATOR: u8 = 2u8;
-
-pub const MANUAL_STATE_MIGRATION_VERSION: u8 = 2u8;
 
 impl ManualState {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
@@ -31,7 +28,6 @@ impl ManualState {
 	) -> Result<usize, solana_program_error::ProgramError> {
 		patch
 			.discriminator(MANUAL_STATE_DISCRIMINATOR)
-			.migration_version(MANUAL_STATE_MIGRATION_VERSION)
 			.initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
@@ -44,19 +40,6 @@ impl ManualState {
 		if account.discriminator != MANUAL_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != MANUAL_STATE_MIGRATION_VERSION {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
 		Ok(account)
-	}
-}
-
-/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
-/// [`MANUAL_STATE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
-pub fn manual_state_needs_migration(data: &[u8]) -> bool {
-	data.len() >= 2 && data[0] == 2 && {
-		let mut version = [0_u8; 8];
-		version[..1].copy_from_slice(&data[1..2]);
-		u64::from_le_bytes(version) < 2
 	}
 }

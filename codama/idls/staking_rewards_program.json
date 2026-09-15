@@ -240,7 +240,32 @@
 						"name": "poolState",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "pool"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "stakeMint",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "stakeMint"
+									}
+								},
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "rewardMint",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "rewardMint"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

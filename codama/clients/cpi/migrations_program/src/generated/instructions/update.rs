@@ -71,15 +71,15 @@ pub struct UpdateIx {
 
 impl UpdateIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 12;
+	pub const LEN: usize = 11;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 12], ProgramError> {
-		let mut data = [0u8; 12];
-		data[..2].copy_from_slice(&UPDATE_DISCRIMINATOR);
-		data[2..10].copy_from_slice(&self.value.to_le_bytes());
-		data[10..12].copy_from_slice(&self.memo.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 11], ProgramError> {
+		let mut data = [0u8; 11];
+		data[..1].copy_from_slice(&UPDATE_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.value.to_le_bytes());
+		data[9..11].copy_from_slice(&self.memo.to_le_bytes());
 
 		Ok(data)
 	}
@@ -133,4 +133,4 @@ impl<'account> Update<'account> {
 	}
 }
 
-const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 2];
+const UPDATE_DISCRIMINATOR: [u8; 1] = [0];

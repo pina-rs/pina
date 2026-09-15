@@ -47,7 +47,6 @@ import {
 	getPinaPodBoundedStringDecoder,
 	getPinaPodBoundedStringEncoder,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 	getPinaPodUtf8Decoder,
 } from "../pinaPodCodecs";
 
@@ -57,15 +56,8 @@ export function getCompactStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(COMPACT_STATE_DISCRIMINATOR);
 }
 
-export const COMPACT_STATE_DISCRIMINATOR2 = 1;
-
-export function getCompactStateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(COMPACT_STATE_DISCRIMINATOR2);
-}
-
 export type CompactState = {
 	discriminator: number;
-	migrationVersion: number;
 	name: string;
 	tags: Array<number>;
 };
@@ -76,16 +68,13 @@ export type CompactStateArgs = { name: string; tags: Array<number> };
 export function getCompactStateEncoder(): Encoder<CompactStateArgs> {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], [
 			"name",
 			offsetEncoder(
 				getPinaPodBoundedStringEncoder(
 					addEncoderSizePrefix(
 						getUtf8Encoder(),
 						offsetEncoder(
-							offsetEncoder(getU8Encoder(), { preOffset: () => 2 }),
+							offsetEncoder(getU8Encoder(), { preOffset: () => 1 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					),
@@ -98,67 +87,58 @@ export function getCompactStateEncoder(): Encoder<CompactStateArgs> {
 			getPinaPodBoundedArrayEncoder(
 				getArrayEncoder(getU16Encoder(), {
 					size: offsetEncoder(
-						offsetEncoder(getU16Encoder(), { preOffset: () => 3 }),
+						offsetEncoder(getU16Encoder(), { preOffset: () => 2 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				2,
 			),
 		]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 1 }),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
 /** Gets the decoder for {@link CompactState} account data. */
 export function getCompactStateDecoder(): Decoder<CompactState> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				COMPACT_STATE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(1, getU8Decoder())],
-		[
-			"name",
-			offsetDecoder(
-				getPinaPodBoundedStringDecoder(
-					addDecoderSizePrefix(
-						getPinaPodUtf8Decoder(),
-						getPinaPodBoundedCountDecoder(
-							offsetDecoder(
-								offsetDecoder(getU8Decoder(), { preOffset: () => 2 }),
-								{ postOffset: ({ preOffset }) => preOffset + 0 },
-							),
-							4,
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(COMPACT_STATE_DISCRIMINATOR, getU8Decoder()),
+	], [
+		"name",
+		offsetDecoder(
+			getPinaPodBoundedStringDecoder(
+				addDecoderSizePrefix(
+					getPinaPodUtf8Decoder(),
+					getPinaPodBoundedCountDecoder(
+						offsetDecoder(
+							offsetDecoder(getU8Decoder(), { preOffset: () => 1 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
+						4,
 					),
-					4,
 				),
-				{ preOffset: ({ preOffset }) => preOffset + 3 },
+				4,
 			),
-		],
-		[
-			"tags",
-			getPinaPodBoundedArrayDecoder(
-				getArrayDecoder(getU16Decoder(), {
-					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 3 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
-					),
-				}),
-				getPinaPodBoundedCountDecoder(
-					offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 3 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
-					),
-					2,
+			{ preOffset: ({ preOffset }) => preOffset + 3 },
+		),
+	], [
+		"tags",
+		getPinaPodBoundedArrayDecoder(
+			getArrayDecoder(getU16Decoder(), {
+				size: offsetDecoder(
+					offsetDecoder(getU16Decoder(), { preOffset: () => 2 }),
+					{ postOffset: ({ preOffset }) => preOffset + 0 },
 				),
+			}),
+			getPinaPodBoundedCountDecoder(
+				offsetDecoder(offsetDecoder(getU16Decoder(), { preOffset: () => 2 }), {
+					postOffset: ({ preOffset }) => preOffset + 0,
+				}),
 				2,
 			),
-		],
-	]);
+			2,
+		),
+	]]);
 }
 
 /** Gets the codec for {@link CompactState} account data. */
@@ -217,32 +197,4 @@ export async function fetchAllMaybeCompactState(
 ): Promise<MaybeAccount<CompactState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeCompactState(maybeAccount));
-}
-
-/** The account schema version this client was generated from. */
-export const COMPACT_STATE_MIGRATION_VERSION = 1;
-
-/**
- * Cheap envelope check for a fetched `CompactState` account: `true` only when the
- * bytes name this account's discriminator and a migration version older than
- * this client's schema. Those are exactly the accounts
- * {@link getMigrateInstruction} can bring current; every other mismatch is
- * reported by the decoder when the account is decoded.
- *
- * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (compactStateNeedsMigration(data)) {
- * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ compactState: address, payer }).make());
- * }
- * ```
- */
-export function compactStateNeedsMigration(data: ReadonlyUint8Array): boolean {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] !== 3) {
-		return false;
-	}
-	return data[1]! < 1;
 }

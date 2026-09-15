@@ -45,10 +45,10 @@ import {
 	type DeactivateRoleInput,
 	getAddRoleInstruction,
 	getDeactivateRoleInstruction,
-	getInitializeInstruction,
+	getInitializeInstructionAsync,
 	getRotateAdminInstruction,
 	getUpdateRoleInstruction,
-	type InitializeInput,
+	type InitializeAsyncInput,
 	parseAddRoleInstruction,
 	type ParsedAddRoleInstruction,
 	type ParsedDeactivateRoleInstruction,
@@ -210,8 +210,10 @@ export type RoleRegistryProgramPluginAccounts = {
 
 export type RoleRegistryProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	addRole: (
 		input: AddRoleInput,
 	) => ReturnType<typeof getAddRoleInstruction> & SelfPlanAndSendFunctions;
@@ -255,7 +257,7 @@ export function roleRegistryProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					addRole: (input) =>
 						addSelfPlanAndSendFunctions(client, getAddRoleInstruction(input)),

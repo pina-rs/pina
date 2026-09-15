@@ -53,7 +53,6 @@ import {
 	type RelayInput,
 	type UpdateInput,
 } from "../instructions";
-import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
 export const MIGRATIONS_PROGRAM_PROGRAM_ADDRESS =
 	"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS" as Address<
@@ -70,18 +69,15 @@ export function identifyMigrationsProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MigrationsProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(2), 1)
-	) return MigrationsProgramAccount.State;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(2), 1)
-	) return MigrationsProgramAccount.ManualState;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(1), 1)
-	) return MigrationsProgramAccount.CompactState;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return MigrationsProgramAccount.State;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return MigrationsProgramAccount.ManualState;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return MigrationsProgramAccount.CompactState;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "migrationsProgram" },
@@ -96,10 +92,9 @@ export function identifyMigrationsProgramEvent(
 	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MigrationsProgramEvent {
 	const data = "data" in event ? event.data : event;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(1), 1)
-	) return MigrationsProgramEvent.ValueChangedEvent;
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return MigrationsProgramEvent.ValueChangedEvent;
+	}
 	throw new Error(
 		"The provided event could not be identified as a migrationsProgram event.",
 	);
@@ -114,10 +109,9 @@ export function identifyMigrationsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MigrationsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(2), 1)
-	) return MigrationsProgramInstruction.Update;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return MigrationsProgramInstruction.Update;
+	}
 	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
 		return MigrationsProgramInstruction.Relay;
 	}
@@ -213,8 +207,6 @@ export function migrationsProgramProgram() {
 					compactState: addSelfFetchFunctions(client, getCompactStateCodec()),
 				},
 				instructions: {
-					migrate: (input: MigrateInput) =>
-						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					update: (input) =>
 						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
 					relay: (input) =>

@@ -16,57 +16,15 @@ import {
 	type ValueChangedEventEvent,
 } from "./valueChangedEvent.js";
 
-interface ValueChangedEventEventProjectionStep {
-	readonly from: number;
-	readonly to: number;
-	readonly automatic: boolean;
-	readonly sourcePayloadSize: number;
-	readonly destinationPayloadSize: number;
-	readonly moves: readonly (readonly [number, number, number])[];
-}
-
 /**
- * Adjacent projections derived from the checked-in migration manifest.
- * Adjacent steps compose, mirroring the runtime's `normalize_event_data`.
- */
-const VALUE_CHANGED_EVENT_EVENT_PROJECTION_STEPS:
-	readonly ValueChangedEventEventProjectionStep[] = [
-		{
-			from: 0,
-			to: 1,
-			automatic: true,
-			sourcePayloadSize: 8,
-			destinationPayloadSize: 10,
-			moves: [[0, 0, 8]],
-		},
-	];
-
-/** Versions whose adjacent transition is manual and not derivable in clients. */
-const VALUE_CHANGED_EVENT_EVENT_MANUAL_VERSIONS: readonly number[] = [];
-
-const VALUE_CHANGED_EVENT_EVENT_HEADER_SIZE = 2;
-const VALUE_CHANGED_EVENT_EVENT_CURRENT_VERSION = 1;
-
-/** Raw event bytes with their source version and whether a projection ran. */
-export type NormalizedValueChangedEventEvent = {
-	name: "valueChangedEvent";
-	data: ValueChangedEventEvent;
-	sourceVersion: number;
-	wasMigrated: boolean;
-};
-
-/**
- * Decode one event record, projecting historical versions into the current
- * shape and retaining the version that actually wrote the bytes.
- *
- * Unknown, future, and non-projectable versions fail closed with the reason.
+ * Decode one current-layout event record: the event has no version envelope; only its current layout decodes.
  */
 export function normalizeValueChangedEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): NormalizedValueChangedEventEvent {
+): DecodedValueChangedEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getValueChangedEventEventDiscriminatorBytes();
-	if (bytes.length < VALUE_CHANGED_EVENT_EVENT_HEADER_SIZE) {
+	if (bytes.length < 1) {
 		throw new RangeError(
 			`the provided data is too short for the "ValueChangedEventEvent" event envelope`,
 		);
@@ -78,37 +36,21 @@ export function normalizeValueChangedEventEvent(
 			);
 		}
 	}
-	const sourceVersion = bytes[1];
-	if (sourceVersion === VALUE_CHANGED_EVENT_EVENT_CURRENT_VERSION) {
-		return {
-			name: "valueChangedEvent",
-			data: getValueChangedEventEventDecoder().decode(bytes),
-			sourceVersion,
-			wasMigrated: false,
-		};
-	}
-	if (sourceVersion > VALUE_CHANGED_EVENT_EVENT_CURRENT_VERSION) {
-		throw new RangeError(
-			`event migration version mismatch: expected 1, received ${sourceVersion} (the log was written by a newer program; upgrade this client)`,
-		);
-	}
-	const projected = projectValueChangedEventEvent(bytes, sourceVersion);
 	return {
 		name: "valueChangedEvent",
-		data: getValueChangedEventEventDecoder().decode(projected),
-		sourceVersion,
-		wasMigrated: true,
+		data: getValueChangedEventEventDecoder().decode(bytes),
 	};
 }
 
 /** One log entry that named this event. */
-export type DecodedValueChangedEventEvent = NormalizedValueChangedEventEvent;
+export type DecodedValueChangedEventEvent = {
+	name: "valueChangedEvent";
+	data: ValueChangedEventEvent;
+};
 
 /**
  * Decode a `Program data:` log line, or return `null` when the line is not
  * this event.
- *
- * Lines that name the event but carry an unprojectable version throw.
  */
 export function parseValueChangedEventEventFromLog(
 	log: string,
@@ -128,51 +70,6 @@ export function parseValueChangedEventEventFromLog(
 		}
 	}
 	return normalizeValueChangedEventEvent(bytes);
-}
-
-function projectValueChangedEventEvent(
-	bytes: Uint8Array,
-	sourceVersion: number,
-): Uint8Array {
-	const discriminatorBytes = getValueChangedEventEventDiscriminatorBytes();
-	let version = sourceVersion;
-	let payload = bytes.slice(VALUE_CHANGED_EVENT_EVENT_HEADER_SIZE);
-	while (version !== VALUE_CHANGED_EVENT_EVENT_CURRENT_VERSION) {
-		const step = VALUE_CHANGED_EVENT_EVENT_PROJECTION_STEPS.find(
-			(candidate) => candidate.from === version,
-		);
-		if (step === undefined || !step.automatic) {
-			const reason = VALUE_CHANGED_EVENT_EVENT_MANUAL_VERSIONS.includes(version)
-				? "its adjacent transition is manual, so only an on-chain projection or a client generated from that schema can represent it"
-				: "this client has no checked-in projection for it";
-			throw new RangeError(
-				`event migration version mismatch: expected 1, received ${version} (${reason})`,
-			);
-		}
-		if (payload.length !== step.sourcePayloadSize) {
-			throw new RangeError(
-				`event migration version mismatch: expected 1, received ${version} (the log length does not match the v${version} schema)`,
-			);
-		}
-		const destination = new Uint8Array(step.destinationPayloadSize);
-		for (const [sourceOffset, destinationOffset, size] of step.moves) {
-			destination.set(
-				payload.subarray(sourceOffset, sourceOffset + size),
-				destinationOffset,
-			);
-		}
-		payload = destination;
-		version = step.to;
-	}
-
-	const projected = new Uint8Array(
-		VALUE_CHANGED_EVENT_EVENT_HEADER_SIZE + payload.length,
-	);
-	projected.set(discriminatorBytes, 0);
-	const header = 1;
-	projected[header] = 1;
-	projected.set(payload, VALUE_CHANGED_EVENT_EVENT_HEADER_SIZE);
-	return projected;
 }
 
 /** Every event this program can emit, as decoded from a log line. */
