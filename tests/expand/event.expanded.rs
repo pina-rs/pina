@@ -424,6 +424,34 @@ impl TransferEvent {
         }
         Ok(value)
     }
+    /// Build this event's complete record and emit it to the transaction log.
+    ///
+    /// This is the on-chain producer for the `Program data:` records that
+    /// generated Rust, TypeScript, and Dart clients decode. The record is
+    /// built by [`Self::initialize`], so it carries the discriminator and
+    /// any schema version envelope and passes the same structural and
+    /// application validation that [`Self::try_from_bytes`] enforces.
+    ///
+    /// Emission is a log write, so an emitted event is observable to
+    /// clients but does not affect program state. Propagate the returned
+    /// error with `?`: a program built without the `logs` feature cannot
+    /// emit, and silently discarding the record hides that.
+    ///
+    /// # Errors
+    ///
+    /// Returns the generated invalid-data error when the record has the
+    /// wrong length, the closure fails, or validation rejects the
+    /// completed representation. Returns `UnsupportedSysvar` when the
+    /// `logs` feature is disabled.
+    pub fn emit(
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<(), pina::ProgramError> {
+        let mut record = [0u8; Self::SIZE];
+        let _ = Self::initialize(&mut record, initialize)?;
+        pina::emit_event(&record)
+    }
 }
 impl pina::HasDiscriminator for TransferEvent {
     type Type = EventDisc;
@@ -618,6 +646,34 @@ impl InitEvent {
         }
         Ok(value)
     }
+    /// Build this event's complete record and emit it to the transaction log.
+    ///
+    /// This is the on-chain producer for the `Program data:` records that
+    /// generated Rust, TypeScript, and Dart clients decode. The record is
+    /// built by [`Self::initialize`], so it carries the discriminator and
+    /// any schema version envelope and passes the same structural and
+    /// application validation that [`Self::try_from_bytes`] enforces.
+    ///
+    /// Emission is a log write, so an emitted event is observable to
+    /// clients but does not affect program state. Propagate the returned
+    /// error with `?`: a program built without the `logs` feature cannot
+    /// emit, and silently discarding the record hides that.
+    ///
+    /// # Errors
+    ///
+    /// Returns the generated invalid-data error when the record has the
+    /// wrong length, the closure fails, or validation rejects the
+    /// completed representation. Returns `UnsupportedSysvar` when the
+    /// `logs` feature is disabled.
+    pub fn emit(
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<(), pina::ProgramError> {
+        let mut record = [0u8; Self::SIZE];
+        let _ = Self::initialize(&mut record, initialize)?;
+        pina::emit_event(&record)
+    }
 }
 impl pina::HasDiscriminator for InitEvent {
     type Type = EventDisc;
@@ -768,6 +824,34 @@ impl EmptyEvent {
             return Err(error);
         }
         Ok(value)
+    }
+    /// Build this event's complete record and emit it to the transaction log.
+    ///
+    /// This is the on-chain producer for the `Program data:` records that
+    /// generated Rust, TypeScript, and Dart clients decode. The record is
+    /// built by [`Self::initialize`], so it carries the discriminator and
+    /// any schema version envelope and passes the same structural and
+    /// application validation that [`Self::try_from_bytes`] enforces.
+    ///
+    /// Emission is a log write, so an emitted event is observable to
+    /// clients but does not affect program state. Propagate the returned
+    /// error with `?`: a program built without the `logs` feature cannot
+    /// emit, and silently discarding the record hides that.
+    ///
+    /// # Errors
+    ///
+    /// Returns the generated invalid-data error when the record has the
+    /// wrong length, the closure fails, or validation rejects the
+    /// completed representation. Returns `UnsupportedSysvar` when the
+    /// `logs` feature is disabled.
+    pub fn emit(
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<(), pina::ProgramError> {
+        let mut record = [0u8; Self::SIZE];
+        let _ = Self::initialize(&mut record, initialize)?;
+        pina::emit_event(&record)
     }
 }
 impl pina::HasDiscriminator for EmptyEvent {
@@ -1018,6 +1102,34 @@ impl AuditEvent {
             return Err(error);
         }
         Ok(value)
+    }
+    /// Build this event's complete record and emit it to the transaction log.
+    ///
+    /// This is the on-chain producer for the `Program data:` records that
+    /// generated Rust, TypeScript, and Dart clients decode. The record is
+    /// built by [`Self::initialize`], so it carries the discriminator and
+    /// any schema version envelope and passes the same structural and
+    /// application validation that [`Self::try_from_bytes`] enforces.
+    ///
+    /// Emission is a log write, so an emitted event is observable to
+    /// clients but does not affect program state. Propagate the returned
+    /// error with `?`: a program built without the `logs` feature cannot
+    /// emit, and silently discarding the record hides that.
+    ///
+    /// # Errors
+    ///
+    /// Returns the generated invalid-data error when the record has the
+    /// wrong length, the closure fails, or validation rejects the
+    /// completed representation. Returns `UnsupportedSysvar` when the
+    /// `logs` feature is disabled.
+    pub fn emit(
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<(), pina::ProgramError> {
+        let mut record = [0u8; Self::SIZE];
+        let _ = Self::initialize(&mut record, initialize)?;
+        pina::emit_event(&record)
     }
 }
 impl pina::HasDiscriminator for AuditEvent {
