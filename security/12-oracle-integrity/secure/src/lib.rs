@@ -5,6 +5,7 @@
 //! than a hard staleness bound. A malicious or abandoned feed cannot price
 //! loans in this market.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

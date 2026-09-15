@@ -18,6 +18,7 @@
 //! - `Update` — allow a fixed global updater to publish a new price
 //! - `RotateAuthority` — let the oracle authority rotate its control key
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

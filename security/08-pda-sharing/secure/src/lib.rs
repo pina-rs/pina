@@ -3,6 +3,7 @@
 //! Each account type uses a unique seed prefix, ensuring distinct PDA
 //! address spaces.
 
+#![allow(missing_docs)]
 #![allow(dead_code)]
 #![no_std]
 

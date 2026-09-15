@@ -13,6 +13,7 @@
 //! example README and the book's production-readiness guide before adapting it
 //! for an asset-bearing program.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

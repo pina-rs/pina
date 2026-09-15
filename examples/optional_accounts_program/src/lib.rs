@@ -15,6 +15,7 @@
 //! | `Inspect`   | `witness: Option<&AccountView>`   | Must be a signer.                 |
 //! | `Note`      | `note: Option<&AccountView>`      | Logged as an opaque reference.    |
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

@@ -3,6 +3,7 @@
 //! Verifies that provided clock, rent, and stake-history accounts are the
 //! expected sysvar accounts.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

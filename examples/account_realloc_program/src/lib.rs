@@ -6,6 +6,7 @@
 //! canonical `[b"sample", authority]` PDA; it cannot resize an arbitrary
 //! program-owned account merely by presenting it as writable.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![expect(
 	clippy::len_without_is_empty,

@@ -3,6 +3,7 @@
 //! Verifies a signer authority plus a wallet account owned by the system
 //! program.
 
+#![allow(missing_docs)]
 #![allow(clippy::inline_always)]
 #![no_std]
 

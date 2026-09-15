@@ -28,6 +28,7 @@ where
 	Err(ProgramError::InvalidAccountData)
 }
 
+/// SPL Token state re-exports with pina compatibility aliases.
 pub mod state {
 	pub use pinocchio_token::state::*;
 

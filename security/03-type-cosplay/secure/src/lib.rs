@@ -3,6 +3,7 @@
 //! This program validates the discriminator before deserialization, preventing
 //! one account type from being used where another is expected.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]

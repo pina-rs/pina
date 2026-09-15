@@ -2,6 +2,7 @@
 //!
 //! This program zeros account data before closing, preventing revival attacks.
 
+#![allow(missing_docs)]
 #![no_std]
 
 #[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]
