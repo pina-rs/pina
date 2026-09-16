@@ -3013,3 +3013,129 @@ fn flag_answers_contradicting_persisted_answers_fail_closed() {
 		"{removal_conflict}"
 	);
 }
+
+/// The generated ABI layout test is the machine-checked replacement for the
+/// hand-written offset asserts every consumer maintains today. It must record
+/// the current size, every field offset, and the envelope geometry from the
+/// manifest, and it must go stale when the schema changes.
+#[test]
+fn abi_layout_test_records_manifest_geometry() {
+	let fixture = publication_fixture();
+	make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.unwrap_or_else(|error| panic!("make migrations: {error}"));
+
+	let generated = std::fs::read_to_string(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read generated abi layout test: {error}"));
+
+	// The test file pins the discriminator envelope geometry ...
+	assert!(
+		generated.contains("VERSION_OFFSET"),
+		"must assert the version offset: {generated}"
+	);
+	// ... the total fixed size ...
+	assert!(
+		generated.contains("SIZE"),
+		"must assert the account size: {generated}"
+	);
+	// ... and each field's offset, so an envelope change that shifts bytes
+	// fails the build instead of a hand-written decoder.
+	assert!(
+		generated.contains("value"),
+		"must assert the `value` field offset: {generated}"
+	);
+	assert!(
+		generated.contains("40") || generated.contains("offset_of"),
+		"must carry the computed offset: {generated}"
+	);
+}
+
+/// Regeneration must be idempotent: running `make` twice produces identical
+/// bytes, so `check` can compare content instead of guessing.
+#[test]
+fn abi_layout_test_regeneration_is_stable() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("first make: {error}"));
+	let first = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read first: {error}"));
+
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("second make: {error}"));
+	let second = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read second: {error}"));
+
+	assert_eq!(first, second, "regeneration must be byte-stable");
+}
+
+/// A stale generated test is a failure, not a silent pass: `check` must report
+/// it so the drift is fixed in the same change that moved the layout.
+#[test]
+fn check_rejects_a_stale_abi_layout_test() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+
+	// Simulate a hand edit that no longer matches the manifest.
+	std::fs::write(
+		fixture.root.join(ABI_LAYOUT_TEST_PATH),
+		"// stale\nfn main() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write stale test: {error}"));
+
+	let error =
+		check_migrations(&fixture.root).expect_err("a stale abi layout test must fail the check");
+	assert!(
+		error.to_string().contains("abi_layout") || error.to_string().contains("layout test"),
+		"the error must name the stale layout test: {error}"
+	);
+}
+
+/// A missing generated test is also stale: the account has migration history,
+/// so the guard file is required.
+#[test]
+fn check_requires_the_abi_layout_test_when_history_exists() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+	std::fs::remove_file(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("remove test: {error}"));
+
+	let error =
+		check_migrations(&fixture.root).expect_err("a missing abi layout test must fail the check");
+	assert!(
+		error.to_string().contains("abi_layout") || error.to_string().contains("layout test"),
+		"the error must name the missing layout test: {error}"
+	);
+}
+
+/// A current, matching test passes the check.
+#[test]
+fn check_accepts_a_current_abi_layout_test() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+
+	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check: {error}"));
+}

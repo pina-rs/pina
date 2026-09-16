@@ -1,6 +1,7 @@
 //! Migrations CLI: schema diffing, transition generation, publication
 //! bookkeeping, and the disambiguation flow that ties them together.
 
+mod abi_layout;
 mod build_script;
 mod cost;
 mod diff;
@@ -21,6 +22,8 @@ use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use abi_layout::ABI_LAYOUT_TEST_PATH;
+use abi_layout::generate as generate_abi_layout;
 pub use build_script::BuildScriptStatus;
 use build_script::ensure_build_script;
 use build_script::verify_build_script;
@@ -155,6 +158,17 @@ pub enum MigrationError {
 
 	#[error("Invalid migration history: {0}")]
 	InvalidHistory(String),
+
+	#[error(
+		"The generated ABI layout test {path} is stale and no longer matches the manifest. Run \
+		 `pina migrations make` to regenerate it."
+	)]
+	AbiLayoutTestStale { path: PathBuf },
+
+	#[error(
+		"The generated ABI layout test {path} is missing. Run `pina migrations make` to create it."
+	)]
+	AbiLayoutTestMissing { path: PathBuf },
 
 	#[error("Migration history belongs to program {found}, but current source declares {expected}")]
 	ProgramIdentityChanged { expected: String, found: String },
@@ -508,6 +522,7 @@ pub fn make_migrations_with_answers(
 		.map_err(MigrationError::InvalidHistory)?;
 	write_json_atomic(&manifest_path, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
+	write_abi_layout_test(&project.program_dir, &manifest, Some(&project.library_name))?;
 	output.auto = manifest
 		.auto
 		.iter()
@@ -517,6 +532,62 @@ pub fn make_migrations_with_answers(
 		output.build_script = Some(ensure_build_script(&project.program_dir)?);
 	}
 	Ok(output)
+}
+
+/// Write the machine-checked ABI layout test.
+///
+/// The file is a deterministic function of the manifest, so an unchanged
+/// program regenerates identical bytes and [`check_project_migrations`] can
+/// compare content instead of tracking a hash.
+fn write_abi_layout_test(
+	program_dir: &Path,
+	manifest: &MigrationManifest,
+	crate_name: Option<&str>,
+) -> Result<(), MigrationError> {
+	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
+	let generated = generate_abi_layout(manifest, crate_name);
+	if let Some(existing) = abi_layout::read_existing(program_dir).map_err(|source| {
+		MigrationError::Read {
+			path: path.clone(),
+			source,
+		}
+	})? {
+		if existing == generated {
+			return Ok(());
+		}
+	}
+	if let Some(parent) = path.parent() {
+		std::fs::create_dir_all(parent).map_err(|source| {
+			MigrationError::CreateDirectory {
+				path: parent.to_path_buf(),
+				source,
+			}
+		})?;
+	}
+	std::fs::write(&path, generated).map_err(|source| MigrationError::Write { path, source })
+}
+
+/// Fail when the checked-in ABI layout test no longer matches the manifest.
+///
+/// A stale file means a schema change shipped without regenerating the guard,
+/// which is exactly the case that let a hand-maintained offset drift.
+fn verify_abi_layout_test(
+	program_dir: &Path,
+	manifest: &MigrationManifest,
+	crate_name: Option<&str>,
+) -> Result<(), MigrationError> {
+	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
+	let expected = generate_abi_layout(manifest, crate_name);
+	match abi_layout::read_existing(program_dir).map_err(|source| {
+		MigrationError::Read {
+			path: path.clone(),
+			source,
+		}
+	})? {
+		Some(existing) if existing == expected => Ok(()),
+		Some(_) => Err(MigrationError::AbiLayoutTestStale { path }),
+		None => Err(MigrationError::AbiLayoutTestMissing { path }),
+	}
 }
 
 /// Reject an explicit `migrations = false` on a contract already recorded.
@@ -605,6 +676,7 @@ fn check_project_migrations_with_manifest(
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
+	verify_abi_layout_test(&project.program_dir, &manifest, Some(&project.library_name))?;
 
 	let mut seen = BTreeMap::new();
 	let mut statuses = Vec::new();
