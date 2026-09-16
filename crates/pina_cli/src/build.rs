@@ -452,11 +452,11 @@ fn warn_manifest_overflow_checks() {
 
 /// Release-profile settings declared by the manifest that owns the build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-struct DeclaredReleaseProfile {
-	lto: Option<bool>,
-	codegen_units: Option<u32>,
-	opt_level: Option<u32>,
-	overflow_checks: Option<bool>,
+pub(crate) struct DeclaredReleaseProfile {
+	pub(crate) lto: Option<bool>,
+	pub(crate) codegen_units: Option<u32>,
+	pub(crate) opt_level: Option<u32>,
+	pub(crate) overflow_checks: Option<bool>,
 }
 
 /// Read `[profile.release]` from the workspace manifest that owns the build.
@@ -464,7 +464,7 @@ struct DeclaredReleaseProfile {
 /// Cargo applies `[profile]` tables from the workspace root manifest only, so
 /// that is the file consulted. A missing file, table, or key all mean the
 /// manifest expresses no opinion, which lets the size profile choose.
-fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
+pub(crate) fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
 	let manifest_path = project.workspace_root().ok().map_or_else(
 		|| project.program_dir.join("Cargo.toml"),
 		|root| root.join("Cargo.toml"),
