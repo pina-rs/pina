@@ -77,13 +77,15 @@ pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
 			}
 			// An annotated enum may sit inside the entrypoint module.
 			Item::Mod(module) => {
-				if let Some((_, items)) = &module.content {
-					for inner in items {
-						if let Item::Enum(item_enum) = inner
-							&& is_dispatch_annotated(item_enum)
-						{
-							entries.extend(dispatch_entries_for(item_enum));
-						}
+				let Some((_, items)) = &module.content else {
+					continue;
+				};
+				for inner in items {
+					let Item::Enum(item_enum) = inner else {
+						continue;
+					};
+					if is_dispatch_annotated(item_enum) {
+						entries.extend(dispatch_entries_for(item_enum));
 					}
 				}
 			}
@@ -617,6 +619,35 @@ mod tests {
 		assert_eq!(dispatch.len(), 2);
 		assert_eq!(dispatch[0].accounts_struct, Some("RealAccounts".to_owned()));
 		assert_eq!(dispatch[1].accounts_struct, Some("RunAccounts".to_owned()));
+	}
+
+	#[test]
+	fn non_enum_items_are_scanned_without_match() {
+		// Top-level and nested non-enum items take the `_` arms of the scanner,
+		// and an unannotated enum keeps both readers empty.
+		let source = r#"
+			pub const VERSION: u8 = 1;
+
+			mod empty;
+
+			fn helper() {}
+
+			mod inner {
+				pub const NESTED: u8 = 2;
+
+				fn nested_helper() {}
+
+				// An unannotated enum inside a module is skipped too.
+				#[discriminator]
+				pub enum PlainInner {
+					A = 0,
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		assert!(!has_dispatch_attribute(&file));
+		assert!(extract_dispatch_from_attribute(&file).is_empty());
 	}
 
 	#[test]
