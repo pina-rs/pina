@@ -1437,6 +1437,10 @@ in
         ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
         ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
         node ${lib.escapeShellArg "${currentDir}/scripts/check-migration-docs.mjs"}
+        # The lint reference page is generated from the CLI's lint table, so a
+        # lint added or reworded without regenerating the page fails here rather
+        # than shipping docs that contradict `pina lint --explain`.
+        ${pkgs.python3}/bin/python3 ${lib.escapeShellArg "${currentDir}/scripts/docs/generate-lint-reference.py"} --check
       '';
       description = "Verify docs folder structure, build mdBook, and check API docs.";
       binary = "bash";

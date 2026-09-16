@@ -59,8 +59,18 @@ jobs:
           # ships compiler libraries only for the toolchain's own host, so a
           # driver can only be produced on a runner whose architecture
           # matches the release target. Targets without a matching runner
-          # ship CLI-only archives; on those platforms `pina lint` fails with
-          # guidance toward the prebuilt channels or `PINA_LINT_DRIVER_PATH`.
+          # ship CLI-only archives; on those platforms `pina lint` falls back
+          # to `--build-driver`, which compiles the driver from the matching
+          # `pina_lints` release with the project's own toolchain.
+          #
+          # Each driver-capable target publishes its driver twice: inside the
+          # CLI archive (so the driver sits next to the CLI for a project on
+          # the pinned nightly) and as a standalone asset named for its exact
+          # compiler revision (so `cargo install pina_cli` users, who get no
+          # archive, can fetch one). The standalone asset is what makes the
+          # name a negotiation: it carries the commit hash, so a project on a
+          # different nightly asks for a name this release does not publish
+          # and gets a clear miss instead of an unloadable binary.
           # The prebuilt driver loads `librustc_driver` from the project's
           # own pinned nightly at runtime; nothing beyond the two binaries is
           # archived.
@@ -164,6 +174,46 @@ jobs:
           dry-run: ${{ inputs.dry_run == true }}
           token: ${{ secrets.GITHUB_TOKEN }}
           checksum: sha256,sha512
+      # Publish the driver as its own asset for users who installed the CLI
+      # from crates.io and therefore have no archive to unpack. The name
+      # embeds the exact compiler revision so `pina lint` requests the driver
+      # for its active nightly by name; another nightly misses rather than
+      # downloading a binary it cannot load.
+      - name: upload standalone lint driver
+        if: matrix.lint_driver && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The revision is read from the compiler that just built the
+          # driver, which is the toolchain this release pins.
+          revision="$(rustc -vV | sed -n 's/^commit-hash: //p')"
+          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not read a full commit hash from rustc -vV (got '$revision')" >&2
+            exit 1
+          fi
+
+          extension=""
+          case "${{ matrix.target }}" in
+            *windows*) extension=".exe" ;;
+          esac
+          built="target/${{ matrix.target }}/release/pina_lint_driver${extension}"
+          asset="pina-lint-driver-${{ matrix.target }}-${revision}${extension}"
+
+          if [[ ! -f "$built" ]]; then
+            echo "::error::The lint driver was not built at $built" >&2
+            exit 1
+          fi
+
+          staged="$RUNNER_TEMP/$asset"
+          cp "$built" "$staged"
+          chmod 755 "$staged"
+          gh release upload "$RELEASE_TAG" "$staged" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          echo "Uploaded $asset"
 
   attest_assets:
     name: attest release assets

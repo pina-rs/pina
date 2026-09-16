@@ -123,21 +123,24 @@ pub(crate) enum Commands {
 
 	/// Run Pina's official security lints against the current program.
 	///
-	/// Discovers the nearest pina.toml or Cargo package, resolves the
-	/// `pina_lint_driver` binary shipped next to this CLI on supported
-	/// platforms, and runs cargo check with the driver as
-	/// `RUSTC_WORKSPACE_WRAPPER`. Lint levels
+	/// Discovers the nearest pina.toml or Cargo package, resolves a
+	/// `pina_lint_driver` built for the project's active toolchain, and runs
+	/// cargo check with the driver as `RUSTC_WORKSPACE_WRAPPER`. Lint levels
 	/// configured in the [lints] table of pina.toml are honored. Use --fix to apply
 	/// machine-applicable suggestions; review every resulting source change.
 	#[command(
 		after_help = "Examples:\n  pina lint\n  pina lint --fix\n  pina lint --project \
-		              ./programs/counter\n\nTooling:\n  The prebuilt lint driver ships next to \
-		              the CLI for supported platforms; archives and packages without it reject \
-		              `pina lint` with guidance, and local lint development can point \
-		              PINA_LINT_DRIVER_PATH at a driver built with the project's toolchain. --fix \
-		              applies only machine-applicable suggestions and allows Cargo to edit dirty, \
-		              staged, or not-yet-versioned working trees; inspect the diff before \
-		              committing."
+		              ./programs/counter\n  pina lint --explain require_zeroed_before_close\n  \
+		              pina lint --build-driver\n\nTooling:\n  A lint driver only loads against \
+		              the exact compiler revision it was built with, so `pina lint` resolves one \
+		              for the toolchain the project activates: the bundled driver when it \
+		              matches, a driver cached for that revision, or a download from this CLI's \
+		              release. A toolchain Pina publishes no driver for can be linted with \
+		              --build-driver, which compiles the driver from the matching pina_lints \
+		              release using the active toolchain, and `pina doctor` reports the resolved \
+		              driver and the remedy when none is available. --fix applies only \
+		              machine-applicable suggestions and allows Cargo to edit dirty, staged, or \
+		              not-yet-versioned working trees; inspect the diff before committing."
 	)]
 	Lint {
 		/// Directory inside the project to discover. Defaults to the current directory.
@@ -153,6 +156,21 @@ pub(crate) enum Commands {
 		/// Apply machine-applicable lint suggestions to the working tree.
 		#[arg(long)]
 		fix: bool,
+
+		/// Build the lint driver from source with the active toolchain.
+		///
+		/// Use this on a toolchain Pina publishes no prebuilt driver for. The
+		/// build compiles the `pina_lints` release matching this CLI, so it needs
+		/// the `rustc-dev` and `rust-src` components of the active toolchain.
+		#[arg(long)]
+		build_driver: bool,
+
+		/// Print the full reference for one lint and exit without linting.
+		///
+		/// Accepts the lint name, with or without the `pina::` prefix. The same
+		/// reference is available for every lint under `docs/src/lint-reference.md`.
+		#[arg(long, value_name = "LINT")]
+		explain: Option<String>,
 	},
 
 	/// Create and verify checked-in ABI migrations.

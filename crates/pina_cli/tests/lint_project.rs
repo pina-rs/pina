@@ -257,8 +257,62 @@ fi
 		LintOptions {
 			project: self.project.clone(),
 			fix: false,
+			build_driver: false,
 		}
 	}
+
+	/// Environment with no driver override, so the CLI negotiates.
+	///
+	/// The cache is redirected into the fixture and the download is pointed at
+	/// an unroutable endpoint, which keeps the tests hermetic: nothing reads or
+	/// writes the developer's real cache and no request leaves the machine.
+	fn negotiating_environment(&self) -> Environment<'static> {
+		let mut environment = Environment::acquire();
+		let real_cargo = real_cargo_path();
+		environment.set("CARGO", &self.fake_cargo);
+		environment.set("REAL_CARGO", real_cargo);
+		environment.set("PINA_LINT_LOG", &self.log);
+		environment.set("PINA_LINT_CACHE_DIR", self._temp.path().join("cache"));
+		// Port 1 has no listener; a download attempt fails immediately rather
+		// than reaching the network.
+		environment.set("PINA_LINT_DRIVER_BASE_URL", "http://127.0.0.1:1");
+		environment
+	}
+
+	/// Environment with a driver already installed in a negotiated cache path.
+	fn cached_driver_environment(&self) -> Environment<'static> {
+		self.cached_driver_with_contents("#!/bin/bash\nexec \"$@\"\n")
+	}
+
+	/// Environment whose cache holds a driver with the given contents.
+	fn cached_driver_with_contents(&self, contents: &str) -> Environment<'static> {
+		let environment = self.negotiating_environment();
+		let cached = cached_driver_path(&self.project, self._temp.path());
+		if let Some(parent) = cached.parent() {
+			fs::create_dir_all(parent).expect("failed to create the cache directory");
+		}
+		executable(&cached, contents);
+		environment
+	}
+
+	/// Environment where neither an override nor a cache entry exists.
+	fn environment_without_driver(&self) -> Environment<'static> {
+		self.negotiating_environment()
+	}
+}
+
+/// Return the path `prepare_driver` looks for a negotiated driver at, for the
+/// fixture project's active toolchain.
+fn cached_driver_path(project: &Path, cache_root: &Path) -> PathBuf {
+	let identity = pina_cli::lint_toolchain::identify(project)
+		.expect("the fixture project has an active toolchain");
+	// Mirrors `prepare_driver`: the CLI release is part of the path because a
+	// driver from another release runs another lint set.
+	pina_cli::lint_toolchain::cached_driver_path(
+		&cache_root.join("cache"),
+		env!("CARGO_PKG_VERSION"),
+		&identity,
+	)
 }
 
 #[test]
@@ -270,6 +324,77 @@ fn driver_override_runs_the_lint_with_a_local_driver() {
 		lint_project(&fixture.options()).expect("lint over the driver override should succeed");
 	assert_eq!(output.package_name, "lint-fixture");
 	assert!(!output.fix);
+	assert_eq!(
+		output.driver_origin,
+		pina_cli::lint_driver::DriverOrigin::Override,
+		"the summary must report which driver ran"
+	);
+}
+
+/// The cache is the negotiation's whole point: a driver resolved for one
+/// compiler revision must not be reused for another.
+#[test]
+fn cached_drivers_are_keyed_by_compiler_revision() {
+	let fixture = Fixture::new();
+	let environment = fixture.cached_driver_environment();
+
+	let output = lint_project(&fixture.options()).expect("a cached driver should be reused");
+	assert_eq!(
+		output.driver_origin,
+		pina_cli::lint_driver::DriverOrigin::Cache,
+	);
+	drop(environment);
+}
+
+/// A cache entry that cannot load is discarded rather than reported, so a
+/// driver built for another nightly heals on the next run.
+#[test]
+fn an_unloadable_cached_driver_is_not_reused() {
+	let fixture = Fixture::new();
+	let environment = fixture.cached_driver_with_contents("#!/bin/bash\nexit 9\n");
+
+	let error = lint_project(&fixture.options())
+		.expect_err("an unloadable cached driver must not run the lint");
+	// Nothing else can supply a driver here: the download is pointed at an
+	// unroutable endpoint and there is no bundled driver next to the test
+	// binary, so the run reports that no driver is available.
+	assert!(
+		matches!(
+			error,
+			LintError::Driver(
+				pina_cli::lint_driver::DriverError::NoDriverForToolchain { .. }
+					| pina_cli::lint_driver::DriverError::Download { .. }
+			)
+		),
+		"unexpected error: {error:?}",
+	);
+	drop(environment);
+}
+
+/// Without a bundled or cached driver the CLI reports one actionable line
+/// naming the toolchain and both remedies, whether the download fails or the
+/// release simply has no matching artifact.
+#[test]
+fn a_missing_driver_reports_the_toolchain_and_both_remedies() {
+	let fixture = Fixture::new();
+	let environment = fixture.environment_without_driver();
+
+	let error = lint_project(&fixture.options()).expect_err("no driver is available");
+	let message = error.to_string();
+
+	assert!(
+		message.contains("--build-driver"),
+		"the error must name the source-build remedy: {message}"
+	);
+	assert!(
+		message.contains("PINA_LINT_DRIVER_PATH"),
+		"the error must name the override escape hatch: {message}"
+	);
+	assert!(
+		message.contains("nightly"),
+		"the error must name the active toolchain: {message}"
+	);
+	drop(environment);
 }
 
 #[test]
