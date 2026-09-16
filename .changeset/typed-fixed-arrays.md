@@ -1,6 +1,8 @@
 ---
 pina: feat
+pina_abi: feat
 pina_cli: feat
+pina_macros: feat
 ---
 
 # Accept typed fixed arrays `[T; N]` in zero-copy schemas
