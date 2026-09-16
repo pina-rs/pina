@@ -237,7 +237,10 @@
 				"kind": "errorNode",
 				"name": "authorityMismatch",
 				"code": 0,
-				"message": ""
+				"message": "The signer is not the authority recorded on the account.",
+				"docs": [
+					"The signer is not the authority recorded on the account."
+				]
 			}
 		]
 	}

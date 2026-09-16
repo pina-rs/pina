@@ -13,29 +13,36 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum CustomErrorsProgramError {
-	/// 6000 -
-	#[error("")]
+	/// A plain custom error.
+	/// 6000 - A plain custom error.
+	#[error("A plain custom error.")]
 	Hello = 0x1770,
 	/// 6123 -
 	#[error("")]
 	HelloNoMsg = 0x17EB,
-	/// 6124 -
-	#[error("")]
+	/// A distinct code with its own message.
+	/// 6124 - A distinct code with its own message.
+	#[error("A distinct code with its own message.")]
 	HelloNext = 0x17EC,
-	/// 6125 -
-	#[error("")]
+	/// A custom error carrying caller-supplied context.
+	/// 6125 - A custom error carrying caller-supplied context.
+	#[error("A custom error carrying caller-supplied context.")]
 	HelloCustom = 0x17ED,
-	/// 6126 -
-	#[error("")]
+	/// Two values were expected to differ and did not.
+	/// 6126 - Two values were expected to differ and did not.
+	#[error("Two values were expected to differ and did not.")]
 	ValueMismatch = 0x17EE,
-	/// 6127 -
-	#[error("")]
+	/// Two values were expected to be equal and were not.
+	/// 6127 - Two values were expected to be equal and were not.
+	#[error("Two values were expected to be equal and were not.")]
 	ValueMatch = 0x17EF,
-	/// 6128 -
-	#[error("")]
+	/// The compared value was not less than the bound.
+	/// 6128 - The compared value was not less than the bound.
+	#[error("The compared value was not less than the bound.")]
 	ValueLess = 0x17F0,
-	/// 6129 -
-	#[error("")]
+	/// The compared value was not less than or equal to the bound.
+	/// 6129 - The compared value was not less than or equal to the bound.
+	#[error("The compared value was not less than or equal to the bound.")]
 	ValueLessOrEqual = 0x17F1,
 }
 

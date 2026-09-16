@@ -64,8 +64,11 @@ pub mod entrypoint {
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistryError {
+	/// The requested permission bits are empty or outside the supported set.
 	InvalidPermissions = 0,
+	/// A role with this address is already registered.
 	RoleAlreadyExists = 1,
+	/// The role exists but was deactivated, so it grants nothing.
 	RoleInactive = 2,
 }
 

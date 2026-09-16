@@ -14,13 +14,20 @@ import {
 } from "@solana/kit";
 import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** A plain custom error. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO = 0x1770; // 6000
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG = 0x17eb; // 6123
+/** A distinct code with its own message. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT = 0x17ec; // 6124
+/** A custom error carrying caller-supplied context. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM = 0x17ed; // 6125
+/** Two values were expected to differ and did not. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH = 0x17ee; // 6126
+/** Two values were expected to be equal and were not. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH = 0x17ef; // 6127
+/** The compared value was not less than the bound. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS = 0x17f0; // 6128
+/** The compared value was not less than or equal to the bound. */
 export const CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL = 0x17f1; // 6129
 
 export type CustomErrorsProgramError =
@@ -38,14 +45,20 @@ let customErrorsProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	customErrorsProgramErrorMessages = {
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT]: ``,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO]: `A plain custom error.`,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_CUSTOM]:
+			`A custom error carrying caller-supplied context.`,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NEXT]:
+			`A distinct code with its own message.`,
 		[CUSTOM_ERRORS_PROGRAM_ERROR__HELLO_NO_MSG]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH]: ``,
-		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH]: ``,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS]:
+			`The compared value was not less than the bound.`,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_LESS_OR_EQUAL]:
+			`The compared value was not less than or equal to the bound.`,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MATCH]:
+			`Two values were expected to be equal and were not.`,
+		[CUSTOM_ERRORS_PROGRAM_ERROR__VALUE_MISMATCH]:
+			`Two values were expected to differ and did not.`,
 	};
 }
 

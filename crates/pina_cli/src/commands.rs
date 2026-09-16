@@ -199,6 +199,7 @@ fn run_migrations(command: MigrationCommands) {
 			renames,
 			assume_removed,
 			no_interactive,
+			envelope_ack,
 			json,
 		} => {
 			// The one-command loop: make -> build -> generate. Each stage
@@ -210,7 +211,10 @@ fn run_migrations(command: MigrationCommands) {
 				&assume_removed,
 				no_interactive,
 			) {
-				Ok(answers) => answers,
+				Ok(mut answers) => {
+					answers.set_envelope_ack(envelope_ack);
+					answers
+				}
 				Err(reason) => {
 					if json {
 						print_json(&pina_cli::migrations::JsonErrorEnvelope {
@@ -295,6 +299,7 @@ fn run_migrations(command: MigrationCommands) {
 			renames,
 			assume_removed,
 			no_interactive,
+			envelope_ack,
 			json,
 		} => {
 			let answers = match build_migration_answers(
@@ -303,7 +308,10 @@ fn run_migrations(command: MigrationCommands) {
 				&assume_removed,
 				no_interactive,
 			) {
-				Ok(answers) => answers,
+				Ok(mut answers) => {
+					answers.set_envelope_ack(envelope_ack);
+					answers
+				}
 				Err(reason) => {
 					if json {
 						print_json(&pina_cli::migrations::JsonErrorEnvelope {
@@ -358,7 +366,11 @@ fn run_migrations(command: MigrationCommands) {
 			print_migration_notices(&output);
 		}
 		MigrationCommands::Check { project, json } => {
-			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
+			// `check` is the CI gate, so it also requires the generated ABI
+			// layout test to match the manifest.
+			let statuses = unwrap_or_exit(pina_cli::migrations::check_migrations_with_abi_layout(
+				&project,
+			));
 			if json {
 				print_json(&statuses);
 				return;

@@ -32,9 +32,13 @@ const SEED_SAMPLE: &[u8] = b"sample";
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReallocError {
+	/// The requested growth exceeds the runtime's per-instruction realloc limit.
 	AccountReallocExceedsLimit = 3016,
+	/// The same account was passed to more than one realloc slot.
 	AccountDuplicateReallocs = 3017,
+	/// The account is smaller than the data the instruction writes.
 	AccountDataTooSmall = 3018,
+	/// The signer is not the authority recorded on the account.
 	AuthorityMismatch = 3019,
 }
 

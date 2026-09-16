@@ -262,13 +262,19 @@
 				"kind": "errorNode",
 				"name": "unauthorizedUpdateAuthority",
 				"code": 0,
-				"message": ""
+				"message": "The signer cannot update the pool's oracle price.",
+				"docs": [
+					"The signer cannot update the pool's oracle price."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "unauthorizedOracleAuthority",
 				"code": 1,
-				"message": ""
+				"message": "The signer cannot publish a new oracle price.",
+				"docs": [
+					"The signer cannot publish a new oracle price."
+				]
 			}
 		]
 	}

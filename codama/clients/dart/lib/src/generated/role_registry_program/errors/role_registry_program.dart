@@ -3,17 +3,26 @@
 
 /// Error codes for the RoleRegistryProgram program.
 
+/// The requested permission bits are empty or outside the supported set.
+/// Message: "The requested permission bits are empty or outside the supported set."
 const int roleRegistryProgramErrorInvalidPermissions = 0x0; // 0
 
+/// A role with this address is already registered.
+/// Message: "A role with this address is already registered."
 const int roleRegistryProgramErrorRoleAlreadyExists = 0x1; // 1
 
+/// The role exists but was deactivated, so it grants nothing.
+/// Message: "The role exists but was deactivated, so it grants nothing."
 const int roleRegistryProgramErrorRoleInactive = 0x2; // 2
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _roleRegistryProgramErrorMessages = {
-  roleRegistryProgramErrorInvalidPermissions: '',
-  roleRegistryProgramErrorRoleAlreadyExists: '',
-  roleRegistryProgramErrorRoleInactive: '',
+  roleRegistryProgramErrorInvalidPermissions:
+      'The requested permission bits are empty or outside the supported set.',
+  roleRegistryProgramErrorRoleAlreadyExists:
+      'A role with this address is already registered.',
+  roleRegistryProgramErrorRoleInactive:
+      'The role exists but was deactivated, so it grants nothing.',
 };
 
 /// Get the error message for a RoleRegistryProgram program error code.

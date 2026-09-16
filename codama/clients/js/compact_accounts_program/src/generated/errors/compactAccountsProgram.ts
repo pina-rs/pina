@@ -14,8 +14,11 @@ import {
 } from "@solana/kit";
 import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The write would exceed the collection's declared capacity. */
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED = 0x1b58; // 7000
+/** The requested index is past the end of the active collection. */
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS = 0x1b59; // 7001
+/** The signer is not the authority recorded on the account. */
 export const COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0x1b5a; // 7002
 
 export type CompactAccountsProgramError =
@@ -28,9 +31,12 @@ let compactAccountsProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	compactAccountsProgramErrorMessages = {
-		[COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``,
-		[COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED]: ``,
-		[COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS]: ``,
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]:
+			`The signer is not the authority recorded on the account.`,
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__CAPACITY_EXCEEDED]:
+			`The write would exceed the collection's declared capacity.`,
+		[COMPACT_ACCOUNTS_PROGRAM_ERROR__INDEX_OUT_OF_BOUNDS]:
+			`The requested index is past the end of the active collection.`,
 	};
 }
 

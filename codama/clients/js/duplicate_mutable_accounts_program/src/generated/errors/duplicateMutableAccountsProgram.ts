@@ -14,6 +14,7 @@ import {
 } from "@solana/kit";
 import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** Two mutable account fields point at the same runtime account. */
 export const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT =
 	0x7f8; // 2040
 
@@ -26,7 +27,7 @@ let duplicateMutableAccountsProgramErrorMessages:
 if (process.env["NODE_ENV"] !== "production") {
 	duplicateMutableAccountsProgramErrorMessages = {
 		[DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT]:
-			``,
+			`Two mutable account fields point at the same runtime account.`,
 	};
 }
 

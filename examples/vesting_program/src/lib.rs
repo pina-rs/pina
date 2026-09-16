@@ -64,8 +64,11 @@ pub mod entrypoint {
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VestingError {
+	/// The schedule is malformed: its window is empty, unordered, or fully elapsed.
 	InvalidSchedule = 0,
+	/// The claim exceeds what has vested so far.
 	ClaimTooLarge = 1,
+	/// The vesting account was already cancelled and holds nothing to claim.
 	AlreadyCancelled = 2,
 }
 

@@ -13,14 +13,17 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum CompactAccountsProgramError {
-	/// 7000 -
-	#[error("")]
+	/// The write would exceed the collection's declared capacity.
+	/// 7000 - The write would exceed the collection's declared capacity.
+	#[error("The write would exceed the collection's declared capacity.")]
 	CapacityExceeded = 0x1B58,
-	/// 7001 -
-	#[error("")]
+	/// The requested index is past the end of the active collection.
+	/// 7001 - The requested index is past the end of the active collection.
+	#[error("The requested index is past the end of the active collection.")]
 	IndexOutOfBounds = 0x1B59,
-	/// 7002 -
-	#[error("")]
+	/// The signer is not the authority recorded on the account.
+	/// 7002 - The signer is not the authority recorded on the account.
+	#[error("The signer is not the authority recorded on the account.")]
 	AuthorityMismatch = 0x1B5A,
 }
 

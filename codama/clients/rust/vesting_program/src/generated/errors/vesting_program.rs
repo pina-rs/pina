@@ -13,14 +13,17 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum VestingProgramError {
-	/// 0 -
-	#[error("")]
+	/// The schedule is malformed: its window is empty, unordered, or fully elapsed.
+	/// 0 - The schedule is malformed: its window is empty, unordered, or fully elapsed.
+	#[error("The schedule is malformed: its window is empty, unordered, or fully elapsed.")]
 	InvalidSchedule = 0x0,
-	/// 1 -
-	#[error("")]
+	/// The claim exceeds what has vested so far.
+	/// 1 - The claim exceeds what has vested so far.
+	#[error("The claim exceeds what has vested so far.")]
 	ClaimTooLarge = 0x1,
-	/// 2 -
-	#[error("")]
+	/// The vesting account was already cancelled and holds nothing to claim.
+	/// 2 - The vesting account was already cancelled and holds nothing to claim.
+	#[error("The vesting account was already cancelled and holds nothing to claim.")]
 	AlreadyCancelled = 0x2,
 }
 

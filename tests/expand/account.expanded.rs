@@ -370,7 +370,15 @@ impl ConfigState {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -671,7 +679,15 @@ impl GameState {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -997,7 +1013,15 @@ impl DataAccount {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -1363,7 +1387,15 @@ impl BalanceAccount {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -1608,7 +1640,15 @@ impl MyStruct {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -2134,7 +2174,15 @@ impl LargeState {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
-            return Err(pina::ProgramError::InvalidAccountData);
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;

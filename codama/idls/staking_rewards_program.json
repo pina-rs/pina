@@ -825,31 +825,46 @@
 				"kind": "errorNode",
 				"name": "invalidAmount",
 				"code": 0,
-				"message": ""
+				"message": "The amount is zero, or it leaves a position below the pool minimum.",
+				"docs": [
+					"The amount is zero, or it leaves a position below the pool minimum."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "poolPaused",
 				"code": 1,
-				"message": ""
+				"message": "The pool is paused, so deposits and withdrawals are refused.",
+				"docs": [
+					"The pool is paused, so deposits and withdrawals are refused."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "insufficientBalance",
 				"code": 2,
-				"message": ""
+				"message": "The position holds less than the requested withdrawal.",
+				"docs": [
+					"The position holds less than the requested withdrawal."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "unauthorized",
 				"code": 3,
-				"message": ""
+				"message": "The signer is not the pool authority this instruction requires.",
+				"docs": [
+					"The signer is not the pool authority this instruction requires."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "invalidPool",
 				"code": 4,
-				"message": ""
+				"message": "The supplied account is not the pool this position belongs to.",
+				"docs": [
+					"The supplied account is not the pool this position belongs to."
+				]
 			}
 		]
 	}

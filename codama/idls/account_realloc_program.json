@@ -419,25 +419,37 @@
 				"kind": "errorNode",
 				"name": "accountReallocExceedsLimit",
 				"code": 3016,
-				"message": ""
+				"message": "The requested growth exceeds the runtime's per-instruction realloc limit.",
+				"docs": [
+					"The requested growth exceeds the runtime's per-instruction realloc limit."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "accountDuplicateReallocs",
 				"code": 3017,
-				"message": ""
+				"message": "The same account was passed to more than one realloc slot.",
+				"docs": [
+					"The same account was passed to more than one realloc slot."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "accountDataTooSmall",
 				"code": 3018,
-				"message": ""
+				"message": "The account is smaller than the data the instruction writes.",
+				"docs": [
+					"The account is smaller than the data the instruction writes."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "authorityMismatch",
 				"code": 3019,
-				"message": ""
+				"message": "The signer is not the authority recorded on the account.",
+				"docs": [
+					"The signer is not the authority recorded on the account."
+				]
 			}
 		]
 	}

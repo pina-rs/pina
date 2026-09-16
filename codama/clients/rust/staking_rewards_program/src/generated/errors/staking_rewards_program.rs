@@ -13,20 +13,25 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum StakingRewardsProgramError {
-	/// 0 -
-	#[error("")]
+	/// The amount is zero, or it leaves a position below the pool minimum.
+	/// 0 - The amount is zero, or it leaves a position below the pool minimum.
+	#[error("The amount is zero, or it leaves a position below the pool minimum.")]
 	InvalidAmount = 0x0,
-	/// 1 -
-	#[error("")]
+	/// The pool is paused, so deposits and withdrawals are refused.
+	/// 1 - The pool is paused, so deposits and withdrawals are refused.
+	#[error("The pool is paused, so deposits and withdrawals are refused.")]
 	PoolPaused = 0x1,
-	/// 2 -
-	#[error("")]
+	/// The position holds less than the requested withdrawal.
+	/// 2 - The position holds less than the requested withdrawal.
+	#[error("The position holds less than the requested withdrawal.")]
 	InsufficientBalance = 0x2,
-	/// 3 -
-	#[error("")]
+	/// The signer is not the pool authority this instruction requires.
+	/// 3 - The signer is not the pool authority this instruction requires.
+	#[error("The signer is not the pool authority this instruction requires.")]
 	Unauthorized = 0x3,
-	/// 4 -
-	#[error("")]
+	/// The supplied account is not the pool this position belongs to.
+	/// 4 - The supplied account is not the pool this position belongs to.
+	#[error("The supplied account is not the pool this position belongs to.")]
 	InvalidPool = 0x4,
 }
 
