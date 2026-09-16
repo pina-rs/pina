@@ -12,6 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURE_DIR="$ROOT/crates/pina_cpi_renderer/fixtures"
 WORK_DIR="${PINA_CPI_SBF_WORK_DIR:-$(mktemp -d)}"
+SHARED_TARGET="$WORK_DIR/target"
 TARGET="${PINA_CPI_SBF_TARGET:-bpfel-unknown-none}"
 # The BPF/SBF Rust toolchain pin lives in `devenv.nix` so this gate uses the
 # same compiler as the compute-units workflow and the example program builds.
@@ -82,9 +83,13 @@ EOF
 rustflags = ["-C", "linker=sbpf-linker", "-C", "panic=abort"]
 EOF
 
+	# Every fixture depends on the same `pina` path dependency, so they share one
+	# target directory. Without this each crate rebuilds the whole dependency
+	# graph, which dominates the run.
 	(
 		cd "$crate_dir"
-		cargo "+$TOOLCHAIN" check \
+		CARGO_TARGET_DIR="$SHARED_TARGET" \
+			cargo "+$TOOLCHAIN" check \
 			--quiet \
 			--target "$TARGET" \
 			-Z build-std=core,alloc
@@ -92,7 +97,8 @@ EOF
 
 	# The generated crate ships a test binding its compiled-in program ID to the
 	# address from the IDL. Run it on the host, where `cargo test` works.
-	cargo test --quiet --manifest-path "$crate_dir/Cargo.toml"
+	CARGO_TARGET_DIR="$SHARED_TARGET" \
+		cargo test --quiet --manifest-path "$crate_dir/Cargo.toml"
 
 	echo "$name: SBF check passed"
 done
