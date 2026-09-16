@@ -9,6 +9,9 @@
 //! outside the repository (for example from a crates.io checkout) the sibling
 //! file is absent and the test is skipped.
 
+use std::env;
+use std::ffi::OsString;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -45,6 +48,42 @@ fn pinned_sysroot() -> PathBuf {
 		sysroot.display()
 	);
 	sysroot
+}
+
+/// The environment entries that locate the pinned toolchain's compiler
+/// libraries for the dynamically linked driver, mirroring
+/// `pina_cli`'s `driver_library_environment`: each platform's search
+/// variable gets the sysroot directory prepended while the inherited value
+/// is preserved.
+///
+/// Preserving the inherited value matters: replacing a variable outright
+/// strands the driver's transitive dependencies, because on Linux the
+/// devenv shell carries the Nix profile's `libz` in `LD_LIBRARY_PATH`, and
+/// dropping it makes `librustc_driver` fail to load with
+/// `libz.so.1: cannot open shared object file`. On Windows the loader
+/// resolves the driver's DLLs from `PATH`, so the sysroot's `bin` directory
+/// is what must be prepended there.
+fn library_environment(sysroot: &Path) -> Vec<(&'static str, OsString)> {
+	let variables: &[&'static str] = if cfg!(target_os = "macos") {
+		&["DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"]
+	} else if cfg!(windows) {
+		&["PATH"]
+	} else {
+		&["LD_LIBRARY_PATH"]
+	};
+	let directory = if cfg!(windows) { "bin" } else { "lib" };
+	let separator = if cfg!(windows) { ";" } else { ":" };
+	variables
+		.iter()
+		.map(|variable| {
+			let mut value = OsString::from(sysroot.join(directory));
+			if let Some(existing) = env::var_os(*variable).filter(|existing| !existing.is_empty()) {
+				value.push(separator);
+				value.push(existing);
+			}
+			(*variable, value)
+		})
+		.collect()
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,11 +133,10 @@ fn embedded_cli_catalog_matches_the_registered_lints() {
 
 	let sysroot = pinned_sysroot();
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina_lint_driver"));
-	command
-		.arg("rustc")
-		.env("PINA_LINT_LIST", "1")
-		.env("DYLD_LIBRARY_PATH", sysroot.join("lib"))
-		.env("LD_LIBRARY_PATH", sysroot.join("lib"));
+	command.arg("rustc").env("PINA_LINT_LIST", "1");
+	for (variable, value) in library_environment(&sysroot) {
+		command.env(variable, value);
+	}
 	let output = command
 		.output()
 		.expect("could not run the bundled lint driver");
