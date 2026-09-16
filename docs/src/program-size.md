@@ -28,6 +28,18 @@ Four decisions account for nearly all of it. `pina build` applies the first thre
 
 A crate that declares `crate-type = ["cdylib", "lib"]` cannot be linked with LTO: rustc rejects `-C lto` when one invocation also emits an rlib, and the SBF toolchain silently drops the profile setting. Programs are therefore `crate-type = ["cdylib"]` only. See [Testing](#testing-a-cdylib-program) for how tests still reach the real code.
 
+**Check the entrypoint's stack frame after switching.** LTO inlines every instruction handler into the entrypoint, and the SBF runtime allows 4 KB of stack per frame. A program with enough handlers can exceed that, and the failure is quiet: `cargo-build-sbf` prints
+
+```
+Error: Function entrypoint overflows the maximum allowed frame space by accessing
+an offset 1088 bytes greater than the maximum of 4096. Estimated function frame
+size: 5184 bytes.
+```
+
+to stderr but still **exits 0 and writes the `.so`**, so a build that looks successful can produce a program that faults at runtime. A real case: a 55-instruction program at 446 KB built fine with `["cdylib", "lib"]`, and switching to `["cdylib"]` alone — before any version change — produced a 5,184-byte frame.
+
+When this happens, either keep `["cdylib", "lib"]` and forgo LTO, or raise the limit with `cargo build-sbf --sbf-stack-size <BYTES>`. Raising it is a runtime-budget decision, not a free change, so treat it the way you would any other resource limit.
+
 ### 2. Diagnostics
 
 Failure paths are the largest avoidable cost. `log!("address: {} …", addr)` and caller locations pull all of `core::fmt` into the binary, which is far more expensive than the message strings themselves.
