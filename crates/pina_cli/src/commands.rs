@@ -78,16 +78,16 @@ pub(crate) fn run(cli: Cli) {
 			mode,
 			npx,
 		} => {
-			run_import(
-				&name,
-				&program_id,
-				idl.as_deref(),
-				url.as_deref(),
-				&cluster,
-				output.as_deref(),
+			run_import(&ImportCommand {
+				name: &name,
+				program_id: &program_id,
+				idl: idl.as_deref(),
+				url: url.as_deref(),
+				cluster: &cluster,
+				output: output.as_deref(),
 				mode,
-				&npx,
-			)
+				npx: &npx,
+			});
 		}
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
@@ -2492,19 +2492,33 @@ mod size_profile_tests {
 	}
 }
 
-/// Imports a foreign program's IDL as a CPI crate and stamps its provenance.
-fn run_import(
-	name: &str,
-	program_id: &str,
-	idl: Option<&Path>,
-	url: Option<&str>,
-	cluster: &str,
-	output: Option<&Path>,
+/// The flags `pina import` collected for one run.
+struct ImportCommand<'a> {
+	name: &'a str,
+	program_id: &'a str,
+	idl: Option<&'a Path>,
+	url: Option<&'a str>,
+	cluster: &'a str,
+	output: Option<&'a Path>,
 	mode: pina_cli::GenerationMode,
-	npx: &str,
-) {
+	npx: &'a str,
+}
+
+/// Imports a foreign program's IDL as a CPI crate and stamps its provenance.
+fn run_import(command: &ImportCommand<'_>) {
 	use pina_cli::import_idl::ImportOptions;
 	use pina_cli::import_idl::ImportSource;
+
+	let ImportCommand {
+		name,
+		program_id,
+		idl,
+		url,
+		cluster,
+		output,
+		mode,
+		npx,
+	} = *command;
 
 	// `--idl` and `--url` both name an IDL for one program; without either, the
 	// cluster's canonical metadata is the source.
