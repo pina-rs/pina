@@ -589,6 +589,37 @@ mod tests {
 	}
 
 	#[test]
+	fn override_parsing_skips_every_unusable_attribute_shape() {
+		// Each attribute before the final one exercises one guard in the
+		// override reader: a foreign attribute, a bare word, a non-`accounts`
+		// name-value pair, and a non-path value. The readable override comes
+		// last so every guard runs first.
+		let source = r#"
+			#[instruction_dispatch]
+			pub enum Guards {
+				/// A doc comment is an attribute whose path is `doc`.
+				#[dispatch(bare)]
+				#[dispatch(other = Somewhere)]
+				#[dispatch(accounts = 12)]
+				#[dispatch(accounts = RealAccounts)]
+				Run = 0,
+			}
+
+			/// Doc comments also sit on the enum without being dispatch attrs.
+			#[instruction_dispatch]
+			pub enum Documented {
+				Run = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_from_attribute(&file);
+
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(dispatch[0].accounts_struct, Some("RealAccounts".to_owned()));
+		assert_eq!(dispatch[1].accounts_struct, Some("RunAccounts".to_owned()));
+	}
+
+	#[test]
 	fn unannotated_enums_produce_no_dispatch() {
 		let source = r#"
 			#[discriminator]
