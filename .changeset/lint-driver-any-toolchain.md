@@ -1,6 +1,6 @@
 ---
 pina_cli: feat
-pina_lints: chore
+pina_lints: fix
 ---
 
 # Make the lint driver work on any toolchain
