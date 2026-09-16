@@ -369,3 +369,86 @@ impl<'a> TokenAccountRef<'a> {
 		}
 	}
 }
+
+/// Reconcile the balance change a token CPI already caused.
+///
+/// Every program holding a vault writes the same three steps by hand: read the
+/// token balance before the CPI, invoke, read it again, and check that the
+/// observed debit matches the amount the instruction was supposed to move. The
+/// builders in this module and [`crate::cpi`] perform the transfer; this module
+/// is the check that the transfer did what it claimed.
+///
+/// Rejecting a mismatch is the point. A CPI that moves less than requested —
+/// through a fee, a transfer hook, or a partial transfer — credits the
+/// recipient short while the program's own accounting records the full amount,
+/// so the two diverge silently. A CPI that moves *more* means the caller's
+/// arithmetic is wrong in the other direction. Neither is safe to guess about,
+/// so every discrepancy fails with [`crate::PinaProgramError::UnverifiedTransfer`].
+pub mod verified {
+	use crate::PinaProgramError;
+	use crate::ProgramError;
+
+	/// Check that a token balance fell by exactly `amount`.
+	///
+	/// `before` and `after` are reads of the same account's token balance taken
+	/// immediately before and after the CPI. Use [`crate::TokenAccountRef::amount`]
+	/// to read them from a validated token account.
+	///
+	/// # Errors
+	///
+	/// Returns [`crate::PinaProgramError::UnverifiedTransfer`] when `amount` is
+	/// zero, when the balance did not change, when it changed by a different
+	/// amount, or when it increased.
+	#[inline]
+	pub fn reconcile_debit(before: u64, after: u64, amount: u64) -> Result<(), ProgramError> {
+		if amount == 0 {
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		}
+
+		let Some(debit) = before.checked_sub(after) else {
+			// `after > before` means the account gained tokens during the CPI.
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		};
+
+		if debit != amount {
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		}
+
+		Ok(())
+	}
+
+	/// Check that a token balance rose by *at least* `amount`.
+	///
+	/// The recipient side cannot always be checked exactly: Token-2022
+	/// transfer fees and hooks make the credit smaller than the debit, so a
+	/// caller verifying the destination must accept a credit no larger than the
+	/// amount it sent. An increase beyond `amount` means the destination
+	/// account received tokens from somewhere else in the same instruction, so
+	/// the caller's attribution is wrong.
+	///
+	/// # Errors
+	///
+	/// Returns [`crate::PinaProgramError::UnverifiedTransfer`] when `amount` is
+	/// zero, when the balance did not increase, or when the increase exceeds
+	/// `amount`.
+	#[inline]
+	pub fn reconcile_credit_at_most(
+		before: u64,
+		after: u64,
+		amount: u64,
+	) -> Result<(), ProgramError> {
+		if amount == 0 {
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		}
+
+		let Some(credit) = after.checked_sub(before) else {
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		};
+
+		if credit == 0 || credit > amount {
+			return Err(PinaProgramError::UnverifiedTransfer.into());
+		}
+
+		Ok(())
+	}
+}

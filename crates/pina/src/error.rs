@@ -102,6 +102,14 @@ pub enum PinaProgramError {
 	InvalidAccountSize = 0xFFFF_FFFB,
 	/// Account is not owned by the expected token program.
 	InvalidTokenOwner = 0xFFFF_FFFC,
+	/// A verified CPI did not move the balance it was asked to move.
+	///
+	/// Returned by the [`crate::token::verified`] helpers when the observed
+	/// debit differs from the requested amount, when a transfer moved nothing,
+	/// or when the requested amount was zero. A CPI that transfers less than
+	/// the caller accounted for silently credits the recipient short, so the
+	/// reconciliation refuses to guess which side is wrong.
+	UnverifiedTransfer = 0xFFFF_FFF1,
 	/// Too many PDA seeds were provided.
 	SeedsTooMany = 0xFFFF_FFFD,
 	/// More account keys were provided than the instruction expects.
