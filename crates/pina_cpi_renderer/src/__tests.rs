@@ -1393,3 +1393,43 @@ fn renders_examples_with_runtime_relative_account_layouts() {
 		}
 	}
 }
+
+/// Boolean account fields previously decoded as `let value = value;`, which
+/// referenced itself and failed to compile. Every committed example with a
+/// boolean account field must produce a parser that reads it from the buffer.
+#[test]
+fn account_parsers_read_boolean_fields_from_the_buffer() {
+	for name in [
+		"role_registry_program",
+		"validation_program",
+		"escrow_program",
+	] {
+		let root = load_fixture_root(name);
+		let files = render_program_to_files(&root)
+			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
+
+		for (path, source) in &files {
+			if !path.starts_with("accounts") || !source.contains("pub fn parse(") {
+				continue;
+			}
+			// A self-referential binding is the failure this guards against.
+			assert!(
+				!source.contains("let value = value;"),
+				"`{name}` {path:?} decodes a field into itself"
+			);
+			for line in source.lines() {
+				let trimmed = line.trim();
+				if let Some(rest) = trimmed.strip_prefix("let ") {
+					if let Some((name, value)) = rest.split_once(" = ") {
+						let name = name.trim_end_matches(':').trim();
+						assert_ne!(
+							name,
+							value.trim_end_matches(';').trim(),
+							"`{name}` {path:?} binds `{name}` to itself"
+						);
+					}
+				}
+			}
+		}
+	}
+}

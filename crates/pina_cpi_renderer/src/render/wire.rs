@@ -154,7 +154,7 @@ impl Encoded {
 		};
 
 		let read = match self.rust_type.as_str() {
-			"bool" => format!("data[cursor] != 0;\n\t\tlet {name} = {name};\n\t\tcursor += 1;"),
+			"bool" => format!("let {name} = data[cursor] != 0;\n\t\tcursor += 1;"),
 			"Address" => {
 				format!(
 					"let {name} = Address::new_from_array(\n\t\t\tdata[cursor..cursor + \
