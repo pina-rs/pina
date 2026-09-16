@@ -177,3 +177,82 @@ mod compact {
 		assert_eq!(table.label(), "hi");
 	}
 }
+
+/// Typed arrays compose with the rest of the closed grammar.
+///
+/// Pins which surrounding shapes accept a `[T; N]` element: `Vec` elements,
+/// `Option` payloads at both levels, and fixed-point elements. The layout
+/// assertions make the storage contract explicit rather than implied.
+#[cfg(feature = "fixed")]
+mod composition {
+	use pina::fixed::FixedU64;
+	use pina::fixed::types::extra::U16;
+	use pina::*;
+
+	#[discriminator(crate = ::pina, primitive = u8, final)]
+	enum ComposeKind {
+		Wide = 7,
+	}
+
+	#[account(crate = ::pina, discriminator = ComposeKind, variant = Wide)]
+	struct Wide {
+		pub matrix: Vec<[u64; 2], 3>,
+		pub maybe_row: Option<[u64; 2]>,
+		pub maybe_prices: Option<[FixedU64<U16>; 2]>,
+		pub deep: [[[u8; 2]; 2]; 2],
+	}
+
+	#[test]
+	fn array_compositions_share_the_element_layout() {
+		// 1 discriminator
+		// + (2 prefix + 3 * 2 * 8) matrix
+		// + (1 + 2 * 8) maybe_row
+		// + (1 + 2 * 8) maybe_prices
+		// + 2 * 2 * 2 deep
+		assert_eq!(Wide::SIZE, 1 + 50 + 17 + 17 + 8);
+	}
+
+	#[test]
+	fn array_compositions_roundtrip() {
+		let mut bytes = [0u8; Wide::SIZE];
+		{
+			Wide::initialize(&mut bytes, |state| {
+				// Pod containers store pod values, exactly like scalar fields:
+				// `[u64; 2]` fields store `[PodU64; 2]`.
+				state.matrix.try_push([PodU64::from(1), PodU64::from(2)])?;
+				state.matrix.try_push([PodU64::from(3), PodU64::from(4)])?;
+				state
+					.maybe_row
+					.set(Some([PodU64::from(5), PodU64::from(6)]));
+				state.maybe_prices.set(Some([
+					PodU64::from(FixedU64::<U16>::from_num(7).to_bits()),
+					PodU64::from(FixedU64::<U16>::from_num(8).to_bits()),
+				]));
+				state.deep[1][0] = [9, 10];
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("initialization failed: {error:?}"));
+		}
+
+		let state = Wide::try_from_bytes(&bytes)
+			.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+
+		assert_eq!(state.matrix.len(), 2);
+		assert_eq!(state.matrix[1][0].get(), 3);
+		assert_eq!(state.matrix[1][1].get(), 4);
+		assert_eq!(
+			state.maybe_row.get().map(|row| row[1].get()),
+			Some(6),
+			"Option<[T; N]> resolves through the array pod"
+		);
+		assert_eq!(
+			state
+				.maybe_prices
+				.get()
+				.map(|prices| FixedU64::<U16>::from_bits(prices[1].get()).to_num::<u64>()),
+			Some(8),
+			"fixed-point elements keep their bit-pattern storage"
+		);
+		assert_eq!(state.deep[1][0], [9, 10]);
+	}
+}
