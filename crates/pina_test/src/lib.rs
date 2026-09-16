@@ -22,6 +22,7 @@ pub use solana_account::Account;
 use solana_client::client_error::ClientError;
 pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
+use solana_instruction::error::InstructionError;
 pub use solana_keypair::Keypair;
 use solana_message::Message;
 use solana_message::VersionedMessage;
@@ -175,6 +176,70 @@ impl TestError {
 			.as_ref()
 			.and_then(ClientError::get_transaction_error)
 	}
+}
+
+/// Assert that a program rejected an instruction with a specific custom code.
+///
+/// This is the assertion a test usually wants: not "something failed" but "the
+/// program refused this request for the reason it was supposed to". It reads
+/// the structured [`TransactionError`] retained by [`ProgramTest`] rather than
+/// matching rendered text, so it is unaffected by how the runtime words a
+/// failure and cannot confuse the expected error with a different one that
+/// happens to share digits.
+///
+/// The expected code accepts anything that converts into `u32`, so a generated
+/// `#[error]` enum, a [`core::num::TryFromIntError`]-checked value, or a plain
+/// `u32` all work.
+///
+/// # Panics
+///
+/// Panics with a message naming the expected and actual errors when the
+/// transaction carried no error, carried a non-custom instruction error, or
+/// carried a different custom code.
+#[track_caller]
+pub fn assert_custom_error(error: &TestError, expected: impl Into<u32>) {
+	let expected = expected.into();
+	let Some(transaction_error) = error.transaction_error() else {
+		panic!(
+			"expected the program to fail with custom error {expected}, but the transaction \
+			 carried no transaction error: {error}"
+		);
+	};
+
+	let actual = match &transaction_error {
+		TransactionError::InstructionError(_index, InstructionError::Custom(code)) => *code,
+		other => {
+			panic!(
+				"expected the program to fail with custom error {expected}, but it failed with \
+				 {other:?}"
+			)
+		}
+	};
+
+	assert_eq!(
+		actual, expected,
+		"expected custom error {expected}, got custom error {actual}"
+	);
+}
+
+/// Decode a fetched account's data with the program's own reader.
+///
+/// Tests otherwise reach into raw bytes — asserting `account.data[0]` for a
+/// discriminator, `account.data[2..]` for a field — which silently keeps
+/// passing against the wrong layout and cannot tell a decode failure from a
+/// value assertion. Passing the program's generated reader here means a layout
+/// change fails the test at the decode, and the error the program would return
+/// stays available to assert on.
+///
+/// # Errors
+///
+/// Returns whatever `decode` returns, so the caller asserts on the program's
+/// own error type instead of a flattened test error.
+pub fn with_account_bytes<T, E>(
+	account: &Account,
+	decode: impl FnOnce(&[u8]) -> Result<T, E>,
+) -> Result<T, E> {
+	decode(&account.data)
 }
 
 /// Exact bytes and account metas captured from one historical client version.
@@ -1388,6 +1453,33 @@ fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestErr
 	}
 }
 
+/// Build a `TestError` carrying one instruction error, for the in-crate tests.
+///
+/// The public surface extracts `TransactionError` from an RPC `ClientError`,
+/// which cannot be constructed cheaply, so the extraction path is exercised
+/// through this narrow constructor instead.
+#[cfg(test)]
+fn execution_error_with(instruction_error: InstructionError) -> TestError {
+	TestError {
+		operation: "execute program instruction",
+		message: format!("{instruction_error:?}"),
+		client_error: Some(ClientError::from(TransactionError::InstructionError(
+			0,
+			instruction_error,
+		))),
+	}
+}
+
+/// Read the panic payload the standard hook would have printed.
+#[cfg(test)]
+fn panic_message(panic: Box<dyn std::any::Any + Send>) -> String {
+	panic
+		.downcast_ref::<String>()
+		.cloned()
+		.or_else(|| panic.downcast_ref::<&str>().map(|text| (*text).to_owned()))
+		.unwrap_or_default()
+}
+
 fn execution_error(error: ClientError) -> TestError {
 	TestError {
 		operation: "execute program instruction",
@@ -1452,6 +1544,113 @@ fn artifact_path(artifact: OsString) -> Result<PathBuf, TestError> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// A custom code matches exactly.
+	#[test]
+	fn custom_error_assertion_accepts_the_expected_code() {
+		let error = execution_error_with(InstructionError::Custom(6000));
+
+		assert_custom_error(&error, 6000u32);
+	}
+
+	/// A different code fails, and the message names both so the failure is
+	/// diagnosable without re-running the test.
+	#[test]
+	fn custom_error_assertion_rejects_a_different_code() {
+		let error = execution_error_with(InstructionError::Custom(6000));
+
+		let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+			assert_custom_error(&error, 6001u32);
+		}))
+		.expect_err("a mismatched code must fail the assertion");
+		let message = panic_message(panic);
+
+		assert!(
+			message.contains("6001") && message.contains("6000"),
+			"the failure must name expected and actual: {message}"
+		);
+	}
+
+	/// A standard `InstructionError` is reported as itself rather than being
+	/// mistaken for a custom code.
+	#[test]
+	fn custom_error_assertion_rejects_a_standard_error() {
+		let error = execution_error_with(InstructionError::InvalidArgument);
+
+		let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+			assert_custom_error(&error, 6000u32);
+		}))
+		.expect_err("a non-custom error must fail the assertion");
+		let message = panic_message(panic);
+
+		assert!(
+			message.contains("InvalidArgument"),
+			"the failure must report what was actually returned: {message}"
+		);
+	}
+
+	/// An error carrying no transaction detail fails with a clear message
+	/// instead of silently passing.
+	#[test]
+	fn custom_error_assertion_requires_transaction_detail() {
+		let error = test_error("execute program instruction", "no detail");
+
+		let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+			assert_custom_error(&error, 6000u32);
+		}))
+		.expect_err("missing detail must fail the assertion");
+		let message = panic_message(panic);
+
+		assert!(
+			message.contains("no transaction error"),
+			"the failure must say the detail was missing: {message}"
+		);
+	}
+
+	/// The framework's reserved band is matched exactly, including codes above
+	/// the range a user `#[error]` enum may occupy.
+	#[test]
+	fn custom_error_assertion_accepts_a_reserved_code() {
+		let error = execution_error_with(InstructionError::Custom(0xFFFF_FFF8));
+
+		assert_custom_error(&error, 0xFFFF_FFF8u32);
+	}
+
+	/// Decoding through the helper yields the value the decoder produced.
+	#[test]
+	fn account_data_helper_passes_the_fetched_bytes_to_the_decoder() {
+		let account = solana_account::Account {
+			lamports: 1,
+			data: vec![7, 8, 9],
+			owner: Pubkey::default(),
+			executable: false,
+			rent_epoch: 0,
+		};
+
+		let decoded = with_account_bytes(&account, |data| Ok::<u8, u32>(data.iter().sum::<u8>()))
+			.expect("decode succeeds");
+
+		assert_eq!(decoded, 24);
+	}
+
+	/// A decoder rejection is returned as the decoder's own error type rather
+	/// than being flattened into a `TestError`, so a test can assert on the
+	/// exact variant the program returned.
+	#[test]
+	fn account_data_helper_propagates_the_decoder_error() {
+		let account = solana_account::Account {
+			lamports: 1,
+			data: vec![0; 4],
+			owner: Pubkey::default(),
+			executable: false,
+			rent_epoch: 0,
+		};
+
+		let error = with_account_bytes(&account, |_data| Err::<u8, u32>(9))
+			.expect_err("a rejected decode must surface the program error");
+
+		assert_eq!(error, 9u32);
+	}
 
 	#[test]
 	fn preserves_error_operation_and_source() {
