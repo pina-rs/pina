@@ -1,0 +1,5 @@
+error: `[T; N]` arrays require an integer literal length
+  --> tests/ui/fail/account_array_const_length.rs:12:14
+   |
+12 |     pub values: [u64; WIDTH],
+   |                 ^^^^^^^^^^^^

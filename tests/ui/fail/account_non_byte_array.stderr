@@ -1,5 +1,5 @@
-error: only `[u8; N]` arrays with a literal length are supported in Pina schemas
-  --> tests/ui/fail/account_non_byte_array.rs:10:14
+error: `[T; N]` array elements must be fixed Pina schema types: `char` is not a zero-copy field: not every 32-bit pattern is a valid character
+  --> tests/ui/fail/account_non_byte_array.rs:10:15
    |
-10 |     pub values: [u16; 4],
-   |                 ^^^^^^^^
+10 |     pub values: [char; 4],
+   |                  ^^^^

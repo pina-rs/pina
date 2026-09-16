@@ -1884,11 +1884,11 @@ mod __pinapod_compact_CompactState {
     #[repr(C)]
     pub struct CompactStateHeader
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
-        discriminator: [u8; PdaDisc::BYTES],
+        discriminator: [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES],
         pub authority: <Address as pina::pinapod::ZcField>::Pod,
         pub bump: <u8 as pina::pinapod::ZcField>::Pod,
         __values_len: [u8; 2usize],
@@ -1900,13 +1900,13 @@ mod __pinapod_compact_CompactState {
     };
     impl Copy for CompactStateHeader
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {}
     impl Clone for CompactStateHeader
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
@@ -1916,12 +1916,12 @@ mod __pinapod_compact_CompactState {
     }
     impl pina::pinapod::ZcValidate for CompactStateHeader
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
         fn validate_ref(value: &Self) -> Result<(), pina::pinapod::PinaPodError> {
-            <[u8; PdaDisc::BYTES] as pina::pinapod::ZcValidate>::validate_ref(
+            <[<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES] as pina::pinapod::ZcValidate>::validate_ref(
                 &value.discriminator,
             )?;
             <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
@@ -1935,20 +1935,20 @@ mod __pinapod_compact_CompactState {
     }
     unsafe impl pina::pinapod::ZcElem for CompactStateHeader
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {}
     impl pina::pinapod::PinaPod for CompactState
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {}
     unsafe impl pina::pinapod::PinaPodCompact for CompactState
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2066,7 +2066,7 @@ mod __pinapod_compact_CompactState {
     }
     pub struct CompactStateRef<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2076,7 +2076,7 @@ mod __pinapod_compact_CompactState {
     }
     impl<'__pinapod_data> core::ops::Deref for CompactStateRef<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2088,7 +2088,7 @@ mod __pinapod_compact_CompactState {
     }
     impl<'__pinapod_data> CompactStateRef<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2135,7 +2135,7 @@ mod __pinapod_compact_CompactState {
     }
     struct CompactStateMut<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2146,7 +2146,7 @@ mod __pinapod_compact_CompactState {
     }
     impl<'__pinapod_data> core::ops::Deref for CompactStateMut<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2158,7 +2158,7 @@ mod __pinapod_compact_CompactState {
     }
     impl<'__pinapod_data> CompactStateMut<'__pinapod_data>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2194,7 +2194,9 @@ mod __pinapod_compact_CompactState {
         fn header_mut(&mut self) -> &mut CompactStateHeader {
             unsafe { &mut *(self.data.as_mut_ptr() as *mut CompactStateHeader) }
         }
-        pub fn discriminator_mut(&mut self) -> &mut [u8; PdaDisc::BYTES] {
+        pub fn discriminator_mut(
+            &mut self,
+        ) -> &mut [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES] {
             &mut self.header_mut().discriminator
         }
         pub fn authority_mut(
@@ -2341,7 +2343,7 @@ mod __pinapod_compact_CompactState {
     }
     pub struct CompactStatePatch<'__pinapod_patch>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2353,7 +2355,7 @@ mod __pinapod_compact_CompactState {
     }
     impl<'__pinapod_patch> CompactStatePatch<'__pinapod_patch>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
@@ -2549,7 +2551,7 @@ mod __pinapod_compact_CompactState {
     impl<'__pinapod_patch> pina::pinapod::PinaPodPatch<CompactState>
     for CompactStatePatch<'__pinapod_patch>
     where
-        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES]: pina::pinapod::ZcElem,
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,

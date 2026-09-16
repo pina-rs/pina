@@ -2307,7 +2307,10 @@ fn fixed_type_size_at_depth(ty: &str, depth: usize) -> Option<usize> {
 		"Address" => Some(32),
 		other => {
 			if let Some((element, length)) = parse_array(other) {
-				return (element.trim() == "u8").then_some(length);
+				// Element size composes: `[u8; N]` stays `N` because `u8`
+				// measures one byte, and typed arrays multiply their element
+				// size exactly like the compiler lays them out.
+				return fixed_type_size_at_depth(element, depth + 1)?.checked_mul(length);
 			}
 			let (name, arguments) = parse_generic(other)?;
 			match name {
@@ -2725,7 +2728,9 @@ fn canonical_const(expression: &syn::Expr) -> String {
 
 fn parse_array(ty: &str) -> Option<(&str, usize)> {
 	let inner = ty.strip_prefix('[')?.strip_suffix(']')?;
-	let (element, length) = inner.split_once(';')?;
+	// The separator is the last `;` at any nesting depth, so `[[u8; 4]; 2]`
+	// splits into the element `[u8; 4]` and the length `2`.
+	let (element, length) = inner.rsplit_once(';')?;
 	Some((element.trim(), length.trim().parse().ok()?))
 }
 
@@ -2929,15 +2934,15 @@ mod tests {
 		let nested_option: syn::ItemStruct = syn::parse_quote! {
 			struct Invalid { values: Option<Option<String<4>>> }
 		};
-		let non_byte_array: syn::ItemStruct = syn::parse_quote! {
-			struct Invalid { values: [u16; 2], name: String<4> }
+		let restricted_element_array: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { values: [char; 2], name: String<4> }
 		};
 
 		for item in [
 			nested_vector,
 			optional_strings,
 			nested_option,
-			non_byte_array,
+			restricted_element_array,
 		] {
 			assert!(data_schema(&item, LayoutKind::Compact).is_err());
 		}
@@ -3689,6 +3694,18 @@ mod tests {
 		assert_eq!(fixed_type_size("f64"), Some(8));
 		assert_eq!(fixed_type_size("Vec<f32, 4>"), Some(18));
 		assert_eq!(fixed_type_size("Option<f64>"), Some(9));
+	}
+
+	#[test]
+	fn typed_arrays_size_by_element_composition() {
+		assert_eq!(fixed_type_size("[u8; 32]"), Some(32));
+		assert_eq!(fixed_type_size("[u64; 8]"), Some(64));
+		assert_eq!(fixed_type_size("[PodU64; 4]"), Some(32));
+		assert_eq!(fixed_type_size("[[u8; 4]; 2]"), Some(8));
+		assert_eq!(fixed_type_size("Option<[u64; 2]>"), Some(17));
+		assert_eq!(fixed_type_size("[Address; 2]"), Some(64));
+		assert_eq!(fixed_type_size("[char; 4]"), None);
+		assert_eq!(fixed_type_size("[u64; N]"), None);
 	}
 
 	#[test]

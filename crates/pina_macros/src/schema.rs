@@ -631,35 +631,40 @@ fn classify_fixed_field(field: &Field, crate_path: &syn::Path) -> syn::Result<Au
 
 fn classify_fixed_type(ty: &Type, crate_path: &syn::Path) -> syn::Result<AuditedField> {
 	match ty {
-		Type::Array(array) => classify_byte_array(array, crate_path),
+		Type::Array(array) => classify_fixed_array(array, crate_path),
 		Type::Path(path) if path.qself.is_none() => classify_path(ty, path, crate_path),
 		other => Err(unsupported(other)),
 	}
 }
 
-fn classify_byte_array(
+fn classify_fixed_array(
 	array: &syn::TypeArray,
-	_crate_path: &syn::Path,
+	crate_path: &syn::Path,
 ) -> syn::Result<AuditedField> {
-	let Type::Path(element) = array.elem.as_ref() else {
-		return Err(syn::Error::new_spanned(
-			&array.elem,
-			"only one-dimensional `[u8; N]` byte arrays are supported in Pina schemas",
-		));
-	};
-
-	if !element.path.is_ident("u8") || !is_integer_literal(&array.len) {
+	if !is_integer_literal(&array.len) {
 		return Err(syn::Error::new_spanned(
 			array,
-			"only `[u8; N]` arrays with a literal length are supported in Pina schemas",
+			"`[T; N]` arrays require an integer literal length",
 		));
 	}
 
+	// The element classifies through the same closed grammar, so audited
+	// scalars, `Address`, nested byte arrays, and dynamic-free collections
+	// compose: `[u64; 8]` stores `[PodU64; 8]` little-endian with no length
+	// prefix, and validation recurses per element.
+	let element = classify_fixed_type(&array.elem, crate_path).map_err(|error| {
+		syn::Error::new(
+			syn::spanned::Spanned::span(array.elem.as_ref()),
+			format!("`[T; N]` array elements must be fixed Pina schema types: {error}"),
+		)
+	})?;
+	let native_element = &element.native;
+	let pod_element = &element.pod;
 	let length = &array.len;
 
 	Ok(AuditedField::new(
-		quote!([::core::primitive::u8; #length]),
-		quote!([::core::primitive::u8; #length]),
+		quote!([#native_element; #length]),
+		quote!([#pod_element; #length]),
 	))
 }
 
@@ -1028,18 +1033,18 @@ fn custom_mapping(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
 		"custom `ZcField` mappings and nested schema types are unsupported because Pina cannot \
-		 prove their alignment and bit validity; use an audited scalar, `Address`, `[u8; N]`, \
-		 `FixedI*<Frac>`, `FixedU*<Frac>`, `String<N>`, `Vec<T, N>`, or `Option<T>` where `T` is \
-		 one of these fixed types",
+		 prove their alignment and bit validity; use an audited scalar, `Address`, `[T; N]` where \
+		 `T` is a fixed type, `FixedI*<Frac>`, `FixedU*<Frac>`, `String<N>`, `Vec<T, N>`, or \
+		 `Option<T>` where `T` is one of these fixed types",
 	)
 }
 
 fn unsupported(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
-		"unsupported Pina zero-copy field; expected an audited scalar, `Address`, `[u8; N]`, \
-		 `FixedI*<Frac>`, `FixedU*<Frac>`, `String<N>`, `Vec<T, N>`, or `Option<T>` where `T` is \
-		 one of these fixed types",
+		"unsupported Pina zero-copy field; expected an audited scalar, `Address`, `[T; N]` where \
+		 `T` is a fixed type, `FixedI*<Frac>`, `FixedU*<Frac>`, `String<N>`, `Vec<T, N>`, or \
+		 `Option<T>` where `T` is one of these fixed types",
 	)
 }
 
@@ -1101,6 +1106,89 @@ mod tests {
 		assert_eq!(
 			audited.native.to_string(),
 			"pina :: fixed :: FixedU64 < U16 >"
+		);
+	}
+
+	#[test]
+	fn classifies_typed_arrays_through_their_element_pods() {
+		let cases: &[(&str, &str, &str)] = &[
+			(
+				"[u8; 32]",
+				"[:: core :: primitive :: u8 ; 32]",
+				"[:: core :: primitive :: u8 ; 32]",
+			),
+			(
+				"[u16; 4]",
+				"[:: core :: primitive :: u16 ; 4]",
+				"[pina :: PodU16 ; 4]",
+			),
+			(
+				"[u64; 8]",
+				"[:: core :: primitive :: u64 ; 8]",
+				"[pina :: PodU64 ; 8]",
+			),
+			(
+				"[PodU64; 8]",
+				"[pina :: PodU64 ; 8]",
+				"[pina :: PodU64 ; 8]",
+			),
+			(
+				"[bool; 2]",
+				"[:: core :: primitive :: bool ; 2]",
+				"[pina :: PodBool ; 2]",
+			),
+			(
+				"[Address; 4]",
+				"[pina :: Address ; 4]",
+				"[pina :: Address ; 4]",
+			),
+			(
+				"[[u8; 4]; 2]",
+				"[[:: core :: primitive :: u8 ; 4] ; 2]",
+				"[[:: core :: primitive :: u8 ; 4] ; 2]",
+			),
+			(
+				"[FixedU64<U16>; 2]",
+				"[FixedU64 < U16 > ; 2]",
+				"[pina :: PodU64 ; 2]",
+			),
+		];
+
+		for (source, native, pod) in cases {
+			let audited = classify_spelled(source)
+				.unwrap_or_else(|error| panic!("`{source}` should classify: {error}"));
+			assert_eq!(
+				&audited.native.to_string(),
+				native,
+				"unexpected native mapping for `{source}`"
+			);
+			assert_eq!(
+				&audited.pod.to_string(),
+				pod,
+				"unexpected pod mapping for `{source}`"
+			);
+		}
+	}
+
+	#[test]
+	fn rejects_typed_arrays_with_non_literal_lengths() {
+		let error = classify_spelled("[u64; WIDTH]")
+			.expect_err("non-literal array lengths must be rejected");
+		assert!(
+			error.to_string().contains("integer literal length"),
+			"unexpected error: {error}"
+		);
+	}
+
+	#[test]
+	fn rejects_typed_array_elements_outside_the_closed_grammar() {
+		let error =
+			classify_spelled("[char; 4]").expect_err("restricted-domain elements must be rejected");
+		assert!(
+			error
+				.to_string()
+				.contains("array elements must be fixed Pina schema types"),
+			"unexpected error: {error}"
 		);
 	}
 
