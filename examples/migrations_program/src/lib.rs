@@ -11,6 +11,19 @@ declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 // `pina migrations make` prints the same estimate when a transition grows.
 const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 
+/// Instruction discriminator.
+///
+/// The `migrations(...)` list is the reserved `Migrate` instruction's slot
+/// order: `[payer, systemProgram, state, manualState, compactState,
+/// spareState]`. The trailing `spareState` slot shows several accounts of the
+/// same contract migrating in one sweep under one shared lamport budget.
+/// Declaring the order here makes it typed instead of a comment beside a run of
+/// `run_optional` calls, and generated clients derive the same order from the
+/// IDL.
+#[instruction_dispatch(
+	migrations(State, ManualState, CompactState, State),
+	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS
+)]
 #[discriminator]
 pub enum MigrationInstruction {
 	Update = 0,
@@ -201,52 +214,11 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	}
 }
 
-/// Reserved framework `Migrate` instruction.
-///
-/// A client prepends this instruction when an account is stale, so the payer
-/// authorizes exactly the migration cost and the business instruction that
-/// follows sees current data. Accounts are `[payer, systemProgram, state,
-/// manualState, compactState, spareState]`: the payer is a writable account
-/// (or the program address when no step needs funding), the system program
-/// slot backs the rent transfers, a migratable slot holding the program
-/// address is treated as omitted, and the trailing `spareState` slot shows
-/// several accounts of the same contract migrating in one sweep under one
-/// shared lamport budget.
-fn process_migrate(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResult {
-	let mut context = MigrateContext::new(program_id, accounts, MAX_INLINE_MIGRATION_LAMPORTS)?;
-	context.run_optional::<State>(2)?;
-	context.run_optional::<ManualState>(3)?;
-	context.run_optional::<CompactState>(4)?;
-	context.run_optional::<State>(5)?;
-
-	Ok(())
-}
-
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
-
-	#[inline]
-	pub fn process_instruction(
-		program_id: &Address,
-		accounts: &mut [AccountView],
-		data: &[u8],
-	) -> ProgramResult {
-		if is_migrate_instruction(data) {
-			return process_migrate(program_id, accounts);
-		}
-		let instruction: MigrationInstruction = parse_instruction(program_id, &ID, data)?;
-		match instruction {
-			MigrationInstruction::Update => {
-				UpdateAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			MigrationInstruction::Relay => {
-				RelayAccounts::try_from((program_id, accounts))?.process(data)
-			}
-		}
-	}
+	nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
 }
 
 #[cfg(test)]

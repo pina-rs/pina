@@ -1161,6 +1161,25 @@ impl<'a> AccountsCursor<'a> {
 
 /// Cursor-based parser for typed account structs.
 pub trait ParseAccounts<'a>: Sized {
+	/// Declared account capacity for this struct.
+	///
+	/// `#[derive(Accounts)]` sums one slot per positional field and one slot for
+	/// a `#[pina(remaining)]` field, so the value is exact for a struct with only
+	/// positional fields and a declared capacity for one whose trailing slice is
+	/// caller-controlled. Hand-written parsers keep [`Self::UNBOUNDED`].
+	///
+	/// This is a declaration, not a hard limit: a trailing slice can hold more
+	/// accounts than the single slot counted here. Treat it as the capacity a
+	/// program reserves, which is what `MAX_INSTRUCTION_ACCOUNTS` folds together.
+	const ACCOUNT_BOUND: usize = Self::UNBOUNDED;
+
+	/// Sentinel for a parser that declares no capacity.
+	///
+	/// Hand-written implementations keep this value so they can never understate
+	/// what a program reads; a bound this large saturates at the transaction
+	/// maximum instead of being trusted as a capacity.
+	const UNBOUNDED: usize = usize::MAX;
+
 	/// Parse accounts from the cursor, preserving user-authored validation for
 	/// later instruction processing.
 	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;

@@ -410,6 +410,82 @@ fn default_crate_path() -> Path {
 		.unwrap_or_else(|e| panic!("internal error: failed to parse default crate path: {e}"))
 }
 
+/// Arguments for the `#[instruction_dispatch(...)]` attribute macro.
+#[derive(Debug, FromMeta)]
+pub(crate) struct InstructionDispatchArgs {
+	/// Set the path to the crate
+	#[darling(default = "default_crate_path", rename = "crate")]
+	pub(crate) crate_path: Path,
+	/// Emit the reserved `Migrate` prelude for these migratable contracts.
+	///
+	/// The list is the reserved instruction's slot order: the first entry is
+	/// slot 2, the next slot 3, and so on. Slot order is wire format that the
+	/// manifest cannot express, so it is declared here rather than inferred.
+	#[darling(default)]
+	pub(crate) migrations: Option<Vec<Path>>,
+	/// Lamport budget shared by every slot of the reserved `Migrate`
+	/// instruction.
+	///
+	/// Required alongside `migrations`, because the cap is program policy and a
+	/// default would silently misprice rent transfers.
+	#[darling(default)]
+	pub(crate) migrations_max_lamports: Option<Expr>,
+	/// Emit the compile-time capacity assertions for
+	/// `MAX_INSTRUCTION_ACCOUNTS`.
+	///
+	/// A bare `capacity_test` or `capacity_test = true` emits them;
+	/// `capacity_test = false` suppresses them.
+	#[darling(default, rename = "capacity_test")]
+	pub(crate) capacity_test: Option<CapacityTestArg>,
+	/// Set the account cap that `MAX_INSTRUCTION_ACCOUNTS` saturates at.
+	///
+	/// Defaults to the entrypoint's account array, `pinocchio::MAX_TX_ACCOUNTS`.
+	#[darling(default)]
+	pub(crate) maximum_accounts: Option<Expr>,
+	/// Set the program id the dispatch compares against.
+	///
+	/// Defaults to `ID` from the crate's `declare_id!`.
+	#[darling(default)]
+	pub(crate) program_id: Option<Expr>,
+}
+
+/// The `capacity_test` argument on the dispatch attribute.
+///
+/// Only a bare token or a boolean literal is accepted, matching the strictness
+/// of [`MigrationsArg`] so the attribute grammar has one boolean convention.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CapacityTestArg {
+	/// A bare `capacity_test` token or `capacity_test = true`.
+	Enabled,
+	/// `capacity_test = false`.
+	Disabled,
+}
+
+impl CapacityTestArg {
+	/// The explicit opt-in decision.
+	#[must_use]
+	pub(crate) const fn is_enabled(self) -> bool {
+		matches!(self, Self::Enabled)
+	}
+}
+
+impl FromMeta for CapacityTestArg {
+	fn from_word() -> darling::Result<Self> {
+		Ok(Self::Enabled)
+	}
+
+	fn from_bool(value: bool) -> darling::Result<Self> {
+		Ok(if value { Self::Enabled } else { Self::Disabled })
+	}
+}
+
+/// Arguments for a per-variant `#[dispatch(...)]` override.
+#[derive(Debug, FromMeta)]
+pub(crate) struct DispatchVariantArgs {
+	/// Route this variant through a different accounts struct.
+	pub(crate) accounts: Option<Path>,
+}
+
 /// Arguments for the `#[discriminator(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct DiscriminatorArgs {

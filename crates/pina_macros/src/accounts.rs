@@ -219,8 +219,39 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 	});
 	let remaining_field_ident = remaining_field.map(|(field, ..)| quote!(#field,));
 
+	// Positional fields contribute one slot each. A `remaining` slice contributes
+	// one slot as well: it is the declaration the entrypoint reserves for, and a
+	// trailing slice can hold more accounts than any constant could count.
+	let account_bound = {
+		let positional = field_kinds
+			.iter()
+			.filter(|(_, kind)| *kind != AccountFieldKind::Nested)
+			.count()
+			+ usize::from(remaining_field.is_some());
+		// A suffixed literal keeps `3.saturating_add(..)` from lexing as a float
+		// member access.
+		let positional = proc_macro2::Literal::usize_suffixed(positional);
+		let nested = field_kinds
+			.iter()
+			.filter(|(_, kind)| *kind == AccountFieldKind::Nested)
+			.map(|(field, _)| {
+				let ty = &field.ty;
+
+				quote! {
+					.saturating_add(<#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_BOUND)
+				}
+			})
+			.collect::<Vec<_>>();
+
+		quote! {
+			const ACCOUNT_BOUND: usize = #positional #(#nested)*;
+		}
+	};
+
 	quote! {
 		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {
+			#account_bound
+
 			fn parse_accounts(
 				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {

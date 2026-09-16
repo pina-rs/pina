@@ -1,0 +1,5 @@
+error: could not parse the `#[instruction_dispatch(...)]` input: Unknown field: `disptach`. Available values: `capacity_test`, `crate`, `maximum_accounts`, `migrations`, `migrations_max_lamports`, `program_id`. Supported arguments are `crate = path`, `migrations(Account, ...)`, `migrations_max_lamports = EXPR`, `capacity_test`, `maximum_accounts = EXPR`, and `program_id = EXPR`
+ --> tests/ui/fail/instruction_dispatch_unknown_argument.rs:8:24
+  |
+8 | #[instruction_dispatch(disptach = true)]
+  |                        ^^^^^^^^^^^^^^^

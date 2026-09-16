@@ -6,6 +6,7 @@ pub struct InitAccounts<'a> {
     pub system_program: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 3usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -75,6 +76,7 @@ pub struct TransferAccounts<'a> {
     pub extra: &'a [AccountView],
 }
 impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 4usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -145,6 +147,7 @@ pub struct MutableTransferAccounts<'a> {
     pub extra: &'a mut [AccountView],
 }
 impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 2usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -205,6 +208,7 @@ pub struct DuplicateMutableRemainingAccounts<'a> {
     pub extra: &'a mut [AccountView],
 }
 impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 2usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -264,6 +268,7 @@ pub struct SingleAccount<'a> {
     pub account: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
+    const ACCOUNT_BOUND: usize = 1usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -327,6 +332,7 @@ pub struct EscrowAccounts<'a> {
     pub system_program: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 9usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -422,6 +428,7 @@ pub struct DefaultCrateAccounts<'a> {
     pub data: &'a AccountView,
 }
 impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 2usize;
     fn parse_accounts(
         cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
@@ -486,6 +493,7 @@ pub struct MakeAccounts<'a> {
     pub system_program: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
+    const ACCOUNT_BOUND: usize = 4usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {

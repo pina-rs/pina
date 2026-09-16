@@ -1,0 +1,14 @@
+error[E0425]: cannot find type `AbsentAccounts` in this scope
+  --> tests/ui/fail/instruction_dispatch_missing_accounts.rs:12:2
+   |
+12 |     Absent = 1,
+   |     ^^^^^^
+...
+16 | pub struct PresentAccounts<'a> {
+   | ------------------------------ similarly named struct `PresentAccounts` defined here
+   |
+help: a struct with a similar name exists
+   |
+12 -     Absent = 1,
+12 +     PresentAccounts = 1,
+   |

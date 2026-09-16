@@ -31,27 +31,10 @@ pub mod entrypoint {
 
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
-
-	#[inline(always)]
-	pub fn process_instruction(
-		program_id: &Address,
-		accounts: &mut [AccountView],
-		data: &[u8],
-	) -> ProgramResult {
-		let instruction: EscrowInstruction = parse_instruction(program_id, &ID, data)?;
-
-		match instruction {
-			EscrowInstruction::Make => {
-				MakeAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			EscrowInstruction::Take => {
-				TakeAccounts::try_from((program_id, accounts))?.process(data)
-			}
-		}
-	}
+	nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
 }
 
+#[instruction_dispatch]
 #[discriminator]
 pub enum EscrowInstruction {
 	Make = 1,

@@ -1205,6 +1205,78 @@ fn resolve_manifest(
 	})
 }
 
+/// Verify that every contract named by a dispatch migration ladder is
+/// recorded in the checked-in manifest.
+///
+/// The generated ladder calls `MigratableAccount`, so a contract with no
+/// snapshot would otherwise fail later as an unsatisfied trait bound. Reporting
+/// the `pina migrations make` remedy here keeps the failure mode identical to
+/// a schema that opts into migrations without a snapshot.
+pub(crate) fn verify_migration_contracts(
+	enum_name: &syn::Ident,
+	ladder: &[syn::Path],
+) -> syn::Result<()> {
+	let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") else {
+		return Err(syn::Error::new_spanned(
+			enum_name,
+			"could not locate Cargo manifest for migration-aware dispatch",
+		));
+	};
+	let program_dir = PathBuf::from(manifest_dir);
+	let path = program_dir.join(MANIFEST_PATH);
+	let source = match std::fs::read(&path) {
+		Ok(source) => source,
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+			return Err(syn::Error::new_spanned(
+				enum_name,
+				format!(
+					"this program declares a migration ladder, but {} does not exist; run `pina \
+					 migrations make`",
+					path.display()
+				),
+			));
+		}
+		Err(error) => {
+			return Err(syn::Error::new_spanned(
+				enum_name,
+				format!(
+					"the migration ladder cannot be verified because {} could not be read \
+					 ({error}); run `pina migrations make` to regenerate it",
+					path.display()
+				),
+			));
+		}
+	};
+	let manifest: MigrationManifest = pina_abi::decode_manifest(&source).map_err(|error| {
+		syn::Error::new_spanned(
+			enum_name,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+	manifest.validate().map_err(|error| {
+		syn::Error::new_spanned(
+			enum_name,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+
+	for account in ladder {
+		let Some(segment) = account.segments.last() else {
+			return Err(syn::Error::new_spanned(
+				account,
+				"migration ladder entries cannot be empty paths",
+			));
+		};
+		let name = segment.ident.to_string();
+
+		manifest
+			.contract_for_source(ContractKind::Account, &name)
+			.map_err(|error| syn::Error::new_spanned(account, error))?;
+	}
+
+	Ok(())
+}
+
 fn verify_transition_files(
 	item: &ItemStruct,
 	program_dir: &std::path::Path,

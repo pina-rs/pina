@@ -33,34 +33,7 @@ pub mod entrypoint {
 
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
-
-	#[inline(always)]
-	pub fn process_instruction(
-		program_id: &Address,
-		accounts: &mut [AccountView],
-		data: &[u8],
-	) -> ProgramResult {
-		let instruction: StakingInstruction = parse_instruction(program_id, &ID, data)?;
-
-		match instruction {
-			StakingInstruction::InitializePool => {
-				InitializePoolAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			StakingInstruction::OpenPosition => {
-				OpenPositionAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			StakingInstruction::Deposit => {
-				DepositAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			StakingInstruction::Withdraw => {
-				WithdrawAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			StakingInstruction::Claim => {
-				ClaimAccounts::try_from((program_id, accounts))?.process(data)
-			}
-		}
-	}
+	nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
 }
 
 #[error]
@@ -78,6 +51,7 @@ pub enum StakingError {
 	InvalidPool = 4,
 }
 
+#[instruction_dispatch]
 #[discriminator]
 pub enum StakingInstruction {
 	InitializePool = 0,
