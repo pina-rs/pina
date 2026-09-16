@@ -24,3 +24,39 @@ impl CpiProgramId for CounterProgram {
 
 /// A validated executable account for the `counterProgram` program.
 pub type ProgramAccount<'a> = Program<'a, CounterProgram>;
+
+/// Whether `address` is the `counterProgram` program this crate calls.
+///
+/// Check this before a CPI when the address arrives from caller input, so a
+/// call can never be redirected to a program this crate was not imported
+/// for.
+#[inline(always)]
+pub fn is_expected_program(address: &Address) -> bool {
+	*address == COUNTER_PROGRAM_ID
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Binds the compiled-in ID to a literal.
+	///
+	/// A swapped dependency could otherwise retarget every CPI in this crate
+	/// without the source changing, so the expected address is asserted here in
+	/// full rather than only through the constant.
+	#[test]
+	fn binds_the_expected_program_id() {
+		assert_eq!(
+			COUNTER_PROGRAM_ID,
+			pina::address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
+		);
+		assert_eq!(CounterProgram::ID, COUNTER_PROGRAM_ID);
+		assert!(is_expected_program(&COUNTER_PROGRAM_ID));
+	}
+
+	#[test]
+	fn rejects_a_foreign_program_id() {
+		let foreign = pina::address!("11111111111111111111111111111111");
+		assert!(!is_expected_program(&foreign));
+	}
+}

@@ -24,3 +24,39 @@ impl CpiProgramId for AccountReallocProgram {
 
 /// A validated executable account for the `accountReallocProgram` program.
 pub type ProgramAccount<'a> = Program<'a, AccountReallocProgram>;
+
+/// Whether `address` is the `accountReallocProgram` program this crate calls.
+///
+/// Check this before a CPI when the address arrives from caller input, so a
+/// call can never be redirected to a program this crate was not imported
+/// for.
+#[inline(always)]
+pub fn is_expected_program(address: &Address) -> bool {
+	*address == ACCOUNT_REALLOC_PROGRAM_ID
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Binds the compiled-in ID to a literal.
+	///
+	/// A swapped dependency could otherwise retarget every CPI in this crate
+	/// without the source changing, so the expected address is asserted here in
+	/// full rather than only through the constant.
+	#[test]
+	fn binds_the_expected_program_id() {
+		assert_eq!(
+			ACCOUNT_REALLOC_PROGRAM_ID,
+			pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS")
+		);
+		assert_eq!(AccountReallocProgram::ID, ACCOUNT_REALLOC_PROGRAM_ID);
+		assert!(is_expected_program(&ACCOUNT_REALLOC_PROGRAM_ID));
+	}
+
+	#[test]
+	fn rejects_a_foreign_program_id() {
+		let foreign = pina::address!("11111111111111111111111111111111");
+		assert!(!is_expected_program(&foreign));
+	}
+}
