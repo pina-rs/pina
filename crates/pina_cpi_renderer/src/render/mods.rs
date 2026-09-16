@@ -4,8 +4,23 @@ use codama_nodes::ProgramNode;
 
 use super::helpers::pascal;
 
-pub(crate) fn render_root_mod(program: &ProgramNode) -> String {
+pub(crate) fn render_root_mod(program: &ProgramNode, has_types: bool) -> String {
 	let mut lines = vec!["mod programs;".to_string()];
+
+	if !has_types {
+		// An empty module keeps the instruction pages' import path valid.
+		lines.insert(0, "pub(crate) mod generated_types {}".to_string());
+	}
+
+	if has_types {
+		lines.insert(0, "pub(crate) mod types;".to_string());
+		lines.push(String::new());
+		lines.push("pub use types::*;".to_string());
+		// Instruction pages import the generated types through a name that
+		// resolves whether or not this IDL needed any.
+		lines.push(String::new());
+		lines.push("pub(crate) use types as generated_types;".to_string());
+	}
 
 	if !program.instructions.is_empty() {
 		lines.insert(0, "mod instructions;".to_string());

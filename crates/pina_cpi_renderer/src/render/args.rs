@@ -15,20 +15,71 @@ use crate::error::Result;
 use crate::render::helpers::rust_identifier;
 
 /// How one instruction argument appears in the generated builder.
+///
+/// The terse fixed-layout renderer produces [`ArgumentEncoding::Fixed`], whose
+/// statements are byte-identical to what this renderer has always emitted.
+/// Arguments it cannot express fall back to [`ArgumentEncoding::Planned`],
+/// produced by the general ABI planner in [`super::wire`], which understands
+/// `definedTypes` references, structs, enums, options, and length-prefixed
+/// collections.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedArgument {
 	/// Rust field name in the builder struct.
 	pub(crate) field: String,
 	/// Rust field type (owned; builder fields hold the value or a reference).
 	pub(crate) rust_type: String,
-	/// Byte width of the argument on the wire.
+	/// Byte width for fixed arguments, largest width for variable ones.
 	pub(crate) wire_size: usize,
-	/// Statement writing the argument into the data buffer at `offset`.
+	/// Statement writing the argument into the data buffer.
 	pub(crate) write: String,
 	/// Whether the generated field borrows caller-owned data.
 	pub(crate) borrows: bool,
 	/// Docs attached to the argument, already indented.
 	pub(crate) docs: Vec<String>,
+	/// Whether the encoded width depends on caller-supplied data.
+	pub(crate) variable: bool,
+	/// Whether the general ABI planner produced this argument.
+	pub(crate) planned: bool,
+}
+
+impl RenderedArgument {
+	/// Renders one argument, falling back to the general ABI planner.
+	///
+	/// # Errors
+	///
+	/// Returns the planner's error when neither renderer can encode the
+	/// argument.
+	pub(crate) fn render(
+		name: &str,
+		argument_type: &TypeNode,
+		types: &mut super::wire::TypeIndex,
+		context: &str,
+	) -> Result<Self> {
+		match render_argument(name, argument_type, context) {
+			Ok(argument) => Ok(argument),
+			Err(original) => {
+				let planned = super::wire::plan(argument_type, types, context)?;
+				if original.to_string().contains("is not declared") {
+					return Err(original);
+				}
+				let variable = planned.is_variable();
+				let field = rust_identifier(&name.to_snake_case(), context)?;
+				Ok(Self {
+					rust_type: planned.rust_type,
+					wire_size: planned.max_size,
+					// Rebind the planner's placeholder to this argument's field.
+					write: planned
+						.encode
+						.replace("self_value", &format!("(&self.{field})")),
+					borrows: planned.borrows,
+					docs: Vec::new(),
+					variable,
+					planned: true,
+					field,
+				})
+			}
+		}
+	}
 }
 
 /// Renders a non-omitted instruction argument.
@@ -48,6 +99,8 @@ pub(crate) fn render_argument(
 				wire_size: 1,
 				borrows: false,
 				docs: Vec::new(),
+				variable: false,
+				planned: false,
 			})
 		}
 		TypeNode::PublicKey(_) => {
@@ -60,6 +113,8 @@ pub(crate) fn render_argument(
 				borrows: true,
 				wire_size: 32,
 				docs: Vec::new(),
+				variable: false,
+				planned: false,
 			})
 		}
 		TypeNode::Array(array_type) => render_array_argument(&field, array_type, context),
@@ -123,6 +178,8 @@ fn render_number_argument(
 		write,
 		borrows: false,
 		docs: Vec::new(),
+		variable: false,
+		planned: false,
 	})
 }
 
@@ -159,6 +216,8 @@ fn render_fixed_bytes_argument(field: &str, wire_size: usize) -> RenderedArgumen
 		wire_size,
 		borrows: false,
 		docs: Vec::new(),
+		variable: false,
+		planned: false,
 	}
 }
 
@@ -200,6 +259,8 @@ fn render_pinapod_string_argument(
 		write,
 		borrows: true,
 		docs: Vec::new(),
+		variable: false,
+		planned: false,
 	})
 }
 
@@ -268,6 +329,8 @@ fn render_pinapod_vec_argument(
 		write,
 		borrows: true,
 		docs: Vec::new(),
+		variable: false,
+		planned: false,
 	})
 }
 
@@ -439,6 +502,8 @@ fn render_array_argument(
 		write,
 		borrows: false,
 		docs: Vec::new(),
+		variable: false,
+		planned: false,
 	})
 }
 

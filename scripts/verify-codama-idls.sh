@@ -99,6 +99,13 @@ format_codama_outputs
 echo "Verifying Rust IDL fixture drift tests..."
 cargo test -p pina_cli --locked --test codama_idls
 
+# Foreign IDLs exercise the CPI renderer against real-world Anchor shapes.
+# The in-crate tests pin discriminators, accounts, and encoded lengths; this
+# gate proves the rendered crates actually build for the SBF target.
+echo "Verifying foreign-IDL CPI fixtures render and compile for SBF..."
+cargo test -p pina_cpi_renderer --locked --lib
+"$ROOT/scripts/verify-cpi-fixtures-sbf.sh"
+
 echo "Running Codama JS IDL validation..."
 pnpm --dir "$ROOT" run test:idls
 

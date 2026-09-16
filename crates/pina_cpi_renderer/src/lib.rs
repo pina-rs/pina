@@ -57,6 +57,9 @@ use render::mods::render_root_mod;
 use render::scaffold::ensure_crate_scaffold;
 use render::scaffold::open_crate_dir;
 use render::scaffold::write_files;
+use render::types::render_type_page;
+use render::types::render_types_mod;
+use render::wire::TypeIndex;
 
 mod error;
 mod render;
@@ -285,10 +288,26 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 		));
 	}
 
-	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
 	files.insert(
 		PathBuf::from("programs.rs"),
 		page(&render_programs_mod(program, &program_constants)),
+	);
+
+	// Instruction arguments register the `definedTypes` they reference, so
+	// instructions render before the type pages that back them.
+	let mut types = TypeIndex::new(&program.defined_types);
+	let mut instruction_pages = Vec::new();
+	for instruction in &program.instructions {
+		instruction_pages.push((
+			snake(instruction.name.as_ref()),
+			render_instruction_page(instruction, &mut types)?,
+		));
+	}
+
+	let named = types.named().to_vec();
+	files.insert(
+		PathBuf::from("mod.rs"),
+		page(&render_root_mod(program, !named.is_empty())),
 	);
 
 	if !program.instructions.is_empty() {
@@ -297,11 +316,36 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 			page(&render_instructions_mod(&program.instructions)),
 		);
 
-		for instruction in &program.instructions {
-			let filename = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
-			let instruction_content = render_instruction_page(instruction)?;
+		for (name, content) in &instruction_pages {
+			files.insert(
+				PathBuf::from(format!("instructions/{name}.rs")),
+				page(content),
+			);
+		}
+	}
 
-			files.insert(PathBuf::from(filename), page(&instruction_content));
+	if !named.is_empty() {
+		files.insert(
+			PathBuf::from("types/mod.rs"),
+			page(&render_types_mod(&named)),
+		);
+		for name in &named {
+			let defined_type = program
+				.defined_types
+				.iter()
+				.find(|defined| defined.name.as_ref() == name.as_str())
+				.ok_or_else(|| {
+					RenderError::UnsupportedType {
+						context: format!("defined type `{name}`"),
+						kind: "definedTypeNode",
+						reason: "the type was referenced but is not declared in this IDL"
+							.to_string(),
+					}
+				})?;
+			files.insert(
+				PathBuf::from(format!("types/{}.rs", snake(name))),
+				page(&render_type_page(defined_type, &mut types)?),
+			);
 		}
 	}
 

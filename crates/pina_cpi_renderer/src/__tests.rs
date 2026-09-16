@@ -29,6 +29,8 @@ use codama_nodes::U8;
 use codama_nodes::U64;
 use codama_nodes::ValueNode;
 
+use super::render::wire;
+use super::render::wire::TypeIndex;
 use super::*;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -61,7 +63,8 @@ fn render_fixture_instruction(name: &str, instruction: &str) -> String {
 		.iter()
 		.find(|candidate| candidate.name.as_ref() == instruction)
 		.unwrap_or_else(|| panic!("fixture `{name}` has no `{instruction}` instruction"));
-	render_instruction_page(page).unwrap_or_else(|error| panic!("renders: {error}"))
+	render_instruction_page(page, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"))
 }
 
 fn program_node(name: &str, public_key: &str, instructions: Vec<InstructionNode>) -> ProgramNode {
@@ -488,7 +491,7 @@ fn renders_program_id_optional_accounts() {
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
-	let page = render_instruction_page(&root.program.instructions[0])
+	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders optional account: {error}"));
 
 	assert!(page.contains("pub admin: Option<&'account AccountView>,"));
@@ -506,7 +509,7 @@ fn renders_runtime_signer_selection() {
 	root.program.instructions[0].accounts.push(witness);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
-	let page = render_instruction_page(&root.program.instructions[0])
+	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders runtime signer: {error}"));
 
 	assert!(page.contains("pub admin: (&'account AccountView, bool),"));
@@ -519,18 +522,32 @@ fn renders_runtime_signer_selection() {
 }
 
 #[test]
-fn refuses_omitted_optional_accounts() {
+fn refuses_a_non_trailing_omitted_optional_account() {
 	let mut root = load_fixture_root("vesting_program");
+	// `admin` is the first account, so dropping it under the `omitted`
+	// strategy would shift every account after the hole.
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::Omitted);
-	let error = render_program_to_files(&root).expect_err("refuses omitted optional accounts");
+	let error = render_program_to_files(&root).expect_err("refuses a mid-list omitted option");
 
-	assert!(
-		error
-			.to_string()
-			.contains("omitted optional-account strategy")
-	);
+	assert!(error.to_string().contains("trailing optional accounts"));
+}
+
+#[test]
+fn renders_trailing_omitted_optional_accounts() {
+	let mut root = load_fixture_root("vesting_program");
+	let mut witness = InstructionAccountNode::new("witness", false, IsSigner::False);
+	witness.is_optional = Some(true);
+	root.program.instructions[0].accounts.push(witness);
+	root.program.instructions[0].optional_account_strategy =
+		Some(codama_nodes::OptionalAccountStrategy::Omitted);
+	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("renders trailing optional account: {error}"));
+
+	// The generated builder still exposes the account, so a caller can supply
+	// it; omitting it leaves the placeholder the IDL's strategy expects.
+	assert!(page.contains("pub witness: Option<&'account AccountView>,"));
 }
 
 #[test]
@@ -560,8 +577,8 @@ fn renders_non_omitted_arguments_only() {
 			)
 		})
 		.count();
-	let page =
-		render_instruction_page(initialize).unwrap_or_else(|error| panic!("renders: {error}"));
+	let page = render_instruction_page(initialize, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	// The wire buffer also reserves the migration version byte that the
 	// fixture IDL carries between the discriminator and the payload.
@@ -608,7 +625,7 @@ fn renders_anchor_field_discriminators() {
 			vec![discriminator],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains(
@@ -632,7 +649,7 @@ fn renders_byte_array_arguments() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub digest: [u8; 32]"));
@@ -658,7 +675,7 @@ fn renders_base16_discriminators() {
 			vec![],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("const OPEN_DISCRIMINATOR: [u8; 4] = [222, 173, 190, 239];"));
@@ -687,7 +704,7 @@ fn renders_public_key_bool_and_number_arguments() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub sponsor: &'argument Address,"));
@@ -723,7 +740,7 @@ fn renders_signed_number_arguments() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	for (field, rust_type) in [
@@ -761,7 +778,7 @@ fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("keyword fields should render: {error}"));
 	assert!(page.contains("pub r#match: &'account AccountView,"));
 	assert!(page.contains("pub r#type: u64,"));
@@ -793,7 +810,7 @@ fn renders_address_only_instruction_lifetimes() {
 			vec![InstructionArgumentNode::new("owner", PublicKeyTypeNode {})],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders address-only instruction: {error}"));
 
 	assert!(page.contains("pub struct SetOwner<'argument> {"));
@@ -822,7 +839,7 @@ fn shares_one_argument_lifetime_for_addresses_and_pinapod_strings() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders address and String arguments: {error}"));
 
 	assert!(page.contains("pub struct SetProfile<'argument> {"));
@@ -847,7 +864,7 @@ fn renders_fixed_size_byte_arguments() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub digest: [u8; 32]"));
@@ -1124,4 +1141,158 @@ fn scaffold_and_generated_writes_refuse_symlink_targets() {
 	);
 
 	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans symlink test: {error}"));
+}
+
+/// Loads a checked-in foreign IDL fixture.
+fn foreign_fixture_root(name: &str) -> RootNode {
+	let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("fixtures")
+		.join(format!("{name}.json"));
+	read_root_node(&fixture_path)
+		.unwrap_or_else(|error| panic!("failed to load foreign fixture `{name}`: {error}"))
+}
+
+/// Every checked-in foreign IDL, as `(fixture name, instruction count)`.
+const FOREIGN_FIXTURES: &[(&str, usize)] = &[
+	("switchboard_on_demand", 4),
+	("metaplex_token_metadata", 58),
+	("meteora_dlmm", 76),
+	("squads_v4_multisig", 36),
+];
+
+#[test]
+fn renders_every_foreign_idl_fixture() {
+	for (name, expected_instructions) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		assert_eq!(
+			root.program.instructions.len(),
+			*expected_instructions,
+			"fixture `{name}` changed shape"
+		);
+
+		let files = render_program_to_files(&root)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		// Every instruction gets a page, and the root module wires the result.
+		assert!(files.contains_key(Path::new("mod.rs")), "fixture `{name}`");
+		assert!(
+			files.contains_key(Path::new("programs.rs")),
+			"fixture `{name}`"
+		);
+		for instruction in &root.program.instructions {
+			let page = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
+			assert!(
+				files.contains_key(Path::new(&page)),
+				"fixture `{name}` is missing `{page}`"
+			);
+		}
+	}
+}
+
+#[test]
+fn generates_compilable_sources_for_every_foreign_idl() {
+	for (name, _) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		let files = render_program_to_files(&root)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		// `render_program_to_files` already parses each page with `syn`, so a
+		// pass here means every generated file is syntactically valid Rust.
+		assert!(!files.is_empty(), "fixture `{name}` produced no files");
+	}
+}
+
+/// Switchboard is the flagship case from the hardening issue, and the
+/// hand-written `pina-rs/lootbox` crate is its capability benchmark. These
+/// values are pinned to that crate and to the deployed program's Anchor IDL.
+#[test]
+fn switchboard_matches_the_hand_written_reference_crate() {
+	let root = foreign_fixture_root("switchboard_on_demand");
+	let files = render_program_to_files(&root)
+		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
+
+	// Discriminators pinned to the hand-written crate's unit tests.
+	let expected = [
+		(
+			"randomness_init",
+			"[9, 9, 204, 33, 50, 116, 113, 15]",
+			13,
+			16,
+		),
+		(
+			"randomness_commit",
+			"[52, 170, 152, 201, 179, 133, 242, 141]",
+			5,
+			8,
+		),
+		(
+			"randomness_reveal",
+			"[197, 181, 187, 10, 30, 58, 20, 73]",
+			12,
+			105,
+		),
+		(
+			"randomness_close",
+			"[146, 101, 14, 74, 225, 246, 0, 156]",
+			10,
+			8,
+		),
+	];
+
+	for (instruction, discriminator, accounts, encoded_len) in expected {
+		let page = format!("instructions/{instruction}.rs");
+		let source = files
+			.get(Path::new(&page))
+			.unwrap_or_else(|| panic!("switchboard is missing `{page}`"));
+
+		assert!(
+			source.contains(discriminator),
+			"`{instruction}` discriminator drifted: expected {discriminator}"
+		);
+		assert_eq!(
+			source.matches("CpiHandle::").count(),
+			accounts,
+			"`{instruction}` account list drifted"
+		);
+		assert!(
+			source.contains(&format!("pub const LEN: usize = {encoded_len};")),
+			"`{instruction}` encoded length drifted: expected {encoded_len}"
+		);
+	}
+}
+
+#[test]
+fn documents_every_rejected_foreign_argument_shape() {
+	// The issue requires a deliberate, recorded decision for each type the
+	// renderer refuses. These are the shapes it must never accept silently.
+	let cases = [
+		(
+			"shortU16",
+			NumberTypeNode::le(NumberFormat::ShortU16),
+			"variable-length prefix",
+		),
+		(
+			"f32",
+			NumberTypeNode::le(NumberFormat::F32),
+			"floating-point",
+		),
+		(
+			"big-endian u16",
+			NumberTypeNode::be(NumberFormat::U16),
+			"little-endian",
+		),
+	];
+
+	for (label, node, expected_reason) in cases {
+		let error = wire::plan(
+			&node.into(),
+			&mut TypeIndex::default(),
+			"documented rejection",
+		)
+		.expect_err(&format!("`{label}` must be rejected"));
+		assert!(
+			error.to_string().contains(expected_reason),
+			"`{label}` rejection must explain `{expected_reason}`, got: {error}"
+		);
+	}
 }
