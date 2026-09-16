@@ -375,8 +375,8 @@ impl<'a> TokenAccountRef<'a> {
 /// Every program holding a vault writes the same three steps by hand: read the
 /// token balance before the CPI, invoke, read it again, and check that the
 /// observed debit matches the amount the instruction was supposed to move. The
-/// builders in this module and [`crate::cpi`] perform the transfer; this module
-/// is the check that the transfer did what it claimed.
+/// transfer builders perform the move; this module is the check that the move
+/// did what it claimed.
 ///
 /// Rejecting a mismatch is the point. A CPI that moves less than requested —
 /// through a fee, a transfer hook, or a partial transfer — credits the
@@ -391,8 +391,8 @@ pub mod verified {
 	/// Check that a token balance fell by exactly `amount`.
 	///
 	/// `before` and `after` are reads of the same account's token balance taken
-	/// immediately before and after the CPI. Use [`crate::TokenAccountRef::amount`]
-	/// to read them from a validated token account.
+	/// immediately before and after the CPI. On a validated token account,
+	/// `amount()` reads them.
 	///
 	/// # Errors
 	///

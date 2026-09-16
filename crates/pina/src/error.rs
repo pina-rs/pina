@@ -104,7 +104,7 @@ pub enum PinaProgramError {
 	InvalidTokenOwner = 0xFFFF_FFFC,
 	/// A verified CPI did not move the balance it was asked to move.
 	///
-	/// Returned by the [`crate::token::verified`] helpers when the observed
+	/// Returned by the `token::verified` helpers when the observed
 	/// debit differs from the requested amount, when a transfer moved nothing,
 	/// or when the requested amount was zero. A CPI that transfers less than
 	/// the caller accounted for silently credits the recipient short, so the

@@ -13,8 +13,9 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum DuplicateMutableAccountsProgramError {
-	/// 2040 -
-	#[error("")]
+	/// Two mutable account fields point at the same runtime account.
+	/// 2040 - Two mutable account fields point at the same runtime account.
+	#[error("Two mutable account fields point at the same runtime account.")]
 	ConstraintDuplicateMutableAccount = 0x7F8,
 }
 

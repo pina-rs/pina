@@ -14,7 +14,9 @@ import {
 } from "@solana/kit";
 import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The signer cannot update the pool's configuration. */
 export const PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_UPDATE_AUTHORITY = 0x0; // 0
+/** The signer cannot publish a new oracle price. */
 export const PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_ORACLE_AUTHORITY = 0x1; // 1
 
 export type PropAmmProgramError =
@@ -26,8 +28,10 @@ let propAmmProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	propAmmProgramErrorMessages = {
-		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_ORACLE_AUTHORITY]: ``,
-		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_UPDATE_AUTHORITY]: ``,
+		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_ORACLE_AUTHORITY]:
+			`The signer cannot publish a new oracle price.`,
+		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_UPDATE_AUTHORITY]:
+			`The signer cannot update the pool's configuration.`,
 	};
 }
 

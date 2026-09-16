@@ -632,19 +632,28 @@
 				"kind": "errorNode",
 				"name": "invalidPermissions",
 				"code": 0,
-				"message": ""
+				"message": "The requested permission bits are empty or outside the supported set.",
+				"docs": [
+					"The requested permission bits are empty or outside the supported set."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "roleAlreadyExists",
 				"code": 1,
-				"message": ""
+				"message": "A role with this address is already registered.",
+				"docs": [
+					"A role with this address is already registered."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "roleInactive",
 				"code": 2,
-				"message": ""
+				"message": "The role exists but was deactivated, so it grants nothing.",
+				"docs": [
+					"The role exists but was deactivated, so it grants nothing."
+				]
 			}
 		]
 	}

@@ -177,3 +177,66 @@ fn codama_idl_fixtures_match_generated_output() {
 		);
 	}
 }
+
+/// Every checked-in IDL error must carry a human-readable message.
+///
+/// The message reaches generated clients, so an explorer, a wallet, or a
+/// logging stack can say "offer key mismatch" instead of "custom program error
+/// 0x1770". A variant without a doc comment produces `"message": ""`, which
+/// clients render as an opaque code — the same gap every other framework
+/// closes by requiring the text.
+#[test]
+fn every_idl_error_carries_a_message() {
+	let root = workspace_root();
+	let fixture_dir = root.join("codama").join("idls");
+	let mut undocumented = Vec::new();
+	let mut total = 0usize;
+
+	for entry in fs::read_dir(&fixture_dir)
+		.unwrap_or_else(|error| panic!("read {}: {error}", fixture_dir.display()))
+		.filter_map(Result::ok)
+		.filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+	{
+		let path = entry.path();
+		let json = read_fixture(&path);
+		let program_name = path
+			.file_name()
+			.and_then(|name| name.to_str())
+			.unwrap_or("unknown");
+		let Some(errors) = json
+			.get("program")
+			.and_then(|program| program.get("errors"))
+			.and_then(Value::as_array)
+		else {
+			continue;
+		};
+
+		for error in errors {
+			total += 1;
+			let name = error.get("name").and_then(Value::as_str).unwrap_or("?");
+			let message = error
+				.get("message")
+				.and_then(Value::as_str)
+				.unwrap_or_default();
+			// `HelloNoMsg` is the Anchor-parity fixture for an error whose IDL
+			// message is empty, so its emptiness is asserted behavior rather
+			// than a missing doc comment. It is the only exemption.
+			let is_deliberate_fixture =
+				program_name == "custom_errors_program.json" && name == "helloNoMsg";
+			if message.trim().is_empty() && !is_deliberate_fixture {
+				undocumented.push(format!("{program_name}: {name}"));
+			}
+		}
+	}
+
+	assert!(
+		total > 0,
+		"expected at least one error node across the IDLs"
+	);
+	assert!(
+		undocumented.is_empty(),
+		"every `#[error]` variant needs a doc comment so the IDL carries its message; \
+		 undocumented: {}",
+		undocumented.join(", ")
+	);
+}

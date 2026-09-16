@@ -14,6 +14,7 @@ import {
 } from "@solana/kit";
 import { FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The signer is not the authority recorded on the account. */
 export const FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0x0; // 0
 
 export type FloatAccountsProgramError =
@@ -24,7 +25,8 @@ let floatAccountsProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	floatAccountsProgramErrorMessages = {
-		[FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``,
+		[FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]:
+			`The signer is not the authority recorded on the account.`,
 	};
 }
 

@@ -20,6 +20,7 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FloatError {
+	/// The signer is not the authority recorded on the account.
 	AuthorityMismatch = 0,
 }
 
