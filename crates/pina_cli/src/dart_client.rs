@@ -1170,6 +1170,82 @@ fn dart_error(path: impl AsRef<Path>, message: String) -> CodamaError {
 mod tests {
 	use super::*;
 
+	/// Build the minimum account description the hardener needs.
+	fn migratable_account() -> MigratableAccount {
+		MigratableAccount {
+			camel: "configState".to_owned(),
+			shouting: "CONFIG_STATE".to_owned(),
+			discriminator: vec![1],
+			version: 1,
+			version_bytes: 1,
+		}
+	}
+
+	/// A decoder already carrying the direction-aware check must be reported as
+	/// hardened, not re-processed.
+	#[test]
+	fn dart_version_hardening_reports_already_hardened() {
+		let account = migratable_account();
+		let source =
+			"final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);\n";
+
+		assert!(matches!(
+			enforce_dart_migration_version(source, &account),
+			DartMigrationHardening::AlreadyHardened
+		));
+	}
+
+	/// The statement the hardener rewrites, un-hardened.
+	const UNHARDENED_DECODE: &str =
+		"  final configState = getConstantDecoder(getU8Decoder()).read(bytes, offset + 1);\n";
+
+	/// A matching statement is rewritten into the direction-aware check.
+	#[test]
+	fn dart_version_hardening_rewrites_the_envelope_read() {
+		let account = migratable_account();
+
+		let DartMigrationHardening::Rewritten(hardened) =
+			enforce_dart_migration_version(UNHARDENED_DECODE, &account)
+		else {
+			panic!("an un-hardened envelope read must be rewritten");
+		};
+
+		assert!(hardened.contains("storedMigrationVersion"));
+		assert!(hardened.contains("migration version mismatch: expected 1"));
+		assert!(!hardened.contains("getConstantDecoder(getU8Decoder()).read(bytes, offset + 1)"));
+	}
+
+	/// The critical case: an account *has* migration history, but the generated
+	/// source does not contain the expected envelope read. Shipping it would
+	/// decode silently with no version check — the exact failure that let
+	/// bitflip's server accept 85-byte records while the program emitted 86.
+	/// The hardener must report `NotEnveloped` so the caller fails closed.
+	#[test]
+	fn dart_version_hardening_reports_a_missing_envelope_read() {
+		let account = migratable_account();
+		// A decoder that reads *some* constant but not the envelope offset.
+		let source =
+			"  final configState = getConstantDecoder(getU8Decoder()).read(bytes, offset + 9);\n";
+
+		assert!(matches!(
+			enforce_dart_migration_version(source, &account),
+			DartMigrationHardening::NotEnveloped
+		));
+	}
+
+	/// A source with no envelope read at all is also reported as
+	/// `NotEnveloped`; the caller decides whether that is acceptable.
+	#[test]
+	fn dart_version_hardening_reports_sources_without_any_envelope() {
+		let account = migratable_account();
+		let source = "  final value = getU64Decoder().read(bytes, offset + 8);\n";
+
+		assert!(matches!(
+			enforce_dart_migration_version(source, &account),
+			DartMigrationHardening::NotEnveloped
+		));
+	}
+
 	#[test]
 	fn event_module_emission_failures_propagate() {
 		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -1544,7 +1620,25 @@ fn emit_dart_migration_helpers(
 				dart_needs_migration_module(account)
 			);
 		}
-		let hardened = enforce_dart_migration_version(&source, account).unwrap_or(source);
+		// `plan.accounts` only contains accounts the IDL marks as envelope-aware,
+		// so a missing version read means the generated decoder would silently
+		// skip the check. Fail closed instead of shipping it — mirroring the
+		// JavaScript hardener's generation-time assert.
+		let hardened = match enforce_dart_migration_version(&source, account) {
+			DartMigrationHardening::AlreadyHardened => source,
+			DartMigrationHardening::Rewritten(rewritten) => rewritten,
+			DartMigrationHardening::NotEnveloped => {
+				return Err(CodamaError::DartClient {
+					path: path.clone(),
+					source: Box::new(std::io::Error::other(format!(
+						"generated Dart client has an unhardened migrationVersion decoder for \
+						 `{}`: the account is envelope-aware in the IDL but no version read was \
+						 found to harden, so decoding would skip the version check",
+						account.camel
+					))),
+				});
+			}
+		};
 		if hardened == original {
 			continue;
 		}
@@ -1778,20 +1872,46 @@ Instruction getMigrateInstruction({{
 	)
 }
 
+/// Outcome of hardening an account's migration-version read.
+///
+/// The three cases must stay distinct. Collapsing "no envelope read found"
+/// into "already hardened" is what allowed a generated decoder to ship with no
+/// version check at all.
+enum DartMigrationHardening {
+	/// The source already carries the direction-aware check.
+	AlreadyHardened,
+	/// The generic constant decoder was replaced with the version check.
+	Rewritten(String),
+	/// The source contains no envelope read to harden. Acceptable only for an
+	/// account with no migration history.
+	NotEnveloped,
+}
+
 /// Replace the migration version's constant-decoder call with a
 /// direction-aware check.
 ///
 /// The generated Dart decoder reads the envelope version with a generic
 /// constant decoder whose mismatch names neither the expected nor the
 /// received version. The replacement mirrors the JavaScript decoder's two
-/// hints. Returns `None` when the statement is absent or already rewritten.
-fn enforce_dart_migration_version(source: &str, account: &MigratableAccount) -> Option<String> {
+/// hints.
+///
+/// Returns [`DartMigrationHardening::NotEnveloped`] when the source holds no
+/// envelope read at all, letting the caller fail closed for accounts that the
+/// IDL says *are* envelope-aware.
+fn enforce_dart_migration_version(
+	source: &str,
+	account: &MigratableAccount,
+) -> DartMigrationHardening {
 	if source.contains("storedMigrationVersion") {
-		return None;
+		return DartMigrationHardening::AlreadyHardened;
 	}
 	let marker = format!(".read(bytes, offset + {});", account.version_offset());
-	let marker_position = source.find(&marker)?;
-	let decoder_start = source[..marker_position].rfind("getConstantDecoder(")?;
+	let Some(marker_position) = source.find(&marker) else {
+		return DartMigrationHardening::NotEnveloped;
+	};
+	let Some(decoder_start) = source[..marker_position].rfind("getConstantDecoder(") else {
+		return DartMigrationHardening::NotEnveloped;
+	};
 	let line_start = source[..decoder_start]
 		.rfind('\n')
 		.map_or(0, |position| position + 1);
@@ -1828,7 +1948,7 @@ fn enforce_dart_migration_version(source: &str, account: &MigratableAccount) -> 
 	]
 	.join("\n");
 
-	Some(format!(
+	DartMigrationHardening::Rewritten(format!(
 		"{}{}{}",
 		&source[..line_start],
 		replacement,
