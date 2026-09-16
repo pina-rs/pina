@@ -49,7 +49,7 @@ The scaffold includes:
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
 - a pinned nightly Rust toolchain with the `rust-src` component;
-- no source-installed lint tooling; `pina lint` installs the `pina_lint_driver` binary under Cargo home on first use;
+- no source-installed lint tooling; `pina lint` resolves a prebuilt `pina_lint_driver` for the project's active toolchain, and `pina lint --build-driver` compiles one when no prebuilt driver matches;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
 - a dedicated host-only test package with one `pina_test` dependency for the isolated Surfpool test;

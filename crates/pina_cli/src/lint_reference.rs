@@ -238,7 +238,7 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		            mutable-account vulnerability. The doc comment forces the author to state the \
 		            reason, which is the only thing distinguishing a deliberate exception from a \
 		            mistake.",
-		blessing: "Write the doc comment. This lint *is* the blessing mechanism: it asks for an \
+		blessing: "Write the doc comment. This lint _is_ the blessing mechanism: it asks for an \
 		           explanation rather than forbidding the pattern, so an `#[allow]` would remove \
 		           the only recorded justification.",
 	},

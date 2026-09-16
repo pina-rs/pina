@@ -418,22 +418,23 @@ fn diagnose_lint_driver(
 	// the non-mutating half is reported here.
 	let resolved = resolve_without_download(project_root);
 
-	let (resolved_driver, resolved_origin, remedy) = match resolved {
-		Some((path, origin)) => (Some(path), Some(origin.to_owned()), None),
-		None => {
-			let remedy = if std::env::var_os(PINA_LINT_DRIVER_PATH).is_some() {
-				format!(
-					"`{PINA_LINT_DRIVER_PATH}` is set but does not point at an executable driver; \
-					 unset it to negotiate a driver, or point it at one you built."
-				)
-			} else {
-				"Run `pina lint --build-driver` to build the driver for the active toolchain, or \
-				 `pina lint` to download the driver published for this CLI release."
-					.to_owned()
-			};
-			findings.push(remedy.clone());
-			(None, None, Some(remedy))
-		}
+	let (resolved_driver, resolved_origin, remedy) = if let Some((path, origin)) = resolved {
+		(Some(path), Some(origin.to_owned()), None)
+	} else {
+		// An override that does not name an executable is the most confusing
+		// state, because the user believes they already configured a driver.
+		let remedy = if std::env::var_os(PINA_LINT_DRIVER_PATH).is_some() {
+			format!(
+				"`{PINA_LINT_DRIVER_PATH}` is set but does not point at an executable driver; \
+				 unset it to negotiate a driver, or point it at one you built."
+			)
+		} else {
+			"Run `pina lint --build-driver` to build the driver for the active toolchain, or `pina \
+			 lint` to download the driver published for this CLI release."
+				.to_owned()
+		};
+		findings.push(remedy.clone());
+		(None, None, Some(remedy))
 	};
 
 	let status = if resolved_driver.is_some() {

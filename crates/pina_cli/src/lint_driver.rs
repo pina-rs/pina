@@ -217,7 +217,7 @@ pub enum DriverError {
 		 toolchain, or set `{PINA_LINT_DRIVER_PATH}` to a driver you built."
 	)]
 	NoDriverForToolchain {
-		toolchain: ToolchainIdentity,
+		toolchain: String,
 		bundled: PathBuf,
 		cached: PathBuf,
 	},
@@ -230,7 +230,7 @@ pub enum DriverError {
 	)]
 	DriverUnloadable {
 		path: PathBuf,
-		toolchain: ToolchainIdentity,
+		toolchain: String,
 		remedy: String,
 		diagnostics: String,
 	},
@@ -335,7 +335,7 @@ pub fn prepare_driver(
 	if options.build_driver {
 		let destination = cached.clone().ok_or_else(|| {
 			DriverError::NoDriverForToolchain {
-				toolchain: identity.clone(),
+				toolchain: identity.to_string(),
 				bundled: bundled.clone(),
 				cached: PathBuf::from("<no per-user cache directory on this platform>"),
 			}
@@ -352,20 +352,16 @@ pub fn prepare_driver(
 	// driver by construction; probing it still catches a truncated or corrupt
 	// download before cargo reports it deep inside a lint run.
 	if let Some(path) = cached.as_ref().filter(|path| is_executable(path)) {
-		match driver_loads(path, &sysroot)? {
-			true => {
-				return Ok(PreparedDriver {
-					path: path.clone(),
-					sysroot,
-					origin: DriverOrigin::Cache,
-				});
-			}
-			false => {
-				// Drop the unusable file so nothing resolves it again; a
-				// download below may replace it.
-				let _ = std::fs::remove_file(path);
-			}
+		if driver_loads(path, &sysroot)? {
+			return Ok(PreparedDriver {
+				path: path.clone(),
+				sysroot,
+				origin: DriverOrigin::Cache,
+			});
 		}
+		// Drop the unusable file so nothing resolves it again; a download
+		// below may replace it.
+		let _ = std::fs::remove_file(path);
 	}
 
 	// A bundled driver is only usable when it was built for the active
@@ -397,13 +393,13 @@ pub fn prepare_driver(
 		return Err(DriverError::DriverUnloadable {
 			path: bundled,
 			remedy: remedy_for(&identity),
-			toolchain: identity,
+			toolchain: identity.to_string(),
 			diagnostics: format_diagnostics(&output.stderr),
 		});
 	}
 
 	Err(DriverError::NoDriverForToolchain {
-		toolchain: identity,
+		toolchain: identity.to_string(),
 		bundled,
 		cached: PathBuf::from("<no per-user cache directory on this platform>"),
 	})
@@ -412,9 +408,8 @@ pub fn prepare_driver(
 /// Return the one-line remedy for a driver that cannot load.
 fn remedy_for(identity: &ToolchainIdentity) -> String {
 	format!(
-		"Run `pina lint --build-driver` to compile a driver for {} with the active toolchain, or \
-		 install the Pina release built for that nightly.",
-		identity,
+		"Run `pina lint --build-driver` to compile a driver for {identity} with the active \
+		 toolchain, or install the Pina release built for that nightly."
 	)
 }
 
@@ -1220,7 +1215,7 @@ mod tests {
 	#[test]
 	fn no_driver_error_names_the_toolchain_and_both_remedies() {
 		let error = DriverError::NoDriverForToolchain {
-			toolchain: identity_fixture(),
+			toolchain: identity_fixture().to_string(),
 			bundled: PathBuf::from("/opt/pina/pina_lint_driver"),
 			cached: PathBuf::from("/home/dev/.cache/pina/lint-driver/0.18.0/key/pina_lint_driver"),
 		};
@@ -1264,7 +1259,7 @@ mod tests {
 	fn unloadable_drivers_name_the_toolchain_the_remedy_and_the_loader_report() {
 		let error = DriverError::DriverUnloadable {
 			path: PathBuf::from("/opt/pina/pina_lint_driver"),
-			toolchain: identity_fixture(),
+			toolchain: identity_fixture().to_string(),
 			remedy: remedy_for(&identity_fixture()),
 			diagnostics: "dyld: Symbol not found".to_owned(),
 		};
@@ -1312,17 +1307,21 @@ mod tests {
 	/// Serve one fixed HTTP response and return the base URL.
 	#[cfg(test)]
 	fn serve_once(response: &'static str) -> (String, std::thread::JoinHandle<()>) {
-		let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-		let port = listener.local_addr().expect("local address").port();
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.unwrap_or_else(|error| panic!("bind a local listener: {error}"));
+		let port = listener
+			.local_addr()
+			.unwrap_or_else(|error| panic!("local address: {error}"))
+			.port();
 		let server = std::thread::spawn(move || {
 			use std::io::Write as _;
 
-			let (mut stream, _) = listener.accept().expect("accept");
+			let Ok((mut stream, _)) = listener.accept() else {
+				return;
+			};
 			let mut request = [0_u8; 4096];
-			let _ = std::io::Read::read(&mut stream, &mut request);
-			stream
-				.write_all(response.as_bytes())
-				.expect("write the response");
+			let _ = stream.read(&mut request);
+			let _ = stream.write_all(response.as_bytes());
 			let _ = stream.shutdown(std::net::Shutdown::Write);
 		});
 		(format!("http://127.0.0.1:{port}"), server)
@@ -1338,16 +1337,22 @@ mod tests {
 		.into_bytes();
 		let body = body.to_vec();
 
-		let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-		let port = listener.local_addr().expect("local address").port();
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.unwrap_or_else(|error| panic!("bind a local listener: {error}"));
+		let port = listener
+			.local_addr()
+			.unwrap_or_else(|error| panic!("local address: {error}"))
+			.port();
 		let server = std::thread::spawn(move || {
 			use std::io::Write as _;
 
-			let (mut stream, _) = listener.accept().expect("accept");
+			let Ok((mut stream, _)) = listener.accept() else {
+				return;
+			};
 			let mut request = [0_u8; 4096];
-			let _ = std::io::Read::read(&mut stream, &mut request);
-			stream.write_all(&response).expect("write the header");
-			stream.write_all(&body).expect("write the body");
+			let _ = stream.read(&mut request);
+			let _ = stream.write_all(&response);
+			let _ = stream.write_all(&body);
 			let _ = stream.shutdown(std::net::Shutdown::Write);
 		});
 		(format!("http://127.0.0.1:{port}"), server)
