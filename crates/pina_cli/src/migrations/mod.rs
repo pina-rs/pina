@@ -50,10 +50,12 @@ use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
 use pina_abi::ProcessContract;
+use pina_abi::PublicationLedger;
 use pina_abi::SchemaVersion;
 pub use prompt::DisambiguationQuestion;
 pub use prompt::MigrationAnswers;
 use prompt::PromptIo;
+use scan::CurrentContract;
 use scan::CurrentOptOut;
 use scan::next_migration_version;
 use scan::scan_current_contracts;
@@ -169,6 +171,14 @@ pub enum MigrationError {
 		"The generated ABI layout test {path} is missing. Run `pina migrations make` to create it."
 	)]
 	AbiLayoutTestMissing { path: PathBuf },
+
+	#[error(
+		"Opting these already-published contracts into the migration version envelope changes \
+		 their wire format: {contracts}. Every byte after the discriminator shifts, so regenerate \
+		 clients, update fixtures and hand-written decoders, and commit the regenerated layout \
+		 test. Re-run with `--envelope-ack` to record the change."
+	)]
+	EnvelopeAcknowledgementRequired { contracts: String },
 
 	#[error("Migration history belongs to program {found}, but current source declares {expected}")]
 	ProgramIdentityChanged { expected: String, found: String },
@@ -352,6 +362,20 @@ pub fn make_migrations_with_answers(
 		..MakeMigrationsOutput::default()
 	};
 	let mut seen = BTreeMap::new();
+
+	// Opting a contract into the version envelope inserts a byte after its
+	// discriminator, shifting every byte that follows. When the contract was
+	// already published, that reaches every generated client, fixture, and
+	// hand-written decoder for it, so the command must say so and require an
+	// explicit acknowledgement instead of recording the change quietly.
+	if !answers.envelope_ack {
+		let newly_enveloped = first_time_envelopes(&current.contracts, &manifest, &ledger);
+		if !newly_enveloped.is_empty() {
+			return Err(MigrationError::EnvelopeAcknowledgementRequired {
+				contracts: newly_enveloped.join(", "),
+			});
+		}
+	}
 
 	for source in current.contracts {
 		let key = source.identity.key();
@@ -546,15 +570,14 @@ fn write_abi_layout_test(
 ) -> Result<(), MigrationError> {
 	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
 	let generated = generate_abi_layout(manifest, crate_name);
-	if let Some(existing) = abi_layout::read_existing(program_dir).map_err(|source| {
+	if abi_layout::read_existing(program_dir).map_err(|source| {
 		MigrationError::Read {
 			path: path.clone(),
 			source,
 		}
-	})? {
-		if existing == generated {
-			return Ok(());
-		}
+	})? == Some(generated.clone())
+	{
+		return Ok(());
 	}
 	if let Some(parent) = path.parent() {
 		std::fs::create_dir_all(parent).map_err(|source| {
@@ -588,6 +611,39 @@ fn verify_abi_layout_test(
 		Some(_) => Err(MigrationError::AbiLayoutTestStale { path }),
 		None => Err(MigrationError::AbiLayoutTestMissing { path }),
 	}
+}
+
+/// Return the contracts this run envelopes for the first time on a program
+/// that already has published deployments.
+///
+/// Ledger validation guarantees every published contract is also in the
+/// manifest, so "published but missing" cannot happen. The reachable case is a
+/// program that is already live where `[migrations].auto` widens — accounts
+/// only today, accounts and events tomorrow — so contracts that carried no
+/// envelope gain one. Their wire format changes even though nothing was
+/// removed: every byte after the discriminator shifts, and every generated
+/// client and hand-written decoder for that contract sees it.
+///
+/// A program with no receipts at all has nothing live to break, so a
+/// first-time envelope there is free.
+fn first_time_envelopes(
+	contracts: &[CurrentContract],
+	manifest: &MigrationManifest,
+	ledger: &PublicationLedger,
+) -> Vec<String> {
+	let program_is_live = !ledger.receipts.is_empty() || ledger.pending.is_some();
+	if !program_is_live {
+		return Vec::new();
+	}
+	let mut names = Vec::new();
+	for source in contracts {
+		let key = source.identity.key();
+		if manifest.contracts.contains_key(&key) {
+			continue;
+		}
+		names.push(format!("{} ({})", source.rust_name, key));
+	}
+	names
 }
 
 /// Reject an explicit `migrations = false` on a contract already recorded.
@@ -633,6 +689,24 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 	check_project_migrations(&project)
 }
 
+/// Verify the explicit `pina migrations check` gate, including the generated
+/// ABI layout test.
+///
+/// `check` is the CI entry point, so it requires the guard file. The plain
+/// `check_migrations` used by `build`, `status`, and publication stays
+/// unchanged: those run during ordinary work on an existing project, where
+/// demanding a regenerated guard would block them for an unrelated reason.
+pub fn check_migrations_with_abi_layout(
+	start: &Path,
+) -> Result<Vec<MigrationStatus>, MigrationError> {
+	let project = Project::discover(start)?;
+	let (statuses, manifest) = check_project_migrations_with_manifest(&project)?;
+	if let Some(manifest) = &manifest {
+		verify_abi_layout_test(&project.program_dir, manifest, Some(&project.library_name))?;
+	}
+	Ok(statuses)
+}
+
 pub(crate) fn check_project_migrations(
 	project: &Project,
 ) -> Result<Vec<MigrationStatus>, MigrationError> {
@@ -676,7 +750,6 @@ fn check_project_migrations_with_manifest(
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
-	verify_abi_layout_test(&project.program_dir, &manifest, Some(&project.library_name))?;
 
 	let mut seen = BTreeMap::new();
 	let mut statuses = Vec::new();

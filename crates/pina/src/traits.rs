@@ -119,7 +119,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate the discriminator and content of `data`.
 	fn validate_account_data(data: &[u8]) -> Result<(), ProgramError> {
-		validate_account_header::<Self>(data)?;
+		validate_decode_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -140,7 +140,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s immutable zero-copy companion.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self::Zc, ProgramError> {
-		validate_account_header::<Self>(data)?;
+		validate_decode_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -162,7 +162,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s mutable zero-copy companion.
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ProgramError> {
-		validate_account_header::<Self>(data)?;
+		validate_decode_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -192,22 +192,45 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 /// Collapsing both into `InvalidAccountData` makes a migration-envelope change
 /// undiagnosable from the caller.
 ///
+/// Validate the length and discriminator of fixed-account bytes.
+///
+/// The accepted path is exactly the condition this check used before the two
+/// failures were distinguished, and only the rejected arm changed. Splitting
+/// the accepted path into a sequence of checks reorganized the caller's layout
+/// and cost measured compute units on example suites that load accounts, the
+/// same hazard `parse_instruction` documents for its own cold error arm.
+///
 /// The length check runs first because the discriminator check reads the first
-/// `D::BYTES` bytes and cannot distinguish a short buffer from a wrong type.
+/// `D::BYTES` bytes and cannot tell a short buffer from a wrong type.
 #[inline(always)]
-fn validate_account_header<T>(data: &[u8]) -> Result<(), ProgramError>
+fn validate_decode_header<T>(data: &[u8]) -> Result<(), ProgramError>
+where
+	T: HasDiscriminator + PinaPodFixed,
+{
+	if data.len() == size_of::<T::Zc>() && T::matches_discriminator(data) {
+		return Ok(());
+	}
+
+	Err(account_header_error::<T>(data))
+}
+
+/// Classify which half of [`validate_decode_header`] rejected `data`.
+///
+/// `InvalidAccountSize` covers a length mismatch, which usually means a stale
+/// or un-migrated representation; `InvalidDiscriminator` covers bytes of a
+/// different type entirely. Both are built here, in a cold and non-generic
+/// function, so no monomorphized copy of this arm lands beside a caller.
+#[cold]
+#[inline(never)]
+fn account_header_error<T>(data: &[u8]) -> ProgramError
 where
 	T: HasDiscriminator + PinaPodFixed,
 {
 	if data.len() != size_of::<T::Zc>() {
-		return Err(crate::PinaProgramError::InvalidAccountSize.into());
+		PinaProgramError::InvalidAccountSize.into()
+	} else {
+		PinaProgramError::InvalidDiscriminator.into()
 	}
-
-	if !T::matches_discriminator(data) {
-		return Err(crate::PinaProgramError::InvalidDiscriminator.into());
-	}
-
-	Ok(())
 }
 
 /// A discriminator-first, variable-length account schema.
@@ -1334,7 +1357,7 @@ mod tests {
 		assert!(result.is_err());
 		assert_eq!(
 			result.err(),
-			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+			Some(PinaProgramError::InvalidDiscriminator.into())
 		);
 	}
 
@@ -1500,7 +1523,7 @@ mod tests {
 		assert!(result.is_err());
 		assert_eq!(
 			result.err(),
-			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+			Some(PinaProgramError::InvalidDiscriminator.into())
 		);
 	}
 
@@ -1512,7 +1535,7 @@ mod tests {
 		assert!(result.is_err());
 		assert_eq!(
 			result.err(),
-			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+			Some(PinaProgramError::InvalidDiscriminator.into())
 		);
 	}
 

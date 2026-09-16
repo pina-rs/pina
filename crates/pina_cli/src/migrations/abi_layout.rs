@@ -73,9 +73,11 @@ pub fn generate(manifest: &MigrationManifest, crate_name: Option<&str>) -> Strin
 			&mut output,
 			key,
 			&history.rust_name,
-			&history.identity.kind,
-			history.identity.discriminator_bytes,
-			manifest.version_type.bytes() as u8,
+			&ContractGeometry {
+				kind: &history.identity.kind,
+				discriminator_bytes: history.identity.discriminator_bytes,
+				version_bytes: manifest.version_type.bytes() as u8,
+			},
 			current,
 		);
 	}
@@ -134,22 +136,27 @@ fn render_crate_assertions(output: &mut String, manifest: &MigrationManifest, cr
 }
 
 /// Render one contract's constants.
+/// One contract's recorded geometry, grouped to keep the argument list short.
+struct ContractGeometry<'a> {
+	kind: &'a ContractKind,
+	discriminator_bytes: u8,
+	version_bytes: u8,
+}
+
 fn render_contract(
 	output: &mut String,
 	key: &str,
 	rust_name: &str,
-	kind: &ContractKind,
-	discriminator_bytes: u8,
-	version_bytes: u8,
+	geometry: &ContractGeometry<'_>,
 	current: &SchemaVersion,
 ) {
-	let kind_label = match kind {
+	let kind_label = match geometry.kind {
 		ContractKind::Account => "account",
 		ContractKind::Instruction => "instruction",
 		ContractKind::Event => "event",
 	};
 	let module = sanitize_identifier(key);
-	let envelope = usize::from(discriminator_bytes) + usize::from(version_bytes);
+	let envelope = usize::from(geometry.discriminator_bytes) + usize::from(geometry.version_bytes);
 
 	let _ = writeln!(output, "/// ABI layout for the `{rust_name}` {kind_label}.");
 	let _ = writeln!(output, "pub mod {module} {{");
@@ -172,12 +179,14 @@ fn render_contract(
 	let _ = writeln!(output, "\t/// Width of the discriminator in bytes.");
 	let _ = writeln!(
 		output,
-		"\tpub const DISCRIMINATOR_BYTES: usize = {discriminator_bytes};"
+		"\tpub const DISCRIMINATOR_BYTES: usize = {};",
+		geometry.discriminator_bytes
 	);
 	let _ = writeln!(output, "\t/// Byte offset of the migration version field.");
 	let _ = writeln!(
 		output,
-		"\tpub const VERSION_OFFSET: usize = {discriminator_bytes};"
+		"\tpub const VERSION_OFFSET: usize = {};",
+		geometry.discriminator_bytes
 	);
 	let _ = writeln!(
 		output,
@@ -185,7 +194,8 @@ fn render_contract(
 	);
 	let _ = writeln!(
 		output,
-		"\tpub const VERSION_BYTES: usize = {version_bytes};"
+		"\tpub const VERSION_BYTES: usize = {};",
+		geometry.version_bytes
 	);
 	let _ = writeln!(
 		output,

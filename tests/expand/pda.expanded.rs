@@ -475,11 +475,18 @@ impl CounterState {
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::PinaProgramError::InvalidAccountSize.into());
-        }
-        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
-            return Err(pina::PinaProgramError::InvalidDiscriminator.into());
+        if data.len() != Self::SIZE
+            || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
+        {
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -1174,11 +1181,18 @@ impl AllSeedState {
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::PinaProgramError::InvalidAccountSize.into());
-        }
-        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
-            return Err(pina::PinaProgramError::InvalidDiscriminator.into());
+        if data.len() != Self::SIZE
+            || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
+        {
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
@@ -1676,11 +1690,18 @@ impl TodoState {
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::PinaProgramError::InvalidAccountSize.into());
-        }
-        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
-            return Err(pina::PinaProgramError::InvalidDiscriminator.into());
+        if data.len() != Self::SIZE
+            || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
+        {
+            #[cold]
+            #[inline(never)]
+            fn __pina_header_error(is_size: bool) -> pina::ProgramError {
+                if is_size {
+                    return pina::PinaProgramError::InvalidAccountSize.into();
+                }
+                pina::PinaProgramError::InvalidDiscriminator.into()
+            }
+            return Err(__pina_header_error(data.len() != Self::SIZE));
         }
         let value = <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;

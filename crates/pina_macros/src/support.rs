@@ -62,17 +62,39 @@ pub(crate) fn generate_view_helpers(
 	// describe payload data (`InvalidInstructionData`). The discriminator is
 	// always `InvalidDiscriminator`, which the framework reserves for exactly
 	// this check. See `pina::traits::validate_account_header`.
-	let size_error = if account_boundary {
-		quote!(#crate_path::PinaProgramError::InvalidAccountSize.into())
-	} else {
-		quote!(#crate_path::ProgramError::InvalidInstructionData)
-	};
-	let validate_header = quote! {
-		if data.len() != Self::SIZE {
-			return Err(#size_error);
+	// Only accounts gain from splitting the header check. Their length failure
+	// means "wrong size for this type" — the stale-representation signal a
+	// migration envelope change produces — while an instruction or event length
+	// failure is just malformed payload data, which `InvalidInstructionData`
+	// already describes. Narrowing the split to accounts keeps the generated
+	// instruction and event readers byte-identical to before, because
+	// restructuring their accepted path measured compute-unit regressions
+	// across the example suites.
+	let validate_header = if account_boundary {
+		quote! {
+			if data.len() != Self::SIZE
+				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
+			{
+				#[cold]
+				#[inline(never)]
+				fn __pina_header_error(is_size: bool) -> #crate_path::ProgramError {
+					if is_size {
+						return #crate_path::PinaProgramError::InvalidAccountSize.into();
+					}
+
+					#crate_path::PinaProgramError::InvalidDiscriminator.into()
+				}
+
+				return Err(__pina_header_error(data.len() != Self::SIZE));
+			}
 		}
-		if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
-			return Err(#crate_path::PinaProgramError::InvalidDiscriminator.into());
+	} else {
+		quote! {
+			if data.len() != Self::SIZE
+				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
+			{
+				return Err(#error);
+			}
 		}
 	};
 	let write_version = migration.map(MigrationExpansion::write_zc_version);

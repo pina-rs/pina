@@ -70,6 +70,9 @@ pub struct MigrationAnswers {
 	pub(super) removed: BTreeSet<String>,
 	/// Disable interactive prompts even when stdin is a terminal.
 	pub(super) no_interactive: bool,
+	/// Acknowledge that a first-time envelope on an already-published contract
+	/// changes its wire format.
+	pub(super) envelope_ack: bool,
 }
 
 impl MigrationAnswers {
@@ -80,6 +83,12 @@ impl MigrationAnswers {
 		no_interactive: bool,
 	) -> Result<Self, String> {
 		Self::parse_answers(renames, removed, no_interactive)
+	}
+
+	/// Record that the developer acknowledged a first-time envelope on an
+	/// already-published contract.
+	pub fn set_envelope_ack(&mut self, acknowledged: bool) {
+		self.envelope_ack = acknowledged;
 	}
 
 	/// Layer CLI arguments over the persisted `[migrations.answers]` table.
@@ -124,6 +133,7 @@ impl MigrationAnswers {
 			renames: BTreeMap::new(),
 			removed: removed.iter().cloned().collect(),
 			no_interactive,
+			envelope_ack: false,
 		};
 		for rename in renames {
 			let (from, to) = rename.split_once(':').ok_or_else(|| {
