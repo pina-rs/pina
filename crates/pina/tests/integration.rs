@@ -913,8 +913,9 @@ fn error_discriminator_mismatch_rejected() {
 	assert!(result.is_err(), "should fail with discriminator mismatch");
 	assert_eq!(
 		result.unwrap_err(),
-		ProgramError::InvalidAccountData,
-		"error should be InvalidAccountData for discriminator mismatch"
+		PinaProgramError::InvalidDiscriminator.into(),
+		"error should name the discriminator mismatch so it stays distinguishable from a size \
+		 failure"
 	);
 }
 

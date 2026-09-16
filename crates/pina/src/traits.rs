@@ -119,9 +119,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate the discriminator and content of `data`.
 	fn validate_account_data(data: &[u8]) -> Result<(), ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
-			return Err(ProgramError::InvalidAccountData);
-		}
+		validate_account_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -142,9 +140,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s immutable zero-copy companion.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
-			return Err(ProgramError::InvalidAccountData);
-		}
+		validate_account_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -166,9 +162,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s mutable zero-copy companion.
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
-			return Err(ProgramError::InvalidAccountData);
-		}
+		validate_account_header::<Self>(data)?;
 
 		Self::require_current_migration_envelope(data)?;
 
@@ -187,6 +181,33 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			Ok(value)
 		}
 	}
+}
+
+/// Validate the length and discriminator of fixed-account bytes.
+///
+/// The two failures are reported separately so a decode failure names what
+/// actually went wrong. A length mismatch (`InvalidAccountSize`) usually means
+/// a stale or un-migrated representation, while a discriminator mismatch
+/// (`InvalidDiscriminator`) means the bytes are a different type entirely.
+/// Collapsing both into `InvalidAccountData` makes a migration-envelope change
+/// undiagnosable from the caller.
+///
+/// The length check runs first because the discriminator check reads the first
+/// `D::BYTES` bytes and cannot distinguish a short buffer from a wrong type.
+#[inline(always)]
+fn validate_account_header<T>(data: &[u8]) -> Result<(), ProgramError>
+where
+	T: HasDiscriminator + PinaPodFixed,
+{
+	if data.len() != size_of::<T::Zc>() {
+		return Err(crate::PinaProgramError::InvalidAccountSize.into());
+	}
+
+	if !T::matches_discriminator(data) {
+		return Err(crate::PinaProgramError::InvalidDiscriminator.into());
+	}
+
+	Ok(())
 }
 
 /// A discriminator-first, variable-length account schema.
@@ -1311,7 +1332,10 @@ mod tests {
 		data[0] = 99; // wrong discriminator — TestType expects 7
 		let result = TestType::try_from_bytes(&data);
 		assert!(result.is_err());
-		assert_eq!(result.err(), Some(ProgramError::InvalidAccountData));
+		assert_eq!(
+			result.err(),
+			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+		);
 	}
 
 	#[test]
@@ -1474,7 +1498,10 @@ mod tests {
 		let data = [0u8; 17]; // discriminator is 0, TestType expects 7
 		let result = TestType::try_from_bytes(&data);
 		assert!(result.is_err());
-		assert_eq!(result.err(), Some(ProgramError::InvalidAccountData));
+		assert_eq!(
+			result.err(),
+			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+		);
 	}
 
 	#[test]
@@ -1483,7 +1510,10 @@ mod tests {
 		data[0] = 99; // wrong discriminator
 		let result = TestType::try_from_bytes_mut(&mut data);
 		assert!(result.is_err());
-		assert_eq!(result.err(), Some(ProgramError::InvalidAccountData));
+		assert_eq!(
+			result.err(),
+			Some(crate::PinaProgramError::InvalidDiscriminator.into())
+		);
 	}
 
 	#[test]

@@ -703,7 +703,7 @@ fn assert_type_rejects_wrong_discriminator() {
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
-	assert_eq!(result, Err(ProgramError::InvalidAccountData));
+	assert_eq!(result, Err(PinaProgramError::InvalidDiscriminator.into()));
 }
 
 #[test]
