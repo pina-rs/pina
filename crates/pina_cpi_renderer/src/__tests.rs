@@ -1296,3 +1296,68 @@ fn documents_every_rejected_foreign_argument_shape() {
 		);
 	}
 }
+
+#[test]
+fn renders_read_only_account_parsers_for_foreign_idls() {
+	for (name, _) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		let files = render_program_to_files(&root)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		for account in &root.program.accounts {
+			let module = snake(account.name.as_ref());
+			let page = format!("accounts/{module}.rs");
+			let source = files
+				.get(Path::new(&page))
+				.unwrap_or_else(|| panic!("fixture `{name}` is missing `{page}`"));
+
+			// Every account gets its declared layout plus a discriminator guard,
+			// whether or not a parser could be generated for it.
+			assert!(
+				source.contains("pub fn matches("),
+				"`{page}` has no discriminator guard"
+			);
+			assert!(
+				source.contains("pub const LEN: usize")
+					|| source.contains("pub const MAX_LEN: usize"),
+				"`{page}` declares no encoded size"
+			);
+		}
+	}
+}
+
+/// The Switchboard randomness account is the parser the hardening issue calls
+/// out: `pina-rs/lootbox` hand-wrote 408 bytes of offset arithmetic for it.
+#[test]
+fn switchboard_account_parser_matches_the_hand_written_offsets() {
+	let root = foreign_fixture_root("switchboard_on_demand");
+	let files = render_program_to_files(&root)
+		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
+	let source = files
+		.get(Path::new("accounts/randomness_account_data.rs"))
+		.unwrap_or_else(|| panic!("switchboard has no randomness account parser"));
+
+	// Size pinned to `RandomnessAccountData` in `switchboard-on-demand` 0.13.0.
+	assert!(source.contains("pub const LEN: usize = 408;"));
+	// Account discriminator pinned to the deployed program, and to the
+	// hand-written crate's `RANDOMNESS_ACCOUNT_DISCRIMINATOR`.
+	assert!(source.contains("[10, 66, 229, 135, 220, 239, 217, 114]"));
+	assert!(source.contains("pub fn parse(data: &[u8])"));
+	assert!(source.contains("pub fn matches(data: &[u8]) -> bool"));
+
+	// Each field the hand-written parser reads must be present.
+	for field in [
+		"authority",
+		"queue",
+		"seed_slothash",
+		"seed_slot",
+		"oracle",
+		"reveal_slot",
+		"value",
+	] {
+		assert!(
+			source.contains(&format!("pub {field}:")),
+			"missing `{field}`"
+		);
+	}
+}

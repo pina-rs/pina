@@ -137,6 +137,63 @@ impl Encoded {
 		self.fixed_size.is_none()
 	}
 
+	/// The Rust statements that read this value from `data` at a `cursor`,
+	/// producing a binding named `{name}`.
+	///
+	/// This mirrors [`Self::encode`] in the opposite direction. A fixed shape
+	/// copies out of a byte range; a variable one needs a bound the caller
+	/// declared, so it reports unsupported instead of guessing.
+	pub(crate) fn decode_into(&self, name: &str, context: &str) -> Result<String> {
+		let Some(size) = self.fixed_size else {
+			return Err(unsupported(
+				context,
+				"accountNode",
+				"this field's width is not fixed, so a read-only parser cannot locate the field \
+				 that follows it",
+			));
+		};
+
+		let read = match self.rust_type.as_str() {
+			"bool" => format!("data[cursor] != 0;\n\t\tlet {name} = {name};\n\t\tcursor += 1;"),
+			"Address" => {
+				format!(
+					"let {name} = Address::new_from_array(\n\t\t\tdata[cursor..cursor + \
+					 32]\n\t\t\t\t.try_into()\n\t\t\t\t.ok()?,\n\t\t);\n\t\tcursor += 32;"
+				)
+			}
+			_ if self.rust_type.starts_with("[u8; ") => {
+				format!(
+					"let {name}: {} = data[cursor..cursor + {size}].try_into().ok()?;\n\t\tcursor \
+					 += {size};",
+					self.rust_type
+				)
+			}
+			// Everything left is a native integer or a generated named type.
+			_ if is_integer_type(&self.rust_type) => {
+				format!(
+					"let {name}: {} = {}(\n\t\t\tdata[cursor..cursor + \
+					 {size}]\n\t\t\t\t.try_into()\n\t\t\t\t.ok()?,\n\t\t);\n\t\tcursor += {size};",
+					self.rust_type,
+					from_le_bytes_fn(&self.rust_type)
+				)
+			}
+			_ => {
+				return Err(unsupported(
+					context,
+					"accountNode",
+					&format!(
+						"a field of type `{}` needs a value decoder this renderer does not emit; \
+						 only integers, booleans, addresses, fixed byte arrays, and generated \
+						 structs have one",
+						self.rust_type
+					),
+				));
+			}
+		};
+
+		Ok(read)
+	}
+
 	/// Rebinds the expression the encoding reads from.
 	pub(crate) fn with_value(mut self, value: &str) -> Self {
 		self.encode = self.encode.replace("self_value", value);
@@ -742,6 +799,19 @@ pub(crate) fn variant_name(variant: &EnumVariantTypeNode) -> String {
 /// The Rust identifier for an enum variant.
 pub(crate) fn enum_variant_name(name: &str) -> String {
 	name.to_upper_camel_case()
+}
+
+/// The `from_le_bytes` constructor for a little-endian integer type.
+fn from_le_bytes_fn(rust_type: &str) -> String {
+	format!("{rust_type}::from_le_bytes")
+}
+
+/// Whether a generated Rust type name is a native integer.
+fn is_integer_type(rust_type: &str) -> bool {
+	matches!(
+		rust_type,
+		"u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128"
+	)
 }
 
 fn integer_width(number: &NumberTypeNode, context: &str) -> Result<usize> {

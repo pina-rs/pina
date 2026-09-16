@@ -4,8 +4,16 @@ use codama_nodes::ProgramNode;
 
 use super::helpers::pascal;
 
-pub(crate) fn render_root_mod(program: &ProgramNode, has_types: bool) -> String {
+pub(crate) fn render_root_mod(
+	program: &ProgramNode,
+	has_types: bool,
+	has_accounts: bool,
+) -> String {
 	let mut lines = vec!["mod programs;".to_string()];
+
+	if has_accounts {
+		lines.insert(0, "pub mod accounts;".to_string());
+	}
 
 	if !has_types {
 		// An empty module keeps the instruction pages' import path valid.

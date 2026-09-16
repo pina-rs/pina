@@ -93,6 +93,28 @@
                   "kind": "bytesTypeNode"
                 }
               }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "_ebuf2",
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 96,
+                "type": {
+                  "kind": "bytesTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "_ebuf1",
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 128,
+                "type": {
+                  "kind": "bytesTypeNode"
+                }
+              }
             }
           ]
         },

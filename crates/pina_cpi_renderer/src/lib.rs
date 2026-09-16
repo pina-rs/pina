@@ -44,6 +44,9 @@ use codama_nodes::ProgramNode;
 use codama_nodes::RootNode;
 pub use error::RenderError;
 pub use error::Result;
+use render::accounts::plan_account;
+use render::accounts::render_accounts_mod;
+use render::accounts::render_planned_account;
 use render::helpers::GENERATED_HEADER;
 use render::helpers::canonical_pubkey;
 use render::helpers::page;
@@ -304,10 +307,24 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 		));
 	}
 
+	// Accounts render after instructions so argument planning has already
+	// registered every `definedTypes` name the module needs.
+	let mut account_names = Vec::new();
+	let mut account_pages = Vec::new();
+	for account in &program.accounts {
+		let planned = plan_account(account, &mut types)?;
+		account_names.push(planned.module.clone());
+		account_pages.push((planned.module.clone(), render_planned_account(&planned)));
+	}
+
 	let named = types.named().to_vec();
 	files.insert(
 		PathBuf::from("mod.rs"),
-		page(&render_root_mod(program, !named.is_empty())),
+		page(&render_root_mod(
+			program,
+			!named.is_empty(),
+			!account_names.is_empty(),
+		)),
 	);
 
 	if !program.instructions.is_empty() {
@@ -319,6 +336,19 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 		for (name, content) in &instruction_pages {
 			files.insert(
 				PathBuf::from(format!("instructions/{name}.rs")),
+				page(content),
+			);
+		}
+	}
+
+	if !account_names.is_empty() {
+		files.insert(
+			PathBuf::from("accounts/mod.rs"),
+			page(&render_accounts_mod(&account_names)),
+		);
+		for (module, content) in &account_pages {
+			files.insert(
+				PathBuf::from(format!("accounts/{module}.rs")),
 				page(content),
 			);
 		}
@@ -405,6 +435,9 @@ fn validate_generated_sources(files: &BTreeMap<PathBuf, String>) -> Result<()> {
 			RenderError::InvalidGeneratedSource {
 				path: path.clone(),
 				reason: error.to_string(),
+				// The rejected text is kept so a renderer bug is diagnosable
+				// from the error alone.
+				rejected: Some(source.clone()),
 			}
 		})?;
 	}

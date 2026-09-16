@@ -1,3 +1,4 @@
+pub(crate) mod accounts;
 pub(crate) mod args;
 pub(crate) mod discriminator;
 pub(crate) mod helpers;
