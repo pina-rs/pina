@@ -1216,13 +1216,27 @@ pub(crate) fn verify_migration_contracts(
 	enum_name: &syn::Ident,
 	ladder: &[syn::Path],
 ) -> syn::Result<()> {
-	let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") else {
+	let program_dir = std::env::var_os("CARGO_MANIFEST_DIR").map(PathBuf::from);
+
+	verify_ladder(enum_name, ladder, program_dir.as_deref())
+}
+
+/// Verify a dispatch migration ladder against the manifest under
+/// `program_dir`.
+///
+/// The manifest location is passed in rather than read from the environment so
+/// every failure mode stays unit-testable.
+fn verify_ladder(
+	enum_name: &syn::Ident,
+	ladder: &[syn::Path],
+	program_dir: Option<&std::path::Path>,
+) -> syn::Result<()> {
+	let Some(program_dir) = program_dir else {
 		return Err(syn::Error::new_spanned(
 			enum_name,
 			"could not locate Cargo manifest for migration-aware dispatch",
 		));
 	};
-	let program_dir = PathBuf::from(manifest_dir);
 	let path = program_dir.join(MANIFEST_PATH);
 	let source = match std::fs::read(&path) {
 		Ok(source) => source,
@@ -1260,14 +1274,18 @@ pub(crate) fn verify_migration_contracts(
 		)
 	})?;
 
+	require_ladder_contracts(&manifest, ladder)
+}
+
+/// Require every ladder entry to be a recorded migratable account contract.
+fn require_ladder_contracts(manifest: &MigrationManifest, ladder: &[syn::Path]) -> syn::Result<()> {
 	for account in ladder {
-		let Some(segment) = account.segments.last() else {
-			return Err(syn::Error::new_spanned(
-				account,
-				"migration ladder entries cannot be empty paths",
-			));
-		};
-		let name = segment.ident.to_string();
+		let name = account
+			.segments
+			.last()
+			.expect("darling parses ladder entries as paths")
+			.ident
+			.to_string();
 
 		manifest
 			.contract_for_source(ContractKind::Account, &name)
@@ -1571,6 +1589,8 @@ fn verify_source_schema(
 
 #[cfg(test)]
 mod tests {
+	use std::path::Path;
+
 	use pina_abi::ContractIdentity;
 	use pina_abi::ContractKind;
 	use pina_abi::MigrationAuto;
@@ -1697,7 +1717,7 @@ mod tests {
 		);
 	}
 
-	fn write_manifest(program_dir: &std::path::Path, source: &[u8]) -> PathBuf {
+	fn write_manifest(program_dir: &Path, source: &[u8]) -> PathBuf {
 		let path = program_dir.join(pina_abi::MANIFEST_PATH);
 		let parent = path
 			.parent()
@@ -1886,5 +1906,141 @@ mod tests {
 			.unwrap_or_else(|error| panic!("auto manifest: {error}"))
 			.is_some()
 		);
+	}
+	fn ladder_path(name: &str) -> syn::Path {
+		syn::parse_str(name).unwrap_or_else(|error| panic!("test path: {error}"))
+	}
+
+	#[test]
+	fn ladder_without_a_cargo_manifest_dir_is_rejected() {
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			None,
+		)
+		.unwrap_err();
+
+		assert!(
+			error
+				.to_string()
+				.contains("could not locate Cargo manifest")
+		);
+	}
+
+	#[test]
+	fn ladder_without_a_manifest_names_the_remedy() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			Some(dir.path()),
+		)
+		.unwrap_err();
+
+		let message = error.to_string();
+		assert!(message.contains("does not exist"), "message: {message}");
+		assert!(
+			message.contains("pina migrations make"),
+			"message: {message}"
+		);
+		// The diagnostic must not embed the resolved path: it contains the cargo
+		// target directory, which differs between build environments.
+		assert!(!message.contains(dir.path().to_str().unwrap_or_default()));
+	}
+
+	#[test]
+	fn unreadable_manifest_is_reported() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let migrations = dir.path().join("migrations");
+		std::fs::create_dir_all(&migrations)
+			.unwrap_or_else(|error| panic!("test migrations dir: {error}"));
+		// A directory in place of the manifest makes the read fail with a
+		// non-NotFound error on every supported platform.
+		std::fs::create_dir_all(migrations.join("manifest.json"))
+			.unwrap_or_else(|error| panic!("test manifest dir: {error}"));
+
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			Some(dir.path()),
+		)
+		.unwrap_err();
+
+		let message = error.to_string();
+		assert!(message.contains("could not be read"), "message: {message}");
+	}
+
+	#[test]
+	fn malformed_manifest_is_reported() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		write_manifest(dir.path(), b"not json");
+
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			Some(dir.path()),
+		)
+		.unwrap_err();
+
+		assert!(error.to_string().contains("invalid migration manifest"));
+	}
+
+	#[test]
+	fn manifest_failing_validation_is_reported() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		// A wrong format version fails `MigrationManifest::validate`.
+		write_manifest(
+			dir.path(),
+			br#"{"formatVersion":0,"programId":"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS","versionType":"u8","contracts":{}}"#,
+		);
+
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			Some(dir.path()),
+		)
+		.unwrap_err();
+
+		assert!(error.to_string().contains("invalid migration manifest"));
+	}
+
+	#[test]
+	fn ladder_entry_missing_from_the_manifest_is_reported() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let item = item_struct("State");
+		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::none());
+		write_manifest(dir.path(), &encode(&manifest));
+
+		let error = verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("Unrelated")],
+			Some(dir.path()),
+		)
+		.unwrap_err();
+
+		let message = error.to_string();
+		assert!(message.contains("Unrelated"), "message: {message}");
+	}
+
+	#[test]
+	fn ladder_fully_recorded_in_the_manifest_passes() {
+		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let item = item_struct("State");
+		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::none());
+		write_manifest(dir.path(), &encode(&manifest));
+
+		verify_ladder(
+			&syn::parse_str::<syn::Ident>("Instruction")
+				.unwrap_or_else(|error| panic!("ident: {error}")),
+			&[ladder_path("State")],
+			Some(dir.path()),
+		)
+		.unwrap_or_else(|error| panic!("recorded contract: {error}"));
 	}
 }

@@ -10,6 +10,7 @@ use darling::ast::NestedMeta;
 use proc_macro2::Literal;
 use quote::quote;
 use quote::quote_spanned;
+use syn::Expr;
 use syn::Ident;
 use syn::ItemEnum;
 use syn::Path;
@@ -119,11 +120,14 @@ pub(crate) fn expand(
 		}
 
 		let (accounts, accounts_name) = if let Some(accounts) = declared_accounts {
-			let Some(segment) = accounts.segments.last() else {
-				return syn::Error::new_spanned(&accounts, "`accounts` path cannot be empty")
-					.to_compile_error();
-			};
-			let name = segment.ident.clone();
+			// Darling parses the value as a `syn::Path`, which always carries at
+			// least one segment.
+			let name = accounts
+				.segments
+				.last()
+				.expect("darling parses `accounts` as a non-empty path")
+				.ident
+				.clone();
 
 			(accounts, name)
 		} else {
@@ -359,6 +363,19 @@ fn resolve_migrations(
 	// surfaces later as an unsatisfied trait bound instead of the remedy.
 	crate::migration::verify_migration_contracts(enum_name, ladder)?;
 
+	Ok(Some(migrate_emission(crate_path, ladder, max_lamports)))
+}
+
+/// Emit the reserved-`Migrate` helper and the dispatch prelude for a validated
+/// ladder.
+///
+/// Split from [`resolve_migrations`] so the emitted shape is unit-testable
+/// without a manifest on disk.
+fn migrate_emission(
+	crate_path: &Path,
+	ladder: &[Path],
+	max_lamports: &Expr,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
 	let steps = ladder.iter().enumerate().map(|(position, account)| {
 		// Slots 0 and 1 are the payer and the system program.
 		let index = Literal::usize_unsuffixed(position + 2);
@@ -399,5 +416,228 @@ fn resolve_migrations(
 		}
 	};
 
-	Ok(Some((helper, prelude)))
+	(helper, prelude)
+}
+
+#[cfg(test)]
+mod tests {
+	use proc_macro2::TokenStream;
+
+	use super::*;
+	use crate::args::CapacityTestArg;
+
+	fn expand_with(args: TokenStream, input: TokenStream) -> String {
+		squeezed(&expand(args, input).to_string())
+	}
+
+	fn dispatch_args(tokens: TokenStream) -> InstructionDispatchArgs {
+		let nested = NestedMeta::parse_meta_list(tokens)
+			.unwrap_or_else(|error| panic!("test args: {error}"));
+		InstructionDispatchArgs::from_list(&nested)
+			.unwrap_or_else(|error| panic!("test dispatch args: {error}"))
+	}
+
+	fn ident(name: &str) -> Ident {
+		Ident::new(name, proc_macro2::Span::call_site())
+	}
+
+	fn ladder_of(name: &str) -> Path {
+		syn::parse_str(name).unwrap_or_else(|error| panic!("test ladder path: {error}"))
+	}
+
+	/// Collapse whitespace so assertions match a token stream's normalized
+	/// spacing rather than its pretty-printed form.
+	fn squeezed(text: &str) -> String {
+		text.split_whitespace().collect()
+	}
+
+	#[test]
+	fn happy_path_emits_dispatch_constant_and_capacity_block() {
+		let input: TokenStream = quote! {
+			#[discriminator]
+			pub enum CounterInstruction {
+				Initialize = 0,
+				Increment = 1,
+			}
+		};
+		let expanded = expand_with(quote!(), input);
+
+		assert!(expanded.contains("pubconstMAX_INSTRUCTION_ACCOUNTS:usize"));
+		assert!(expanded.contains("pubfnprocess_instruction"));
+		assert!(expanded.contains("CounterInstruction::Initialize"));
+		// Variant `Foo` routes to `FooAccounts` by convention.
+		assert!(expanded.contains("InitializeAccounts"));
+		assert!(expanded.contains("IncrementAccounts"));
+		assert!(
+			expanded.contains("#[cfg(test)]"),
+			"capacity block is test-gated"
+		);
+		assert!(expanded.contains("MAX_INSTRUCTION_ACCOUNTSmustnotexceed"));
+		// The dispatcher is inlined by default.
+		assert!(expanded.contains("#[inline(always)]"));
+	}
+
+	#[test]
+	fn accounts_override_routes_the_named_struct() {
+		let input: TokenStream = quote! {
+			pub enum Mixed {
+				Default = 0,
+				#[dispatch(accounts = CustomAccounts)]
+				Overridden = 1,
+			}
+		};
+		let expanded = expand_with(quote!(), input);
+
+		assert!(expanded.contains("DefaultAccounts"));
+		assert!(expanded.contains("CustomAccounts"));
+		// The override attribute is consumed, not re-emitted.
+		assert!(!expanded.contains("#[dispatch("));
+	}
+
+	#[test]
+	fn capacity_test_can_be_suppressed() {
+		let input: TokenStream = quote! {
+			pub enum CounterInstruction {
+				Initialize = 0,
+			}
+		};
+		let expanded = expand_with(quote!(capacity_test = false), input);
+
+		assert!(expanded.contains("pubconstMAX_INSTRUCTION_ACCOUNTS:usize"));
+		assert!(!expanded.contains("#[cfg(test)]"));
+	}
+
+	#[test]
+	fn inline_hint_is_honoured() {
+		let input: TokenStream = quote! {
+			pub enum CounterInstruction {
+				Initialize = 0,
+			}
+		};
+		let expanded = expand_with(quote!(inline = "hint"), input);
+
+		assert!(expanded.contains("#[inline]"));
+		assert!(!expanded.contains("#[inline(always)]"));
+	}
+
+	#[test]
+	fn empty_enum_is_rejected() {
+		let input: TokenStream = quote! {
+			pub enum Empty {}
+		};
+		let expanded = expand_with(quote!(), input);
+
+		assert!(expanded.contains("requiresatleastoneinstructionvariant"));
+	}
+
+	#[test]
+	fn duplicate_variant_attribute_is_rejected() {
+		let input: TokenStream = quote! {
+			pub enum Mixed {
+				#[dispatch(accounts = OneAccounts)]
+				#[dispatch(accounts = TwoAccounts)]
+				Run = 0,
+			}
+		};
+		let expanded = expand_with(quote!(), input);
+
+		assert!(expanded.contains("duplicate`#[dispatch(...)]`onvariant`Run`"));
+	}
+
+	#[test]
+	fn unknown_outer_argument_is_rejected() {
+		let input: TokenStream = quote! {
+			pub enum CounterInstruction {
+				Initialize = 0,
+			}
+		};
+		let expanded = expand_with(quote!(disptach = true), input);
+
+		assert!(expanded.contains("couldnotparsethe`#[instruction_dispatch(...)]`input"));
+	}
+
+	#[test]
+	fn migrations_budget_without_a_ladder_is_rejected() {
+		let args = dispatch_args(quote!(migrations_max_lamports = 20_000));
+		let error = resolve_migrations(&args, &ident("Instruction")).unwrap_err();
+
+		assert!(
+			error
+				.to_string()
+				.contains("requires `migrations(Account, ...)`")
+		);
+	}
+
+	#[test]
+	fn empty_ladder_is_rejected() {
+		let args = dispatch_args(quote!(migrations(), migrations_max_lamports = 20_000));
+		let error = resolve_migrations(&args, &ident("Instruction")).unwrap_err();
+
+		assert!(
+			error
+				.to_string()
+				.contains("at least one migratable contract")
+		);
+	}
+
+	#[test]
+	fn ladder_without_a_budget_is_rejected() {
+		let args = dispatch_args(quote!(migrations(State)));
+		let error = resolve_migrations(&args, &ident("Instruction")).unwrap_err();
+
+		let message = error.to_string();
+		assert!(
+			message.contains("migrations_max_lamports"),
+			"message: {message}"
+		);
+		assert!(message.contains("program policy"), "message: {message}");
+	}
+
+	#[test]
+	fn migration_emission_wires_the_declared_slot_order() {
+		let crate_path: Path = syn::parse_quote!(::pina);
+		let budget: Expr = syn::parse_quote!(BUDGET);
+		let ladder = [
+			ladder_of("State"),
+			ladder_of("ManualState"),
+			ladder_of("CompactState"),
+			ladder_of("State"),
+		];
+		let (helper, prelude) = migrate_emission(&crate_path, &ladder, &budget);
+		let helper = squeezed(&helper.to_string());
+		let prelude = squeezed(&prelude.to_string());
+
+		assert!(helper.contains("fnprocess_migrate"));
+		assert!(helper.contains("MigrateContext::new(program_id,accounts,BUDGET)"));
+		// Slots start at 2: the payer and the system program precede them.
+		assert!(helper.contains("run_optional::<State>(2)"));
+		assert!(helper.contains("run_optional::<ManualState>(3)"));
+		assert!(helper.contains("run_optional::<CompactState>(4)"));
+		assert!(helper.contains("run_optional::<State>(5)"));
+		assert!(prelude.contains("is_migrate_instruction(data)"));
+	}
+
+	#[test]
+	fn ladder_resolved_under_this_crate_reports_the_missing_manifest() {
+		// The unit-test environment has no checked-in manifest, so the resolved
+		// path reports the same remedy a program without one would see.
+		let args = dispatch_args(quote!(migrations(State), migrations_max_lamports = 20_000));
+		let error = resolve_migrations(&args, &ident("Instruction")).unwrap_err();
+
+		let message = error.to_string();
+		assert!(
+			message.contains("pina migrations make"),
+			"message: {message}"
+		);
+	}
+
+	#[test]
+	fn capacity_flag_round_trips() {
+		let enabled = CapacityTestArg::from_word().unwrap_or_else(|error| panic!("word: {error}"));
+		assert!(enabled.is_enabled());
+
+		let disabled =
+			CapacityTestArg::from_bool(false).unwrap_or_else(|error| panic!("bool: {error}"));
+		assert!(!disabled.is_enabled());
+	}
 }
