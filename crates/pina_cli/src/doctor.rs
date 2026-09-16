@@ -390,6 +390,7 @@ fn diagnose_project(
 		status: CheckStatus::Pass,
 		message: format!("found {}", project.root.display()),
 	});
+	checks.push(size_profile_check(&project));
 	let artifact = project.sbf_artifact();
 	let keypair = project.keypair();
 	let artifact_metadata = inspect_metadata(&artifact, fs::symlink_metadata(&artifact));
@@ -801,6 +802,45 @@ fn presence(exists: bool) -> &'static str {
 	if exists { "found" } else { "missing" }
 }
 
+/// Report the deployed-size settings for this program.
+///
+/// The two ways a program silently pays for unused bytes are a second crate
+/// type, which makes rustc refuse LTO, and a release profile with no LTO at
+/// all. Both were measured in the wild: dropping `"lib"` from a real program
+/// shrank it 28.5%, and another measured losing LTO at +40%.
+fn size_profile_check(project: &Project) -> DoctorCheck {
+	let crate_types = &project.library_crate_types;
+	let profile = crate::build::declared_release_profile(project);
+
+	if crate_types.iter().any(|crate_type| crate_type != "cdylib") {
+		return DoctorCheck {
+			id: "project.size-profile".to_owned(),
+			status: CheckStatus::Warn,
+			message: format!(
+				"crate-type [{}] precludes link-time optimization; a `[\"cdylib\"]`-only target \
+				 is typically 20-35% smaller. Move shared logic into a separate crate.",
+				crate_types.join(", ")
+			),
+		};
+	}
+
+	if profile.lto != Some(true) {
+		return DoctorCheck {
+			id: "project.size-profile".to_owned(),
+			status: CheckStatus::Warn,
+			message: "`[profile.release] lto` is not enabled; fat LTO is the largest single \
+			          deployed-size reduction available"
+				.to_owned(),
+		};
+	}
+
+	DoctorCheck {
+		id: "project.size-profile".to_owned(),
+		status: CheckStatus::Pass,
+		message: "cdylib-only target with link-time optimization enabled".to_owned(),
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use std::fs;
@@ -932,6 +972,97 @@ mod tests {
 		assert!(error.render_text().contains("Project: unavailable"));
 		assert!(error.render_text().contains("Status: error"));
 		assert!(ok.render_text().contains("Status: ok"));
+	}
+
+	/// Build a minimal discoverable project whose library target declares the
+	/// given crate types and release profile lines.
+	fn project_with_crate_types(crate_types: &str, release_lines: &str) -> TempDir {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let root = temp.path();
+		let source_dir = root.join("src");
+		fs::create_dir_all(&source_dir)
+			.unwrap_or_else(|error| panic!("source create failed: {error}"));
+		fs::write(
+			root.join("Cargo.toml"),
+			format!(
+				"[package]\nname = \"size-demo\"\n\n[lib]\ncrate-type = \
+				 {crate_types}\n\n[profile.release]\n{release_lines}"
+			),
+		)
+		.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+		fs::write(
+			source_dir.join("lib.rs"),
+			"declare_id!(\"11111111111111111111111111111111\");\n",
+		)
+		.unwrap_or_else(|error| panic!("source write failed: {error}"));
+		temp
+	}
+
+	fn check<'a>(report: &'a DoctorReport, id: &str) -> Option<&'a DoctorCheck> {
+		report.checks.iter().find(|check| check.id == id)
+	}
+
+	/// A second crate type silently disables fat LTO. Measured in the wild: a
+	/// program that dropped `"lib"` shrank 28.5%, and another measured the
+	/// reverse at +40%. The diagnostic has to fire on the crate-type alone,
+	/// because `cargo-build-sbf --lto` also rejects the combination.
+	#[test]
+	fn warns_when_a_second_crate_type_disables_lto() {
+		let temp =
+			project_with_crate_types("[\"cdylib\", \"lib\"]", "opt-level = 3\nlto = \"fat\"\n");
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Warn,
+			"a dual crate type must warn: {}",
+			size_check.message
+		);
+		assert!(
+			size_check.message.contains("cdylib")
+				&& size_check.message.contains("link-time optimization")
+				&& size_check.message.contains("35%"),
+			"the message must name the cause, the remedy, and the measured cost: {}",
+			size_check.message
+		);
+	}
+
+	/// A cdylib-only target with the size settings passes.
+	#[test]
+	fn passes_for_a_cdylib_only_target_with_size_settings() {
+		let temp = project_with_crate_types(
+			"[\"cdylib\"]",
+			"opt-level = 3\nlto = \"fat\"\ncodegen-units = 1\npanic = \"abort\"\n",
+		);
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Pass,
+			"a cdylib-only target with a size profile must pass: {}",
+			size_check.message
+		);
+	}
+
+	/// A cdylib-only target that never enabled LTO still warns, because the
+	/// single biggest size win is unclaimed.
+	#[test]
+	fn warns_when_lto_is_not_enabled() {
+		let temp = project_with_crate_types("[\"cdylib\"]", "opt-level = 3\n");
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Warn,
+			"a missing lto setting must warn: {}",
+			size_check.message
+		);
 	}
 
 	#[test]
