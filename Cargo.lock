@@ -6401,9 +6401,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c44a010bc0548a14eb99b3dfb7abafaf839bcd2b2d6ea38090085664d27039dc"
+checksum = "70e0bd87f6bd76df412aedf8006b878514b417d1387e1813325d3110fcde32f9"
 dependencies = [
  "fixed",
  "pinapod-derive",
@@ -6413,9 +6413,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b800816ea8d3a8122046062829999d32e196b984d2fde42410b89e81c79777b6"
+checksum = "203b6c3e7298a3a894e79a211710b198cced87d5811a1bc8b6b7684fc13644a9"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
@@ -12773,7 +12773,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
