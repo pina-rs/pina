@@ -1061,6 +1061,10 @@ pub(crate) enum MigrationCommands {
 		/// Never prompt, even on a terminal; unanswered questions fail.
 		#[arg(long = "no-interactive", default_value_t = false)]
 		no_interactive: bool,
+		/// Acknowledge that enveloping an already-published contract changes
+		/// its wire format.
+		#[arg(long = "envelope-ack")]
+		envelope_ack: bool,
 		/// Print the machine-readable result.
 		#[arg(long, default_value_t = false)]
 		json: bool,

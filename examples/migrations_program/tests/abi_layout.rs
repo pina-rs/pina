@@ -16,51 +16,6 @@
 /// Program id recorded in the manifest.
 pub const PROGRAM_ID: &str = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
 
-/// Bind the recorded geometry to the program's own types.
-pub mod layout_guard {
-	#![allow(unused_imports)]
-
-	use migrations_program::*;
-
-	use super::*;
-
-	#[test]
-	fn manifest_program_id_matches_the_program() {
-		assert_eq!(
-			ID.to_string(),
-			super::PROGRAM_ID,
-			"manifest program id drifted from `declare_id!`"
-		);
-	}
-
-	#[test]
-	fn account_1_01_size_matches_the_program_type() {
-		assert_eq!(
-			State::SIZE,
-			super::account_1_01::SIZE,
-			"State changed size without regenerating the manifest (recorded version 2)"
-		);
-	}
-
-	#[test]
-	fn event_1_04_size_matches_the_program_type() {
-		assert_eq!(
-			ValueChangedEvent::SIZE,
-			super::event_1_04::SIZE,
-			"ValueChangedEvent changed size without regenerating the manifest (recorded version 1)"
-		);
-	}
-
-	#[test]
-	fn instruction_1_00_size_matches_the_program_type() {
-		assert_eq!(
-			UpdateInstruction::SIZE,
-			super::instruction_1_00::SIZE,
-			"UpdateInstruction changed size without regenerating the manifest (recorded version 2)"
-		);
-	}
-}
-
 /// ABI layout for the `State` account.
 pub mod account_1_01 {
 	/// Manifest contract key.

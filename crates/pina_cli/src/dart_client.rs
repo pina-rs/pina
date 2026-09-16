@@ -1186,8 +1186,9 @@ mod tests {
 	#[test]
 	fn dart_version_hardening_reports_already_hardened() {
 		let account = migratable_account();
-		let source =
-			"final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);\n";
+		let source = "final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + \
+		              1);\nif (storedMigrationVersion != 1) {\n  throw \
+		              StateError('mismatch');\n}\n";
 
 		assert!(matches!(
 			enforce_dart_migration_version(source, &account),
@@ -1231,6 +1232,24 @@ mod tests {
 			enforce_dart_migration_version(source, &account),
 			DartMigrationHardening::NotEnveloped
 		));
+	}
+
+	/// A payload field named `storedMigrationVersion` must not be mistaken for
+	/// the guard. Without this, declaring such a field would silently disable
+	/// version enforcement for the whole account.
+	#[test]
+	fn dart_version_hardening_is_not_fooled_by_a_lookalike_field() {
+		let account = migratable_account();
+		let source = "  final storedMigrationVersion = getU8Decoder().read(bytes, offset + 8);\n  \
+		              final configState = getConstantDecoder(getU8Decoder()).read(bytes, offset + \
+		              1);\n";
+
+		let DartMigrationHardening::Rewritten(hardened) =
+			enforce_dart_migration_version(source, &account)
+		else {
+			panic!("a lookalike field must not be treated as an existing guard");
+		};
+		assert!(hardened.contains("migration version mismatch"));
 	}
 
 	/// A source with the envelope offset but no constant decoder is also
@@ -1964,7 +1983,10 @@ fn enforce_dart_migration_version(
 	source: &str,
 	account: &MigratableAccount,
 ) -> DartMigrationHardening {
-	if source.contains("storedMigrationVersion") {
+	// Match the guard this function emits, not the bare identifier: a payload
+	// field that happens to be named `storedMigrationVersion` must not make the
+	// hardener think the check is already in place.
+	if source.contains("storedMigrationVersion !=") {
 		return DartMigrationHardening::AlreadyHardened;
 	}
 	let marker = format!(".read(bytes, offset + {});", account.version_offset());

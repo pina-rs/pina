@@ -3033,25 +3033,34 @@ fn abi_layout_test_records_manifest_geometry() {
 	let generated = std::fs::read_to_string(fixture.root.join(ABI_LAYOUT_TEST_PATH))
 		.unwrap_or_else(|error| panic!("read generated abi layout test: {error}"));
 
-	// The test file pins the discriminator envelope geometry ...
+	// The fixture is one account with a single `u64` field behind a
+	// `version-type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
+	// and an 8-byte payload. Asserting the exact values pins the geometry
+	// rather than merely finding the words "SIZE" or a digit somewhere.
+	for expected in [
+		"pub const DISCRIMINATOR_BYTES: usize = 1;",
+		"pub const VERSION_OFFSET: usize = 1;",
+		"pub const VERSION_BYTES: usize = 1;",
+		"pub const MIGRATION_HEADER_SIZE: usize = 2;",
+		"pub const PAYLOAD_SIZE: usize = 8;",
+		"pub const MANIFEST_PAYLOAD_SIZE: usize = 8;",
+		"pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;",
+		"pub const VERSION: u32 = 0;",
+	] {
+		assert!(
+			generated.contains(expected),
+			"generated test must record `{expected}`:\n{generated}"
+		);
+	}
+	// The single field sits after the envelope, at the header size.
 	assert!(
-		generated.contains("VERSION_OFFSET"),
-		"must assert the version offset: {generated}"
+		generated.contains(r#"("value", MIGRATION_HEADER_SIZE + 0, 8),"#),
+		"generated test must record the field offset:\n{generated}"
 	);
-	// ... the total fixed size ...
+	// The program id is what a downstream decoder keys on.
 	assert!(
-		generated.contains("SIZE"),
-		"must assert the account size: {generated}"
-	);
-	// ... and each field's offset, so an envelope change that shifts bytes
-	// fails the build instead of a hand-written decoder.
-	assert!(
-		generated.contains("value"),
-		"must assert the `value` field offset: {generated}"
-	);
-	assert!(
-		generated.contains("40") || generated.contains("offset_of"),
-		"must carry the computed offset: {generated}"
+		generated.contains("pub const PROGRAM_ID: &str ="),
+		"generated test must record the program id:\n{generated}"
 	);
 }
 

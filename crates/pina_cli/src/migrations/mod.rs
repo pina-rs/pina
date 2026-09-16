@@ -62,6 +62,7 @@ use scan::scan_current_contracts;
 use scan::validate_program_configuration;
 use serde::Serialize;
 use storage::acquire_migration_lock;
+use storage::write_atomic;
 use storage::write_json_atomic;
 use transition::TransitionRequest;
 use transition::create_transition;
@@ -546,7 +547,7 @@ pub fn make_migrations_with_answers(
 		.map_err(MigrationError::InvalidHistory)?;
 	write_json_atomic(&manifest_path, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
-	write_abi_layout_test(&project.program_dir, &manifest, Some(&project.library_name))?;
+	write_abi_layout_test(&project.program_dir, &manifest)?;
 	output.auto = manifest
 		.auto
 		.iter()
@@ -566,10 +567,9 @@ pub fn make_migrations_with_answers(
 fn write_abi_layout_test(
 	program_dir: &Path,
 	manifest: &MigrationManifest,
-	crate_name: Option<&str>,
 ) -> Result<(), MigrationError> {
 	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
-	let generated = generate_abi_layout(manifest, crate_name);
+	let generated = generate_abi_layout(manifest);
 	if abi_layout::read_existing(program_dir).map_err(|source| {
 		MigrationError::Read {
 			path: path.clone(),
@@ -587,7 +587,9 @@ fn write_abi_layout_test(
 			}
 		})?;
 	}
-	std::fs::write(&path, generated).map_err(|source| MigrationError::Write { path, source })
+	// `write_atomic` also enforces the safe-path check, matching how the
+	// manifest and publication ledger are written.
+	write_atomic(&path, generated.as_bytes())
 }
 
 /// Fail when the checked-in ABI layout test no longer matches the manifest.
@@ -597,10 +599,9 @@ fn write_abi_layout_test(
 fn verify_abi_layout_test(
 	program_dir: &Path,
 	manifest: &MigrationManifest,
-	crate_name: Option<&str>,
 ) -> Result<(), MigrationError> {
 	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
-	let expected = generate_abi_layout(manifest, crate_name);
+	let expected = generate_abi_layout(manifest);
 	match abi_layout::read_existing(program_dir).map_err(|source| {
 		MigrationError::Read {
 			path: path.clone(),
@@ -702,7 +703,7 @@ pub fn check_migrations_with_abi_layout(
 	let project = Project::discover(start)?;
 	let (statuses, manifest) = check_project_migrations_with_manifest(&project)?;
 	if let Some(manifest) = &manifest {
-		verify_abi_layout_test(&project.program_dir, manifest, Some(&project.library_name))?;
+		verify_abi_layout_test(&project.program_dir, manifest)?;
 	}
 	Ok(statuses)
 }

@@ -194,6 +194,7 @@ fn run_migrations(command: MigrationCommands) {
 			renames,
 			assume_removed,
 			no_interactive,
+			envelope_ack,
 			json,
 		} => {
 			// The one-command loop: make -> build -> generate. Each stage
@@ -205,7 +206,10 @@ fn run_migrations(command: MigrationCommands) {
 				&assume_removed,
 				no_interactive,
 			) {
-				Ok(answers) => answers,
+				Ok(mut answers) => {
+					answers.set_envelope_ack(envelope_ack);
+					answers
+				}
 				Err(reason) => {
 					if json {
 						print_json(&pina_cli::migrations::JsonErrorEnvelope {
