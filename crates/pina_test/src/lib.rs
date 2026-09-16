@@ -662,6 +662,34 @@ impl ProgramTest {
 		)
 	}
 
+	/// Move the Surfnet clock forward to an absolute slot.
+	///
+	/// Programs that read the `Clock` sysvar otherwise need their tests to
+	/// parse sysvar bytes or to fake the sysvar account, because the runtime
+	/// clock only advances with real slots. This advances it directly, so a
+	/// time-dependent branch is reachable without waiting.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the request.
+	pub fn time_travel_to_slot(&self, slot: u64) -> Result<u64, TestError> {
+		self.surfnet.time_travel_to_slot(slot)
+	}
+
+	/// Move the Surfnet clock forward to an absolute Unix timestamp.
+	///
+	/// The argument is **milliseconds**, matching the `Clock` sysvar's
+	/// `unix_timestamp` granularity as surfpool accepts it; divide a seconds
+	/// value before passing it.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the request.
+	pub fn time_travel_to_timestamp_millis(&self, timestamp_millis: u64) -> Result<u64, TestError> {
+		self.surfnet
+			.time_travel_to_timestamp_millis(timestamp_millis)
+	}
+
 	/// Fund an address inside the isolated Surfnet.
 	///
 	/// # Errors
@@ -980,6 +1008,35 @@ impl OfflineSurfnet {
 			.deploy(DeployProgram::new(program_id).so_path(artifact))
 			.map(|_| ())
 			.map_err(|error| test_error("deploy SBF program", error))
+	}
+
+	/// Move the Surfnet clock forward to an absolute slot.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the request.
+	pub fn time_travel_to_slot(&self, slot: u64) -> Result<u64, TestError> {
+		self.inner
+			.cheatcodes()
+			.time_travel_to_slot(slot)
+			.map(|info| info.absolute_slot)
+			.map_err(|error| test_error("time travel to slot", error))
+	}
+
+	/// Move the Surfnet clock forward to an absolute Unix timestamp.
+	///
+	/// The argument is **milliseconds**, matching what surfpool accepts;
+	/// divide a seconds value before passing it.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the request.
+	pub fn time_travel_to_timestamp_millis(&self, timestamp_millis: u64) -> Result<u64, TestError> {
+		self.inner
+			.cheatcodes()
+			.time_travel_to_timestamp(timestamp_millis)
+			.map(|info| info.absolute_slot)
+			.map_err(|error| test_error("time travel to timestamp", error))
 	}
 
 	/// Install one exact historical account fixture without running a transaction.
@@ -1472,7 +1529,7 @@ fn execution_error_with(instruction_error: InstructionError) -> TestError {
 
 /// Read the panic payload the standard hook would have printed.
 #[cfg(test)]
-fn panic_message(panic: Box<dyn std::any::Any + Send>) -> String {
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
 	panic
 		.downcast_ref::<String>()
 		.cloned()
@@ -1563,7 +1620,7 @@ mod tests {
 			assert_custom_error(&error, 6001u32);
 		}))
 		.expect_err("a mismatched code must fail the assertion");
-		let message = panic_message(panic);
+		let message = panic_message(&*panic);
 
 		assert!(
 			message.contains("6001") && message.contains("6000"),
@@ -1581,7 +1638,7 @@ mod tests {
 			assert_custom_error(&error, 6000u32);
 		}))
 		.expect_err("a non-custom error must fail the assertion");
-		let message = panic_message(panic);
+		let message = panic_message(&*panic);
 
 		assert!(
 			message.contains("InvalidArgument"),
@@ -1599,7 +1656,7 @@ mod tests {
 			assert_custom_error(&error, 6000u32);
 		}))
 		.expect_err("missing detail must fail the assertion");
-		let message = panic_message(panic);
+		let message = panic_message(&*panic);
 
 		assert!(
 			message.contains("no transaction error"),
@@ -1628,7 +1685,7 @@ mod tests {
 		};
 
 		let decoded = with_account_bytes(&account, |data| Ok::<u8, u32>(data.iter().sum::<u8>()))
-			.expect("decode succeeds");
+			.unwrap_or_else(|error| panic!("decode succeeds: {error:?}"));
 
 		assert_eq!(decoded, 24);
 	}
