@@ -417,7 +417,7 @@ pub mod verified {
 		Ok(())
 	}
 
-	/// Check that a token balance rose by *at least* `amount`.
+	/// Check that a token balance rose by *at most* `amount`.
 	///
 	/// The recipient side cannot always be checked exactly: Token-2022
 	/// transfer fees and hooks make the credit smaller than the debit, so a

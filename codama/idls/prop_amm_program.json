@@ -262,9 +262,9 @@
 				"kind": "errorNode",
 				"name": "unauthorizedUpdateAuthority",
 				"code": 0,
-				"message": "The signer cannot update the pool's configuration.",
+				"message": "The signer cannot update the pool's oracle price.",
 				"docs": [
-					"The signer cannot update the pool's configuration."
+					"The signer cannot update the pool's oracle price."
 				]
 			},
 			{

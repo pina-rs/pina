@@ -3,8 +3,8 @@
 
 /// Error codes for the PropAmmProgram program.
 
-/// The signer cannot update the pool's configuration.
-/// Message: "The signer cannot update the pool's configuration."
+/// The signer cannot update the pool's oracle price.
+/// Message: "The signer cannot update the pool's oracle price."
 const int propAmmProgramErrorUnauthorizedUpdateAuthority = 0x0; // 0
 
 /// The signer cannot publish a new oracle price.
@@ -14,7 +14,7 @@ const int propAmmProgramErrorUnauthorizedOracleAuthority = 0x1; // 1
 /// Map of error codes to human-readable messages.
 const Map<int, String> _propAmmProgramErrorMessages = {
   propAmmProgramErrorUnauthorizedUpdateAuthority:
-      'The signer cannot update the pool\'s configuration.',
+      'The signer cannot update the pool\'s oracle price.',
   propAmmProgramErrorUnauthorizedOracleAuthority:
       'The signer cannot publish a new oracle price.',
 };

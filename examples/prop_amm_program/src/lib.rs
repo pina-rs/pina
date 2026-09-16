@@ -42,7 +42,7 @@ pub const UPDATE_AUTHORITY: Address = Address::new_from_array([
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropAmmError {
-	/// The signer cannot update the pool's configuration.
+	/// The signer cannot update the pool's oracle price.
 	UnauthorizedUpdateAuthority = 0,
 	/// The signer cannot publish a new oracle price.
 	UnauthorizedOracleAuthority = 1,
