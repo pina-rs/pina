@@ -10,6 +10,7 @@ pub mod deploy;
 pub mod doctor;
 pub mod error;
 pub mod idl_metadata;
+pub mod import_idl;
 pub mod init;
 pub mod ir;
 pub mod keys;

@@ -278,6 +278,62 @@ pub(crate) enum Commands {
 		npx: String,
 	},
 
+	/// Import a foreign program's IDL as a supported CPI crate.
+	///
+	/// Fetches the IDL from a file, a URL, or the program's on-chain canonical
+	/// metadata, renders a standalone Pina CPI crate, and stamps the generated
+	/// README with provenance: the IDL's SHA-256, where it came from, and the
+	/// generator version. Re-running against an unchanged IDL is a no-op, and
+	/// running it against a changed one rewrites the crate and updates the
+	/// provenance block.
+	#[command(after_help = "Examples:\n  pina import switchboard --program-id \
+		              SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl \
+		              ./idls/on_demand.json\n  pina import metaplex --program-id \
+		              metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s --url \
+		              https://example.com/token_metadata.json\n  pina import squads \
+		              --program-id SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf --cluster \
+		              mainnet-beta\n\nProvenance:\n  The generated README records the IDL \
+		              SHA-256, the source it came from, and the generator version, so a \
+		              reviewer can tell what a committed CPI crate was built from.")]
+	Import {
+		/// Name for the imported crate, used as `clients/cpi/<name>`.
+		#[arg(value_name = "NAME")]
+		name: String,
+
+		/// Program ID the CPI crate targets.
+		#[arg(long, value_name = "PUBKEY")]
+		program_id: String,
+
+		/// Read the IDL from a local file.
+		#[arg(long, value_name = "FILE", conflicts_with_all = ["url", "cluster"])]
+		idl: Option<PathBuf>,
+
+		/// Fetch the IDL from an HTTP(S) URL.
+		#[arg(long, value_name = "URL", conflicts_with = "cluster")]
+		url: Option<String>,
+
+		/// Fetch the IDL from a cluster's canonical program metadata.
+		#[arg(long, value_name = "CLUSTER", default_value = "mainnet-beta")]
+		cluster: String,
+
+		/// Directory to write the crate into. Defaults to `clients/cpi`.
+		#[arg(long, value_name = "DIR")]
+		output: Option<PathBuf>,
+
+		/// How to handle an existing output directory.
+		#[arg(long, value_enum, default_value = "auto", value_name = "MODE")]
+		mode: GenerationMode,
+
+		/// Executable used to normalize Anchor IDLs. Defaults to npx.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+
 	/// Generate, inspect, and publish canonical Codama IDLs.
 	///
 	/// Bare invocation preserves local generation: it parses PATH and emits a

@@ -68,6 +68,27 @@ pub(crate) fn run(cli: Cli) {
 			no_scaffold,
 			npx,
 		} => run_cpi(idl.as_deref(), stdin, &output, mode, no_scaffold, &npx),
+		Commands::Import {
+			name,
+			program_id,
+			idl,
+			url,
+			cluster,
+			output,
+			mode,
+			npx,
+		} => {
+			run_import(
+				&name,
+				&program_id,
+				idl.as_deref(),
+				url.as_deref(),
+				&cluster,
+				output.as_deref(),
+				mode,
+				&npx,
+			)
+		}
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
@@ -2469,4 +2490,68 @@ mod size_profile_tests {
 		// `--no-size-profile` leaves the program's own release profile alone.
 		assert_eq!(size_profile(false, true, false), SizeProfile::None);
 	}
+}
+
+/// Imports a foreign program's IDL as a CPI crate and stamps its provenance.
+fn run_import(
+	name: &str,
+	program_id: &str,
+	idl: Option<&Path>,
+	url: Option<&str>,
+	cluster: &str,
+	output: Option<&Path>,
+	mode: pina_cli::GenerationMode,
+	npx: &str,
+) {
+	use pina_cli::import_idl::ImportOptions;
+	use pina_cli::import_idl::ImportSource;
+
+	// `--idl` and `--url` both name an IDL for one program; without either, the
+	// cluster's canonical metadata is the source.
+	let source = match (idl, url) {
+		(Some(path), None) => ImportSource::File(path.to_path_buf()),
+		(None, Some(url)) => ImportSource::Url(url.to_string()),
+		(None, None) => {
+			ImportSource::Cluster {
+				cluster: cluster.to_string(),
+				program_id: program_id.to_string(),
+			}
+		}
+		(Some(_), Some(_)) => {
+			eprintln!(
+				"{} --idl and --url cannot be used together",
+				"Error".red().bold()
+			);
+			std::process::exit(2);
+		}
+	};
+
+	let output = output.map_or_else(|| PathBuf::from("clients/cpi"), Path::to_path_buf);
+	let options = ImportOptions {
+		name: name.to_string(),
+		program_id: program_id.to_string(),
+		source,
+		output,
+		mode,
+		npx: npx.to_string(),
+	};
+	let outcome = match pina_cli::import_idl::import_idl(&options) {
+		Ok(outcome) => outcome,
+		Err(error) => {
+			eprintln!("{} {error}", "Error".red().bold());
+			std::process::exit(1);
+		}
+	};
+
+	let state = if outcome.changed {
+		"Imported".green().bold().to_string()
+	} else {
+		"Already up to date".green().to_string()
+	};
+	println!(
+		"{state} {name} -> {}\n  IDL sha256: {}\n  source: {}",
+		outcome.crate_dir.display(),
+		outcome.idl_sha256,
+		outcome.source
+	);
 }
