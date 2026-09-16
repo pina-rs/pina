@@ -14,10 +14,14 @@ import {
 } from "@solana/kit";
 import { ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The requested growth exceeds the runtime's per-instruction realloc limit. */
 export const ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT =
 	0xbc8; // 3016
+/** The same account was passed to more than one realloc slot. */
 export const ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DUPLICATE_REALLOCS = 0xbc9; // 3017
+/** The account is smaller than the data the instruction writes. */
 export const ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DATA_TOO_SMALL = 0xbca; // 3018
+/** The signer is not the authority recorded on the account. */
 export const ACCOUNT_REALLOC_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0xbcb; // 3019
 
 export type AccountReallocProgramError =
@@ -31,10 +35,14 @@ let accountReallocProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	accountReallocProgramErrorMessages = {
-		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DATA_TOO_SMALL]: ``,
-		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DUPLICATE_REALLOCS]: ``,
-		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT]: ``,
-		[ACCOUNT_REALLOC_PROGRAM_ERROR__AUTHORITY_MISMATCH]: ``,
+		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DATA_TOO_SMALL]:
+			`The account is smaller than the data the instruction writes.`,
+		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_DUPLICATE_REALLOCS]:
+			`The same account was passed to more than one realloc slot.`,
+		[ACCOUNT_REALLOC_PROGRAM_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT]:
+			`The requested growth exceeds the runtime's per-instruction realloc limit.`,
+		[ACCOUNT_REALLOC_PROGRAM_ERROR__AUTHORITY_MISMATCH]:
+			`The signer is not the authority recorded on the account.`,
 	};
 }
 

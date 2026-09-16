@@ -13,11 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum EscrowProgramError {
-	/// 0 -
-	#[error("")]
+	/// The token accounts do not match the offer's recorded mint and maker.
+	/// 0 - The token accounts do not match the offer's recorded mint and maker.
+	#[error("The token accounts do not match the offer's recorded mint and maker.")]
 	OfferKeyMismatch = 0x0,
-	/// 1 -
-	#[error("")]
+	/// A supplied token account is not the one the offer references.
+	/// 1 - A supplied token account is not the one the offer references.
+	#[error("A supplied token account is not the one the offer references.")]
 	TokenAccountMismatch = 0x1,
 }
 

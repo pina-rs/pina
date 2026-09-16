@@ -66,10 +66,15 @@ pub mod entrypoint {
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StakingError {
+	/// The amount is zero, or it leaves a position below the pool minimum.
 	InvalidAmount = 0,
+	/// The pool is paused, so deposits and withdrawals are refused.
 	PoolPaused = 1,
+	/// The position holds less than the requested withdrawal.
 	InsufficientBalance = 2,
+	/// The signer is not the pool authority this instruction requires.
 	Unauthorized = 3,
+	/// The supplied account is not the pool this position belongs to.
 	InvalidPool = 4,
 }
 

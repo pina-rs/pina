@@ -1,6 +1,7 @@
 //! Migrations CLI: schema diffing, transition generation, publication
 //! bookkeeping, and the disambiguation flow that ties them together.
 
+mod abi_layout;
 mod build_script;
 mod cost;
 mod diff;
@@ -21,6 +22,8 @@ use std::io::IsTerminal as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use abi_layout::ABI_LAYOUT_TEST_PATH;
+use abi_layout::generate as generate_abi_layout;
 pub use build_script::BuildScriptStatus;
 use build_script::ensure_build_script;
 use build_script::verify_build_script;
@@ -47,16 +50,19 @@ use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
 use pina_abi::ProcessContract;
+use pina_abi::PublicationLedger;
 use pina_abi::SchemaVersion;
 pub use prompt::DisambiguationQuestion;
 pub use prompt::MigrationAnswers;
 use prompt::PromptIo;
+use scan::CurrentContract;
 use scan::CurrentOptOut;
 use scan::next_migration_version;
 use scan::scan_current_contracts;
 use scan::validate_program_configuration;
 use serde::Serialize;
 use storage::acquire_migration_lock;
+use storage::write_atomic;
 use storage::write_json_atomic;
 use transition::TransitionRequest;
 use transition::create_transition;
@@ -155,6 +161,25 @@ pub enum MigrationError {
 
 	#[error("Invalid migration history: {0}")]
 	InvalidHistory(String),
+
+	#[error(
+		"The generated ABI layout test {path} is stale and no longer matches the manifest. Run \
+		 `pina migrations make` to regenerate it."
+	)]
+	AbiLayoutTestStale { path: PathBuf },
+
+	#[error(
+		"The generated ABI layout test {path} is missing. Run `pina migrations make` to create it."
+	)]
+	AbiLayoutTestMissing { path: PathBuf },
+
+	#[error(
+		"Opting these already-published contracts into the migration version envelope changes \
+		 their wire format: {contracts}. Every byte after the discriminator shifts, so regenerate \
+		 clients, update fixtures and hand-written decoders, and commit the regenerated layout \
+		 test. Re-run with `--envelope-ack` to record the change."
+	)]
+	EnvelopeAcknowledgementRequired { contracts: String },
 
 	#[error("Migration history belongs to program {found}, but current source declares {expected}")]
 	ProgramIdentityChanged { expected: String, found: String },
@@ -339,6 +364,20 @@ pub fn make_migrations_with_answers(
 	};
 	let mut seen = BTreeMap::new();
 
+	// Opting a contract into the version envelope inserts a byte after its
+	// discriminator, shifting every byte that follows. When the contract was
+	// already published, that reaches every generated client, fixture, and
+	// hand-written decoder for it, so the command must say so and require an
+	// explicit acknowledgement instead of recording the change quietly.
+	if !answers.envelope_ack {
+		let newly_enveloped = first_time_envelopes(&current.contracts, &manifest, &ledger);
+		if !newly_enveloped.is_empty() {
+			return Err(MigrationError::EnvelopeAcknowledgementRequired {
+				contracts: newly_enveloped.join(", "),
+			});
+		}
+	}
+
 	for source in current.contracts {
 		let key = source.identity.key();
 		seen.insert(
@@ -508,6 +547,7 @@ pub fn make_migrations_with_answers(
 		.map_err(MigrationError::InvalidHistory)?;
 	write_json_atomic(&manifest_path, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
+	write_abi_layout_test(&project.program_dir, &manifest)?;
 	output.auto = manifest
 		.auto
 		.iter()
@@ -517,6 +557,94 @@ pub fn make_migrations_with_answers(
 		output.build_script = Some(ensure_build_script(&project.program_dir)?);
 	}
 	Ok(output)
+}
+
+/// Write the machine-checked ABI layout test.
+///
+/// The file is a deterministic function of the manifest, so an unchanged
+/// program regenerates identical bytes and [`check_project_migrations`] can
+/// compare content instead of tracking a hash.
+fn write_abi_layout_test(
+	program_dir: &Path,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
+	let generated = generate_abi_layout(manifest);
+	if abi_layout::read_existing(program_dir).map_err(|source| {
+		MigrationError::Read {
+			path: path.clone(),
+			source,
+		}
+	})? == Some(generated.clone())
+	{
+		return Ok(());
+	}
+	if let Some(parent) = path.parent() {
+		std::fs::create_dir_all(parent).map_err(|source| {
+			MigrationError::CreateDirectory {
+				path: parent.to_path_buf(),
+				source,
+			}
+		})?;
+	}
+	// `write_atomic` also enforces the safe-path check, matching how the
+	// manifest and publication ledger are written.
+	write_atomic(&path, generated.as_bytes())
+}
+
+/// Fail when the checked-in ABI layout test no longer matches the manifest.
+///
+/// A stale file means a schema change shipped without regenerating the guard,
+/// which is exactly the case that let a hand-maintained offset drift.
+fn verify_abi_layout_test(
+	program_dir: &Path,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	let path = program_dir.join(ABI_LAYOUT_TEST_PATH);
+	let expected = generate_abi_layout(manifest);
+	match abi_layout::read_existing(program_dir).map_err(|source| {
+		MigrationError::Read {
+			path: path.clone(),
+			source,
+		}
+	})? {
+		Some(existing) if existing == expected => Ok(()),
+		Some(_) => Err(MigrationError::AbiLayoutTestStale { path }),
+		None => Err(MigrationError::AbiLayoutTestMissing { path }),
+	}
+}
+
+/// Return the contracts this run envelopes for the first time on a program
+/// that already has published deployments.
+///
+/// Ledger validation guarantees every published contract is also in the
+/// manifest, so "published but missing" cannot happen. The reachable case is a
+/// program that is already live where `[migrations].auto` widens — accounts
+/// only today, accounts and events tomorrow — so contracts that carried no
+/// envelope gain one. Their wire format changes even though nothing was
+/// removed: every byte after the discriminator shifts, and every generated
+/// client and hand-written decoder for that contract sees it.
+///
+/// A program with no receipts at all has nothing live to break, so a
+/// first-time envelope there is free.
+fn first_time_envelopes(
+	contracts: &[CurrentContract],
+	manifest: &MigrationManifest,
+	ledger: &PublicationLedger,
+) -> Vec<String> {
+	let program_is_live = !ledger.receipts.is_empty() || ledger.pending.is_some();
+	if !program_is_live {
+		return Vec::new();
+	}
+	let mut names = Vec::new();
+	for source in contracts {
+		let key = source.identity.key();
+		if manifest.contracts.contains_key(&key) {
+			continue;
+		}
+		names.push(format!("{} ({})", source.rust_name, key));
+	}
+	names
 }
 
 /// Reject an explicit `migrations = false` on a contract already recorded.
@@ -560,6 +688,24 @@ fn validate_auto_policy(
 pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	let project = Project::discover(start)?;
 	check_project_migrations(&project)
+}
+
+/// Verify the explicit `pina migrations check` gate, including the generated
+/// ABI layout test.
+///
+/// `check` is the CI entry point, so it requires the guard file. The plain
+/// `check_migrations` used by `build`, `status`, and publication stays
+/// unchanged: those run during ordinary work on an existing project, where
+/// demanding a regenerated guard would block them for an unrelated reason.
+pub fn check_migrations_with_abi_layout(
+	start: &Path,
+) -> Result<Vec<MigrationStatus>, MigrationError> {
+	let project = Project::discover(start)?;
+	let (statuses, manifest) = check_project_migrations_with_manifest(&project)?;
+	if let Some(manifest) = &manifest {
+		verify_abi_layout_test(&project.program_dir, manifest)?;
+	}
+	Ok(statuses)
 }
 
 pub(crate) fn check_project_migrations(

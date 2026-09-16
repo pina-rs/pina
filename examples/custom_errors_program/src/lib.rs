@@ -21,13 +21,23 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MyError {
+	/// A plain custom error.
 	Hello = 6000,
+	// Deliberately undocumented: this variant exists to pin the Anchor-parity
+	// behavior of an error whose IDL message is empty. Documenting it would
+	// delete the only fixture covering that case.
 	HelloNoMsg = 6123,
+	/// A distinct code with its own message.
 	HelloNext = 6124,
+	/// A custom error carrying caller-supplied context.
 	HelloCustom = 6125,
+	/// Two values were expected to differ and did not.
 	ValueMismatch = 6126,
+	/// Two values were expected to be equal and were not.
 	ValueMatch = 6127,
+	/// The compared value was not less than the bound.
 	ValueLess = 6128,
+	/// The compared value was not less than or equal to the bound.
 	ValueLessOrEqual = 6129,
 }
 

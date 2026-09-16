@@ -44,7 +44,12 @@ pub(crate) fn run(cli: Cli) {
 				solana_verify,
 			);
 		}
-		Commands::Lint { project, fix } => run_lint(project, fix),
+		Commands::Lint {
+			project,
+			fix,
+			build_driver,
+			explain,
+		} => run_lint(project, fix, build_driver, explain),
 		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
 		Commands::Generate {
@@ -194,6 +199,7 @@ fn run_migrations(command: MigrationCommands) {
 			renames,
 			assume_removed,
 			no_interactive,
+			envelope_ack,
 			json,
 		} => {
 			// The one-command loop: make -> build -> generate. Each stage
@@ -205,7 +211,10 @@ fn run_migrations(command: MigrationCommands) {
 				&assume_removed,
 				no_interactive,
 			) {
-				Ok(answers) => answers,
+				Ok(mut answers) => {
+					answers.set_envelope_ack(envelope_ack);
+					answers
+				}
 				Err(reason) => {
 					if json {
 						print_json(&pina_cli::migrations::JsonErrorEnvelope {
@@ -290,6 +299,7 @@ fn run_migrations(command: MigrationCommands) {
 			renames,
 			assume_removed,
 			no_interactive,
+			envelope_ack,
 			json,
 		} => {
 			let answers = match build_migration_answers(
@@ -298,7 +308,10 @@ fn run_migrations(command: MigrationCommands) {
 				&assume_removed,
 				no_interactive,
 			) {
-				Ok(answers) => answers,
+				Ok(mut answers) => {
+					answers.set_envelope_ack(envelope_ack);
+					answers
+				}
 				Err(reason) => {
 					if json {
 						print_json(&pina_cli::migrations::JsonErrorEnvelope {
@@ -353,7 +366,11 @@ fn run_migrations(command: MigrationCommands) {
 			print_migration_notices(&output);
 		}
 		MigrationCommands::Check { project, json } => {
-			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
+			// `check` is the CI gate, so it also requires the generated ABI
+			// layout test to match the manifest.
+			let statuses = unwrap_or_exit(pina_cli::migrations::check_migrations_with_abi_layout(
+				&project,
+			));
 			if json {
 				print_json(&statuses);
 				return;
@@ -416,25 +433,51 @@ fn run_migrations(command: MigrationCommands) {
 	}
 }
 
-fn run_lint(project: PathBuf, fix: bool) {
+fn run_lint(project: PathBuf, fix: bool, build_driver: bool, explain: Option<String>) {
+	if let Some(name) = explain {
+		run_lint_explain(&name);
+	}
+
 	let output = unwrap_or_exit(pina_cli::lint::lint_project(&pina_cli::lint::LintOptions {
 		project,
 		fix,
+		build_driver,
 	}));
 
 	if output.fix {
 		println!(
-			"{} Applied available Pina security lint fixes for {}",
+			"{} Applied available Pina security lint fixes for {} ({})",
 			"✔".green(),
-			escaped_text(&output.package_name)
+			escaped_text(&output.package_name),
+			output.driver_origin.as_str(),
 		);
 	} else {
 		println!(
-			"{} Pina security lints passed for {}",
+			"{} Pina security lints passed for {} ({})",
 			"✔".green(),
-			escaped_text(&output.package_name)
+			escaped_text(&output.package_name),
+			output.driver_origin.as_str(),
 		);
 	}
+}
+
+/// Print one lint's reference, or fail with the names that are available.
+fn run_lint_explain(name: &str) -> ! {
+	let Some(explanation) = pina_cli::lint_reference::explain(name) else {
+		eprintln!(
+			"{} Unknown pina lint `{}`. Run `pina lint --explain <LINT>` with one of: {}",
+			"Error".red().bold(),
+			escaped_text(name),
+			pina_cli::lint_reference::names().join(", "),
+		);
+		std::process::exit(1);
+	};
+
+	println!("{} ({})\n", explanation.name, explanation.default_level);
+	println!("{}\n", explanation.contract);
+	println!("Why this matters: {}\n", explanation.rationale);
+	println!("Blessing an exception: {}", explanation.blessing);
+	std::process::exit(0);
 }
 
 fn run_keys(path: &Path, keypair: Option<&Path>, json: bool, command: Option<&KeysCommands>) {

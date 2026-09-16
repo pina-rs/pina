@@ -14,8 +14,11 @@ import {
 } from "@solana/kit";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The requested permission bits are empty or outside the supported set. */
 export const ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS = 0x0; // 0
+/** A role with this address is already registered. */
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS = 0x1; // 1
+/** The role exists but was deactivated, so it grants nothing. */
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE = 0x2; // 2
 
 export type RoleRegistryProgramError =
@@ -28,9 +31,12 @@ let roleRegistryProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	roleRegistryProgramErrorMessages = {
-		[ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS]: ``,
-		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS]: ``,
-		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE]: ``,
+		[ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS]:
+			`The requested permission bits are empty or outside the supported set.`,
+		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS]:
+			`A role with this address is already registered.`,
+		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE]:
+			`The role exists but was deactivated, so it grants nothing.`,
 	};
 }
 

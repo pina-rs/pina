@@ -13,11 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum PropAmmProgramError {
-	/// 0 -
-	#[error("")]
+	/// The signer cannot update the pool's oracle price.
+	/// 0 - The signer cannot update the pool's oracle price.
+	#[error("The signer cannot update the pool's oracle price.")]
 	UnauthorizedUpdateAuthority = 0x0,
-	/// 1 -
-	#[error("")]
+	/// The signer cannot publish a new oracle price.
+	/// 1 - The signer cannot publish a new oracle price.
+	#[error("The signer cannot publish a new oracle price.")]
 	UnauthorizedOracleAuthority = 0x1,
 }
 

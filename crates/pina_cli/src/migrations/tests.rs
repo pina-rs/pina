@@ -3013,3 +3013,248 @@ fn flag_answers_contradicting_persisted_answers_fail_closed() {
 		"{removal_conflict}"
 	);
 }
+
+/// The generated ABI layout test is the machine-checked replacement for the
+/// hand-written offset asserts every consumer maintains today. It must record
+/// the current size, every field offset, and the envelope geometry from the
+/// manifest, and it must go stale when the schema changes.
+#[test]
+fn abi_layout_test_records_manifest_geometry() {
+	let fixture = publication_fixture();
+	make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.unwrap_or_else(|error| panic!("make migrations: {error}"));
+
+	let generated = std::fs::read_to_string(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read generated abi layout test: {error}"));
+
+	// The fixture is one account with a single `u64` field behind a
+	// `version-type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
+	// and an 8-byte payload. Asserting the exact values pins the geometry
+	// rather than merely finding the words "SIZE" or a digit somewhere.
+	for expected in [
+		"pub const DISCRIMINATOR_BYTES: usize = 1;",
+		"pub const VERSION_OFFSET: usize = 1;",
+		"pub const VERSION_BYTES: usize = 1;",
+		"pub const MIGRATION_HEADER_SIZE: usize = 2;",
+		"pub const PAYLOAD_SIZE: usize = 8;",
+		"pub const MANIFEST_PAYLOAD_SIZE: usize = 8;",
+		"pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;",
+		"pub const VERSION: u32 = 0;",
+	] {
+		assert!(
+			generated.contains(expected),
+			"generated test must record `{expected}`:\n{generated}"
+		);
+	}
+	// The single field sits after the envelope, at the header size.
+	assert!(
+		generated.contains(r#"("value", MIGRATION_HEADER_SIZE + 0, 8),"#),
+		"generated test must record the field offset:\n{generated}"
+	);
+	// The program id is what a downstream decoder keys on.
+	assert!(
+		generated.contains("pub const PROGRAM_ID: &str ="),
+		"generated test must record the program id:\n{generated}"
+	);
+}
+
+/// Regeneration must be idempotent: running `make` twice produces identical
+/// bytes, so `check` can compare content instead of guessing.
+#[test]
+fn abi_layout_test_regeneration_is_stable() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("first make: {error}"));
+	let first = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read first: {error}"));
+
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("second make: {error}"));
+	let second = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("read second: {error}"));
+
+	assert_eq!(first, second, "regeneration must be byte-stable");
+}
+
+/// A stale generated test is a failure, not a silent pass: `check` must report
+/// it so the drift is fixed in the same change that moved the layout.
+#[test]
+fn check_rejects_a_stale_abi_layout_test() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+
+	// Simulate a hand edit that no longer matches the manifest.
+	std::fs::write(
+		fixture.root.join(ABI_LAYOUT_TEST_PATH),
+		"// stale\nfn main() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write stale test: {error}"));
+
+	let error = check_migrations_with_abi_layout(&fixture.root)
+		.expect_err("a stale abi layout test must fail the check");
+	assert!(
+		error.to_string().contains("abi_layout") || error.to_string().contains("layout test"),
+		"the error must name the stale layout test: {error}"
+	);
+}
+
+/// A missing generated test is also stale: the account has migration history,
+/// so the guard file is required.
+#[test]
+fn check_requires_the_abi_layout_test_when_history_exists() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+	std::fs::remove_file(fixture.root.join(ABI_LAYOUT_TEST_PATH))
+		.unwrap_or_else(|error| panic!("remove test: {error}"));
+
+	let error = check_migrations_with_abi_layout(&fixture.root)
+		.expect_err("a missing abi layout test must fail the check");
+	assert!(
+		error.to_string().contains("abi_layout") || error.to_string().contains("layout test"),
+		"the error must name the missing layout test: {error}"
+	);
+}
+
+/// A current, matching test passes the check.
+#[test]
+fn check_accepts_a_current_abi_layout_test() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+
+	check_migrations_with_abi_layout(&fixture.root)
+		.unwrap_or_else(|error| panic!("check: {error}"));
+}
+
+/// Enabling the migration envelope on a contract in a program that is already
+/// live is a wire-format change: every byte after the discriminator shifts, so
+/// every generated client, fixture, and hand-written decoder for that contract
+/// sees it. The command must say so and require acknowledgement, which is the
+/// `[migrations].auto` widening that made kickjump's 0.17 upgrade a 273-file
+/// change discovered mid-flight.
+#[test]
+fn enveloping_new_contracts_on_a_live_program_requires_acknowledgement() {
+	let fixture = publication_fixture();
+	// The program is live: publish its current single contract.
+	publish_current(&fixture);
+	// A second contract appears in the source and now opts into migrations.
+	write_state_source(&fixture, "value: u64");
+	std::fs::write(
+		fixture.root.join("src/lib.rs"),
+		format!(
+			"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1, Other \
+			 = 2 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ value: \
+			 u64 }}\n#[account(discriminator = Kind::Other, migrations)]\nstruct Other {{ amount: \
+			 u64 }}\n",
+			fixture.program_id
+		),
+	)
+	.unwrap_or_else(|error| panic!("write expanded source: {error}"));
+
+	let error = make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.expect_err("enveloping a new contract on a live program must require acknowledgement");
+	assert!(
+		error.to_string().contains("--envelope-ack"),
+		"the error must name the acknowledgement flag: {error}"
+	);
+	assert!(
+		error.to_string().contains("Other"),
+		"the error must name the contract it covers: {error}"
+	);
+}
+
+/// The acknowledgement flag records the change.
+#[test]
+fn envelope_acknowledgement_allows_the_change() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	std::fs::write(
+		fixture.root.join("src/lib.rs"),
+		format!(
+			"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1, Other \
+			 = 2 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ value: \
+			 u64 }}\n#[account(discriminator = Kind::Other, migrations)]\nstruct Other {{ amount: \
+			 u64 }}\n",
+			fixture.program_id
+		),
+	)
+	.unwrap_or_else(|error| panic!("write expanded source: {error}"));
+
+	make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			envelope_ack: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.unwrap_or_else(|error| panic!("acknowledged envelope must be recorded: {error}"));
+}
+
+/// A program with nothing published has nothing live to break, so a
+/// first-time envelope needs no acknowledgement.
+#[test]
+fn enveloping_on_an_unpublished_program_needs_no_acknowledgement() {
+	let fixture = publication_fixture();
+	make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.unwrap_or_else(|error| panic!("unpublished envelope must not need an ack: {error}"));
+}
+
+/// An unreadable guard file is reported as a read error, not silently
+/// overwritten or mistaken for a missing file.
+#[test]
+fn make_reports_an_unreadable_abi_layout_guard() {
+	let fixture = publication_fixture();
+	let guard = fixture.root.join(ABI_LAYOUT_TEST_PATH);
+	std::fs::create_dir_all(&guard).unwrap_or_else(|error| panic!("create dir: {error}"));
+
+	let error = make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.expect_err("an unreadable guard must fail the run");
+
+	assert!(
+		matches!(error, MigrationError::Read { .. }),
+		"expected a read error, got {error}"
+	);
+}

@@ -383,7 +383,13 @@ impl BundledFixture {
 			.env_remove("RUSTC_WRAPPER")
 			.env("CARGO", &self.fake_cargo)
 			.env("REAL_CARGO", real_cargo)
-			.env("PINA_LINT_LOG", &self.log);
+			.env("PINA_LINT_LOG", &self.log)
+			// Keep the CLI's own cache out of this run and point the driver
+			// download at a port nobody listens on. Without this the test
+			// would populate the developer's cache and reach GitHub, which
+			// makes it slow, non-hermetic, and dependent on the network.
+			.env("PINA_LINT_CACHE_DIR", self._temp.path().join("cache"))
+			.env("PINA_LINT_DRIVER_BASE_URL", "http://127.0.0.1:1");
 		command
 	}
 
@@ -405,9 +411,11 @@ fn lint_runs_the_prebuilt_driver_bundled_next_to_the_cli() {
 		"pina lint failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("Pina security lints passed for lint-fixture"));
 	assert!(
-		String::from_utf8_lossy(&output.stdout)
-			.contains("Pina security lints passed for lint-fixture")
+		stdout.contains("(bundled)"),
+		"the summary must report that the bundled driver ran: {stdout}"
 	);
 
 	let log = fixture.log();
@@ -421,8 +429,17 @@ fn lint_runs_the_prebuilt_driver_bundled_next_to_the_cli() {
 	);
 }
 
+/// Return whether the fixture's command log exists, which is how a test
+/// asserts that cargo never ran.
+fn log_exists(fixture: &BundledFixture) -> bool {
+	fixture._temp.path().join("commands.log").is_file()
+}
+
+/// A bundled driver built for another compiler revision cannot load, so the
+/// CLI must not select it. The run then reports one actionable line naming
+/// the active toolchain and both remedies.
 #[test]
-fn unloadable_bundled_driver_reports_the_required_toolchain() {
+fn unloadable_bundled_driver_is_not_selected_and_reports_a_remedy() {
 	let fixture = BundledFixture::new("pina-lint-bundled-broken", Some("#!/bin/bash\nexit 9\n"));
 	let output = fixture
 		.command()
@@ -431,12 +448,20 @@ fn unloadable_bundled_driver_reports_the_required_toolchain() {
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("Could not load the lint driver"),
-		"stderr: {stderr}"
+		!stderr.contains("Could not load the lint driver"),
+		"an unloadable bundled driver is skipped, not reported as the failure: {stderr}"
 	);
 	assert!(
-		stderr.contains("nightly-2026-02-20") && stderr.contains("rust-toolchain.toml"),
-		"the error should name the required toolchain and the pin file: {stderr}"
+		stderr.contains("--build-driver"),
+		"the error must name the source-build remedy: {stderr}"
+	);
+	assert!(
+		stderr.contains("PINA_LINT_DRIVER_PATH"),
+		"the error must name the override escape hatch: {stderr}"
+	);
+	assert!(
+		!log_exists(&fixture),
+		"cargo must not run when no driver matched the toolchain"
 	);
 }
 
@@ -450,7 +475,82 @@ fn missing_bundled_driver_is_reported() {
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("Could not find the prebuilt lint driver"),
-		"stderr: {stderr}"
+		stderr.contains("No lint driver is available for the active toolchain")
+			|| stderr.contains("Could not download the lint driver"),
+		"the error must report that no driver matched: {stderr}"
 	);
+	assert!(stderr.contains("--build-driver"), "stderr: {stderr}");
+}
+
+/// A driver cached for the project's exact compiler revision is reused, so a
+/// `cargo install pina_cli` user pays for the download only once.
+#[test]
+fn a_cached_driver_is_reused_without_touching_the_bundle() {
+	let fixture = BundledFixture::new("pina-lint-cache", None);
+	let cached = cache_path(&fixture);
+	fs::create_dir_all(cached.parent().expect("the cache path has a parent"))
+		.unwrap_or_else(|error| panic!("failed to create the cache directory: {error}"));
+	executable(&cached, "#!/bin/bash\nexit 0\n");
+
+	let output = fixture
+		.command()
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	assert!(
+		output.status.success(),
+		"pina lint failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(
+		stdout.contains("(cached)"),
+		"the summary must report the cached driver: {stdout}"
+	);
+	assert!(
+		fixture.log().contains("workspace_wrapper=pina_lint_driver"),
+		"the cached driver must be the workspace wrapper"
+	);
+}
+
+/// `--build-driver` compiles the driver with the active toolchain and must
+/// never fall back to a driver that does not match it. The fixture cannot
+/// install `pina_lints`, so the property under test is that the run fails and
+/// says how to make the build succeed instead of quietly linting with the
+/// bundle.
+#[test]
+fn build_driver_never_falls_back_to_an_unmatched_bundle() {
+	let fixture = BundledFixture::new("pina-lint-build-driver", Some("#!/bin/bash\nexit 0\n"));
+	let output = fixture
+		.command()
+		.arg("--build-driver")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina lint --build-driver: {error}"));
+	assert!(!output.status.success());
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("Could not build the lint driver") || stderr.contains("rustc-dev"),
+		"a failed source build must report the build failure: {stderr}"
+	);
+	assert!(
+		!stderr.contains("Pina security lints passed"),
+		"--build-driver must not lint with an unmatched driver: {stderr}"
+	);
+	// The fake cargo logs an `install` attempt, which is the source build. What
+	// must not appear is a lint run over the project.
+	let log = fixture.log();
+	assert!(
+		!log.contains("cargo check"),
+		"--build-driver must not run cargo check over the project: {log}"
+	);
+}
+
+/// Return the cache path the CLI resolves for the fixture's active toolchain.
+fn cache_path(fixture: &BundledFixture) -> PathBuf {
+	let identity = pina_cli::lint_toolchain::identify(&fixture.project)
+		.expect("the fixture project has an active toolchain");
+	pina_cli::lint_toolchain::cached_driver_path(
+		&fixture._temp.path().join("cache"),
+		env!("CARGO_PKG_VERSION"),
+		&identity,
+	)
 }

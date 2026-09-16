@@ -452,11 +452,11 @@ fn warn_manifest_overflow_checks() {
 
 /// Release-profile settings declared by the manifest that owns the build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-struct DeclaredReleaseProfile {
-	lto: Option<bool>,
-	codegen_units: Option<u32>,
-	opt_level: Option<u32>,
-	overflow_checks: Option<bool>,
+pub(crate) struct DeclaredReleaseProfile {
+	pub(crate) lto: Option<bool>,
+	pub(crate) codegen_units: Option<u32>,
+	pub(crate) opt_level: Option<u32>,
+	pub(crate) overflow_checks: Option<bool>,
 }
 
 /// Read `[profile.release]` from the workspace manifest that owns the build.
@@ -464,7 +464,7 @@ struct DeclaredReleaseProfile {
 /// Cargo applies `[profile]` tables from the workspace root manifest only, so
 /// that is the file consulted. A missing file, table, or key all mean the
 /// manifest expresses no opinion, which lets the size profile choose.
-fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
+pub(crate) fn declared_release_profile(project: &Project) -> DeclaredReleaseProfile {
 	let manifest_path = project.workspace_root().ok().map_or_else(
 		|| project.program_dir.join("Cargo.toml"),
 		|root| root.join("Cargo.toml"),
@@ -627,7 +627,11 @@ fn warn_lto_unavailable(project: &Project) {
 	eprintln!(
 		"warning: library crate-type [{crate_types}] precludes link-time optimization; deployed \
 		 programs built from `[\"cdylib\"]` only are typically 20-30% smaller. Move shared logic \
-		 into a separate crate, or pass --no-lto to silence this warning."
+		 into a separate crate, or pass --no-lto to silence this warning. Check the entrypoint's \
+		 stack frame after switching: LTO inlines every handler into it, and a program with many \
+		 instructions can exceed the 4 KB per-frame limit in a build that still exits 0. Raise \
+		 the limit with cargo build-sbf --sbf-stack-size <BYTES> when it does; see \
+		 docs/src/program-size.md."
 	);
 }
 

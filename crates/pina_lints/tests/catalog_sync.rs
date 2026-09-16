@@ -172,3 +172,47 @@ fn embedded_cli_catalog_matches_the_registered_lints() {
 		);
 	}
 }
+
+/// The readme's catalog table is what most users read first, and it silently
+/// drifted behind the registered set once already. Every registered lint must
+/// appear in it.
+#[test]
+fn readme_catalog_lists_every_registered_lint() {
+	let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+	let Ok(readme) = std::fs::read_to_string(manifest.join("readme.md")) else {
+		return;
+	};
+	let Ok(source) =
+		std::fs::read_to_string(manifest.join("..").join("pina_cli").join("lints.json"))
+	else {
+		// Not running inside the repository workspace.
+		return;
+	};
+	let catalog: CatalogFile = serde_json::from_str(&source)
+		.unwrap_or_else(|error| panic!("lints.json must be valid JSON: {error}"));
+
+	// The table rows are `| \`<lint-name>\` | <level> | <invariant> |`.
+	let table = readme
+		.lines()
+		.filter_map(|line| {
+			let rest = line.strip_prefix("| `")?;
+			let (name, _) = rest.split_once('`')?;
+			name.contains('_').then(|| name.to_owned())
+		})
+		.collect::<Vec<_>>();
+
+	for entry in &catalog.lints {
+		assert!(
+			table.iter().any(|name| name == &entry.name),
+			"the readme catalog table must list `{}`",
+			entry.name,
+		);
+	}
+
+	for name in &table {
+		assert!(
+			catalog.lints.iter().any(|entry| &entry.name == name),
+			"the readme catalog table lists `{name}`, which is not a registered lint",
+		);
+	}
+}

@@ -66,7 +66,9 @@ pub enum EscrowAccount {
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EscrowError {
+	/// The token accounts do not match the offer's recorded mint and maker.
 	OfferKeyMismatch = 0,
+	/// A supplied token account is not the one the offer references.
 	TokenAccountMismatch = 1,
 }
 

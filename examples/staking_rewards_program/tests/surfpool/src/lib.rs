@@ -13,6 +13,7 @@ use pina_test::Pubkey;
 use pina_test::Signer;
 use pina_test::TestError;
 use program_under_test::ID;
+use program_under_test::StakingError;
 use program_under_test::StakingInstruction;
 
 /// SPL Token (Tokenkeg…), one of the example's allowlisted programs.
@@ -464,8 +465,10 @@ fn pool_positions_and_stake_accounting() {
 				DEPOSIT - WITHDRAW + 1,
 			))
 			.expect_err("cannot withdraw more than the stake");
-		assert_eq!(error.operation(), "execute program instruction");
-		eprintln!("over-withdraw error: {}", error.message());
+		// The exact variant matters: printing the error passes when the program
+		// fails for an unrelated reason, and the balance check is the behavior
+		// this test exists to pin.
+		pina_test::assert_custom_error(&error, StakingError::InsufficientBalance as u32);
 
 		// The claim path creates the user's reward ATA address safely.
 		let claim = program.instruction(

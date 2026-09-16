@@ -163,7 +163,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		);
 		log_caller();
 
-		return Err(ProgramError::InvalidAccountData);
+		return Err(PinaProgramError::InvalidDiscriminator.into());
 	}
 
 	#[cfg(not(feature = "validation"))]

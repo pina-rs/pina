@@ -182,14 +182,27 @@ bpf-entrypoint = []
 [dependencies]
 pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
 
-# Production profile for the deployed program. `lto` and `codegen-units`
-# shrink the binary; `overflow-checks` is opt-in because disabling it turns
-# arithmetic overflow from a panic into a wrap.
+# Production profile for the deployed program. Every setting here either
+# shrinks the deployed binary or keeps the build honest about it.
+#
+# `overflow-checks` is opt-in: leaving it off turns arithmetic overflow from a
+# panic into a wrap, which is cheaper but loses a real class of bug detection.
+# Set it to `true` while the program is young even though it costs bytes.
 [profile.release]
 opt-level = 3
 lto = "fat"
 codegen-units = 1
+panic = "abort"
+strip = true
 overflow-checks = false
+
+# Build scripts and proc macros do not ship in the deployed program, so they
+# should not be built at the program's opt-level or serialized behind its
+# codegen-units setting.
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 1
+incremental = false
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

@@ -3,14 +3,20 @@
 
 /// Error codes for the EscrowProgram program.
 
+/// The token accounts do not match the offer's recorded mint and maker.
+/// Message: "The token accounts do not match the offer's recorded mint and maker."
 const int escrowProgramErrorOfferKeyMismatch = 0x0; // 0
 
+/// A supplied token account is not the one the offer references.
+/// Message: "A supplied token account is not the one the offer references."
 const int escrowProgramErrorTokenAccountMismatch = 0x1; // 1
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _escrowProgramErrorMessages = {
-  escrowProgramErrorOfferKeyMismatch: '',
-  escrowProgramErrorTokenAccountMismatch: '',
+  escrowProgramErrorOfferKeyMismatch:
+      'The token accounts do not match the offer\'s recorded mint and maker.',
+  escrowProgramErrorTokenAccountMismatch:
+      'A supplied token account is not the one the offer references.',
 };
 
 /// Get the error message for a EscrowProgram program error code.

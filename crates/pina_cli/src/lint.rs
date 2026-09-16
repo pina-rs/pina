@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crate::lint_driver::DriverError;
+use crate::lint_driver::DriverOptions;
+use crate::lint_driver::DriverOrigin;
 use crate::lint_driver::driver_build_identity;
 use crate::lint_driver::driver_library_environment;
 use crate::lint_driver::format_lint_levels;
@@ -20,6 +22,10 @@ pub struct LintOptions {
 
 	/// Apply machine-applicable suggestions emitted by the lint set.
 	pub fix: bool,
+
+	/// Build the driver from source with the active toolchain instead of
+	/// accepting a cached, bundled, or downloaded driver.
+	pub build_driver: bool,
 }
 
 /// The project linted by [`lint_project`].
@@ -30,6 +36,9 @@ pub struct LintOutput {
 
 	/// Whether automatic fixes were requested.
 	pub fix: bool,
+
+	/// How the lint driver was obtained.
+	pub driver_origin: DriverOrigin,
 }
 
 /// Errors produced while preparing or running Pina's security lints.
@@ -51,20 +60,28 @@ pub enum LintError {
 /// Discover a Pina project and run this CLI release's official lint set.
 ///
 /// The lints are compiled into the `pina_lints` crate and statically linked
-/// into the `pina_lint_driver` binary, which ships prebuilt next to this CLI
-/// (see [`crate::lint_driver`]). This command resolves the driver, then runs
-/// `cargo check` — or `cargo fix` with `--fix` — with the driver as
+/// into the `pina_lint_driver` binary. The CLI resolves a driver built for the
+/// project's *active* toolchain (see [`crate::lint_driver`]), then runs `cargo
+/// check` — or `cargo fix` with `--fix` — with the driver as
 /// `RUSTC_WORKSPACE_WRAPPER`. Level overrides from the project's `pina.toml`
 /// `[lints]` table are forwarded through `PINA_LINT_LEVELS`.
 ///
 /// # Errors
 ///
-/// Returns an error when project discovery fails, the prebuilt lint driver
-/// cannot be resolved or loaded, or cargo reports a lint or compilation
+/// Returns an error when project discovery fails, no lint driver can be
+/// obtained for the active toolchain, or cargo reports a lint or compilation
 /// failure.
 pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
-	let driver = prepare_driver(&project.root)?;
+	let driver = prepare_driver(
+		&project.root,
+		DriverOptions {
+			build_driver: options.build_driver,
+			// A lint run may fetch the driver published for this CLI release;
+			// only `pina doctor` reports state without changing it.
+			allow_download: true,
+		},
+	)?;
 	let driver_build =
 		driver_build_identity(&driver.path).map_err(|source| LintError::RunCargo { source })?;
 	let manifest = project.program_dir.join("Cargo.toml");
@@ -125,5 +142,36 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	Ok(LintOutput {
 		package_name: project.package_name,
 		fix: options.fix,
+		driver_origin: driver.origin,
 	})
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn lint_options_record_the_requested_driver_build() {
+		let options = LintOptions {
+			project: PathBuf::from("."),
+			fix: false,
+			build_driver: true,
+		};
+
+		assert!(options.build_driver);
+		assert!(!options.fix);
+	}
+
+	#[test]
+	fn lint_output_carries_the_driver_origin() {
+		let output = LintOutput {
+			package_name: "counter".to_owned(),
+			fix: true,
+			driver_origin: DriverOrigin::Cache,
+		};
+
+		assert_eq!(output.package_name, "counter");
+		assert!(output.fix);
+		assert_eq!(output.driver_origin.as_str(), "cached");
+	}
 }

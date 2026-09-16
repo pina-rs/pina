@@ -101,6 +101,15 @@ impl LintCatalog {
 	pub fn contains(&self, name: &str) -> bool {
 		self.entries.iter().any(|entry| entry.name == name)
 	}
+
+	/// Return the configured default level of `name`, when it is a known lint.
+	#[must_use]
+	pub fn level(&self, name: &str) -> Option<&'static str> {
+		self.entries
+			.iter()
+			.find(|entry| entry.name == name)
+			.map(|entry| entry.level.as_str())
+	}
 }
 
 #[cfg(test)]

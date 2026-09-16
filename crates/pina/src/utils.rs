@@ -75,6 +75,12 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 
 /// Maps a custom discriminator-parse error to `InvalidInstructionData`.
 ///
+/// This path only sees the discriminator's own error, which is deliberately
+/// generic: `InvalidDiscriminator` becomes `InvalidInstructionData` so callers
+/// get one uniform "bad instruction data" failure. Migration-envelope errors
+/// (`MigrationRequired`, `InvalidMigrationVersion`) never reach this function —
+/// generated readers propagate them with `?` before the remap applies.
+///
 /// Outlined with `#[cold]` and `#[inline(never)]` deliberately. Inlining this
 /// error path changed how the compiler laid out the surrounding dispatch code
 /// and cost a measured 7 CU on `pina_bpf_program/hello`, even though the arm

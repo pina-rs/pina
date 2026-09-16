@@ -14,10 +14,15 @@ import {
 } from "@solana/kit";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The amount is zero, or it leaves a position below the pool minimum. */
 export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT = 0x0; // 0
+/** The pool is paused, so deposits and withdrawals are refused. */
 export const STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED = 0x1; // 1
+/** The position holds less than the requested withdrawal. */
 export const STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE = 0x2; // 2
+/** The signer is not the pool authority this instruction requires. */
 export const STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED = 0x3; // 3
+/** The supplied account is not the pool this position belongs to. */
 export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL = 0x4; // 4
 
 export type StakingRewardsProgramError =
@@ -32,11 +37,16 @@ let stakingRewardsProgramErrorMessages:
 	| undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	stakingRewardsProgramErrorMessages = {
-		[STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE]: ``,
-		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT]: ``,
-		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL]: ``,
-		[STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]: ``,
-		[STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]: ``,
+		[STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE]:
+			`The position holds less than the requested withdrawal.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT]:
+			`The amount is zero, or it leaves a position below the pool minimum.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL]:
+			`The supplied account is not the pool this position belongs to.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]:
+			`The pool is paused, so deposits and withdrawals are refused.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]:
+			`The signer is not the pool authority this instruction requires.`,
 	};
 }
 

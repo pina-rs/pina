@@ -58,6 +58,7 @@
 - [Security Model](./security-model.md)
 - [PinaPod Safety Boundary](./pinapod-safety-boundary.md)
 - [Security Lints](./security-lints.md)
+- [Lint Reference](./lint-reference.md)
 - [Production Readiness](./production-readiness.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)

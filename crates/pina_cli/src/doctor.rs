@@ -97,6 +97,39 @@ pub struct ProjectDiagnostic {
 	pub clients: Vec<ClientLanguage>,
 }
 
+/// The lint-driver state reported by `pina doctor`.
+///
+/// Every field answers one question a user cannot otherwise answer: which
+/// toolchain is active, which toolchain a driver must match, where the CLI
+/// looked, and what to do when nothing was found.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LintDriverDiagnostic {
+	/// Release, host, and commit hash of the active compiler.
+	pub active_toolchain: Option<String>,
+
+	/// The nightly release Pina's shipped lints are developed against.
+	pub expected_toolchain: String,
+
+	/// The driver path `pina lint` would use, absent when nothing resolved.
+	pub resolved_driver: Option<PathBuf>,
+
+	/// How that driver would be obtained, absent when nothing resolved.
+	pub resolved_origin: Option<String>,
+
+	/// Per-user cache directory searched for a negotiated driver.
+	pub cache_directory: Option<PathBuf>,
+
+	/// Driver path bundled next to the CLI.
+	pub bundled_driver: Option<PathBuf>,
+
+	/// Whether the bundled driver exists.
+	pub bundled_driver_exists: bool,
+
+	/// The one-line remedy when no driver is available.
+	pub remedy: Option<String>,
+}
+
 /// Stable diagnostic report emitted by `pina doctor`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,6 +142,8 @@ pub struct DoctorReport {
 	pub status: DoctorStatus,
 	/// Project information, absent when discovery fails.
 	pub project: Option<ProjectDiagnostic>,
+	/// Lint-driver resolution state.
+	pub lint_driver: LintDriverDiagnostic,
 	/// External tool availability in stable display order.
 	pub tools: Vec<ToolDiagnostic>,
 	/// Typed checks with stable IDs for agent decisions.
@@ -155,6 +190,49 @@ impl DoctorReport {
 			);
 		} else {
 			let _ = writeln!(output, "Project: unavailable");
+		}
+
+		let lint_driver = &self.lint_driver;
+		let _ = writeln!(output, "Lint driver:");
+		let active = lint_driver
+			.active_toolchain
+			.as_deref()
+			.unwrap_or("unavailable");
+		let _ = writeln!(output, "  active toolchain: {}", escape_controls(active));
+		let _ = writeln!(
+			output,
+			"  expected toolchain: {}",
+			escape_controls(&lint_driver.expected_toolchain)
+		);
+		match (&lint_driver.resolved_driver, &lint_driver.resolved_origin) {
+			(Some(path), Some(origin)) => {
+				let path = path.to_string_lossy();
+				let _ = writeln!(
+					output,
+					"  driver: {} ({})",
+					escape_controls(&path),
+					escape_controls(origin)
+				);
+			}
+			_ => {
+				let _ = writeln!(output, "  driver: unavailable");
+			}
+		}
+		if let Some(cache) = &lint_driver.cache_directory {
+			let cache = cache.to_string_lossy();
+			let _ = writeln!(output, "  cache: {}", escape_controls(&cache));
+		}
+		if let Some(bundled) = &lint_driver.bundled_driver {
+			let bundled = bundled.to_string_lossy();
+			let _ = writeln!(
+				output,
+				"  bundled: {} ({})",
+				escape_controls(&bundled),
+				presence(lint_driver.bundled_driver_exists)
+			);
+		}
+		if let Some(remedy) = &lint_driver.remedy {
+			let _ = writeln!(output, "  remedy: {}", escape_controls(remedy));
 		}
 
 		let _ = writeln!(output, "Tools:");
@@ -214,6 +292,16 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 	let mut findings = Vec::new();
 	let mut checks = Vec::new();
 	let project = diagnose_project(start, &mut findings, &mut checks);
+
+	// The lint driver is resolved against the discovered project, because the
+	// project's own rust-toolchain.toml selects the compiler a driver must
+	// match. Without a project there is no toolchain to negotiate against, so
+	// the diagnostic reports the state without claiming a resolution.
+	let lint_root = project
+		.as_ref()
+		.map_or_else(|| start.to_path_buf(), |project| project.root.clone());
+	let lint_driver = diagnose_lint_driver(&lint_root, &mut findings, &mut checks);
+
 	let needs_node = project.as_ref().is_some_and(|project| {
 		project
 			.clients
@@ -291,10 +379,109 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 		cli_version: env!("CARGO_PKG_VERSION"),
 		status,
 		project,
+		lint_driver,
 		tools,
 		checks,
 		findings,
 	}
+}
+
+/// Diagnose the lint-driver resolution state for `project_root`.
+///
+/// The check answers the question a failing `pina lint` leaves open: which
+/// toolchain is active, whether a driver exists for it, and what to run when
+/// one does not. It deliberately does not download anything — a diagnostic
+/// that mutates a cache is not a diagnostic — so a missing driver is reported
+/// as a warning with the exact command that fixes it.
+fn diagnose_lint_driver(
+	project_root: &Path,
+	findings: &mut Vec<String>,
+	checks: &mut Vec<DoctorCheck>,
+) -> LintDriverDiagnostic {
+	use crate::lint_driver::PINA_LINT_DRIVER_PATH;
+
+	let expected_toolchain = crate::lint_driver::LINT_DRIVER_TOOLCHAIN.to_owned();
+	let cache_directory =
+		crate::lint_toolchain::cache_root().map(|root| root.join(env!("CARGO_PKG_VERSION")));
+	let bundled_driver = std::env::current_exe()
+		.ok()
+		.map(|executable| executable.with_file_name(crate::lint_driver::driver_binary_name()));
+	let bundled_driver_exists = bundled_driver
+		.as_ref()
+		.is_some_and(|path| crate::lint_driver::is_executable(path));
+	let active_toolchain = crate::lint_toolchain::identify(project_root)
+		.ok()
+		.map(|identity| identity.to_string());
+
+	// Preparing the driver without the source-build option only inspects
+	// cache, bundle, and download. A download would mutate the cache, so only
+	// the non-mutating half is reported here.
+	let resolved = resolve_without_download(project_root);
+
+	let (resolved_driver, resolved_origin, remedy) = if let Some((path, origin)) = resolved {
+		(Some(path), Some(origin.to_owned()), None)
+	} else {
+		// An override that does not name an executable is the most confusing
+		// state, because the user believes they already configured a driver.
+		let remedy = if std::env::var_os(PINA_LINT_DRIVER_PATH).is_some() {
+			format!(
+				"`{PINA_LINT_DRIVER_PATH}` is set but does not point at an executable driver; \
+				 unset it to negotiate a driver, or point it at one you built."
+			)
+		} else {
+			"Run `pina lint --build-driver` to build the driver for the active toolchain, or `pina \
+			 lint` to download the driver published for this CLI release."
+				.to_owned()
+		};
+		findings.push(remedy.clone());
+		(None, None, Some(remedy))
+	};
+
+	let status = if resolved_driver.is_some() {
+		CheckStatus::Pass
+	} else {
+		// A missing driver blocks one command, not the whole project; the
+		// project itself may build and deploy with no lints at all.
+		CheckStatus::Warn
+	};
+	let message = resolved_driver.as_ref().map_or_else(
+		|| {
+			format!(
+				"no driver resolved for the active toolchain; the expected release is \
+				 {expected_toolchain}"
+			)
+		},
+		|path| format!("resolved {}", path.to_string_lossy()),
+	);
+	checks.push(DoctorCheck {
+		id: "lint.driver".to_owned(),
+		status,
+		message,
+	});
+
+	LintDriverDiagnostic {
+		active_toolchain,
+		expected_toolchain,
+		resolved_driver,
+		resolved_origin,
+		cache_directory,
+		bundled_driver,
+		bundled_driver_exists,
+		remedy,
+	}
+}
+
+/// Resolve a driver without mutating the cache.
+///
+/// Mirrors [`crate::lint_driver::prepare_driver`] for the sources that already
+/// exist on disk. A download is intentionally excluded: `pina doctor` reports
+/// state rather than changing it, and the remedy line names the command that
+/// performs the download.
+fn resolve_without_download(project_root: &Path) -> Option<(PathBuf, &'static str)> {
+	crate::lint_driver::resolve_existing(project_root)
+		.ok()
+		.flatten()
+		.map(|driver| (driver.path, driver.origin.as_str()))
 }
 
 #[derive(Clone, Copy)]
@@ -390,6 +577,7 @@ fn diagnose_project(
 		status: CheckStatus::Pass,
 		message: format!("found {}", project.root.display()),
 	});
+	checks.push(size_profile_check(&project));
 	let artifact = project.sbf_artifact();
 	let keypair = project.keypair();
 	let artifact_metadata = inspect_metadata(&artifact, fs::symlink_metadata(&artifact));
@@ -801,6 +989,45 @@ fn presence(exists: bool) -> &'static str {
 	if exists { "found" } else { "missing" }
 }
 
+/// Report the deployed-size settings for this program.
+///
+/// The two ways a program silently pays for unused bytes are a second crate
+/// type, which makes rustc refuse LTO, and a release profile with no LTO at
+/// all. Both were measured in the wild: dropping `"lib"` from a real program
+/// shrank it 28.5%, and another measured losing LTO at +40%.
+fn size_profile_check(project: &Project) -> DoctorCheck {
+	let crate_types = &project.library_crate_types;
+	let profile = crate::build::declared_release_profile(project);
+
+	if crate_types.iter().any(|crate_type| crate_type != "cdylib") {
+		return DoctorCheck {
+			id: "project.size-profile".to_owned(),
+			status: CheckStatus::Warn,
+			message: format!(
+				"crate-type [{}] precludes link-time optimization; a `[\"cdylib\"]`-only target \
+				 is typically 20-35% smaller. Move shared logic into a separate crate.",
+				crate_types.join(", ")
+			),
+		};
+	}
+
+	if profile.lto != Some(true) {
+		return DoctorCheck {
+			id: "project.size-profile".to_owned(),
+			status: CheckStatus::Warn,
+			message: "`[profile.release] lto` is not enabled; fat LTO is the largest single \
+			          deployed-size reduction available"
+				.to_owned(),
+		};
+	}
+
+	DoctorCheck {
+		id: "project.size-profile".to_owned(),
+		status: CheckStatus::Pass,
+		message: "cdylib-only target with link-time optimization enabled".to_owned(),
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use std::fs;
@@ -811,12 +1038,33 @@ mod tests {
 
 	use super::*;
 
+	/// A lint-driver diagnostic for tests that are not about the driver.
+	///
+	/// The report renders the section unconditionally, so the fixture carries
+	/// a resolved driver; tests that assert the unresolved state build their
+	/// own value.
+	fn resolved_lint_driver() -> LintDriverDiagnostic {
+		LintDriverDiagnostic {
+			active_toolchain: Some(
+				"1.95.0-nightly (aarch64-apple-darwin 7f99507f5, 2026-02-19)".to_owned(),
+			),
+			expected_toolchain: "nightly-2026-02-20".to_owned(),
+			resolved_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
+			resolved_origin: Some("bundled".to_owned()),
+			cache_directory: Some(PathBuf::from("/cache/pina/lint-driver/0.18.0")),
+			bundled_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
+			bundled_driver_exists: true,
+			remedy: None,
+		}
+	}
+
 	#[test]
 	fn renders_stable_human_report() {
 		let report = DoctorReport {
 			schema_version: 1,
 			cli_version: "1.2.3",
 			status: DoctorStatus::Warning,
+			lint_driver: resolved_lint_driver(),
 			project: Some(ProjectDiagnostic {
 				root: PathBuf::from("/project"),
 				package_name: "counter".to_owned(),
@@ -855,10 +1103,63 @@ mod tests {
 			report.render_text(),
 			"Pina doctor\nCLI: 1.2.3\nProject: /project\nPackage: counter\nProgram ID: \
 			 11111111111111111111111111111111\nArtifact: /project/target/deploy/counter.so \
-			 (missing)\nKeypair: /project/target/deploy/counter-keypair.json (found)\nTools:\n  \
-			 cargo (required): cargo 1.89.0\n  surfpool (optional): missing\nChecks:\n  [warn] \
-			 project.artifact: missing\nFindings:\n  - build the program\nStatus: warning\n"
+			 (missing)\nKeypair: /project/target/deploy/counter-keypair.json (found)\nLint \
+			 driver:\n  active toolchain: 1.95.0-nightly (aarch64-apple-darwin 7f99507f5, \
+			 2026-02-19)\n  expected toolchain: nightly-2026-02-20\n  driver: \
+			 /cli/pina_lint_driver (bundled)\n  cache: /cache/pina/lint-driver/0.18.0\n  bundled: \
+			 /cli/pina_lint_driver (found)\nTools:\n  cargo (required): cargo 1.89.0\n  surfpool \
+			 (optional): missing\nChecks:\n  [warn] project.artifact: missing\nFindings:\n  - \
+			 build the program\nStatus: warning\n"
 		);
+	}
+
+	#[test]
+	fn lint_driver_section_reports_an_unresolved_driver_with_its_remedy() {
+		let mut report = DoctorReport {
+			schema_version: 1,
+			cli_version: "1.2.3",
+			status: DoctorStatus::Warning,
+			lint_driver: LintDriverDiagnostic {
+				active_toolchain: Some("1.96.0-nightly (host 8a1061806, 2026-03-01)".to_owned()),
+				expected_toolchain: "nightly-2026-02-20".to_owned(),
+				resolved_driver: None,
+				resolved_origin: None,
+				cache_directory: None,
+				bundled_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
+				bundled_driver_exists: false,
+				remedy: Some("Run `pina lint --build-driver`...".to_owned()),
+			},
+			project: None,
+			tools: Vec::new(),
+			checks: Vec::new(),
+			findings: Vec::new(),
+		};
+
+		let text = report.render_text();
+		assert!(text.contains("driver: unavailable"), "{text}");
+		assert!(text.contains("active toolchain: 1.96.0-nightly"), "{text}");
+		assert!(
+			text.contains("expected toolchain: nightly-2026-02-20"),
+			"{text}"
+		);
+		assert!(
+			text.contains("bundled: /cli/pina_lint_driver (missing)"),
+			"{text}"
+		);
+		assert!(
+			text.contains("remedy: Run `pina lint --build-driver`"),
+			"{text}"
+		);
+		assert!(
+			!text.contains("cache:"),
+			"an unavailable cache directory is omitted rather than shown empty: {text}"
+		);
+
+		// An unresolved driver is reported in JSON without inventing a path.
+		report.status = DoctorStatus::Warning;
+		let json = serde_json::to_value(&report).expect("serialize the report");
+		assert!(json["lintDriver"]["resolvedDriver"].is_null());
+		assert_eq!(json["lintDriver"]["bundledDriverExists"], false);
 	}
 
 	#[test]
@@ -867,6 +1168,7 @@ mod tests {
 			schema_version: 1,
 			cli_version: "1.2.3",
 			status: DoctorStatus::Warning,
+			lint_driver: resolved_lint_driver(),
 			project: Some(ProjectDiagnostic {
 				root: PathBuf::from("/project\n\u{1b}"),
 				package_name: "counter\rname".to_owned(),
@@ -915,6 +1217,7 @@ mod tests {
 			schema_version: 1,
 			cli_version: "1.2.3",
 			status: DoctorStatus::Error,
+			lint_driver: resolved_lint_driver(),
 			project: None,
 			tools: Vec::new(),
 			checks: vec![DoctorCheck {
@@ -932,6 +1235,97 @@ mod tests {
 		assert!(error.render_text().contains("Project: unavailable"));
 		assert!(error.render_text().contains("Status: error"));
 		assert!(ok.render_text().contains("Status: ok"));
+	}
+
+	/// Build a minimal discoverable project whose library target declares the
+	/// given crate types and release profile lines.
+	fn project_with_crate_types(crate_types: &str, release_lines: &str) -> TempDir {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let root = temp.path();
+		let source_dir = root.join("src");
+		fs::create_dir_all(&source_dir)
+			.unwrap_or_else(|error| panic!("source create failed: {error}"));
+		fs::write(
+			root.join("Cargo.toml"),
+			format!(
+				"[package]\nname = \"size-demo\"\n\n[lib]\ncrate-type = \
+				 {crate_types}\n\n[profile.release]\n{release_lines}"
+			),
+		)
+		.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+		fs::write(
+			source_dir.join("lib.rs"),
+			"declare_id!(\"11111111111111111111111111111111\");\n",
+		)
+		.unwrap_or_else(|error| panic!("source write failed: {error}"));
+		temp
+	}
+
+	fn check<'a>(report: &'a DoctorReport, id: &str) -> Option<&'a DoctorCheck> {
+		report.checks.iter().find(|check| check.id == id)
+	}
+
+	/// A second crate type silently disables fat LTO. Measured in the wild: a
+	/// program that dropped `"lib"` shrank 28.5%, and another measured the
+	/// reverse at +40%. The diagnostic has to fire on the crate-type alone,
+	/// because `cargo-build-sbf --lto` also rejects the combination.
+	#[test]
+	fn warns_when_a_second_crate_type_disables_lto() {
+		let temp =
+			project_with_crate_types("[\"cdylib\", \"lib\"]", "opt-level = 3\nlto = \"fat\"\n");
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Warn,
+			"a dual crate type must warn: {}",
+			size_check.message
+		);
+		assert!(
+			size_check.message.contains("cdylib")
+				&& size_check.message.contains("link-time optimization")
+				&& size_check.message.contains("35%"),
+			"the message must name the cause, the remedy, and the measured cost: {}",
+			size_check.message
+		);
+	}
+
+	/// A cdylib-only target with the size settings passes.
+	#[test]
+	fn passes_for_a_cdylib_only_target_with_size_settings() {
+		let temp = project_with_crate_types(
+			"[\"cdylib\"]",
+			"opt-level = 3\nlto = \"fat\"\ncodegen-units = 1\npanic = \"abort\"\n",
+		);
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Pass,
+			"a cdylib-only target with a size profile must pass: {}",
+			size_check.message
+		);
+	}
+
+	/// A cdylib-only target that never enabled LTO still warns, because the
+	/// single biggest size win is unclaimed.
+	#[test]
+	fn warns_when_lto_is_not_enabled() {
+		let temp = project_with_crate_types("[\"cdylib\"]", "opt-level = 3\n");
+		let report = diagnose(temp.path());
+
+		let size_check = check(&report, "project.size-profile")
+			.unwrap_or_else(|| panic!("size profile check must run: {:?}", report.checks));
+		assert_eq!(
+			size_check.status,
+			CheckStatus::Warn,
+			"a missing lto setting must warn: {}",
+			size_check.message
+		);
 	}
 
 	#[test]

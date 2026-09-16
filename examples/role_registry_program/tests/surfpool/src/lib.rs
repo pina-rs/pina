@@ -4,6 +4,7 @@ use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use program_under_test::ID;
+use program_under_test::RegistryError;
 use program_under_test::RegistryInstruction;
 
 /// Seed prefixes, mirroring the program's constants.
@@ -192,8 +193,9 @@ fn add_update_deactivate_role_lifecycle() {
 		let error = program
 			.send_instruction(update)
 			.expect_err("an inactive role cannot be updated");
-		assert_eq!(error.operation(), "execute program instruction");
-		eprintln!("update inactive role error: {}", error.message());
+		// The exact variant matters: a test that only prints the error passes
+		// when the program fails for an unrelated reason.
+		pina_test::assert_custom_error(&error, RegistryError::RoleInactive as u32);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -246,7 +248,19 @@ fn cannot_add_the_same_role_twice() {
 		let error = program
 			.send_instruction(add)
 			.expect_err("role id 7 already exists");
-		assert_eq!(error.operation(), "execute program instruction");
+		// The duplicate is rejected by the create-account CPI, which the runtime
+		// refuses because the PDA already exists. `RegistryError::RoleAlreadyExists`
+		// is declared but unreachable from this path: the system program fails
+		// first, so asserting the program's own code here would be asserting
+		// something the program never returns.
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::AccountAlreadyInitialized
+			)),
+			"the duplicate add is refused by account creation"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});
