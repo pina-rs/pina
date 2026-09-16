@@ -737,29 +737,29 @@ fn plan_enum(enumeration: &EnumTypeNode, types: &mut TypeIndex, context: &str) -
 	let tag = enumeration.size.get_nested_type_node().clone();
 	let tag_width = prefix_width(&tag, context)?;
 	let mut payload_max = 0usize;
-	let mut payload_fixed: Option<usize> = Some(0);
+	// The first payload establishes the width; every later one must match it.
+	// A mismatch marks the enum variable-length rather than unsupported, because
+	// Borsh writes the tag followed by whatever the variant carries.
+	let mut payload_width: Option<usize> = None;
+	let mut uniform = true;
 	let mut borrows = false;
 
 	for variant in &enumeration.variants {
 		let payload = plan_variant_payload(variant, types, context)?;
 		let combined = combine(&payload);
+		match (payload_width, combined.fixed_size) {
+			(None, size) => payload_width = size,
+			(Some(current), Some(size)) if current == size => {}
+			(..) => uniform = false,
+		}
 		payload_max = payload_max.max(combined.max_size);
-		payload_fixed = match (payload_fixed, combined.fixed_size) {
-			(Some(current), Some(size)) if current == size => Some(size),
-			_ => None,
-		};
 		borrows |= combined.borrows;
 	}
-
-	// Borsh writes the tag followed by the variant payload, which is why an
-	// enum whose variants differ in width is variable-length rather than
-	// unsupported.
-	let uniform = payload_fixed.is_some();
 
 	Ok(Encoded {
 		rust_type: String::new(),
 		fixed_size: if uniform {
-			payload_fixed.map(|size| tag_width.saturating_add(size))
+			payload_width.map(|size| tag_width.saturating_add(size))
 		} else {
 			None
 		},
@@ -1237,7 +1237,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U64).into(),
 			BooleanTypeNode::default().into(),
 		]);
-		let planned = plan(&tuple.into(), &mut types, "test")
+		let planned = plan(&TypeNode::Tuple(tuple), &mut types, "test")
 			.unwrap_or_else(|error| panic!("tuple should plan: {error}"));
 		assert_eq!(planned.fixed_size, Some(9));
 
@@ -1368,5 +1368,266 @@ mod tests {
 			borrows: true,
 		};
 		assert!(variable.decode_into("name", "test").is_err());
+	}
+	#[test]
+	fn plans_booleans_public_keys_and_fixed_bytes_directly() {
+		let mut types = index(&[]);
+
+		let boolean = plan(&BooleanTypeNode::default().into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("bool should plan: {error}"));
+		assert_eq!(boolean.fixed_size, Some(1));
+		assert!(boolean.encode.contains("u8::from"));
+
+		let key = plan(&PublicKeyTypeNode::new().into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("key should plan: {error}"));
+		assert_eq!(key.fixed_size, Some(32));
+		assert!(key.encode.contains("as_ref()"));
+
+		let bytes = FixedSizeTypeNode::new(BytesTypeNode {}, 4).into();
+		let planned = plan(&bytes, &mut types, "test")
+			.unwrap_or_else(|error| panic!("fixed bytes should plan: {error}"));
+		assert!(planned.encode.contains("copy_from_slice(&self_value[..])"));
+	}
+
+	#[test]
+	fn fixed_windows_accept_payloads_that_fit() {
+		let mut types = index(&[]);
+		let string = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		// An 8-byte window cannot hold a u8-prefixed array whose payload may run
+		// to 255 bytes, so the wrapper is rejected outright.
+		let undersized = FixedSizeTypeNode::new(
+			TypeNode::Array(codama_nodes::ArrayTypeNode::prefixed(
+				NumberTypeNode::le(NumberFormat::U8),
+				NumberTypeNode::le(NumberFormat::U8),
+			)),
+			8,
+		);
+		let error = plan(&undersized.into(), &mut types, "test")
+			.expect_err("an undersized window must be rejected");
+		assert!(error.to_string().contains("cannot hold a payload"));
+
+		// A window that holds the payload maximum is accepted; the payload
+		// inside stays variable because its prefix is a maximum.
+		let prefixed = codama_nodes::ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::U8),
+			NumberTypeNode::le(NumberFormat::U8),
+		);
+		let loose = FixedSizeTypeNode::new(TypeNode::Array(prefixed), 256);
+		let planned = plan(&loose.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("loose window should plan: {error}"));
+		assert_eq!(planned.fixed_size, None);
+		assert_eq!(planned.max_size, 256);
+	}
+
+	#[test]
+	fn rejects_fixed_arrays_with_variable_elements_and_overflowing_counts() {
+		let mut types = index(&[]);
+		let variable_item = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let array = codama_nodes::ArrayTypeNode::fixed(variable_item, 3);
+		let error = plan(&array.into(), &mut types, "test")
+			.expect_err("fixed array of variable elements must be rejected");
+		assert!(error.to_string().contains("cannot hold a variable-length"));
+
+		let overflowing =
+			codama_nodes::ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U16), u64::MAX);
+		let error = plan(&overflowing.into(), &mut types, "test")
+			.expect_err("overflowing array must be rejected");
+		assert!(error.to_string().contains("overflows"));
+	}
+
+	#[test]
+	fn plans_options_in_both_encodings() {
+		let mut types = index(&[]);
+		let variable = codama_nodes::OptionTypeNode::new(NumberTypeNode::le(NumberFormat::U64));
+		let planned = plan(&variable.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("variable option should plan: {error}"));
+		assert!(planned.is_variable());
+		assert!(planned.encode.contains("Some(value)"));
+		assert!(planned.encode.contains("None =>"));
+
+		let fixed = codama_nodes::OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64));
+		let planned = plan(&fixed.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("fixed option should plan: {error}"));
+		assert_eq!(planned.fixed_size, Some(9));
+		assert!(planned.encode.contains("fill(0)"));
+	}
+
+	#[test]
+	fn plans_size_prefixed_arrays_and_rejects_bad_inners() {
+		let mut types = index(&[]);
+		let prefix = NumberTypeNode::le(NumberFormat::U32);
+
+		let string_array = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			TypeNode::Array(codama_nodes::ArrayTypeNode::prefixed(
+				NumberTypeNode::le(NumberFormat::U8),
+				NumberTypeNode::le(NumberFormat::U8),
+			)),
+			prefix.clone(),
+		);
+		let planned = plan(&string_array.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("prefixed array should plan: {error}"));
+		assert!(planned.is_variable());
+		assert!(planned.encode.contains("payload_len"));
+
+		// A size prefix around a bare number has no length to encode.
+		let invalid = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			NumberTypeNode::le(NumberFormat::U64),
+			prefix,
+		);
+		let error = plan(&invalid.into(), &mut types, "test")
+			.expect_err("size prefix around a number must be rejected");
+		assert!(
+			error
+				.to_string()
+				.contains("must wrap a string, byte slice, or array")
+		);
+	}
+
+	#[test]
+	fn rejects_non_utf8_strings() {
+		let mut types = index(&[]);
+		let node = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			codama_nodes::StringTypeNode::base16(),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let error =
+			plan(&node.into(), &mut types, "test").expect_err("non-UTF-8 strings must be rejected");
+		assert!(error.to_string().contains("UTF-8"));
+	}
+
+	#[test]
+	fn plans_uniform_enums_and_wide_discriminants() {
+		let mut types = index(&[]);
+		let wide = codama_nodes::EnumTypeNode {
+			variants: vec![
+				codama_nodes::EnumEmptyVariantTypeNode::new("small").into(),
+				codama_nodes::EnumEmptyVariantTypeNode::new("large").into(),
+			],
+			size: codama_nodes::NumberTypeNode::le(NumberFormat::U32).into(),
+		};
+		let planned = plan(&wide.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("wide enum should plan: {error}"));
+		assert_eq!(planned.fixed_size, Some(4));
+
+		let bad_size = codama_nodes::EnumTypeNode {
+			variants: vec![EnumEmptyVariantTypeNode::new("only").into()],
+			size: codama_nodes::NumberTypeNode::le(NumberFormat::U128).into(),
+		};
+		let error = plan(&bad_size.into(), &mut types, "test")
+			.expect_err("u128 discriminants must be rejected");
+		assert!(error.to_string().contains("at most 8 bytes"));
+	}
+
+	#[test]
+	fn plans_enum_tuple_variants() {
+		let mut types = index(&[]);
+		let enumeration = EnumTypeNode::new(vec![
+			codama_nodes::EnumTupleVariantTypeNode::new(
+				"pair",
+				codama_nodes::TupleTypeNode::new(vec![
+					NumberTypeNode::le(NumberFormat::U8).into(),
+					NumberTypeNode::le(NumberFormat::U8).into(),
+				]),
+			)
+			.into(),
+		]);
+		let planned = plan(&enumeration.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("tuple enum should plan: {error}"));
+		assert_eq!(planned.fixed_size, Some(3));
+	}
+
+	#[test]
+	fn rejects_unsupported_root_shapes() {
+		let mut types = index(&[]);
+		let date_time = codama_nodes::DateTimeTypeNode::new(NumberTypeNode::le(NumberFormat::U64));
+		let error = plan(&date_time.into(), &mut types, "test")
+			.expect_err("unsupported shapes must be rejected");
+		assert!(error.to_string().contains("no instruction-data encoding"));
+	}
+
+	#[test]
+	fn maps_reject_non_prefixed_counts_and_prefix_their_entries() {
+		let mut types = index(&[]);
+		let prefixed = codama_nodes::MapTypeNode::new(
+			codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+				StringTypeNode::utf8(),
+				NumberTypeNode::le(NumberFormat::U32),
+			),
+			NumberTypeNode::le(NumberFormat::U8),
+			codama_nodes::PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U16)),
+		);
+		let planned = plan(&prefixed.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("map should plan: {error}"));
+		assert!(planned.encode.contains("for (key, value) in"));
+		assert!(planned.rust_type.contains("&'argument str"));
+
+		let fixed = codama_nodes::MapTypeNode::new(
+			NumberTypeNode::le(NumberFormat::U8),
+			NumberTypeNode::le(NumberFormat::U8),
+			codama_nodes::FixedCountNode::new(3),
+		);
+		let error =
+			plan(&fixed.into(), &mut types, "test").expect_err("fixed-count maps must be rejected");
+		assert!(error.to_string().contains("length-prefixed sequence"));
+	}
+
+	#[test]
+	fn decode_final_drops_the_trailing_advance() {
+		let number = Encoded {
+			rust_type: "u64".to_string(),
+			fixed_size: Some(8),
+			max_size: 8,
+			encode: "data[offset..offset + 8].copy_from_slice(&self_value.to_le_bytes());\noffset \
+			         += 8;"
+				.to_string(),
+			borrows: false,
+		};
+
+		let advancing = number
+			.decode_into("value", "test")
+			.unwrap_or_else(|error| panic!("decode should succeed: {error}"));
+		assert!(advancing.contains("cursor += 8;"));
+
+		let final_field = number
+			.decode_final("value", "test")
+			.unwrap_or_else(|error| panic!("decode should succeed: {error}"));
+		assert!(!final_field.contains("cursor +="));
+	}
+
+	#[test]
+	fn rejects_generated_types_without_a_scalar_reader() {
+		let named = Encoded {
+			rust_type: "Key".to_string(),
+			fixed_size: Some(1),
+			max_size: 1,
+			encode: String::new(),
+			borrows: false,
+		};
+		let error = named
+			.decode_into("key", "test")
+			.expect_err("generated types need their own reader");
+		assert!(error.to_string().contains("value decoder"));
+	}
+	#[test]
+	fn probe_enum_tuple() {
+		let mut types = index(&[]);
+		let enumeration = EnumTypeNode::new(vec![
+			codama_nodes::EnumTupleVariantTypeNode::new(
+				"pair",
+				codama_nodes::TupleTypeNode::new(vec![
+					NumberTypeNode::le(NumberFormat::U8).into(),
+					NumberTypeNode::le(NumberFormat::U8).into(),
+				]),
+			)
+			.into(),
+		]);
+		let planned = plan(&enumeration.into(), &mut types, "probe").unwrap();
+		println!("FIXED={:?} MAX={:?}", planned.fixed_size, planned.max_size);
 	}
 }

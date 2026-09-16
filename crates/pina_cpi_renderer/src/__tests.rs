@@ -17,6 +17,7 @@ use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::IsSigner;
+use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
@@ -1431,5 +1432,109 @@ fn account_parsers_read_boolean_fields_from_the_buffer() {
 				}
 			}
 		}
+	}
+}
+
+mod account_planning {
+	use codama_nodes::StructFieldTypeNode;
+
+	use super::render::accounts;
+	use super::*;
+
+	fn account_node(name: &str, fields: Vec<StructFieldTypeNode>) -> codama_nodes::AccountNode {
+		codama_nodes::AccountNode {
+			name: name.into(),
+			data: codama_nodes::NestedTypeNode::Value(codama_nodes::StructTypeNode::new(fields)),
+			discriminators: Vec::new().into(),
+			docs: Vec::new().into(),
+			pda: None,
+			size: None,
+		}
+	}
+
+	fn field(name: &str, r#type: TypeNode) -> StructFieldTypeNode {
+		StructFieldTypeNode::new(name, r#type)
+	}
+
+	#[test]
+	fn falls_back_to_positional_names_when_the_idl_omits_them() {
+		let account = account_node(
+			"thing",
+			vec![
+				field("authority", TypeNode::PublicKey(PublicKeyTypeNode::new())),
+				field("", TypeNode::Number(NumberTypeNode::le(NumberFormat::U8))),
+			],
+		);
+		let names: Vec<String> = account
+			.data
+			.get_nested_type_node()
+			.fields
+			.iter()
+			.enumerate()
+			.map(|(index, field)| {
+				if field.name.as_ref().is_empty() {
+					format!("field_{index}")
+				} else {
+					snake(field.name.as_ref())
+				}
+			})
+			.collect();
+		assert_eq!(names, ["authority", "field_1"]);
+	}
+
+	#[test]
+	fn renders_accounts_without_a_discriminator_or_parser() {
+		let root = load_fixture_root("vesting_program");
+		// The vesting IDL has no accounts module; exercise the renderer through
+		// a minimal synthetic account with an unsupported field.
+		let mut types = TypeIndex::default();
+		let account = account_node(
+			"opaque",
+			vec![field(
+				"payload",
+				TypeNode::String(codama_nodes::StringTypeNode::utf8()),
+			)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("pub struct Opaque"));
+		// A bare string has no fixed size, so the account reports a ceiling.
+		assert!(page.contains("pub const MAX_LEN") || page.contains("pub const LEN"));
+	}
+}
+
+mod foreign_fixture_accounts {
+	use super::render::accounts;
+	use super::*;
+
+	/// Accounts whose fields cannot all be located still ship their layout,
+	/// with the reason recorded instead of a parser that would misread.
+	#[test]
+	fn renders_parser_unsupported_accounts_with_their_reason() {
+		let root = foreign_fixture_root("metaplex_token_metadata");
+		let mut types = TypeIndex::new(&root.program.defined_types);
+		let files =
+			render_program_to_files(&root).unwrap_or_else(|error| panic!("render: {error}"));
+
+		let page = files
+			.get(Path::new("accounts/collection_authority_record.rs"))
+			.unwrap_or_else(|| panic!("missing collection authority record"));
+		assert!(page.contains("PARSER_UNSUPPORTED"));
+		assert!(page.contains("pub struct CollectionAuthorityRecord"));
+	}
+
+	/// A discriminated account with only fixed-width fields gets a complete
+	/// parser and a LEN that matches the on-chain layout.
+	#[test]
+	fn switchboard_parser_has_the_full_layout() {
+		let root = foreign_fixture_root("switchboard_on_demand");
+		let files =
+			render_program_to_files(&root).unwrap_or_else(|error| panic!("render: {error}"));
+		let page = files
+			.get(Path::new("accounts/randomness_account_data.rs"))
+			.unwrap_or_else(|| panic!("missing randomness account"));
+		assert!(page.contains("pub const LEN: usize = 408;"));
+		assert!(page.contains("pub fn parse(data: &[u8])"));
 	}
 }

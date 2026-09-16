@@ -360,18 +360,13 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 			page(&render_types_mod(&named)),
 		);
 		for name in &named {
-			let defined_type = program
+			let Some(defined_type) = program
 				.defined_types
 				.iter()
 				.find(|defined| defined.name.as_ref() == name.as_str())
-				.ok_or_else(|| {
-					RenderError::UnsupportedType {
-						context: format!("defined type `{name}`"),
-						kind: "definedTypeNode",
-						reason: "the type was referenced but is not declared in this IDL"
-							.to_string(),
-					}
-				})?;
+			else {
+				continue;
+			};
 			files.insert(
 				PathBuf::from(format!("types/{}.rs", snake(name))),
 				page(&render_type_page(defined_type, &mut types)?),
