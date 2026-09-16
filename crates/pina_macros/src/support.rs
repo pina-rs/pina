@@ -55,6 +55,48 @@ pub(crate) fn generate_view_helpers(
 	migration: Option<&MigrationExpansion>,
 ) -> proc_macro2::TokenStream {
 	let require_current = migration.map(|_| MigrationExpansion::require_current(crate_path));
+	// Length and discriminator failures are reported separately so a decode
+	// failure names what actually went wrong instead of collapsing both into a
+	// single generic error. The length error is contract-appropriate: accounts
+	// describe a size (`InvalidAccountSize`) while instructions and events
+	// describe payload data (`InvalidInstructionData`). The discriminator is
+	// always `InvalidDiscriminator`, which the framework reserves for exactly
+	// this check. See `pina::traits::validate_account_header`.
+	// Only accounts gain from splitting the header check. Their length failure
+	// means "wrong size for this type" — the stale-representation signal a
+	// migration envelope change produces — while an instruction or event length
+	// failure is just malformed payload data, which `InvalidInstructionData`
+	// already describes. Narrowing the split to accounts keeps the generated
+	// instruction and event readers byte-identical to before, because
+	// restructuring their accepted path measured compute-unit regressions
+	// across the example suites.
+	let validate_header = if account_boundary {
+		quote! {
+			if data.len() != Self::SIZE
+				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
+			{
+				#[cold]
+				#[inline(never)]
+				fn __pina_header_error(is_size: bool) -> #crate_path::ProgramError {
+					if is_size {
+						return #crate_path::PinaProgramError::InvalidAccountSize.into();
+					}
+
+					#crate_path::PinaProgramError::InvalidDiscriminator.into()
+				}
+
+				return Err(__pina_header_error(data.len() != Self::SIZE));
+			}
+		}
+	} else {
+		quote! {
+			if data.len() != Self::SIZE
+				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
+			{
+				return Err(#error);
+			}
+		}
+	};
 	let write_version = migration.map(MigrationExpansion::write_zc_version);
 	let initialize = if account_boundary {
 		quote! {
@@ -139,11 +181,7 @@ pub(crate) fn generate_view_helpers(
 		pub fn try_from_bytes(
 			data: &[u8],
 		) -> Result<&<Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError> {
-			if data.len() != Self::SIZE
-				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
-			{
-				return Err(#error);
-			}
+			#validate_header
 			#require_current
 
 			#read

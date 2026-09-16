@@ -133,7 +133,7 @@ fn zeroed_storage_still_requires_the_typed_discriminator() {
 		Err(error) => error,
 		Ok(_) => panic!("a zeroed discriminator must not validate"),
 	};
-	assert_eq!(error, ProgramError::InvalidAccountData);
+	assert_eq!(error, PinaProgramError::InvalidDiscriminator.into());
 }
 
 #[test]
