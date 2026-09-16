@@ -62,7 +62,6 @@ impl PoolState {
 		let paused = data[cursor] != 0;
 		cursor += 1;
 		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
-		cursor += 1;
 
 		Some(PoolState {
 			admin,

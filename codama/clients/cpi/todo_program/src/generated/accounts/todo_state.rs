@@ -53,7 +53,6 @@ impl TodoState {
 		let completed = data[cursor] != 0;
 		cursor += 1;
 		let digest: [u8; 32] = data[cursor..cursor + 32].try_into().ok()?;
-		cursor += 32;
 
 		Some(TodoState {
 			owner,

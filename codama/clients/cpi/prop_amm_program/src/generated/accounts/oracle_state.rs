@@ -47,7 +47,6 @@ impl OracleState {
 		let authority = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
 		cursor += 32;
 		let price: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
-		cursor += 8;
 
 		Some(OracleState { authority, price })
 	}

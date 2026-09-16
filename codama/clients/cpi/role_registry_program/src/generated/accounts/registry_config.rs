@@ -50,7 +50,6 @@ impl RegistryConfig {
 		let role_count: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
 		cursor += 8;
 		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
-		cursor += 1;
 
 		Some(RegistryConfig {
 			admin,

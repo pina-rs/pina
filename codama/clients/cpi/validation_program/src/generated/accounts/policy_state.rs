@@ -8,8 +8,6 @@
 )]
 #![allow(rustdoc::broken_intra_doc_links)]
 
-use pina::Address;
-
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
@@ -53,7 +51,6 @@ impl PolicyState {
 		let maximum: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
 		cursor += 8;
 		let required_approvals: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
-		cursor += 1;
 
 		Some(PolicyState {
 			bump,

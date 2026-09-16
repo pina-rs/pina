@@ -46,16 +46,26 @@ pub(crate) fn render_accounts_mod(names: &[String]) -> String {
 }
 
 /// Imports shared by every generated account page.
-fn account_prelude() -> Vec<String> {
-	vec![
+///
+/// `Address` is only imported when a field actually uses it, because an
+/// account without an address field would otherwise fail a `-D warnings`
+/// build with an unused import.
+fn account_prelude(uses_address: bool) -> Vec<String> {
+	let mut lines = vec![
 		"#![allow(rustdoc::broken_intra_doc_links)]".to_string(),
 		String::new(),
-		"use pina::Address;".to_string(),
-		String::new(),
+	];
+	if uses_address {
+		lines.push("use pina::Address;".to_string());
+		lines.push(String::new());
+	}
+	lines.extend([
 		"#[allow(unused_imports)]".to_string(),
 		"use crate::generated_types::*;".to_string(),
 		String::new(),
-	]
+	]);
+
+	lines
 }
 
 /// The Rust field name for an account field, falling back to a positional one
@@ -295,7 +305,11 @@ pub(crate) fn plan_account(account: &AccountNode, types: &mut TypeIndex) -> Resu
 /// Renders a planned account's read-only parser page.
 pub(crate) fn render_planned_account(account: &PlannedAccount) -> String {
 	let name = &account.name;
-	let mut lines = account_prelude();
+	let uses_address = account
+		.fields
+		.iter()
+		.any(|(_, encoded)| encoded.rust_type.contains("Address"));
+	let mut lines = account_prelude(uses_address);
 	lines.extend(render_docs(&account.docs, 0));
 	// An account struct owns its decoded values, so a borrowed field type is
 	// read as a slice that outlives the call rather than as a builder borrow.
@@ -333,8 +347,16 @@ pub(crate) fn render_planned_account(account: &PlannedAccount) -> String {
 	// more specific explanation, so it takes precedence over a decode failure.
 	let mut decode_error = account.unsupported.clone();
 	if decode_error.is_none() {
-		for (field, encoded) in &account.fields {
-			match encoded.decode_into(field, &format!("account `{name}` field `{field}`")) {
+		let last = account.fields.len().saturating_sub(1);
+		for (index, (field, encoded)) in account.fields.iter().enumerate() {
+			// The final field has nothing after it, so its decode must not
+			// advance the cursor: that would be a dead store.
+			let decode = if index == last {
+				encoded.decode_final(field, &format!("account `{name}` field `{field}`"))
+			} else {
+				encoded.decode_into(field, &format!("account `{name}` field `{field}`"))
+			};
+			match decode {
 				Ok(read) => decodes.push(read),
 				Err(error) => {
 					decode_error = Some(error.to_string());

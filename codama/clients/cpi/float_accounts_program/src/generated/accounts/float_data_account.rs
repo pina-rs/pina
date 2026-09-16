@@ -50,7 +50,6 @@ impl FloatDataAccount {
 		let data_f32: u32 = u32::from_le_bytes(data[cursor..cursor + 4].try_into().ok()?);
 		cursor += 4;
 		let authority = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
-		cursor += 32;
 
 		Some(FloatDataAccount {
 			data_f64,

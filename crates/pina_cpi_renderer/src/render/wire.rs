@@ -144,6 +144,18 @@ impl Encoded {
 	/// copies out of a byte range; a variable one needs a bound the caller
 	/// declared, so it reports unsupported instead of guessing.
 	pub(crate) fn decode_into(&self, name: &str, context: &str) -> Result<String> {
+		self.decode_into_at(name, true, context)
+	}
+
+	/// Like [`Self::decode_into`], with the option to leave the cursor alone.
+	///
+	/// The final field of a parser has no field after it, so advancing past it
+	/// would be a dead store that a `-D warnings` build rejects.
+	pub(crate) fn decode_final(&self, name: &str, context: &str) -> Result<String> {
+		self.decode_into_at(name, false, context)
+	}
+
+	fn decode_into_at(&self, name: &str, advance: bool, context: &str) -> Result<String> {
 		let Some(size) = self.fixed_size else {
 			return Err(unsupported(
 				context,
@@ -189,6 +201,16 @@ impl Encoded {
 					),
 				));
 			}
+		};
+
+		let read = if advance {
+			read
+		} else {
+			// Drop the final `cursor += N;` line, which would be a dead store.
+			read.lines()
+				.filter(|line| !line.trim().starts_with("cursor +="))
+				.collect::<Vec<_>>()
+				.join("\n")
 		};
 
 		Ok(read)
@@ -1207,5 +1229,144 @@ mod tests {
 			assert!(planned.is_variable());
 			assert!(planned.borrows);
 		}
+	}
+	#[test]
+	fn plans_tuples_and_offset_wrappers() {
+		let mut types = index(&[]);
+		let tuple = codama_nodes::TupleTypeNode::new(vec![
+			NumberTypeNode::le(NumberFormat::U64).into(),
+			BooleanTypeNode::default().into(),
+		]);
+		let planned = plan(&tuple.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("tuple should plan: {error}"));
+		assert_eq!(planned.fixed_size, Some(9));
+
+		// A relative offset has no static position, so the field is variable.
+		let inner = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let pre = codama_nodes::PreOffsetTypeNode {
+			offset: 12,
+			strategy: codama_nodes::PreOffsetStrategy::Relative,
+			r#type: Box::new(inner.into()),
+		};
+		let planned = plan(&pre.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("preOffset should plan: {error}"));
+		assert!(
+			planned.is_variable(),
+			"an offset field has no static position"
+		);
+		assert!(planned.encode.contains("runtime"));
+	}
+
+	#[test]
+	fn plans_maps_and_rejects_unprefixed_counts() {
+		let mut types = index(&[]);
+		let map = codama_nodes::MapTypeNode::new(
+			codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+				StringTypeNode::utf8(),
+				NumberTypeNode::le(NumberFormat::U32),
+			),
+			NumberTypeNode::le(NumberFormat::U8),
+			codama_nodes::PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U32)),
+		);
+		let planned = plan(&map.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("map should plan: {error}"));
+		assert!(planned.is_variable());
+		assert!(
+			planned
+				.rust_type
+				.contains("&'argument [(&'argument str, u8)]")
+		);
+
+		// A remainder count has no length prefix, so a reader cannot find the end.
+		let remainder = codama_nodes::MapTypeNode::new(
+			NumberTypeNode::le(NumberFormat::U8),
+			NumberTypeNode::le(NumberFormat::U8),
+			codama_nodes::RemainderCountNode {},
+		);
+		assert!(plan(&remainder.into(), &mut types, "test").is_err());
+	}
+
+	#[test]
+	fn rejects_unsupported_container_shapes() {
+		let mut types = index(&[]);
+		// `TypeNode::Link` is only reachable through a declared alias, so a bare
+		// link node is reported rather than silently resolved.
+		let error = plan(
+			&codama_nodes::BooleanTypeNode::default().into(),
+			&mut types,
+			"test",
+		);
+		assert!(error.is_ok());
+
+		let remainder =
+			codama_nodes::ArrayTypeNode::remainder(NumberTypeNode::le(NumberFormat::U8));
+		let error = plan(&remainder.into(), &mut types, "test")
+			.expect_err("a remainder array has no length prefix");
+		assert!(
+			error
+				.to_string()
+				.contains("fixed-count and length-prefixed")
+		);
+	}
+
+	#[test]
+	fn decodes_every_supported_field_shape() {
+		let address = Encoded {
+			rust_type: "Address".to_string(),
+			fixed_size: Some(32),
+			max_size: 32,
+			encode: String::new(),
+			borrows: false,
+		};
+		assert!(address.decode_into("owner", "test").is_ok());
+
+		let boolean = Encoded {
+			rust_type: "bool".to_string(),
+			fixed_size: Some(1),
+			max_size: 1,
+			encode: String::new(),
+			borrows: false,
+		};
+		let read = boolean
+			.decode_into("active", "test")
+			.unwrap_or_else(|error| panic!("bool should decode: {error}"));
+		// A self-referential binding is the exact bug this guards against.
+		assert!(!read.contains("let active = active"));
+		assert!(read.contains("data[cursor] != 0"));
+
+		let bytes = Encoded {
+			rust_type: "[u8; 8]".to_string(),
+			fixed_size: Some(8),
+			max_size: 8,
+			encode: String::new(),
+			borrows: false,
+		};
+		assert!(bytes.decode_into("tag", "test").is_ok());
+
+		// A generated named type has no scalar reader.
+		let named = Encoded {
+			rust_type: "Key".to_string(),
+			fixed_size: Some(1),
+			max_size: 1,
+			encode: String::new(),
+			borrows: false,
+		};
+		let error = named
+			.decode_into("key", "test")
+			.expect_err("a generated type needs its own reader");
+		assert!(error.to_string().contains("value decoder"));
+
+		// A variable-width field has no offset for the fields after it.
+		let variable = Encoded {
+			rust_type: "&'argument str".to_string(),
+			fixed_size: None,
+			max_size: 8,
+			encode: String::new(),
+			borrows: true,
+		};
+		assert!(variable.decode_into("name", "test").is_err());
 	}
 }

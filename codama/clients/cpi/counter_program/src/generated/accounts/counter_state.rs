@@ -8,8 +8,6 @@
 )]
 #![allow(rustdoc::broken_intra_doc_links)]
 
-use pina::Address;
-
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
@@ -65,7 +63,6 @@ impl CounterState {
 		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
 		cursor += 1;
 		let count: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
-		cursor += 8;
 
 		Some(CounterState { bump, count })
 	}
