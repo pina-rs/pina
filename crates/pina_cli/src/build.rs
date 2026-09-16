@@ -627,7 +627,11 @@ fn warn_lto_unavailable(project: &Project) {
 	eprintln!(
 		"warning: library crate-type [{crate_types}] precludes link-time optimization; deployed \
 		 programs built from `[\"cdylib\"]` only are typically 20-30% smaller. Move shared logic \
-		 into a separate crate, or pass --no-lto to silence this warning."
+		 into a separate crate, or pass --no-lto to silence this warning. Check the entrypoint's \
+		 stack frame after switching: LTO inlines every handler into it, and a program with many \
+		 instructions can exceed the 4 KB per-frame limit in a build that still exits 0. Raise \
+		 the limit with cargo build-sbf --sbf-stack-size <BYTES> when it does; see \
+		 docs/src/program-size.md."
 	);
 }
 
