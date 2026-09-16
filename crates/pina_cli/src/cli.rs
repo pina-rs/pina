@@ -22,23 +22,26 @@ use pina_cli::GenerationMode;
 	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
 	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
 	              for explicit cluster deployment, and 'pina verify' for deployed-program \
-	              verification. Use 'pina cpi' for standalone CPI crates, 'pina doctor' for \
-	              agent-readable diagnostics, 'pina keys' for program identity, and 'pina \
-	              completions' for shell integration. Low-level IDL, profiling, terminal \
-	              documentation, and the legacy repository-wide Codama workflow remain available.",
+	              verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt \
+	              another program's IDL as one, 'pina doctor' for agent-readable diagnostics, \
+	              'pina keys' for program identity, and 'pina completions' for shell integration. \
+	              Low-level IDL, profiling, terminal documentation, and the legacy \
+	              repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
 	              pina lint\n  pina test\n  pina test --unit\n  pina dev --yes\n  pina generate \
 	              --client rust --client typescript\n  pina doctor --json\n  pina keys\n  pina \
-	              cpi --idl ./idl.json --output ./clients/program-cpi\n  pina idl --path \
-	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
-	              ./target/deploy/counter_program.so --json\n  pina deploy --cluster localnet \
-	              --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json \
-	              --dry-run\n\nAgent discovery:\n  Run 'pina <command> --help' for \
-	              command-specific inputs, outputs, and examples.\n  Run 'pina docs' to list the \
-	              bundled architecture and IDL reference topics.\n  For deployment verification, \
-	              run 'pina verify --help' and then inspect the selected leaf command."
+	              cpi --idl ./idl.json --output ./clients/program-cpi\n  pina import switchboard \
+	              --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json\n  \
+	              pina idl --path ./programs/counter_program --output \
+	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
+	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
+	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
+	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
+	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
+	              topics.\n  For deployment verification, run 'pina verify --help' and then \
+	              inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]

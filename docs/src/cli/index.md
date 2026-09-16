@@ -37,6 +37,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina verify`](./verify.md)                   | Compare deployments and record verified source                 | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                          | Generated clients                         |
 | [`pina cpi`](./cpi.md)                         | Generate a standalone Pina CPI crate from an IDL               | Rust crate                                |
+| [`pina import`](./import.md)                   | Import a foreign program's IDL as a CPI crate                  | Rust crate with provenance                |
 | [`pina test`](./test.md)                       | Run native/Mollusk or SBF/Surfpool tests                       | Test runner output                        |
 | [`pina dev`](./dev.md)                         | Start an offline Surfpool watch/redeploy loop                  | Surfpool UI and logs                      |
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                                 | JSON                                      |
