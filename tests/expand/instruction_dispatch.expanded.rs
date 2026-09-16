@@ -124,6 +124,14 @@ impl ::pina::IntoDiscriminator for CounterInstruction {
 /// Derived from every instruction's declared `ACCOUNT_BOUND` and
 /// saturated at the entrypoint's account array, so a variant that
 /// declares an unbounded trailing slice cannot inflate the cap.
+///
+/// This is the count a program declares, not a security boundary. Passing
+/// it to `nostd_entrypoint!` would size the runtime's account array below
+/// the transaction maximum, and the loader *skips* any account beyond that
+/// array instead of failing, so `finish_exact` would no longer reject an
+/// instruction that supplies too many accounts. Keep the entrypoint at its
+/// default maximum and use this constant as the declaration and test
+/// contract it is.
 pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
     const fn maximum(values: [usize; 2]) -> usize {
         let mut index = 0;
@@ -314,6 +322,14 @@ impl ::pina::IntoDiscriminator for OverrideInstruction {
 /// Derived from every instruction's declared `ACCOUNT_BOUND` and
 /// saturated at the entrypoint's account array, so a variant that
 /// declares an unbounded trailing slice cannot inflate the cap.
+///
+/// This is the count a program declares, not a security boundary. Passing
+/// it to `nostd_entrypoint!` would size the runtime's account array below
+/// the transaction maximum, and the loader *skips* any account beyond that
+/// array instead of failing, so `finish_exact` would no longer reject an
+/// instruction that supplies too many accounts. Keep the entrypoint at its
+/// default maximum and use this constant as the declaration and test
+/// contract it is.
 pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
     const fn maximum(values: [usize; 2]) -> usize {
         let mut index = 0;

@@ -226,8 +226,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		let positional = field_kinds
 			.iter()
 			.filter(|(_, kind)| *kind != AccountFieldKind::Nested)
-			.count()
-			+ usize::from(remaining_field.is_some());
+			.count() + usize::from(remaining_field.is_some());
 		// A suffixed literal keeps `3.saturating_add(..)` from lexing as a float
 		// member access.
 		let positional = proc_macro2::Literal::usize_suffixed(positional);

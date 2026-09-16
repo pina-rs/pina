@@ -261,6 +261,9 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 ///   listing the migratable contracts in reserved-instruction slot order.
 /// - `migrations_max_lamports = EXPR` — the lamport budget shared by every
 ///   slot. Required with `migrations`.
+/// - `inline = "hint"` — emit `#[inline]` instead of the default
+///   `#[inline(always)]` on the generated dispatcher. The two spellings differ
+///   at the codegen level, so match whichever the program was measured with.
 ///
 /// # Example
 ///
@@ -282,7 +285,10 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// pub mod entrypoint {
 ///     use super::*;
 ///
-///     nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
+///     // Keep the default account array. Sizing it to `MAX_INSTRUCTION_ACCOUNTS`
+///     // would make the loader skip accounts beyond the array instead of
+///     // letting `finish_exact` reject them.
+///     nostd_entrypoint!(process_instruction);
 /// }
 /// ```
 #[proc_macro_attribute]

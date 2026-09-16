@@ -18,6 +18,7 @@ use syn::spanned::Spanned;
 
 use crate::args::CapacityTestArg;
 use crate::args::DispatchVariantArgs;
+use crate::args::InlineArg;
 use crate::args::InstructionDispatchArgs;
 
 /// Suffix appended to a variant name to find its accounts struct.
@@ -52,8 +53,8 @@ pub(crate) fn expand(
 				format!(
 					"could not parse the `#[instruction_dispatch(...)]` input: {reason} Supported \
 					 arguments are `crate = path`, `migrations(Account, ...)`, \
-					 `migrations_max_lamports = EXPR`, `capacity_test`, `maximum_accounts = EXPR`, \
-					 and `program_id = EXPR`"
+					 `migrations_max_lamports = EXPR`, `capacity_test`, `maximum_accounts = \
+					 EXPR`, and `program_id = EXPR`"
 				),
 			)
 			.to_compile_error();
@@ -91,17 +92,14 @@ pub(crate) fn expand(
 				.to_compile_error();
 			}
 
-			let metas = match attribute.parse_args_with(
-				Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-			) {
+			let metas = match attribute
+				.parse_args_with(Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+			{
 				Ok(value) => value,
 				Err(error) => return error.to_compile_error(),
 			};
 			let parsed = match DispatchVariantArgs::from_list(
-				&metas
-					.into_iter()
-					.map(NestedMeta::Meta)
-					.collect::<Vec<_>>(),
+				&metas.into_iter().map(NestedMeta::Meta).collect::<Vec<_>>(),
 			) {
 				Ok(value) => value,
 				Err(error) => {
@@ -111,8 +109,7 @@ pub(crate) fn expand(
 						attribute,
 						format!(
 							"could not parse `#[dispatch(...)]` on variant `{variant_name}`: \
-							 {reason} The only supported argument is `accounts = \
-							 AccountsStruct`"
+							 {reason} The only supported argument is `accounts = AccountsStruct`"
 						),
 					)
 					.to_compile_error();
@@ -174,9 +171,7 @@ pub(crate) fn expand(
 	// the variant the caller wrote, instead of at the attribute.
 	let dispatch_arms = routes.iter().map(|route| {
 		let Route {
-			variant,
-			accounts,
-			..
+			variant, accounts, ..
 		} = route;
 
 		quote_spanned! {variant.span()=>
@@ -211,6 +206,15 @@ pub(crate) fn expand(
 		quote!(#expression)
 	} else {
 		quote!(#crate_path::pinocchio::MAX_TX_ACCOUNTS)
+	};
+
+	// The hand-written dispatchers this replaces are all inlined, but the two
+	// spellings are not equivalent at the codegen level: a program measured with
+	// `#[inline]` grew by 240 bytes once the generated dispatcher was inlined
+	// unconditionally. Callers keep the spelling their program was measured with.
+	let inline_attribute: syn::Attribute = match args.inline.unwrap_or(InlineArg::Always) {
+		InlineArg::Always => syn::parse_quote!(#[inline(always)]),
+		InlineArg::Hint => syn::parse_quote!(#[inline]),
 	};
 
 	let capacity_test = args
@@ -268,6 +272,14 @@ pub(crate) fn expand(
 		/// Derived from every instruction's declared `ACCOUNT_BOUND` and
 		/// saturated at the entrypoint's account array, so a variant that
 		/// declares an unbounded trailing slice cannot inflate the cap.
+		///
+		/// This is the count a program declares, not a security boundary. Passing
+		/// it to `nostd_entrypoint!` would size the runtime's account array below
+		/// the transaction maximum, and the loader *skips* any account beyond that
+		/// array instead of failing, so `finish_exact` would no longer reject an
+		/// instruction that supplies too many accounts. Keep the entrypoint at its
+		/// default maximum and use this constant as the declaration and test
+		/// contract it is.
 		pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
 			const fn maximum(values: [usize; #bound_count]) -> usize {
 				let mut index = 0;
@@ -289,7 +301,7 @@ pub(crate) fn expand(
 
 		#capacity_test
 
-		#[inline(always)]
+		#inline_attribute
 		pub fn process_instruction(
 			program_id: & #crate_path::Address,
 			accounts: &mut [#crate_path::AccountView],
@@ -337,8 +349,8 @@ fn resolve_migrations(
 	let Some(max_lamports) = &args.migrations_max_lamports else {
 		return Err(syn::Error::new_spanned(
 			enum_name,
-			"`migrations(...)` requires `migrations_max_lamports = EXPR`: the budget is \
-			 program policy, and a default would silently misprice rent transfers",
+			"`migrations(...)` requires `migrations_max_lamports = EXPR`: the budget is program \
+			 policy, and a default would silently misprice rent transfers",
 		));
 	};
 
@@ -370,7 +382,7 @@ fn resolve_migrations(
 		///
 		/// Inherits `MigrateContext`'s layout validation and each slot's
 		/// migration failures.
-		pub fn process_migrate(
+		fn process_migrate(
 			program_id: & #crate_path::Address,
 			accounts: &mut [#crate_path::AccountView],
 		) -> #crate_path::ProgramResult {

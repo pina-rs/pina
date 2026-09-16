@@ -226,7 +226,7 @@ pub mod entrypoint {
 
 	use super::*;
 
-	nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
+	nostd_entrypoint!(process_instruction);
 }
 
 // ---------------------------------------------------------------------------

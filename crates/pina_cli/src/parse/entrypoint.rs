@@ -105,15 +105,21 @@ fn is_dispatch_annotated(item_enum: &ItemEnum) -> bool {
 /// Whether a file declares an `#[instruction_dispatch]` enum, at the top level
 /// or inside the entrypoint module.
 pub fn has_dispatch_attribute(file: &File) -> bool {
-	file.items.iter().any(|item| match item {
-		Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
-		Item::Mod(module) => module.content.as_ref().is_some_and(|(_, items)| {
-			items.iter().any(|inner| match inner {
-				Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
-				_ => false,
-			})
-		}),
-		_ => false,
+	file.items.iter().any(|item| {
+		match item {
+			Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
+			Item::Mod(module) => {
+				module.content.as_ref().is_some_and(|(_, items)| {
+					items.iter().any(|inner| {
+						match inner {
+							Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
+							_ => false,
+						}
+					})
+				})
+			}
+			_ => false,
+		}
 	})
 }
 
@@ -553,7 +559,10 @@ mod tests {
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		let dispatch = extract_dispatch_from_attribute(&file);
 		assert_eq!(dispatch.len(), 2);
-		assert_eq!(dispatch[0].accounts_struct, Some("DefaultAccounts".to_owned()));
+		assert_eq!(
+			dispatch[0].accounts_struct,
+			Some("DefaultAccounts".to_owned())
+		);
 		assert_eq!(
 			dispatch[1].accounts_struct,
 			Some("CustomAccounts".to_owned())

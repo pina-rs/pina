@@ -447,6 +447,42 @@ pub(crate) struct InstructionDispatchArgs {
 	/// Defaults to `ID` from the crate's `declare_id!`.
 	#[darling(default)]
 	pub(crate) program_id: Option<Expr>,
+	/// Set the inline attribute on the generated `process_instruction`.
+	///
+	/// Defaults to `always`. The two spellings are not interchangeable at the
+	/// codegen level: a program measured with `#[inline]` can grow when the
+	/// generated dispatcher is inlined unconditionally, and one measured with
+	/// `#[inline(always)]` can grow with the weaker hint. Match whichever the
+	/// program was measured with.
+	#[darling(default, rename = "inline")]
+	pub(crate) inline: Option<InlineArg>,
+}
+
+/// The `inline` argument on the dispatch attribute.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InlineArg {
+	/// `#[inline(always)]`.
+	Always,
+	/// `#[inline]`.
+	Hint,
+}
+
+impl FromMeta for InlineArg {
+	fn from_word() -> darling::Result<Self> {
+		Ok(Self::Always)
+	}
+
+	fn from_string(value: &str) -> darling::Result<Self> {
+		match value {
+			"always" => Ok(Self::Always),
+			"hint" | "never" => Ok(Self::Hint),
+			other => Err(darling::Error::unknown_value(other)),
+		}
+	}
+
+	fn from_bool(value: bool) -> darling::Result<Self> {
+		Ok(if value { Self::Always } else { Self::Hint })
+	}
 }
 
 /// The `capacity_test` argument on the dispatch attribute.

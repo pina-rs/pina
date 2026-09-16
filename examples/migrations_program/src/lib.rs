@@ -22,7 +22,10 @@ const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 /// IDL.
 #[instruction_dispatch(
 	migrations(State, ManualState, CompactState, State),
-	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS
+	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS,
+	// This program was measured with `#[inline]`; the unconditional hint adds
+	// 240 bytes to the deployed binary without changing its dispatch cost.
+	inline = "hint"
 )]
 #[discriminator]
 pub enum MigrationInstruction {
@@ -218,7 +221,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(process_instruction, MAX_INSTRUCTION_ACCOUNTS);
+	nostd_entrypoint!(process_instruction);
 }
 
 #[cfg(test)]
