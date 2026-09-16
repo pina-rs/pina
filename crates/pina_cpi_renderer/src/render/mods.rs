@@ -93,6 +93,53 @@ pub(crate) fn render_programs_mod(
 	lines.push(format!(
 		"pub type ProgramAccount<'a> = Program<'a, {marker}>;"
 	));
+	lines.push(String::new());
+	lines.push(format!(
+		"/// Whether `address` is the `{}` program this crate calls.",
+		program.name.as_ref()
+	));
+	lines.push("///".to_string());
+	lines.push(
+		"/// Check this before a CPI when the address arrives from caller input, so a\n/// call \
+		 can never be redirected to a program this crate was not imported\n/// for."
+			.to_string(),
+	);
+	lines.push("#[inline(always)]".to_string());
+	lines.push("pub fn is_expected_program(address: &Address) -> bool {".to_string());
+	lines.push(format!("\t*address == {primary_id}"));
+	lines.push("}".to_string());
+	lines.push(String::new());
+	lines.push("#[cfg(test)]".to_string());
+	lines.push("mod tests {".to_string());
+	lines.push("\tuse super::*;".to_string());
+	lines.push(String::new());
+	lines.push("\t/// Binds the compiled-in ID to a literal.".to_string());
+	lines.push("\t///".to_string());
+	lines.push(
+		"\t/// A swapped dependency could otherwise retarget every CPI in this crate\n\t/// \
+		 without the source changing, so the expected address is asserted here in\n\t/// full \
+		 rather than only through the constant."
+			.to_string(),
+	);
+	lines.push("\t#[test]".to_string());
+	lines.push("\tfn binds_the_expected_program_id() {".to_string());
+	for (name, literal, _) in constants {
+		lines.push(format!(
+			"\t\tassert_eq!({name}, pina::address!({literal}));"
+		));
+	}
+	lines.push(format!("\t\tassert_eq!({marker}::ID, {primary_id});"));
+	lines.push(format!("\t\tassert!(is_expected_program(&{primary_id}));"));
+	lines.push("\t}".to_string());
+	lines.push(String::new());
+	lines.push("\t#[test]".to_string());
+	lines.push("\tfn rejects_a_foreign_program_id() {".to_string());
+	lines.push(
+		"\t\tlet foreign = pina::address!(\"11111111111111111111111111111111\");".to_string(),
+	);
+	lines.push("\t\tassert!(!is_expected_program(&foreign));".to_string());
+	lines.push("\t}".to_string());
+	lines.push("}".to_string());
 
 	lines.join("\n")
 }

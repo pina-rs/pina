@@ -16,12 +16,11 @@ use crate::render::helpers::rust_identifier;
 
 /// How one instruction argument appears in the generated builder.
 ///
-/// The terse fixed-layout renderer produces [`ArgumentEncoding::Fixed`], whose
-/// statements are byte-identical to what this renderer has always emitted.
-/// Arguments it cannot express fall back to [`ArgumentEncoding::Planned`],
-/// produced by the general ABI planner in [`super::wire`], which understands
-/// `definedTypes` references, structs, enums, options, and length-prefixed
-/// collections.
+/// The terse renderer in this module handles fixed-width arguments and emits
+/// byte-identical statements to what it has always emitted. An argument it
+/// cannot express falls back to the general ABI planner in [`super::wire`],
+/// which understands `definedTypes` references, structs, enums, options, and
+/// length-prefixed collections; those are marked `planned`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedArgument {
 	/// Rust field name in the builder struct.

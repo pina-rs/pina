@@ -89,6 +89,11 @@ EOF
 			--target "$TARGET" \
 			-Z build-std=core,alloc
 	)
+
+	# The generated crate ships a test binding its compiled-in program ID to the
+	# address from the IDL. Run it on the host, where `cargo test` works.
+	cargo test --quiet --manifest-path "$crate_dir/Cargo.toml"
+
 	echo "$name: SBF check passed"
 done
 
