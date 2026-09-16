@@ -69,6 +69,11 @@ fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize) -> String
 	}
 }
 
+/// Resolves an account's discriminator, if one can gate a read-only parser.
+///
+/// A discriminator that is not a simple prefix returns `None` rather than
+/// failing: the account's layout is still worth emitting, and only the guard
+/// and parser are withheld.
 fn account_discriminator(
 	account: &AccountNode,
 	context: &str,
@@ -79,11 +84,7 @@ fn account_discriminator(
 		match discriminator {
 			DiscriminatorNode::Field(field) => {
 				if field.offset != 0 {
-					return Err(unsupported(
-						context,
-						"fieldDiscriminatorNode",
-						"only an account discriminator at offset 0 can gate a read-only parser",
-					));
+					return Ok(None);
 				}
 				let Some(data) = account
 					.data
@@ -102,11 +103,7 @@ fn account_discriminator(
 			}
 			DiscriminatorNode::Constant(node) => {
 				if node.offset != 0 {
-					return Err(unsupported(
-						context,
-						"constantDiscriminatorNode",
-						"only an account discriminator at offset 0 can gate a read-only parser",
-					));
+					return Ok(None);
 				}
 				constant = Some(constant_discriminator_bytes(node, context)?);
 			}
@@ -213,7 +210,7 @@ pub(crate) fn plan_account_fields(
 	account: &AccountNode,
 	types: &mut TypeIndex,
 	context: &str,
-) -> Result<Vec<(String, Encoded)>> {
+) -> (Vec<(String, Encoded)>, Option<String>) {
 	let mut planned = Vec::new();
 	for (index, field) in account
 		.data
@@ -229,11 +226,15 @@ pub(crate) fn plan_account_fields(
 			continue;
 		}
 		let name = field_name(field, index);
-		let encoded = plan(&field.r#type, types, &format!("{context} field `{name}`"))?;
-		planned.push((name, encoded));
+		match plan(&field.r#type, types, &format!("{context} field `{name}`")) {
+			Ok(encoded) => planned.push((name, encoded)),
+			// The account's layout is still worth emitting, so the first
+			// unsupported field is reported instead of failing the render.
+			Err(error) => return (planned, Some(error.to_string())),
+		}
 	}
 
-	Ok(planned)
+	(planned, None)
 }
 
 /// The `types` a rendered account references.
@@ -247,6 +248,8 @@ pub(crate) struct PlannedAccount {
 	pub(crate) module: String,
 	pub(crate) docs: Vec<String>,
 	pub(crate) fields: Vec<(String, Encoded)>,
+	/// Why this account has no parser, when a field could not be planned.
+	unsupported: Option<String>,
 	discriminator: Option<RenderedDiscriminator>,
 	/// Total encoded width when fixed, `None` when it varies.
 	pub(crate) fixed_size: Option<usize>,
@@ -262,7 +265,7 @@ pub(crate) fn plan_account(account: &AccountNode, types: &mut TypeIndex) -> Resu
 	let name = pascal(account.name.as_ref());
 	let context = format!("account `{name}`");
 	let discriminator = account_discriminator(account, &context)?;
-	let fields = plan_account_fields(account, types, &context)?;
+	let (fields, unsupported) = plan_account_fields(account, types, &context);
 
 	let discriminator_len = discriminator.as_ref().map_or(0, |d| d.bytes.len());
 	let fixed_size = fields
@@ -282,6 +285,7 @@ pub(crate) fn plan_account(account: &AccountNode, types: &mut TypeIndex) -> Resu
 		name,
 		docs: account.docs.to_vec(),
 		fields,
+		unsupported,
 		discriminator,
 		fixed_size,
 		max_size: payload_max.saturating_add(discriminator_len),
@@ -325,13 +329,17 @@ pub(crate) fn render_planned_account(account: &PlannedAccount) -> String {
 	// because a variable-width field leaves the fields after it with no fixed
 	// offset. Planning first keeps the emitted block syntactically whole.
 	let mut decodes = Vec::new();
-	let mut decode_error = None;
-	for (field, encoded) in &account.fields {
-		match encoded.decode_into(field, &format!("account `{name}` field `{field}`")) {
-			Ok(read) => decodes.push(read),
-			Err(error) => {
-				decode_error = Some(error.to_string());
-				break;
+	// A field that could not be planned already rules out a parser, and is the
+	// more specific explanation, so it takes precedence over a decode failure.
+	let mut decode_error = account.unsupported.clone();
+	if decode_error.is_none() {
+		for (field, encoded) in &account.fields {
+			match encoded.decode_into(field, &format!("account `{name}` field `{field}`")) {
+				Ok(read) => decodes.push(read),
+				Err(error) => {
+					decode_error = Some(error.to_string());
+					break;
+				}
 			}
 		}
 	}

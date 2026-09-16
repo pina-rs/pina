@@ -304,6 +304,15 @@ fn plan_resolved(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> Res
 			let inner = prefix.r#type.as_ref().clone();
 			plan_size_prefix(&inner, width, types, context)
 		}
+		// A relative offset shifts the cursor against the container's total size,
+		// which a compact account only knows at runtime. The value still has a
+		// type, but its absolute position is not fixed, so it is planned as
+		// variable: a CPI writer never emits one, and an account parser declines
+		// rather than reading the wrong offsets.
+		TypeNode::PreOffset(pre) => plan_offset(&pre.r#type, types, context, "preOffsetTypeNode"),
+		TypeNode::PostOffset(post) => {
+			plan_offset(&post.r#type, types, context, "postOffsetTypeNode")
+		}
 		TypeNode::Struct(structure) => {
 			let fields = structure.fields.clone();
 			plan_struct(&fields, types, context)
@@ -659,6 +668,27 @@ fn plan_size_prefix(
 		encode,
 		borrows: true,
 	})
+}
+
+/// Plans the type inside an offset wrapper.
+///
+/// The wrapper only moves the cursor, so the value keeps its own type; because
+/// the shift depends on the container's total size, the field is treated as
+/// having no statically known width.
+fn plan_offset(
+	inner: &TypeNode,
+	types: &mut TypeIndex,
+	context: &str,
+	kind: &'static str,
+) -> Result<Encoded> {
+	let mut planned = plan_resolved(inner, types, context)?;
+	planned.fixed_size = None;
+	planned.encode = format!(
+		"// {kind} positions this value relative to the container's total size, which is only \
+		 known at runtime."
+	);
+
+	Ok(planned)
 }
 
 fn plan_struct(

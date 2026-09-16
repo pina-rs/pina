@@ -1361,3 +1361,35 @@ fn switchboard_account_parser_matches_the_hand_written_offsets() {
 		);
 	}
 }
+
+/// Pina's own compact accounts use `preOffset`/`postOffset` nodes and a
+/// discriminator at a non-zero offset. Neither has a statically known position,
+/// so the account ships its layout without a parser instead of failing to
+/// render — a regression that previously broke `test:idl` for every example.
+#[test]
+fn renders_examples_with_runtime_relative_account_layouts() {
+	for name in ["compact_accounts_program", "migrations_program"] {
+		let root = load_fixture_root(name);
+		let files = render_program_to_files(&root)
+			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
+
+		for account in &root.program.accounts {
+			let page = format!("accounts/{}.rs", snake(account.name.as_ref()));
+			let source = files
+				.get(Path::new(&page))
+				.unwrap_or_else(|| panic!("`{name}` is missing `{page}`"));
+
+			// The layout ships either way; a parser is optional.
+			assert!(
+				source.contains("pub struct "),
+				"`{page}` has no layout struct"
+			);
+			if !source.contains("pub fn parse(") {
+				assert!(
+					source.contains("PARSER_UNSUPPORTED"),
+					"`{page}` omits its parser without recording why"
+				);
+			}
+		}
+	}
+}
