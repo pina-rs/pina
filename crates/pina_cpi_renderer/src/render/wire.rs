@@ -477,7 +477,7 @@ fn plan_array(count: &CountNode, item: &Encoded, context: &str) -> Result<Encode
 				borrows: true,
 			})
 		}
-		other => {
+		other @ CountNode::Remainder(_) => {
 			Err(unsupported(
 				context,
 				other.kind(),
@@ -940,15 +940,15 @@ mod tests {
 
 	use super::*;
 
-	fn index(defined: Vec<DefinedTypeNode>) -> TypeIndex {
-		TypeIndex::new(&defined)
+	fn index(defined: &[DefinedTypeNode]) -> TypeIndex {
+		TypeIndex::new(defined)
 	}
 
 	#[test]
 	fn rejects_short_u16_and_floats_with_actionable_reasons() {
 		let error = plan(
 			&NumberTypeNode::le(NumberFormat::ShortU16).into(),
-			&mut index(Vec::new()),
+			&mut index(&[]),
 			"test",
 		)
 		.expect_err("shortU16 must be rejected");
@@ -957,19 +957,15 @@ mod tests {
 		assert!(message.contains("declare the field as `u16`"));
 
 		for format in [NumberFormat::F32, NumberFormat::F64] {
-			let error = plan(
-				&NumberTypeNode::le(format).into(),
-				&mut index(Vec::new()),
-				"test",
-			)
-			.expect_err("floats must be rejected");
+			let error = plan(&NumberTypeNode::le(format).into(), &mut index(&[]), "test")
+				.expect_err("floats must be rejected");
 			assert!(error.to_string().contains("floating-point"));
 		}
 	}
 
 	#[test]
 	fn resolves_aliases_and_registers_structs_and_enums() {
-		let mut types = index(vec![
+		let mut types = index(&[
 			DefinedTypeNode::new("alias", DefinedTypeLinkNode::new("amounts")),
 			DefinedTypeNode::new("amounts", NumberTypeNode::le(NumberFormat::U64)),
 			DefinedTypeNode::new(
@@ -1007,13 +1003,13 @@ mod tests {
 	fn reports_undeclared_and_cyclic_links() {
 		let error = plan(
 			&DefinedTypeLinkNode::new("missing").into(),
-			&mut index(Vec::new()),
+			&mut index(&[]),
 			"test",
 		)
 		.expect_err("undeclared links must be rejected");
 		assert!(error.to_string().contains("not declared"));
 
-		let mut types = index(vec![
+		let mut types = index(&[
 			DefinedTypeNode::new("first", DefinedTypeLinkNode::new("second")),
 			DefinedTypeNode::new("second", DefinedTypeLinkNode::new("first")),
 		]);
@@ -1033,7 +1029,7 @@ mod tests {
 			StructFieldTypeNode::new("enabled", BooleanTypeNode::default()),
 			StructFieldTypeNode::new("owner", PublicKeyTypeNode::new()),
 		]);
-		let planned = plan(&structure.into(), &mut index(Vec::new()), "test")
+		let planned = plan(&structure.into(), &mut index(&[]), "test")
 			.unwrap_or_else(|error| panic!("struct should plan: {error}"));
 
 		assert_eq!(planned.fixed_size, Some(41));
@@ -1051,7 +1047,7 @@ mod tests {
 				NumberTypeNode::le(NumberFormat::U32),
 			),
 		)]);
-		let planned = plan(&structure.into(), &mut index(Vec::new()), "test")
+		let planned = plan(&structure.into(), &mut index(&[]), "test")
 			.unwrap_or_else(|error| panic!("struct should plan: {error}"));
 
 		assert!(planned.borrows);
@@ -1071,7 +1067,7 @@ mod tests {
 			)
 			.into(),
 		]);
-		let planned = plan(&enumeration.into(), &mut index(Vec::new()), "test")
+		let planned = plan(&enumeration.into(), &mut index(&[]), "test")
 			.unwrap_or_else(|error| panic!("enum should plan: {error}"));
 
 		// Mixed payloads have no single layout, so the enum reports the largest.
@@ -1085,7 +1081,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U64),
 			NumberTypeNode::le(NumberFormat::U16),
 		);
-		let planned = plan(&array.into(), &mut index(Vec::new()), "test")
+		let planned = plan(&array.into(), &mut index(&[]), "test")
 			.unwrap_or_else(|error| panic!("prefixed array should plan: {error}"));
 
 		assert!(planned.is_variable());
@@ -1105,7 +1101,7 @@ mod tests {
 			TypeNode::String(StringTypeNode::utf8()),
 			TypeNode::Bytes(BytesTypeNode {}),
 		] {
-			let error = plan(&node, &mut index(Vec::new()), "test")
+			let error = plan(&node, &mut index(&[]), "test")
 				.expect_err("unprefixed variable data must be rejected");
 			assert!(error.to_string().contains("length prefix"));
 		}
@@ -1114,14 +1110,14 @@ mod tests {
 	#[test]
 	fn rejects_fixed_windows_that_cannot_hold_the_payload() {
 		let too_small = FixedSizeTypeNode::new(NumberTypeNode::le(NumberFormat::U32), 2);
-		assert!(plan(&too_small.into(), &mut index(Vec::new()), "test").is_err());
+		assert!(plan(&too_small.into(), &mut index(&[]), "test").is_err());
 
 		let prefixed = ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::U64),
 			NumberTypeNode::le(NumberFormat::U8),
 		);
 		let window = FixedSizeTypeNode::new(prefixed, 4);
-		let error = plan(&window.into(), &mut index(Vec::new()), "test")
+		let error = plan(&window.into(), &mut index(&[]), "test")
 			.expect_err("an undersized window must be rejected");
 		assert!(error.to_string().contains("cannot hold a payload"));
 	}
@@ -1140,12 +1136,8 @@ mod tests {
 			(NumberFormat::I64, 8),
 			(NumberFormat::I128, 16),
 		] {
-			let planned = plan(
-				&NumberTypeNode::le(format).into(),
-				&mut index(Vec::new()),
-				"test",
-			)
-			.unwrap_or_else(|error| panic!("native integer should plan: {error}"));
+			let planned = plan(&NumberTypeNode::le(format).into(), &mut index(&[]), "test")
+				.unwrap_or_else(|error| panic!("native integer should plan: {error}"));
 			assert_eq!(planned.fixed_size, Some(size));
 			assert!(!planned.borrows);
 		}
@@ -1156,7 +1148,7 @@ mod tests {
 		assert!(
 			plan(
 				&NumberTypeNode::be(NumberFormat::U16).into(),
-				&mut index(Vec::new()),
+				&mut index(&[]),
 				"test"
 			)
 			.is_err()
@@ -1165,12 +1157,12 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U8),
 			NumberTypeNode::be(NumberFormat::U16),
 		);
-		assert!(plan(&big_endian.into(), &mut index(Vec::new()), "test").is_err());
+		assert!(plan(&big_endian.into(), &mut index(&[]), "test").is_err());
 	}
 
 	#[test]
 	fn plans_size_prefixed_strings_and_byte_slices() {
-		let mut types = index(Vec::new());
+		let mut types = index(&[]);
 		for (inner, expected) in [
 			(TypeNode::String(StringTypeNode::utf8()), "&'argument str"),
 			(TypeNode::Bytes(BytesTypeNode {}), "&'argument [u8]"),

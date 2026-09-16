@@ -821,7 +821,7 @@ fn renders_address_only_instruction_lifetimes() {
 
 #[test]
 fn shares_one_argument_lifetime_for_addresses_and_pinapod_strings() {
-	let string = codama_nodes::SizePrefixTypeNode::<codama_nodes::TypeNode>::new(
+	let string = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
 		codama_nodes::StringTypeNode::utf8(),
 		NumberTypeNode::le(U8),
 	);

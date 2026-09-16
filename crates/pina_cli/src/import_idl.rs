@@ -348,7 +348,7 @@ fn fetch_cluster(cluster: &str, program_id: &str) -> Result<Vec<u8>, ImportError
 ///
 /// A Codama document passes through untouched; anything else is treated as an
 /// Anchor IDL and converted with the pinned converter, matching `pina cpi`.
-fn normalize_to_codama(bytes: &[u8], npx: &str) -> Result<serde_json::Value, ImportError> {
+fn normalize_to_codama(bytes: &[u8], npx: &str) -> Result<Value, ImportError> {
 	let value: Value =
 		serde_json::from_slice(bytes).map_err(|source| ImportError::InvalidJson { source })?;
 

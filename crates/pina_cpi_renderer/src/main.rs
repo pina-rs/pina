@@ -90,10 +90,10 @@ fn main() {
 		let crate_dir = if idls.len() == 1 && single_idl {
 			args.output.clone()
 		} else {
-			let name = idl
-				.file_stem()
-				.map(|stem| stem.to_string_lossy().into_owned())
-				.unwrap_or_else(|| "program".to_string());
+			let name = idl.file_stem().map_or_else(
+				|| "program".to_string(),
+				|stem| stem.to_string_lossy().into_owned(),
+			);
 			args.output.join(name)
 		};
 

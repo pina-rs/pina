@@ -214,7 +214,7 @@ fn render_enum(
 					"\t{}({}),",
 					variant.name,
 					lifetime_type(&variant.payload[0].rust_type)
-				))
+				));
 			}
 			_ => {
 				lines.push(format!("\t{} {{", variant.name));
@@ -270,10 +270,11 @@ fn render_enum(
 		.collect::<Vec<_>>();
 
 	lines.push("\t/// Writes this value into `data` and advances `offset`.".to_string());
-	lines.push(format!(
+	lines.push(
 		"\tpub fn encode_into(&self, data: &mut [u8], __offset: &mut usize) -> Result<(), \
-		 ProgramError> {{"
-	));
+		 ProgramError> {"
+			.to_string(),
+	);
 	lines.push("\t\tlet mut offset = *__offset;".to_string());
 	lines.push(format!(
 		"\t\tmatch self {{\n\t\t\t{}\n\t\t}}",

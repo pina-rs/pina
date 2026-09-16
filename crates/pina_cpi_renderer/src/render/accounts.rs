@@ -337,18 +337,15 @@ pub(crate) fn render_planned_account(account: &PlannedAccount) -> String {
 	}
 
 	lines.push(format!("impl{impl_generics} {name}{impl_generics} {{"));
-	match account.fixed_size {
-		Some(size) => {
-			lines.push("\t/// Encoded size of this account's data.".to_string());
-			lines.push(format!("\tpub const LEN: usize = {size};"));
-		}
-		None => {
-			lines.push("\t/// Largest encoded size of this account's data.".to_string());
-			lines.push(format!(
-				"\tpub const MAX_LEN: usize = {};",
-				account.max_size
-			));
-		}
+	if let Some(size) = account.fixed_size {
+		lines.push("\t/// Encoded size of this account's data.".to_string());
+		lines.push(format!("\tpub const LEN: usize = {size};"));
+	} else {
+		lines.push("\t/// Largest encoded size of this account's data.".to_string());
+		lines.push(format!(
+			"\tpub const MAX_LEN: usize = {};",
+			account.max_size
+		));
 	}
 	lines.push(String::new());
 	lines.push("\t/// Whether `data` carries this account's discriminator.".to_string());
