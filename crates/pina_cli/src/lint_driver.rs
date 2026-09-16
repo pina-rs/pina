@@ -1148,12 +1148,15 @@ mod tests {
 	fn a_hanging_driver_is_reported_instead_of_blocking_forever() {
 		let directory = tempfile::tempdir().expect("temp directory");
 		let driver = directory.path().join("hanging-driver");
-		std::fs::write(&driver, "#!/bin/sh\nread -r line\n").expect("write hanging driver");
+		// A fixed sleep blocks on every platform and every shell. Reading stdin
+		// would not: the probe closes the child's stdin, so `read` sees an
+		// immediate end of file on Linux and exits rather than hanging.
+		std::fs::write(&driver, "#!/bin/sh\nsleep 30\n").expect("write hanging driver");
 		set_executable(&driver).expect("permissions");
 
 		let timeout = Duration::from_millis(200);
 		let error = probe_output_with_timeout(&driver, Path::new("/toolchain/sysroot"), timeout)
-			.expect_err("a driver waiting on input must not be treated as usable");
+			.expect_err("a driver that outlives the deadline must not be treated as usable");
 
 		assert!(
 			matches!(error, DriverError::DriverHang { .. }),
