@@ -1,4 +1,4 @@
-error: this program declares a migration ladder, but $DIR/target/tests/trybuild/pina_root/migrations/manifest.json does not exist; run `pina migrations make`
+error: this program declares a migration ladder, but its `migrations/manifest.json` does not exist; run `pina migrations make`
   --> tests/ui/fail/instruction_dispatch_migrations_without_manifest.rs:12:10
    |
 12 | pub enum Instruction {

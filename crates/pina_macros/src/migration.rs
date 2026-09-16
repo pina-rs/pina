@@ -1226,23 +1226,23 @@ pub(crate) fn verify_migration_contracts(
 	let path = program_dir.join(MANIFEST_PATH);
 	let source = match std::fs::read(&path) {
 		Ok(source) => source,
+		// The diagnostics name the manifest by its fixed location, never by the
+		// resolved path: an absolute path embeds the cargo target directory,
+		// which differs between a normal build and a coverage build and would
+		// make the emitted message unstable across environments.
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
 			return Err(syn::Error::new_spanned(
 				enum_name,
-				format!(
-					"this program declares a migration ladder, but {} does not exist; run `pina \
-					 migrations make`",
-					path.display()
-				),
+				"this program declares a migration ladder, but its `migrations/manifest.json` \
+				 does not exist; run `pina migrations make`",
 			));
 		}
 		Err(error) => {
 			return Err(syn::Error::new_spanned(
 				enum_name,
 				format!(
-					"the migration ladder cannot be verified because {} could not be read \
-					 ({error}); run `pina migrations make` to regenerate it",
-					path.display()
+					"the migration ladder cannot be verified because `migrations/manifest.json` \
+					 could not be read ({error}); run `pina migrations make` to regenerate it"
 				),
 			));
 		}
@@ -1250,13 +1250,13 @@ pub(crate) fn verify_migration_contracts(
 	let manifest: MigrationManifest = pina_abi::decode_manifest(&source).map_err(|error| {
 		syn::Error::new_spanned(
 			enum_name,
-			format!("invalid migration manifest {}: {error}", path.display()),
+			format!("invalid migration manifest `migrations/manifest.json`: {error}"),
 		)
 	})?;
 	manifest.validate().map_err(|error| {
 		syn::Error::new_spanned(
 			enum_name,
-			format!("invalid migration manifest {}: {error}", path.display()),
+			format!("invalid migration manifest `migrations/manifest.json`: {error}"),
 		)
 	})?;
 
