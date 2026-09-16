@@ -14,7 +14,9 @@ import {
 } from "@solana/kit";
 import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
+/** The token accounts do not match the offer's recorded mint and maker. */
 export const ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH = 0x0; // 0
+/** A supplied token account is not the one the offer references. */
 export const ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH = 0x1; // 1
 
 export type EscrowProgramError =
@@ -24,8 +26,10 @@ export type EscrowProgramError =
 let escrowProgramErrorMessages: Record<EscrowProgramError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	escrowProgramErrorMessages = {
-		[ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]: ``,
-		[ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]: ``,
+		[ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]:
+			`The token accounts do not match the offer's recorded mint and maker.`,
+		[ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]:
+			`A supplied token account is not the one the offer references.`,
 	};
 }
 

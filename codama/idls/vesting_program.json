@@ -558,19 +558,28 @@
 				"kind": "errorNode",
 				"name": "invalidSchedule",
 				"code": 0,
-				"message": ""
+				"message": "The schedule is malformed: its window is empty, unordered, or fully elapsed.",
+				"docs": [
+					"The schedule is malformed: its window is empty, unordered, or fully elapsed."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "claimTooLarge",
 				"code": 1,
-				"message": ""
+				"message": "The claim exceeds what has vested so far.",
+				"docs": [
+					"The claim exceeds what has vested so far."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "alreadyCancelled",
 				"code": 2,
-				"message": ""
+				"message": "The vesting account was already cancelled and holds nothing to claim.",
+				"docs": [
+					"The vesting account was already cancelled and holds nothing to claim."
+				]
 			}
 		]
 	}

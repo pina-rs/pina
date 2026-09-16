@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 76
 expression: idl
 ---
 {
@@ -442,13 +443,19 @@ expression: idl
         "kind": "errorNode",
         "name": "offerKeyMismatch",
         "code": 0,
-        "message": ""
+        "message": "The token accounts do not match the offer's recorded mint and maker.",
+        "docs": [
+          "The token accounts do not match the offer's recorded mint and maker."
+        ]
       },
       {
         "kind": "errorNode",
         "name": "tokenAccountMismatch",
         "code": 1,
-        "message": ""
+        "message": "A supplied token account is not the one the offer references.",
+        "docs": [
+          "A supplied token account is not the one the offer references."
+        ]
       }
     ]
   }

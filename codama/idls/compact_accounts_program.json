@@ -747,19 +747,28 @@
 				"kind": "errorNode",
 				"name": "capacityExceeded",
 				"code": 7000,
-				"message": ""
+				"message": "The write would exceed the collection's declared capacity.",
+				"docs": [
+					"The write would exceed the collection's declared capacity."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "indexOutOfBounds",
 				"code": 7001,
-				"message": ""
+				"message": "The requested index is past the end of the active collection.",
+				"docs": [
+					"The requested index is past the end of the active collection."
+				]
 			},
 			{
 				"kind": "errorNode",
 				"name": "authorityMismatch",
 				"code": 7002,
-				"message": ""
+				"message": "The signer is not the authority recorded on the account.",
+				"docs": [
+					"The signer is not the authority recorded on the account."
+				]
 			}
 		]
 	}

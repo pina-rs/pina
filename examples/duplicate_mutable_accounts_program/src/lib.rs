@@ -21,6 +21,7 @@ declare_id!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DuplicateMutableError {
+	/// Two mutable account fields point at the same runtime account.
 	ConstraintDuplicateMutableAccount = 2040,
 }
 

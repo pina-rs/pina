@@ -13,8 +13,9 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum FloatAccountsProgramError {
-	/// 0 -
-	#[error("")]
+	/// The signer is not the authority recorded on the account.
+	/// 0 - The signer is not the authority recorded on the account.
+	#[error("The signer is not the authority recorded on the account.")]
 	AuthorityMismatch = 0x0,
 }
 

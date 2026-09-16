@@ -13,17 +13,21 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AccountReallocProgramError {
-	/// 3016 -
-	#[error("")]
+	/// The requested growth exceeds the runtime's per-instruction realloc limit.
+	/// 3016 - The requested growth exceeds the runtime's per-instruction realloc limit.
+	#[error("The requested growth exceeds the runtime's per-instruction realloc limit.")]
 	AccountReallocExceedsLimit = 0xBC8,
-	/// 3017 -
-	#[error("")]
+	/// The same account was passed to more than one realloc slot.
+	/// 3017 - The same account was passed to more than one realloc slot.
+	#[error("The same account was passed to more than one realloc slot.")]
 	AccountDuplicateReallocs = 0xBC9,
-	/// 3018 -
-	#[error("")]
+	/// The account is smaller than the data the instruction writes.
+	/// 3018 - The account is smaller than the data the instruction writes.
+	#[error("The account is smaller than the data the instruction writes.")]
 	AccountDataTooSmall = 0xBCA,
-	/// 3019 -
-	#[error("")]
+	/// The signer is not the authority recorded on the account.
+	/// 3019 - The signer is not the authority recorded on the account.
+	#[error("The signer is not the authority recorded on the account.")]
 	AuthorityMismatch = 0xBCB,
 }
 

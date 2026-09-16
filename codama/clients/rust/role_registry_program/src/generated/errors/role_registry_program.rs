@@ -13,14 +13,17 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum RoleRegistryProgramError {
-	/// 0 -
-	#[error("")]
+	/// The requested permission bits are empty or outside the supported set.
+	/// 0 - The requested permission bits are empty or outside the supported set.
+	#[error("The requested permission bits are empty or outside the supported set.")]
 	InvalidPermissions = 0x0,
-	/// 1 -
-	#[error("")]
+	/// A role with this address is already registered.
+	/// 1 - A role with this address is already registered.
+	#[error("A role with this address is already registered.")]
 	RoleAlreadyExists = 0x1,
-	/// 2 -
-	#[error("")]
+	/// The role exists but was deactivated, so it grants nothing.
+	/// 2 - The role exists but was deactivated, so it grants nothing.
+	#[error("The role exists but was deactivated, so it grants nothing.")]
 	RoleInactive = 0x2,
 }
 

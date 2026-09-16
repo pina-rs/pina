@@ -28,8 +28,11 @@ pub const DEFAULT_TITLE: &str = "journal";
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompactAccountError {
+	/// The write would exceed the collection's declared capacity.
 	CapacityExceeded = 7000,
+	/// The requested index is past the end of the active collection.
 	IndexOutOfBounds = 7001,
+	/// The signer is not the authority recorded on the account.
 	AuthorityMismatch = 7002,
 }
 
