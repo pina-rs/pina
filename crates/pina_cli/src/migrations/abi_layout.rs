@@ -66,9 +66,9 @@ pub fn generate(manifest: &MigrationManifest, crate_name: Option<&str>) -> Strin
 	}
 
 	for (key, history) in &manifest.contracts {
-		let Some(current) = history.current() else {
-			continue;
-		};
+		let current = history
+			.current()
+			.expect("validated migration histories always contain a current version");
 		render_contract(
 			&mut output,
 			key,
@@ -109,9 +109,9 @@ fn render_crate_assertions(output: &mut String, manifest: &MigrationManifest, cr
 	output.push_str("\t}\n");
 
 	for (key, history) in &manifest.contracts {
-		let Some(current) = history.current() else {
-			continue;
-		};
+		let current = history
+			.current()
+			.expect("validated migration histories always contain a current version");
 		// Only fixed-layout contracts expose a `SIZE` constant on the type.
 		if let PhysicalLayout::Fixed { .. } = &current.schema.physical {
 			let module = sanitize_identifier(key);
@@ -293,5 +293,94 @@ pub fn read_existing(program_dir: &Path) -> std::io::Result<Option<String>> {
 		Ok(contents) => Ok(Some(contents)),
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
 		Err(error) => Err(error),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use pina_abi::MigrationVersionType;
+
+	use super::*;
+
+	/// Manifest keys contain separators that are not valid in an identifier.
+	#[test]
+	fn contract_keys_become_valid_module_names() {
+		assert_eq!(sanitize_identifier("account:1:01"), "account_1_01");
+		assert_eq!(sanitize_identifier("event-2-04"), "event_2_04");
+	}
+
+	/// A key that starts with a digit must not produce a bare numeric module.
+	#[test]
+	fn a_leading_digit_is_prefixed() {
+		let identifier = sanitize_identifier("1account");
+
+		assert!(
+			identifier.starts_with('_'),
+			"a leading digit needs a prefix: {identifier}"
+		);
+	}
+
+	/// Missing files read as `None` rather than an error, which is what makes a
+	/// first generation and a stale-file check the same code path.
+	#[test]
+	fn a_missing_layout_file_reads_as_none() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
+
+		let existing =
+			read_existing(temp.path()).unwrap_or_else(|error| panic!("read existing: {error}"));
+
+		assert_eq!(existing, None);
+	}
+
+	/// A present file is returned verbatim so `check` can compare it.
+	#[test]
+	fn a_present_layout_file_is_returned() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		std::fs::create_dir_all(temp.path().join("tests"))
+			.unwrap_or_else(|error| panic!("create tests dir: {error}"));
+		std::fs::write(temp.path().join(ABI_LAYOUT_TEST_PATH), "// generated\n")
+			.unwrap_or_else(|error| panic!("write layout file: {error}"));
+
+		let existing =
+			read_existing(temp.path()).unwrap_or_else(|error| panic!("read existing: {error}"));
+
+		assert_eq!(existing.as_deref(), Some("// generated\n"));
+	}
+
+	/// A manifest with no contracts still produces a valid, self-describing
+	/// file rather than an empty one.
+	#[test]
+	fn an_empty_manifest_still_renders_a_header() {
+		let manifest = MigrationManifest::new(
+			"11111111111111111111111111111111".to_owned(),
+			MigrationVersionType::U8,
+		);
+
+		let rendered = generate(&manifest, None);
+
+		assert!(rendered.contains("program-id: 11111111111111111111111111111111"));
+		assert!(rendered.contains("version-type: u8"));
+		assert!(!rendered.contains("layout_guard"), "no contracts, no guard");
+	}
+}
+
+#[cfg(test)]
+mod read_error_tests {
+	use super::*;
+
+	/// A path that exists but cannot be read as text surfaces the error rather
+	/// than being reported as "no file", so `check` never mistakes an
+	/// unreadable guard for a missing one.
+	#[test]
+	fn an_unreadable_path_surfaces_the_error() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		let path = temp.path().join(ABI_LAYOUT_TEST_PATH);
+		// A directory where the file is expected fails `read_to_string` with
+		// something other than `NotFound`.
+		std::fs::create_dir_all(&path).unwrap_or_else(|error| panic!("create dir: {error}"));
+
+		let error = read_existing(temp.path()).expect_err("an unreadable path must error");
+
+		assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
 	}
 }

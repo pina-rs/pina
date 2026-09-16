@@ -1233,6 +1233,20 @@ mod tests {
 		));
 	}
 
+	/// A source with the envelope offset but no constant decoder is also
+	/// `NotEnveloped`: the marker matched but the call it belongs to is not the
+	/// generated one, so there is nothing to rewrite.
+	#[test]
+	fn dart_version_hardening_reports_a_marker_without_a_decoder() {
+		let account = migratable_account();
+		let source = "  final value = plainRead(bytes, offset + 1);\n";
+
+		assert!(matches!(
+			enforce_dart_migration_version(source, &account),
+			DartMigrationHardening::NotEnveloped
+		));
+	}
+
 	/// A source with no envelope read at all is also reported as
 	/// `NotEnveloped`; the caller decides whether that is acceptable.
 	#[test]
@@ -1244,6 +1258,56 @@ mod tests {
 			enforce_dart_migration_version(source, &account),
 			DartMigrationHardening::NotEnveloped
 		));
+	}
+
+	/// A migrations-aware account whose generated source has no version read
+	/// fails generation instead of shipping an unhardened decoder.
+	///
+	/// This is the fail-closed path: the hardener previously treated "statement
+	/// not found" as "already hardened" and wrote the generic decoder back out,
+	/// so decoding would skip the version check entirely.
+	#[test]
+	fn an_envelope_aware_account_without_a_version_read_fails_generation() {
+		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+		let source = std::fs::read_to_string(workspace.join("codama/idls/migrations_program.json"))
+			.expect("migrations IDL should be readable");
+		let root: RootNode = serde_json::from_str(&source).expect("migrations IDL should decode");
+		let temporary = tempfile::tempdir().expect("temp dir");
+		let idl = temporary.path().join("migrations_program.json");
+		std::fs::write(&idl, serde_json::to_string(&root).expect("serialize IDL"))
+			.expect("IDL should be writable");
+
+		// Every account module exists, but none reads the envelope byte, so
+		// there is nothing for the hardener to enforce.
+		let generated = temporary
+			.path()
+			.join("lib/src/generated/migrations_program/accounts");
+		std::fs::create_dir_all(&generated).expect("generated accounts dir");
+		for account in &root.program.accounts {
+			std::fs::write(
+				generated.join(format!("{}.dart", account.name.to_snake_case())),
+				"// no envelope read here\n",
+			)
+			.expect("account source should be writable");
+		}
+
+		let error = harden_generated_dart_clients(
+			temporary.path(),
+			&["migrations_program".to_owned()],
+			&[idl],
+			&[],
+		)
+		.expect_err("an envelope-aware account with no version read must fail generation");
+
+		let CodamaError::DartClient { source, .. } = &error else {
+			panic!("expected a Dart client error, got {error}");
+		};
+		assert!(
+			source
+				.to_string()
+				.contains("unhardened migrationVersion decoder"),
+			"the failure must come from the version check, not a missing file: {source}"
+		);
 	}
 
 	#[test]
@@ -1872,18 +1936,16 @@ Instruction getMigrateInstruction({{
 	)
 }
 
-/// Outcome of hardening an account's migration-version read.
-///
-/// The three cases must stay distinct. Collapsing "no envelope read found"
-/// into "already hardened" is what allowed a generated decoder to ship with no
-/// version check at all.
+/// Outcome of hardening an account's migration-version read. The three cases
+/// must stay distinct: collapsing "no envelope read found" into "already
+/// hardened" is what allowed a generated decoder to ship with no version check
+/// at all.
 enum DartMigrationHardening {
 	/// The source already carries the direction-aware check.
 	AlreadyHardened,
 	/// The generic constant decoder was replaced with the version check.
 	Rewritten(String),
-	/// The source contains no envelope read to harden. Acceptable only for an
-	/// account with no migration history.
+	/// The source contains no envelope read to harden.
 	NotEnveloped,
 }
 

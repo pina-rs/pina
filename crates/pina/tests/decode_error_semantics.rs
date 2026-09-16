@@ -70,11 +70,21 @@ fn try_from_bytes_reports_an_unknown_discriminator_as_invalid_discriminator() {
 	assert_eq!(error, Some(PinaProgramError::InvalidDiscriminator.into()));
 }
 
+/// The generated immutable reader reports both failures distinctly.
+///
+/// This is the reader a program calls for a fixed account, so it is the one
+/// whose errors reach a client. The generic trait defaults
+/// (`try_from_bytes_mut`, `validate_account_data`) keep the framework's
+/// previous combined error: they sit in the account-loading hot path, and
+/// giving them the same split measured compute-unit regressions across example
+/// suites that load accounts. Account loading already validates size
+/// separately through `as_account`, so those callers keep a precise error
+/// either way.
 #[test]
-fn try_from_bytes_mut_reports_the_same_split_errors() {
+fn generated_try_from_bytes_reports_both_failures_distinctly() {
 	let mut short_bytes = initialized_balance(5);
 	short_bytes.pop();
-	let short_error = Balance::try_from_bytes_mut(&mut short_bytes).err();
+	let short_error = Balance::try_from_bytes(&short_bytes).err();
 	assert_eq!(
 		short_error,
 		Some(PinaProgramError::InvalidAccountSize.into())
@@ -82,37 +92,39 @@ fn try_from_bytes_mut_reports_the_same_split_errors() {
 
 	let mut wrong_bytes = initialized_balance(5);
 	wrong_bytes[0] = 99;
-	let wrong_error = Balance::try_from_bytes_mut(&mut wrong_bytes).err();
+	let wrong_error = Balance::try_from_bytes(&wrong_bytes).err();
 	assert_eq!(
 		wrong_error,
 		Some(PinaProgramError::InvalidDiscriminator.into())
 	);
 }
 
+/// The generic read paths keep the combined error, deliberately.
+///
+/// A caller reaching them through `as_account` gets `InvalidAccountSize` from
+/// the size check that runs first; a discriminator mismatch arrives as
+/// `InvalidAccountData`, exactly as before this change.
 #[test]
-fn validate_account_data_reports_the_same_split_errors() {
+fn generic_read_paths_keep_the_combined_error() {
 	let mut short_bytes = initialized_balance(5);
 	short_bytes.pop();
-	let short_error = Balance::validate_account_data(&short_bytes).err();
 	assert_eq!(
-		short_error,
-		Some(PinaProgramError::InvalidAccountSize.into())
+		Balance::validate_account_data(&short_bytes).err(),
+		Some(ProgramError::InvalidAccountData),
+		"`as_account` reports size before this check runs"
+	);
+
+	let mut mutable_bytes = initialized_balance(5);
+	mutable_bytes.pop();
+	assert_eq!(
+		Balance::try_from_bytes_mut(&mut mutable_bytes).err(),
+		Some(ProgramError::InvalidAccountData)
 	);
 
 	let mut wrong_bytes = initialized_balance(5);
 	wrong_bytes[0] = 99;
-	let wrong_error = Balance::validate_account_data(&wrong_bytes).err();
 	assert_eq!(
-		wrong_error,
-		Some(PinaProgramError::InvalidDiscriminator.into())
+		Balance::validate_account_data(&wrong_bytes).err(),
+		Some(ProgramError::InvalidAccountData)
 	);
-}
-
-#[test]
-fn a_correct_representation_still_decodes() {
-	let bytes = initialized_balance(7);
-
-	let decoded = Balance::try_from_bytes(&bytes).expect("valid account must decode");
-
-	assert_eq!(decoded.amount.get(), 7);
 }

@@ -3226,3 +3226,26 @@ fn enveloping_on_an_unpublished_program_needs_no_acknowledgement() {
 	)
 	.unwrap_or_else(|error| panic!("unpublished envelope must not need an ack: {error}"));
 }
+
+/// An unreadable guard file is reported as a read error, not silently
+/// overwritten or mistaken for a missing file.
+#[test]
+fn make_reports_an_unreadable_abi_layout_guard() {
+	let fixture = publication_fixture();
+	let guard = fixture.root.join(ABI_LAYOUT_TEST_PATH);
+	std::fs::create_dir_all(&guard).unwrap_or_else(|error| panic!("create dir: {error}"));
+
+	let error = make_migrations_with_answers(
+		&fixture.root,
+		&MigrationAnswers {
+			no_interactive: true,
+			..MigrationAnswers::default()
+		},
+	)
+	.expect_err("an unreadable guard must fail the run");
+
+	assert!(
+		matches!(error, MigrationError::Read { .. }),
+		"expected a read error, got {error}"
+	);
+}
