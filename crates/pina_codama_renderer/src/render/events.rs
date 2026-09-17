@@ -952,9 +952,13 @@ mod tests {
 			.unwrap_or_else(|| panic!("event module must exist"));
 		assert!(page.contains("pub struct MyEvent {"));
 		assert!(page.contains("pub discriminator: u8,"));
+		// The program envelopes events, so the current-only decoder still
+		// carries the migration version constant and validates it.
+		assert!(page.contains("pub migration_version: u8,"));
+		assert!(page.contains("pub const MY_EVENT_MIGRATION_VERSION: u8 = 0u8;"));
 		assert!(page.contains("pub fn from_bytes(data: &[u8])"));
 		assert!(!page.contains("pub fn project_from_bytes("));
-		assert!(!page.contains("MIGRATION_VERSION"));
+		assert!(!page.contains("PROJECTION_STEPS"));
 	}
 
 	#[test]

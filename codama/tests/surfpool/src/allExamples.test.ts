@@ -962,9 +962,12 @@ async function runAnchorReallocGuards(
 
 	const forgedAddress = Surfnet.newKeypair().publicKey;
 	const forgedData = new Uint8Array(SAMPLE_HEADER_SIZE);
+	// A valid envelope (current version) so the forged header reaches the
+	// program's canonical-PDA validation instead of failing the version check.
 	forgedData[0] = 1;
-	forgedData[1] = bump;
-	forgedData.set(getAddressEncoder().encode(payer.address), 2);
+	forgedData[1] = 0;
+	forgedData[2] = bump;
+	forgedData.set(getAddressEncoder().encode(payer.address), 3);
 	surfnet.setAccount(
 		forgedAddress,
 		1_000_000,
@@ -975,7 +978,7 @@ async function runAnchorReallocGuards(
 		() =>
 			submit(rawInstruction(
 				descriptor.programId,
-				reallocInstructionData(0, 100),
+				reallocInstructionData(0, SAMPLE_HEADER_SIZE + 8 * 8),
 				[
 					payerWritableSigner,
 					{ address: address(forgedAddress), role: AccountRole.WRITABLE },
