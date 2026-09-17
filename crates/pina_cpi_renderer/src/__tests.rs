@@ -563,7 +563,9 @@ fn renders_non_omitted_arguments_only() {
 	let page =
 		render_instruction_page(initialize).unwrap_or_else(|error| panic!("renders: {error}"));
 
-	assert!(page.contains(&format!("[0u8; {}", 1 + 8 * wire_args - 7)));
+	// The wire buffer also reserves the migration version byte that the
+	// fixture IDL carries between the discriminator and the payload.
+	assert!(page.contains(&format!("[0u8; {}", 2 + 8 * wire_args - 7)));
 	assert!(!page.contains("discriminator:"));
 }
 
