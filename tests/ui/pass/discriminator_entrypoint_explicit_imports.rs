@@ -10,19 +10,17 @@ use pina::ParseAccounts;
 use pina::ProgramResult;
 use pina::declare_id;
 use pina::discriminator;
-use pina::instruction_dispatch;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum CounterInstruction {
 	Initialize = 0,
 	Increment = 1,
 }
 
 fn main() {
-	assert_eq!(MAX_INSTRUCTION_ACCOUNTS, 3);
+	assert_eq!(CounterInstruction::MAX_INSTRUCTION_ACCOUNTS, 3);
 	assert_eq!(
 		<InitializeAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_BOUND,
 		3,

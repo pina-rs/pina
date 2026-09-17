@@ -22,7 +22,21 @@ pub(crate) fn expand(
 
 	let args = match DiscriminatorArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => return e.write_errors(),
+		Err(error) => {
+			let reason = crate::validation::darling_reason(&error);
+
+			return syn::Error::new(
+				error.span(),
+				format!(
+					"could not parse the `#[discriminator(...)]` input: {reason} Supported \
+					 arguments are `primitive = u8 | u16 | u32 | u64`, `crate = path`, `final`, \
+					 `entrypoint`, `migrations(Account, ...)`, `migrations_max_lamports = EXPR`, \
+					 `capacity_test`, `maximum_accounts = EXPR`, `program_id = EXPR`, and `inline \
+					 = \"always\" | \"hint\"`"
+				),
+			)
+			.to_compile_error();
+		}
 	};
 
 	let mut item_enum: ItemEnum = match syn::parse2(input) {
@@ -30,13 +44,15 @@ pub(crate) fn expand(
 		Err(e) => return e.to_compile_error(),
 	};
 
-	let enum_name = &item_enum.ident;
+	let enum_name = item_enum.ident.clone();
 
 	let DiscriminatorArgs {
 		primitive,
 		crate_path,
 		is_final,
-	} = args;
+		entrypoint,
+		..
+	} = &args;
 
 	// Add #[repr(primitive)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(#primitive)]);
@@ -47,6 +63,17 @@ pub(crate) fn expand(
 		let non_exhaustive_attr: Attribute = syn::parse_quote!(#[non_exhaustive]);
 		item_enum.attrs.push(non_exhaustive_attr);
 	}
+
+	// The entrypoint is generated before the enum is finalized so its
+	// diagnostics point at the enum and its variants.
+	let entrypoint_expansion = if entrypoint.is_present() {
+		match crate::entrypoint::expand(&args, &mut item_enum) {
+			Ok(value) => Some(value),
+			Err(error) => return error.to_compile_error(),
+		}
+	} else {
+		None
+	};
 
 	let derives = [
 		syn::parse_quote!(::core::clone::Clone),
@@ -148,8 +175,15 @@ pub(crate) fn expand(
 		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
+	let (uniqueness_marker, entrypoint_impl) = match entrypoint_expansion {
+		Some(expansion) => (expansion.uniqueness_marker, expansion.implementation),
+		None => (quote! {}, quote! {}),
+	};
+
 	quote! {
+		#uniqueness_marker
 		#item_enum
 		#implementations
+		#entrypoint_impl
 	}
 }

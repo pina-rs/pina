@@ -27,15 +27,16 @@ struct DiscriminatorArgs {
 impl syn::parse::Parse for DiscriminatorArgs {
 	fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
 		let mut args = Self::default();
-		// `crate` and `final` belong to the proc macro's public grammar. IDL
-		// extraction validates their shape and uniqueness but does not otherwise
-		// need their values.
-		let mut has_crate_path = false;
-		let mut is_final = false;
+		// Most arguments belong to the proc macro's public grammar, and IDL
+		// extraction only validates their shape and uniqueness. They are
+		// consumed here so the scanner accepts every documented spelling.
+		let mut seen: Vec<String> = Vec::new();
 
 		while !input.is_empty() {
 			let name = input.call(syn::Ident::parse_any)?;
-			match name.to_string().as_str() {
+			let name_text = name.to_string();
+
+			match name_text.as_str() {
 				"primitive" => {
 					if args.primitive.is_some() {
 						return Err(syn::Error::new(
@@ -45,20 +46,40 @@ impl syn::parse::Parse for DiscriminatorArgs {
 					}
 					input.parse::<syn::Token![=]>()?;
 					args.primitive = Some(input.parse()?);
+					seen.push(name_text);
 				}
 				"crate" => {
-					if has_crate_path {
-						return Err(syn::Error::new(name.span(), "duplicate `crate` argument"));
-					}
 					input.parse::<syn::Token![=]>()?;
 					input.parse::<syn::Path>()?;
-					has_crate_path = true;
+					record_once(&mut seen, &name_text, name.span())?;
 				}
-				"final" => {
-					if is_final {
-						return Err(syn::Error::new(name.span(), "duplicate `final` argument"));
+				// Bare flags.
+				"final" | "entrypoint" | "capacity_test" => {
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				// `name = value` arguments the scanner validates but does not read.
+				"migrations_max_lamports" | "maximum_accounts" | "program_id" => {
+					input.parse::<syn::Token![=]>()?;
+					input.parse::<syn::Expr>()?;
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				"inline" => {
+					input.parse::<syn::Token![=]>()?;
+					input.parse::<syn::LitStr>()?;
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				// A list of paths: `migrations(Account, ...)`.
+				"migrations" => {
+					let content;
+					syn::parenthesized!(content in input);
+					while !content.is_empty() {
+						content.parse::<syn::Path>()?;
+						if content.is_empty() {
+							break;
+						}
+						content.parse::<syn::Token![,]>()?;
 					}
-					is_final = true;
+					record_once(&mut seen, &name_text, name.span())?;
 				}
 				_ => {
 					return Err(syn::Error::new(
@@ -76,6 +97,19 @@ impl syn::parse::Parse for DiscriminatorArgs {
 
 		Ok(args)
 	}
+}
+
+/// Reject a repeated argument name, mirroring the proc macro's grammar.
+fn record_once(seen: &mut Vec<String>, name: &str, span: proc_macro2::Span) -> syn::Result<()> {
+	if seen.iter().any(|existing| existing == name) {
+		return Err(syn::Error::new(
+			span,
+			format!("duplicate `{name}` argument"),
+		));
+	}
+	seen.push(name.to_owned());
+
+	Ok(())
 }
 
 /// Parse the discriminator enum and variant used by an attribute macro.

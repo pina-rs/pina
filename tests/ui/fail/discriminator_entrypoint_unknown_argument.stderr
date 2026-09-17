@@ -1,0 +1,5 @@
+error: could not parse the `#[discriminator(...)]` input: Unknown field: `disptach`. Supported arguments are `primitive = u8 | u16 | u32 | u64`, `crate = path`, `final`, `entrypoint`, `migrations(Account, ...)`, `migrations_max_lamports = EXPR`, `capacity_test`, `maximum_accounts = EXPR`, `program_id = EXPR`, and `inline = "always" | "hint"`
+ --> tests/ui/fail/discriminator_entrypoint_unknown_argument.rs:8:29
+  |
+8 | #[discriminator(entrypoint, disptach = true)]
+  |                             ^^^^^^^^^^^^^^^

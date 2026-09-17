@@ -4,8 +4,11 @@ use syn::Item;
 use syn::ItemEnum;
 use syn::Stmt;
 
-/// The attribute macro that generates dispatch from an instruction enum.
-const DISPATCH_ATTRIBUTE: &str = "instruction_dispatch";
+/// The attribute macro that carries the entrypoint declaration.
+const DISCRIMINATOR_ATTRIBUTE: &str = "discriminator";
+
+/// The argument that makes a discriminator enum a program entrypoint.
+const ENTRYPOINT_ARGUMENT: &str = "entrypoint";
 
 /// The suffix an unannotated variant appends to find its accounts struct.
 const ACCOUNTS_SUFFIX: &str = "Accounts";
@@ -61,12 +64,12 @@ pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 	entries
 }
 
-/// Extract the dispatch map from an `#[instruction_dispatch]` annotation.
+/// Extract the dispatch map from an `#[discriminator(entrypoint)]` annotation.
 ///
-/// The macro generates `process_instruction` and the match arms, so neither is
-/// present in the source the IDL extractor reads. The annotation carries the
-/// same routing facts the generated match would: each variant names its
-/// accounts struct, defaulting to `VariantAccounts`.
+/// The macro generates `Self::process_instruction` and its match arms, so
+/// neither is present in the source the IDL extractor reads. The annotation
+/// carries the same routing facts the generated match would: each variant names
+/// its accounts struct, defaulting to `VariantAccounts`.
 pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
 	let mut entries = Vec::new();
 
@@ -96,26 +99,58 @@ pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
 	entries
 }
 
-/// Whether an enum's own attributes carry the dispatch attribute.
+/// Whether an enum's own attributes declare `#[discriminator(entrypoint)]`.
 ///
-/// Qualified spellings such as `#[pina::instruction_dispatch]` are recognized
-/// by their final segment, mirroring how Rust resolves the proc macro.
+/// Qualified spellings such as `#[pina::discriminator(entrypoint)]` are
+/// recognized by their final segment, mirroring how Rust resolves the proc
+/// macro.
 fn is_dispatch_annotated(item_enum: &ItemEnum) -> bool {
 	item_enum
 		.attrs
 		.iter()
-		.any(|attribute| is_dispatch_attribute(attribute.path()))
+		.any(|attribute| is_entrypoint_declaration(attribute))
 }
 
-/// Whether a path names the dispatch macro.
-fn is_dispatch_attribute(path: &syn::Path) -> bool {
-	path.segments
+/// Whether one attribute is an `entrypoint`-flagged discriminator.
+fn is_entrypoint_declaration(attribute: &syn::Attribute) -> bool {
+	if !attribute
+		.path()
+		.segments
 		.last()
-		.is_some_and(|segment| segment.ident == DISPATCH_ATTRIBUTE)
+		.is_some_and(|segment| segment.ident == DISCRIMINATOR_ATTRIBUTE)
+	{
+		return false;
+	}
+
+	let Ok(metas) = attribute.parse_args_with(
+		syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+	) else {
+		return false;
+	};
+
+	metas.iter().any(|meta| {
+		match meta {
+			// A bare `entrypoint` token.
+			syn::Meta::Path(path) => path.is_ident(ENTRYPOINT_ARGUMENT),
+			// `entrypoint = true` selects it; `entrypoint = false` does not.
+			syn::Meta::NameValue(name_value) => {
+				if !name_value.path.is_ident(ENTRYPOINT_ARGUMENT) {
+					return false;
+				}
+
+				matches!(
+					&name_value.value,
+					syn::Expr::Lit(lit)
+						if matches!(&lit.lit, syn::Lit::Bool(value) if value.value)
+				)
+			}
+			syn::Meta::List(_) => false,
+		}
+	})
 }
 
-/// Whether a file declares an `#[instruction_dispatch]` enum, at the top level
-/// or inside the entrypoint module.
+/// Whether a file declares an `#[discriminator(entrypoint)]` enum, at the top
+/// level or inside the entrypoint module.
 pub fn has_dispatch_attribute(file: &File) -> bool {
 	file.items.iter().any(|item| {
 		match item {
@@ -534,8 +569,7 @@ mod tests {
 	#[test]
 	fn extracts_dispatch_from_the_attribute() {
 		let source = r#"
-			#[instruction_dispatch]
-			#[discriminator]
+			#[discriminator(entrypoint)]
 			pub enum CounterInstruction {
 				Initialize = 0,
 				Increment = 1,
@@ -561,7 +595,7 @@ mod tests {
 	#[test]
 	fn attribute_dispatch_honours_per_variant_overrides() {
 		let source = r#"
-			#[instruction_dispatch]
+			#[discriminator(entrypoint)]
 			pub enum Mixed {
 				Default = 0,
 				#[dispatch(accounts = CustomAccounts)]
@@ -585,7 +619,7 @@ mod tests {
 	fn attribute_dispatch_is_found_inside_the_entrypoint_module() {
 		let source = r#"
 			mod entrypoint {
-				#[instruction_dispatch]
+				#[discriminator(entrypoint)]
 				pub enum Nested {
 					Run = 0,
 				}
@@ -607,7 +641,7 @@ mod tests {
 		// name-value pair, and a non-path value. The readable override comes
 		// last so every guard runs first.
 		let source = r#"
-			#[instruction_dispatch]
+			#[discriminator(entrypoint)]
 			pub enum Guards {
 				/// A doc comment is an attribute whose path is `doc`.
 				#[dispatch(bare)]
@@ -618,7 +652,7 @@ mod tests {
 			}
 
 			/// Doc comments also sit on the enum without being dispatch attrs.
-			#[instruction_dispatch]
+			#[discriminator(entrypoint)]
 			pub enum Documented {
 				Run = 0,
 			}
@@ -658,6 +692,46 @@ mod tests {
 
 		assert!(!has_dispatch_attribute(&file));
 		assert!(extract_dispatch_from_attribute(&file).is_empty());
+	}
+
+	#[test]
+	fn only_the_entrypoint_flag_declares_dispatch() {
+		// A plain `#[discriminator]`, an explicit `entrypoint = false`, and a
+		// qualified path that does not select the flag are all non-entrypoints.
+		let source = r#"
+			#[discriminator]
+			pub enum Plain {
+				A = 0,
+			}
+
+			#[discriminator(entrypoint = false)]
+			pub enum Disabled {
+				A = 0,
+			}
+
+			#[discriminator(primitive = u16)]
+			pub enum OtherPrimitive {
+				A = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		assert!(!has_dispatch_attribute(&file));
+		assert!(extract_dispatch_from_attribute(&file).is_empty());
+
+		// The same flags, with the qualified macro path and `entrypoint = true`.
+		let qualified = r#"
+			#[pina::discriminator(entrypoint = true)]
+			pub enum Qualified {
+				A = 0,
+			}
+		"#;
+		let file = syn::parse_file(qualified).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(has_dispatch_attribute(&file));
+
+		let dispatch = extract_dispatch_from_attribute(&file);
+		assert_eq!(dispatch.len(), 1);
+		assert_eq!(dispatch[0].accounts_struct, Some("AAccounts".to_owned()));
 	}
 
 	#[test]

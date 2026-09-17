@@ -7,8 +7,7 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[instruction_dispatch(migrations(State), migrations_max_lamports = 20_000)]
-#[discriminator]
+#[discriminator(entrypoint, migrations(State), migrations_max_lamports = 20_000)]
 pub enum Instruction {
 	Update = 0,
 }

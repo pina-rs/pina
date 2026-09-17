@@ -1,4 +1,7 @@
 use pina::*;
+#[doc(hidden)]
+#[allow(dead_code, non_upper_case_globals)]
+const __PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM: () = ();
 #[repr(u8)]
 #[non_exhaustive]
 pub enum CounterInstruction {
@@ -119,90 +122,100 @@ impl ::pina::IntoDiscriminator for CounterInstruction {
         (*self as u8).matches_discriminator(bytes)
     }
 }
-/// Upper bound on the accounts this program reads in one instruction.
-///
-/// Derived from every instruction's declared `ACCOUNT_BOUND` and
-/// saturated at the entrypoint's account array, so a variant that
-/// declares an unbounded trailing slice cannot inflate the cap.
-///
-/// This is the count a program declares, not a security boundary. Passing
-/// it to `nostd_entrypoint!` would size the runtime's account array below
-/// the transaction maximum, and the loader *skips* any account beyond that
-/// array instead of failing, so `finish_exact` would no longer reject an
-/// instruction that supplies too many accounts. Keep the entrypoint at its
-/// default maximum and use this constant as the declaration and test
-/// contract it is.
-pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
-    const fn maximum(values: [usize; 2]) -> usize {
-        let mut index = 0;
-        let mut highest = 0;
-        while index < values.len() {
-            if values[index] > highest {
-                highest = values[index];
+impl CounterInstruction {
+    /// Upper bound on the accounts this program reads in one instruction.
+    ///
+    /// Derived from every instruction's declared `ACCOUNT_BOUND` and
+    /// saturated at the entrypoint's account array, so a variant that
+    /// declares an unbounded trailing slice cannot inflate the cap.
+    ///
+    /// This is the count a program declares, not a security boundary. Passing
+    /// it to `nostd_entrypoint!` would size the runtime's account array below
+    /// the transaction maximum, and the loader *skips* any account beyond that
+    /// array instead of failing, so `finish_exact` would no longer reject an
+    /// instruction that supplies too many accounts. Keep the entrypoint at its
+    /// default maximum and use this constant as the declaration and test
+    /// contract it is.
+    pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
+        const fn maximum(values: [usize; 2]) -> usize {
+            let mut index = 0;
+            let mut highest = 0;
+            while index < values.len() {
+                if values[index] > highest {
+                    highest = values[index];
+                }
+                index += 1;
             }
-            index += 1;
+            highest
         }
-        highest
-    }
-    const fn clamp(value: usize, limit: usize) -> usize {
-        if value > limit { limit } else { value }
-    }
-    clamp(
-        maximum([
-            {
-                const fn __pina_account_bound<'a, T>() -> usize
-                where
-                    T: ::pina::ParseAccounts<'a>,
-                {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
-                }
-                __pina_account_bound::<'static, InitializeAccounts>()
-            },
-            {
-                const fn __pina_account_bound<'a, T>() -> usize
-                where
-                    T: ::pina::ParseAccounts<'a>,
-                {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
-                }
-                __pina_account_bound::<'static, IncrementAccounts>()
-            },
-        ]),
-        ::pina::pinocchio::MAX_TX_ACCOUNTS,
-    )
-};
-#[inline(always)]
-pub fn process_instruction(
-    program_id: &::pina::Address,
-    accounts: &mut [::pina::AccountView],
-    data: &[u8],
-) -> ::pina::ProgramResult {
-    let instruction: CounterInstruction = ::pina::parse_instruction(
-        program_id,
-        &ID,
-        data,
-    )?;
-    match instruction {
-        CounterInstruction::Initialize => {
-            let __pina_accounts = <InitializeAccounts as ::core::convert::TryFrom<
-                (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?;
-            <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
-                __pina_accounts,
-                data,
-            )
+        const fn clamp(value: usize, limit: usize) -> usize {
+            if value > limit { limit } else { value }
         }
-        CounterInstruction::Increment => {
-            let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
-                (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?;
-            <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
-                __pina_accounts,
-                data,
-            )
+        clamp(
+            maximum([
+                {
+                    const fn __pina_account_bound<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    }
+                    __pina_account_bound::<'static, InitializeAccounts>()
+                },
+                {
+                    const fn __pina_account_bound<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    }
+                    __pina_account_bound::<'static, IncrementAccounts>()
+                },
+            ]),
+            ::pina::pinocchio::MAX_TX_ACCOUNTS,
+        )
+    };
+    /// Dispatches one instruction to its accounts struct.
+    ///
+    /// Pass this to `nostd_entrypoint!` as
+    /// `nostd_entrypoint!(Self::process_instruction)`. Program-specific behavior beyond
+    /// routing belongs in each accounts struct's `ProcessAccountInfos::process`.
+    #[inline(always)]
+    pub fn process_instruction(
+        program_id: &::pina::Address,
+        accounts: &mut [::pina::AccountView],
+        data: &[u8],
+    ) -> ::pina::ProgramResult {
+        let instruction: CounterInstruction = ::pina::parse_instruction(
+            program_id,
+            &ID,
+            data,
+        )?;
+        match instruction {
+            CounterInstruction::Initialize => {
+                let __pina_accounts = <InitializeAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+            CounterInstruction::Increment => {
+                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
         }
     }
 }
+#[doc(hidden)]
+#[allow(dead_code, non_upper_case_globals)]
+const __PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM: () = ();
 #[repr(u8)]
 #[non_exhaustive]
 pub enum OverrideInstruction {
@@ -323,87 +336,94 @@ impl ::pina::IntoDiscriminator for OverrideInstruction {
         (*self as u8).matches_discriminator(bytes)
     }
 }
-/// Upper bound on the accounts this program reads in one instruction.
-///
-/// Derived from every instruction's declared `ACCOUNT_BOUND` and
-/// saturated at the entrypoint's account array, so a variant that
-/// declares an unbounded trailing slice cannot inflate the cap.
-///
-/// This is the count a program declares, not a security boundary. Passing
-/// it to `nostd_entrypoint!` would size the runtime's account array below
-/// the transaction maximum, and the loader *skips* any account beyond that
-/// array instead of failing, so `finish_exact` would no longer reject an
-/// instruction that supplies too many accounts. Keep the entrypoint at its
-/// default maximum and use this constant as the declaration and test
-/// contract it is.
-pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
-    const fn maximum(values: [usize; 2]) -> usize {
-        let mut index = 0;
-        let mut highest = 0;
-        while index < values.len() {
-            if values[index] > highest {
-                highest = values[index];
+impl OverrideInstruction {
+    /// Upper bound on the accounts this program reads in one instruction.
+    ///
+    /// Derived from every instruction's declared `ACCOUNT_BOUND` and
+    /// saturated at the entrypoint's account array, so a variant that
+    /// declares an unbounded trailing slice cannot inflate the cap.
+    ///
+    /// This is the count a program declares, not a security boundary. Passing
+    /// it to `nostd_entrypoint!` would size the runtime's account array below
+    /// the transaction maximum, and the loader *skips* any account beyond that
+    /// array instead of failing, so `finish_exact` would no longer reject an
+    /// instruction that supplies too many accounts. Keep the entrypoint at its
+    /// default maximum and use this constant as the declaration and test
+    /// contract it is.
+    pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
+        const fn maximum(values: [usize; 2]) -> usize {
+            let mut index = 0;
+            let mut highest = 0;
+            while index < values.len() {
+                if values[index] > highest {
+                    highest = values[index];
+                }
+                index += 1;
             }
-            index += 1;
+            highest
         }
-        highest
-    }
-    const fn clamp(value: usize, limit: usize) -> usize {
-        if value > limit { limit } else { value }
-    }
-    clamp(
-        maximum([
-            {
-                const fn __pina_account_bound<'a, T>() -> usize
-                where
-                    T: ::pina::ParseAccounts<'a>,
-                {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
-                }
-                __pina_account_bound::<'static, IncrementAccounts>()
-            },
-            {
-                const fn __pina_account_bound<'a, T>() -> usize
-                where
-                    T: ::pina::ParseAccounts<'a>,
-                {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
-                }
-                __pina_account_bound::<'static, UntouchedAccounts>()
-            },
-        ]),
-        ::pina::pinocchio::MAX_TX_ACCOUNTS,
-    )
-};
-#[inline(always)]
-pub fn process_instruction(
-    program_id: &::pina::Address,
-    accounts: &mut [::pina::AccountView],
-    data: &[u8],
-) -> ::pina::ProgramResult {
-    let instruction: OverrideInstruction = ::pina::parse_instruction(
-        program_id,
-        &ID,
-        data,
-    )?;
-    match instruction {
-        OverrideInstruction::Routed => {
-            let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
-                (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?;
-            <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
-                __pina_accounts,
-                data,
-            )
+        const fn clamp(value: usize, limit: usize) -> usize {
+            if value > limit { limit } else { value }
         }
-        OverrideInstruction::Untouched => {
-            let __pina_accounts = <UntouchedAccounts as ::core::convert::TryFrom<
-                (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?;
-            <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
-                __pina_accounts,
-                data,
-            )
+        clamp(
+            maximum([
+                {
+                    const fn __pina_account_bound<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    }
+                    __pina_account_bound::<'static, IncrementAccounts>()
+                },
+                {
+                    const fn __pina_account_bound<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    }
+                    __pina_account_bound::<'static, UntouchedAccounts>()
+                },
+            ]),
+            ::pina::pinocchio::MAX_TX_ACCOUNTS,
+        )
+    };
+    /// Dispatches one instruction to its accounts struct.
+    ///
+    /// Pass this to `nostd_entrypoint!` as
+    /// `nostd_entrypoint!(Self::process_instruction)`. Program-specific behavior beyond
+    /// routing belongs in each accounts struct's `ProcessAccountInfos::process`.
+    #[inline(always)]
+    pub fn process_instruction(
+        program_id: &::pina::Address,
+        accounts: &mut [::pina::AccountView],
+        data: &[u8],
+    ) -> ::pina::ProgramResult {
+        let instruction: OverrideInstruction = ::pina::parse_instruction(
+            program_id,
+            &ID,
+            data,
+        )?;
+        match instruction {
+            OverrideInstruction::Routed => {
+                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+            OverrideInstruction::Untouched => {
+                let __pina_accounts = <UntouchedAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
         }
     }
 }

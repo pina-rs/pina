@@ -11,7 +11,6 @@
 //! - [`macro@event`] defines event data.
 //! - [`derive@Accounts`] parses instruction accounts.
 //! - [`macro@discriminator`] defines typed discriminator enums.
-//! - [`macro@instruction_dispatch`] generates instruction dispatch.
 //! - [`macro@pda`] defines typed PDA seeds and loaders.
 //! - [`macro@error`] maps custom errors to Solana program errors.
 //!
@@ -25,7 +24,7 @@ mod account;
 mod accounts;
 mod args;
 mod discriminator;
-mod dispatch;
+mod entrypoint;
 mod error;
 mod event;
 mod instruction;
@@ -86,6 +85,49 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 ///
 /// Every variant must have an explicit value. The storage primitive defaults
 /// to `u8` and can be set to `u16`, `u32`, or `u64`.
+///
+/// # Entrypoints
+///
+/// Add `entrypoint` to generate the program entrypoint as associated items on
+/// the enum, so the routing has one discoverable name:
+///
+/// ```ignore
+/// #[discriminator(entrypoint)]
+/// pub enum CounterInstruction {
+///     Initialize = 0,
+///     Increment = 1,
+/// }
+///
+/// nostd_entrypoint!(CounterInstruction::process_instruction);
+/// ```
+///
+/// The macro emits `CounterInstruction::process_instruction` and
+/// `CounterInstruction::MAX_INSTRUCTION_ACCOUNTS` inside an inherent `impl`, so
+/// nothing is added to the surrounding module and custom entrypoint behavior
+/// can stay wherever the program already puts it. Variant `Foo` routes to
+/// `FooAccounts`, overridable per variant with
+/// `#[dispatch(accounts = BarAccounts)]`.
+///
+/// At most one enum in a program may opt in: a module-level marker collides if
+/// a second one does. Only the instruction enum needs the flag; account-type
+/// and event discriminators leave it off.
+///
+/// Arguments accepted alongside `entrypoint`:
+///
+/// - `crate = path` — the Pina crate path. Defaults to `::pina`.
+/// - `program_id = EXPR` — the checked program id. Defaults to `ID`.
+/// - `maximum_accounts = EXPR` — the saturation cap for
+///   `MAX_INSTRUCTION_ACCOUNTS`. Defaults to `pinocchio::MAX_TX_ACCOUNTS`.
+/// - `capacity_test` / `capacity_test = false` — emit or suppress the
+///   self-verifying assertions. Emitted by default.
+/// - `migrations(Account, ...)` — route the reserved `Migrate` instruction
+///   through `Self::process_migrate`, listing migratable contracts in
+///   reserved-instruction slot order.
+/// - `migrations_max_lamports = EXPR` — the lamport budget shared by every
+///   slot. Required with `migrations`.
+/// - `inline = "hint"` — emit `#[inline]` instead of the default
+///   `#[inline(always)]` on the generated entrypoint. The two spellings differ
+///   at the codegen level, so match whichever the program was measured with.
 ///
 /// # Example
 ///
@@ -230,68 +272,4 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 	error::expand(args.into(), input.into()).into()
-}
-
-/// Generates instruction dispatch from a discriminator enum.
-///
-/// Generates a `process_instruction` compatible with `nostd_entrypoint!`, plus
-/// the account-count constant the hand-written entrypoint used to carry. Apply
-/// it above `#[discriminator]` on the instruction enum: the outer attribute
-/// expands first, and the enum it emits still carries `#[discriminator]`, so
-/// the two compose into one type.
-///
-/// Variant `Foo` routes to `FooAccounts`. Override that per variant with
-/// `#[dispatch(accounts = BarAccounts)]`.
-///
-/// `MAX_INSTRUCTION_ACCOUNTS` is the largest `ACCOUNT_BOUND` across every
-/// routed accounts struct, saturated at `pinocchio::MAX_TX_ACCOUNTS`. A
-/// `#[cfg(test)]` assertion block makes the constant verify itself: it fails
-/// to compile if any route's bound exceeds the constant, which catches a route
-/// that was forgotten when the enum grew.
-///
-/// # Arguments
-///
-/// - `crate = path` — the Pina crate path. Defaults to `::pina`.
-/// - `program_id = EXPR` — the checked program id. Defaults to `ID`.
-/// - `maximum_accounts = EXPR` — the saturation cap. Defaults to
-///   `pinocchio::MAX_TX_ACCOUNTS`.
-/// - `capacity_test` / `capacity_test = false` — emit or suppress the
-///   self-verifying assertions. Emitted by default.
-/// - `migrations(Account, ...)` — emit the reserved `Migrate` prelude,
-///   listing the migratable contracts in reserved-instruction slot order.
-/// - `migrations_max_lamports = EXPR` — the lamport budget shared by every
-///   slot. Required with `migrations`.
-/// - `inline = "hint"` — emit `#[inline]` instead of the default
-///   `#[inline(always)]` on the generated dispatcher. The two spellings differ
-///   at the codegen level, so match whichever the program was measured with.
-///
-/// # Example
-///
-/// ```ignore
-/// #[instruction_dispatch]
-/// #[discriminator]
-/// pub enum CounterInstruction {
-///     Initialize = 0,
-///     Increment = 1,
-/// }
-///
-/// #[derive(Accounts)]
-/// pub struct InitializeAccounts<'a> { /* ... */ }
-///
-/// #[derive(Accounts)]
-/// pub struct IncrementAccounts<'a> { /* ... */ }
-///
-/// #[cfg(feature = "bpf-entrypoint")]
-/// pub mod entrypoint {
-///     use super::*;
-///
-///     // Keep the default account array. Sizing it to `MAX_INSTRUCTION_ACCOUNTS`
-///     // would make the loader skip accounts beyond the array instead of
-///     // letting `finish_exact` reject them.
-///     nostd_entrypoint!(process_instruction);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn instruction_dispatch(args: TokenStream, input: TokenStream) -> TokenStream {
-	dispatch::expand(args.into(), input.into()).into()
 }
