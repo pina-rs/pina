@@ -184,16 +184,22 @@ pub fn process_instruction(
     )?;
     match instruction {
         CounterInstruction::Initialize => {
-            <InitializeAccounts as ::core::convert::TryFrom<
+            let __pina_accounts = <InitializeAccounts as ::core::convert::TryFrom<
                 (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?
-                .process(data)
+            >>::try_from((program_id, accounts))?;
+            <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
+                __pina_accounts,
+                data,
+            )
         }
         CounterInstruction::Increment => {
-            <IncrementAccounts as ::core::convert::TryFrom<
+            let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
                 (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?
-                .process(data)
+            >>::try_from((program_id, accounts))?;
+            <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                __pina_accounts,
+                data,
+            )
         }
     }
 }
@@ -382,16 +388,22 @@ pub fn process_instruction(
     )?;
     match instruction {
         OverrideInstruction::Routed => {
-            <IncrementAccounts as ::core::convert::TryFrom<
+            let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
                 (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?
-                .process(data)
+            >>::try_from((program_id, accounts))?;
+            <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                __pina_accounts,
+                data,
+            )
         }
         OverrideInstruction::Untouched => {
-            <UntouchedAccounts as ::core::convert::TryFrom<
+            let __pina_accounts = <UntouchedAccounts as ::core::convert::TryFrom<
                 (&::pina::Address, &mut [::pina::AccountView]),
-            >>::try_from((program_id, accounts))?
-                .process(data)
+            >>::try_from((program_id, accounts))?;
+            <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
+                __pina_accounts,
+                data,
+            )
         }
     }
 }
