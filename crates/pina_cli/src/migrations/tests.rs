@@ -589,7 +589,7 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 	let fixture = migration_fixture();
 	std::fs::write(
 		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\nauto = true\n",
+		"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\nauto = true\n",
 	)
 	.unwrap_or_else(|error| panic!("write auto policy: {error}"));
 	std::fs::write(
@@ -729,7 +729,7 @@ fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
 		.unwrap_or_else(|error| panic!("restore program identity: {error}"));
 	std::fs::write(
 		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n[migrations]\nversion-type = \"u16\"\n",
+		"[project]\nprogram = \".\"\n[migrations]\nversion_type = \"u16\"\n",
 	)
 	.unwrap_or_else(|error| panic!("write changed version type: {error}"));
 	assert!(matches!(
@@ -3034,7 +3034,7 @@ fn abi_layout_test_records_manifest_geometry() {
 		.unwrap_or_else(|error| panic!("read generated abi layout test: {error}"));
 
 	// The fixture is one account with a single `u64` field behind a
-	// `version-type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
+	// `version_type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
 	// and an 8-byte payload. Asserting the exact values pins the geometry
 	// rather than merely finding the words "SIZE" or a digit somewhere.
 	for expected in [

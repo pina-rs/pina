@@ -218,12 +218,14 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 | Reorder, remove, or escalate an instruction slot | **Breaking**; create a new instruction discriminator                     |
 | Change the migration version width after release | **Breaking** for every migration-aware wire contract                     |
 
-Add `migrations` to an account, instruction, or event attribute to opt into a framework-owned version field. Pina places the field immediately after the discriminator. Set its width once for the program:
+Add `migrations` to an account, instruction, or event attribute to opt into a framework-owned version field. Pina places the field immediately after the discriminator. Set its width once for the program, before the first release:
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 ```
+
+The accepted widths are `u8`, `u16`, and `u32`; `u8` is the default and the recommendation. Versions are tracked per contract, so each account, instruction, and event owns an independent history starting at `0` and `u8` gives every contract its own 255-version budget. The width is program-wide and freezes at the first published release, which is why it cannot be widened later.
 
 Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 
