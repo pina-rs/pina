@@ -50,12 +50,7 @@ impl ::core::cmp::PartialEq for AccountDisc {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for AccountDisc {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for AccountDisc {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {

@@ -488,27 +488,21 @@ fn build_pda_default_value(
 			continue;
 		};
 
-		let value = if let Some(seed_account) = instruction
+		let seed_account = instruction
 			.accounts
 			.iter()
-			.find(|account| account.name == *name)
+			.find(|account| account.name == *name)?;
+		if seed_account.name == account.name
+			|| seed_account.is_optional
+			|| seed_account.default_value.is_some()
 		{
-			if seed_account.name == account.name
-				|| seed_account.is_optional
-				|| seed_account.default_value.is_some()
-			{
-				return None;
-			}
-
-			PdaSeedValueNode {
-				name: name.as_str().into(),
-				value: Box::new(AccountValueNode::new(name.as_str()).into()),
-			}
-		} else {
 			return None;
-		};
+		}
 
-		seed_values.push(value);
+		seed_values.push(PdaSeedValueNode {
+			name: name.as_str().into(),
+			value: Box::new(AccountValueNode::new(name.as_str()).into()),
+		});
 	}
 
 	Some(InstructionInputValueNode::PdaValue(PdaValueNode::new(

@@ -11,19 +11,11 @@ help: the trait `pina::PinaCompactPatch<State>` is not implemented for `Unchecke
    |
 13 | struct UncheckedPatch;
    | ^^^^^^^^^^^^^^^^^^^^^
-help: the following other types implement trait `pina::PinaCompactPatch<T>`
+help: the trait `pina::PinaCompactPatch<State>` is implemented for `StatePatch<'__pina_patch>`
   --> tests/ui/fail/compact_builder_custom_patch.rs:8:1
    |
- 8 |   #[account(discriminator = Kind, compact)]
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `StatePatch<'__pina_patch>` implements `pina::PinaCompactPatch<State>`
-   |
-  ::: crates/pina/src/traits.rs
-   |
-   | / impl<T, P> PinaCompactPatch<T> for &P
-   | | where
-   | |     T: PinaCompactAccount,
-   | |     P: PinaCompactPatch<T> + ?Sized,
-   | |____________________________________^ `&P` implements `pina::PinaCompactPatch<T>`
+ 8 | #[account(discriminator = Kind, compact)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 note: required by a bound in `require_builder_patch`
   --> tests/ui/fail/compact_builder_custom_patch.rs:31:29
    |

@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -76,7 +76,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 			&& !uses_generated_seed_builder
 			&& let Some(seed_assertion) = seed_assertion
 		{
-			cx.lint(
+			diagnostics::emit(
+				cx,
 				REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 				|diag| {
 					diag.span(seed_assertion.span);

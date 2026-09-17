@@ -17,9 +17,9 @@ use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 use rustc_span::Span;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -373,7 +373,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 				continue;
 			}
 
-			cx.lint(REQUIRE_GUARDED_FULL_BALANCE_DRAIN, |diag| {
+			diagnostics::emit(cx, REQUIRE_GUARDED_FULL_BALANCE_DRAIN, |diag| {
 				diag.span(*span);
 				diag.primary_message(
 					"an instruction path can sweep an account's entire balance in one call",

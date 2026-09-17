@@ -2784,7 +2784,9 @@ fn unhex(value: &str) -> Result<Vec<u8>, String> {
 	}
 	value
 		.as_bytes()
-		.chunks_exact(2)
+		.as_chunks::<2>()
+		.0
+		.iter()
 		.map(|pair| {
 			let high = hex_digit(pair[0]).ok_or_else(|| format!("invalid hex value `{value}`"))?;
 			let low = hex_digit(pair[1]).ok_or_else(|| format!("invalid hex value `{value}`"))?;

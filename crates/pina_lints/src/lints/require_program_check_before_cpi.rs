@@ -14,8 +14,8 @@ use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -224,6 +224,7 @@ fn definition_type_is_freeze(cx: &LateContext<'_>, definition: rustc_hir::def_id
 	cx.tcx
 		.type_of(definition)
 		.instantiate_identity()
+		.skip_norm_wip()
 		.is_freeze(cx.tcx, typing_env)
 }
 
@@ -269,7 +270,11 @@ fn const_is_trusted_inner(
 	if !definition_type_is_freeze(cx, definition) {
 		return false;
 	}
-	let declared_type = cx.tcx.type_of(definition).instantiate_identity();
+	let declared_type = cx
+		.tcx
+		.type_of(definition)
+		.instantiate_identity()
+		.skip_norm_wip();
 	if !type_contains_indirection(declared_type) {
 		return true;
 	}
@@ -299,14 +304,10 @@ impl<'hir, 'tcx> Visitor<'hir> for StaticScan<'_, 'tcx> {
 		if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = expr.kind {
 			match path.res {
 				Res::Def(DefKind::Static { .. }, definition) => {
-					if !definition_type_is_freeze(self.cx, definition) {
-						self.trusted = false;
-					}
+					self.trusted &= definition_type_is_freeze(self.cx, definition);
 				}
 				Res::Def(DefKind::Const | DefKind::AssocConst, definition) => {
-					if !const_is_trusted_inner(self.cx, definition, self.visited) {
-						self.trusted = false;
-					}
+					self.trusted &= const_is_trusted_inner(self.cx, definition, self.visited);
 				}
 				_ => {}
 			}
@@ -440,7 +441,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			"invoke_signed_with_unverified_program" => "invoke_signed_with_program",
 			_ => "invoke_with_program",
 		};
-		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
+		diagnostics::emit(self.cx, REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
 			diag.span(expr.span);
 			diag.primary_message(format!(
 				"`.{}()` called without a preceding program address verification",
@@ -460,7 +461,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			DynamicCpiMethod::Invoke => "invoke_with_program",
 			DynamicCpiMethod::InvokeSigned => "invoke_signed_with_program",
 		};
-		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
+		diagnostics::emit(self.cx, REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
 			diag.span(expr.span);
 			diag.primary_message(format!(
 				"`{}` cannot be used as a function value",

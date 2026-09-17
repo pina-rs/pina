@@ -22,6 +22,10 @@ use proc_macro::TokenStream;
 
 mod account;
 mod accounts;
+// `darling` repeats the field name in the literal it generates for a
+// `#[darling(multiple)]` field, and that lint lands on the field declaration
+// here, where no field- or struct-level allow reaches it.
+#[allow(clippy::redundant_field_names)]
 mod args;
 mod discriminator;
 mod entrypoint;
@@ -32,6 +36,8 @@ mod migration;
 mod pda;
 mod schema;
 mod support;
+// See the note on `mod args` above.
+#[allow(clippy::redundant_field_names)]
 mod validation;
 
 /// Parses an account slice into a named-field struct.

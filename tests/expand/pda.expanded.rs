@@ -47,12 +47,7 @@ impl ::core::cmp::PartialEq for PdaDisc {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for PdaDisc {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for PdaDisc {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -309,9 +304,7 @@ pub struct CounterStateSeedsWithBump<'a> {
 impl CounterState {
     /// Build the PDA seeds for this account.
     pub fn seeds<'a>(authority: &'a Address) -> CounterStateSeeds<'a> {
-        CounterStateSeeds {
-            authority: authority,
-        }
+        CounterStateSeeds { authority }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
@@ -888,10 +881,10 @@ impl AllSeedState {
         height: u32,
     ) -> AllSeedStateSeeds<'a> {
         AllSeedStateSeeds {
-            authority: authority,
+            authority,
             amount: amount.to_le_bytes(),
             side: [side],
-            tag: tag,
+            tag,
             width: width.to_le_bytes(),
             height: height.to_le_bytes(),
         }
@@ -1327,7 +1320,7 @@ pub struct VaultStateSeedsWithBump<'a> {
 impl VaultState {
     /// Build the PDA seeds for this account.
     pub fn seeds<'a>(user: &'a Address) -> VaultStateSeeds<'a> {
-        VaultStateSeeds { user: user }
+        VaultStateSeeds { user }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
@@ -1526,7 +1519,7 @@ pub struct TodoStateSeedsWithBump<'a> {
 impl TodoState {
     /// Build the PDA seeds for this account.
     pub fn seeds<'a>(owner: &'a Address) -> TodoStateSeeds<'a> {
-        TodoStateSeeds { owner: owner }
+        TodoStateSeeds { owner }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
@@ -2496,16 +2489,18 @@ mod __pinapod_compact_CompactState {
                 *writer.bump_mut() = value;
             }
             if true {
-                match (&encoded_len, &expected_len) {
-                    (left_val, right_val) => {
-                        if !(*left_val == *right_val) {
-                            let kind = ::core::panicking::AssertKind::Eq;
-                            ::core::panicking::assert_failed(
-                                kind,
-                                &*left_val,
-                                &*right_val,
-                                ::core::option::Option::None,
-                            );
+                {
+                    match (&encoded_len, &expected_len) {
+                        (left_val, right_val) => {
+                            if !(*left_val == *right_val) {
+                                let kind = ::core::panicking::AssertKind::Eq;
+                                ::core::panicking::assert_failed(
+                                    kind,
+                                    &*left_val,
+                                    &*right_val,
+                                    ::core::option::Option::None,
+                                );
+                            }
                         }
                     }
                 };
@@ -2544,16 +2539,18 @@ mod __pinapod_compact_CompactState {
                 &data[..encoded_len],
             )?;
             if true {
-                match (&encoded_len, &expected_len) {
-                    (left_val, right_val) => {
-                        if !(*left_val == *right_val) {
-                            let kind = ::core::panicking::AssertKind::Eq;
-                            ::core::panicking::assert_failed(
-                                kind,
-                                &*left_val,
-                                &*right_val,
-                                ::core::option::Option::None,
-                            );
+                {
+                    match (&encoded_len, &expected_len) {
+                        (left_val, right_val) => {
+                            if !(*left_val == *right_val) {
+                                let kind = ::core::panicking::AssertKind::Eq;
+                                ::core::panicking::assert_failed(
+                                    kind,
+                                    &*left_val,
+                                    &*right_val,
+                                    ::core::option::Option::None,
+                                );
+                            }
                         }
                     }
                 };
@@ -2627,9 +2624,7 @@ pub struct CompactStateSeedsWithBump<'a> {
 impl CompactState {
     /// Build the PDA seeds for this account.
     pub fn seeds<'a>(authority: &'a Address) -> CompactStateSeeds<'a> {
-        CompactStateSeeds {
-            authority: authority,
-        }
+        CompactStateSeeds { authority }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
@@ -3197,7 +3192,7 @@ impl NumericState {
     pub fn seeds<'a>(nonce: u64, tag: [u8; 8usize]) -> NumericStateSeeds<'a> {
         NumericStateSeeds {
             nonce: nonce.to_le_bytes(),
-            tag: tag,
+            tag,
             _marker: ::core::marker::PhantomData,
         }
     }

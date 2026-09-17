@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -61,7 +61,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 				continue;
 			}
 
-			cx.lint(REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE, |diag| {
+			diagnostics::emit(cx, REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE, |diag| {
 				diag.span(call.span);
 				diag.primary_message(
 					"explicit PDA bump used without first proving the canonical address",

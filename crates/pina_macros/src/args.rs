@@ -207,13 +207,17 @@ impl SeedType {
 		}
 	}
 
-	/// The expression that stores a constructor parameter in the struct field.
-	pub(crate) fn stored_expr(&self, param: &Ident) -> proc_macro2::TokenStream {
+	/// The field initializer that stores a constructor parameter in the
+	/// generated seeds struct.
+	///
+	/// A seed stored unchanged uses the field shorthand so the generated
+	/// literal never repeats the field name.
+	pub(crate) fn stored_field(&self, param: &Ident) -> proc_macro2::TokenStream {
 		match self {
 			SeedType::Address | SeedType::Bytes(_) => quote::quote!(#param),
-			SeedType::U8 => quote::quote!([#param]),
+			SeedType::U8 => quote::quote!(#param: [#param]),
 			SeedType::U16 | SeedType::U32 | SeedType::U64 => {
-				quote::quote!(#param.to_le_bytes())
+				quote::quote!(#param: #param.to_le_bytes())
 			}
 		}
 	}

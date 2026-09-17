@@ -212,8 +212,6 @@ impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	nostd_entrypoint!(process_instruction);

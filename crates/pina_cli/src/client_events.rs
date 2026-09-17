@@ -283,7 +283,7 @@ fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
 		return Err("discriminator hex must contain complete bytes".to_owned());
 	}
 	let mut bytes = Vec::with_capacity(value.len() / 2);
-	for pair in value.as_bytes().chunks_exact(2) {
+	for pair in value.as_bytes().as_chunks::<2>().0 {
 		let text = std::str::from_utf8(pair).map_err(|_| "discriminator hex is not ASCII")?;
 		let byte = u8::from_str_radix(text, 16)
 			.map_err(|_| format!("discriminator hex `{text}` is not a byte"))?;

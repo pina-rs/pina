@@ -6,8 +6,8 @@ use rustc_hir::ExprKind;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -51,7 +51,7 @@ fn looks_like_asset(expr: &Expr<'_>) -> bool {
 }
 
 fn lint(cx: &LateContext<'_>, span: rustc_span::Span, shift: bool) {
-	cx.lint(REQUIRE_CHECKED_ASSET_ARITHMETIC, |diag| {
+	diagnostics::emit(cx, REQUIRE_CHECKED_ASSET_ARITHMETIC, |diag| {
 		diag.span(span);
 		diag.primary_message("asset arithmetic can overflow, underflow, or silently saturate");
 

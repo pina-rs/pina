@@ -2,11 +2,13 @@ error[E0425]: cannot find type `AbsentAccounts` in this scope
   --> tests/ui/fail/discriminator_entrypoint_missing_accounts.rs:11:2
    |
 11 |     Absent = 1,
-   |     ^^^^^^
-...
-15 | pub struct PresentAccounts<'a> {
-   | ------------------------------ similarly named struct `PresentAccounts` defined here
+   |     ^^^^^^ not found in this scope
    |
+note: similarly named struct `PresentAccounts` defined here
+  --> tests/ui/fail/discriminator_entrypoint_missing_accounts.rs:15:1
+   |
+15 | pub struct PresentAccounts<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: a struct with a similar name exists
    |
 11 -     Absent = 1,

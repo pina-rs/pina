@@ -21,6 +21,7 @@ use pinocchio_token::Instruction;
 
 static STATIC_TOKEN_ID: Address = Address;
 const CONST_TOKEN_ID: Address = Address;
+const CONST_POINTER_TOKEN_ID: &Address = &CONST_TOKEN_ID;
 static mut MUTABLE_TOKEN_ID: Address = Address;
 
 type ProgramAccount = PinaProgramAccount<Address>;
@@ -46,6 +47,17 @@ fn process_parenthesized_const_expected_id(
 	program: &ProgramAccount,
 ) -> Result<(), ()> {
 	program.assert_program((&CONST_TOKEN_ID))?;
+	instruction.invoke_with_unverified_program(program.address())
+}
+
+/// A const whose type carries indirection is trusted only when its initializer
+/// reaches trusted values; the pointer's body references another const, which
+/// walks the const-reference branch of the initializer scan.
+fn process_const_pointer_expected_id(
+	instruction: &Instruction,
+	program: &ProgramAccount,
+) -> Result<(), ()> {
+	program.assert_program(CONST_POINTER_TOKEN_ID)?;
 	instruction.invoke_with_unverified_program(program.address())
 }
 

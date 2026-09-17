@@ -102,7 +102,7 @@ pub(crate) fn expand(
 	let mut find_seed_params = Vec::new();
 	let mut constructor_seed_params = Vec::new();
 	let mut seed_param_names = Vec::new();
-	let mut seed_stored_exprs = Vec::new();
+	let mut seed_field_inits = Vec::new();
 	let mut seed_slice_exprs = Vec::new();
 	let mut seed_slice_exprs_with_bump = Vec::new();
 	let mut seed_constants = Vec::new();
@@ -122,7 +122,7 @@ pub(crate) fn expand(
 				let field_type = ty.field_type();
 				let param_type = ty.param_type();
 				let param_type_lt = ty.param_type_lt();
-				let stored_expr = ty.stored_expr(name);
+				let stored_field = ty.stored_field(name);
 				let slice_expr = ty.slice_expr(name);
 				let slice_expr_with_bump = ty.slice_expr_inner(name);
 				let doc = format!("The `{name}` seed.");
@@ -132,7 +132,7 @@ pub(crate) fn expand(
 				find_seed_params.push(quote!(#name: #param_type));
 				constructor_seed_params.push(quote!(#name: #param_type_lt));
 				seed_param_names.push(name.clone());
-				seed_stored_exprs.push(stored_expr);
+				seed_field_inits.push(stored_field);
 				seed_slice_exprs.push(slice_expr);
 				seed_slice_exprs_with_bump.push(slice_expr_with_bump);
 			}
@@ -370,7 +370,7 @@ pub(crate) fn expand(
 			/// Build the PDA seeds for this account.
 			pub fn seeds<'a>(#(#constructor_seed_params,)*) -> #seeds_name<'a> {
 				#seeds_name {
-					#(#seed_param_names: #seed_stored_exprs,)*
+					#(#seed_field_inits,)*
 					#lifetime_marker_init
 				}
 			}

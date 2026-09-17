@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -61,7 +61,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireZeroedBeforeClose {
 				&call.receiver,
 			);
 			if !has_guard {
-				cx.lint(REQUIRE_ZEROED_BEFORE_CLOSE, |diag| {
+				diagnostics::emit(cx, REQUIRE_ZEROED_BEFORE_CLOSE, |diag| {
 					diag.span(call.span);
 					diag.primary_message(
 						"account close should be preceded by `zeroed()` on the same account",

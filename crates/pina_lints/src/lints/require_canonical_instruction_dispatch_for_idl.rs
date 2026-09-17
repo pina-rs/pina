@@ -15,8 +15,8 @@ use rustc_hir::intravisit::walk_expr;
 use rustc_hir::intravisit::walk_stmt;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -218,7 +218,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 		};
 		visitor.visit_expr(body.value);
 		if !visitor.found {
-			cx.lint(REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL, |diag| {
+			diagnostics::emit(cx, REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL, |diag| {
 				diag.span(span);
 				diag.primary_message(
 					"IDL-friendly instruction dispatch should be a direct `match` over the parsed \

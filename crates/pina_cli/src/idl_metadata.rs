@@ -798,7 +798,9 @@ fn extract_raw_hex(output: &[u8]) -> Result<Vec<u8>, IdlMetadataError> {
 	}
 
 	line.as_bytes()
-		.chunks_exact(2)
+		.as_chunks::<2>()
+		.0
+		.iter()
 		.map(|pair| {
 			let text = std::str::from_utf8(pair)
 				.unwrap_or_else(|error| panic!("validated hexadecimal was not UTF-8: {error}"));
@@ -866,19 +868,15 @@ fn ensure_safe_path(path: &Path, include_self: bool) -> Result<(), IdlMetadataEr
 }
 
 fn is_link_or_reparse(metadata: &std::fs::Metadata) -> bool {
-	if metadata.file_type().is_symlink() {
-		return true;
-	}
-
 	#[cfg(windows)]
 	{
 		use std::os::windows::fs::MetadataExt;
 
-		return metadata.file_attributes() & 0x0400 != 0;
+		metadata.file_type().is_symlink() || metadata.file_attributes() & 0x0400 != 0
 	}
 
 	#[cfg(not(windows))]
-	false
+	metadata.file_type().is_symlink()
 }
 
 #[cfg(test)]

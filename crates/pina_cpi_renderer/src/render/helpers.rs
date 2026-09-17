@@ -159,10 +159,8 @@ pub(crate) fn decode_base16(data: &str, context: &str) -> Result<Vec<u8>> {
 	}
 
 	let mut bytes = Vec::with_capacity(digits.len() / 2);
-	let mut chunk = [0u8; 2];
-	for pair in digits.as_bytes().chunks_exact(2) {
-		chunk.copy_from_slice(pair);
-		let decoded = std::str::from_utf8(&chunk)
+	for pair in digits.as_bytes().as_chunks::<2>().0 {
+		let decoded = std::str::from_utf8(pair)
 			.ok()
 			.and_then(|pair| u8::from_str_radix(pair, 16).ok())
 			.ok_or_else(|| {

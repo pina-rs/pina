@@ -46,12 +46,7 @@ impl ::core::cmp::PartialEq for EventDisc {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for EventDisc {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for EventDisc {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {

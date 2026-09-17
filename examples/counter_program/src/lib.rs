@@ -228,8 +228,6 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	nostd_entrypoint!(CounterInstruction::process_instruction);

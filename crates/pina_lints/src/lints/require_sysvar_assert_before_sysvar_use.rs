@@ -12,8 +12,8 @@ use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -188,7 +188,7 @@ fn unchecked_typed_constructor(
 }
 
 fn emit_unchecked_typed_constructor(cx: &LateContext<'_>, span: rustc_span::Span) {
-	cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
+	diagnostics::emit(cx, REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
 		diag.span(span);
 		diag.primary_message(
 			"unchecked typed sysvar constructor requires a validated source account",
@@ -205,7 +205,7 @@ fn emit_unchecked_typed_constructor_value(
 	span: rustc_span::Span,
 	constructor: UncheckedTypedConstructor,
 ) {
-	cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
+	diagnostics::emit(cx, REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
 		diag.span(span);
 		diag.primary_message(format!(
 			"`{}::{}` cannot be used as a function value",
@@ -219,7 +219,7 @@ fn emit_unchecked_typed_constructor_value(
 }
 
 fn emit_unchecked_sysvar(cx: &LateContext<'_>, span: rustc_span::Span) {
-	cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
+	diagnostics::emit(cx, REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
 		diag.span(span);
 		diag.primary_message(
 			"raw sysvar access should be preceded by `assert_sysvar()` on the same account",

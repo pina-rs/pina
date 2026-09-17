@@ -54,6 +54,7 @@ extern crate rustc_driver;
 extern crate rustc_lint;
 extern crate rustc_session;
 
+mod diagnostics;
 pub mod lints;
 mod macros;
 pub mod shared;
@@ -176,180 +177,180 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 			lint_store.register_lints(&[
 				lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::deny_account_borrows_across_cpi::DenyAccountBorrowsAcrossCpi)
-			});
+			}));
 		}
 		"deny_heap_allocations_in_onchain_instruction_handlers" => {
 			lint_store.register_lints(&[
 				lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::deny_heap_allocations_in_onchain_instruction_handlers::DenyHeapAllocationsInOnchainInstructionHandlers,
 				)
-			});
+			}));
 		}
 		"deny_unchecked_remaining_mut" => {
 			lint_store.register_lints(&[
 				lints::deny_unchecked_remaining_mut::DENY_UNCHECKED_REMAINING_MUT,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::deny_unchecked_remaining_mut::DenyUncheckedRemainingMut)
-			});
+			}));
 		}
 		"deny_unused_account_borrow_guards" => {
 			lint_store.register_lints(&[
 				lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::deny_unused_account_borrow_guards::DenyUnusedAccountBorrowGuards)
-			});
+			}));
 		}
 		"require_bounded_remaining_accounts" => {
 			lint_store.register_lints(&[
 				lints::require_bounded_remaining_accounts::REQUIRE_BOUNDED_REMAINING_ACCOUNTS,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_bounded_remaining_accounts::RequireBoundedRemainingAccounts)
-			});
+			}));
 		}
 		"require_canonical_bump_before_pda_write" => {
 			lint_store.register_lints(&[
 				lints::require_canonical_bump_before_pda_write::REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_canonical_bump_before_pda_write::RequireCanonicalBumpBeforePdaWrite,
 				)
-			});
+			}));
 		}
 		"require_canonical_instruction_dispatch_for_idl" => {
 			lint_store.register_lints(&[
 				lints::require_canonical_instruction_dispatch_for_idl::REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_canonical_instruction_dispatch_for_idl::RequireCanonicalInstructionDispatchForIdl,
 				)
-			});
+			}));
 		}
 		"require_checked_asset_arithmetic" => {
 			lint_store.register_lints(&[
 				lints::require_checked_asset_arithmetic::REQUIRE_CHECKED_ASSET_ARITHMETIC,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_checked_asset_arithmetic::RequireCheckedAssetArithmetic)
-			});
+			}));
 		}
 		"require_consistent_token_program" => {
 			lint_store.register_lints(&[
 				lints::require_consistent_token_program::REQUIRE_CONSISTENT_TOKEN_PROGRAM,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_consistent_token_program::RequireConsistentTokenProgram)
-			});
+			}));
 		}
 		"require_explicit_discriminators_and_seed_namespaces" => {
 			lint_store.register_lints(&[
 				lints::require_explicit_discriminators_and_seed_namespaces::REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_explicit_discriminators_and_seed_namespaces::RequireExplicitDiscriminatorsAndSeedNamespaces,
 				)
-			});
+			}));
 		}
 		"require_explicit_token_2022_extension_policy" => {
 			lint_store.register_lints(&[
 				lints::require_explicit_token_2022_extension_policy::REQUIRE_EXPLICIT_TOKEN_2022_EXTENSION_POLICY,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_explicit_token_2022_extension_policy::RequireExplicitToken2022ExtensionPolicy,
 				)
-			});
+			}));
 		}
 		"require_guarded_full_balance_drain" => {
 			lint_store.register_lints(&[
 				lints::require_guarded_full_balance_drain::REQUIRE_GUARDED_FULL_BALANCE_DRAIN,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_guarded_full_balance_drain::RequireGuardedFullBalanceDrain)
-			});
+			}));
 		}
 		"require_idl_root_to_define_one_program_id" => {
 			lint_store.register_lints(&[
 				lints::require_idl_root_to_define_one_program_id::REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_idl_root_to_define_one_program_id::RequireIdlRootToDefineOneProgramId,
 				)
-			});
+			}));
 		}
 		"require_post_cpi_balance_reload" => {
 			lint_store.register_lints(&[
 				lints::require_post_cpi_balance_reload::REQUIRE_POST_CPI_BALANCE_RELOAD,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_post_cpi_balance_reload::RequirePostCpiBalanceReload)
-			});
+			}));
 		}
 		"require_program_check_before_cpi" => {
 			lint_store.register_lints(&[
 				lints::require_program_check_before_cpi::REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_program_check_before_cpi::RequireProgramCheckBeforeCpi)
-			});
+			}));
 		}
 		"require_reason_for_duplicate_remaining_accounts" => {
 			lint_store.register_lints(&[
 				lints::require_reason_for_duplicate_remaining_accounts::REQUIRE_REASON_FOR_DUPLICATE_REMAINING_ACCOUNTS,
 			]);
-			lint_store.register_pre_expansion_pass(|| {
+			lint_store.register_pre_expansion_lint_pass(Box::new(|| {
 				Box::new(
 					lints::require_reason_for_duplicate_remaining_accounts::RequireReasonForDuplicateRemainingAccounts,
 				)
-			});
+			}));
 		}
 		"require_sysvar_assert_before_sysvar_use" => {
 			lint_store.register_lints(&[
 				lints::require_sysvar_assert_before_sysvar_use::REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_sysvar_assert_before_sysvar_use::RequireSysvarAssertBeforeSysvarUse,
 				)
-			});
+			}));
 		}
 		"require_type_assert_before_zero_copy_cast" => {
 			lint_store.register_lints(&[
 				lints::require_type_assert_before_zero_copy_cast::REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_type_assert_before_zero_copy_cast::RequireTypeAssertBeforeZeroCopyCast,
 				)
-			});
+			}));
 		}
 		"require_writable_before_account_resize" => {
 			lint_store.register_lints(&[
 				lints::require_writable_before_account_resize::REQUIRE_WRITABLE_BEFORE_ACCOUNT_RESIZE,
 			]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::require_writable_before_account_resize::RequireWritableBeforeAccountResize,
 				)
-			});
+			}));
 		}
 		"require_zeroed_before_close" => {
 			lint_store
 				.register_lints(&[lints::require_zeroed_before_close::REQUIRE_ZEROED_BEFORE_CLOSE]);
-			lint_store.register_late_pass(|_| {
+			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::require_zeroed_before_close::RequireZeroedBeforeClose)
-			});
+			}));
 		}
 		_ => {}
 	}

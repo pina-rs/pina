@@ -42,12 +42,7 @@ impl ::core::cmp::PartialEq for MyError {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for MyError {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for MyError {}
 impl ::core::convert::From<MyError> for pina::ProgramError {
     fn from(e: MyError) -> Self {
         pina::ProgramError::Custom(e as u32)

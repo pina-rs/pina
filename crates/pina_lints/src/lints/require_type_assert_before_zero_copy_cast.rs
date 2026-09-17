@@ -10,8 +10,8 @@ use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -115,21 +115,19 @@ struct Analyzer<'cx, 'tcx> {
 
 impl Analyzer<'_, '_> {
 	fn emit(&self, span: rustc_span::Span) {
-		self.cx
-			.lint(REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST, |diag| {
-				diag.span(span);
-				diag.primary_message(
-					"raw zero-copy account casts bypass guard-backed account validation",
-				);
-				diag.help(
-					"replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a \
-					 generated `load_pda*` method",
-				);
-				diag.help(
-					"`assert_type::<T>()` is validation-only and does not make a later raw cast \
-					 safe",
-				);
-			});
+		diagnostics::emit(self.cx, REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST, |diag| {
+			diag.span(span);
+			diag.primary_message(
+				"raw zero-copy account casts bypass guard-backed account validation",
+			);
+			diag.help(
+				"replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a \
+				 generated `load_pda*` method",
+			);
+			diag.help(
+				"`assert_type::<T>()` is validation-only and does not make a later raw cast safe",
+			);
+		});
 	}
 
 	fn is_direct_call_callee(&self, expression: &Expr<'_>) -> bool {

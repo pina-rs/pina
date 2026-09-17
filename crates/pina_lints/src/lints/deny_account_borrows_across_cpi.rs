@@ -12,7 +12,8 @@ use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
+
+use crate::diagnostics;
 
 crate::declare_late_lint! {
 	/// ### What it does
@@ -197,7 +198,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 
 				let method = segment.ident.name.as_str();
 				if is_cpi_invocation(self.cx, expr, method) && !active.is_empty() {
-					self.cx.lint(DENY_ACCOUNT_BORROWS_ACROSS_CPI, |diag| {
+					diagnostics::emit(self.cx, DENY_ACCOUNT_BORROWS_ACROSS_CPI, |diag| {
 						diag.span(expr.span);
 						diag.primary_message(
 							"CPI invoked while a mutable account-data borrow is still alive",
