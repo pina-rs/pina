@@ -69,4 +69,7 @@ Configuration:
   [clients.cpi]
   output = "onchain/cpi"
 
+  [clients.cli_rust]
+  output = "clients/rust-cli"
+
 ----- stderr -----

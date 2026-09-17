@@ -16,7 +16,7 @@ One contract opts in with the `migrations` token; a whole program opts in throug
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = true # or ["accounts", "events", "instructions"], or a staged subset
 ```
 
@@ -102,7 +102,7 @@ Disambiguation answers do not have to travel as flags every run. A `[migrations.
 ```toml
 [migrations.answers]
 rename = ["value:points"]
-assume-removed = []
+assume_removed = []
 ```
 
 `make` consults the table before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename (for example `--assume-removed value` when the file renames `value`) fails closed. Fresh clones and CI therefore replay an answer made locally without anyone re-deriving flag lists, and `--json` failures print a machine-actionable envelope carrying the message plus the exact outstanding questions.

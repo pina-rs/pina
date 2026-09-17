@@ -35,16 +35,16 @@ mode = "auto"
 scaffold = true
 
 [migrations]
-version-type = "u8" # u8, u16, or u32; never u64
+version_type = "u8" # u8, u16, or u32; never u64
 auto = true # optional: true, false, or ["accounts", "events", "instructions"]
 
 [migrations.answers]
 rename = ["value:points"]
-assume-removed = []
+assume_removed = []
 ```
 
-- `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli-rust]`, `[clients.cli-ts]`, and `[clients.cli-dart]`.
-- `[migrations]` is only needed when the program opts into migrations. `version-type` is program-wide and freezes at the first persistent publication; `auto` opts whole contract kinds in; `[migrations.answers]` persists rename and removal decisions for CI.
+- `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli_rust]`, `[clients.cli_ts]`, and `[clients.cli_dart]` (the kebab-case `[clients.cli-rust]` form is a deprecated alias).
+- `[migrations]` is only needed when the program opts into migrations. `version_type` chooses the width once and freezes at the first persistent publication; `auto` opts whole contract kinds in; `[migrations.answers]` persists rename and removal decisions for CI. Prefer the default `u8`: versions are counted per contract, so its 255-version budget applies to each account, instruction, and event separately.
 - A program with a recorded `auto` policy needs a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. `pina migrations make` scaffolds it or prints the exact line, and `pina migrations check` fails until it is present. Commit `migrations/` with the source.
 
 Before deployment, establish the program identity explicitly. Use `pina keys new` for a fresh local identity or validate a keypair produced by trusted platform tooling with `pina keys sync --keypair <path>`. Never use `--force` unless the intended operation is an identity rotation.

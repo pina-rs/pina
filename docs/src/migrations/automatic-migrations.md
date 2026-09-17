@@ -21,7 +21,7 @@ after:  [discriminator][schema version][payload]
 | Instruction   | The instruction payload plus its process account contract |
 | Event         | The emitted log payload                                   |
 
-The version is little-endian, program-wide, and hidden from generated accessors, patches, and instruction arguments. `version-type` in `pina.toml` picks the width once for the program: `u8` (255 versions, the default), `u16`, or `u32`. There is deliberately no `u64`; see [Core Concepts](../core-concepts.md).
+The version is little-endian, stored per contract, and hidden from generated accessors, patches, and instruction arguments. Each account, instruction, and event carries its own history starting at version `0`, so a program with one account at version `3` and another still at `0` is normal. Only the width is program-wide: `version_type` in `pina.toml` picks it once for the program: `u8` (255 versions per contract, the default and the recommendation), `u16`, or `u32`. There is deliberately no `u64`; see [Core Concepts](../core-concepts.md).
 
 Because the version is part of the bytes, changing it after publication is a breaking change for every migration-aware contract. That is why the width is chosen once, and why the manifest is checked in.
 
@@ -40,7 +40,7 @@ Declare the policy in `pina.toml`:
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = true # or ["accounts", "events", "instructions"], or a staged subset
 ```
 

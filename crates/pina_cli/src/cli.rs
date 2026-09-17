@@ -194,7 +194,8 @@ pub(crate) enum Commands {
 		              ./programs/counter --output ./generated\n  pina generate --mode update \
 		              --no-scaffold\n\nConfiguration:\n  [clients]\n  output = \"clients\"\n  \
 		              languages = [\"cpi\", \"rust\", \"cli-rust\"]\n  mode = \"auto\"\n  \
-		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\""
+		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\"\n\n  \
+		              [clients.cli_rust]\n  output = \"clients/rust-cli\""
 	)]
 	Generate {
 		/// Directory inside the project to discover. Defaults to the current directory.

@@ -161,6 +161,8 @@ impl MigrationFixture {
 			 \"2024\"\n[lib]\nname = \"migration_command_fixture\"\npath = \"src/lib.rs\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write fixture manifest: {error}"));
+		// Deliberately the legacy kebab-case key: this fixture keeps the
+		// back-compat alias on the end-to-end `migrations make` path.
 		fs::write(
 			root.join("pina.toml"),
 			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n",
@@ -244,7 +246,7 @@ impl MigrationFixture {
 	fn configure_auto(&self, auto: &str) {
 		fs::write(
 			self.root.join("pina.toml"),
-			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n{auto}"),
+			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{auto}"),
 		)
 		.unwrap_or_else(|error| panic!("write auto config: {error}"));
 	}

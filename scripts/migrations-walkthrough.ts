@@ -208,7 +208,7 @@ function scaffoldProgram(programId: string): void {
 			'program = "."',
 			"",
 			"[migrations]",
-			'version-type = "u8"',
+			'version_type = "u8"',
 			"",
 		].join("\n"),
 	);

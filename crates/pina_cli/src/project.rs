@@ -30,6 +30,11 @@ pub const CONFIG_FILE_NAME: &str = "pina.toml";
 pub const LEGACY_CONFIG_FILE_NAME: &str = "Pina.toml";
 
 /// A generated client ecosystem.
+///
+/// The CLI variants use their kebab-case spelling — the one [`Self::as_str`],
+/// the CLI flag, and the generated directory name already use — so `languages`
+/// no longer needs a second spelling. The squashed legacy form keeps parsing so
+/// existing checkouts keep building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ClientLanguage {
@@ -37,8 +42,11 @@ pub enum ClientLanguage {
 	Typescript,
 	Dart,
 	Cpi,
+	#[serde(rename = "cli-rust", alias = "clirust")]
 	CliRust,
+	#[serde(rename = "cli-ts", alias = "clits")]
 	CliTs,
+	#[serde(rename = "cli-dart", alias = "clidart")]
 	CliDart,
 }
 
@@ -160,8 +168,13 @@ struct LintsConfig(BTreeMap<String, String>);
 
 /// Program-wide migration settings.
 #[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+#[serde(default, deny_unknown_fields)]
 struct MigrationsConfig {
+	/// Version envelope width, one of `u8`, `u16`, or `u32`.
+	///
+	/// `version-type` is accepted as an alias because it was the only kebab-case
+	/// key in `pina.toml`; `snake_case` is the canonical spelling.
+	#[serde(alias = "version-type")]
 	version_type: MigrationVersionType,
 	/// Kinds automatically enveloped by `pina migrations make`. Accepts `true`
 	/// (every kind), `false`, or a list of kind names, so the raw TOML value is
@@ -180,6 +193,7 @@ pub struct MigrationsAnswersConfig {
 	/// Persisted rename answers in `from:to` form.
 	pub rename: Vec<String>,
 	/// Persisted data-dropping acknowledgements.
+	#[serde(alias = "assume-removed")]
 	pub assume_removed: Vec<String>,
 }
 
@@ -210,8 +224,13 @@ struct ClientsConfig {
 	rust: ClientGenerationOverride,
 	typescript: ClientGenerationOverride,
 	dart: ClientGenerationOverride,
+	/// Per-language overrides for the generated CLI clients. The kebab-case
+	/// aliases match the language spelling used everywhere else.
+	#[serde(alias = "cli-rust")]
 	cli_rust: ClientGenerationOverride,
+	#[serde(alias = "cli-ts")]
 	cli_ts: ClientGenerationOverride,
+	#[serde(alias = "cli-dart")]
 	cli_dart: ClientGenerationOverride,
 }
 
@@ -284,9 +303,9 @@ impl ClientsConfig {
 				ClientLanguage::Rust => "clients.rust.output",
 				ClientLanguage::Typescript => "clients.typescript.output",
 				ClientLanguage::Dart => "clients.dart.output",
-				ClientLanguage::CliRust => "clients.cli-rust.output",
-				ClientLanguage::CliTs => "clients.cli-ts.output",
-				ClientLanguage::CliDart => "clients.cli-dart.output",
+				ClientLanguage::CliRust => "clients.cli_rust.output",
+				ClientLanguage::CliTs => "clients.cli_ts.output",
+				ClientLanguage::CliDart => "clients.cli_dart.output",
 			};
 			resolve_output_config_path(clients_dir, field, &generation.output)?;
 			resolved.insert(language, generation);
@@ -999,6 +1018,84 @@ mode = "overwrite"
 				"error lists the supported width `{width}`: {message}"
 			);
 		}
+	}
+
+	/// Snake case is the canonical `pina.toml` spelling; the kebab-case keys
+	/// that shipped first keep parsing so existing checkouts keep building.
+	#[test]
+	fn migrations_keys_accept_snake_case_and_the_legacy_kebab_spelling() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		discover_with_migrations(
+			temp.path(),
+			"auto = true\n\n[migrations.answers]\nassume_removed = [\"legacy\"]\n",
+		);
+		let project = Project::discover(temp.path())
+			.unwrap_or_else(|error| panic!("snake_case must parse: {error}"));
+
+		assert_eq!(project.migration_version_type, MigrationVersionType::U8);
+		assert_eq!(project.migration_auto, MigrationAuto::all());
+		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
+
+		let legacy = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(legacy.path(), "counter");
+		fs::write(
+			legacy.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \
+			 \"u16\"\n\n[migrations.answers]\nassume-removed = [\"legacy\"]\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		let project = Project::discover(legacy.path())
+			.unwrap_or_else(|error| panic!("the legacy kebab spelling must keep parsing: {error}"));
+
+		assert_eq!(project.migration_version_type, MigrationVersionType::U16);
+		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
+	}
+
+	#[test]
+	fn migrations_answers_reject_unknown_keys() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[migrations.answers]\nassume_removedx = []\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let error = Project::discover(temp.path())
+			.expect_err("aliases must not weaken unknown-key rejection");
+
+		assert!(error.to_string().contains("unknown field"), "{error}");
+	}
+
+	/// The CLI ecosystem spellings must match the rest of the CLI surface: the
+	/// `--client` flag, the generated directory name, and `ClientLanguage::as_str`.
+	#[test]
+	fn client_languages_read_kebab_case_and_the_legacy_squashed_spelling() {
+		fn languages(entries: &str) -> Vec<ClientLanguage> {
+			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+			write_program(temp.path(), "counter");
+			fs::write(
+				temp.path().join(CONFIG_FILE_NAME),
+				format!("[project]\nprogram = \".\"\n\n[clients]\nlanguages = [{entries}]\n"),
+			)
+			.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+			Project::discover(temp.path())
+				.unwrap_or_else(|error| panic!("`{entries}` must parse: {error}"))
+				.clients
+		}
+
+		let expected = vec![
+			ClientLanguage::CliRust,
+			ClientLanguage::CliTs,
+			ClientLanguage::CliDart,
+		];
+		assert_eq!(
+			languages("\"cli-rust\", \"cli-ts\", \"cli-dart\""),
+			expected
+		);
+		assert_eq!(languages("\"clirust\", \"clits\", \"clidart\""), expected);
+		assert_eq!(ClientLanguage::CliRust.as_str(), "cli-rust");
 	}
 
 	#[test]
