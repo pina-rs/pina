@@ -110,7 +110,7 @@ You can pass multiple `--idl` flags or `--idl-dir`. Add `--no-scaffold` to emit 
 
 The extractor currently supports these dispatch shapes:
 
-- Generated dispatch: an `#[instruction_dispatch]` enum, where each variant routes to `VariantAccounts` unless `#[dispatch(accounts = OtherAccounts)]` overrides it
+- Generated dispatch: an `#[discriminator(entrypoint)]` enum, whose variants route to `VariantAccounts` unless `#[dispatch(accounts = OtherAccounts)]` overrides them
 - Canonical routed arms: `Variant => Accounts::try_from((program_id, accounts))?.process(data)`
 - Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from((program_id, accounts))?.process(data)`
 - Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
@@ -122,7 +122,7 @@ Keep in mind:
 - Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields. PDA inference still depends on direct validation calls and a field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
 - Existing direct `assert_signer()`, `assert_writable()`, `assert_address()`, and PDA validation-chain inference remains supported. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
-- Multiple files containing `process_instruction` or an `#[instruction_dispatch]` enum, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
+- Multiple files containing `process_instruction` or an `#[discriminator(entrypoint)]` enum, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
 
 <!-- {/pinaIdlDispatchSupport} -->
 
