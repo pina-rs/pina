@@ -890,13 +890,15 @@ async function runAnchorReallocGuards(
 
 	await submit(rawInstruction(
 		descriptor.programId,
-		reallocInstructionData(0, 100),
+		// Eight values: the target must stay a multiple of the u64 value width
+		// above the enveloped header.
+		reallocInstructionData(0, SAMPLE_HEADER_SIZE + 8 * 8),
 		[payerWritableSigner, sampleWritable, systemProgram],
 	));
 	const grownData = await fetchAccountData(surfnet, String(sample));
 	assert.equal(
 		grownData.length,
-		100,
+		SAMPLE_HEADER_SIZE + 8 * 8,
 		"authorized growth did not resize sample",
 	);
 	assertSampleHeader(grownData, bump, authority);
@@ -904,7 +906,10 @@ async function runAnchorReallocGuards(
 
 	for (
 		const [target, message] of [
-			[101, "a target splitting a compact value was accepted"],
+			[
+				SAMPLE_HEADER_SIZE + 8 * 8 + 1,
+				"a target splitting a compact value was accepted",
+			],
 			[
 				SAMPLE_HEADER_SIZE + 65 * 8,
 				"growth beyond compact capacity was accepted",

@@ -1,5 +1,6 @@
 ---
 pina_cli: none
+pina_codama_nodes: docs
 ---
 
 # Adopt migrations across every example program

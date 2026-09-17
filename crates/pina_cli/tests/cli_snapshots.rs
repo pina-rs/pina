@@ -29,11 +29,11 @@ fn reset_snapshot_dir(name: &str) -> PathBuf {
 
 /// Recursively copy a generated client tree into a fixture destination.
 fn copy_tree(source: &Path, destination: &Path) -> std::io::Result<()> {
+	fs::create_dir_all(destination)?;
 	for entry in fs::read_dir(source)? {
 		let entry = entry?;
 		let target = destination.join(entry.file_name());
 		if entry.file_type()?.is_dir() {
-			fs::create_dir_all(&target)?;
 			copy_tree(&entry.path(), &target)?;
 		} else {
 			fs::copy(entry.path(), &target)?;

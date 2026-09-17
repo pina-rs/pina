@@ -81,23 +81,24 @@ void main() {
         encoded,
         orderedEquals(_decodeHex(fixture['encodedHex']! as String)),
       );
-      expect(encoded.sublist(0, 2), orderedEquals([1, 254]));
-      expect(encoded.sublist(2, 6), orderedEquals([3, 65, 0, 66]));
-      expect(encoded.sublist(35, 39), orderedEquals([3, 98, 105, 111]));
-      expect(encoded.sublist(164, 166), orderedEquals([2, 0]));
+      // Envelope: discriminator, migration version, then the payload.
+      expect(encoded.sublist(0, 3), orderedEquals([1, 0, 254]));
+      expect(encoded.sublist(3, 7), orderedEquals([3, 65, 0, 66]));
+      expect(encoded.sublist(36, 40), orderedEquals([3, 98, 105, 111]));
+      expect(encoded.sublist(165, 167), orderedEquals([2, 0]));
       expect(
-        encoded.sublist(166, 174),
+        encoded.sublist(167, 175),
         orderedEquals([7, 0, 0, 0, 0, 0, 0, 0]),
       );
       expect(
-        encoded.sublist(174, 182),
+        encoded.sublist(175, 183),
         orderedEquals([9, 0, 0, 0, 0, 0, 0, 0]),
       );
       expect(
-        encoded.sublist(230, 239),
+        encoded.sublist(231, 240),
         orderedEquals([1, 42, 0, 0, 0, 0, 0, 0, 0]),
       );
-      expect(encoded[239], 1);
+      expect(encoded[240], 1);
 
       final decoded = getProfileStateDecoder().decode(encoded);
       expect(decoded.discriminator, 1);
@@ -126,8 +127,8 @@ void main() {
     test('rejects invalid discriminators, booleans, and option tags', () {
       final canonical = getProfileStateEncoder().encode(_profile());
       final badDiscriminator = Uint8List.fromList(canonical)..[0] = 2;
-      final badOption = Uint8List.fromList(canonical)..[230] = 2;
-      final badBoolean = Uint8List.fromList(canonical)..[239] = 2;
+      final badOption = Uint8List.fromList(canonical)..[231] = 2;
+      final badBoolean = Uint8List.fromList(canonical)..[240] = 2;
 
       expect(
         () => getProfileStateDecoder().decode(badDiscriminator),
@@ -172,7 +173,7 @@ void main() {
     test('treats inactive option capacity as unobservable', () {
       final none = getProfileStateEncoder().encode(_profile());
 
-      for (var index = 231; index < 239; index++) {
+      for (var index = 232; index < 240; index++) {
         none[index] = 0xa5;
       }
 
@@ -202,7 +203,8 @@ void main() {
       );
       final decoded = getSampleDecoder().decode(encoded);
 
-      expect(encoded, hasLength(36 + values.length * 8));
+      // Envelope adds the migration version byte.
+      expect(encoded, hasLength(37 + values.length * 8));
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 254);
       expect(decoded.authority, systemAddress);
@@ -230,15 +232,15 @@ void main() {
       expect(
         encoded,
         hasLength(
-          59 + utf8.encode(title).length + entries.length * 8 + markers.length,
+          60 + utf8.encode(title).length + entries.length * 8 + markers.length,
         ),
       );
-      expect(encoded.sublist(38, 47), [1, 13, 0, 0, 0, 0, 0, 0, 0]);
-      expect(encoded[47], utf8.encode(title).length);
-      expect(encoded.sublist(48, 50), [3, 0]);
-      expect(encoded.sublist(50, 58), [2, 0, 0, 0, 0, 0, 0, 0]);
-      expect(encoded[58], 0);
-      expect(encoded.sublist(59, 64), utf8.encode(title));
+      expect(encoded.sublist(39, 48), [1, 13, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded[48], utf8.encode(title).length);
+      expect(encoded.sublist(49, 51), [3, 0]);
+      expect(encoded.sublist(51, 59), [2, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded[59], 0);
+      expect(encoded.sublist(60, 65), utf8.encode(title));
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 7);
       expect(decoded.authority, systemAddress);
@@ -290,13 +292,13 @@ void main() {
       );
 
       final empty = getJournalEncoder().encode(journal());
-      final excessiveEntries = Uint8List.fromList(empty)..[48] = 9;
-      final excessiveMarkers = Uint8List.fromList(empty)..[50] = 9;
-      final invalidOption = Uint8List.fromList(empty)..[38] = 2;
-      final invalidNoteOption = Uint8List.fromList(empty)..[58] = 2;
+      final excessiveEntries = Uint8List.fromList(empty)..[49] = 9;
+      final excessiveMarkers = Uint8List.fromList(empty)..[51] = 9;
+      final invalidOption = Uint8List.fromList(empty)..[39] = 2;
+      final invalidNoteOption = Uint8List.fromList(empty)..[59] = 2;
       final malformedUtf8 = Uint8List.fromList(
         getJournalEncoder().encode(journal(title: 'x')),
-      )..[59] = 0xff;
+      )..[60] = 0xff;
 
       expect(
         () => getJournalDecoder().decode(excessiveEntries),
@@ -338,9 +340,10 @@ void main() {
 
       expect(data.length, fixture['size']);
       expect(data, orderedEquals(_decodeHex(fixture['encodedHex']! as String)));
-      expect(data.sublist(0, 2), orderedEquals([0, 9]));
-      expect(data.sublist(2, 7), orderedEquals([4, 110, 97, 109, 101]));
-      expect(data.sublist(35, 39), orderedEquals([3, 98, 105, 111]));
+      // Envelope: discriminator, migration version, bump, then the payload.
+      expect(data.sublist(0, 3), orderedEquals([0, 0, 9]));
+      expect(data.sublist(3, 8), orderedEquals([4, 110, 97, 109, 101]));
+      expect(data.sublist(36, 40), orderedEquals([3, 98, 105, 111]));
 
       final parsed = parseInitializeInstruction(instruction);
       expect(parsed.discriminator, 0);
@@ -565,11 +568,12 @@ void main() {
       expect(discovered.first.name, 'valueChangedEvent');
     });
 
-    test('decode events that carry no version envelope', () {
-      final bytes = Uint8List(17);
+    test('decode events at the current version envelope', () {
+      final bytes = Uint8List(18);
       bytes[0] = 1;
+      bytes[1] = 0;
       final view = ByteData.sublistView(bytes);
-      view.setUint64(1, 5, Endian.little);
+      view.setUint64(2, 5, Endian.little);
       final decoded = events_program.decodeMyEventEvent(bytes);
       expect(decoded.discriminator, 1);
       expect(decoded.data, BigInt.from(5));
