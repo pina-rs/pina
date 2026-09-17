@@ -4,7 +4,10 @@
 
 extern crate pina;
 
+use pina::AccountView;
 use pina::Accounts;
+use pina::ParseAccounts;
+use pina::ProgramResult;
 use pina::declare_id;
 use pina::discriminator;
 use pina::instruction_dispatch;
@@ -18,14 +21,10 @@ pub enum CounterInstruction {
 	Increment = 1,
 }
 
-pub struct InitializeInstruction {}
-
-pub struct IncrementInstruction {}
-
 fn main() {
 	assert_eq!(MAX_INSTRUCTION_ACCOUNTS, 3);
 	assert_eq!(
-		<InitializeAccounts<'static> as ::pina::ParseAccounts<'static>>::ACCOUNT_BOUND,
+		<InitializeAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_BOUND,
 		3,
 	);
 }
