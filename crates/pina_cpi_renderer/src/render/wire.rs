@@ -1335,7 +1335,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("bool should decode: {error}"));
 		// A self-referential binding is the exact bug this guards against.
 		assert!(!read.contains("let active = active"));
-		assert!(read.contains("data.get(cursor).copied().ok()? != 0"));
+		assert!(read.contains("data.get(cursor).copied()? != 0"));
 
 		let bytes = Encoded {
 			rust_type: "[u8; 8]".to_string(),

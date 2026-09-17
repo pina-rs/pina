@@ -185,7 +185,7 @@ fn render_enum(
 		})
 		.collect::<Vec<_>>();
 	let uniform = !payload_widths.is_empty()
-		&& payload_widths.iter().all(|width| width.is_some())
+		&& payload_widths.iter().all(Option::is_some)
 		&& payload_widths.windows(2).all(|pair| pair[0] == pair[1]);
 	let maximum = variants
 		.iter()
