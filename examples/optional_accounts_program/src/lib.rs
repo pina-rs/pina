@@ -159,6 +159,10 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 		self.authority.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 
+		// The seeds bind `authority` and `Init` requires that authority to sign,
+		// so a noncanonical bump could only duplicate the signer's own store.
+		// Every later handler requires the same signer and loads through the
+		// stored-bump `load_pda`, which one derivation verifies.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.store,
 			payer: self.authority,

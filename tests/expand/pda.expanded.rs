@@ -2670,9 +2670,49 @@ impl CompactState {
             )
             .map(|_| ())
     }
-    ///Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
+    /// Load and validate `CompactState`, its stored-bump PDA address, and its compact representation for the duration of `use_account`.
+    ///
+    /// Derives the address once from the account's own `bump` field and rejects a mismatch, so only the address that field derives is loadable. This is a single derivation, not a canonical bump search.
+    ///
+    /// Canonicality is the creation builder's proof. `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` both reject a noncanonical bump, so a compact PDA this program created stores the canonical one. That makes this method safe when the address is already established -- a per-signer namespace whose handlers require that signer.
+    ///
+    /// Prefer `with_checked_pda` when an untrusted caller chooses which account the handler loads. This method accepts any address the stored bump derives, including a shadow account created at a noncanonical bump, so it cannot on its own prove the namespace is unique.
     #[inline(always)]
     pub fn with_pda<R>(
+        account: &pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+        use_account: impl FnOnce(
+            <Self as pina::PinaCompactAccount>::Ref<'_>,
+        ) -> ::core::result::Result<R, pina::ProgramError>,
+    ) -> ::core::result::Result<R, pina::ProgramError> {
+        let account_address = *account.address();
+        pina::AsCompactAccount::with_compact_account::<
+            Self,
+            _,
+        >(
+            account,
+            program_id,
+            |state| {
+                let seeds = Self::seeds(authority).with_bump(state.bump);
+                let expected_address = pina::create_program_address(
+                    &seeds.as_slices(),
+                    program_id,
+                )?;
+                if account_address != expected_address {
+                    return Err(pina::ProgramError::InvalidSeeds);
+                }
+                use_account(state)
+            },
+        )
+    }
+    /// Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
+    ///
+    /// Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the only compact loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `with_pda` performs.
+    ///
+    /// Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.
+    #[inline(always)]
+    pub fn with_checked_pda<R>(
         account: &pina::AccountView,
         authority: &Address,
         program_id: &pina::Address,

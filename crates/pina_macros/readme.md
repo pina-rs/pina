@@ -299,7 +299,7 @@ The existing `events_program` also enables `validation` and applies event rules 
 - Generated instructions, events, and ordinary accounts accept audited scalars, addresses, byte arrays, bounded `String` and `Vec` fields, and recursively fixed `Option` fields. PinaPod supplies alignment-one storage and load-bearing validation.
 - `#[account(compact)]` accepts a final suffix made from `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` fields stay in the header. Unsupported nesting produces a compile-time error that lists these forms.
 - A fixed `#[account]` with `#[pda(bump = ...)]` generates `load_pda` and `load_pda_mut`. These methods validate the typed representation and stored-bump PDA address before returning a guard, without repeating recursive validation.
-- A compact `#[account]` with `#[pda(bump = ...)]` generates `with_pda`. The closure-scoped helper validates compact data, the canonical bump, and the PDA address during one runtime borrow.
+- A compact `#[account]` with `#[pda(bump = ...)]` generates `with_pda` and `with_checked_pda`. Both validate compact data and the PDA address during one runtime borrow: `with_pda` derives the address once from the stored bump, while `with_checked_pda` searches for the canonical bump and so also rejects a shadow account created at a noncanonical bump.
 - Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix. Prefix widths are const arguments, not macro attributes.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.

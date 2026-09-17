@@ -264,6 +264,44 @@ fn benchmark_pda_creation_validation_paths() {
 }
 
 // ---------------------------------------------------------------------------
+// Compact PDA loader benchmarks
+// ---------------------------------------------------------------------------
+
+/// What the generated `with_pda` and `with_checked_pda` pay for address
+/// validation, isolated from compact parsing.
+#[test]
+fn benchmark_compact_pda_loader_address_checks() {
+	let authority = [42u8; 32];
+	let seeds: &[&[u8]] = &[b"compact-state", &authority];
+	let (expected_address, bump) =
+		try_find_program_address(seeds, &SYSTEM_ID).unwrap_or_else(|| panic!("expected PDA"));
+	let bump_seed = [bump];
+	let seeds_with_bump: &[&[u8]] = &[b"compact-state", &authority, &bump_seed];
+
+	// `with_pda`: one derivation from the stored bump plus an address compare.
+	bench("compact PDA loader (stored bump)", || {
+		let derived = black_box(create_program_address(
+			black_box(seeds_with_bump),
+			black_box(&SYSTEM_ID),
+		));
+		let valid = derived.is_ok_and(|address| address == expected_address);
+		black_box(valid);
+	});
+
+	// `with_checked_pda`: the canonical search plus the same compare.
+	bench("compact PDA loader (canonical search)", || {
+		let canonical = black_box(try_find_program_address(
+			black_box(seeds),
+			black_box(&SYSTEM_ID),
+		));
+		let valid = canonical.is_some_and(|(address, derived_bump)| {
+			address == expected_address && derived_bump == bump
+		});
+		black_box(valid);
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Instruction parsing benchmarks
 // ---------------------------------------------------------------------------
 

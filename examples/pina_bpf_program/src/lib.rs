@@ -169,7 +169,12 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 
 			self.payer.assert_signer()?.assert_writable()?;
 			self.system_program.assert_address(&system::ID)?;
-			CreateProgramAccountWithUncheckedBump {
+			// The seeds are the global `[SEED_STATE_PREFIX]` with no signer, so
+			// this is a singleton and canonical derivation is the only thing
+			// naming it. The unchecked builder would let anyone mint a second
+			// "State" at a noncanonical bump's address, and nothing on chain
+			// could tell the two apart. Pay the canonical search instead.
+			CreateProgramAccountWithBump {
 				account: self.state,
 				payer: self.payer,
 				owner: &ID,

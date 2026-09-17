@@ -211,6 +211,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
+		//
+		// The seeds bind `authority` and this handler requires that authority to
+		// sign, so a noncanonical bump could only duplicate the signer's own
+		// profile. Every read and update requires the same signer and validates
+		// through the stored bump, so the duplicate stays private to them.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.profile,
 			payer: self.authority,

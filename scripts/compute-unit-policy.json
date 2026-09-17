@@ -30,7 +30,8 @@
 		"token_loader_cu_program/token_2022_ata_success": 3224,
 		"events_program/initialize": 298,
 		"events_program/testEvent": 298,
-		"events_program/testEventCpi": 297
+		"events_program/testEventCpi": 297,
+		"staking_rewards_program/openPosition": 6528
 	},
 	"runtimeExpectedOutcomes": {
 		"token_loader_cu_program/explicit_owner_assert_then_load": true,

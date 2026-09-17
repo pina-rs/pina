@@ -226,8 +226,19 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.stake_vault.assert_empty()?.assert_writable()?;
 		self.reward_vault.assert_empty()?.assert_writable()?;
 
-		// Create the pool state account
-		CreateProgramAccountWithUncheckedBump {
+		// Create the pool state account.
+		//
+		// The pool's seeds carry no signer, so the pool for a mint pair is a
+		// global singleton and the canonical address is the only thing naming it.
+		// `CreateProgramAccountWithBump` searches for the canonical bump and
+		// rejects a supplied bump that does not match, so the second address a
+		// noncanonical bump derives cannot be created. The unchecked sibling
+		// would accept it: its emptiness check sees a fresh address, and every
+		// later read validates stored fields rather than the seeds, so the shadow
+		// pool would be fully functional while invisible to canonical
+		// derivation. That costs a ~10k CU search per initialization, once per
+		// pool, which is worth paying for singleton integrity.
+		CreateProgramAccountWithBump {
 			account: self.pool_state,
 			payer: self.admin,
 			owner: &ID,
@@ -291,8 +302,18 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			return Err(StakingError::PoolPaused.into());
 		}
 
-		// Create the position account
-		CreateProgramAccountWithUncheckedBump {
+		// Create the position account.
+		//
+		// One position per `(pool, owner)` is the invariant every deposit and
+		// claim assumes, and the seeds are the only thing expressing it. Reward
+		// accrual is flat per position, so a second position for the same pair
+		// accrues the full amount a second time while `staked_amount` splits
+		// between them. `assert_empty` cannot prevent that: it guards only the
+		// address being created, and the address a noncanonical bump derives is
+		// empty. `CreateProgramAccountWithBump` searches for the canonical bump
+		// and rejects any other, so the duplicate is unreachable. The user pays
+		// the ~10k CU search once, when they open their position.
+		CreateProgramAccountWithBump {
 			account: self.position_state,
 			payer: self.user,
 			owner: &ID,

@@ -136,6 +136,12 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		self.vault.assert_empty()?.assert_writable()?;
 
 		// Create and initialize the escrow account atomically.
+		//
+		// The seeds bind `maker` and `Make` requires the maker to sign, so a
+		// noncanonical bump could only duplicate the maker's own escrow. Every
+		// later instruction validates the stored bump, the stored parties, and the
+		// vault as the ATA of the passed escrow, so the two stay self-consistent
+		// and a third party cannot be substituted into either.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.escrow,
 			payer: self.maker,

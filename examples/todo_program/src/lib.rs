@@ -85,6 +85,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
+		//
+		// The seeds bind `owner` and this handler requires that owner to sign, so
+		// a noncanonical bump could only duplicate the signer's own todo list.
+		// `Update` requires the same owner and loads through the stored-bump
+		// `load_pda_mut`, so no third party can reach the duplicate.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.todo,
 			payer: self.owner,

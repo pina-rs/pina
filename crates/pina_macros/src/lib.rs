@@ -187,9 +187,11 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `seeds` accepts byte-string constants and typed dynamic seeds. An optional
 /// `bump` field enables generated stored-bump verification. Fixed `#[account]`
 /// schemas with a stored bump receive `load_pda` and `load_pda_mut`. Compact
-/// schemas receive `with_pda` instead because their generated views borrow
-/// variable-length data. Each helper validates the account representation and
-/// PDA address in one pass.
+/// schemas receive `with_pda` and `with_checked_pda` instead because their
+/// generated views borrow variable-length data. Each helper validates the
+/// account representation and PDA address in one pass; `with_checked_pda`
+/// additionally searches for the canonical bump and so rejects an account that
+/// a noncanonical bump derives.
 ///
 /// # Example
 ///
