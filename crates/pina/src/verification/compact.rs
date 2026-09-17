@@ -349,32 +349,39 @@ fn compact_repeated_grow_and_shrink_operations_preserve_logical_values() {
 	// The earlier-tail proof covers every symbolic source and destination length.
 	// This state-machine proof fixes a boundary grow-then-shrink sequence so Kani
 	// can verify the repeated-operation lifecycle without re-solving that same
-	// length cross-product.
+	// length cross-product. The two updates are unrolled by hand: a runtime loop
+	// over the updates would be unwound to the harness bound, multiplying the
+	// whole update-and-validate condition by the unwind factor.
 	let first = [0x11u8, 0x12];
 	let second = [0x21u8, 0x22];
 	let third = [0x31u8, 0x32];
-	let first_len = 0;
-	let second_len = 2;
-	let third_len = 1;
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
 
 	CompactProofState::initialize(
 		&mut data,
-		&CompactProofStatePatch::new().replace_bytes(&first[..first_len]),
+		&CompactProofStatePatch::new().replace_bytes(&first[..0]),
 	)
 	.unwrap();
 
-	for (values, len) in [(&second, second_len), (&third, third_len)] {
-		let committed_size = CompactProofState::update(
-			&mut data,
-			&CompactProofStatePatch::new().replace_bytes(&values[..len]),
-		)
-		.unwrap();
-		let state = CompactProofState::try_from_bytes(&data[..committed_size]).unwrap();
-		assert_eq!(state.bytes(), &values[..len]);
-		assert!(state.words().is_empty());
-		assert!(state.triples().is_empty());
-	}
+	let committed_size = CompactProofState::update(
+		&mut data,
+		&CompactProofStatePatch::new().replace_bytes(&second[..2]),
+	)
+	.unwrap();
+	let state = CompactProofState::try_from_bytes(&data[..committed_size]).unwrap();
+	assert_eq!(state.bytes(), &second[..2]);
+	assert!(state.words().is_empty());
+	assert!(state.triples().is_empty());
+
+	let committed_size = CompactProofState::update(
+		&mut data,
+		&CompactProofStatePatch::new().replace_bytes(&third[..1]),
+	)
+	.unwrap();
+	let state = CompactProofState::try_from_bytes(&data[..committed_size]).unwrap();
+	assert_eq!(state.bytes(), &third[..1]);
+	assert!(state.words().is_empty());
+	assert!(state.triples().is_empty());
 }
 
 #[kani::proof]
