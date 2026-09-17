@@ -12,7 +12,7 @@ install:all
 - Cargo binaries are managed via `cargo-run-bin` and pinned in `[workspace.metadata.bin]` in `Cargo.toml` (`cargo-expand` is the one exception; devenv installs it directly with `cargo install`).
 - External binaries such as the Solana CLI/agave and surfpool are nix packages from the `ifiokjr-nixpkgs` flake input (`custom.agave`, `custom.surfpool` in `devenv.nix`).
 - Snapshot, coverage, and test-runner binaries (`cargo-insta`, `cargo-llvm-cov`, `cargo-nextest`) are also nix packages from devenv.
-- Kani is provided by the pinned `ifiokjr/nixpkgs` input through the dedicated devenv `kani` profile. Devenv links Kani's matching nightly Rust toolchain into the package, so proof tasks need no setup command or mutable `KANI_HOME`, while unrelated commands avoid realizing the large verifier closure.
+- Kani is provided by the pinned `ifiokjr/nixpkgs` input through the dedicated devenv `kani` profile. Devenv links Kani's matching nightly Rust toolchain into the package, so proof tasks need no setup command or mutable `KANI_HOME`, while unrelated commands avoid realizing the large verifier closure. CI does not use that profile: the `kani (quick)` and `kani (compact layouts)` jobs install Kani through `model-checking/kani-github-action`, because the proofs need nothing else from devenv and the nix setup costs roughly five minutes per job. Kani's version is pinned in `.github/workflows/ci.yml`, so raise it there and in the nixpkgs input together.
 
 ## Common commands
 
