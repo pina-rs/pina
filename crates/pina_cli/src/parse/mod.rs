@@ -196,7 +196,7 @@ pub fn assemble_program_ir_multi_with_auto(
 		all_pinapod_enums.extend(pod_enum::extract_pinapod_enums(file)?);
 
 		// A hand-written match is authoritative when present. Otherwise the
-		// `#[instruction_dispatch]` annotation carries the same routing facts,
+		// `#[discriminator(entrypoint)]` annotation carries the same routing facts,
 		// because the macro generates the match the extractor would have read.
 		let file_dispatch = match entrypoint::extract_dispatch_map(file) {
 			dispatch if !dispatch.is_empty() => dispatch,

@@ -20,14 +20,14 @@ const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 /// Declaring the order here makes it typed instead of a comment beside a run of
 /// `run_optional` calls, and generated clients derive the same order from the
 /// IDL.
-#[instruction_dispatch(
+#[discriminator(
+	entrypoint,
 	migrations(State, ManualState, CompactState, State),
 	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS,
 	// This program was measured with `#[inline]`; the unconditional hint adds
 	// 240 bytes to the deployed binary without changing its dispatch cost.
 	inline = "hint"
 )]
-#[discriminator]
 pub enum MigrationInstruction {
 	Update = 0,
 	Relay = 1,
@@ -221,7 +221,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
+	nostd_entrypoint!(MigrationInstruction::process_instruction);
 }
 
 #[cfg(test)]
@@ -272,7 +272,7 @@ mod tests {
 		// SAFETY: `count` views were initialized by `deserialize`.
 		let accounts = unsafe { core::slice::from_raw_parts_mut(views.as_mut_ptr().cast(), count) };
 
-		let result = process_instruction(program_id, accounts, data);
+		let result = MigrationInstruction::process_instruction(program_id, accounts, data);
 		assert!(
 			result.is_err_and(|error| error.eq(&ProgramError::IncorrectProgramId)),
 			"a mismatched program id must be rejected before any migration runs"

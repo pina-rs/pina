@@ -33,7 +33,7 @@ pub mod entrypoint {
 
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
+	nostd_entrypoint!(StakingInstruction::process_instruction);
 }
 
 #[error]
@@ -51,8 +51,7 @@ pub enum StakingError {
 	InvalidPool = 4,
 }
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum StakingInstruction {
 	InitializePool = 0,
 	OpenPosition = 1,

@@ -1,0 +1,11 @@
+error[E0428]: the name `__pina_entrypoint_must_be_unique_per_program` is defined multiple times
+  --> tests/ui/fail/discriminator_two_entrypoints.rs:13:1
+   |
+ 8 | #[discriminator(entrypoint)]
+   | ---------------------------- previous definition of the macro `__pina_entrypoint_must_be_unique_per_program` here
+...
+13 | #[discriminator(entrypoint)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `__pina_entrypoint_must_be_unique_per_program` redefined here
+   |
+   = note: `__pina_entrypoint_must_be_unique_per_program` must be defined only once in the macro namespace of this module
+   = note: this error originates in the attribute macro `discriminator` (in Nightly builds, run with -Z macro-backtrace for more info)

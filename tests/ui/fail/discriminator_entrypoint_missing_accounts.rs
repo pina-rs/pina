@@ -5,8 +5,7 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum Instruction {
 	Present = 0,
 	Absent = 1,

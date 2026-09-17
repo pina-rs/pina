@@ -6,8 +6,7 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum Instruction {
 	Initialize = 0,
 	#[dispatch(accounts = CustomAccounts)]
@@ -54,7 +53,7 @@ impl<'a> ProcessAccountInfos<'a> for SweepAccounts<'a> {
 fn main() {
 	// The largest route is `Initialize` with two positional accounts; `Sweep`
 	// declares one positional account plus one `remaining` slot.
-	assert_eq!(MAX_INSTRUCTION_ACCOUNTS, 2);
+	assert_eq!(Instruction::MAX_INSTRUCTION_ACCOUNTS, 2);
 	assert_eq!(
 		<InitializeAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_BOUND,
 		2,

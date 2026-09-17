@@ -31,11 +31,10 @@ pub mod entrypoint {
 
 	use super::*;
 
-	nostd_entrypoint!(process_instruction);
+	nostd_entrypoint!(EscrowInstruction::process_instruction);
 }
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum EscrowInstruction {
 	Make = 1,
 	Take = 2,

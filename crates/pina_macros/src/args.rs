@@ -410,82 +410,7 @@ fn default_crate_path() -> Path {
 		.unwrap_or_else(|e| panic!("internal error: failed to parse default crate path: {e}"))
 }
 
-/// Arguments for the `#[instruction_dispatch(...)]` attribute macro.
-#[derive(Debug, FromMeta)]
-pub(crate) struct InstructionDispatchArgs {
-	/// Set the path to the crate
-	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: Path,
-	/// Emit the reserved `Migrate` prelude for these migratable contracts.
-	///
-	/// The list is the reserved instruction's slot order: the first entry is
-	/// slot 2, the next slot 3, and so on. Slot order is wire format that the
-	/// manifest cannot express, so it is declared here rather than inferred.
-	#[darling(default)]
-	pub(crate) migrations: Option<Vec<Path>>,
-	/// Lamport budget shared by every slot of the reserved `Migrate`
-	/// instruction.
-	///
-	/// Required alongside `migrations`, because the cap is program policy and a
-	/// default would silently misprice rent transfers.
-	#[darling(default)]
-	pub(crate) migrations_max_lamports: Option<Expr>,
-	/// Emit the compile-time capacity assertions for
-	/// `MAX_INSTRUCTION_ACCOUNTS`.
-	///
-	/// A bare `capacity_test` or `capacity_test = true` emits them;
-	/// `capacity_test = false` suppresses them.
-	#[darling(default, rename = "capacity_test")]
-	pub(crate) capacity_test: Option<CapacityTestArg>,
-	/// Set the account cap that `MAX_INSTRUCTION_ACCOUNTS` saturates at.
-	///
-	/// Defaults to the entrypoint's account array, `pinocchio::MAX_TX_ACCOUNTS`.
-	#[darling(default)]
-	pub(crate) maximum_accounts: Option<Expr>,
-	/// Set the program id the dispatch compares against.
-	///
-	/// Defaults to `ID` from the crate's `declare_id!`.
-	#[darling(default)]
-	pub(crate) program_id: Option<Expr>,
-	/// Set the inline attribute on the generated `process_instruction`.
-	///
-	/// Defaults to `always`. The two spellings are not interchangeable at the
-	/// codegen level: a program measured with `#[inline]` can grow when the
-	/// generated dispatcher is inlined unconditionally, and one measured with
-	/// `#[inline(always)]` can grow with the weaker hint. Match whichever the
-	/// program was measured with.
-	#[darling(default, rename = "inline")]
-	pub(crate) inline: Option<InlineArg>,
-}
-
-/// The `inline` argument on the dispatch attribute.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InlineArg {
-	/// `#[inline(always)]`.
-	Always,
-	/// `#[inline]`.
-	Hint,
-}
-
-impl FromMeta for InlineArg {
-	fn from_word() -> darling::Result<Self> {
-		Ok(Self::Always)
-	}
-
-	fn from_string(value: &str) -> darling::Result<Self> {
-		match value {
-			"always" => Ok(Self::Always),
-			"hint" => Ok(Self::Hint),
-			other => Err(darling::Error::unknown_value(other)),
-		}
-	}
-
-	fn from_bool(value: bool) -> darling::Result<Self> {
-		Ok(if value { Self::Always } else { Self::Hint })
-	}
-}
-
-/// The `capacity_test` argument on the dispatch attribute.
+/// The `capacity_test` argument on the entrypoint declaration.
 ///
 /// Only a bare token or a boolean literal is accepted, matching the strictness
 /// of [`MigrationsArg`] so the attribute grammar has one boolean convention.
@@ -522,6 +447,33 @@ pub(crate) struct DispatchVariantArgs {
 	pub(crate) accounts: Option<Path>,
 }
 
+/// The `inline` argument on an entrypoint declaration.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InlineArg {
+	/// `#[inline(always)]`.
+	Always,
+	/// `#[inline]`.
+	Hint,
+}
+
+impl FromMeta for InlineArg {
+	fn from_word() -> darling::Result<Self> {
+		Ok(Self::Always)
+	}
+
+	fn from_string(value: &str) -> darling::Result<Self> {
+		match value {
+			"always" => Ok(Self::Always),
+			"hint" => Ok(Self::Hint),
+			other => Err(darling::Error::unknown_value(other)),
+		}
+	}
+
+	fn from_bool(value: bool) -> darling::Result<Self> {
+		Ok(if value { Self::Always } else { Self::Hint })
+	}
+}
+
 /// Arguments for the `#[discriminator(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct DiscriminatorArgs {
@@ -539,6 +491,53 @@ pub(crate) struct DiscriminatorArgs {
 	/// Set whether the error enum is in it's final form.
 	#[darling(rename = "final")]
 	pub(crate) is_final: Flag,
+	/// Generate the program entrypoint as associated items on this enum.
+	///
+	/// A bare `entrypoint` token opts in. At most one enum per crate may carry
+	/// it, because a program has one entrypoint.
+	#[darling(default)]
+	pub(crate) entrypoint: Flag,
+	/// Route the reserved `Migrate` instruction over these migratable
+	/// contracts, emitted as `Self::process_migrate`.
+	///
+	/// The list is the reserved instruction's slot order: the first entry is
+	/// slot 2, the next slot 3, and so on. Slot order is wire format that the
+	/// manifest cannot express, so it is declared here rather than inferred.
+	#[darling(default)]
+	pub(crate) migrations: Option<Vec<Path>>,
+	/// Lamport budget shared by every slot of the reserved `Migrate`
+	/// instruction.
+	///
+	/// Required alongside `migrations`, because the cap is program policy and a
+	/// default would silently misprice rent transfers.
+	#[darling(default)]
+	pub(crate) migrations_max_lamports: Option<Expr>,
+	/// Emit the compile-time capacity assertions for
+	/// `MAX_INSTRUCTION_ACCOUNTS`.
+	///
+	/// A bare `capacity_test` or `capacity_test = true` emits them;
+	/// `capacity_test = false` suppresses them.
+	#[darling(default, rename = "capacity_test")]
+	pub(crate) capacity_test: Option<CapacityTestArg>,
+	/// Set the account cap that `MAX_INSTRUCTION_ACCOUNTS` saturates at.
+	///
+	/// Defaults to the entrypoint's account array, `pinocchio::MAX_TX_ACCOUNTS`.
+	#[darling(default)]
+	pub(crate) maximum_accounts: Option<Expr>,
+	/// Set the program id the entrypoint compares against.
+	///
+	/// Defaults to `ID` from the crate's `declare_id!`.
+	#[darling(default)]
+	pub(crate) program_id: Option<Expr>,
+	/// Set the inline attribute on the generated entrypoint.
+	///
+	/// Defaults to `always`. The two spellings are not interchangeable at the
+	/// codegen level: a program measured with `#[inline]` can grow when the
+	/// generated dispatcher is inlined unconditionally, and one measured with
+	/// `#[inline(always)]` can grow with the weaker hint. Match whichever the
+	/// program was measured with.
+	#[darling(default, rename = "inline")]
+	pub(crate) inline: Option<InlineArg>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

@@ -1,5 +1,5 @@
 error: this program declares a migration ladder, but its `migrations/manifest.json` does not exist; run `pina migrations make`
-  --> tests/ui/fail/instruction_dispatch_migrations_without_manifest.rs:12:10
+  --> tests/ui/fail/discriminator_entrypoint_migrations_without_manifest.rs:11:10
    |
-12 | pub enum Instruction {
+11 | pub enum Instruction {
    |          ^^^^^^^^^^^

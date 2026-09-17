@@ -19,7 +19,7 @@ pub struct DiscriminatorVariant {
 	pub value: u64,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct DiscriminatorArgs {
 	primitive: Option<syn::Expr>,
 }
@@ -27,15 +27,16 @@ struct DiscriminatorArgs {
 impl syn::parse::Parse for DiscriminatorArgs {
 	fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
 		let mut args = Self::default();
-		// `crate` and `final` belong to the proc macro's public grammar. IDL
-		// extraction validates their shape and uniqueness but does not otherwise
-		// need their values.
-		let mut has_crate_path = false;
-		let mut is_final = false;
+		// Most arguments belong to the proc macro's public grammar, and IDL
+		// extraction only validates their shape and uniqueness. They are
+		// consumed here so the scanner accepts every documented spelling.
+		let mut seen: Vec<String> = Vec::new();
 
 		while !input.is_empty() {
 			let name = input.call(syn::Ident::parse_any)?;
-			match name.to_string().as_str() {
+			let name_text = name.to_string();
+
+			match name_text.as_str() {
 				"primitive" => {
 					if args.primitive.is_some() {
 						return Err(syn::Error::new(
@@ -45,20 +46,45 @@ impl syn::parse::Parse for DiscriminatorArgs {
 					}
 					input.parse::<syn::Token![=]>()?;
 					args.primitive = Some(input.parse()?);
+					seen.push(name_text);
 				}
 				"crate" => {
-					if has_crate_path {
-						return Err(syn::Error::new(name.span(), "duplicate `crate` argument"));
-					}
 					input.parse::<syn::Token![=]>()?;
 					input.parse::<syn::Path>()?;
-					has_crate_path = true;
+					record_once(&mut seen, &name_text, name.span())?;
 				}
-				"final" => {
-					if is_final {
-						return Err(syn::Error::new(name.span(), "duplicate `final` argument"));
+				// Flags that also accept an explicit boolean, as the proc macro
+				// grammar does: `final`, `entrypoint = false`, and so on.
+				"final" | "entrypoint" | "capacity_test" => {
+					if input.peek(syn::Token![=]) {
+						input.parse::<syn::Token![=]>()?;
+						input.parse::<syn::LitBool>()?;
 					}
-					is_final = true;
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				// `name = value` arguments the scanner validates but does not read.
+				"migrations_max_lamports" | "maximum_accounts" | "program_id" => {
+					input.parse::<syn::Token![=]>()?;
+					input.parse::<syn::Expr>()?;
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				"inline" => {
+					input.parse::<syn::Token![=]>()?;
+					input.parse::<syn::LitStr>()?;
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				// A list of paths: `migrations(Account, ...)`.
+				"migrations" => {
+					let content;
+					syn::parenthesized!(content in input);
+					while !content.is_empty() {
+						content.parse::<syn::Path>()?;
+						if content.is_empty() {
+							break;
+						}
+						content.parse::<syn::Token![,]>()?;
+					}
+					record_once(&mut seen, &name_text, name.span())?;
 				}
 				_ => {
 					return Err(syn::Error::new(
@@ -76,6 +102,19 @@ impl syn::parse::Parse for DiscriminatorArgs {
 
 		Ok(args)
 	}
+}
+
+/// Reject a repeated argument name, mirroring the proc macro's grammar.
+fn record_once(seen: &mut Vec<String>, name: &str, span: proc_macro2::Span) -> syn::Result<()> {
+	if seen.iter().any(|existing| existing == name) {
+		return Err(syn::Error::new(
+			span,
+			format!("duplicate `{name}` argument"),
+		));
+	}
+	seen.push(name.to_owned());
+
+	Ok(())
 }
 
 /// Parse the discriminator enum and variant used by an attribute macro.
@@ -369,5 +408,93 @@ mod tests {
 			.expect_err("unsupported primitive must fail extraction");
 
 		assert!(error.to_string().contains("u8`, `u16`, `u32`, or `u64"));
+	}
+	/// Drive the argument scanner directly so every documented branch executes.
+	///
+	/// The argument list is interpolated into a real attribute and parsed, which
+	/// is exactly how `extract_discriminator_enums` reaches this scanner.
+	fn parse_discriminator_args(source: &str) -> syn::Result<DiscriminatorArgs> {
+		let item_enum: syn::ItemEnum = syn::parse_str(&format!(
+			"#[discriminator({source})] enum Probe {{ A = 0 }}"
+		))
+		.unwrap_or_else(|error| panic!("test attribute: {error}"));
+		let attribute = item_enum
+			.attrs
+			.first()
+			.unwrap_or_else(|| panic!("the probe carries one attribute"));
+
+		attribute.parse_args::<DiscriminatorArgs>()
+	}
+
+	#[test]
+	fn argument_scanner_accepts_every_documented_spelling() {
+		// One enumeration covering each match arm: the primitive, the crate
+		// path, the bare flags, the expression-valued arguments, the string
+		// argument, and the parenthesized ladder.
+		let args = parse_discriminator_args(
+			r#"primitive = u8, crate = ::pina, final, capacity_test,
+				migrations_max_lamports = 20_000, maximum_accounts = 255,
+				program_id = ID, inline = "hint", migrations(State, ManualState)"#,
+		)
+		.unwrap_or_else(|error| panic!("documented grammar must parse: {error}"));
+
+		assert!(args.primitive.is_some());
+	}
+
+	#[test]
+	fn argument_scanner_accepts_the_entrypoint_flag() {
+		parse_discriminator_args("entrypoint")
+			.unwrap_or_else(|error| panic!("the flag must parse: {error}"));
+	}
+
+	#[test]
+	fn argument_scanner_accepts_explicit_boolean_flags() {
+		// The proc macro accepts `entrypoint = true` and `capacity_test = false`,
+		// so the scanner must consume the value rather than rejecting it.
+		parse_discriminator_args("entrypoint = true, capacity_test = false, final = false")
+			.unwrap_or_else(|error| panic!("boolean flags must parse: {error}"));
+	}
+
+	#[test]
+	fn argument_scanner_accepts_an_empty_ladder() {
+		// The `migrations` arm's inner loop must terminate immediately when the
+		// list is empty.
+		parse_discriminator_args("migrations()")
+			.unwrap_or_else(|error| panic!("empty ladder must parse: {error}"));
+	}
+
+	#[test]
+	fn argument_scanner_rejects_a_duplicate_flag() {
+		let error = parse_discriminator_args("final, final")
+			.expect_err("a repeated argument must be rejected");
+
+		assert!(error.to_string().contains("duplicate `final` argument"));
+	}
+
+	#[test]
+	fn argument_scanner_rejects_an_unknown_argument() {
+		let error = parse_discriminator_args("disptach = true")
+			.expect_err("an unknown argument must be rejected");
+
+		assert!(error.to_string().contains("unknown discriminator argument"));
+	}
+
+	#[test]
+	fn entrypoint_flag_is_read_from_the_enum() {
+		// The scanner's result feeds `extract_discriminator_enums`, so the
+		// entrypoint spelling must survive a full extraction.
+		let source = r#"
+			#[discriminator(entrypoint)]
+			pub enum CounterInstruction {
+				Initialize = 0,
+				Increment = 1,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let enums = extract_discriminator_enums(&file)
+			.unwrap_or_else(|error| panic!("extraction must succeed: {error}"));
+
+		assert_eq!(enums.len(), 1);
+		assert_eq!(enums[0].variants.len(), 2);
 	}
 }

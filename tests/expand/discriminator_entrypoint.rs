@@ -1,14 +1,12 @@
 use pina::*;
 
-#[instruction_dispatch]
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum CounterInstruction {
 	Initialize = 0,
 	Increment = 1,
 }
 
-#[instruction_dispatch(capacity_test = false)]
-#[discriminator]
+#[discriminator(entrypoint, capacity_test = false)]
 pub enum OverrideInstruction {
 	#[dispatch(accounts = IncrementAccounts)]
 	Routed = 0,
