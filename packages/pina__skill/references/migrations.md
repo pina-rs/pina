@@ -154,6 +154,14 @@ Also expect `MigrationRequired` (a stale account was touched without a migration
 
 Builds before the split reported the workspace, growth, and lamport failures as the aggregate `MigrationBudgetExceeded` (`0xFFFF_FFF5`). That code stays reserved so published binaries remain decodable; clients must decode the aggregate code and the three split codes.
 
+## Version exhaustion
+
+Versions are counted per contract, not per program: each account, instruction, and event owns an independent history starting at `0`, so a `u8` program gives every contract its own 255-version budget. `pina migrations status` prints what is left (`account State v3 (published, 252 version(s) remaining)`), and `status --json`/`check --json` carry it as `versionsRemaining`.
+
+The width is program-wide and freezes at the first persistent publication, so it cannot be widened after release. Pre-launch, the only widening path is deleting `migrations/` and re-running `make` with the wider setting, which re-baselines history; there is nothing deployed to stay compatible with yet.
+
+Reaching the ceiling is terminal for that contract. `make` fails closed with `VersionExhausted` and the on-chain path rejects out-of-range versions instead of truncating, so no version number is ever reused. The remedy is a successor contract: a new discriminator with a fresh version-0 history, plus a bridge instruction that reads the exhausted account through the current loaders and writes the successor, with clients sweeping accounts lazily. History cannot be pruned, because a program cannot enumerate its own accounts.
+
 ## Honest limits
 
 - Data written before the envelope existed is not interpreted as version zero: its first payload bytes could be a valid version by accident. Adopting migrations on a live program is a deliberate wire-format change that needs a new discriminator or a bridge. ADR 0008 tracks the unbuilt `legacy` ergonomics, so do not promise a launched program a transparent adoption.

@@ -104,6 +104,12 @@ pub struct MigrationStatus {
 	pub published: bool,
 	pub publication_pending: bool,
 	pub schema_sha256: String,
+	/// Versions this contract can still consume before its width is exhausted.
+	///
+	/// Every contract owns an independent history, so this is a per-contract
+	/// budget. The width freezes at the first publication, which is why running
+	/// out is a planning problem rather than something a later release fixes.
+	pub versions_remaining: u32,
 }
 
 /// `pina migrations status` output: per-contract state plus the cost preview.
@@ -263,7 +269,15 @@ pub enum MigrationError {
 		identity: String,
 	},
 
-	#[error("Configured {version_type} migration versions are exhausted for `{identity}`")]
+	#[error(
+		"Configured {version_type} migration versions are exhausted for `{identity}`. Versions \
+		 are counted per contract, so this is the ceiling for this one contract, not for the \
+		 program. The width is program-wide and freezes at the first publication, so it cannot be \
+		 widened now: adopt a successor contract with a new discriminator and a fresh version-0 \
+		 history, and add a bridge instruction that reads the exhausted account through the \
+		 current loaders and writes the successor. Account history cannot be pruned, because a \
+		 program cannot enumerate its own accounts without an external completeness proof."
+	)]
 	VersionExhausted {
 		version_type: String,
 		identity: String,
@@ -790,6 +804,10 @@ fn check_project_migrations_with_manifest(
 					.is_some_and(|published| published.version >= latest.version)
 			}),
 			schema_sha256: latest.schema_sha256.clone(),
+			versions_remaining: manifest
+				.version_type
+				.max_version()
+				.saturating_sub(latest.version),
 		});
 	}
 	for (key, history) in &manifest.contracts {

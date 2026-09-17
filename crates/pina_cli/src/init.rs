@@ -31,6 +31,7 @@ const SCAFFOLD_FILES: &[&str] = &[
 	"README.md",
 	".gitignore",
 	".cargo/config.toml",
+	"build.rs",
 	"src/lib.rs",
 	"src/entrypoint.rs",
 	"tests/integration.rs",
@@ -83,15 +84,16 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 	write_file(&paths[2], &readme_template(package_name))?;
 	write_file(&paths[3], &gitignore_template())?;
 	write_file(&paths[4], &cargo_config_template())?;
-	write_file(&paths[5], &lib_template(package_name, &program_title))?;
-	write_file(&paths[6], &entrypoint_template())?;
+	write_file(&paths[5], &build_script_template())?;
+	write_file(&paths[6], &lib_template(package_name, &program_title))?;
+	write_file(&paths[7], &entrypoint_template())?;
 	write_file(
-		&paths[7],
+		&paths[8],
 		&integration_test_template(package_name, &program_title),
 	)?;
-	write_file(&paths[8], &rust_toolchain_template())?;
-	write_file(&paths[9], &surfpool_cargo_toml_template(package_name))?;
-	write_file(&paths[10], &surfpool_test_template())?;
+	write_file(&paths[9], &rust_toolchain_template())?;
+	write_file(&paths[10], &surfpool_cargo_toml_template(package_name))?;
+	write_file(&paths[11], &surfpool_test_template())?;
 
 	Ok(())
 }
@@ -102,6 +104,9 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("  Next steps:");
 	println!();
 	println!("    cd {}", project_dir.display());
+	println!("    # 1. Set your program address in src/lib.rs, then snapshot the ABI:");
+	println!("    pina migrations make           # record the version-0 baseline");
+	println!();
 	println!("    pina lint                      # run Pina's security lints");
 	println!("    pina build                     # build SBF and generate the IDL");
 	println!("    pina test --unit               # fast native tests");
@@ -109,10 +114,20 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("    pina dev --yes                 # create and review the Surfpool runbook");
 	println!("    pina generate                  # generate configured clients");
 	println!();
-	println!("  Update the program address in src/lib.rs with your deployed program ID.");
+	println!(
+		"  Run `pina migrations make` only after the declared program address is final: the \
+		 recorded history is bound to that address."
+	);
 	println!();
 }
 
+/// `pina.toml` for a new program.
+///
+/// Migrations are on by default. The recorded history is bound to the declared
+/// program address, so the manifest is deliberately *not* scaffolded here: the
+/// placeholder `declare_id!` would pin the history to an address the user is
+/// about to replace. `pina migrations make` is the bootstrap step, and it runs
+/// once the real address is in place.
 fn pina_toml_template() -> String {
 	r#"[project]
 program = "."
@@ -122,8 +137,27 @@ output = "clients"
 languages = ["cpi", "rust", "typescript"]
 mode = "auto"
 scaffold = true
+
+# ABI migrations. Versions are counted per contract, so `u8` gives every
+# account, instruction, and event its own 255-version budget. The width is
+# program-wide and freezes at the first published release, so it cannot be
+# widened later; pick `u16` or `u32` before launch only if one contract is
+# expected to need more.
+[migrations]
+version_type = "u8"
+auto = true
 "#
 	.to_owned()
+}
+
+/// Build script that keeps macro expansion fresh when the migration policy or
+/// manifest changes.
+///
+/// A proc macro does not re-expand when `pina.toml` or the manifest changes, so
+/// the recorded `auto` policy needs this directive to take effect on the next
+/// build. `pina migrations make` scaffolds the same file when it is missing.
+fn build_script_template() -> String {
+	"fn main() {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n".to_owned()
 }
 
 fn is_valid_package_name(name: &str) -> bool {
@@ -575,6 +609,42 @@ mod tests {
 		assert!(surfpool_cargo.contains(&format!("pina = \"{}\"", env!("CARGO_PKG_VERSION"))));
 		assert!(!surfpool_cargo.contains("program_under_test"));
 		assert!(!surfpool_cargo.contains("surfpool-sdk"));
+	}
+
+	/// Migrations are on by default, and the manifest is deliberately absent:
+	/// it would bind the recorded history to the placeholder program address.
+	#[test]
+	fn init_project_enables_migrations_without_pinning_the_placeholder_address() {
+		let dir = TempDir::new("migrations_default");
+		init_project(&dir.path, "my_program", false)
+			.unwrap_or_else(|err| panic!("expected init to succeed: {err}"));
+
+		let config = fs::read_to_string(dir.path.join("pina.toml"))
+			.unwrap_or_else(|err| panic!("expected pina.toml to be readable: {err}"));
+		let parsed: toml::Value = toml::from_str(&config)
+			.unwrap_or_else(|err| panic!("scaffolded pina.toml must parse: {err}"));
+		let migrations = parsed
+			.get("migrations")
+			.and_then(toml::Value::as_table)
+			.unwrap_or_else(|| panic!("scaffold must configure [migrations]"));
+
+		assert_eq!(
+			migrations.get("version_type").and_then(toml::Value::as_str),
+			Some("u8")
+		);
+		assert_eq!(
+			migrations.get("auto").and_then(toml::Value::as_bool),
+			Some(true)
+		);
+
+		// The scaffold must not pre-record a history: `make` pins the declared
+		// program address, and the scaffold still carries the placeholder.
+		assert!(!dir.path.join("migrations").exists());
+
+		// The auto policy needs the rerun directive so a policy flip re-expands.
+		let build_script = fs::read_to_string(dir.path.join("build.rs"))
+			.unwrap_or_else(|err| panic!("expected build.rs to be readable: {err}"));
+		assert!(build_script.contains("cargo:rerun-if-changed=migrations/manifest.json"));
 	}
 
 	#[test]
