@@ -105,20 +105,17 @@ pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
 /// recognized by their final segment, mirroring how Rust resolves the proc
 /// macro.
 fn is_dispatch_annotated(item_enum: &ItemEnum) -> bool {
-	item_enum
-		.attrs
-		.iter()
-		.any(|attribute| is_entrypoint_declaration(attribute))
+	item_enum.attrs.iter().any(is_entrypoint_declaration)
 }
 
 /// Whether one attribute is an `entrypoint`-flagged discriminator.
 fn is_entrypoint_declaration(attribute: &syn::Attribute) -> bool {
-	if !attribute
+	let is_discriminator = attribute
 		.path()
 		.segments
 		.last()
-		.is_some_and(|segment| segment.ident == DISCRIMINATOR_ATTRIBUTE)
-	{
+		.is_some_and(|segment| segment.ident == DISCRIMINATOR_ATTRIBUTE);
+	if !is_discriminator {
 		return false;
 	}
 
@@ -132,17 +129,13 @@ fn is_entrypoint_declaration(attribute: &syn::Attribute) -> bool {
 		match meta {
 			// A bare `entrypoint` token.
 			syn::Meta::Path(path) => path.is_ident(ENTRYPOINT_ARGUMENT),
-			// `entrypoint = true` selects it; `entrypoint = false` does not.
 			syn::Meta::NameValue(name_value) => {
-				if !name_value.path.is_ident(ENTRYPOINT_ARGUMENT) {
-					return false;
-				}
-
-				matches!(
-					&name_value.value,
-					syn::Expr::Lit(lit)
-						if matches!(&lit.lit, syn::Lit::Bool(value) if value.value)
-				)
+				// `entrypoint = true` selects it; `entrypoint = false` does not.
+				name_value.path.is_ident(ENTRYPOINT_ARGUMENT)
+					&& matches!(
+						&name_value.value,
+						Expr::Lit(lit) if matches!(&lit.lit, syn::Lit::Bool(value) if value.value)
+					)
 			}
 			syn::Meta::List(_) => false,
 		}
