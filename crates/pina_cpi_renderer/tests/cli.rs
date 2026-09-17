@@ -114,3 +114,79 @@ fn rejects_invocations_without_an_idl_source() {
 	assert!(!success);
 	assert!(stderr.contains("provide at least one --idl"));
 }
+
+#[test]
+fn mode_update_refreshes_an_existing_crate() {
+	let output = unique_dir("pina-cpi-cli-update");
+
+	let (success, _, stderr) = run(&["--idl", &fixture(), "--output", &output, "--mode", "create"]);
+	assert!(success, "{stderr}");
+
+	let (success, stdout, _) = run(&["--idl", &fixture(), "--output", &output, "--mode", "update"]);
+	assert!(success, "{stdout}");
+	assert!(Path::new(&output).join("Cargo.toml").is_file());
+
+	std::fs::remove_dir_all(&output)
+		.unwrap_or_else(|error| panic!("failed to clean generated crate: {error}"));
+}
+
+#[test]
+fn mode_overwrite_replaces_the_whole_crate() {
+	let output = unique_dir("pina-cpi-cli-overwrite");
+	std::fs::create_dir_all(&output)
+		.unwrap_or_else(|error| panic!("failed to create output: {error}"));
+	std::fs::write(Path::new(&output).join("stale.txt"), "old")
+		.unwrap_or_else(|error| panic!("failed to write stale file: {error}"));
+
+	let (success, _, stderr) = run(&[
+		"--idl",
+		&fixture(),
+		"--output",
+		&output,
+		"--mode",
+		"overwrite",
+	]);
+	assert!(success, "{stderr}");
+	assert!(Path::new(&output).join("src/generated/mod.rs").is_file());
+	assert!(!Path::new(&output).join("stale.txt").exists());
+
+	std::fs::remove_dir_all(&output)
+		.unwrap_or_else(|error| panic!("failed to clean generated crate: {error}"));
+}
+
+#[test]
+fn rejects_an_idl_directory_that_is_a_file() {
+	let file = unique_dir("pina-cpi-cli-not-a-dir");
+	std::fs::write(&file, "not a directory")
+		.unwrap_or_else(|error| panic!("failed to write: {error}"));
+
+	let (success, _, stderr) = run(&[
+		"--idl-dir",
+		&file,
+		"--output",
+		&unique_dir("pina-cpi-cli-unused"),
+	]);
+	assert!(!success);
+	assert!(stderr.contains("failed to read IDL directory"));
+
+	std::fs::remove_file(&file).unwrap_or_else(|error| panic!("failed to clean: {error}"));
+}
+
+#[test]
+fn rejects_an_idl_with_an_unusable_program_id() {
+	let root = unique_dir("pina-cpi-cli-bad-key");
+	std::fs::create_dir_all(&root).unwrap_or_else(|error| panic!("failed to create root: {error}"));
+	let idl = Path::new(&root).join("broken.json");
+	std::fs::write(
+		&idl,
+		r#"{"kind":"rootNode","standard":"codama","version":"1.0.0","program":{"kind":"programNode","name":"broken","publicKey":"not-a-key","version":"0.0.0"}}"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to write idl: {error}"));
+
+	let unused = unique_dir("pina-cpi-cli-bad-out");
+	let (success, _, stderr) = run(&["--idl", &idl.to_string_lossy(), "--output", &unused]);
+	assert!(!success);
+	assert!(stderr.contains("failed to render") || stderr.contains("invalid"));
+
+	std::fs::remove_dir_all(&root).unwrap_or_else(|error| panic!("failed to clean: {error}"));
+}
