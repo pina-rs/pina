@@ -124,7 +124,9 @@ pub(crate) fn parse_program_with_sources(
 	})?;
 	let entrypoint_source_count = syn_files
 		.iter()
-		.filter(|file| entrypoint::has_process_instruction(file))
+		.filter(|file| {
+			entrypoint::has_process_instruction(file) || entrypoint::has_dispatch_attribute(file)
+		})
 		.count();
 	if entrypoint_source_count > 1 {
 		return Err(IdlError::ambiguous_entrypoint(entrypoint_source_count));
@@ -193,7 +195,13 @@ pub fn assemble_program_ir_multi_with_auto(
 		all_errors.extend(error_enum::extract_error_enums(file));
 		all_pinapod_enums.extend(pod_enum::extract_pinapod_enums(file)?);
 
-		let file_dispatch = entrypoint::extract_dispatch_map(file);
+		// A hand-written match is authoritative when present. Otherwise the
+		// `#[instruction_dispatch]` annotation carries the same routing facts,
+		// because the macro generates the match the extractor would have read.
+		let file_dispatch = match entrypoint::extract_dispatch_map(file) {
+			dispatch if !dispatch.is_empty() => dispatch,
+			_ => entrypoint::extract_dispatch_from_attribute(file),
+		};
 		if !file_dispatch.is_empty() {
 			dispatch_source_count += 1;
 			if dispatch_source_count > 1 {

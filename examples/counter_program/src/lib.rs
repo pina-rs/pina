@@ -50,6 +50,11 @@ declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
 /// Instruction discriminator. Each variant maps to a unique `u8` tag that
 /// appears as the first byte of instruction data.
+///
+/// `#[instruction_dispatch]` generates `process_instruction`, routing each
+/// variant to the accounts struct of the same name plus `Accounts`, and derives
+/// `MAX_INSTRUCTION_ACCOUNTS` from those structs' declared bounds.
+#[instruction_dispatch]
 #[discriminator]
 pub enum CounterInstruction {
 	Initialize = 0,
@@ -222,24 +227,6 @@ pub mod entrypoint {
 	use super::*;
 
 	nostd_entrypoint!(process_instruction);
-
-	#[inline(always)]
-	pub fn process_instruction(
-		program_id: &Address,
-		accounts: &mut [AccountView],
-		data: &[u8],
-	) -> ProgramResult {
-		let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
-
-		match instruction {
-			CounterInstruction::Initialize => {
-				InitializeAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			CounterInstruction::Increment => {
-				IncrementAccounts::try_from((program_id, accounts))?.process(data)
-			}
-		}
-	}
 }
 
 // ---------------------------------------------------------------------------

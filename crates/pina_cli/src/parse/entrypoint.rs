@@ -1,7 +1,14 @@
 use syn::Expr;
 use syn::File;
 use syn::Item;
+use syn::ItemEnum;
 use syn::Stmt;
+
+/// The attribute macro that generates dispatch from an instruction enum.
+const DISPATCH_ATTRIBUTE: &str = "instruction_dispatch";
+
+/// The suffix an unannotated variant appends to find its accounts struct.
+const ACCOUNTS_SUFFIX: &str = "Accounts";
 
 /// A mapping from a discriminator variant to the accounts struct used for that
 /// instruction.
@@ -52,6 +59,129 @@ pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 	}
 
 	entries
+}
+
+/// Extract the dispatch map from an `#[instruction_dispatch]` annotation.
+///
+/// The macro generates `process_instruction` and the match arms, so neither is
+/// present in the source the IDL extractor reads. The annotation carries the
+/// same routing facts the generated match would: each variant names its
+/// accounts struct, defaulting to `VariantAccounts`.
+pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
+	let mut entries = Vec::new();
+
+	for item in &file.items {
+		match item {
+			Item::Enum(item_enum) if is_dispatch_annotated(item_enum) => {
+				entries.extend(dispatch_entries_for(item_enum));
+			}
+			// An annotated enum may sit inside the entrypoint module.
+			Item::Mod(module) => {
+				let Some((_, items)) = &module.content else {
+					continue;
+				};
+				for inner in items {
+					let Item::Enum(item_enum) = inner else {
+						continue;
+					};
+					if is_dispatch_annotated(item_enum) {
+						entries.extend(dispatch_entries_for(item_enum));
+					}
+				}
+			}
+			_ => {}
+		}
+	}
+
+	entries
+}
+
+/// Whether an enum's own attributes carry the dispatch attribute.
+///
+/// Qualified spellings such as `#[pina::instruction_dispatch]` are recognized
+/// by their final segment, mirroring how Rust resolves the proc macro.
+fn is_dispatch_annotated(item_enum: &ItemEnum) -> bool {
+	item_enum
+		.attrs
+		.iter()
+		.any(|attribute| is_dispatch_attribute(attribute.path()))
+}
+
+/// Whether a path names the dispatch macro.
+fn is_dispatch_attribute(path: &syn::Path) -> bool {
+	path.segments
+		.last()
+		.is_some_and(|segment| segment.ident == DISPATCH_ATTRIBUTE)
+}
+
+/// Whether a file declares an `#[instruction_dispatch]` enum, at the top level
+/// or inside the entrypoint module.
+pub fn has_dispatch_attribute(file: &File) -> bool {
+	file.items.iter().any(|item| {
+		match item {
+			Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
+			Item::Mod(module) => {
+				module.content.as_ref().is_some_and(|(_, items)| {
+					items.iter().any(|inner| {
+						match inner {
+							Item::Enum(item_enum) => is_dispatch_annotated(item_enum),
+							_ => false,
+						}
+					})
+				})
+			}
+			_ => false,
+		}
+	})
+}
+
+/// Build dispatch entries for one annotated enum.
+///
+/// Every variant routes to `VariantAccounts` unless a per-variant
+/// `#[dispatch(accounts = Struct)]` override names another struct. The runtime
+/// macro applies the same rule, so the IDL and the program agree.
+fn dispatch_entries_for(item_enum: &ItemEnum) -> Vec<DispatchEntry> {
+	item_enum
+		.variants
+		.iter()
+		.map(|variant| {
+			let variant_name = variant.ident.to_string();
+			let override_accounts = variant.attrs.iter().find_map(|attribute| {
+				if !attribute.path().is_ident("dispatch") {
+					return None;
+				}
+
+				let metas = attribute
+					.parse_args_with(
+						syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+					)
+					.ok()?;
+				metas.into_iter().find_map(|meta| {
+					let syn::Meta::NameValue(name_value) = meta else {
+						return None;
+					};
+					if !name_value.path.is_ident("accounts") {
+						return None;
+					}
+					let Expr::Path(path) = &name_value.value else {
+						return None;
+					};
+
+					path.path
+						.segments
+						.last()
+						.map(|segment| segment.ident.to_string())
+				})
+			});
+
+			DispatchEntry {
+				variant: variant_name.clone(),
+				accounts_struct: Some(
+					override_accounts.unwrap_or_else(|| format!("{variant_name}{ACCOUNTS_SUFFIX}")),
+				),
+			}
+		})
+		.collect()
 }
 
 /// Return whether a source file defines a top-level or inline-module
@@ -399,5 +529,147 @@ mod tests {
 			extract_accounts_struct_from_call(&valid),
 			Some("Accounts".to_owned())
 		);
+	}
+
+	#[test]
+	fn extracts_dispatch_from_the_attribute() {
+		let source = r#"
+			#[instruction_dispatch]
+			#[discriminator]
+			pub enum CounterInstruction {
+				Initialize = 0,
+				Increment = 1,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(has_dispatch_attribute(&file));
+
+		let dispatch = extract_dispatch_from_attribute(&file);
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(dispatch[0].variant, "Initialize");
+		assert_eq!(
+			dispatch[0].accounts_struct,
+			Some("InitializeAccounts".to_owned())
+		);
+		assert_eq!(dispatch[1].variant, "Increment");
+		assert_eq!(
+			dispatch[1].accounts_struct,
+			Some("IncrementAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn attribute_dispatch_honours_per_variant_overrides() {
+		let source = r#"
+			#[instruction_dispatch]
+			pub enum Mixed {
+				Default = 0,
+				#[dispatch(accounts = CustomAccounts)]
+				Overridden = 1,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_from_attribute(&file);
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(
+			dispatch[0].accounts_struct,
+			Some("DefaultAccounts".to_owned())
+		);
+		assert_eq!(
+			dispatch[1].accounts_struct,
+			Some("CustomAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn attribute_dispatch_is_found_inside_the_entrypoint_module() {
+		let source = r#"
+			mod entrypoint {
+				#[instruction_dispatch]
+				pub enum Nested {
+					Run = 0,
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(has_dispatch_attribute(&file));
+
+		let dispatch = extract_dispatch_from_attribute(&file);
+		assert_eq!(dispatch.len(), 1);
+		assert_eq!(dispatch[0].variant, "Run");
+		assert_eq!(dispatch[0].accounts_struct, Some("RunAccounts".to_owned()));
+	}
+
+	#[test]
+	fn override_parsing_skips_every_unusable_attribute_shape() {
+		// Each attribute before the final one exercises one guard in the
+		// override reader: a foreign attribute, a bare word, a non-`accounts`
+		// name-value pair, and a non-path value. The readable override comes
+		// last so every guard runs first.
+		let source = r#"
+			#[instruction_dispatch]
+			pub enum Guards {
+				/// A doc comment is an attribute whose path is `doc`.
+				#[dispatch(bare)]
+				#[dispatch(other = Somewhere)]
+				#[dispatch(accounts = 12)]
+				#[dispatch(accounts = RealAccounts)]
+				Run = 0,
+			}
+
+			/// Doc comments also sit on the enum without being dispatch attrs.
+			#[instruction_dispatch]
+			pub enum Documented {
+				Run = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_from_attribute(&file);
+
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(dispatch[0].accounts_struct, Some("RealAccounts".to_owned()));
+		assert_eq!(dispatch[1].accounts_struct, Some("RunAccounts".to_owned()));
+	}
+
+	#[test]
+	fn non_enum_items_are_scanned_without_match() {
+		// Top-level and nested non-enum items take the `_` arms of the scanner,
+		// and an unannotated enum keeps both readers empty.
+		let source = r#"
+			pub const VERSION: u8 = 1;
+
+			mod empty;
+
+			fn helper() {}
+
+			mod inner {
+				pub const NESTED: u8 = 2;
+
+				fn nested_helper() {}
+
+				// An unannotated enum inside a module is skipped too.
+				#[discriminator]
+				pub enum PlainInner {
+					A = 0,
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		assert!(!has_dispatch_attribute(&file));
+		assert!(extract_dispatch_from_attribute(&file).is_empty());
+	}
+
+	#[test]
+	fn unannotated_enums_produce_no_dispatch() {
+		let source = r#"
+			#[discriminator]
+			pub enum Plain {
+				Run = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(!has_dispatch_attribute(&file));
+		assert!(extract_dispatch_from_attribute(&file).is_empty());
 	}
 }

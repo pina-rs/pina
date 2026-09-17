@@ -11,6 +11,22 @@ declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 // `pina migrations make` prints the same estimate when a transition grows.
 const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 
+/// Instruction discriminator.
+///
+/// The `migrations(...)` list is the reserved `Migrate` instruction's slot
+/// order: `[payer, systemProgram, state, manualState, compactState,
+/// spareState]`. The trailing `spareState` slot shows several accounts of the
+/// same contract migrating in one sweep under one shared lamport budget.
+/// Declaring the order here makes it typed instead of a comment beside a run of
+/// `run_optional` calls, and generated clients derive the same order from the
+/// IDL.
+#[instruction_dispatch(
+	migrations(State, ManualState, CompactState, State),
+	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS,
+	// This program was measured with `#[inline]`; the unconditional hint adds
+	// 240 bytes to the deployed binary without changing its dispatch cost.
+	inline = "hint"
+)]
 #[discriminator]
 pub enum MigrationInstruction {
 	Update = 0,
@@ -201,57 +217,67 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	}
 }
 
-/// Reserved framework `Migrate` instruction.
-///
-/// A client prepends this instruction when an account is stale, so the payer
-/// authorizes exactly the migration cost and the business instruction that
-/// follows sees current data. Accounts are `[payer, systemProgram, state,
-/// manualState, compactState, spareState]`: the payer is a writable account
-/// (or the program address when no step needs funding), the system program
-/// slot backs the rent transfers, a migratable slot holding the program
-/// address is treated as omitted, and the trailing `spareState` slot shows
-/// several accounts of the same contract migrating in one sweep under one
-/// shared lamport budget.
-fn process_migrate(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResult {
-	let mut context = MigrateContext::new(program_id, accounts, MAX_INLINE_MIGRATION_LAMPORTS)?;
-	context.run_optional::<State>(2)?;
-	context.run_optional::<ManualState>(3)?;
-	context.run_optional::<CompactState>(4)?;
-	context.run_optional::<State>(5)?;
-
-	Ok(())
-}
-
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
 	use super::*;
 
 	nostd_entrypoint!(process_instruction);
-
-	#[inline]
-	pub fn process_instruction(
-		program_id: &Address,
-		accounts: &mut [AccountView],
-		data: &[u8],
-	) -> ProgramResult {
-		if is_migrate_instruction(data) {
-			return process_migrate(program_id, accounts);
-		}
-		let instruction: MigrationInstruction = parse_instruction(program_id, &ID, data)?;
-		match instruction {
-			MigrationInstruction::Update => {
-				UpdateAccounts::try_from((program_id, accounts))?.process(data)
-			}
-			MigrationInstruction::Relay => {
-				RelayAccounts::try_from((program_id, accounts))?.process(data)
-			}
-		}
-	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// The reserved `Migrate` path must reject a mismatched executing program id
+	/// before any account is migrated, exactly as ordinary instructions do.
+	#[test]
+	#[allow(unsafe_code)]
+	fn reserved_instruction_rejects_a_mismatched_program_id() {
+		extern crate std;
+
+		use std::vec::Vec;
+
+		use pina::entrypoint;
+
+		const MAX_ACCOUNTS: usize = 2;
+
+		fn serialize_input() -> Vec<u8> {
+			let mut input = Vec::new();
+			input.extend_from_slice(&(MAX_ACCOUNTS as u64).to_le_bytes());
+			for _ in 0..MAX_ACCOUNTS {
+				let mut header = [0_u8; 16];
+				header[0] = entrypoint::NON_DUP_MARKER;
+				input.extend_from_slice(&header);
+				input.extend_from_slice(&[0_u8; 32]);
+				input.extend_from_slice(&[0_u8; 32]);
+				input.extend_from_slice(&0_u64.to_le_bytes());
+				input.extend_from_slice(&0_u64.to_le_bytes());
+				input.extend_from_slice(&[0_u8; 10240]);
+			}
+			// The reserved all-ones discriminator, alone.
+			input.extend_from_slice(&1_u64.to_le_bytes());
+			input.push(u8::MAX);
+			// An executing program id that is not this program's address.
+			input.extend_from_slice(&[9_u8; 32]);
+			input
+		}
+
+		let mut input = serialize_input();
+		let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; MAX_ACCOUNTS];
+		// SAFETY: the buffer is a complete runtime input in the layout
+		// `deserialize` documents, and it outlives the assertions below.
+		let (program_id, count, data) =
+			unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), &mut views) };
+		assert_eq!(count, MAX_ACCOUNTS);
+		// SAFETY: `count` views were initialized by `deserialize`.
+		let accounts = unsafe { core::slice::from_raw_parts_mut(views.as_mut_ptr().cast(), count) };
+
+		let result = process_instruction(program_id, accounts, data);
+		assert!(
+			result.is_err_and(|error| error.eq(&ProgramError::IncorrectProgramId)),
+			"a mismatched program id must be rejected before any migration runs"
+		);
+	}
 
 	#[test]
 	fn generated_instruction_migration_accepts_version_zero_exactly() {
