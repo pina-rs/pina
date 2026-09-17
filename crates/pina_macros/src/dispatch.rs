@@ -430,6 +430,13 @@ fn migrate_emission(
 			program_id: & #crate_path::Address,
 			accounts: &mut [#crate_path::AccountView],
 		) -> #crate_path::ProgramResult {
+			// The reserved path bypasses `parse_instruction`, so the configured
+			// id is checked here: a mismatched program id must fail before any
+			// account is migrated, exactly as ordinary instructions reject it.
+			if program_id != &#program_id {
+				return Err(#crate_path::ProgramError::IncorrectProgramId);
+			}
+
 			let mut migrate = #crate_path::MigrateContext::new(program_id, accounts, #max_lamports)?;
 			#(#steps)*
 
@@ -438,15 +445,11 @@ fn migrate_emission(
 	};
 
 	// The reserved instruction bypasses `parse_instruction`, so the configured
-	// id is checked here: the loader would otherwise let a mismatched program
-	// id run migrations that ordinary instructions reject. The comparison is
-	// gated to the reserved path, leaving other instructions' cost unchanged.
+	// id must still be checked before any account is migrated. The comparison
+	// lives in the cold helper, keeping the hot path's executed instructions
+	// identical to a dispatcher without the prelude.
 	let prelude = quote! {
 		if #crate_path::is_migrate_instruction(data) {
-			if program_id != &#program_id {
-				return Err(#crate_path::ProgramError::IncorrectProgramId);
-			}
-
 			return process_migrate(program_id, accounts);
 		}
 	};
