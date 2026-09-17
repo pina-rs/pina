@@ -13,8 +13,10 @@ const int escrowProgramErrorTokenAccountMismatch = 0x1; // 1
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _escrowProgramErrorMessages = {
-    escrowProgramErrorOfferKeyMismatch: 'The token accounts do not match the offer\'s recorded mint and maker.',
-    escrowProgramErrorTokenAccountMismatch: 'A supplied token account is not the one the offer references.',
+  escrowProgramErrorOfferKeyMismatch:
+      'The token accounts do not match the offer\'s recorded mint and maker.',
+  escrowProgramErrorTokenAccountMismatch:
+      'A supplied token account is not the one the offer references.',
 };
 
 /// Get the error message for a EscrowProgram program error code.
