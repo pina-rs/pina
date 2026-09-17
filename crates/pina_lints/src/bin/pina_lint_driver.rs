@@ -33,12 +33,9 @@ extern crate rustc_interface;
 extern crate rustc_session;
 extern crate rustc_span;
 
-use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::ffi::OsStr;
 use std::ffi::OsString;
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -66,15 +63,16 @@ const PINA_LINT_ONLY: &str = "PINA_LINT_ONLY";
 
 /// Environment variables that change lint behavior and must invalidate
 /// cargo's cached check results.
+///
+/// The driver records each value in dep-info through
+/// `Session::env_depinfo`, which is what makes cargo re-check a crate when the
+/// configuration changes even though its sources did not.
 const UNTRACKED_STATE_VARS: &[&str] = &[
 	PINA_LINT_DRIVER_BUILD,
 	PINA_LINT_LEVELS,
 	PINA_LINT_NO_DEPS,
 	PINA_LINT_ONLY,
 ];
-
-/// Dep-info key recording the hash of [`UNTRACKED_STATE_VARS`].
-const UNTRACKED_STATE_VAR: &str = "PINA_LINT_UNTRACKED_STATE";
 
 struct Callbacks;
 
@@ -90,7 +88,7 @@ impl rustc_driver::Callbacks for Callbacks {
 			// the crate whenever the configuration changes.
 			for var in UNTRACKED_STATE_VARS {
 				let value = env::var(var).ok();
-				sess.psess.env_depinfo.lock().insert((
+				sess.env_depinfo.lock().insert((
 					rustc_span::Symbol::intern(var),
 					value.as_deref().map(rustc_span::Symbol::intern),
 				));
@@ -164,12 +162,8 @@ fn run(args: &[OsString]) -> Result<(), String> {
 	}
 
 	rustc_args.extend(level_args(PINA_LINT_LEVELS)?);
-
-	if let Some(state) = untracked_state() {
-		rustc_args.push("--allow=rustc::internal".to_owned());
-		rustc_args.push("-Zunstable-options".to_owned());
-		rustc_args.push(format!("--env-set={UNTRACKED_STATE_VAR}={state}"));
-	}
+	rustc_args.push("--allow=rustc::internal".to_owned());
+	rustc_args.push("-Zunstable-options".to_owned());
 
 	rustc_driver::run_compiler(&rustc_args, &mut Callbacks);
 
@@ -251,18 +245,6 @@ fn no_deps_enabled() -> bool {
 /// Return whether catalog output was requested.
 fn list_enabled() -> bool {
 	env::var(PINA_LINT_LIST).is_ok_and(|value| value != "0")
-}
-
-/// Hash the values of the untracked environment variables.
-///
-/// The hash is recorded in dep-info through `--env-set`, so any configuration
-/// change re-checks the crate even when the source is unchanged.
-fn untracked_state() -> Option<String> {
-	let mut hasher = DefaultHasher::new();
-	for var in UNTRACKED_STATE_VARS {
-		env::var(var).unwrap_or_default().hash(&mut hasher);
-	}
-	Some(format!("{:016x}", hasher.finish()))
 }
 
 /// Print the lint catalog in the format Dylint uses for `--list`.

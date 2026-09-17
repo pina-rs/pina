@@ -259,8 +259,6 @@ impl<'a> ProcessAccountInfos<'a> for NoteAccounts<'a> {
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	nostd_entrypoint!(process_instruction);

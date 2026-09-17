@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -92,7 +92,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitToken2022ExtensionPolicy {
 				continue;
 			}
 
-			cx.lint(REQUIRE_EXPLICIT_TOKEN_2022_EXTENSION_POLICY, |diag| {
+			diagnostics::emit(cx, REQUIRE_EXPLICIT_TOKEN_2022_EXTENSION_POLICY, |diag| {
 				diag.span(call.span);
 				diag.primary_message(
 					"Token-2022-capable mint loaded without an explicit extension policy",

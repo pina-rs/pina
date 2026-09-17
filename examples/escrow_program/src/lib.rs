@@ -27,8 +27,6 @@ declare_id!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	nostd_entrypoint!(EscrowInstruction::process_instruction);

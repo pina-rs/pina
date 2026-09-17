@@ -7,7 +7,8 @@ use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
+
+use crate::diagnostics;
 
 crate::declare_late_lint! {
 	/// ### What it does
@@ -102,7 +103,7 @@ impl<'tcx> LateLintPass<'tcx> for DenyUncheckedRemainingMut {
 			return;
 		}
 
-		cx.lint(DENY_UNCHECKED_REMAINING_MUT, |diag| {
+		diagnostics::emit(cx, DENY_UNCHECKED_REMAINING_MUT, |diag| {
 			diag.span(expr.span.source_callsite());
 			diag.primary_message(
 				"direct mutable remaining-account access permits duplicate writable aliases",

@@ -606,7 +606,7 @@ fn constant_seed(value: &codama_nodes::ConstantPdaSeedValue, context: &str) -> R
 		other => {
 			Err(RenderError::UnsupportedIdl {
 				context: context.to_string(),
-				reason: format!("constant PDA seed `{}` is not supported", other.kind(),),
+				reason: format!("constant PDA seed `{}` is not supported", other.kind()),
 			})
 		}
 	}

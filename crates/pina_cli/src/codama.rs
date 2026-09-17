@@ -933,19 +933,16 @@ fn create_dir_error(path: &Path, source: std::io::Error) -> CodamaError {
 }
 
 fn is_link_like(metadata: &std::fs::Metadata) -> bool {
-	if metadata.file_type().is_symlink() {
-		return true;
-	}
-
 	#[cfg(windows)]
 	{
 		use std::os::windows::fs::MetadataExt;
 
-		return has_windows_reparse_attribute(metadata.file_attributes());
+		metadata.file_type().is_symlink()
+			|| has_windows_reparse_attribute(metadata.file_attributes())
 	}
 
 	#[cfg(not(windows))]
-	false
+	metadata.file_type().is_symlink()
 }
 
 #[cfg(windows)]

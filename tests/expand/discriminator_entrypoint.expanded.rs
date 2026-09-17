@@ -29,12 +29,7 @@ impl ::core::cmp::PartialEq for CounterInstruction {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for CounterInstruction {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for CounterInstruction {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -238,12 +233,7 @@ impl ::core::cmp::PartialEq for OverrideInstruction {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for OverrideInstruction {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for OverrideInstruction {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {

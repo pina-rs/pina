@@ -6,6 +6,7 @@ use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -85,7 +86,7 @@ fn invocation_matches(constructor: &shared::CallInfo, invocation: &shared::CallI
 }
 
 fn lint_balance_reload(cx: &LateContext<'_>, span: rustc_span::Span, destination: &str) {
-	cx.lint(REQUIRE_POST_CPI_BALANCE_RELOAD, |diag| {
+	diagnostics::emit(cx, REQUIRE_POST_CPI_BALANCE_RELOAD, |diag| {
 		diag.span(span);
 		diag.primary_message(format!(
 			"transfer into `{destination}` is not accounted from its observed balance delta"

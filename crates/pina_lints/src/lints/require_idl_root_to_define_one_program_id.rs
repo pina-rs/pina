@@ -6,17 +6,18 @@ use std::cell::RefCell;
 
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::Level;
 use rustc_lint::LintContext;
 use rustc_span::hygiene::ExpnKind;
 use rustc_span::hygiene::MacroKind;
+
+use crate::diagnostics;
 
 thread_local! {
 	/// Definition paths, spans, and defining nodes of the found program
 	/// ids, so warnings and suppression resolve against the declaration
 	/// that introduced them. Entries whose definition path carries no `::`
 	/// separator live at the crate root.
-	static DECLARE_ID_DECLARATIONS: RefCell<Vec<(String, rustc_span::Span, rustc_hir::hir_id::HirId)>> = const { RefCell::new(Vec::new()) };
+	static DECLARE_ID_DECLARATIONS: RefCell<Vec<(String, rustc_span::Span, rustc_hir::HirId)>> = const { RefCell::new(Vec::new()) };
 	static HAS_MATCHED_ITEMS: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -128,20 +129,17 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 			.iter()
 			.filter(|(def_path, ..)| root_count != 1 || def_path.contains("::"))
 			.filter(|(_, _, declaration_id)| {
-				!matches!(
-					cx.tcx
-						.lint_level_at_node(
-							REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID,
-							*declaration_id,
-						)
-						.level,
-					Level::Allow,
-				)
+				!cx.tcx
+					.lint_level_spec_at_node(
+						REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID,
+						*declaration_id,
+					)
+					.is_allow()
 			})
 			.collect::<Vec<_>>();
 
 		if declarations.is_empty() {
-			cx.lint(REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
+			diagnostics::emit(cx, REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
 				diag.primary_message(
 					"IDL-oriented example crates should define exactly one `declare_id!` in the \
 					 crate root",
@@ -156,7 +154,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 			return;
 		}
 
-		cx.lint(REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
+		diagnostics::emit(cx, REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
 			// Point at the declaration that makes the crate-level contract invalid.
 			if let Some((_, declaration_span, _)) = invalid_declarations.first() {
 				diag.span(*declaration_span);

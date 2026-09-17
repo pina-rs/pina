@@ -23,8 +23,6 @@ declare_id!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	nostd_entrypoint!(process_instruction);

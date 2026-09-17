@@ -44,12 +44,7 @@ impl ::core::cmp::PartialEq for MyDiscriminator {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for MyDiscriminator {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for MyDiscriminator {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -190,12 +185,7 @@ impl ::core::cmp::PartialEq for U16Discriminator {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for U16Discriminator {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for U16Discriminator {}
 const _: () = {
     if !(::core::mem::size_of::<u16>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -323,12 +313,7 @@ impl ::core::cmp::PartialEq for U32Discriminator {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for U32Discriminator {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for U32Discriminator {}
 const _: () = {
     if !(::core::mem::size_of::<u32>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -456,12 +441,7 @@ impl ::core::cmp::PartialEq for U64Discriminator {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for U64Discriminator {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for U64Discriminator {}
 const _: () = {
     if !(::core::mem::size_of::<u64>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {
@@ -579,12 +559,7 @@ impl ::core::cmp::PartialEq for FinalDiscriminator {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for FinalDiscriminator {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for FinalDiscriminator {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {

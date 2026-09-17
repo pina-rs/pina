@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -61,7 +61,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireWritableBeforeAccountResize {
 				&call.receiver,
 			);
 			if !has_guard {
-				cx.lint(REQUIRE_WRITABLE_BEFORE_ACCOUNT_RESIZE, |diag| {
+				diagnostics::emit(cx, REQUIRE_WRITABLE_BEFORE_ACCOUNT_RESIZE, |diag| {
 					diag.span(call.span);
 					diag.primary_message(
 						"account resize should be preceded by `assert_writable()` on the same \

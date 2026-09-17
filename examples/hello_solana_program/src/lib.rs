@@ -125,8 +125,6 @@ impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
 /// the BPF entrypoint machinery.
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use pina::*;
-
 	use super::*;
 
 	// `nostd_entrypoint!` wires up:

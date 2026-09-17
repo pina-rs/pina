@@ -6,8 +6,8 @@ use std::collections::HashSet;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -109,7 +109,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 					})
 				});
 				if was_reassigned && reported_reassignments.insert(identity.to_string()) {
-					cx.lint(REQUIRE_CONSISTENT_TOKEN_PROGRAM, |diag| {
+					diagnostics::emit(cx, REQUIRE_CONSISTENT_TOKEN_PROGRAM, |diag| {
 						diag.span(call.span);
 						diag.primary_message(format!(
 							"token-program value `{identity}` was reassigned between token \
@@ -125,7 +125,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 				continue;
 			}
 
-			cx.lint(REQUIRE_CONSISTENT_TOKEN_PROGRAM, |diag| {
+			diagnostics::emit(cx, REQUIRE_CONSISTENT_TOKEN_PROGRAM, |diag| {
 				diag.span(call.span);
 				diag.primary_message(format!(
 					"token operation uses `{identity}` after the instruction established `{first}`"

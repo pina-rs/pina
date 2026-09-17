@@ -10,7 +10,7 @@
 //! Each macro expands to:
 //!
 //! - the `extern crate` declarations the lint needs,
-//! - a `rustc_session::declare_lint!` call, and
+//! - a `rustc_lint::declare_lint!` call, and
 //! - the corresponding `declare_lint_pass!`/`impl_lint_pass!` call.
 //!
 //! The lint pass structure is named as the camel case of the lint constant
@@ -24,11 +24,10 @@
 macro_rules! declare_late_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }
@@ -40,11 +39,10 @@ macro_rules! declare_late_lint {
 macro_rules! declare_early_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }
@@ -56,11 +54,10 @@ macro_rules! declare_early_lint {
 macro_rules! declare_pre_expansion_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::declare_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }
@@ -74,11 +71,10 @@ macro_rules! declare_pre_expansion_lint {
 macro_rules! impl_late_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr, $pass:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }
@@ -90,11 +86,10 @@ macro_rules! impl_late_lint {
 macro_rules! impl_early_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr, $pass:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }
@@ -106,11 +101,10 @@ macro_rules! impl_early_lint {
 macro_rules! impl_pre_expansion_lint {
 	($(#[$attr:meta])* $vis:vis $NAME:ident, $Level:ident, $desc:expr, $pass:expr) => {
 		extern crate rustc_lint;
-		extern crate rustc_session;
 
 		$crate::paste::paste! {
-			rustc_session::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
-			rustc_session::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
+			rustc_lint::declare_lint!($(#[$attr])* $vis $NAME, $Level, $desc);
+			rustc_lint::impl_lint_pass!([< $NAME:camel >] => [$NAME]);
 		}
 	};
 }

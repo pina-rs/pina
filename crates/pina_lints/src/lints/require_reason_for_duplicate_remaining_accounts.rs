@@ -9,7 +9,8 @@ use rustc_ast::MetaItemKind;
 use rustc_ast::VariantData;
 use rustc_lint::EarlyContext;
 use rustc_lint::EarlyLintPass;
-use rustc_lint::LintContext;
+
+use crate::diagnostics;
 
 crate::declare_pre_expansion_lint! {
 	/// ### What it does
@@ -91,16 +92,20 @@ fn check_fields(cx: &EarlyContext<'_>, data: &VariantData) {
 			continue;
 		}
 
-		cx.lint(REQUIRE_REASON_FOR_DUPLICATE_REMAINING_ACCOUNTS, |diag| {
-			diag.span(attribute.span);
-			diag.primary_message(
-				"`distinct = false` permits duplicate writable accounts without explaining why",
-			);
-			diag.help(
-				"add a field doc comment explaining the invariant that makes duplicate addresses \
-				 safe",
-			);
-		});
+		diagnostics::emit(
+			cx,
+			REQUIRE_REASON_FOR_DUPLICATE_REMAINING_ACCOUNTS,
+			|diag| {
+				diag.span(attribute.span);
+				diag.primary_message(
+					"`distinct = false` permits duplicate writable accounts without explaining why",
+				);
+				diag.help(
+					"add a field doc comment explaining the invariant that makes duplicate \
+					 addresses safe",
+				);
+			},
+		);
 	}
 }
 

@@ -7,18 +7,18 @@ use std::collections::HashSet;
 use rustc_hir::BinOpKind;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
-use rustc_hir::LangItem;
 use rustc_hir::LoopSource;
 use rustc_hir::MatchSource;
 use rustc_hir::Node;
+use rustc_hir::attrs::lang_items::LangItem;
 use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 use rustc_middle::ty::TyKind;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -440,7 +440,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					&& !has_constant_take
 					&& !has_validated_bound
 				{
-					self.cx.lint(REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
+					diagnostics::emit(self.cx, REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
 						diag.span(expr.span);
 						diag.primary_message(
 							"remaining accounts are processed without an explicit bound",

@@ -241,21 +241,16 @@ fn validate_runbook_metadata(
 }
 
 fn metadata_is_path_indirection(metadata: &fs::Metadata) -> bool {
-	if metadata.file_type().is_symlink() {
-		return true;
-	}
-
 	#[cfg(windows)]
 	{
 		use std::os::windows::fs::MetadataExt;
 
-		windows_attributes_indicate_reparse_point(metadata.file_attributes())
+		metadata.file_type().is_symlink()
+			|| windows_attributes_indicate_reparse_point(metadata.file_attributes())
 	}
 
 	#[cfg(not(windows))]
-	{
-		false
-	}
+	metadata.file_type().is_symlink()
 }
 
 #[cfg(any(windows, test))]

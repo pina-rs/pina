@@ -15,6 +15,8 @@ use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
 use rustc_span::Span;
 
+use crate::diagnostics;
+
 crate::declare_late_lint! {
 	/// ### What it does
 	///
@@ -73,7 +75,7 @@ fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
 // Always inlined at its call sites; the out-of-line copy never runs, which
 // would otherwise show up as a permanently uncovered signature line.
 #[coverage(off)]
-fn local_binding(expr: &Expr<'_>) -> Option<rustc_hir::hir_id::HirId> {
+fn local_binding(expr: &Expr<'_>) -> Option<rustc_hir::HirId> {
 	match &expr.kind {
 		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
 			match path.res {
@@ -87,7 +89,7 @@ fn local_binding(expr: &Expr<'_>) -> Option<rustc_hir::hir_id::HirId> {
 
 /// One guard binding discovered in the function body.
 struct GuardBinding {
-	hir_id: rustc_hir::hir_id::HirId,
+	hir_id: rustc_hir::HirId,
 	name: String,
 	span: Span,
 	statement_span: Span,
@@ -99,7 +101,7 @@ struct GuardBinding {
 struct GuardPatternCollector<'cx, 'tcx, 'guards> {
 	cx: &'cx LateContext<'tcx>,
 	guards: &'guards mut Vec<GuardBinding>,
-	root_pattern: rustc_hir::hir_id::HirId,
+	root_pattern: rustc_hir::HirId,
 	statement_span: Span,
 	initializer_span: Span,
 }
@@ -135,13 +137,13 @@ impl<'tcx> Visitor<'tcx> for GuardPatternCollector<'_, 'tcx, '_> {
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
 	guards: Vec<GuardBinding>,
-	referenced: HashSet<rustc_hir::hir_id::HirId>,
+	referenced: HashSet<rustc_hir::HirId>,
 	/// Number of `drop(local)` calls per binding, regardless of where the
 	/// call appears.
-	all_drops: HashMap<rustc_hir::hir_id::HirId, usize>,
+	all_drops: HashMap<rustc_hir::HirId, usize>,
 	/// Spans of `drop(local)` statements per binding. Bindings whose only
 	/// drops are statements can be fixed by removing those statements.
-	statement_drops: HashMap<rustc_hir::hir_id::HirId, Vec<Span>>,
+	statement_drops: HashMap<rustc_hir::HirId, Vec<Span>>,
 }
 
 impl<'cx, 'tcx> Analyzer<'cx, 'tcx> {
@@ -254,7 +256,7 @@ impl<'tcx> LateLintPass<'tcx> for DenyUnusedAccountBorrowGuards {
 				continue;
 			}
 
-			cx.lint(DENY_UNUSED_ACCOUNT_BORROW_GUARDS, |diag| {
+			diagnostics::emit(cx, DENY_UNUSED_ACCOUNT_BORROW_GUARDS, |diag| {
 				diag.span(guard.span);
 				diag.primary_message(format!(
 					"account borrow guard `{}` is never read",

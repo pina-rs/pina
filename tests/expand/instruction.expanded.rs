@@ -48,12 +48,7 @@ impl ::core::cmp::PartialEq for InstructionDisc {
     }
 }
 #[automatically_derived]
-impl ::core::cmp::Eq for InstructionDisc {
-    #[inline]
-    #[doc(hidden)]
-    #[coverage(off)]
-    fn assert_receiver_is_total_eq(&self) {}
-}
+impl ::core::cmp::Eq for InstructionDisc {}
 const _: () = {
     if !(::core::mem::size_of::<u8>() <= ::pina::MAX_DISCRIMINATOR_SPACE) {
         {

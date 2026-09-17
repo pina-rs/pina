@@ -4,8 +4,8 @@ extern crate rustc_span;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
-use rustc_lint::LintContext;
 
+use crate::diagnostics;
 use crate::shared;
 
 crate::declare_late_lint! {
@@ -71,7 +71,8 @@ impl<'tcx> LateLintPass<'tcx> for DenyHeapAllocationsInOnchainInstructionHandler
 				continue;
 			}
 
-			cx.lint(
+			diagnostics::emit(
+				cx,
 				DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 				|diag| {
 					diag.span(call.span);
