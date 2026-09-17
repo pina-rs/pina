@@ -175,6 +175,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
+		//
+		// The seeds bind `authority` and this handler requires that authority to
+		// sign, so a noncanonical bump could only duplicate the signer's own
+		// namespace. That is self-inflicted, and nobody else can reach it. A
+		// canonical search would cost ~10k CU on every initialization to prevent
+		// it, so `CreateProgramAccountWithUncheckedBump` checks one derivation.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.counter,
 			payer: self.authority,

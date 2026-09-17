@@ -55,6 +55,27 @@ fn position_pda(program_id: &Pubkey, pool: &Pubkey, owner: &Pubkey) -> (Pubkey, 
 	Pubkey::find_program_address(&[SEED_POSITION, pool.as_ref(), owner.as_ref()], program_id)
 }
 
+/// Find a bump that derives a valid PDA for `seeds` without being canonical.
+///
+/// `find_program_address` returns the highest bump that yields a valid address,
+/// and any lower bump that also happens to be valid yields a *different*
+/// account for the same seeds. This is the shadow account an attacker creates
+/// by calling a creation instruction a second time with that bump.
+fn noncanonical_pda(seeds: &[&[u8]], program_id: &Pubkey) -> (Pubkey, u8) {
+	let (_, canonical) = Pubkey::find_program_address(seeds, program_id);
+
+	for candidate in (0..canonical).rev() {
+		let bump = [candidate];
+		let mut with_bump: Vec<&[u8]> = seeds.to_vec();
+		with_bump.push(&bump);
+		if let Ok(address) = Pubkey::create_program_address(&with_bump, program_id) {
+			return (address, candidate);
+		}
+	}
+
+	panic!("seeds with a noncanonical valid bump");
+}
+
 fn rent_minimum(space: u64) -> u64 {
 	pina_test::Rent::default().minimum_balance(usize::try_from(space).expect("space"))
 }
@@ -489,6 +510,176 @@ fn pool_positions_and_stake_accounting() {
 			.account(&user_reward_ata)
 			.expect("reward ATA created by claim idempotent");
 		assert_eq!(vault_amount(&reward_account), 0, "no real reward payout");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A pool's seeds are `[pool, stake_mint, reward_mint]` and contain no signer,
+/// so the pool for a mint pair is a global singleton. This test pins that a
+/// second pool for the same pair cannot be created at a noncanonical bump.
+///
+/// `InitializePool` requires the caller to sign and stores them as admin, but
+/// the signature authorizes the *creator*, not the namespace: the seeds do not
+/// include the caller. Before pool creation was canonicalized, anyone could
+/// pass a noncanonical bump and create a shadow pool for an existing mint pair,
+/// with themselves as admin, at an address canonical derivation never returns.
+/// Deposits were accepted into it, because every read path validates stored
+/// fields (`pool.stake_mint`, `pool.reward_mint`, `pool.admin`) and the
+/// position's stored pool address, never the seeds.
+///
+/// The vaults make this worse rather than better: they are ATAs of the shadow
+/// pool's own address, so they are fresh accounts the attacker controls
+/// outright, and the shadow pool is fully functional while being invisible to
+/// anything that derives the canonical address.
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_a_shadow_pool_at_a_noncanonical_bump() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&ata_of(&pool, &stake_mint),
+				&ata_of(&pool, &reward_mint),
+				pool_bump,
+			))
+			.expect("execute InitializePool at the canonical address");
+
+		// The attacker creates a second pool for the same mint pair. Their own
+		// signature satisfies `assert_signer`, and the seeds never bounded them,
+		// so nothing but canonical derivation distinguishes the two pools.
+		let attacker = Keypair::new_from_array([77; 32]);
+		program
+			.fund(&attacker.pubkey(), FUND)
+			.expect("fund attacker");
+		let seeds: &[&[u8]] = &[SEED_POOL, stake_mint.as_ref(), reward_mint.as_ref()];
+		let (shadow_pool, shadow_bump) = noncanonical_pda(seeds, &program_id);
+		assert_ne!(shadow_pool, pool, "shadow pool is a distinct address");
+
+		let error = program
+			.send_with_signers(
+				initialize_pool_instruction(
+					&program,
+					&attacker.pubkey(),
+					&stake_mint,
+					&reward_mint,
+					&shadow_pool,
+					&ata_of(&shadow_pool, &stake_mint),
+					&ata_of(&shadow_pool, &reward_mint),
+					shadow_bump,
+				),
+				&[&attacker],
+			)
+			.expect_err("reject a shadow pool");
+
+		assert_eq!(error.operation(), "execute program instruction");
+		assert!(
+			program.account(&shadow_pool).is_err(),
+			"the shadow pool must not exist"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A position's seeds are `[position, pool, owner]`, so one position per
+/// (pool, owner) is the invariant every deposit and claim assumes. This test
+/// pins that a second position for the same pair cannot be opened at a
+/// noncanonical bump.
+///
+/// The duplicate is the double-claim vector. Reward accrual is flat per
+/// position with no pro-rata term, so two positions for one owner each accrue
+/// the full amount while `staked_amount` is split between them. Both pass every
+/// read path, because each is self-consistent and validates against its own
+/// stored pool, owner, and bump.
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_a_duplicate_position_at_a_noncanonical_bump() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&ata_of(&pool, &stake_mint),
+				&ata_of(&pool, &reward_mint),
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		// The user opens their real position...
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition at the canonical address");
+
+		// ...and a second one for the same (pool, owner) pair. `assert_empty`
+		// only guards the address being created, and this address is empty.
+		let seeds: &[&[u8]] = &[SEED_POSITION, pool.as_ref(), admin.as_ref()];
+		let (duplicate, duplicate_bump) = noncanonical_pda(seeds, &program_id);
+		assert_ne!(duplicate, position, "duplicate is a distinct address");
+
+		let error = program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&duplicate,
+				duplicate_bump,
+			))
+			.expect_err("reject a duplicate position");
+
+		assert_eq!(error.operation(), "execute program instruction");
+		assert!(
+			program.account(&duplicate).is_err(),
+			"the duplicate position must not exist"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});

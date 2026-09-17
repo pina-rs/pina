@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { subtle } from "node:crypto";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -12,10 +13,13 @@ import {
 	createSolanaRpc,
 	createSolanaRpcSubscriptions,
 	createTransactionMessage,
+	getAddressCodec,
+	getAddressDecoder,
 	getAddressEncoder,
 	getBase64EncodedWireTransaction,
 	getProgramDerivedAddress,
 	type Instruction,
+	isOffCurveAddress,
 	sendAndConfirmTransactionFactory,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
@@ -29,6 +33,9 @@ const SBF_OUT_DIR = process.env.SBF_OUT_DIR ??
 const PINA_BPF_PROGRAM_ID = "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe";
 const PROP_AMM_PROGRAM_ID = "55555555555555555555555555555555555555555555";
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
+
+/// The byte string 'ProgramDerivedAddress', appended to every PDA preimage.
+const PDA_MARKER = new TextEncoder().encode("ProgramDerivedAddress");
 
 type TestSigner = Awaited<ReturnType<typeof createKeyPairSignerFromBytes>>;
 
@@ -294,6 +301,89 @@ async function deriveStatePda(): Promise<readonly [string, number]> {
 	return [String(state), bump];
 }
 
+/**
+ * Derive the address for exactly these seeds, without searching for a bump.
+ *
+ * This is `create_program_address` rather than `getProgramDerivedAddress`: the
+ * caller supplies the bump, the derivation runs once, and the result is
+ * rejected only when it lands on the Ed25519 curve. `getProgramDerivedAddress`
+ * cannot express this, because it searches from 255 down and always returns the
+ * canonical bump.
+ */
+async function createProgramAddress(
+	seeds: readonly (string | Uint8Array)[],
+	programAddress: string,
+): Promise<string> {
+	const addressCodec = getAddressCodec();
+	const addressDecoder = getAddressDecoder();
+	const textEncoder = new TextEncoder();
+	const seedBytes: number[] = [];
+	for (const seed of seeds) {
+		// A string seed is literal seed bytes, not an address; only the program
+		// address is base58-decoded.
+		seedBytes.push(
+			...(typeof seed === "string" ? textEncoder.encode(seed) : seed),
+		);
+	}
+
+	const digest = await subtle.digest(
+		"SHA-256",
+		new Uint8Array([
+			...seedBytes,
+			...addressCodec.encode(address(programAddress)),
+			...PDA_MARKER,
+		]),
+	);
+	const candidate = addressDecoder.decode(new Uint8Array(digest));
+	// A PDA must not fall on the Ed25519 curve. `getProgramDerivedAddress`
+	// rejects an on-curve candidate and moves to the next bump down; supplying
+	// the bump directly makes that rejection the caller's failure.
+	assert.ok(
+		isOffCurveAddress(candidate),
+		"seed combination lands on the Ed25519 curve",
+	);
+
+	return String(candidate);
+}
+
+/**
+ * Find a bump that yields a valid PDA without being the canonical one.
+ *
+ * Every bump `b` where `create_program_address(seeds, b)` succeeds yields a
+ * distinct address for the same seeds. Canonical derivation returns only the
+ * highest such bump, so a lower one produces a shadow account that seeded
+ * lookups never find.
+ */
+async function deriveShadowStatePda(): Promise<readonly [string, number]> {
+	const [canonicalAddress, canonical] = await deriveStatePda();
+	// Tie this helper to the canonical derivation so a drift in the preimage,
+	// the marker, or the curve check cannot quietly turn the shadow test into a
+	// test of a made-up address.
+	assert.equal(
+		await createProgramAddress(
+			["state", Uint8Array.of(canonical)],
+			PINA_BPF_PROGRAM_ID,
+		),
+		canonicalAddress,
+		"create_program_address must reproduce the canonical address",
+	);
+
+	for (let bump = canonical - 1; bump >= 0; bump -= 1) {
+		try {
+			const state = await createProgramAddress(
+				["state", Uint8Array.of(bump)],
+				PINA_BPF_PROGRAM_ID,
+			);
+
+			return [state, bump];
+		} catch {
+			// Not a valid bump for these seeds; try the next one down.
+		}
+	}
+
+	throw new Error("state seeds have no noncanonical valid bump");
+}
+
 function createPdaInstruction(
 	payer: string,
 	state: string,
@@ -387,5 +477,35 @@ test("PDA creation rejects the canonical target with a wrong bump", async () => 
 				)),
 			"InvalidSeeds",
 		);
+	});
+});
+
+// The tests above pair the canonical address with a wrong bump, which a
+// single-derivation check already rejects because the derived address does not
+// match the account. They do not cover the actual shadow: a *valid* bump whose
+// own address is passed alongside it. `assert_empty` only guards the address
+// being created, so the unchecked builder accepts it, and `State` seeds are the
+// global `[SEED_STATE_PREFIX]`, which makes the target a singleton that nothing
+// on chain can distinguish from the real one.
+test("PDA creation rejects a shadow state at a noncanonical bump", async () => {
+	await withSurfnet(async (surfnet) => {
+		const { payer, submit } = await createSubmitter(surfnet);
+		const [shadowState, shadowBump] = await deriveShadowStatePda();
+
+		await assertProgramError(
+			() =>
+				submit(createPdaInstruction(
+					String(payer.address),
+					shadowState,
+					shadowBump,
+					false,
+				)),
+			"InvalidSeeds",
+		);
+
+		const created = await createSolanaRpc(surfnet.rpcUrl)
+			.getAccountInfo(address(shadowState), { encoding: "base64" })
+			.send();
+		assert.equal(created.value, null, "the shadow state must not exist");
 	});
 });

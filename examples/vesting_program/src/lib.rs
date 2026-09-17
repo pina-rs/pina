@@ -188,6 +188,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// rejects a mismatch with `InvalidSeeds` before it creates anything.
 		self.vault.assert_empty()?.assert_writable()?;
 
+		// The seeds bind `admin`, `beneficiary`, and `mint`, and `Initialize`
+		// requires the admin to sign, so only that admin can duplicate its own
+		// schedule. `Claim` and `Cancel` re-derive these seeds from the stored
+		// fields and require the matching party to sign, so a duplicate stays
+		// scoped to the signers who could already create one.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.vesting_state,
 			payer: self.admin,

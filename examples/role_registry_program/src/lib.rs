@@ -181,6 +181,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 
+		// The seeds bind `admin` and this handler requires that admin to sign, so
+		// a noncanonical bump could only duplicate the signer's own registry. Role
+		// entries are keyed by the registry's address rather than its seeds, so a
+		// duplicate registry owns a disjoint entry namespace either way.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.registry_config,
 			payer: self.admin,
@@ -223,6 +227,10 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let registry_address = *self.registry_config.address();
 		let grantee_address = *self.grantee.address();
 
+		// The seeds bind the registry config and the role id, and the handler
+		// requires the registry's own stored admin to sign, so a noncanonical bump
+		// could only duplicate a role inside the registry that admin already
+		// controls. `UpdateRole` and `DeactivateRole` resolve the same way.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.role_entry,
 			payer: self.admin,
