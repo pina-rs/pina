@@ -45,11 +45,11 @@ impl FloatDataAccount {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let data_f64: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let data_f64: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let data_f32: u32 = u32::from_le_bytes(data[cursor..cursor + 4].try_into().ok()?);
+		let data_f32: u32 = u32::from_le_bytes(data.get(cursor..cursor + 4)?.try_into().ok()?);
 		cursor += 4;
-		let authority = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 
 		Some(FloatDataAccount {
 			data_f64,

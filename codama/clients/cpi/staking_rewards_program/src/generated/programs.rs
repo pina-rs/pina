@@ -56,7 +56,10 @@ mod tests {
 
 	#[test]
 	fn rejects_a_foreign_program_id() {
-		let foreign = pina::address!("11111111111111111111111111111111");
+		let mut foreign_bytes = STAKING_REWARDS_PROGRAM_ID.to_bytes();
+		foreign_bytes[0] ^= 0xFF;
+		let foreign = pina::Address::new_from_array(foreign_bytes);
+		assert_ne!(foreign, STAKING_REWARDS_PROGRAM_ID);
 		assert!(!is_expected_program(&foreign));
 	}
 }

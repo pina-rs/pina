@@ -48,17 +48,17 @@ impl RoleEntry {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let registry = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let registry = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let role_id: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let role_id: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let grantee = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let grantee = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let permissions: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let permissions: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let active = data[cursor] != 0;
+		let active = data.get(cursor).copied()? != 0;
 		cursor += 1;
-		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(RoleEntry {
 			registry,

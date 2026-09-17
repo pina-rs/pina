@@ -52,25 +52,26 @@ impl VestingState {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let admin = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let admin = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let beneficiary = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let beneficiary = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let mint = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let mint = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let total_amount: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let total_amount: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let claimed_amount: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let claimed_amount: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let start_ts: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let start_ts: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let cliff_ts: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let cliff_ts: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let end_ts: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let end_ts: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let cancelled = data[cursor] != 0;
+		let cancelled = data.get(cursor).copied()? != 0;
 		cursor += 1;
-		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(VestingState {
 			admin,

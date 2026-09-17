@@ -48,17 +48,18 @@ impl PositionState {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let pool = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let pool = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let owner = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let owner = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let staked_amount: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let staked_amount: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let reward_debt: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let reward_debt: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let pending_rewards: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let pending_rewards: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(PositionState {
 			pool,

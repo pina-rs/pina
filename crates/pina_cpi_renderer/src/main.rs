@@ -57,8 +57,6 @@ impl From<Mode> for RenderMode {
 
 fn main() {
 	let args = Args::parse();
-	let single_idl = args.idls.len() == 1;
-
 	let mut idls = args.idls;
 	if let Some(dir) = &args.idl_dir {
 		let entries = std::fs::read_dir(dir).unwrap_or_else(|error| {
@@ -85,6 +83,8 @@ fn main() {
 		eprintln!("provide at least one --idl or an --idl-dir containing *.json files");
 		std::process::exit(1);
 	}
+
+	let single_idl = idls.len() == 1;
 
 	for idl in &idls {
 		let crate_dir = if single_idl {

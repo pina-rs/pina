@@ -134,9 +134,14 @@ pub(crate) fn render_programs_mod(
 	lines.push(String::new());
 	lines.push("\t#[test]".to_string());
 	lines.push("\tfn rejects_a_foreign_program_id() {".to_string());
-	lines.push(
-		"\t\tlet foreign = pina::address!(\"11111111111111111111111111111111\");".to_string(),
-	);
+	// Derive the foreign address from the configured ID by flipping the first
+	// byte, so the test cannot collide with the program it imports.
+	lines.push(format!(
+		"\t\tlet mut foreign_bytes = {primary_id}.to_bytes();"
+	));
+	lines.push("\t\tforeign_bytes[0] ^= 0xFF;".to_string());
+	lines.push("\t\tlet foreign = pina::Address::new_from_array(foreign_bytes);".to_string());
+	lines.push(format!("\t\tassert_ne!(foreign, {primary_id});"));
 	lines.push("\t\tassert!(!is_expected_program(&foreign));".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());

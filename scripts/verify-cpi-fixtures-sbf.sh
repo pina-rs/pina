@@ -64,8 +64,15 @@ for fixture in "${FIXTURES[@]}"; do
 		exit 1
 	fi
 
-	# The generated crate is standalone; point it at the in-repo `pina` so the
-	# SBF check exercises the same types a consumer would build against.
+	mkdir -p "$crate_dir/.cargo"
+	cat >"$crate_dir/.cargo/config.toml" <<EOF
+[target.$TARGET]
+rustflags = ["-C", "linker=sbpf-linker", "-C", "panic=abort"]
+EOF
+
+	# The fixtures are standalone temp crates, so the script writes their
+	# manifests itself, pointing `pina` at the in-repo crate; nothing rendered
+	# is discarded.
 	cat >"$crate_dir/Cargo.toml" <<EOF
 [package]
 name = "${name}_cpi"
@@ -73,19 +80,13 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+# Standalone: never adopt a parent manifest as a workspace.
+[workspace]
+
 [dependencies]
 pina = { path = "$ROOT/crates/pina", default-features = false }
 EOF
 
-	mkdir -p "$crate_dir/.cargo"
-	cat >"$crate_dir/.cargo/config.toml" <<EOF
-[target.$TARGET]
-rustflags = ["-C", "linker=sbpf-linker", "-C", "panic=abort"]
-EOF
-
-	# Every fixture depends on the same `pina` path dependency, so they share one
-	# target directory. Without this each crate rebuilds the whole dependency
-	# graph, which dominates the run.
 	(
 		cd "$crate_dir"
 		CARGO_TARGET_DIR="$SHARED_TARGET" \
@@ -96,10 +97,9 @@ EOF
 	)
 
 	# The generated crate ships a test binding its compiled-in program ID to the
-	# address from the IDL. Run it on the host, where `cargo test` works.
+	# address from the IDL. Run it on the host, where \`cargo test\` works.
 	CARGO_TARGET_DIR="$SHARED_TARGET" \
 		cargo test --quiet --manifest-path "$crate_dir/Cargo.toml"
-
 	echo "$name: SBF check passed"
 done
 

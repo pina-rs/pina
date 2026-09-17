@@ -49,19 +49,19 @@ impl EscrowState {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let maker = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let maker = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let mint_a = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let mint_a = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let mint_b = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let mint_b = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let amount_a: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let amount_a: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let amount_b: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let amount_b: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let seed: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let seed: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(EscrowState {
 			maker,

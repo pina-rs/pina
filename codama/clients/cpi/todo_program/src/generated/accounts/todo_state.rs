@@ -46,13 +46,13 @@ impl TodoState {
 		let mut cursor = 0usize;
 		cursor += 8;
 
-		let owner = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let owner = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let bump: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let completed = data[cursor] != 0;
+		let completed = data.get(cursor).copied()? != 0;
 		cursor += 1;
-		let digest: [u8; 32] = data[cursor..cursor + 32].try_into().ok()?;
+		let digest: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
 
 		Some(TodoState {
 			owner,

@@ -60,6 +60,12 @@ pub(crate) fn render_type_page(
 			let fields = structure.fields.clone();
 			let mut planned: Vec<(String, Vec<String>, Encoded)> = Vec::new();
 			for field in &fields {
+				if matches!(
+					field.default_value_strategy,
+					Some(codama_nodes::DefaultValueStrategy::Omitted)
+				) {
+					continue;
+				}
 				planned.push((
 					snake(field.name.as_ref()),
 					field.docs.to_vec(),
@@ -168,22 +174,19 @@ fn render_enum(
 		}
 	};
 
+	// A variant with a variable-length payload keeps `fixed_size` unset; the
+	// enum is uniform only when every variant carries the same fixed width.
 	let payload_widths = variants
 		.iter()
 		.map(|variant| {
-			variant
-				.payload
-				.iter()
-				.try_fold(0usize, |total, item| {
-					item.fixed_size.map(|size| total.saturating_add(size))
-				})
-				.unwrap_or(0)
+			variant.payload.iter().try_fold(0usize, |total, item| {
+				item.fixed_size.map(|size| total.saturating_add(size))
+			})
 		})
 		.collect::<Vec<_>>();
-	// Borsh serializes the tag followed by the variant payload, so variants
-	// with different widths simply make the enum variable-length.
-	let uniform = payload_widths.windows(2).all(|pair| pair[0] == pair[1]);
-	let payload_width = payload_widths.first().copied().unwrap_or(0);
+	let uniform = !payload_widths.is_empty()
+		&& payload_widths.iter().all(|width| width.is_some())
+		&& payload_widths.windows(2).all(|pair| pair[0] == pair[1]);
 	let maximum = variants
 		.iter()
 		.map(|variant| {
@@ -233,7 +236,7 @@ fn render_enum(
 
 	lines.push(format!("impl{generics} {name}{generics} {{"));
 	lines.extend(render_size_constants(
-		uniform.then_some(tag_width + payload_width),
+		uniform.then(|| tag_width.saturating_add(payload_widths.iter().flatten().sum())),
 		maximum,
 	));
 	lines.push(String::new());

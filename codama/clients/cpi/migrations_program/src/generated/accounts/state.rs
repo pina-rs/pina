@@ -41,13 +41,13 @@ impl State {
 		}
 
 		let mut cursor = 0usize;
-		let authority = Address::new_from_array(data[cursor..cursor + 32].try_into().ok()?);
+		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let value: u64 = u64::from_le_bytes(data[cursor..cursor + 8].try_into().ok()?);
+		let value: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let enabled = data[cursor] != 0;
+		let enabled = data.get(cursor).copied()? != 0;
 		cursor += 1;
-		let revision: u8 = u8::from_le_bytes(data[cursor..cursor + 1].try_into().ok()?);
+		let revision: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(State {
 			authority,

@@ -394,7 +394,7 @@ mod tests {
 
 	use super::*;
 
-	fn fixture_path() -> PathBuf {
+	pub(crate) fn fixture_path() -> PathBuf {
 		Path::new(env!("CARGO_MANIFEST_DIR"))
 			.parent()
 			.and_then(Path::parent)
@@ -612,6 +612,7 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
+
 	fn converter_failures_are_bounded_and_actionable() {
 		use std::os::unix::process::ExitStatusExt;
 

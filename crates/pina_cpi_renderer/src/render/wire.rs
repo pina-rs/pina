@@ -165,26 +165,26 @@ impl Encoded {
 			));
 		};
 
+		let bounds = format!("data.get(cursor..cursor + {size})?\n\t\t");
 		let read = match self.rust_type.as_str() {
-			"bool" => format!("let {name} = data[cursor] != 0;\n\t\tcursor += 1;"),
+			"bool" => {
+				format!("let {name} = data.get(cursor).copied()? != 0;\n\t\tcursor += 1;")
+			}
 			"Address" => {
 				format!(
-					"let {name} = Address::new_from_array(\n\t\t\tdata[cursor..cursor + \
-					 32]\n\t\t\t\t.try_into()\n\t\t\t\t.ok()?,\n\t\t);\n\t\tcursor += 32;"
+					"let {name} = Address::new_from_array({bounds}.try_into().ok()?);\n\t\tcursor \
+					 += 32;"
 				)
 			}
 			_ if self.rust_type.starts_with("[u8; ") => {
 				format!(
-					"let {name}: {} = data[cursor..cursor + {size}].try_into().ok()?;\n\t\tcursor \
-					 += {size};",
-					self.rust_type
+					"let {name}: [u8; {size}] = {bounds}.try_into().ok()?;\n\t\tcursor += {size};"
 				)
 			}
 			// Everything left is a native integer or a generated named type.
 			_ if is_integer_type(&self.rust_type) => {
 				format!(
-					"let {name}: {} = {}(\n\t\t\tdata[cursor..cursor + \
-					 {size}]\n\t\t\t\t.try_into()\n\t\t\t\t.ok()?,\n\t\t);\n\t\tcursor += {size};",
+					"let {name}: {} = {}({bounds}.try_into().ok()?);\n\t\tcursor += {size};",
 					self.rust_type,
 					from_le_bytes_fn(&self.rust_type)
 				)
@@ -322,9 +322,10 @@ fn plan_resolved(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> Res
 			plan_option(&prefix, &item, option.fixed, context)
 		}
 		TypeNode::SizePrefix(prefix) => {
-			let width = prefix_width(prefix.prefix.get_nested_type_node(), context)?;
+			let prefix_node = prefix.prefix.get_nested_type_node().clone();
+			let width = prefix_width(&prefix_node, context)?;
 			let inner = prefix.r#type.as_ref().clone();
-			plan_size_prefix(&inner, width, types, context)
+			plan_size_prefix(&inner, &prefix_node, width, types, context)
 		}
 		// A relative offset shifts the cursor against the container's total size,
 		// which a compact account only knows at runtime. The value still has a
@@ -561,8 +562,13 @@ fn plan_option(
 	// The arm binds `value` from a borrowed `Option`, so it is already a
 	// reference, matching the convention every encoder assumes.
 	let item = item.clone().with_value("value");
-	let present = "data[offset] = 1;\noffset += 1;";
-	let absent = "data[offset] = 0;\noffset += 1;";
+	// The tag occupies the declared prefix width; `None` fills the whole
+	// declared window with zeros so the layout stays fixed.
+	let present = format!(
+		"data[offset..offset + {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset \
+		 += {width};"
+	);
+	let absent = format!("data[offset..offset + {width}].fill(0);\n\t\t\toffset += {width};");
 
 	Ok(Encoded {
 		rust_type: format!("Option<{}>", item.rust_type),
@@ -590,12 +596,13 @@ fn plan_option(
 
 fn plan_size_prefix(
 	inner: &TypeNode,
+	prefix: &NumberTypeNode,
 	width: usize,
 	types: &mut TypeIndex,
 	context: &str,
 ) -> Result<Encoded> {
 	let resolved = types.resolve(inner, context)?;
-	let prefix_type = "u32";
+	let prefix_type = integer_type_name(prefix, context)?;
 
 	let (rust_type, payload_max, encode) = match &resolved {
 		TypeNode::String(StringTypeNode {
@@ -653,7 +660,7 @@ fn plan_size_prefix(
 			let item = item.with_value("item");
 			(
 				format!("&'argument [{}]", item.rust_type.clone()),
-				count_max.saturating_mul(item_size),
+				count_width.saturating_add(count_max.saturating_mul(item_size)),
 				format!(
 					"if self_value.len() > {count_max} {{\n\treturn \
 					 Err(ProgramError::InvalidInstructionData);\n}}\nlet payload_len = \
@@ -1328,7 +1335,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("bool should decode: {error}"));
 		// A self-referential binding is the exact bug this guards against.
 		assert!(!read.contains("let active = active"));
-		assert!(read.contains("data[cursor] != 0"));
+		assert!(read.contains("data.get(cursor).copied().ok()? != 0"));
 
 		let bytes = Encoded {
 			rust_type: "[u8; 8]".to_string(),

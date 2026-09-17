@@ -321,11 +321,16 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 		});
 	}
 
-	let response = ureq::get(url).call().map_err(|error| {
-		ImportError::Fetch {
-			reason: error.to_string(),
-		}
-	})?;
+	let response = ureq::get(url)
+		.config()
+		.timeout_global(Some(std::time::Duration::from_secs(30)))
+		.build()
+		.call()
+		.map_err(|error| {
+			ImportError::Fetch {
+				reason: error.to_string(),
+			}
+		})?;
 
 	read_bounded_reader(response.into_body().into_reader())
 }
