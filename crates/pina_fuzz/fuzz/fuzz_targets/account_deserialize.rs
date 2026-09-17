@@ -13,9 +13,9 @@ use libfuzzer_sys::fuzz_target;
 use role_registry_program::RegistryConfig;
 use role_registry_program::RoleEntry;
 
-const _: [(); 10] = [(); CounterState::SIZE];
-const _: [(); 42] = [(); RegistryConfig::SIZE];
-const _: [(); 83] = [(); RoleEntry::SIZE];
+const _: [(); 11] = [(); CounterState::SIZE];
+const _: [(); 43] = [(); RegistryConfig::SIZE];
+const _: [(); 84] = [(); RoleEntry::SIZE];
 
 // Exercise every real account layout from one libFuzzer entry point. Defining
 // multiple `fuzz_target!` invocations in a binary emits duplicate linker symbols.

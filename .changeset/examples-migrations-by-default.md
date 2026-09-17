@@ -2,6 +2,7 @@
 pina_cli: none
 pina_codama_nodes: docs
 pina_codama_renderer: docs
+pina_cpi_renderer: docs
 ---
 
 # Adopt migrations across every example program
