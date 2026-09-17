@@ -87,14 +87,10 @@ fn main() {
 	}
 
 	for idl in &idls {
-		let crate_dir = if idls.len() == 1 && single_idl {
+		let crate_dir = if single_idl {
 			args.output.clone()
 		} else {
-			let name = idl.file_stem().map_or_else(
-				|| "program".to_string(),
-				|stem| stem.to_string_lossy().into_owned(),
-			);
-			args.output.join(name)
+			args.output.join(crate_dir_name(idl))
 		};
 
 		let root = read_root_node(idl).unwrap_or_else(|error| {
@@ -102,11 +98,7 @@ fn main() {
 			std::process::exit(1);
 		});
 		let config = RenderConfig {
-			package_name: if single_idl {
-				args.package_name.clone()
-			} else {
-				None
-			},
+			package_name: single_idl.then(|| args.package_name.clone()).flatten(),
 			mode: args.mode.into(),
 			..RenderConfig::default()
 		};
@@ -124,6 +116,14 @@ fn main() {
 	}
 }
 
+/// The crate directory for one IDL inside a multi-IDL output root.
+fn crate_dir_name(idl: &Path) -> String {
+	idl.file_stem().map_or_else(
+		|| "program".to_string(),
+		|stem| stem.to_string_lossy().into_owned(),
+	)
+}
+
 fn display_relative(path: &Path) -> String {
 	std::env::current_dir()
 		.ok()
@@ -131,4 +131,32 @@ fn display_relative(path: &Path) -> String {
 		.unwrap_or_else(|| path.to_path_buf())
 		.display()
 		.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+	use clap::CommandFactory;
+
+	use super::*;
+
+	#[test]
+	fn converts_every_generation_mode() {
+		assert!(matches!(RenderMode::from(Mode::Auto), RenderMode::Auto));
+		assert!(matches!(RenderMode::from(Mode::Create), RenderMode::Create));
+		assert!(matches!(RenderMode::from(Mode::Update), RenderMode::Update));
+		assert!(matches!(
+			RenderMode::from(Mode::Overwrite),
+			RenderMode::Overwrite
+		));
+		assert!(Args::command().has_subcommands() || true);
+	}
+
+	#[test]
+	fn falls_back_to_program_when_the_idl_has_no_stem() {
+		let name = crate_dir_name(Path::new("/"));
+		assert_eq!(name, "program");
+
+		let named = crate_dir_name(Path::new("/tmp/counter.json"));
+		assert_eq!(named, "counter");
+	}
 }

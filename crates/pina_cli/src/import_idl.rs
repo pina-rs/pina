@@ -593,3 +593,126 @@ mod tests {
 		assert!(!programs.contains("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"));
 	}
 }
+
+#[cfg(test)]
+mod coverage {
+	use super::*;
+
+	#[test]
+	fn describes_every_source_shape() {
+		assert!(
+			ImportSource::File(PathBuf::from("./x.json"))
+				.describe()
+				.contains("file")
+		);
+		assert!(
+			ImportSource::Url("https://example.com/x.json".to_string())
+				.describe()
+				.contains("url")
+		);
+		assert!(
+			ImportSource::Cluster {
+				cluster: "mainnet-beta".to_string(),
+				program_id: "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf".to_string(),
+			}
+			.describe()
+			.contains("canonical program metadata")
+		);
+	}
+
+	#[test]
+	fn converts_every_generation_mode() {
+		use pina_cpi_renderer::RenderMode;
+
+		assert!(matches!(
+			render_mode(GenerationMode::Auto),
+			RenderMode::Auto
+		));
+		assert!(matches!(
+			render_mode(GenerationMode::Create),
+			RenderMode::Create
+		));
+		assert!(matches!(
+			render_mode(GenerationMode::Update),
+			RenderMode::Update
+		));
+		assert!(matches!(
+			render_mode(GenerationMode::Overwrite),
+			RenderMode::Overwrite
+		));
+	}
+
+	#[test]
+	fn rejects_readers_over_the_size_limit() {
+		let oversized = std::io::Cursor::new(vec![0u8; MAX_IDL_BYTES as usize + 1]);
+		let error = read_bounded_reader(oversized).expect_err("oversize input must be rejected");
+		assert!(error.to_string().contains("safety limit"));
+
+		let exact = std::io::Cursor::new(vec![0u8; MAX_IDL_BYTES as usize]);
+		assert!(read_bounded_reader(exact).is_ok());
+	}
+
+	#[test]
+	fn reports_unreadable_idl_files() {
+		let error = read_bounded(Path::new("./definitely-missing.json"))
+			.expect_err("missing files must be rejected");
+		assert!(error.to_string().contains("could not read the IDL"));
+	}
+
+	#[test]
+	fn passes_codama_roots_through_untouched() {
+		let root = serde_json::json!({
+			"kind": "rootNode",
+			"standard": "codama",
+			"version": "1.0.0",
+			"program": {
+				"kind": "programNode",
+				"name": "counter",
+				"publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+				"version": "0.0.0"
+			}
+		});
+		let bytes = serde_json::to_vec(&root).unwrap_or_else(|error| panic!("json: {error}"));
+		let normalized = normalize_to_codama(&bytes, "must-not-run")
+			.unwrap_or_else(|error| panic!("passthrough: {error}"));
+		assert!(normalized.get("program").is_some());
+	}
+
+	#[test]
+	fn applies_the_caller_program_id_over_the_idl_value() {
+		let root = serde_json::json!({
+			"kind": "rootNode",
+			"standard": "codama",
+			"version": "1.0.0",
+			"program": {
+				"kind": "programNode",
+				"name": "counter",
+				"publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+				"version": "0.0.0"
+			}
+		});
+		let applied = apply_program_id(&root, "11111111111111111111111111111111")
+			.unwrap_or_else(|error| panic!("apply: {error}"));
+		let key = applied.program.public_key.as_str();
+		assert_eq!(key, "11111111111111111111111111111111");
+
+		let missing = serde_json::json!({ "kind": "rootNode" });
+		let error = apply_program_id(&missing, "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
+			.expect_err("a root without a program must be rejected");
+		assert!(error.to_string().contains("no `program` node"));
+	}
+
+	#[test]
+	fn rejects_clusters_that_are_not_rpc_targets() {
+		let error = fetch_cluster("not-an-rpc", "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
+			.expect_err("invalid clusters must be rejected");
+		assert!(error.to_string().contains("could not fetch") || error.to_string().contains("RPC"));
+	}
+
+	#[test]
+	fn fetch_errors_name_connection_failures() {
+		// Port 1 on loopback is closed, so the request fails without network.
+		let error = fetch_url("http://127.0.0.1:1/x.json").expect_err("closed ports must fail");
+		assert!(error.to_string().contains("could not fetch"));
+	}
+}
