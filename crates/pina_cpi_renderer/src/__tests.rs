@@ -1538,3 +1538,68 @@ mod foreign_fixture_accounts {
 		assert!(page.contains("pub fn parse(data: &[u8])"));
 	}
 }
+
+mod defined_type_pages {
+	use codama_nodes::DefinedTypeNode;
+	use codama_nodes::StructFieldTypeNode;
+
+	use super::*;
+
+	#[test]
+	fn rejects_defined_types_that_are_not_structs_or_enums() {
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new("plain", NumberTypeNode::le(NumberFormat::U64));
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("scalar defined types must be rejected");
+		assert!(error.to_string().contains("become Rust types"));
+	}
+
+	#[test]
+	fn propagates_field_planning_errors_from_struct_pages() {
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new(
+			"broken",
+			codama_nodes::StructTypeNode::new(vec![StructFieldTypeNode::new(
+				"bare",
+				codama_nodes::StringTypeNode::utf8(),
+			)]),
+		);
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("bare strings must be rejected");
+		assert!(error.to_string().contains("length prefix"));
+	}
+
+	#[test]
+	fn renders_enum_pages_with_wide_discriminants() {
+		for format in [
+			NumberFormat::U8,
+			NumberFormat::U16,
+			NumberFormat::U32,
+			NumberFormat::U64,
+		] {
+			let mut types = TypeIndex::default();
+			let defined = DefinedTypeNode::new(
+				"sized",
+				codama_nodes::EnumTypeNode {
+					variants: vec![codama_nodes::EnumEmptyVariantTypeNode::new("only").into()],
+					size: NumberTypeNode::le(format).into(),
+				},
+			);
+			let page = render::types::render_type_page(&defined, &mut types)
+				.unwrap_or_else(|error| panic!("{format:?} should render: {error}"));
+			assert!(page.contains("pub enum Sized"));
+		}
+
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new(
+			"bad",
+			codama_nodes::EnumTypeNode {
+				variants: vec![codama_nodes::EnumEmptyVariantTypeNode::new("only").into()],
+				size: NumberTypeNode::le(NumberFormat::U128).into(),
+			},
+		);
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("u128 discriminants must be rejected");
+		assert!(error.to_string().contains("discriminants must be"));
+	}
+}

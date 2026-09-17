@@ -357,13 +357,6 @@ fn plan_resolved(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> Res
 			}
 			Ok(combine(&planned))
 		}
-		TypeNode::Link(_) => {
-			Err(unsupported(
-				context,
-				"linkNode",
-				"only `definedTypeLinkNode` references can be resolved from `definedTypes`",
-			))
-		}
 		other => {
 			Err(unsupported(
 				context,
@@ -1615,19 +1608,150 @@ mod tests {
 		assert!(error.to_string().contains("value decoder"));
 	}
 	#[test]
-	fn probe_enum_tuple() {
+	fn plans_both_offset_directions() {
 		let mut types = index(&[]);
+		let string = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let inner = || {
+			TypeNode::SizePrefix(codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+				StringTypeNode::utf8(),
+				NumberTypeNode::le(NumberFormat::U32),
+			))
+		};
+
+		let pre = codama_nodes::PreOffsetTypeNode {
+			offset: 12,
+			strategy: codama_nodes::PreOffsetStrategy::Relative,
+			r#type: Box::new(inner()),
+		};
+		let planned = plan(&TypeNode::PreOffset(pre), &mut types, "test")
+			.unwrap_or_else(|error| panic!("preOffset should plan: {error}"));
+		assert!(planned.is_variable());
+
+		let post = codama_nodes::PostOffsetTypeNode {
+			offset: 4,
+			strategy: codama_nodes::PostOffsetStrategy::Relative,
+			r#type: Box::new(inner()),
+		};
+		let planned = plan(&TypeNode::PostOffset(post), &mut types, "test")
+			.unwrap_or_else(|error| panic!("postOffset should plan: {error}"));
+		assert!(planned.is_variable());
+	}
+
+	#[test]
+	fn fixed_windows_reject_variable_payloads_and_match_exact_ones() {
+		let mut types = index(&[]);
+
+		// A boolean is fixed 1 byte, so a 1-byte window matches exactly.
+		let exact = FixedSizeTypeNode::new(BooleanTypeNode::default(), 1);
+		let planned = plan(&exact.into(), &mut types, "test")
+			.unwrap_or_else(|error| panic!("exact window should plan: {error}"));
+		assert_eq!(planned.fixed_size, Some(1));
+
+		// A variable-length payload cannot live in a fixed window at all.
+		let variable = FixedSizeTypeNode::new(
+			TypeNode::Option(codama_nodes::OptionTypeNode::new(NumberTypeNode::le(
+				NumberFormat::U64,
+			))),
+			9,
+		);
+		let error = plan(&variable.into(), &mut types, "test")
+			.expect_err("variable payloads must be rejected");
+		assert!(error.to_string().contains("variable-length payload"));
+	}
+
+	#[test]
+	fn rejects_size_prefixed_arrays_with_bad_shapes() {
+		let mut types = index(&[]);
+
+		// A fixed-count array carries no length of its own.
+		let fixed_count = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			TypeNode::Array(codama_nodes::ArrayTypeNode::fixed(
+				NumberTypeNode::le(NumberFormat::U8),
+				3,
+			)),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let error = plan(&fixed_count.into(), &mut types, "test")
+			.expect_err("fixed-count arrays must be rejected");
+		assert!(
+			error
+				.to_string()
+				.contains("must itself carry a count prefix")
+		);
+
+		// A prefixed array of variable-length strings cannot be bounded.
+		let variable_items = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			TypeNode::Array(codama_nodes::ArrayTypeNode::prefixed(
+				codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+					StringTypeNode::utf8(),
+					NumberTypeNode::le(NumberFormat::U32),
+				),
+				NumberTypeNode::le(NumberFormat::U8),
+			)),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let error = plan(&variable_items.into(), &mut types, "test")
+			.expect_err("variable elements must be rejected");
+		assert!(
+			error
+				.to_string()
+				.contains("cannot hold a variable-length element")
+		);
+	}
+
+	#[test]
+	fn reports_wide_prefix_limits() {
+		let mut types = index(&[]);
+		for (prefix_format, width, prefix_max) in [
+			(NumberFormat::U16, 2usize, u16::MAX as usize),
+			(NumberFormat::U64, 8usize, usize::MAX),
+		] {
+			let node = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+				StringTypeNode::utf8(),
+				NumberTypeNode::le(prefix_format),
+			);
+			let planned = plan(&node.into(), &mut types, "test")
+				.unwrap_or_else(|error| panic!("prefix should plan: {error}"));
+			assert_eq!(
+				planned.max_size,
+				prefix_max.saturating_add(width),
+				"width {width}"
+			);
+		}
+	}
+
+	#[test]
+	fn skips_and_reports_omitted_struct_and_variant_fields() {
+		let mut types = index(&[]);
+
+		let mut omitted = StructFieldTypeNode::new("pad", NumberTypeNode::le(NumberFormat::U8));
+		omitted.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		let structure = StructTypeNode::new(vec![
+			StructFieldTypeNode::new("amount", NumberTypeNode::le(NumberFormat::U64)),
+			omitted,
+			StructFieldTypeNode::new("bare", StringTypeNode::utf8()),
+		]);
+		let error = plan(&structure.into(), &mut types, "test")
+			.expect_err("bare strings must still be rejected");
+		assert!(error.to_string().contains("length prefix"));
+
+		let mut omitted = StructFieldTypeNode::new("pad", NumberTypeNode::le(NumberFormat::U8));
+		omitted.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
 		let enumeration = EnumTypeNode::new(vec![
-			codama_nodes::EnumTupleVariantTypeNode::new(
-				"pair",
-				codama_nodes::TupleTypeNode::new(vec![
-					NumberTypeNode::le(NumberFormat::U8).into(),
-					NumberTypeNode::le(NumberFormat::U8).into(),
+			codama_nodes::EnumStructVariantTypeNode::new(
+				"withPad",
+				StructTypeNode::new(vec![
+					omitted,
+					StructFieldTypeNode::new("bare", StringTypeNode::utf8()),
 				]),
 			)
 			.into(),
 		]);
-		let planned = plan(&enumeration.into(), &mut types, "probe").unwrap();
-		println!("FIXED={:?} MAX={:?}", planned.fixed_size, planned.max_size);
+		let error = plan(&enumeration.into(), &mut types, "test")
+			.expect_err("variant omitted fields must still be rejected");
+		assert!(error.to_string().contains("length prefix"));
 	}
 }
