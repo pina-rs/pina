@@ -98,6 +98,16 @@ fn create_fake_workflow_project(name: &str) -> (PathBuf, PathBuf, PathBuf, PathB
 	let log = project.join("commands.log");
 	pina_cli::init_project(&project, "test_program", false)
 		.unwrap_or_else(|error| panic!("failed to create fake Pina project: {error}"));
+	// These snapshots exercise the Surfpool workflow wiring, not migrations.
+	// `pina test` builds first, and a scaffolded project now enables migrations
+	// by default, so without a recorded baseline the build would fail closed
+	// with the `pina migrations make` remedy rather than reaching the workflow
+	// under test.
+	fs::write(
+		project.join("pina.toml"),
+		"[project]\nprogram = \".\"\n\n[migrations]\nauto = false\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to disable migrations in the fixture: {error}"));
 	let cargo_toml = fs::read_to_string(&manifest)
 		.unwrap_or_else(|error| panic!("failed to read {}: {error}", manifest.display()));
 	fs::write(&manifest, format!("{cargo_toml}\n[workspace]\n"))

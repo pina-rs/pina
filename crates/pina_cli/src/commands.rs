@@ -2139,8 +2139,8 @@ fn print_migration_statuses(statuses: &[pina_cli::migrations::MigrationStatus]) 
 			"draft"
 		};
 		println!(
-			"{} {} v{} ({publication})",
-			status.kind, status.rust_name, status.current_version
+			"{} {} v{} ({publication}, {} version(s) remaining)",
+			status.kind, status.rust_name, status.current_version, status.versions_remaining
 		);
 	}
 }
