@@ -9,6 +9,20 @@ use syn::Type;
 use crate::args::PdaArgs;
 use crate::args::PdaSeedArg;
 
+/// Split a doc string into individual `#[doc]` attributes.
+///
+/// A single multi-line `#[doc]` string would expand to a `/** */` block comment.
+/// Emitting one attribute per line keeps generated docs in the `///` style used
+/// by the rest of the generated API.
+fn doc_attributes(text: &str) -> Vec<proc_macro2::TokenStream> {
+	text.lines()
+		.map(|line| {
+			let line = format!(" {line}");
+			quote!(#[doc = #line])
+		})
+		.collect()
+}
+
 pub(crate) fn expand(
 	args: proc_macro2::TokenStream,
 	input: proc_macro2::TokenStream,
@@ -238,16 +252,72 @@ pub(crate) fn expand(
 			}
 		})
 	});
+	// `with_pda` derives one address from the stored bump. `with_checked_pda`
+	// keeps the canonical search, and is the only compact loader that rejects a
+	// shadow account created at a noncanonical bump.
 	let with_pda = args.bump.as_ref().and_then(|bump_field| {
 		(has_account_representation && is_compact).then(|| {
 			let with_doc = format!(
-				"Load and validate `{struct_name}`, its canonical stored bump, and its PDA \
-				 address for the duration of `use_account`."
+				"Load and validate `{struct_name}`, its stored-bump PDA address, and its compact \
+				 representation for the duration of `use_account`.\n\nDerives the address once \
+				 from the account's own `{bump_field}` field and rejects a mismatch, so only the \
+				 address that field derives is loadable. This is a single derivation, not a \
+				 canonical bump search.\n\nCanonicality is the creation builder's proof. \
+				 `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` both \
+				 reject a noncanonical bump, so a compact PDA this program created stores the \
+				 canonical one. That makes this method safe when the address is already \
+				 established -- a per-signer namespace whose handlers require that \
+				 signer.\n\nPrefer `with_checked_pda` when an untrusted caller chooses which \
+				 account the handler loads. This method accepts any address the stored bump \
+				 derives, including a shadow account created at a noncanonical bump, so it cannot \
+				 on its own prove the namespace is unique."
 			);
+			let checked_doc = format!(
+				"Load and validate `{struct_name}`, its canonical stored bump, and its PDA \
+				 address for the duration of `use_account`.\n\nSearches the seeds for the \
+				 canonical bump and rejects both an account at any other address and a stored \
+				 `{bump_field}` that is not that canonical bump. This is the only compact loader \
+				 that rejects a shadow account created at a noncanonical bump. The search costs \
+				 more compute than the single derivation `with_pda` performs.\n\nUse this method \
+				 when an untrusted caller chooses which account the handler loads, or when the \
+				 program must be certain that exactly one address exists for the seeds."
+			);
+			let with_doc_attributes = doc_attributes(&with_doc);
+			let checked_doc_attributes = doc_attributes(&checked_doc);
 			quote! {
-				#[doc = #with_doc]
+				#(#with_doc_attributes)*
 				#[inline(always)]
 				pub fn with_pda<R>(
+					account: &#crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+					use_account: impl FnOnce(
+						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
+					) -> ::core::result::Result<R, #crate_path::ProgramError>,
+				) -> ::core::result::Result<R, #crate_path::ProgramError> {
+					let account_address = *account.address();
+
+					#crate_path::AsCompactAccount::with_compact_account::<Self, _>(
+						account,
+						program_id,
+						|state| {
+							let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
+							let expected_address = #crate_path::create_program_address(
+								&seeds.as_slices(),
+								program_id,
+							)?;
+							if account_address != expected_address {
+								return Err(#crate_path::ProgramError::InvalidSeeds);
+							}
+
+							use_account(state)
+						},
+					)
+				}
+
+				#(#checked_doc_attributes)*
+				#[inline(always)]
+				pub fn with_checked_pda<R>(
 					account: &#crate_path::AccountView,
 					#(#find_seed_params,)*
 					program_id: &#crate_path::Address,

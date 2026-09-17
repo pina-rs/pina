@@ -86,9 +86,9 @@ For a non-PDA fixed account, use `as_account` or `as_account_mut` to establish t
 
 ### Compact PDA loading
 
-For a compact account with a stored PDA bump, `Type::with_pda` validates the owner, discriminator, size, every active tail, canonical bump, and derived account address before it runs the closure. The runtime borrow guard remains active for the closure and is released when the closure returns.
+For a compact account with a stored PDA bump, `Type::with_pda` validates the owner, discriminator, size, every active tail, and the address the stored bump derives before it runs the closure. It performs a single derivation, not a canonical bump search, so it accepts any account the stored bump derives — including a shadow account created at a noncanonical bump. `Type::with_checked_pda` searches for the canonical bump and rejects that shadow account, at the cost of the search. The runtime borrow guard remains active for the closure in both cases and is released when the closure returns.
 
-Use `Type::with_pda` when the handler needs compact data. Do not call `assert_compact_type`, generated `assert_seeds`, and `with_compact_account` first. Those calls repeat compact parsing and PDA derivation. Keep `assert_compact_type` or generated `assert_seeds` for validation-only code.
+Use `Type::with_pda` when the handler needs compact data and the address is already established. Use `Type::with_checked_pda` when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds. Do not call `assert_compact_type`, generated `assert_seeds`, and `with_compact_account` first. Those calls repeat compact parsing and PDA derivation. Keep `assert_compact_type` or generated `assert_seeds` for validation-only code.
 
 ### Compact account creation
 

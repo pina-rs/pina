@@ -106,7 +106,7 @@ The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also g
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
-When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates `Type::with_pda`. This closure-scoped loader checks owner, compact data, the canonical stored bump, and the derived account address while one runtime borrow remains active.
+When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates two closure-scoped loaders that differ in how they treat the canonical bump. `Type::with_pda` derives one address from the stored bump, so it checks owner, compact data, and the stored-bump PDA address while one runtime borrow remains active. `Type::with_checked_pda` searches the seeds for the canonical bump instead, which additionally rejects an account at any other address and a stored bump that is not canonical. That search makes it the only compact loader that rejects a shadow account created at a noncanonical bump, and it costs more compute than the single derivation `with_pda` performs.
 
 <!-- {/compactAccountQuickstart} -->
 

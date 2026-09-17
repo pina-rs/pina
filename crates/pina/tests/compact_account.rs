@@ -545,12 +545,15 @@ fn compact_pda_loader_rejects_a_wrong_stored_bump_before_running_the_closure() {
 	assert!(!closure_ran);
 }
 
-#[test]
-fn compact_pda_loader_rejects_a_valid_noncanonical_bump() {
-	let authority = Address::new_from_array([13; 32]);
+/// Build a compact PDA account at a valid noncanonical bump's address.
+///
+/// Returns the account and the bump stored in it. This is the shadow account an
+/// attacker can create by calling a creation instruction again with a different
+/// valid bump, since the second address is empty and the bump still derives it.
+fn shadow_compact_pda(authority: Address) -> (TestAccount<{ CompactPdaState::MAX_SIZE }>, u8) {
 	let (_, canonical_bump) = CompactPdaState::find_pda(&authority, &OWNER);
 	let seeds = CompactPdaState::seeds(&authority);
-	let (address, noncanonical_bump) = (0..=u8::MAX)
+	let (address, bump) = (0..=u8::MAX)
 		.find_map(|candidate| {
 			if candidate == canonical_bump {
 				return None;
@@ -565,16 +568,90 @@ fn compact_pda_loader_rejects_a_valid_noncanonical_bump() {
 	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
 	CompactPdaState::initialize(
 		&mut stored.data,
+		&CompactPdaStatePatch::new().bump(bump).authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+
+	(stored, bump)
+}
+
+#[test]
+fn compact_pda_loader_loads_the_address_the_stored_bump_derives() {
+	// `with_pda` verifies one derivation from the stored bump, so it accepts a
+	// shadow account. That is the documented trade: it trusts whoever wrote the
+	// bump field, and a creation builder only writes canonical ones.
+	let authority = Address::new_from_array([13; 32]);
+	let (mut stored, bump) = shadow_compact_pda(authority);
+	let account = stored.view();
+
+	let loaded = CompactPdaState::with_pda(&account, &authority, &OWNER, |state| Ok(state.bump))
+		.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+
+	assert_eq!(loaded, bump);
+}
+
+#[test]
+fn checked_pda_loader_rejects_a_valid_noncanonical_bump() {
+	// `with_checked_pda` is the only compact loader that rejects the shadow
+	// account, because only it searches for the canonical bump.
+	let authority = Address::new_from_array([13; 32]);
+	let (mut stored, _) = shadow_compact_pda(authority);
+	let account = stored.view();
+	let mut closure_ran = false;
+
+	let result = CompactPdaState::with_checked_pda(&account, &authority, &OWNER, |_| {
+		closure_ran = true;
+		Ok(())
+	});
+
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+	assert!(!closure_ran);
+}
+
+#[test]
+fn checked_pda_loader_accepts_the_canonical_bump() {
+	let authority = Address::new_from_array([14; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
 		&CompactPdaStatePatch::new()
-			.bump(noncanonical_bump)
-			.authority(authority),
+			.bump(bump)
+			.authority(authority)
+			.replace_values(&[PodU64::from(5)]),
 	)
 	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
 	let account = stored.view();
 
-	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| Ok(()));
+	let loaded =
+		CompactPdaState::with_checked_pda(&account, &authority, &OWNER, |state| Ok(state.bump))
+			.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+
+	assert_eq!(loaded, bump);
+}
+
+#[test]
+fn checked_pda_loader_rejects_a_wrong_stored_bump() {
+	let authority = Address::new_from_array([15; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new()
+			.bump(bump.wrapping_add(1))
+			.authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	let account = stored.view();
+	let mut closure_ran = false;
+
+	let result = CompactPdaState::with_checked_pda(&account, &authority, &OWNER, |_| {
+		closure_ran = true;
+		Ok(())
+	});
 
 	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+	assert!(!closure_ran);
 }
 
 #[test]

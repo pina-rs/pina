@@ -500,7 +500,7 @@ The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also g
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
-When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates `Type::with_pda`. This closure-scoped loader checks owner, compact data, the canonical stored bump, and the derived account address while one runtime borrow remains active.
+When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates two closure-scoped loaders that differ in how they treat the canonical bump. `Type::with_pda` derives one address from the stored bump, so it checks owner, compact data, and the stored-bump PDA address while one runtime borrow remains active. `Type::with_checked_pda` searches the seeds for the canonical bump instead, which additionally rejects an account at any other address and a stored bump that is not canonical. That search makes it the only compact loader that rejects a shadow account created at a noncanonical bump, and it costs more compute than the single derivation `with_pda` performs.
 
 <!-- {/compactAccountQuickstart} -->
 
@@ -1047,7 +1047,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Create accounts through the typed creation builders**, which reject targets whose storage is not zeroed with `AccountAlreadyInitialized`
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
-- **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view, so the layout, canonical bump, and PDA address are validated during the same borrow
+- **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view and the address is already established, so the layout and stored-bump PDA address are validated during the same borrow
+- **Use generated `with_checked_pda` instead of `with_pda`** when an untrusted caller chooses which account the handler loads; it searches for the canonical bump and so rejects a shadow account created at a noncanonical bump, which a stored-bump check alone cannot detect
 - **Validate dynamic program accounts** with Pina's `assert_program()` before explicitly unverified CPI invocations; static and self-verifying CPI APIs need no redundant assertion
 - **Use `as_account::<T>()` or `as_account_mut::<T>()`** when a handler needs fixed-account fields; these guard-backed loaders check the owner, discriminator, exact size, and nested values
 - **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast

@@ -150,7 +150,7 @@ let (revision, entries) = Journal::with_pda(
 )?;
 ```
 
-`with_pda` validates ownership, compact data, the canonical bump, and the derived account address before it runs the closure. The closure cannot return the borrowed compact view. Use `assert_compact_type` or generated `assert_seeds` only when code needs validation without field access.
+`with_pda` validates ownership, compact data, and the address the stored bump derives before it runs the closure, using a single derivation. `with_checked_pda` searches for the canonical bump instead and rejects an account at any other address or with a noncanonical stored bump. The closure cannot return the borrowed compact view. Use `assert_compact_type` or generated `assert_seeds` only when code needs validation without field access.
 
 ## Keep compact nesting inside the supported grammar
 
