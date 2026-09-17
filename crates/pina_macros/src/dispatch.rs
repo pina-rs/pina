@@ -233,24 +233,11 @@ pub(crate) fn expand(
 			let assertions = routes.iter().map(|route| {
 				let name = route.accounts_name.to_string();
 				let bound = route_bound(route);
-				let accounts = &route.accounts;
-				// The documented hand-written sentinel, resolved through the
-				// concrete accounts type so the reference is unambiguous.
-				let sentinel = quote! {
-					{
-						const fn __pina_unbounded<'a, T>() -> usize
-						where
-							T: #crate_path::ParseAccounts<'a>,
-						{
-							<T as #crate_path::ParseAccounts<'a>>::UNBOUNDED
-						}
-						__pina_unbounded::<'static, #accounts>()
-					}
-				};
 
 				quote! {
 					const _: () = assert!(
-						#bound <= MAX_INSTRUCTION_ACCOUNTS || #bound == #sentinel,
+						#bound <= MAX_INSTRUCTION_ACCOUNTS
+							|| #bound == ::core::primitive::usize::MAX,
 						concat!(
 							"MAX_INSTRUCTION_ACCOUNTS must cover `",
 							#name,
