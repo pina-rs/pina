@@ -54,30 +54,27 @@ impl RenderedArgument {
 		types: &mut super::wire::TypeIndex,
 		context: &str,
 	) -> Result<Self> {
-		match render_argument(name, argument_type, context) {
-			Ok(argument) => Ok(argument),
-			Err(original) => {
-				let planned = super::wire::plan(argument_type, types, context)?;
-				if original.to_string().contains("is not declared") {
-					return Err(original);
-				}
-				let variable = planned.is_variable();
-				let field = rust_identifier(&name.to_snake_case(), context)?;
-				Ok(Self {
-					rust_type: planned.rust_type,
-					wire_size: planned.max_size,
-					// Rebind the planner's placeholder to this argument's field.
-					write: planned
-						.encode
-						.replace("self_value", &format!("(&self.{field})")),
-					borrows: planned.borrows,
-					docs: Vec::new(),
-					variable,
-					planned: true,
-					field,
-				})
-			}
+		// The terse renderer covers the common fixed-layout cases; anything it
+		// rejects falls back to the general ABI planner.
+		if let Ok(argument) = render_argument(name, argument_type, context) {
+			return Ok(argument);
 		}
+		let planned = super::wire::plan(argument_type, types, context)?;
+		let variable = planned.is_variable();
+		let field = rust_identifier(&name.to_snake_case(), context)?;
+		Ok(Self {
+			rust_type: planned.rust_type,
+			wire_size: planned.max_size,
+			// Rebind the planner's placeholder to this argument's field.
+			write: planned
+				.encode
+				.replace("self_value", &format!("(&self.{field})")),
+			borrows: planned.borrows,
+			docs: Vec::new(),
+			variable,
+			planned: true,
+			field,
+		})
 	}
 }
 

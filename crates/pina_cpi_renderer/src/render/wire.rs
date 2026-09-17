@@ -1034,7 +1034,7 @@ mod tests {
 			&mut types,
 			"test",
 		)
-		.unwrap_or_else(|error| panic!("alias should resolve: {error}"));
+		.expect("alias should resolve");
 		assert_eq!(alias.fixed_size, Some(8));
 		assert_eq!(alias.rust_type, "u64");
 
@@ -1043,7 +1043,7 @@ mod tests {
 			&mut types,
 			"test",
 		)
-		.unwrap_or_else(|error| panic!("struct should plan: {error}"));
+		.expect("struct should plan");
 		assert_eq!(params.rust_type, "Params");
 		assert_eq!(params.fixed_size, Some(8));
 		assert!(params.encode.contains("encode_into"));
@@ -1072,6 +1072,38 @@ mod tests {
 		)
 		.expect_err("cyclic links must be rejected");
 		assert!(error.to_string().contains("cyclic"));
+
+		// A declared alias pointing at an undeclared type fails while the
+		// resolver walks the alias chain, not at the first link.
+		let mut types = index(&[DefinedTypeNode::new(
+			"broken_alias",
+			DefinedTypeLinkNode::new("never_declared"),
+		)]);
+		let error = plan(
+			&DefinedTypeLinkNode::new("broken_alias").into(),
+			&mut types,
+			"test",
+		)
+		.expect_err("aliases to undeclared types must be rejected");
+		assert!(error.to_string().contains("not declared"));
+	}
+
+	#[test]
+	fn keeps_a_fixed_window_whose_payload_exactly_fills_it() {
+		// A fixed array whose encoded width equals the window keeps its own
+		// planned encoding untouched.
+		let window = FixedSizeTypeNode::new(
+			codama_nodes::ArrayTypeNode::fixed(
+				TypeNode::Number(NumberTypeNode::le(NumberFormat::U8)),
+				8,
+			),
+			8,
+		);
+		let planned = plan(&window.into(), &mut index(&[]), "test")
+			.expect("a payload that exactly fills the window should plan");
+
+		assert_eq!(planned.fixed_size, Some(8));
+		assert_eq!(planned.max_size, 8);
 	}
 
 	#[test]
@@ -1081,8 +1113,7 @@ mod tests {
 			StructFieldTypeNode::new("enabled", BooleanTypeNode::default()),
 			StructFieldTypeNode::new("owner", PublicKeyTypeNode::new()),
 		]);
-		let planned = plan(&structure.into(), &mut index(&[]), "test")
-			.unwrap_or_else(|error| panic!("struct should plan: {error}"));
+		let planned = plan(&structure.into(), &mut index(&[]), "test").expect("struct should plan");
 
 		assert_eq!(planned.fixed_size, Some(41));
 		assert_eq!(planned.max_size, 41);
@@ -1099,8 +1130,7 @@ mod tests {
 				NumberTypeNode::le(NumberFormat::U32),
 			),
 		)]);
-		let planned = plan(&structure.into(), &mut index(&[]), "test")
-			.unwrap_or_else(|error| panic!("struct should plan: {error}"));
+		let planned = plan(&structure.into(), &mut index(&[]), "test").expect("struct should plan");
 
 		assert!(planned.borrows);
 		assert!(planned.is_variable());
@@ -1119,8 +1149,7 @@ mod tests {
 			)
 			.into(),
 		]);
-		let planned = plan(&enumeration.into(), &mut index(&[]), "test")
-			.unwrap_or_else(|error| panic!("enum should plan: {error}"));
+		let planned = plan(&enumeration.into(), &mut index(&[]), "test").expect("enum should plan");
 
 		// Mixed payloads have no single layout, so the enum reports the largest.
 		assert!(planned.is_variable());
@@ -1133,8 +1162,8 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U64),
 			NumberTypeNode::le(NumberFormat::U16),
 		);
-		let planned = plan(&array.into(), &mut index(&[]), "test")
-			.unwrap_or_else(|error| panic!("prefixed array should plan: {error}"));
+		let planned =
+			plan(&array.into(), &mut index(&[]), "test").expect("prefixed array should plan");
 
 		assert!(planned.is_variable());
 		assert_eq!(planned.rust_type, "&'argument [u64]");
@@ -1189,7 +1218,7 @@ mod tests {
 			(NumberFormat::I128, 16),
 		] {
 			let planned = plan(&NumberTypeNode::le(format).into(), &mut index(&[]), "test")
-				.unwrap_or_else(|error| panic!("native integer should plan: {error}"));
+				.expect("native integer should plan");
 			assert_eq!(planned.fixed_size, Some(size));
 			assert!(!planned.borrows);
 		}
@@ -1223,8 +1252,8 @@ mod tests {
 				inner,
 				NumberTypeNode::le(NumberFormat::U32),
 			);
-			let planned = plan(&node.into(), &mut types, "test")
-				.unwrap_or_else(|error| panic!("prefixed value should plan: {error}"));
+			let planned =
+				plan(&node.into(), &mut types, "test").expect("prefixed value should plan");
 			assert_eq!(planned.rust_type, expected);
 			assert!(planned.is_variable());
 			assert!(planned.borrows);
@@ -1237,8 +1266,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U64).into(),
 			BooleanTypeNode::default().into(),
 		]);
-		let planned = plan(&TypeNode::Tuple(tuple), &mut types, "test")
-			.unwrap_or_else(|error| panic!("tuple should plan: {error}"));
+		let planned = plan(&TypeNode::Tuple(tuple), &mut types, "test").expect("tuple should plan");
 		assert_eq!(planned.fixed_size, Some(9));
 
 		// A relative offset has no static position, so the field is variable.
@@ -1251,8 +1279,7 @@ mod tests {
 			strategy: codama_nodes::PreOffsetStrategy::Relative,
 			r#type: Box::new(inner.into()),
 		};
-		let planned = plan(&pre.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("preOffset should plan: {error}"));
+		let planned = plan(&pre.into(), &mut types, "test").expect("preOffset should plan");
 		assert!(
 			planned.is_variable(),
 			"an offset field has no static position"
@@ -1271,8 +1298,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U8),
 			codama_nodes::PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U32)),
 		);
-		let planned = plan(&map.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("map should plan: {error}"));
+		let planned = plan(&map.into(), &mut types, "test").expect("map should plan");
 		assert!(planned.is_variable());
 		assert!(
 			planned
@@ -1332,7 +1358,7 @@ mod tests {
 		};
 		let read = boolean
 			.decode_into("active", "test")
-			.unwrap_or_else(|error| panic!("bool should decode: {error}"));
+			.expect("bool should decode");
 		// A self-referential binding is the exact bug this guards against.
 		assert!(!read.contains("let active = active"));
 		assert!(read.contains("data.get(cursor).copied()? != 0"));
@@ -1373,19 +1399,18 @@ mod tests {
 	fn plans_booleans_public_keys_and_fixed_bytes_directly() {
 		let mut types = index(&[]);
 
-		let boolean = plan(&BooleanTypeNode::default().into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("bool should plan: {error}"));
+		let boolean =
+			plan(&BooleanTypeNode::default().into(), &mut types, "test").expect("bool should plan");
 		assert_eq!(boolean.fixed_size, Some(1));
 		assert!(boolean.encode.contains("u8::from"));
 
-		let key = plan(&PublicKeyTypeNode::new().into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("key should plan: {error}"));
+		let key =
+			plan(&PublicKeyTypeNode::new().into(), &mut types, "test").expect("key should plan");
 		assert_eq!(key.fixed_size, Some(32));
 		assert!(key.encode.contains("as_ref()"));
 
 		let bytes = FixedSizeTypeNode::new(BytesTypeNode {}, 4).into();
-		let planned = plan(&bytes, &mut types, "test")
-			.unwrap_or_else(|error| panic!("fixed bytes should plan: {error}"));
+		let planned = plan(&bytes, &mut types, "test").expect("fixed bytes should plan");
 		assert!(planned.encode.contains("copy_from_slice(&self_value[..])"));
 	}
 
@@ -1416,8 +1441,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U8),
 		);
 		let loose = FixedSizeTypeNode::new(TypeNode::Array(prefixed), 256);
-		let planned = plan(&loose.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("loose window should plan: {error}"));
+		let planned = plan(&loose.into(), &mut types, "test").expect("loose window should plan");
 		assert_eq!(planned.fixed_size, None);
 		assert_eq!(planned.max_size, 256);
 	}
@@ -1445,15 +1469,14 @@ mod tests {
 	fn plans_options_in_both_encodings() {
 		let mut types = index(&[]);
 		let variable = codama_nodes::OptionTypeNode::new(NumberTypeNode::le(NumberFormat::U64));
-		let planned = plan(&variable.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("variable option should plan: {error}"));
+		let planned =
+			plan(&variable.into(), &mut types, "test").expect("variable option should plan");
 		assert!(planned.is_variable());
 		assert!(planned.encode.contains("Some(value)"));
 		assert!(planned.encode.contains("None =>"));
 
 		let fixed = codama_nodes::OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64));
-		let planned = plan(&fixed.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("fixed option should plan: {error}"));
+		let planned = plan(&fixed.into(), &mut types, "test").expect("fixed option should plan");
 		assert_eq!(planned.fixed_size, Some(9));
 		assert!(planned.encode.contains("fill(0)"));
 	}
@@ -1470,8 +1493,8 @@ mod tests {
 			)),
 			prefix.clone(),
 		);
-		let planned = plan(&string_array.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("prefixed array should plan: {error}"));
+		let planned =
+			plan(&string_array.into(), &mut types, "test").expect("prefixed array should plan");
 		assert!(planned.is_variable());
 		assert!(planned.encode.contains("payload_len"));
 
@@ -1511,8 +1534,7 @@ mod tests {
 			],
 			size: codama_nodes::NumberTypeNode::le(NumberFormat::U32).into(),
 		};
-		let planned = plan(&wide.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("wide enum should plan: {error}"));
+		let planned = plan(&wide.into(), &mut types, "test").expect("wide enum should plan");
 		assert_eq!(planned.fixed_size, Some(4));
 
 		let bad_size = codama_nodes::EnumTypeNode {
@@ -1537,8 +1559,8 @@ mod tests {
 			)
 			.into(),
 		]);
-		let planned = plan(&enumeration.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("tuple enum should plan: {error}"));
+		let planned =
+			plan(&enumeration.into(), &mut types, "test").expect("tuple enum should plan");
 		assert_eq!(planned.fixed_size, Some(3));
 	}
 
@@ -1562,8 +1584,7 @@ mod tests {
 			NumberTypeNode::le(NumberFormat::U8),
 			codama_nodes::PrefixedCountNode::new(NumberTypeNode::le(NumberFormat::U16)),
 		);
-		let planned = plan(&prefixed.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("map should plan: {error}"));
+		let planned = plan(&prefixed.into(), &mut types, "test").expect("map should plan");
 		assert!(planned.encode.contains("for (key, value) in"));
 		assert!(planned.rust_type.contains("&'argument str"));
 
@@ -1591,12 +1612,12 @@ mod tests {
 
 		let advancing = number
 			.decode_into("value", "test")
-			.unwrap_or_else(|error| panic!("decode should succeed: {error}"));
+			.expect("decode should succeed");
 		assert!(advancing.contains("cursor += 8;"));
 
 		let final_field = number
 			.decode_final("value", "test")
-			.unwrap_or_else(|error| panic!("decode should succeed: {error}"));
+			.expect("decode should succeed");
 		assert!(!final_field.contains("cursor +="));
 	}
 
@@ -1633,8 +1654,8 @@ mod tests {
 			strategy: codama_nodes::PreOffsetStrategy::Relative,
 			r#type: Box::new(inner()),
 		};
-		let planned = plan(&TypeNode::PreOffset(pre), &mut types, "test")
-			.unwrap_or_else(|error| panic!("preOffset should plan: {error}"));
+		let planned =
+			plan(&TypeNode::PreOffset(pre), &mut types, "test").expect("preOffset should plan");
 		assert!(planned.is_variable());
 
 		let post = codama_nodes::PostOffsetTypeNode {
@@ -1642,8 +1663,8 @@ mod tests {
 			strategy: codama_nodes::PostOffsetStrategy::Relative,
 			r#type: Box::new(inner()),
 		};
-		let planned = plan(&TypeNode::PostOffset(post), &mut types, "test")
-			.unwrap_or_else(|error| panic!("postOffset should plan: {error}"));
+		let planned =
+			plan(&TypeNode::PostOffset(post), &mut types, "test").expect("postOffset should plan");
 		assert!(planned.is_variable());
 	}
 
@@ -1653,8 +1674,7 @@ mod tests {
 
 		// A boolean is fixed 1 byte, so a 1-byte window matches exactly.
 		let exact = FixedSizeTypeNode::new(BooleanTypeNode::default(), 1);
-		let planned = plan(&exact.into(), &mut types, "test")
-			.unwrap_or_else(|error| panic!("exact window should plan: {error}"));
+		let planned = plan(&exact.into(), &mut types, "test").expect("exact window should plan");
 		assert_eq!(planned.fixed_size, Some(1));
 
 		// A variable-length payload cannot live in a fixed window at all.
@@ -1720,8 +1740,7 @@ mod tests {
 				StringTypeNode::utf8(),
 				NumberTypeNode::le(prefix_format),
 			);
-			let planned = plan(&node.into(), &mut types, "test")
-				.unwrap_or_else(|error| panic!("prefix should plan: {error}"));
+			let planned = plan(&node.into(), &mut types, "test").expect("prefix should plan");
 			assert_eq!(
 				planned.max_size,
 				prefix_max.saturating_add(width),

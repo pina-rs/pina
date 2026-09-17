@@ -57,15 +57,15 @@ pub(crate) fn render_type_page(
 
 	match defined_type.r#type.as_ref() {
 		TypeNode::Struct(structure) => {
-			let fields = structure.fields.clone();
+			// Omitted fields are constants baked into the program, not values a
+			// caller supplies, so they carry no argument bytes to render.
 			let mut planned: Vec<(String, Vec<String>, Encoded)> = Vec::new();
-			for field in &fields {
-				if matches!(
+			for field in structure.fields.iter().filter(|field| {
+				!matches!(
 					field.default_value_strategy,
 					Some(codama_nodes::DefaultValueStrategy::Omitted)
-				) {
-					continue;
-				}
+				)
+			}) {
 				planned.push((
 					snake(field.name.as_ref()),
 					field.docs.to_vec(),
@@ -80,21 +80,15 @@ pub(crate) fn render_type_page(
 			Ok(render_struct(&name, &defined_type.docs, &planned))
 		}
 		TypeNode::Enum(enumeration) => {
-			let variants = enumeration
-				.variants
-				.iter()
-				.enumerate()
-				.map(|(index, variant)| {
-					let payload = plan_variant_payload(variant, types, &context)?;
-
-					Ok(RenderedVariant {
-						name: super::wire::enum_variant_name(&super::wire::variant_name(variant)),
-						docs: variant_docs(variant),
-						discriminator: variant_discriminator(variant, index),
-						payload,
-					})
-				})
-				.collect::<Result<Vec<_>>>()?;
+			let mut variants = Vec::new();
+			for (index, variant) in enumeration.variants.iter().enumerate() {
+				variants.push(RenderedVariant {
+					name: super::wire::enum_variant_name(&super::wire::variant_name(variant)),
+					docs: variant_docs(variant),
+					discriminator: variant_discriminator(variant, index),
+					payload: plan_variant_payload(variant, types, &context)?,
+				});
+			}
 
 			render_enum(&name, enumeration, &defined_type.docs, &variants)
 		}

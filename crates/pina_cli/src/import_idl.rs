@@ -83,6 +83,30 @@ impl ImportSource {
 			} => format!("canonical program metadata for `{program_id}` on `{cluster}`"),
 		}
 	}
+
+	/// Resolves the `--idl` / `--url` / `--cluster` triangle into one source.
+	///
+	/// # Errors
+	///
+	/// Returns an error when more than one of `--idl` and `--url` is given.
+	pub fn select(
+		idl: Option<PathBuf>,
+		url: Option<String>,
+		cluster: &str,
+		program_id: &str,
+	) -> Result<Self, ImportError> {
+		match (idl, url) {
+			(Some(path), None) => Ok(Self::File(path)),
+			(None, Some(url)) => Ok(Self::Url(url)),
+			(None, None) => {
+				Ok(Self::Cluster {
+					cluster: cluster.to_string(),
+					program_id: program_id.to_string(),
+				})
+			}
+			(Some(_), Some(_)) => Err(ImportError::ConflictingSources),
+		}
+	}
 }
 
 /// Options for importing one foreign program.
@@ -119,6 +143,9 @@ pub enum ImportError {
 
 	#[error("could not fetch the IDL: {reason}")]
 	Fetch { reason: String },
+
+	#[error("--idl and --url cannot be used together")]
+	ConflictingSources,
 
 	#[error(transparent)]
 	UnsafeOutput(#[from] CodamaError),
@@ -157,7 +184,7 @@ pub struct ImportOutcome {
 pub fn import_idl(options: &ImportOptions) -> Result<ImportOutcome, ImportError> {
 	validate_name(&options.name)?;
 	let program_id = validate_program_id(&options.program_id)?;
-	let idl_bytes = fetch_idl(&options.source)?;
+	let idl_bytes = fetch_idl(&options.source, &options.npx)?;
 	let digest = sha256_hex(&idl_bytes);
 
 	let crate_dir = options.output.join(&options.name);
@@ -262,14 +289,14 @@ fn validate_program_id(program_id: &str) -> Result<String, ImportError> {
 }
 
 /// Reads the IDL bytes from whichever source the caller selected.
-fn fetch_idl(source: &ImportSource) -> Result<Vec<u8>, ImportError> {
+fn fetch_idl(source: &ImportSource, npx: &str) -> Result<Vec<u8>, ImportError> {
 	match source {
 		ImportSource::File(path) => read_bounded(path),
 		ImportSource::Url(url) => fetch_url(url),
 		ImportSource::Cluster {
 			cluster,
 			program_id,
-		} => fetch_cluster(cluster, program_id),
+		} => fetch_cluster(cluster, program_id, npx),
 	}
 }
 
@@ -335,9 +362,9 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 	read_bounded_reader(response.into_body().into_reader())
 }
 
-fn fetch_cluster(cluster: &str, program_id: &str) -> Result<Vec<u8>, ImportError> {
+fn fetch_cluster(cluster: &str, program_id: &str, npx: &str) -> Result<Vec<u8>, ImportError> {
 	let client = crate::idl_metadata::ClientOptions {
-		npx: "npx".to_string(),
+		npx: npx.to_string(),
 		cluster: cluster.to_string(),
 	};
 	let value = crate::idl_metadata::fetch_idl(&client, program_id).map_err(|error| {
@@ -347,6 +374,23 @@ fn fetch_cluster(cluster: &str, program_id: &str) -> Result<Vec<u8>, ImportError
 	})?;
 
 	serde_json::to_vec(&value).map_err(|source| ImportError::InvalidJson { source })
+}
+
+/// Builds the read error for the converter's scratch directory.
+///
+/// The scratch directory is freshly created, so its reads only fail when the
+/// environment is broken; the constructor exists to keep that mapping out of
+/// the happy path.
+fn scratch_read_error(source: std::io::Error) -> ImportError {
+	ImportError::ReadIdl {
+		path: PathBuf::from("<temp>"),
+		source,
+	}
+}
+
+/// Builds the write error for the converter's scratch copy of the IDL.
+fn scratch_write_error(path: PathBuf) -> impl FnOnce(std::io::Error) -> ImportError {
+	move |source| ImportError::WriteFile { path, source }
 }
 
 /// Normalizes any accepted IDL into a Codama root node.
@@ -364,19 +408,9 @@ fn normalize_to_codama(bytes: &[u8], npx: &str) -> Result<Value, ImportError> {
 	}
 
 	// Write the raw IDL to a scratch file for the converter, which reads a path.
-	let temp = tempfile::tempdir().map_err(|source| {
-		ImportError::ReadIdl {
-			path: PathBuf::from("<temp>"),
-			source,
-		}
-	})?;
+	let temp = tempfile::tempdir().map_err(scratch_read_error)?;
 	let idl_path = temp.path().join("idl.json");
-	std::fs::write(&idl_path, bytes).map_err(|source| {
-		ImportError::WriteFile {
-			path: idl_path.clone(),
-			source,
-		}
-	})?;
+	std::fs::write(&idl_path, bytes).map_err(scratch_write_error(idl_path.clone()))?;
 
 	convert_anchor(&idl_path, npx)
 }
@@ -476,7 +510,7 @@ mod tests {
 		Path::new(env!("CARGO_MANIFEST_DIR"))
 			.parent()
 			.and_then(Path::parent)
-			.unwrap_or_else(|| Path::new("."))
+			.expect("the CLI manifest lives inside the workspace")
 			.join("crates/pina_cpi_renderer/fixtures/switchboard_on_demand.json")
 	}
 
@@ -507,7 +541,7 @@ mod tests {
 	fn canonicalises_and_rejects_program_ids() {
 		assert_eq!(
 			validate_program_id("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv")
-				.unwrap_or_else(|error| panic!("valid key rejected: {error}")),
+				.expect("valid key rejected"),
 			"SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"
 		);
 		assert!(validate_program_id("not-a-key").is_err());
@@ -536,12 +570,12 @@ mod tests {
 
 	#[test]
 	fn imports_a_file_idl_with_provenance() {
-		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+		let temp = tempfile::TempDir::new().expect("temp");
 		let outcome = import_idl(&options(
 			temp.path().to_path_buf(),
 			ImportSource::File(fixture_path()),
 		))
-		.unwrap_or_else(|error| panic!("import should succeed: {error}"));
+		.expect("import should succeed");
 
 		assert!(outcome.changed);
 		assert_eq!(outcome.idl_sha256.len(), 64);
@@ -553,8 +587,7 @@ mod tests {
 				.is_file()
 		);
 
-		let readme = std::fs::read_to_string(outcome.crate_dir.join("README.md"))
-			.unwrap_or_else(|error| panic!("readme: {error}"));
+		let readme = std::fs::read_to_string(outcome.crate_dir.join("README.md")).expect("readme");
 		assert!(readme.contains(&outcome.idl_sha256));
 		assert!(readme.contains("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"));
 		assert!(readme.contains("pina-import-provenance:start"));
@@ -562,16 +595,16 @@ mod tests {
 
 	#[test]
 	fn re_importing_an_unchanged_idl_reports_no_change() {
-		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+		let temp = tempfile::TempDir::new().expect("temp");
 		let options = options(
 			temp.path().to_path_buf(),
 			ImportSource::File(fixture_path()),
 		);
 
-		let first = import_idl(&options).unwrap_or_else(|error| panic!("first: {error}"));
+		let first = import_idl(&options).expect("first");
 		assert!(first.changed);
 
-		let second = import_idl(&options).unwrap_or_else(|error| panic!("second: {error}"));
+		let second = import_idl(&options).expect("second");
 		assert!(
 			!second.changed,
 			"an unchanged IDL must not rewrite the crate"
@@ -581,7 +614,7 @@ mod tests {
 
 	#[test]
 	fn binds_the_caller_program_id_into_the_crate() {
-		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+		let temp = tempfile::TempDir::new().expect("temp");
 		let mut options = options(
 			temp.path().to_path_buf(),
 			ImportSource::File(fixture_path()),
@@ -590,12 +623,25 @@ mod tests {
 		// integration distinguishes mainnet from devnet.
 		options.program_id = "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2".to_string();
 
-		let outcome = import_idl(&options).unwrap_or_else(|error| panic!("import: {error}"));
+		let outcome = import_idl(&options).expect("import");
 		let programs = std::fs::read_to_string(outcome.crate_dir.join("src/generated/programs.rs"))
-			.unwrap_or_else(|error| panic!("programs: {error}"));
+			.expect("programs");
 
 		assert!(programs.contains("Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"));
 		assert!(!programs.contains("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"));
+	}
+
+	#[test]
+	fn reports_render_failures_from_the_renderer() {
+		let temp = tempfile::TempDir::new().expect("temp");
+		// The output path is a file, so the crate directory cannot be created.
+		let blocker = temp.path().join("blocker");
+		std::fs::write(&blocker, b"occupied").expect("write blocker");
+
+		let error = import_idl(&options(blocker, ImportSource::File(fixture_path())))
+			.err()
+			.expect("an unusable output path must fail the render");
+		assert!(matches!(error, ImportError::Render { .. }));
 	}
 }
 
@@ -677,9 +723,8 @@ mod coverage {
 				"version": "0.0.0"
 			}
 		});
-		let bytes = serde_json::to_vec(&root).unwrap_or_else(|error| panic!("json: {error}"));
-		let normalized = normalize_to_codama(&bytes, "must-not-run")
-			.unwrap_or_else(|error| panic!("passthrough: {error}"));
+		let bytes = serde_json::to_vec(&root).expect("json");
+		let normalized = normalize_to_codama(&bytes, "must-not-run").expect("passthrough");
 		assert!(normalized.get("program").is_some());
 	}
 
@@ -696,8 +741,7 @@ mod coverage {
 				"version": "0.0.0"
 			}
 		});
-		let applied = apply_program_id(&root, "11111111111111111111111111111111")
-			.unwrap_or_else(|error| panic!("apply: {error}"));
+		let applied = apply_program_id(&root, "11111111111111111111111111111111").expect("apply");
 		let key = applied.program.public_key.as_str();
 		assert_eq!(key, "11111111111111111111111111111111");
 
@@ -709,8 +753,12 @@ mod coverage {
 
 	#[test]
 	fn rejects_clusters_that_are_not_rpc_targets() {
-		let error = fetch_cluster("not-an-rpc", "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS")
-			.expect_err("invalid clusters must be rejected");
+		let error = fetch_cluster(
+			"not-an-rpc",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+			"must-not-run",
+		)
+		.expect_err("invalid clusters must be rejected");
 		assert!(error.to_string().contains("could not fetch") || error.to_string().contains("RPC"));
 	}
 
@@ -719,5 +767,257 @@ mod coverage {
 		// Port 1 on loopback is closed, so the request fails without network.
 		let error = fetch_url("http://127.0.0.1:1/x.json").expect_err("closed ports must fail");
 		assert!(error.to_string().contains("could not fetch"));
+	}
+
+	#[test]
+	fn routes_fetching_through_the_selected_source() {
+		let error = fetch_idl(
+			&ImportSource::Url("http://127.0.0.1:1/x.json".to_string()),
+			"must-not-run",
+		)
+		.expect_err("closed ports must fail");
+		assert!(error.to_string().contains("could not fetch"));
+
+		let error = fetch_idl(
+			&ImportSource::Cluster {
+				cluster: "localnet".to_string(),
+				program_id: "not-a-key".to_string(),
+			},
+			"must-not-run",
+		)
+		.expect_err("unusable program ids must fail before any subprocess runs");
+		assert!(error.to_string().contains("could not fetch"));
+	}
+
+	#[test]
+	fn reads_idl_bodies_from_http_sources() {
+		let body = br#"{"kind":"rootNode","standard":"codama"}"#;
+		let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+		let port = listener.local_addr().expect("addr").port();
+		let server = std::thread::spawn(move || {
+			let (mut stream, _) = listener.accept().expect("accept");
+			let head = format!(
+				"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
+				 {}\r\nconnection: close\r\n\r\n",
+				body.len()
+			);
+			use std::io::Write as _;
+			stream.write_all(head.as_bytes()).expect("write head");
+			stream.write_all(body).expect("write body");
+			let _ = stream.shutdown(std::net::Shutdown::Write);
+			let mut sink = [0_u8; 512];
+			while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+		});
+
+		let bytes = fetch_url(&format!("http://127.0.0.1:{port}/idl.json")).expect("fetch");
+		server.join().expect("server");
+		assert_eq!(bytes, body.to_vec());
+	}
+
+	#[test]
+	fn reports_io_failures_from_idl_readers() {
+		struct Broken;
+
+		impl std::io::Read for Broken {
+			fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+				Err(std::io::Error::other("cable unplugged"))
+			}
+		}
+
+		let error = read_bounded_reader(Broken)
+			.err()
+			.expect("io failures must surface");
+		assert!(error.to_string().contains("could not read the IDL"));
+	}
+
+	#[test]
+	fn passes_loose_codama_documents_through() {
+		// The document carries the Codama standard marker even though it is too
+		// loose to parse as a root node, so no converter runs.
+		let bytes = br#"{"kind":"rootNode","standard":"codama"}"#;
+		let normalized = normalize_to_codama(bytes, "must-not-run").expect("passthrough");
+		assert_eq!(
+			normalized.get("standard").and_then(Value::as_str),
+			Some("codama")
+		);
+	}
+
+	#[test]
+	fn selects_exactly_one_idl_source() {
+		let file = ImportSource::select(
+			Some(PathBuf::from("./counter.json")),
+			None,
+			"mainnet-beta",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+		)
+		.expect("a file source is enough");
+		assert!(matches!(file, ImportSource::File(_)));
+
+		let url = ImportSource::select(
+			None,
+			Some("https://example.com/counter.json".to_string()),
+			"mainnet-beta",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+		)
+		.expect("a url source is enough");
+		assert!(matches!(url, ImportSource::Url(_)));
+
+		let cluster = ImportSource::select(
+			None,
+			None,
+			"mainnet-beta",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+		)
+		.expect("without either, the cluster metadata is the source");
+		assert!(matches!(cluster, ImportSource::Cluster { .. }));
+
+		let error = ImportSource::select(
+			Some(PathBuf::from("./counter.json")),
+			Some("https://example.com/counter.json".to_string()),
+			"mainnet-beta",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+		)
+		.err()
+		.expect("naming two sources must be rejected");
+		assert!(error.to_string().contains("cannot be used together"));
+	}
+
+	#[test]
+	fn reports_provenance_write_failures() {
+		let temp = tempfile::TempDir::new().expect("temp");
+		// The parent directory does not exist, so the write fails.
+		let readme = temp.path().join("missing").join("README.md");
+		let error = write_if_changed(&readme, "provenance")
+			.err()
+			.expect("a failed write must be reported");
+		assert!(error.to_string().contains("could not write"));
+	}
+
+	#[test]
+	fn describes_scratch_errors_with_their_context() {
+		let read = scratch_read_error(std::io::Error::other("broken"));
+		assert!(read.to_string().contains("<temp>"));
+
+		let write = scratch_write_error(PathBuf::from("/tmp/scratch/idl.json"))(
+			std::io::Error::other("full"),
+		);
+		assert!(write.to_string().contains("idl.json"));
+	}
+
+	/// Writes an executable stand-in for `npx` that ignores its arguments and
+	/// prints `output`.
+	#[cfg(unix)]
+	fn fake_executable(dir: &Path, name: &str, output: &str) -> PathBuf {
+		fake_script(dir, name, &["printf '", output, "'"].concat())
+	}
+
+	/// Writes an executable stand-in for `npx` running an arbitrary shell body.
+	#[cfg(unix)]
+	fn fake_script(dir: &Path, name: &str, body: &str) -> PathBuf {
+		use std::os::unix::fs::PermissionsExt as _;
+
+		let path = dir.join(name);
+		std::fs::write(&path, format!("#!/bin/sh\n{}\n", body)).expect("write script");
+		std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+			.expect("make executable");
+		path
+	}
+
+	fn codama_root_json() -> String {
+		serde_json::json!({
+			"kind": "rootNode",
+			"standard": "codama",
+			"version": "1.0.0",
+			"program": {
+				"kind": "programNode",
+				"name": "counter",
+				"publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+				"version": "0.0.0"
+			}
+		})
+		.to_string()
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn converts_anchor_idls_with_the_configured_converter() {
+		let anchor_idl = br#"{"name":"counter","version":"0.1.0","instructions":[]}"#;
+		let temp = tempfile::TempDir::new().expect("temp");
+		// The `node` file stem takes the direct-node invocation path; any other
+		// name goes through `npx -y -p <package> node`.
+		let npx = fake_executable(temp.path(), "node", &codama_root_json());
+		let normalized =
+			normalize_to_codama(anchor_idl, &npx.to_string_lossy()).expect("conversion");
+		assert!(normalized.get("program").is_some());
+
+		let temp = tempfile::TempDir::new().expect("temp");
+		let npx = fake_executable(temp.path(), "fake-npx", &codama_root_json());
+		let normalized =
+			normalize_to_codama(anchor_idl, &npx.to_string_lossy()).expect("conversion");
+		assert!(normalized.get("program").is_some());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn reports_anchor_converter_failures() {
+		let anchor_idl = br#"{"name":"counter","version":"0.1.0","instructions":[]}"#;
+		let temp = tempfile::TempDir::new().expect("temp");
+		let npx = fake_script(
+			temp.path(),
+			"fake-npx",
+			"echo 'converter exploded' >&2; exit 3",
+		);
+
+		let error = normalize_to_codama(anchor_idl, &npx.to_string_lossy())
+			.err()
+			.expect("a failing converter must be reported");
+		assert!(error.to_string().contains("conversion failed"));
+		assert!(error.to_string().contains("converter exploded"));
+
+		// A converter that exits successfully without JSON is a parse failure.
+		let npx = fake_script(temp.path(), "fake-npx-quiet", "printf 'not json at all'");
+		let error = normalize_to_codama(anchor_idl, &npx.to_string_lossy())
+			.err()
+			.expect("non-JSON converter output must be reported");
+		assert!(error.to_string().contains("not valid JSON"));
+	}
+
+	#[test]
+	fn reports_missing_converters() {
+		let anchor_idl = br#"{"name":"counter","version":"0.1.0","instructions":[]}"#;
+		let error = normalize_to_codama(anchor_idl, "./definitely-not-installed")
+			.err()
+			.expect("a missing converter must be reported");
+		assert!(error.to_string().contains("could not run"));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn fetches_cluster_idls_through_the_official_client() {
+		use std::io::Write as _;
+
+		use flate2::Compression;
+		use flate2::write::ZlibEncoder;
+
+		let root = codama_root_json();
+		let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+		encoder.write_all(root.as_bytes()).expect("compress");
+		let compressed = encoder.finish().expect("compress");
+		let hex: String = compressed
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect();
+
+		let temp = tempfile::TempDir::new().expect("temp");
+		let npx = fake_executable(temp.path(), "fake-npx", &hex);
+
+		let bytes = fetch_cluster(
+			"localnet",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+			&npx.to_string_lossy(),
+		)
+		.expect("the fake client serves a compressed IDL");
+		let value = serde_json::from_slice::<Value>(&bytes).expect("json");
+		assert_eq!(value.get("kind").and_then(Value::as_str), Some("rootNode"));
 	}
 }

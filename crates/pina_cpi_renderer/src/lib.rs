@@ -359,16 +359,14 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 			PathBuf::from("types/mod.rs"),
 			page(&render_types_mod(&named)),
 		);
-		for name in &named {
-			let Some(defined_type) = program
-				.defined_types
-				.iter()
-				.find(|defined| defined.name.as_ref() == name.as_str())
-			else {
+		// Only types some instruction or account actually uses get a page, and
+		// pages follow the IDL's own `definedTypes` order.
+		for defined_type in &program.defined_types {
+			if !named.iter().any(|name| name == defined_type.name.as_ref()) {
 				continue;
-			};
+			}
 			files.insert(
-				PathBuf::from(format!("types/{}.rs", snake(name))),
+				PathBuf::from(format!("types/{}.rs", snake(defined_type.name.as_ref()))),
 				page(&render_type_page(defined_type, &mut types)?),
 			);
 		}

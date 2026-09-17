@@ -2520,42 +2520,28 @@ fn run_import(command: &ImportCommand<'_>) {
 		npx,
 	} = *command;
 
-	// `--idl` and `--url` both name an IDL for one program; without either, the
-	// cluster's canonical metadata is the source.
-	let source = match (idl, url) {
-		(Some(path), None) => ImportSource::File(path.to_path_buf()),
-		(None, Some(url)) => ImportSource::Url(url.to_string()),
-		(None, None) => {
-			ImportSource::Cluster {
-				cluster: cluster.to_string(),
-				program_id: program_id.to_string(),
-			}
-		}
-		(Some(_), Some(_)) => {
-			eprintln!(
-				"{} --idl and --url cannot be used together",
-				"Error".red().bold()
-			);
-			std::process::exit(2);
-		}
-	};
-
 	let output = output.map_or_else(|| PathBuf::from("clients/cpi"), Path::to_path_buf);
-	let options = ImportOptions {
-		name: name.to_string(),
-		program_id: program_id.to_string(),
-		source,
-		output,
-		mode,
-		npx: npx.to_string(),
-	};
-	let outcome = match pina_cli::import_idl::import_idl(&options) {
-		Ok(outcome) => outcome,
-		Err(error) => {
-			eprintln!("{} {error}", "Error".red().bold());
-			std::process::exit(1);
-		}
-	};
+	let outcome = ImportSource::select(
+		idl.map(Path::to_path_buf),
+		url.map(str::to_string),
+		cluster,
+		program_id,
+	)
+	.and_then(|source| {
+		let options = ImportOptions {
+			name: name.to_string(),
+			program_id: program_id.to_string(),
+			source,
+			output: output.clone(),
+			mode,
+			npx: npx.to_string(),
+		};
+		pina_cli::import_idl::import_idl(&options)
+	})
+	.unwrap_or_else(|error| {
+		eprintln!("{} {error}", "Error".red().bold());
+		std::process::exit(1);
+	});
 
 	let state = if outcome.changed {
 		"Imported".green().bold().to_string()

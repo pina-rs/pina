@@ -70,7 +70,7 @@ fn account_prelude(uses_address: bool) -> Vec<String> {
 
 /// The Rust field name for an account field, falling back to a positional one
 /// when the IDL omits the name.
-fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize) -> String {
+pub(crate) fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize) -> String {
 	let declared = field.name.as_ref();
 	if declared.is_empty() {
 		format!("field_{index}")
@@ -81,9 +81,9 @@ fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize) -> String
 
 /// Resolves an account's discriminator, if one can gate a read-only parser.
 ///
-/// A discriminator that is not a simple prefix returns `None` rather than
-/// failing: the account's layout is still worth emitting, and only the guard
-/// and parser are withheld.
+/// A discriminator that is not a simple constant prefix at offset zero returns
+/// `None` rather than failing: the layout still renders, and the parser's
+/// guard degrades to a non-empty check instead of the program's bytes.
 fn account_discriminator(
 	account: &AccountNode,
 	context: &str,
@@ -137,6 +137,26 @@ pub(crate) struct RenderedDiscriminator {
 	bytes: Vec<u8>,
 }
 
+/// The little-endian bytes of an integer discriminator literal, rejecting
+/// floats, which have no integer byte representation.
+fn integer_literal_bytes(
+	number: codama_nodes::Number,
+	kind: &'static str,
+	context: &str,
+) -> Result<Vec<u8>> {
+	match number {
+		codama_nodes::Number::UnsignedInteger(number) => Ok(number.to_le_bytes().to_vec()),
+		codama_nodes::Number::SignedInteger(number) => Ok(number.to_le_bytes().to_vec()),
+		codama_nodes::Number::Float(_) => {
+			Err(unsupported(
+				context,
+				kind,
+				"a float discriminator has no integer byte representation",
+			))
+		}
+	}
+}
+
 fn field_discriminator_bytes(
 	field: &codama_nodes::StructFieldTypeNode,
 	context: &str,
@@ -160,19 +180,7 @@ fn field_discriminator_bytes(
 			crate::render::helpers::decode_base16(&value.data, context)
 		}
 		Some(ValueNode::Number(value)) => {
-			let bytes = match value.number {
-				codama_nodes::Number::UnsignedInteger(number) => number.to_le_bytes().to_vec(),
-				codama_nodes::Number::SignedInteger(number) => number.to_le_bytes().to_vec(),
-				codama_nodes::Number::Float(_) => {
-					return Err(unsupported(
-						context,
-						"fieldDiscriminatorNode",
-						"a float discriminator has no integer byte representation",
-					));
-				}
-			};
-
-			Ok(bytes)
+			integer_literal_bytes(value.number, "fieldDiscriminatorNode", context)
 		}
 		_ => {
 			Err(unsupported(
@@ -193,17 +201,7 @@ fn constant_discriminator_bytes(
 	match node.constant.value.as_ref() {
 		ValueNode::Bytes(value) => crate::render::helpers::decode_base16(&value.data, context),
 		ValueNode::Number(value) => {
-			Ok(match value.number {
-				codama_nodes::Number::UnsignedInteger(number) => number.to_le_bytes().to_vec(),
-				codama_nodes::Number::SignedInteger(number) => number.to_le_bytes().to_vec(),
-				codama_nodes::Number::Float(_) => {
-					return Err(unsupported(
-						context,
-						"constantDiscriminatorNode",
-						"a float discriminator has no integer byte representation",
-					));
-				}
-			})
+			integer_literal_bytes(value.number, "constantDiscriminatorNode", context)
 		}
 		other => {
 			Err(unsupported(

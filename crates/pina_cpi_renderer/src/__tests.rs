@@ -1456,30 +1456,277 @@ mod account_planning {
 		StructFieldTypeNode::new(name, r#type)
 	}
 
+	/// A discriminator field: present in the layout, but baked into the program
+	/// with an omitted default the account parser can read its bytes from.
+	fn omitted_field(name: &str, default: ValueNode) -> StructFieldTypeNode {
+		let mut node = StructFieldTypeNode::new(name, NumberTypeNode::le(NumberFormat::U64));
+		node.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		node.default_value = Box::new(Some(default));
+		node
+	}
+
+	fn discriminated_account(
+		name: &str,
+		fields: Vec<StructFieldTypeNode>,
+		discriminators: Vec<DiscriminatorNode>,
+	) -> codama_nodes::AccountNode {
+		codama_nodes::AccountNode {
+			discriminators: discriminators.into(),
+			..account_node(name, fields)
+		}
+	}
+
+	fn amount_field() -> StructFieldTypeNode {
+		field(
+			"amount",
+			TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+		)
+	}
+
+	fn field_discriminator(name: &str, offset: u64) -> DiscriminatorNode {
+		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new(name, offset))
+	}
+
 	#[test]
-	fn falls_back_to_positional_names_when_the_idl_omits_them() {
-		let account = account_node(
-			"thing",
+	fn uses_the_declared_field_name_or_a_positional_fallback() {
+		let named = field("authority", TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		let unnamed = field("", TypeNode::Number(NumberTypeNode::le(NumberFormat::U8)));
+		assert_eq!(accounts::field_name(&named, 0), "authority");
+		assert_eq!(accounts::field_name(&unnamed, 1), "field_1");
+	}
+
+	#[test]
+	fn reads_field_discriminator_bytes_from_every_literal_shape() {
+		let mut types = TypeIndex::default();
+		let account = discriminated_account(
+			"tagged",
 			vec![
-				field("authority", TypeNode::PublicKey(PublicKeyTypeNode::new())),
-				field("", TypeNode::Number(NumberTypeNode::le(NumberFormat::U8))),
+				omitted_field(
+					"tag",
+					ValueNode::Bytes(BytesValueNode::base16("a1b2c3d4e5f6a7b8")),
+				),
+				amount_field(),
 			],
+			vec![field_discriminator("tag", 0)],
 		);
-		let names: Vec<String> = account
-			.data
-			.get_nested_type_node()
-			.fields
-			.iter()
-			.enumerate()
-			.map(|(index, field)| {
-				if field.name.as_ref().is_empty() {
-					format!("field_{index}")
-				} else {
-					snake(field.name.as_ref())
-				}
-			})
-			.collect();
-		assert_eq!(names, ["authority", "field_1"]);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("bytes discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("TAGGED_DISCRIMINATOR"));
+		assert!(page.contains("161, 178, 195, 212, 229, 246, 167, 184"));
+
+		let account = discriminated_account(
+			"numbered",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("number discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[1, 0, 0, 0, 0, 0, 0, 0]"));
+
+		let account = discriminated_account(
+			"signed",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::SignedInteger(-1))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("signed discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[255, 255, 255, 255, 255, 255, 255, 255]"));
+	}
+
+	#[test]
+	fn rejects_unusable_field_discriminators() {
+		// A field discriminator naming a field the layout does not carry.
+		let account = discriminated_account(
+			"ghosted",
+			vec![amount_field()],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a missing discriminator field must be rejected");
+		assert!(error.to_string().contains("not present"));
+
+		// A discriminator field without an omitted default has no bytes to read.
+		let account = discriminated_account(
+			"optional",
+			vec![amount_field()],
+			vec![field_discriminator("amount", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a non-omitted discriminator field must be rejected");
+		assert!(error.to_string().contains("no omitted default value"));
+
+		// A float literal has no integer byte representation.
+		let account = discriminated_account(
+			"floated",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::Float(1.5))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a float discriminator must be rejected");
+		assert!(error.to_string().contains("float"));
+
+		// A boolean default is not a byte or number literal.
+		let account = discriminated_account(
+			"flagged",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::String(codama_nodes::StringValueNode::new("nope")),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a non-literal discriminator must be rejected");
+		assert!(error.to_string().contains("byte or number literal"));
+	}
+
+	#[test]
+	fn constant_discriminators_accept_bytes_and_numbers_only() {
+		let mut types = TypeIndex::default();
+		let number_constant = || {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(7))),
+				),
+				0,
+			))
+		};
+
+		let account =
+			discriminated_account("stamped", vec![amount_field()], vec![number_constant()]);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("constant number discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("STAMPED_DISCRIMINATOR"));
+		assert!(page.contains("[7, 0, 0, 0, 0, 0, 0, 0]"));
+
+		let account = discriminated_account(
+			"branded",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Bytes(codama_nodes::BytesTypeNode::new()),
+					ValueNode::Bytes(BytesValueNode::base16("a1b2c3d4")),
+				),
+				0,
+			))],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("constant bytes discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("BRANDED_DISCRIMINATOR"));
+		assert!(page.contains("161, 178, 195, 212"));
+
+		let account = discriminated_account(
+			"seedy",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::String(codama_nodes::StringTypeNode::utf8()),
+					ValueNode::String(codama_nodes::StringValueNode::new("anchor")),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a string constant discriminator must be rejected");
+		assert!(error.to_string().contains("byte or number literals"));
+
+		let account = discriminated_account(
+			"floated",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::F64)),
+					ValueNode::Number(NumberValueNode::new(Number::Float(1.5))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a float constant discriminator must be rejected");
+		assert!(error.to_string().contains("float"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_nonzero_field_discriminator_offset() {
+		// A field discriminator at a non-zero offset cannot gate a parser.
+		let account = discriminated_account(
+			"late",
+			vec![amount_field()],
+			vec![field_discriminator("amount", 8)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("LATE_DISCRIMINATOR"));
+		assert!(page.contains("!data.is_empty()"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_size_discriminator() {
+		// A size discriminator is metadata, not bytes this client can check.
+		let account = discriminated_account(
+			"sized",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Size(
+				codama_nodes::SizeDiscriminatorNode::new(8),
+			)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SIZED_DISCRIMINATOR"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_nonzero_constant_discriminator() {
+		// A constant discriminator at a non-zero offset cannot gate a parser.
+		let account = discriminated_account(
+			"shifted",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(7))),
+				),
+				8,
+			))],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SHIFTED_DISCRIMINATOR"));
 	}
 
 	#[test]

@@ -63,13 +63,10 @@ fn main() {
 			eprintln!("failed to read IDL directory `{}`: {error}", dir.display());
 			std::process::exit(1);
 		});
-		for entry in entries {
-			let path = entry
-				.unwrap_or_else(|error| {
-					eprintln!("failed to read IDL entry: {error}");
-					std::process::exit(1);
-				})
-				.path();
+		// Unreadable entries are skipped; if nothing usable remains, the
+		// empty-source check below reports it.
+		for entry in entries.flatten() {
+			let path = entry.path();
 			if path
 				.extension()
 				.is_some_and(|extension| extension == "json")
@@ -87,11 +84,7 @@ fn main() {
 	let single_idl = idls.len() == 1;
 
 	for idl in &idls {
-		let crate_dir = if single_idl {
-			args.output.clone()
-		} else {
-			args.output.join(crate_dir_name(idl))
-		};
+		let crate_dir = crate_output_dir(&args.output, idl, single_idl);
 
 		let root = read_root_node(idl).unwrap_or_else(|error| {
 			eprintln!("failed to read `{}`: {error}", idl.display());
@@ -124,6 +117,16 @@ fn crate_dir_name(idl: &Path) -> String {
 	)
 }
 
+/// A single IDL writes its crate straight into `--output`; several IDLs become
+/// sibling crates named after each file.
+fn crate_output_dir(output: &Path, idl: &Path, single_idl: bool) -> PathBuf {
+	if single_idl {
+		output.to_path_buf()
+	} else {
+		output.join(crate_dir_name(idl))
+	}
+}
+
 fn display_relative(path: &Path) -> String {
 	std::env::current_dir()
 		.ok()
@@ -149,6 +152,23 @@ mod tests {
 			RenderMode::Overwrite
 		));
 		assert!(Args::command().has_subcommands() || true);
+	}
+
+	#[test]
+	fn single_idls_write_into_the_output_and_multi_idls_become_siblings() {
+		let idl = Path::new("/tmp/idls/vesting_program.json");
+		let output = Path::new("/tmp/clients");
+
+		assert_eq!(
+			crate_output_dir(output, idl, true),
+			PathBuf::from("/tmp/clients")
+		);
+		assert_eq!(
+			crate_output_dir(output, idl, false),
+			PathBuf::from("/tmp/clients/vesting_program")
+		);
+		// An IDL without a file stem still gets a deterministic crate name.
+		assert_eq!(crate_dir_name(Path::new("/")), "program");
 	}
 
 	#[test]
