@@ -795,14 +795,18 @@ async function runSpecificGuards(
 }
 
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
-const SAMPLE_HEADER_SIZE = 36;
+// 1 (discriminator) + 1 (migration version) + 1 (bump) + 32 (authority) +
+// 2 (count). Migrations are on, so the envelope adds the version byte.
+const SAMPLE_HEADER_SIZE = 37;
 
 function reallocInstructionData(
 	discriminator: number,
 	len: number,
 ): Uint8Array {
 	assert.ok(Number.isInteger(len) && len >= 0 && len <= 0xffff);
-	return Uint8Array.of(discriminator, len & 0xff, len >>> 8);
+	// The middle byte is the migration version; the program rejects payloads
+	// that omit it.
+	return Uint8Array.of(discriminator, 0, len & 0xff, len >>> 8);
 }
 
 async function deriveSampleAddress(
@@ -825,9 +829,10 @@ function assertSampleHeader(
 		"sample must retain its authenticated header",
 	);
 	assert.equal(data[0], 1, "sample discriminator changed");
-	assert.equal(data[1], bump, "sample PDA bump changed");
+	assert.equal(data[1], 0, "sample migration version changed");
+	assert.equal(data[2], bump, "sample PDA bump changed");
 	assert.deepEqual(
-		data.slice(2, 34),
+		data.slice(3, 35),
 		getAddressEncoder().encode(address(authority)),
 		"sample authority changed",
 	);
@@ -835,7 +840,7 @@ function assertSampleHeader(
 
 function assertSampleValues(data: Uint8Array, count: number): void {
 	assert.equal(
-		new DataView(data.buffer, data.byteOffset).getUint16(34, true),
+		new DataView(data.buffer, data.byteOffset).getUint16(35, true),
 		count,
 	);
 	assert.equal(data.length, SAMPLE_HEADER_SIZE + count * 8);
@@ -869,11 +874,16 @@ async function runAnchorReallocGuards(
 	const [sample, bump] = await deriveSampleAddress(descriptor, authority);
 	const sampleWritable = { address: sample, role: AccountRole.WRITABLE };
 
-	await submit(rawInstruction(descriptor.programId, Uint8Array.of(2, bump), [
-		payerWritableSigner,
-		sampleWritable,
-		systemProgram,
-	]));
+	await submit(rawInstruction(
+		descriptor.programId,
+		// discriminator + migration version + bump.
+		Uint8Array.of(2, 0, bump),
+		[
+			payerWritableSigner,
+			sampleWritable,
+			systemProgram,
+		],
+	));
 	const initializedData = await fetchAccountData(surfnet, String(sample));
 	assert.equal(initializedData.length, SAMPLE_HEADER_SIZE);
 	assertSampleHeader(initializedData, bump, authority);

@@ -78,12 +78,14 @@ fn derive_counter_pda(authority: &Pubkey) -> (Pubkey, u8) {
 
 /// Build the instruction data for Initialize.
 fn initialize_ix_data(bump: u8) -> Vec<u8> {
-	vec![CounterInstruction::Initialize as u8, bump]
+	// The envelope carries the current migration version between the
+	// discriminator and the payload.
+	vec![CounterInstruction::Initialize as u8, 0, bump]
 }
 
 /// Build the instruction data for Increment.
 fn increment_ix_data() -> Vec<u8> {
-	vec![CounterInstruction::Increment as u8]
+	vec![CounterInstruction::Increment as u8, 0]
 }
 
 /// Build a counter account with the given state for testing.

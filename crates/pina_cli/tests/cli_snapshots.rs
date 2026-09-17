@@ -27,6 +27,21 @@ fn reset_snapshot_dir(name: &str) -> PathBuf {
 	path
 }
 
+/// Recursively copy a generated client tree into a fixture destination.
+fn copy_tree(source: &Path, destination: &Path) -> std::io::Result<()> {
+	for entry in fs::read_dir(source)? {
+		let entry = entry?;
+		let target = destination.join(entry.file_name());
+		if entry.file_type()?.is_dir() {
+			fs::create_dir_all(&target)?;
+			copy_tree(&entry.path(), &target)?;
+		} else {
+			fs::copy(entry.path(), &target)?;
+		}
+	}
+	Ok(())
+}
+
 fn workspace_relative(path: &Path) -> String {
 	path.strip_prefix(workspace_root())
 		.unwrap_or(path)
@@ -554,20 +569,21 @@ fn codama_generate_success_output_snapshot() {
 	let cpi_out = temp_dir.join("cpi");
 	let js_out = temp_dir.join("js");
 	let dart_out = temp_dir.join("dart");
-	let js_generated = js_out.join("counter_program/src/generated");
-	let dart_generated = dart_out.join("lib/src/generated/counter_program");
-	fs::create_dir_all(&js_generated).unwrap_or_else(|error| {
-		panic!(
-			"failed to create fake JavaScript client directory {}: {error}",
-			js_generated.display()
-		)
-	});
-	fs::create_dir_all(&dart_generated).unwrap_or_else(|error| {
-		panic!(
-			"failed to create fake Dart client directory {}: {error}",
-			dart_generated.display()
-		)
-	});
+	// The pipeline hardens the existing JavaScript and Dart clients in place:
+	// it appends the migration-aware decoders to every account module, writes
+	// the reserved `Migrate` composer, and patches the program plugin. Seed the
+	// fake destinations with the committed generated trees so they look like a
+	// real prior generation instead of empty directories.
+	copy_tree(
+		&workspace_root().join("codama/clients/js/counter_program/src/generated"),
+		&js_out.join("counter_program/src/generated"),
+	)
+	.unwrap_or_else(|error| panic!("failed to seed fake JS client tree: {error}"));
+	copy_tree(
+		&workspace_root().join("codama/clients/dart/lib/src/generated/counter_program"),
+		&dart_out.join("lib/src/generated/counter_program"),
+	)
+	.unwrap_or_else(|error| panic!("failed to seed fake Dart client tree: {error}"));
 
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command

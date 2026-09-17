@@ -287,8 +287,9 @@ fn initialize_rejects_invalid_utf8() {
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
 
-	// Name with an invalid UTF-8 byte (0xff)
-	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
+	// Name with an invalid UTF-8 byte (0xff). The envelope's version byte
+	// sits between the discriminator and the payload.
+	let mut data = vec![ProfileInstruction::Initialize as u8, 0, bump];
 	data.extend_from_slice(&[1u8, 0xff]);
 	data.extend_from_slice(&[0u8; 31]);
 	data.extend_from_slice(&[0u8; 129]);

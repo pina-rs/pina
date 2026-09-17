@@ -1,5 +1,6 @@
 ---
 pina_cli: feat
+pina_skill: docs
 ---
 
 # Scaffold migrations for new projects
