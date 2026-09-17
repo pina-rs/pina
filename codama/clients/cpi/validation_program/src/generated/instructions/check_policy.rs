@@ -57,26 +57,26 @@ pub struct CheckPolicyIx<'argument> {
 
 impl<'argument> CheckPolicyIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 80;
+	pub const LEN: usize = 81;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 80], ProgramError> {
-		let mut data = [0u8; 80];
-		data[..1].copy_from_slice(&CHECK_POLICY_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 81], ProgramError> {
+		let mut data = [0u8; 81];
+		data[..2].copy_from_slice(&CHECK_POLICY_DISCRIMINATOR);
+		data[2..10].copy_from_slice(&self.amount.to_le_bytes());
 		let value = self.memo.as_bytes();
 		if value.len() > 64 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[9..9 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
-		data[9 + 1..9 + 1 + value.len()].copy_from_slice(value);
+		data[10..10 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[10 + 1..10 + 1 + value.len()].copy_from_slice(value);
 		if self.approvals.len() > 4 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[74..74 + 2].copy_from_slice(&(self.approvals.len() as u16).to_le_bytes());
+		data[75..75 + 2].copy_from_slice(&(self.approvals.len() as u16).to_le_bytes());
 		for (index, value) in self.approvals.iter().enumerate() {
-			let item_offset = 74 + 2 + index;
+			let item_offset = 75 + 2 + index;
 			data[item_offset..item_offset + 1].copy_from_slice(&value.to_le_bytes());
 		}
 
@@ -111,4 +111,4 @@ impl<'account, 'argument> CheckPolicy<'account, 'argument> {
 	}
 }
 
-const CHECK_POLICY_DISCRIMINATOR: [u8; 1] = [1];
+const CHECK_POLICY_DISCRIMINATOR: [u8; 2] = [1, 0];

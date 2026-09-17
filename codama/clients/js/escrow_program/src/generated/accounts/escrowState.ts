@@ -35,7 +35,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { type EscrowSeeds, findEscrowPda } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
@@ -43,8 +46,15 @@ export function getEscrowStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ESCROW_STATE_DISCRIMINATOR);
 }
 
+export const ESCROW_STATE_DISCRIMINATOR2 = 0;
+
+export function getEscrowStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ESCROW_STATE_DISCRIMINATOR2);
+}
+
 export type EscrowState = {
 	discriminator: number;
+	migrationVersion: number;
 	maker: Address;
 	mintA: Address;
 	mintB: Address;
@@ -73,6 +83,7 @@ export function getEscrowStateEncoder(): FixedSizeEncoder<EscrowStateArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["maker", getAddressEncoder()],
 			["mintA", getAddressEncoder()],
 			["mintB", getAddressEncoder()],
@@ -81,7 +92,7 @@ export function getEscrowStateEncoder(): FixedSizeEncoder<EscrowStateArgs> {
 			["seed", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -95,6 +106,7 @@ export function getEscrowStateDecoder(): FixedSizeDecoder<EscrowState> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["maker", getAddressDecoder()],
 		["mintA", getAddressDecoder()],
 		["mintB", getAddressDecoder()],
@@ -184,4 +196,32 @@ export async function fetchMaybeEscrowStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findEscrowPda(seeds, { programAddress });
 	return await fetchMaybeEscrowState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const ESCROW_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `EscrowState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (escrowStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ escrowState: address, payer }).make());
+ * }
+ * ```
+ */
+export function escrowStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

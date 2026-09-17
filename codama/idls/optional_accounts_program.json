@@ -35,6 +35,20 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "bump",
 							"type": {
 								"kind": "numberTypeNode",
@@ -71,6 +85,22 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 1
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
 							}
 						}
 					}
@@ -151,6 +181,20 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "bump",
 						"type": {
 							"kind": "numberTypeNode",
@@ -163,6 +207,22 @@
 					{
 						"kind": "constantDiscriminatorNode",
 						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
 						"constant": {
 							"kind": "constantValueNode",
 							"type": {
@@ -218,6 +278,20 @@
 							"kind": "numberValueNode",
 							"number": 1
 						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
 					}
 				],
 				"discriminators": [
@@ -234,6 +308,22 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 1
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
 							}
 						}
 					}
@@ -289,6 +379,20 @@
 							"kind": "numberValueNode",
 							"number": 2
 						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
 					}
 				],
 				"discriminators": [
@@ -305,6 +409,22 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 2
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
 							}
 						}
 					}
@@ -350,6 +470,20 @@
 							"kind": "numberValueNode",
 							"number": 3
 						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
 					}
 				],
 				"discriminators": [
@@ -366,6 +500,22 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 3
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
 							}
 						}
 					}

@@ -1,0 +1,50 @@
+{
+	"formatVersion": 4,
+	"programId": "DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "HelloInstructionData",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "user",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "22f2fe11462871355e5ed014d6025ff1f2914e9f66e12d4aea8a7704775d4286",
+					"transition": null
+				}
+			]
+		}
+	}
+}

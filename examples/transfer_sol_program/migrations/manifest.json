@@ -1,0 +1,134 @@
+{
+	"formatVersion": 4,
+	"programId": "BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "CpiTransferInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "570e85ef9ebe7b433f64a94512a1e2524f45842e8b277f9f370cf3d82a57daf6",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 8,
+							"fields": [
+								{
+									"name": "amount",
+									"offset": 0,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "sender",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "recipient",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "5c7c851770f9bbc49bc576bc802b2de242e10c2ec19cf27d3aeeaa9fd0c888a3",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "DirectTransferInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "570e85ef9ebe7b433f64a94512a1e2524f45842e8b277f9f370cf3d82a57daf6",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 8,
+							"fields": [
+								{
+									"name": "amount",
+									"offset": 0,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "sender",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "recipient",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "e2d3903d1348c98d7a58b51c1fd92db7c8d0f6f4447deca5c785748081d484b0",
+					"transition": null
+				}
+			]
+		}
+	}
+}

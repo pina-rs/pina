@@ -9,5 +9,6 @@
 export * from "./claim";
 export * from "./deposit";
 export * from "./initializePool";
+export * from "./migrate";
 export * from "./openPosition";
 export * from "./withdraw";

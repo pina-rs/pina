@@ -348,9 +348,9 @@ mod tests {
 
 	#[test]
 	fn profile_state_layout() {
-		// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) + 66 (tags)
-		// + 9 (favorite tag) + 1 (active) = 240 bytes.
-		assert_eq!(ProfileState::SIZE, 240);
+		// 1 (discriminator) + 1 (migration version) + 1 (bump) + 33 (name)
+		// + 129 (bio) + 66 (tags) + 9 (favorite tag) + 1 (active) = 241 bytes.
+		assert_eq!(ProfileState::SIZE, 241);
 	}
 
 	#[test]
@@ -399,16 +399,20 @@ mod tests {
 		})
 		.unwrap_or_else(|error| panic!("initialization failed: {error:?}"));
 
-		assert_eq!(bytes[2], 5);
-		assert_eq!(&bytes[3..8], b"alice");
-		assert!(bytes[8..35].iter().all(|byte| *byte == 0));
-		assert_eq!(bytes[35], 2);
-		assert_eq!(&bytes[36..38], b"hi");
-		assert!(bytes[38..164].iter().all(|byte| *byte == 0));
-		assert_eq!(&bytes[164..166], 2u16.to_le_bytes());
-		assert_eq!(&bytes[166..174], 7u64.to_le_bytes());
-		assert_eq!(&bytes[174..182], 9u64.to_le_bytes());
-		assert!(bytes[182..230].iter().all(|byte| *byte == 0));
+		// Payload offsets shift by the 2-byte envelope (1 discriminator +
+		// 1 migration version); `tests/abi_layout.rs` records the same geometry:
+		// bump at 2, the `name` length prefix at 3, and `tags` at 165.
+		assert_eq!(bytes[2], 0);
+		assert_eq!(bytes[3], 5);
+		assert_eq!(&bytes[4..9], b"alice");
+		assert!(bytes[9..36].iter().all(|byte| *byte == 0));
+		assert_eq!(bytes[36], 2);
+		assert_eq!(&bytes[37..39], b"hi");
+		assert!(bytes[39..165].iter().all(|byte| *byte == 0));
+		assert_eq!(&bytes[165..167], 2u16.to_le_bytes());
+		assert_eq!(&bytes[167..175], 7u64.to_le_bytes());
+		assert_eq!(&bytes[175..183], 9u64.to_le_bytes());
+		assert!(bytes[183..231].iter().all(|byte| *byte == 0));
 	}
 
 	#[test]
@@ -428,7 +432,10 @@ mod tests {
 	fn bounded_string_rejects_length_over_capacity() {
 		let mut bytes = [0u8; ProfileState::SIZE];
 		ProfileState::initialize(&mut bytes, |_| Ok(())).unwrap();
-		bytes[2] = 33;
+		// `bump` occupies offset 2 (discriminator + migration version), so the
+		// `name` length prefix starts at 3 — the same geometry the generated
+		// `tests/abi_layout.rs` records.
+		bytes[3] = 33;
 
 		assert!(matches!(
 			ProfileState::try_from_bytes(&bytes),
@@ -466,7 +473,9 @@ mod tests {
 	fn bounded_tags_reject_length_over_capacity() {
 		let mut bytes = [0u8; ProfileState::SIZE];
 		ProfileState::initialize(&mut bytes, |_| Ok(())).unwrap();
-		bytes[164..166].copy_from_slice(&9u16.to_le_bytes());
+		// `tags` starts at `MIGRATION_HEADER_SIZE + 163` == 165, so its length
+		// prefix occupies 165..167.
+		bytes[165..167].copy_from_slice(&9u16.to_le_bytes());
 
 		assert!(matches!(
 			ProfileState::try_from_bytes(&bytes),
@@ -476,8 +485,9 @@ mod tests {
 
 	#[test]
 	fn initialize_instruction_data_layout() {
-		// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) = 164 bytes.
-		assert_eq!(InitializeInstruction::SIZE, 164);
+		// 1 (discriminator) + 1 (migration version) + 1 (bump) + 33 (name) +
+		// 129 (bio) = 165 bytes.
+		assert_eq!(InitializeInstruction::SIZE, 165);
 		assert!(InitializeInstruction::matches_discriminator(&[
 			ProfileInstruction::Initialize as u8
 		]));
@@ -485,20 +495,21 @@ mod tests {
 
 	#[test]
 	fn update_profile_instruction_data_layout() {
-		// 1 (discriminator) + 33 (name) + 129 (bio) = 163 bytes.
-		assert_eq!(UpdateProfileInstruction::SIZE, 163);
+		// 1 (discriminator) + 1 (migration version) + 33 (name) + 129 (bio) =
+		// 164 bytes.
+		assert_eq!(UpdateProfileInstruction::SIZE, 164);
 	}
 
 	#[test]
 	fn add_tag_instruction_data_layout() {
-		// 1 (discriminator) + 8 (tag) = 9 bytes.
-		assert_eq!(AddTagInstruction::SIZE, 9);
+		// 1 (discriminator) + 1 (migration version) + 8 (tag) = 10 bytes.
+		assert_eq!(AddTagInstruction::SIZE, 10);
 	}
 
 	#[test]
 	fn remove_tag_instruction_data_layout() {
-		// 1 (discriminator) + 8 (index) = 9 bytes.
-		assert_eq!(RemoveTagInstruction::SIZE, 9);
+		// 1 (discriminator) + 1 (migration version) + 8 (index) = 10 bytes.
+		assert_eq!(RemoveTagInstruction::SIZE, 10);
 	}
 
 	#[test]

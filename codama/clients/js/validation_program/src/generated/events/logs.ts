@@ -16,15 +16,48 @@ import {
 	type PolicyCheckedEvent,
 } from "./policyChecked.js";
 
+interface PolicyCheckedEventProjectionStep {
+	readonly from: number;
+	readonly to: number;
+	readonly automatic: boolean;
+	readonly sourcePayloadSize: number;
+	readonly destinationPayloadSize: number;
+	readonly moves: readonly (readonly [number, number, number])[];
+}
+
 /**
- * Decode one current-layout event record: the event has no version envelope; only its current layout decodes.
+ * Adjacent projections derived from the checked-in migration manifest.
+ * Adjacent steps compose, mirroring the runtime's `normalize_event_data`.
+ */
+const POLICY_CHECKED_EVENT_PROJECTION_STEPS:
+	readonly PolicyCheckedEventProjectionStep[] = [];
+
+/** Versions whose adjacent transition is manual and not derivable in clients. */
+const POLICY_CHECKED_EVENT_MANUAL_VERSIONS: readonly number[] = [];
+
+const POLICY_CHECKED_EVENT_HEADER_SIZE = 2;
+const POLICY_CHECKED_EVENT_CURRENT_VERSION = 0;
+
+/** Raw event bytes with their source version and whether a projection ran. */
+export type NormalizedPolicyCheckedEvent = {
+	name: "policyChecked";
+	data: PolicyCheckedEvent;
+	sourceVersion: number;
+	wasMigrated: boolean;
+};
+
+/**
+ * Decode one event record, projecting historical versions into the current
+ * shape and retaining the version that actually wrote the bytes.
+ *
+ * Unknown, future, and non-projectable versions fail closed with the reason.
  */
 export function normalizePolicyCheckedEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): DecodedPolicyCheckedEvent {
+): NormalizedPolicyCheckedEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getPolicyCheckedEventDiscriminatorBytes();
-	if (bytes.length < 1) {
+	if (bytes.length < POLICY_CHECKED_EVENT_HEADER_SIZE) {
 		throw new RangeError(
 			`the provided data is too short for the "PolicyCheckedEvent" event envelope`,
 		);
@@ -36,21 +69,37 @@ export function normalizePolicyCheckedEvent(
 			);
 		}
 	}
+	const sourceVersion = bytes[1];
+	if (sourceVersion === POLICY_CHECKED_EVENT_CURRENT_VERSION) {
+		return {
+			name: "policyChecked",
+			data: getPolicyCheckedEventDecoder().decode(bytes),
+			sourceVersion,
+			wasMigrated: false,
+		};
+	}
+	if (sourceVersion > POLICY_CHECKED_EVENT_CURRENT_VERSION) {
+		throw new RangeError(
+			`event migration version mismatch: expected 0, received ${sourceVersion} (the log was written by a newer program; upgrade this client)`,
+		);
+	}
+	const projected = projectPolicyCheckedEvent(bytes, sourceVersion);
 	return {
 		name: "policyChecked",
-		data: getPolicyCheckedEventDecoder().decode(bytes),
+		data: getPolicyCheckedEventDecoder().decode(projected),
+		sourceVersion,
+		wasMigrated: true,
 	};
 }
 
 /** One log entry that named this event. */
-export type DecodedPolicyCheckedEvent = {
-	name: "policyChecked";
-	data: PolicyCheckedEvent;
-};
+export type DecodedPolicyCheckedEvent = NormalizedPolicyCheckedEvent;
 
 /**
  * Decode a `Program data:` log line, or return `null` when the line is not
  * this event.
+ *
+ * Lines that name the event but carry an unprojectable version throw.
  */
 export function parsePolicyCheckedEventFromLog(
 	log: string,
@@ -70,6 +119,51 @@ export function parsePolicyCheckedEventFromLog(
 		}
 	}
 	return normalizePolicyCheckedEvent(bytes);
+}
+
+function projectPolicyCheckedEvent(
+	bytes: Uint8Array,
+	sourceVersion: number,
+): Uint8Array {
+	const discriminatorBytes = getPolicyCheckedEventDiscriminatorBytes();
+	let version = sourceVersion;
+	let payload = bytes.slice(POLICY_CHECKED_EVENT_HEADER_SIZE);
+	while (version !== POLICY_CHECKED_EVENT_CURRENT_VERSION) {
+		const step = POLICY_CHECKED_EVENT_PROJECTION_STEPS.find(
+			(candidate) => candidate.from === version,
+		);
+		if (step === undefined || !step.automatic) {
+			const reason = POLICY_CHECKED_EVENT_MANUAL_VERSIONS.includes(version)
+				? "its adjacent transition is manual, so only an on-chain projection or a client generated from that schema can represent it"
+				: "this client has no checked-in projection for it";
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (${reason})`,
+			);
+		}
+		if (payload.length !== step.sourcePayloadSize) {
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (the log length does not match the v${version} schema)`,
+			);
+		}
+		const destination = new Uint8Array(step.destinationPayloadSize);
+		for (const [sourceOffset, destinationOffset, size] of step.moves) {
+			destination.set(
+				payload.subarray(sourceOffset, sourceOffset + size),
+				destinationOffset,
+			);
+		}
+		payload = destination;
+		version = step.to;
+	}
+
+	const projected = new Uint8Array(
+		POLICY_CHECKED_EVENT_HEADER_SIZE + payload.length,
+	);
+	projected.set(discriminatorBytes, 0);
+	const header = 1;
+	projected[header] = 0;
+	projected.set(payload, POLICY_CHECKED_EVENT_HEADER_SIZE);
+	return projected;
 }
 
 /** Every event this program can emit, as decoded from a log line. */

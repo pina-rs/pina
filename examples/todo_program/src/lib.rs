@@ -193,12 +193,13 @@ mod tests {
 
 	#[test]
 	fn todo_state_layout() {
-		assert_eq!(TodoState::SIZE, 67);
+		// Migrations are on, so the envelope adds one version byte.
+		assert_eq!(TodoState::SIZE, 68);
 	}
 
 	#[test]
 	fn initialize_instruction_layout() {
-		assert_eq!(InitializeInstruction::SIZE, 34);
+		assert_eq!(InitializeInstruction::SIZE, 35);
 		assert!(InitializeInstruction::matches_discriminator(&[
 			TodoInstruction::Initialize as u8
 		]));
@@ -206,7 +207,7 @@ mod tests {
 
 	#[test]
 	fn update_digest_layout() {
-		assert_eq!(UpdateDigestInstruction::SIZE, 33);
+		assert_eq!(UpdateDigestInstruction::SIZE, 34);
 		assert!(UpdateDigestInstruction::matches_discriminator(&[
 			TodoInstruction::UpdateDigest as u8
 		]));

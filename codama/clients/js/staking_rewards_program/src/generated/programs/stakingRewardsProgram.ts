@@ -62,6 +62,8 @@ import {
 	parseWithdrawInstruction,
 	type WithdrawInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findPoolPda, findPositionPda } from "../pdas";
 
 export const STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS =
@@ -78,12 +80,14 @@ export function identifyStakingRewardsProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): StakingRewardsProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return StakingRewardsProgramAccount.PoolState;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return StakingRewardsProgramAccount.PositionState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramAccount.PoolState;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramAccount.PositionState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "stakingRewardsProgram" },
@@ -102,21 +106,26 @@ export function identifyStakingRewardsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): StakingRewardsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return StakingRewardsProgramInstruction.InitializePool;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return StakingRewardsProgramInstruction.OpenPosition;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return StakingRewardsProgramInstruction.Deposit;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return StakingRewardsProgramInstruction.Withdraw;
-	}
-	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
-		return StakingRewardsProgramInstruction.Claim;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.InitializePool;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.OpenPosition;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.Deposit;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.Withdraw;
+	if (
+		containsBytes(data, getU8Encoder().encode(4), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.Claim;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "stakingRewardsProgram" },
@@ -252,6 +261,8 @@ export function stakingRewardsProgramProgram() {
 					positionState: addSelfFetchFunctions(client, getPositionStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initializePool: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

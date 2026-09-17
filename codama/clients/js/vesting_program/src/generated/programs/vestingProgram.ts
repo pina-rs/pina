@@ -51,6 +51,8 @@ import {
 	type ParsedInitializeInstruction,
 	parseInitializeInstruction,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findVestingPda } from "../pdas";
 
 export const VESTING_PROGRAM_PROGRAM_ADDRESS =
@@ -66,9 +68,10 @@ export function identifyVestingProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): VestingProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return VestingProgramAccount.VestingState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return VestingProgramAccount.VestingState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "vestingProgram" },
@@ -85,15 +88,18 @@ export function identifyVestingProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): VestingProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return VestingProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return VestingProgramInstruction.Claim;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return VestingProgramInstruction.Cancel;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return VestingProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return VestingProgramInstruction.Claim;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return VestingProgramInstruction.Cancel;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "vestingProgram" },
@@ -195,6 +201,8 @@ export function vestingProgramProgram() {
 					vestingState: addSelfFetchFunctions(client, getVestingStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

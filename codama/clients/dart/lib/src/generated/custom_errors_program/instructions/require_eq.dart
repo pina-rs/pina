@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,45 +12,67 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class RequireEqInstructionData {
-  const RequireEqInstructionData() : discriminator = 3;
+  const RequireEqInstructionData() :
+      discriminator = 3,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
 }
 
 Encoder<RequireEqInstructionData> getRequireEqInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (RequireEqInstructionData value) => <String, Object?>{'discriminator': 3},
+    (RequireEqInstructionData value) => <String, Object?>{
+      'discriminator': 3,
+      'migrationVersion': 0,
+    },
   );
 }
 
 Decoder<RequireEqInstructionData> getRequireEqInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'requireEq instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'requireEq instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (RequireEqInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(3),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (RequireEqInstructionData(), newOffset);
+    return (
+      RequireEqInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -72,21 +95,25 @@ Decoder<RequireEqInstructionData> getRequireEqInstructionDataDecoder() {
   };
 }
 
-Codec<RequireEqInstructionData, RequireEqInstructionData>
-getRequireEqInstructionDataCodec() {
-  return combineCodec(
-    getRequireEqInstructionDataEncoder(),
-    getRequireEqInstructionDataDecoder(),
-  );
+Codec<RequireEqInstructionData, RequireEqInstructionData> getRequireEqInstructionDataCodec() {
+  return combineCodec(getRequireEqInstructionDataEncoder(), getRequireEqInstructionDataDecoder());
 }
 
 /// Creates a [RequireEq] instruction.
-Instruction getRequireEqInstruction({required Address programAddress}) {
-  final instructionData = RequireEqInstructionData();
+Instruction getRequireEqInstruction({
+  required Address programAddress,
+
+
+}) {
+  final instructionData = RequireEqInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getRequireEqInstructionDataEncoder().encode(instructionData),
   );
 }

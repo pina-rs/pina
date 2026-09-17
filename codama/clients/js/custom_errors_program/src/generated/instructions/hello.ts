@@ -23,13 +23,22 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
 export function getHelloDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(HELLO_DISCRIMINATOR);
+}
+
+export const HELLO_DISCRIMINATOR2 = 0;
+
+export function getHelloDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(HELLO_DISCRIMINATOR2);
 }
 
 export type HelloInstruction<
@@ -40,7 +49,10 @@ export type HelloInstruction<
 	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<TRemainingAccounts>;
 
-export type HelloInstructionData = { discriminator: number };
+export type HelloInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+};
 
 export type HelloInstructionDataArgs = {};
 
@@ -48,8 +60,11 @@ export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
 	HelloInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
 	);
 }
 
@@ -59,6 +74,9 @@ export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
+	], [
+		"migrationVersion",
+		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

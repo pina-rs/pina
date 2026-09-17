@@ -38,13 +38,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CREATE_DISCRIMINATOR = 0;
 
 export function getCreateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CREATE_DISCRIMINATOR);
+}
+
+export const CREATE_DISCRIMINATOR2 = 0;
+
+export function getCreateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CREATE_DISCRIMINATOR2);
 }
 
 export type CreateInstruction<
@@ -74,6 +83,7 @@ export type CreateInstruction<
 
 export type CreateInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	dataF32: number;
 	dataF64: bigint;
 };
@@ -87,11 +97,13 @@ export function getCreateInstructionDataEncoder(): FixedSizeEncoder<
 	CreateInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"dataF32",
-			getU32Encoder(),
-		], ["dataF64", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["dataF32", getU32Encoder()],
+			["dataF64", getU64Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
 	);
 }
 
@@ -103,6 +115,7 @@ export function getCreateInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(CREATE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["dataF32", getU32Decoder()],
 		["dataF64", getU64Decoder()],
 	]);

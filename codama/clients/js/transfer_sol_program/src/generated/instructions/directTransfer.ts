@@ -35,13 +35,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const DIRECT_TRANSFER_DISCRIMINATOR = 1;
 
 export function getDirectTransferDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DIRECT_TRANSFER_DISCRIMINATOR);
+}
+
+export const DIRECT_TRANSFER_DISCRIMINATOR2 = 0;
+
+export function getDirectTransferDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(DIRECT_TRANSFER_DISCRIMINATOR2);
 }
 
 export type DirectTransferInstruction<
@@ -66,6 +75,7 @@ export type DirectTransferInstruction<
 
 export type DirectTransferInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	amount: bigint;
 };
 
@@ -76,23 +86,27 @@ export function getDirectTransferInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"amount",
-			getU64Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1 }),
+			"migrationVersion",
+			getU8Encoder(),
+		], ["amount", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
 export function getDirectTransferInstructionDataDecoder(): FixedSizeDecoder<
 	DirectTransferInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(
-			DIRECT_TRANSFER_DISCRIMINATOR,
-			getU8Decoder(),
-		),
-	], ["amount", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				DIRECT_TRANSFER_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["amount", getU64Decoder()],
+	]);
 }
 
 export function getDirectTransferInstructionDataCodec(): FixedSizeCodec<

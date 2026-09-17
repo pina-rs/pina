@@ -9,6 +9,7 @@
 )]
 
 pub const ROTATE_AUTHORITY_DISCRIMINATOR: u8 = 2u8;
+pub const ROTATE_AUTHORITY_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -63,6 +64,7 @@ impl RotateAuthorityInstructionData {
 		<RotateAuthorityInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ROTATE_AUTHORITY_DISCRIMINATOR;
+			data.migration_version = ROTATE_AUTHORITY_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -76,5 +78,6 @@ impl RotateAuthorityInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RotateAuthorityInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub new_authority: solana_pubkey::Pubkey,
 }

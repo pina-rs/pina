@@ -9,8 +9,7 @@ const int floatAccountsProgramErrorAuthorityMismatch = 0x0; // 0
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _floatAccountsProgramErrorMessages = {
-  floatAccountsProgramErrorAuthorityMismatch:
-      'The signer is not the authority recorded on the account.',
+    floatAccountsProgramErrorAuthorityMismatch: 'The signer is not the authority recorded on the account.',
 };
 
 /// Get the error message for a FloatAccountsProgram program error code.

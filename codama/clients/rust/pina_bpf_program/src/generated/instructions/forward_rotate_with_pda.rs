@@ -9,6 +9,7 @@
 )]
 
 pub const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR: u8 = 2u8;
+pub const FORWARD_ROTATE_WITH_PDA_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ impl ForwardRotateWithPdaInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR;
+				data.migration_version = FORWARD_ROTATE_WITH_PDA_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -92,6 +94,7 @@ impl ForwardRotateWithPdaInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ForwardRotateWithPdaInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub bump: u8,
 	pub new_authority: solana_pubkey::Pubkey,
 }

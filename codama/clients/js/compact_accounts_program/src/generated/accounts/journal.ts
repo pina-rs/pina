@@ -58,6 +58,7 @@ import {
 	getPinaPodBoundedStringDecoder,
 	getPinaPodBoundedStringEncoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 	getPinaPodOptionTagDecoder,
 	getPinaPodUtf8Decoder,
 } from "../pinaPodCodecs";
@@ -66,6 +67,12 @@ export const JOURNAL_DISCRIMINATOR = 1;
 
 export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(JOURNAL_DISCRIMINATOR);
+}
+
+export const JOURNAL_DISCRIMINATOR2 = 0;
+
+export function getJournalDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(JOURNAL_DISCRIMINATOR2);
 }
 
 /**
@@ -77,6 +84,7 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
  */
 export type Journal = {
 	discriminator: number;
+	migrationVersion: number;
 	/** Canonical PDA bump. */
 	bump: number;
 	/** Signer permitted to mutate and fund this journal. */
@@ -119,6 +127,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["authority", getAddressEncoder()],
 			["revision", getU32Encoder()],
@@ -133,7 +142,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 						addEncoderSizePrefix(
 							getUtf8Encoder(),
 							offsetEncoder(
-								offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
+								offsetEncoder(getU8Encoder(), { preOffset: () => 48 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
 						),
@@ -147,7 +156,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU64Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
+							offsetEncoder(getU16Encoder(), { preOffset: () => 49 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -159,7 +168,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU8Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
+							offsetEncoder(getU64Encoder(), { preOffset: () => 51 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -175,14 +184,14 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 					),
 					{
 						prefix: offsetEncoder(
-							offsetEncoder(getU8Encoder(), { preOffset: () => 58 }),
+							offsetEncoder(getU8Encoder(), { preOffset: () => 59 }),
 							{ postOffset: ({ preOffset }) => preOffset },
 						),
 					},
 				),
 			],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -193,6 +202,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
 		["revision", getU32Decoder()],
@@ -211,7 +221,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 						getPinaPodUtf8Decoder(),
 						getPinaPodBoundedCountDecoder(
 							offsetDecoder(
-								offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
+								offsetDecoder(getU8Decoder(), { preOffset: () => 48 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
 							24,
@@ -227,13 +237,13 @@ export function getJournalDecoder(): Decoder<Journal> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU64Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 49 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 49 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					8,
@@ -246,13 +256,13 @@ export function getJournalDecoder(): Decoder<Journal> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU8Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						offsetDecoder(getU64Decoder(), { preOffset: () => 51 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						offsetDecoder(getU64Decoder(), { preOffset: () => 51 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					8,
@@ -273,7 +283,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 				{
 					prefix: offsetDecoder(
 						offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), {
-							preOffset: () => 58,
+							preOffset: () => 59,
 						}),
 						{ postOffset: ({ preOffset }) => preOffset },
 					),
@@ -359,4 +369,32 @@ export async function fetchMaybeJournalFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findJournalPda(seeds, { programAddress });
 	return await fetchMaybeJournal(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const JOURNAL_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `Journal` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (journalNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ journal: address, payer }).make());
+ * }
+ * ```
+ */
+export function journalNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

@@ -7,4 +7,5 @@
  */
 
 export * from "./make";
+export * from "./migrate";
 export * from "./take";

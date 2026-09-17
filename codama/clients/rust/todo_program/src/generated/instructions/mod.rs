@@ -9,9 +9,11 @@
 )]
 
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 pub(crate) mod r#toggle_completed;
 pub(crate) mod r#update_digest;
 
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;
 pub use self::r#toggle_completed::*;
 pub use self::r#update_digest::*;

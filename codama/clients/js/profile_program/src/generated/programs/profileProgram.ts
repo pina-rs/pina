@@ -55,6 +55,8 @@ import {
 	type RemoveTagAsyncInput,
 	type UpdateProfileAsyncInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findProfilePda } from "../pdas";
 
 export const PROFILE_PROGRAM_PROGRAM_ADDRESS =
@@ -70,9 +72,10 @@ export function identifyProfileProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ProfileProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ProfileProgramAccount.ProfileState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ProfileProgramAccount.ProfileState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "profileProgram" },
@@ -90,18 +93,22 @@ export function identifyProfileProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ProfileProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return ProfileProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ProfileProgramInstruction.UpdateProfile;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return ProfileProgramInstruction.AddTag;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return ProfileProgramInstruction.RemoveTag;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ProfileProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ProfileProgramInstruction.UpdateProfile;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ProfileProgramInstruction.AddTag;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ProfileProgramInstruction.RemoveTag;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "profileProgram" },
@@ -219,6 +226,8 @@ export function profileProgramProgram() {
 					profileState: addSelfFetchFunctions(client, getProfileStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

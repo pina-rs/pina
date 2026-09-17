@@ -15,7 +15,8 @@ fn create_instruction(
 	f32_bits: u32,
 	f64_bits: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![FloatInstruction::Create as u8];
+	// discriminator + migration version, then the f32 and f64 bit patterns.
+	let mut data = vec![FloatInstruction::Create as u8, 0u8];
 	data.extend_from_slice(&f32_bits.to_le_bytes());
 	data.extend_from_slice(&f64_bits.to_le_bytes());
 
@@ -37,7 +38,7 @@ fn update_instruction(
 	f32_bits: u32,
 	f64_bits: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![FloatInstruction::Update as u8];
+	let mut data = vec![FloatInstruction::Update as u8, 0u8];
 	data.extend_from_slice(&f32_bits.to_le_bytes());
 	data.extend_from_slice(&f64_bits.to_le_bytes());
 
@@ -83,21 +84,22 @@ fn create_roundtrips_float_bit_patterns() {
 			.account(&account.pubkey())
 			.expect("fetch float account");
 		assert_eq!(raw.owner, program_id);
-		assert_eq!(raw.data.len(), 45, "FloatDataAccount layout is 45 bytes");
+		assert_eq!(raw.data.len(), 46, "FloatDataAccount layout is 46 bytes");
 		assert_eq!(raw.data[0], 1, "account discriminator is FloatDataAccount");
+		assert_eq!(raw.data[1], 0, "stored migration version is current");
 		// The PinaPod wire view stores the u64 before the u32.
 		assert_eq!(
-			&raw.data[1..9],
+			&raw.data[2..10],
 			e_full.to_bits().to_le_bytes(),
 			"f64 bits stored"
 		);
 		assert_eq!(
-			&raw.data[9..13],
+			&raw.data[10..14],
 			e_half.to_bits().to_le_bytes(),
 			"f32 bits stored"
 		);
 		assert_eq! {
-			&raw.data[13..45],
+			&raw.data[14..46],
 			authority.as_ref(),
 			"stored authority matches"
 		};
@@ -147,8 +149,8 @@ fn update_replaces_floats() {
 		let raw = program
 			.account(&account.pubkey())
 			.expect("fetch float account");
-		assert_eq!(&raw.data[1..9], new_f64.to_bits().to_le_bytes());
-		assert_eq!(&raw.data[9..13], new_f32.to_bits().to_le_bytes());
+		assert_eq!(&raw.data[2..10], new_f64.to_bits().to_le_bytes());
+		assert_eq!(&raw.data[10..14], new_f32.to_bits().to_le_bytes());
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -185,7 +187,7 @@ fn update_rejects_a_stranger_signer() {
 			.fund(&stranger.pubkey(), 1_000_000_000)
 			.expect("fund stranger");
 
-		let mut payload = vec![FloatInstruction::Update as u8];
+		let mut payload = vec![FloatInstruction::Update as u8, 0u8];
 		payload.extend_from_slice(&3.0_f32.to_bits().to_le_bytes());
 		payload.extend_from_slice(&4.0_f64.to_bits().to_le_bytes());
 

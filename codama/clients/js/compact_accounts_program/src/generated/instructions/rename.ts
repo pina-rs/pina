@@ -43,6 +43,7 @@ import { findJournalPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -50,6 +51,12 @@ export const RENAME_DISCRIMINATOR = 3;
 
 export function getRenameDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(RENAME_DISCRIMINATOR);
+}
+
+export const RENAME_DISCRIMINATOR2 = 0;
+
+export function getRenameDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(RENAME_DISCRIMINATOR2);
 }
 
 export type RenameInstruction<
@@ -79,6 +86,7 @@ export type RenameInstruction<
 
 export type RenameInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	titleLen: number;
 	title: ReadonlyUint8Array;
 };
@@ -92,11 +100,13 @@ export function getRenameInstructionDataEncoder(): FixedSizeEncoder<
 	RenameInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"titleLen",
-			getU8Encoder(),
-		], ["title", fixPinaPodEncoderSize(getBytesEncoder(), 24)]]),
-		(value) => ({ ...value, discriminator: 3 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["titleLen", getU8Encoder()],
+			["title", fixPinaPodEncoderSize(getBytesEncoder(), 24)],
+		]),
+		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
 	);
 }
 
@@ -108,6 +118,7 @@ export function getRenameInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(RENAME_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["titleLen", getU8Decoder()],
 		["title", fixDecoderSize(getBytesDecoder(), 24)],
 	]);

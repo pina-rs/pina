@@ -10,6 +10,7 @@
 
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 pub const UPDATE_PROFILE_DISCRIMINATOR: u8 = 1u8;
+pub const UPDATE_PROFILE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -73,6 +74,7 @@ impl UpdateProfileInstructionData {
 		<UpdateProfileInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_PROFILE_DISCRIMINATOR;
+			data.migration_version = UPDATE_PROFILE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -86,6 +88,7 @@ impl UpdateProfileInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct UpdateProfileInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub name: pina::String<32>,
 	pub bio: pina::String<128>,
 }

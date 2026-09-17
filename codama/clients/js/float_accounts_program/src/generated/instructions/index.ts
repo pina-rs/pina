@@ -7,4 +7,5 @@
  */
 
 export * from "./create";
+export * from "./migrate";
 export * from "./update";

@@ -193,8 +193,8 @@ mod tests {
 
 	#[test]
 	fn instruction_data_try_from_bytes() {
-		// The instruction data is exactly 1 byte (just the discriminator).
-		let data = [0u8];
+		// The envelope is the discriminator plus the migration version byte.
+		let data = [0u8, 0u8];
 		let result = HelloInstructionData::try_from_bytes(&data);
 		assert!(result.is_ok());
 	}

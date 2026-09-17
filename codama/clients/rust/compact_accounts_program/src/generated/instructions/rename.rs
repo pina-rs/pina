@@ -9,6 +9,7 @@
 )]
 
 pub const RENAME_DISCRIMINATOR: u8 = 3u8;
+pub const RENAME_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -71,6 +72,7 @@ impl RenameInstructionData {
 		<RenameInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = RENAME_DISCRIMINATOR;
+			data.migration_version = RENAME_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -84,6 +86,7 @@ impl RenameInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RenameInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub title_len: u8,
 	pub title: [u8; 24],
 }

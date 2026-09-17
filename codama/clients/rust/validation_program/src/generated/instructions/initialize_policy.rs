@@ -9,6 +9,7 @@
 )]
 
 pub const INITIALIZE_POLICY_DISCRIMINATOR: u8 = 0u8;
+pub const INITIALIZE_POLICY_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -73,6 +74,7 @@ impl InitializePolicyInstructionData {
 		<InitializePolicyInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_POLICY_DISCRIMINATOR;
+			data.migration_version = INITIALIZE_POLICY_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -86,6 +88,7 @@ impl InitializePolicyInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct InitializePolicyInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub bump: u8,
 	pub minimum: u64,
 	pub maximum: u64,

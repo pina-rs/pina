@@ -1315,6 +1315,30 @@ const decoder = getStructDecoder([
 		let output = generated.join("journal.ts");
 		std::fs::write(&output, source).expect("fixture should be copied");
 
+		// Hardening walks the rest of the generated tree too: it writes the
+		// reserved `Migrate` composer beside the real instructions, registers it
+		// in `instructions/index.ts`, and patches the program plugin. Mirror the
+		// real generated layout so the fixture exercises the same paths.
+		let real_generated =
+			workspace.join("codama/clients/js/compact_accounts_program/src/generated");
+		let fixture_generated = temporary
+			.path()
+			.join("compact_accounts_program/src/generated");
+		for relative in [
+			"instructions/index.ts",
+			"programs/compactAccountsProgram.ts",
+		] {
+			let destination = fixture_generated.join(relative);
+			std::fs::create_dir_all(
+				destination
+					.parent()
+					.expect("fixture destination should have a parent"),
+			)
+			.expect("fixture directory should be created");
+			std::fs::copy(real_generated.join(relative), &destination)
+				.expect("generated fixture should be copied");
+		}
+
 		harden_generated_clients(
 			temporary.path(),
 			&["compact_accounts_program".to_owned()],

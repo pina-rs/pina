@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,45 +12,67 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class InitializeInstructionData {
-  const InitializeInstructionData() : discriminator = 0;
+  const InitializeInstructionData() :
+      discriminator = 0,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
 }
 
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (InitializeInstructionData value) => <String, Object?>{'discriminator': 0},
+    (InitializeInstructionData value) => <String, Object?>{
+      'discriminator': 0,
+      'migrationVersion': 0,
+    },
   );
 }
 
 Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'initialize instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'initialize instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (InitializeInstructionData(), newOffset);
+    return (
+      InitializeInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -72,21 +95,25 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   };
 }
 
-Codec<InitializeInstructionData, InitializeInstructionData>
-getInitializeInstructionDataCodec() {
-  return combineCodec(
-    getInitializeInstructionDataEncoder(),
-    getInitializeInstructionDataDecoder(),
-  );
+Codec<InitializeInstructionData, InitializeInstructionData> getInitializeInstructionDataCodec() {
+  return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
 }
 
 /// Creates a [Initialize] instruction.
-Instruction getInitializeInstruction({required Address programAddress}) {
-  final instructionData = InitializeInstructionData();
+Instruction getInitializeInstruction({
+  required Address programAddress,
+
+
+}) {
+  final instructionData = InitializeInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getInitializeInstructionDataEncoder().encode(instructionData),
   );
 }

@@ -1,6 +1,8 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+export 'migrate.dart';
 export 'initialize.dart';
 export 'toggle_completed.dart';
 export 'update_digest.dart';
+

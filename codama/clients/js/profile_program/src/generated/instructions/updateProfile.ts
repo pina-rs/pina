@@ -44,6 +44,7 @@ import { findProfilePda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 	getPinaPodStringDecoder,
 } from "../pinaPodCodecs";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
@@ -52,6 +53,12 @@ export const UPDATE_PROFILE_DISCRIMINATOR = 1;
 
 export function getUpdateProfileDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_PROFILE_DISCRIMINATOR);
+}
+
+export const UPDATE_PROFILE_DISCRIMINATOR2 = 0;
+
+export function getUpdateProfileDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(UPDATE_PROFILE_DISCRIMINATOR2);
 }
 
 export type UpdateProfileInstruction<
@@ -76,6 +83,7 @@ export type UpdateProfileInstruction<
 
 export type UpdateProfileInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	name: string;
 	bio: string;
 };
@@ -87,6 +95,9 @@ export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		], [
 			"name",
 			fixPinaPodEncoderSize(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
@@ -99,7 +110,7 @@ export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 				129,
 			),
 		]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -114,6 +125,7 @@ export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["name", getPinaPodStringDecoder(getU8Decoder(), 33)],
 		["bio", getPinaPodStringDecoder(getU8Decoder(), 129)],
 	]);

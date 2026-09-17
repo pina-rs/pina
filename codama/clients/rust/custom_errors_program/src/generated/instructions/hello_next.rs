@@ -9,6 +9,7 @@
 )]
 
 pub const HELLO_NEXT_DISCRIMINATOR: u8 = 2u8;
+pub const HELLO_NEXT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -52,6 +53,7 @@ impl HelloNextInstructionData {
 		<HelloNextInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_NEXT_DISCRIMINATOR;
+			data.migration_version = HELLO_NEXT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -65,4 +67,5 @@ impl HelloNextInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct HelloNextInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

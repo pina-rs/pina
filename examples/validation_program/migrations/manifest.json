@@ -1,0 +1,346 @@
+{
+	"formatVersion": 4,
+	"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "PolicyState",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "af0c41a0121d7cbce909cd26987a1092c956456f12c9de17edb54ab56cd87e2e",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "minimum",
+								"rustType": "u64"
+							},
+							{
+								"name": "maximum",
+								"rustType": "u64"
+							},
+							{
+								"name": "required_approvals",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 18,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "minimum",
+									"offset": 1,
+									"size": 8
+								},
+								{
+									"name": "maximum",
+									"offset": 9,
+									"size": 8
+								},
+								{
+									"name": "required_approvals",
+									"offset": 17,
+									"size": 1
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"event:1:01": {
+			"identity": {
+				"kind": "event",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "PolicyChecked",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "4dcb3bd09cf7c284a408e80a32634fb7984edf85d99ec5a40b8da7ba48bee387",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "memo",
+								"rustType": "String<64>"
+							},
+							{
+								"name": "approvals",
+								"rustType": "Vec<u8, 4>"
+							},
+							{
+								"name": "required_approvals",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 80,
+							"fields": [
+								{
+									"name": "amount",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "memo",
+									"offset": 8,
+									"size": 65
+								},
+								{
+									"name": "approvals",
+									"offset": 73,
+									"size": 6
+								},
+								{
+									"name": "required_approvals",
+									"offset": 79,
+									"size": 1
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "InitializePolicyInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "af0c41a0121d7cbce909cd26987a1092c956456f12c9de17edb54ab56cd87e2e",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "minimum",
+								"rustType": "u64"
+							},
+							{
+								"name": "maximum",
+								"rustType": "u64"
+							},
+							{
+								"name": "required_approvals",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 18,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "minimum",
+									"offset": 1,
+									"size": 8
+								},
+								{
+									"name": "maximum",
+									"offset": 9,
+									"size": 8
+								},
+								{
+									"name": "required_approvals",
+									"offset": 17,
+									"size": 1
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "policy",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "policy",
+								"constraints": [
+									"distinct_from=authority",
+									"empty"
+								]
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null,
+								"constraints": [
+									"program=system::ID"
+								]
+							}
+						]
+					},
+					"processSha256": "9fdbd53428c623ff04e0fded227e2e160aafb807d95625775eb71d121d96165c",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "CheckPolicyInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "3015ea557bc12463709ea8d70bcb6834f6d6c8606de58af4394972fc10132fab",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "memo",
+								"rustType": "String<64>"
+							},
+							{
+								"name": "approvals",
+								"rustType": "Vec<u8, 4>"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 79,
+							"fields": [
+								{
+									"name": "amount",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "memo",
+									"offset": 8,
+									"size": 65
+								},
+								{
+									"name": "approvals",
+									"offset": 73,
+									"size": 6
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "policy",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "policy",
+								"constraints": [
+									"distinct_from=authority",
+									"not_empty",
+									"owner=ID"
+								]
+							},
+							{
+								"name": "audit",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"distinct_from=policy",
+									"writable"
+								]
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null,
+								"constraints": [
+									"program=system::ID"
+								]
+							}
+						]
+					},
+					"processSha256": "56d510d47f5b35bcb39dcb1d5ab6f97342c8b0abfd451733c64c58e84da5e135",
+					"transition": null
+				}
+			]
+		}
+	}
+}

@@ -9,5 +9,6 @@
 export * from "./addRole";
 export * from "./deactivateRole";
 export * from "./initialize";
+export * from "./migrate";
 export * from "./rotateAdmin";
 export * from "./updateRole";

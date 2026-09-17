@@ -10,3 +10,4 @@ export * from "./createPda";
 export * from "./forwardRotateWithPda";
 export * from "./forwardRotateWithSigner";
 export * from "./hello";
+export * from "./migrate";

@@ -1,0 +1,168 @@
+{
+	"formatVersion": 4,
+	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "CounterState",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "a00fbfd9afede69fdc333bd9b6b05811bc48b4b2f5ef32b594c1f2c908896b6c",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "count",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 9,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "count",
+									"offset": 1,
+									"size": 8
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "InitializeInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "43124b1aa7c67081addd4259a24fbc507a54bca9953fea6e38dadfaceee4a8ef",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "counter",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "counter"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "7b955742c6f51418e6f58e6fff82f67e258b2244cb2dbac1c5590d746dfb48a0",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "IncrementInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "counter",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "counter"
+							}
+						]
+					},
+					"processSha256": "5c6c0c7aa24746adcf5b76b309c99a524471653577595813173bab7ff8102791",
+					"transition": null
+				}
+			]
+		}
+	}
+}

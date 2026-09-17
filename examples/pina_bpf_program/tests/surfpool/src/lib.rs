@@ -12,7 +12,8 @@ fn state_pda(program_id: &Pubkey) -> (Pubkey, u8) {
 }
 
 fn hello(program: &ProgramTest) -> pina_test::Instruction {
-	program.instruction(&[PinaBpfInstruction::Hello as u8], vec![])
+	// discriminator + migration version.
+	program.instruction(&[PinaBpfInstruction::Hello as u8, 0u8], vec![])
 }
 
 fn create_pda(
@@ -22,7 +23,8 @@ fn create_pda(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[PinaBpfInstruction::CreatePda as u8, bump],
+		// discriminator + migration version + bump.
+		&[PinaBpfInstruction::CreatePda as u8, 0u8, bump],
 		vec![
 			AccountMeta::new_readonly(*payer, true),
 			AccountMeta::new(*state, false),
@@ -82,7 +84,8 @@ fn gated_instructions_report_invalid_instructions_without_the_feature() {
 		program
 			.fund(&foreign_oracle, 1_000_000_000)
 			.expect("fund oracle stub");
-		let mut data = vec![PinaBpfInstruction::ForwardRotateWithSigner as u8];
+		// discriminator + migration version, then the forwarded oracle address.
+		let mut data = vec![PinaBpfInstruction::ForwardRotateWithSigner as u8, 0u8];
 		data.extend_from_slice(Pubkey::default().as_ref());
 		let instruction = program.instruction(
 			&data,
@@ -103,6 +106,7 @@ fn gated_instructions_report_invalid_instructions_without_the_feature() {
 		);
 		let mut data = vec![
 			PinaBpfInstruction::ForwardRotateWithPda as u8,
+			0u8,
 			authority_bump,
 		];
 		data.extend_from_slice(Pubkey::default().as_ref());

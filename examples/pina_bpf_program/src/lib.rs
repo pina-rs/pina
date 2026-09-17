@@ -261,7 +261,8 @@ mod tests {
 
 	#[test]
 	fn process_hello_accepts_instruction_data() {
-		let data = [PinaBpfInstruction::Hello as u8];
+		// discriminator + migration version.
+		let data = [PinaBpfInstruction::Hello as u8, 0u8];
 		assert!(process_hello(&data).is_ok());
 	}
 

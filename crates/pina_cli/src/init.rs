@@ -155,9 +155,13 @@ auto = true
 ///
 /// A proc macro does not re-expand when `pina.toml` or the manifest changes, so
 /// the recorded `auto` policy needs this directive to take effect on the next
-/// build. `pina migrations make` scaffolds the same file when it is missing.
+/// build. `pina migrations make` scaffolds the same file when it is missing, and
+/// the crate-level doc comment keeps the script warning-clean in projects that
+/// lint with `-D warnings`.
 fn build_script_template() -> String {
-	"fn main() {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n".to_owned()
+	"//! Re-expand Pina macros when the migration manifest changes.\n\nfn main() \
+	 {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n"
+		.to_owned()
 }
 
 fn is_valid_package_name(name: &str) -> bool {

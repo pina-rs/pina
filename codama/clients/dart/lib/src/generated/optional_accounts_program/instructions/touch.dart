@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,45 +12,67 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class TouchInstructionData {
-  const TouchInstructionData() : discriminator = 1;
+  const TouchInstructionData() :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
 }
 
 Encoder<TouchInstructionData> getTouchInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (TouchInstructionData value) => <String, Object?>{'discriminator': 1},
+    (TouchInstructionData value) => <String, Object?>{
+      'discriminator': 1,
+      'migrationVersion': 0,
+    },
   );
 }
 
 Decoder<TouchInstructionData> getTouchInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'touch instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'touch instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (TouchInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (TouchInstructionData(), newOffset);
+    return (
+      TouchInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -72,12 +95,8 @@ Decoder<TouchInstructionData> getTouchInstructionDataDecoder() {
   };
 }
 
-Codec<TouchInstructionData, TouchInstructionData>
-getTouchInstructionDataCodec() {
-  return combineCodec(
-    getTouchInstructionDataEncoder(),
-    getTouchInstructionDataDecoder(),
-  );
+Codec<TouchInstructionData, TouchInstructionData> getTouchInstructionDataCodec() {
+  return combineCodec(getTouchInstructionDataEncoder(), getTouchInstructionDataDecoder());
 }
 
 /// Creates a [Touch] instruction.
@@ -85,17 +104,17 @@ Instruction getTouchInstruction({
   required Address programAddress,
   required Address authority,
   Address? store,
+
 }) {
-  final instructionData = TouchInstructionData();
+  final instructionData = TouchInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
-      if (store != null)
-        AccountMeta(address: store, role: AccountRole.writable)
-      else
-        AccountMeta(address: programAddress, role: AccountRole.readonly),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    if (store != null) AccountMeta(address: store, role: AccountRole.writable) else AccountMeta(address: programAddress, role: AccountRole.readonly),
     ],
     data: getTouchInstructionDataEncoder().encode(instructionData),
   );

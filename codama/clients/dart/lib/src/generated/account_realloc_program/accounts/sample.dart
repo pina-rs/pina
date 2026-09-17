@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -12,15 +13,19 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class Sample {
   const Sample({
     required this.bump,
     required this.authority,
     required this.values,
-  }) : discriminator = 1;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int bump;
   final Address authority;
   final List<BigInt> values;
@@ -31,39 +36,33 @@ class Sample {
       other is Sample &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           bump == other.bump &&
           authority == other.authority &&
           values == other.values;
 
   @override
-  int get hashCode => Object.hash(discriminator, bump, authority, values);
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, authority, values);
 
   @override
-  String toString() =>
-      'Sample(discriminator: $discriminator, bump: $bump, authority: $authority, values: $values)';
+  String toString() => 'Sample(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, values: $values)';
 }
+
 
 Encoder<Sample> getSampleEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('authority', getAddressEncoder()),
-    (
-      'values',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU64Encoder(), (BigInt value) => value),
-          size: PrefixedArraySize(getU16Encoder()),
-        ),
-        64,
-      ),
-    ),
+    ('values', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU64Encoder(), (BigInt value) => value), size: PrefixedArraySize(getU16Encoder())), 64)),
   ]);
 
   return transformEncoder(
     structEncoder,
     (Sample value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'bump': value.bump,
       'authority': value.authority,
       'values': value.values,
@@ -74,58 +73,64 @@ Encoder<Sample> getSampleEncoder() {
 Decoder<Sample> getSampleDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('authority', getAddressDecoder()),
-    (
-      'values',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU64Decoder(),
-          size: PrefixedArraySize(getU16Decoder()),
-        ),
-        getPinaPodBoundedCountDecoder(getU16Decoder(), 64),
-        64,
-      ),
-    ),
+    ('values', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU64Decoder(), size: PrefixedArraySize(getU16Decoder())), getPinaPodBoundedCountDecoder(getU16Decoder(), 64), 64)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'sample account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'sample account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Sample, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
       Sample(
-        bump: map['bump']! as int,
-        authority: map['authority']! as Address,
-        values: map['values']! as List<BigInt>,
+      bump: map['bump']! as int,
+      authority: map['authority']! as Address,
+      values: map['values']! as List<BigInt>,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<Sample>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
-    VariableSizeDecoder<Map<String, Object?>>() => VariableSizeDecoder<Sample>(
-      read: readTopLevel,
-      maxSize: structDecoder.maxSize,
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<Sample>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
+    VariableSizeDecoder<Map<String, Object?>>() =>
+      VariableSizeDecoder<Sample>(
+        read: readTopLevel,
+        maxSize: structDecoder.maxSize,
+      ),
   };
 }
 
@@ -135,4 +140,21 @@ Codec<Sample, Sample> getSampleCodec() {
 
 Account<Sample> decodeSample(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getSampleDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int sampleMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `Sample` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool sampleNeedsMigration(List<int> data) {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 1) {
+		return false;
+	}
+	return data[1] < 0;
 }

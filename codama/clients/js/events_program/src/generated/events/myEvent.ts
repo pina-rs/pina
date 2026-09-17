@@ -28,6 +28,7 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const MY_EVENT_EVENT_DISCRIMINATOR = 1;
@@ -36,8 +37,15 @@ export function getMyEventEventDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR);
 }
 
+export const MY_EVENT_EVENT_DISCRIMINATOR2 = 0;
+
+export function getMyEventEventDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR2);
+}
+
 export type MyEventEvent = {
 	discriminator: number;
+	migrationVersion: number;
 	data: bigint;
 	label: ReadonlyUint8Array;
 };
@@ -50,11 +58,13 @@ export type MyEventEventArgs = {
 /** Gets the encoder for {@link MyEventEventArgs} event data. */
 export function getMyEventEventEncoder(): FixedSizeEncoder<MyEventEventArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"data",
-			getU64Encoder(),
-		], ["label", fixPinaPodEncoderSize(getBytesEncoder(), 8)]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["data", getU64Encoder()],
+			["label", fixPinaPodEncoderSize(getBytesEncoder(), 8)],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -68,6 +78,7 @@ export function getMyEventEventDecoder(): FixedSizeDecoder<MyEventEvent> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["data", getU64Decoder()],
 		["label", fixDecoderSize(getBytesDecoder(), 8)],
 	]);
@@ -86,7 +97,12 @@ export function parseMyEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): MyEventEvent {
 	if (
-		containsBytes(data, getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR), 0)
+		containsBytes(
+			data,
+			getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR),
+			0,
+		) &&
+		containsBytes(data, getU8Encoder().encode(MY_EVENT_EVENT_DISCRIMINATOR2), 1)
 	) return getMyEventEventDecoder().decode(data);
 	throw new Error(
 		'The provided data does not match the "MyEventEvent" event discriminators.',

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,12 +12,18 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class UpdateInstructionData {
-  const UpdateInstructionData({required this.dataF32, required this.dataF64})
-    : discriminator = 1;
+  const UpdateInstructionData({
+    required this.dataF32,
+    required this.dataF64,
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int dataF32;
   final BigInt dataF64;
 }
@@ -24,6 +31,7 @@ class UpdateInstructionData {
 Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('dataF32', getU32Encoder()),
     ('dataF64', getU64Encoder()),
   ]);
@@ -32,6 +40,7 @@ Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
     structEncoder,
     (UpdateInstructionData value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'dataF32': value.dataF32,
       'dataF64': value.dataF64,
     },
@@ -41,20 +50,29 @@ Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
 Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('dataF32', getU32Decoder()),
     ('dataF64', getU64Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'update instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'update instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (UpdateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -62,8 +80,8 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
 
     return (
       UpdateInstructionData(
-        dataF32: map['dataF32']! as int,
-        dataF64: map['dataF64']! as BigInt,
+      dataF32: map['dataF32']! as int,
+      dataF64: map['dataF64']! as BigInt,
       ),
       newOffset,
     );
@@ -89,12 +107,8 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
   };
 }
 
-Codec<UpdateInstructionData, UpdateInstructionData>
-getUpdateInstructionDataCodec() {
-  return combineCodec(
-    getUpdateInstructionDataEncoder(),
-    getUpdateInstructionDataDecoder(),
-  );
+Codec<UpdateInstructionData, UpdateInstructionData> getUpdateInstructionDataCodec() {
+  return combineCodec(getUpdateInstructionDataEncoder(), getUpdateInstructionDataDecoder());
 }
 
 /// Creates a [Update] instruction.
@@ -106,15 +120,15 @@ Instruction getUpdateInstruction({
   required BigInt dataF64,
 }) {
   final instructionData = UpdateInstructionData(
-    dataF32: dataF32,
-    dataF64: dataF64,
+      dataF32: dataF32,
+      dataF64: dataF64,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: account, role: AccountRole.writable),
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    AccountMeta(address: account, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
     ],
     data: getUpdateInstructionDataEncoder().encode(instructionData),
   );

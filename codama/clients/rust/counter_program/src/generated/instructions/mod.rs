@@ -10,6 +10,8 @@
 
 pub(crate) mod r#increment;
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 
 pub use self::r#increment::*;
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;

@@ -314,7 +314,8 @@ mod tests {
 
 	#[test]
 	fn store_state_layout() {
-		assert_eq!(StoreState::SIZE, 10);
+		// 1 (discriminator) + 1 (migration version) + 8 (value).
+		assert_eq!(StoreState::SIZE, 11);
 	}
 
 	#[test]
@@ -337,20 +338,24 @@ mod tests {
 
 	#[test]
 	fn init_instruction_layout() {
-		let data = [OptionalInstruction::Init as u8, 42u8];
+		// discriminator + migration version + bump.
+		let data = [OptionalInstruction::Init as u8, 0u8, 42u8];
 		let ix = InitInstruction::try_from_bytes(&data).unwrap_or_else(|e| panic!("failed: {e:?}"));
 		assert_eq!(ix.bump, 42);
-		assert_eq!(InitInstruction::SIZE, 2);
+		assert_eq!(InitInstruction::SIZE, 3);
 	}
 
 	#[test]
-	fn empty_instructions_have_discriminator_only() {
-		assert_eq!(TouchInstruction::SIZE, 1);
-		assert_eq!(InspectInstruction::SIZE, 1);
-		assert_eq!(NoteInstruction::SIZE, 1);
-		assert!(TouchInstruction::try_from_bytes(&[OptionalInstruction::Touch as u8]).is_ok());
-		assert!(InspectInstruction::try_from_bytes(&[OptionalInstruction::Inspect as u8]).is_ok());
-		assert!(NoteInstruction::try_from_bytes(&[OptionalInstruction::Note as u8]).is_ok());
+	fn empty_instructions_carry_the_envelope() {
+		// One discriminator byte plus the migration version byte.
+		assert_eq!(TouchInstruction::SIZE, 2);
+		assert_eq!(InspectInstruction::SIZE, 2);
+		assert_eq!(NoteInstruction::SIZE, 2);
+		assert!(TouchInstruction::try_from_bytes(&[OptionalInstruction::Touch as u8, 0u8]).is_ok());
+		assert!(
+			InspectInstruction::try_from_bytes(&[OptionalInstruction::Inspect as u8, 0u8]).is_ok()
+		);
+		assert!(NoteInstruction::try_from_bytes(&[OptionalInstruction::Note as u8, 0u8]).is_ok());
 	}
 
 	#[test]

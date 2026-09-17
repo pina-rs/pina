@@ -55,6 +55,8 @@ import {
 	parseTouchInstruction,
 	type TouchInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findStorePda } from "../pdas";
 
 export const OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
@@ -70,9 +72,10 @@ export function identifyOptionalAccountsProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): OptionalAccountsProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return OptionalAccountsProgramAccount.StoreState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return OptionalAccountsProgramAccount.StoreState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "optionalAccountsProgram" },
@@ -90,18 +93,22 @@ export function identifyOptionalAccountsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): OptionalAccountsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return OptionalAccountsProgramInstruction.Init;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return OptionalAccountsProgramInstruction.Touch;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return OptionalAccountsProgramInstruction.Inspect;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return OptionalAccountsProgramInstruction.Note;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return OptionalAccountsProgramInstruction.Init;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return OptionalAccountsProgramInstruction.Touch;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return OptionalAccountsProgramInstruction.Inspect;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return OptionalAccountsProgramInstruction.Note;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "optionalAccountsProgram" },
@@ -220,6 +227,8 @@ export function optionalAccountsProgramProgram() {
 					storeState: addSelfFetchFunctions(client, getStoreStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					init: (input) =>
 						addSelfPlanAndSendFunctions(client, getInitInstructionAsync(input)),
 					touch: (input) =>

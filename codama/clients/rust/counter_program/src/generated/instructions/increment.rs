@@ -11,6 +11,7 @@
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.
 pub const INCREMENT_DISCRIMINATOR: u8 = 1u8;
+pub const INCREMENT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -71,6 +72,7 @@ impl IncrementInstructionData {
 		<IncrementInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INCREMENT_DISCRIMINATOR;
+			data.migration_version = INCREMENT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -84,4 +86,5 @@ impl IncrementInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct IncrementInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

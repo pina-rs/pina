@@ -19,6 +19,7 @@ pub struct Journal {
 	/// `PodOption<PodU64>`. The title and optional note use compact strings, while
 	/// entries and markers use vectors; only their active bytes are allocated.
 	pub discriminator: u8,
+	pub migration_version: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
 	/// Signer permitted to mutate and fund this journal.
@@ -39,6 +40,8 @@ pub struct Journal {
 
 pub const JOURNAL_DISCRIMINATOR: u8 = 1u8;
 
+pub const JOURNAL_MIGRATION_VERSION: u8 = 0u8;
+
 impl Journal {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
@@ -48,6 +51,7 @@ impl Journal {
 	) -> Result<usize, solana_program_error::ProgramError> {
 		patch
 			.discriminator(JOURNAL_DISCRIMINATOR)
+			.migration_version(JOURNAL_MIGRATION_VERSION)
 			.initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
@@ -56,6 +60,9 @@ impl Journal {
 		let account = JournalRef::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != JOURNAL_DISCRIMINATOR {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		if account.migration_version != JOURNAL_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -79,4 +86,12 @@ impl Journal {
 			&crate::COMPACT_ACCOUNTS_PROGRAM_ID,
 		)
 	}
+}
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`JOURNAL_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+///
+/// Version 0 is the initial version, so no bytes can ever be stale.
+pub fn journal_needs_migration(_data: &[u8]) -> bool {
+	false
 }

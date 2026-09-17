@@ -10,10 +10,12 @@
 
 pub(crate) mod r#init;
 pub(crate) mod r#inspect;
+pub(crate) mod r#migrate;
 pub(crate) mod r#note;
 pub(crate) mod r#touch;
 
 pub use self::r#init::*;
 pub use self::r#inspect::*;
+pub use self::r#migrate::*;
 pub use self::r#note::*;
 pub use self::r#touch::*;

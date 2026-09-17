@@ -3113,6 +3113,44 @@ fn check_rejects_a_stale_abi_layout_test() {
 	);
 }
 
+/// Formatting the guard file must not make it stale.
+///
+/// `rustfmt` re-wraps the long `SCHEMA_SHA256` constants past 100 columns, so a
+/// formatted file is never byte-identical to generator output. `fix:format` runs
+/// on every checkout, so byte equality would leave `make` and the formatter
+/// fighting: format, then `check`, then `make`, forever.
+#[test]
+fn formatting_the_abi_layout_test_keeps_it_current() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+	check_migrations_with_abi_layout(&fixture.root)
+		.unwrap_or_else(|error| panic!("freshly generated guard must pass: {error}"));
+
+	// Emulate the wrapping rustfmt applies to a long constant, without invoking
+	// the toolchain from a unit test.
+	let path = fixture.root.join(ABI_LAYOUT_TEST_PATH);
+	let generated = std::fs::read_to_string(&path)
+		.unwrap_or_else(|error| panic!("read generated guard: {error}"));
+	let formatted = generated.replace(
+		"pub const SCHEMA_SHA256: &str = \"",
+		"pub const SCHEMA_SHA256: &str =\n\t\t\"",
+	);
+	assert_ne!(
+		formatted, generated,
+		"the fixture must contain a schema hash to wrap"
+	);
+	std::fs::write(&path, &formatted)
+		.unwrap_or_else(|error| panic!("write formatted guard: {error}"));
+
+	check_migrations_with_abi_layout(&fixture.root)
+		.unwrap_or_else(|error| panic!("formatting must not report drift: {error}"));
+}
+
 /// A missing generated test is also stale: the account has migration history,
 /// so the guard file is required.
 #[test]

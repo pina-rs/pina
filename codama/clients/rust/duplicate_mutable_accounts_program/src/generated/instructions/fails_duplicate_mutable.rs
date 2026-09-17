@@ -9,6 +9,7 @@
 )]
 
 pub const FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR: u8 = 0u8;
+pub const FAILS_DUPLICATE_MUTABLE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -62,6 +63,7 @@ impl FailsDuplicateMutableInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
+				data.migration_version = FAILS_DUPLICATE_MUTABLE_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -76,4 +78,5 @@ impl FailsDuplicateMutableInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FailsDuplicateMutableInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

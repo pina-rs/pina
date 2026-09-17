@@ -622,10 +622,31 @@ fn verify_abi_layout_test(
 			source,
 		}
 	})? {
-		Some(existing) if existing == expected => Ok(()),
+		Some(existing) if layout_tests_agree(&existing, &expected) => Ok(()),
 		Some(_) => Err(MigrationError::AbiLayoutTestStale { path }),
 		None => Err(MigrationError::AbiLayoutTestMissing { path }),
 	}
+}
+
+/// Whether a checked-in ABI layout test carries the same content as generated
+/// output, ignoring incidental line wrapping.
+///
+/// `rustfmt` re-wraps the long `SCHEMA_SHA256` constants and collapses
+/// single-element `FIELDS` arrays, so a formatted guard file is never
+/// byte-identical to generator output. Comparing normalized whitespace keeps
+/// `pina migrations make` and `fix:format` from fighting: the guard still fails
+/// closed on any real change (a value, a constant name, a module), which is what
+/// it exists to catch.
+fn layout_tests_agree(existing: &str, generated: &str) -> bool {
+	fn normalized(source: &str) -> String {
+		source
+			.split_whitespace()
+			.collect::<Vec<_>>()
+			.join(" ")
+			.trim()
+			.to_owned()
+	}
+	normalized(existing) == normalized(generated)
 }
 
 /// Return the contracts this run envelopes for the first time on a program

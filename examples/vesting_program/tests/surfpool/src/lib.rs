@@ -129,7 +129,8 @@ fn initialize_instruction(
 	vault: &Pubkey,
 	bump: u8,
 ) -> pina_test::Instruction {
-	let mut data = vec![VestingInstruction::Initialize as u8];
+	// discriminator + migration version, then amounts, timestamps, and bump.
+	let mut data = vec![VestingInstruction::Initialize as u8, 0u8];
 	data.extend_from_slice(&TOTAL.to_le_bytes());
 	data.extend_from_slice(&0u64.to_le_bytes()); // start_ts
 	data.extend_from_slice(&0u64.to_le_bytes()); // cliff_ts
@@ -160,7 +161,7 @@ fn claim_instruction(
 	vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![VestingInstruction::Claim as u8];
+	let mut data = vec![VestingInstruction::Claim as u8, 0u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -186,7 +187,7 @@ fn cancel_instruction(
 	vault: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[VestingInstruction::Cancel as u8],
+		&[VestingInstruction::Cancel as u8, 0u8],
 		vec![
 			AccountMeta::new_readonly(*admin, true),
 			AccountMeta::new_readonly(*mint, false),

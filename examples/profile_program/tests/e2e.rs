@@ -452,11 +452,14 @@ fn requires_signer() {
 }
 
 /// The account and instruction layouts must match the documented sizes.
+///
+/// Migrations are on, so each size includes the 2-byte envelope (discriminator
+/// plus version). The generated `tests/abi_layout.rs` pins the same geometry.
 #[test]
 fn account_layout_matches_state() {
-	assert_eq!(ProfileState::SIZE, 240);
-	assert_eq!(InitializeInstruction::SIZE, 164);
-	assert_eq!(UpdateProfileInstruction::SIZE, 163);
-	assert_eq!(AddTagInstruction::SIZE, 9);
-	assert_eq!(RemoveTagInstruction::SIZE, 9);
+	assert_eq!(ProfileState::SIZE, 241);
+	assert_eq!(InitializeInstruction::SIZE, 165);
+	assert_eq!(UpdateProfileInstruction::SIZE, 164);
+	assert_eq!(AddTagInstruction::SIZE, 10);
+	assert_eq!(RemoveTagInstruction::SIZE, 10);
 }
