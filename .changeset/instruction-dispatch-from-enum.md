@@ -4,7 +4,7 @@ pina_cli: feat
 pina_macros: feat
 ---
 
-# Generate the instruction entrypoint from the discriminator enum
+# Generate the entrypoint from the discriminator enum
 
 `#[discriminator(entrypoint)]` turns the instruction enum into the program entrypoint, so a program stops hand-writing the discriminator → accounts → `process` match, the account-count constant that goes with it, and the reserved `Migrate` ladder. Variant `Foo` routes to `FooAccounts` unless a `#[dispatch(accounts = BarAccounts)]` override says otherwise.
 
