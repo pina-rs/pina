@@ -180,10 +180,14 @@ pub(crate) fn expand(
 
 		quote_spanned! {variant.span()=>
 			#enum_name::#variant => {
-				<#accounts as ::core::convert::TryFrom<(
+				// Trait-qualified so programs with explicit imports compile
+				// without relying on `ProcessAccountInfos` being in scope.
+				let __pina_accounts = <#accounts as ::core::convert::TryFrom<(
 					& #crate_path::Address,
 					&mut [#crate_path::AccountView],
-				)>>::try_from((program_id, accounts))?.process(data)
+				)>>::try_from((program_id, accounts))?;
+
+				<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)
 			}
 		}
 	});
@@ -229,10 +233,24 @@ pub(crate) fn expand(
 			let assertions = routes.iter().map(|route| {
 				let name = route.accounts_name.to_string();
 				let bound = route_bound(route);
+				let accounts = &route.accounts;
+				// The documented hand-written sentinel, resolved through the
+				// concrete accounts type so the reference is unambiguous.
+				let sentinel = quote! {
+					{
+						const fn __pina_unbounded<'a, T>() -> usize
+						where
+							T: #crate_path::ParseAccounts<'a>,
+						{
+							<T as #crate_path::ParseAccounts<'a>>::UNBOUNDED
+						}
+						__pina_unbounded::<'static, #accounts>()
+					}
+				};
 
 				quote! {
 					const _: () = assert!(
-						#bound <= MAX_INSTRUCTION_ACCOUNTS,
+						#bound <= MAX_INSTRUCTION_ACCOUNTS || #bound == #sentinel,
 						concat!(
 							"MAX_INSTRUCTION_ACCOUNTS must cover `",
 							#name,
@@ -363,7 +381,15 @@ fn resolve_migrations(
 	// surfaces later as an unsatisfied trait bound instead of the remedy.
 	crate::migration::verify_migration_contracts(enum_name, ladder)?;
 
-	Ok(Some(migrate_emission(crate_path, ladder, max_lamports)))
+	Ok(Some(migrate_emission(
+		crate_path,
+		ladder,
+		max_lamports,
+		&args
+			.program_id
+			.clone()
+			.unwrap_or_else(|| syn::parse_quote!(ID)),
+	)))
 }
 
 /// Emit the reserved-`Migrate` helper and the dispatch prelude for a validated
@@ -375,6 +401,7 @@ fn migrate_emission(
 	crate_path: &Path,
 	ladder: &[Path],
 	max_lamports: &Expr,
+	program_id: &Expr,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
 	let steps = ladder.iter().enumerate().map(|(position, account)| {
 		// Slots 0 and 1 are the payer and the system program.
@@ -410,8 +437,16 @@ fn migrate_emission(
 		}
 	};
 
+	// The reserved instruction bypasses `parse_instruction`, so the configured
+	// id is checked here: the loader would otherwise let a mismatched program
+	// id run migrations that ordinary instructions reject. The comparison is
+	// gated to the reserved path, leaving other instructions' cost unchanged.
 	let prelude = quote! {
 		if #crate_path::is_migrate_instruction(data) {
+			if program_id != &#program_id {
+				return Err(#crate_path::ProgramError::IncorrectProgramId);
+			}
+
 			return process_migrate(program_id, accounts);
 		}
 	};
@@ -603,7 +638,8 @@ mod tests {
 			ladder_of("CompactState"),
 			ladder_of("State"),
 		];
-		let (helper, prelude) = migrate_emission(&crate_path, &ladder, &budget);
+		let program_id: Expr = syn::parse_quote!(ID);
+		let (helper, prelude) = migrate_emission(&crate_path, &ladder, &budget, &program_id);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());
 

@@ -97,11 +97,21 @@ pub fn extract_dispatch_from_attribute(file: &File) -> Vec<DispatchEntry> {
 }
 
 /// Whether an enum's own attributes carry the dispatch attribute.
+///
+/// Qualified spellings such as `#[pina::instruction_dispatch]` are recognized
+/// by their final segment, mirroring how Rust resolves the proc macro.
 fn is_dispatch_annotated(item_enum: &ItemEnum) -> bool {
 	item_enum
 		.attrs
 		.iter()
-		.any(|attribute| attribute.path().is_ident(DISPATCH_ATTRIBUTE))
+		.any(|attribute| is_dispatch_attribute(attribute.path()))
+}
+
+/// Whether a path names the dispatch macro.
+fn is_dispatch_attribute(path: &syn::Path) -> bool {
+	path.segments
+		.last()
+		.is_some_and(|segment| segment.ident == DISPATCH_ATTRIBUTE)
 }
 
 /// Whether a file declares an `#[instruction_dispatch]` enum, at the top level

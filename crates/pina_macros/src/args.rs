@@ -475,7 +475,7 @@ impl FromMeta for InlineArg {
 	fn from_string(value: &str) -> darling::Result<Self> {
 		match value {
 			"always" => Ok(Self::Always),
-			"hint" | "never" => Ok(Self::Hint),
+			"hint" => Ok(Self::Hint),
 			other => Err(darling::Error::unknown_value(other)),
 		}
 	}
