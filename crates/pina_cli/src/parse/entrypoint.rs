@@ -728,6 +728,23 @@ mod tests {
 	}
 
 	#[test]
+	fn only_the_flag_selects_a_declaration_not_a_list_argument() {
+		// A list-valued argument such as `migrations(State)` is not the flag,
+		// even though the attribute is a `discriminator`. A program using a
+		// ladder without `entrypoint` stays a non-entrypoint.
+		let source = r#"
+			#[discriminator(migrations(State), migrations_max_lamports = 20_000)]
+			pub enum LadderOnly {
+				Run = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+		assert!(!has_dispatch_attribute(&file));
+		assert!(extract_dispatch_from_attribute(&file).is_empty());
+	}
+
+	#[test]
 	fn unannotated_enums_produce_no_dispatch() {
 		let source = r#"
 			#[discriminator]
