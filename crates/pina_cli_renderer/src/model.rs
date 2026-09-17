@@ -1005,3 +1005,29 @@ fn validate_identifier(context: &str, snake: &str, pascal: &str) -> Result<()> {
 	}
 	Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+	use codama_nodes::BooleanValueNode;
+	use codama_nodes::ConstantPdaSeedValue;
+
+	use super::constant_seed;
+
+	/// A constant seed the CLI cannot express must fail with its node kind
+	/// named, not render a silently wrong seed.
+	#[test]
+	fn constant_seed_rejects_unsupported_value_kinds() {
+		let error = constant_seed(
+			&ConstantPdaSeedValue::Boolean(BooleanValueNode { boolean: true }),
+			"journal pda seed",
+		)
+		.unwrap_err();
+
+		assert!(
+			error
+				.to_string()
+				.contains("constant PDA seed `booleanValueNode` is not supported"),
+			"unexpected error: {error}"
+		);
+	}
+}
