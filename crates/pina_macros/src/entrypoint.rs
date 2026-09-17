@@ -24,11 +24,13 @@ use crate::args::InlineArg;
 /// Suffix appended to a variant name to find its accounts struct.
 const ACCOUNTS_SUFFIX: &str = "Accounts";
 
-/// Name of the module-level marker that keeps the entrypoint unique.
+/// Name of the crate-level marker that keeps the entrypoint unique.
 ///
-/// Two enums in one module that both opt in collide on this item, which is a
-/// compile error naming both definitions.
-const UNIQUENESS_MARKER: &str = "__PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM";
+/// The marker is a `#[macro_export]`-style item in the crate root namespace, so
+/// two opt-ins collide even when they live in different modules. A plain
+/// module-level `const` would only collide within one module and would let a
+/// program declare two entrypoints.
+const UNIQUENESS_MARKER: &str = "__pina_entrypoint_must_be_unique_per_program";
 
 /// One resolved variant → accounts-struct route.
 struct Route {
@@ -127,7 +129,7 @@ fn resolve_routes(item_enum: &ItemEnum) -> syn::Result<Vec<Route>> {
 /// Everything the entrypoint expansion emits besides the enum itself.
 #[derive(Debug)]
 pub(crate) struct EntrypointExpansion {
-	/// A module-level marker keeping the entrypoint unique per program.
+	/// A crate-root marker keeping the entrypoint unique per program.
 	pub(crate) uniqueness_marker: proc_macro2::TokenStream,
 	/// The associated items placed inside `impl Enum { ... }`.
 	pub(crate) implementation: proc_macro2::TokenStream,
@@ -259,13 +261,23 @@ pub(crate) fn expand(
 		None => (None, None),
 	};
 
+	// `macro_export` lifts the name into the crate root regardless of the module
+	// the enum lives in, so a second opt-in anywhere in the crate collides on it.
+	let entrypoint_docs = format!(
+		"Dispatches one instruction to its accounts struct.\n\nPass this to `nostd_entrypoint!` \
+		 as `nostd_entrypoint!({enum_name}::process_instruction)`. Program-specific behavior \
+		 beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`."
+	);
+
 	let uniqueness_marker = {
 		let marker = Ident::new(UNIQUENESS_MARKER, enum_name.span());
 
 		quote! {
 			#[doc(hidden)]
-			#[allow(dead_code, non_upper_case_globals)]
-			const #marker: () = ();
+			#[macro_export]
+			macro_rules! #marker {
+				() => {};
+			}
 		}
 	};
 
@@ -303,11 +315,7 @@ pub(crate) fn expand(
 				clamp(maximum([#(#bound_values),*]), #maximum_accounts)
 			};
 
-			/// Dispatches one instruction to its accounts struct.
-			///
-			/// Pass this to `nostd_entrypoint!` as
-			/// `nostd_entrypoint!(Self::process_instruction)`. Program-specific behavior beyond
-			/// routing belongs in each accounts struct's `ProcessAccountInfos::process`.
+			#[doc = #entrypoint_docs]
 			#inline_attribute
 			pub fn process_instruction(
 				program_id: & #crate_path::Address,
@@ -692,6 +700,26 @@ mod tests {
 	}
 
 	#[test]
+	fn entrypoint_documentation_names_the_enum() {
+		// `Self::` is not valid where `nostd_entrypoint!` is invoked at module
+		// scope, so the generated guidance must spell out the enum.
+		let expanded = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Run = 0,
+				}
+			),
+		);
+
+		assert!(
+			expanded.contains("nostd_entrypoint!(CounterInstruction::process_instruction)"),
+			"the doc must name the enum; got: {expanded}"
+		);
+		assert!(!expanded.contains("nostd_entrypoint!(Self::process_instruction)"));
+	}
+
+	#[test]
 	fn ladder_resolved_under_this_crate_reports_the_missing_manifest() {
 		// The unit-test environment has no checked-in manifest, so the resolved
 		// path reports the same remedy a program without one would see.
@@ -715,7 +743,9 @@ mod tests {
 	}
 
 	#[test]
-	fn the_uniqueness_marker_is_module_level_and_named_for_the_collision() {
+	fn the_uniqueness_marker_lifts_to_the_crate_root() {
+		// `macro_export` puts the name in the crate root namespace, so two
+		// opt-ins collide even when they live in different modules.
 		let args = args(quote!(entrypoint));
 		let mut item_enum = enum_of(quote!(
 			pub enum Instruction {
@@ -726,8 +756,8 @@ mod tests {
 			expand(&args, &mut item_enum).unwrap_or_else(|error| panic!("expansion: {error}"));
 		let marker = squeezed(&expansion.uniqueness_marker.to_string());
 
-		// A named const, not `const _`, so a second opt-in collides on the name.
-		assert!(marker.contains("const__PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM:()=()"));
+		assert!(marker.contains("#[macro_export]"), "marker: {marker}");
+		assert!(marker.contains("__pina_entrypoint_must_be_unique_per_program"));
 	}
 
 	#[test]

@@ -72,6 +72,34 @@ pub(crate) fn expand(
 			Err(error) => return error.to_compile_error(),
 		}
 	} else {
+		// These arguments only shape the entrypoint, so silently ignoring them
+		// would let a migration ladder compile without ever generating
+		// `process_migrate`, or a capacity test that never runs.
+		let dangling = [
+			("migrations", args.migrations.is_some()),
+			(
+				"migrations_max_lamports",
+				args.migrations_max_lamports.is_some(),
+			),
+			("capacity_test", args.capacity_test.is_some()),
+			("maximum_accounts", args.maximum_accounts.is_some()),
+			("program_id", args.program_id.is_some()),
+			("inline", args.inline.is_some()),
+		]
+		.into_iter()
+		.find_map(|(name, present)| present.then_some(name));
+
+		if let Some(name) = dangling {
+			return syn::Error::new_spanned(
+				&item_enum,
+				format!(
+					"`{name}` only configures the generated entrypoint, but this discriminator is \
+					 not marked `entrypoint`; add the `entrypoint` argument or remove `{name}`"
+				),
+			)
+			.to_compile_error();
+		}
+
 		None
 	};
 
@@ -185,5 +213,83 @@ pub(crate) fn expand(
 		#item_enum
 		#implementations
 		#entrypoint_impl
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use proc_macro2::TokenStream;
+
+	fn expand_with(args: TokenStream, item: TokenStream) -> String {
+		crate::discriminator::expand(args, item).to_string()
+	}
+
+	/// Collapse whitespace so assertions match a token stream's normalized
+	/// spacing rather than its pretty-printed form.
+	fn squeezed(tokens: &str) -> String {
+		tokens.split_whitespace().collect()
+	}
+
+	#[test]
+	fn entrypoint_only_arguments_require_the_entrypoint_flag() {
+		// Silently ignoring these would let a ladder compile without generating
+		// `process_migrate`.
+		for (args, name) in [
+			(quote::quote!(migrations(State)), "migrations"),
+			(
+				quote::quote!(migrations_max_lamports = 20_000),
+				"migrations_max_lamports",
+			),
+			(quote::quote!(capacity_test = false), "capacity_test"),
+			(quote::quote!(maximum_accounts = 8), "maximum_accounts"),
+			(quote::quote!(program_id = ID), "program_id"),
+			(quote::quote!(inline = "hint"), "inline"),
+		] {
+			let expanded = expand_with(
+				args,
+				quote::quote!(
+					pub enum Instruction {
+						Run = 0,
+					}
+				),
+			);
+
+			assert!(
+				expanded.contains("is not marked `entrypoint`"),
+				"`{name}` must require the flag; got: {expanded}"
+			);
+			assert!(expanded.contains(name), "the message must name `{name}`");
+		}
+	}
+
+	#[test]
+	fn the_entrypoint_flag_permits_its_own_arguments() {
+		let expanded = expand_with(
+			quote::quote!(entrypoint, capacity_test = false),
+			quote::quote!(
+				pub enum Instruction {
+					Run = 0,
+				}
+			),
+		);
+
+		assert!(!expanded.contains("is not marked `entrypoint`"));
+	}
+
+	#[test]
+	fn the_uniqueness_marker_lifts_to_the_crate_root() {
+		// `macro_export` puts the name in the crate root, so two opt-ins collide
+		// even when they live in different modules.
+		let expanded = squeezed(&expand_with(
+			quote::quote!(entrypoint),
+			quote::quote!(
+				pub enum Instruction {
+					Run = 0,
+				}
+			),
+		));
+
+		assert!(expanded.contains("#[macro_export]"), "marker: {expanded}");
+		assert!(expanded.contains("__pina_entrypoint_must_be_unique_per_program"));
 	}
 }

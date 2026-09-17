@@ -1,7 +1,4 @@
 use pina::*;
-#[doc(hidden)]
-#[allow(dead_code, non_upper_case_globals)]
-const __PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM: () = ();
 #[repr(u8)]
 #[non_exhaustive]
 pub enum CounterInstruction {
@@ -175,11 +172,9 @@ impl CounterInstruction {
             ::pina::pinocchio::MAX_TX_ACCOUNTS,
         )
     };
-    /// Dispatches one instruction to its accounts struct.
-    ///
-    /// Pass this to `nostd_entrypoint!` as
-    /// `nostd_entrypoint!(Self::process_instruction)`. Program-specific behavior beyond
-    /// routing belongs in each accounts struct's `ProcessAccountInfos::process`.
+    /**Dispatches one instruction to its accounts struct.
+
+Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::process_instruction)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
     #[inline(always)]
     pub fn process_instruction(
         program_id: &::pina::Address,
@@ -213,9 +208,6 @@ impl CounterInstruction {
         }
     }
 }
-#[doc(hidden)]
-#[allow(dead_code, non_upper_case_globals)]
-const __PINA_ENTRYPOINT_MUST_BE_UNIQUE_PER_PROGRAM: () = ();
 #[repr(u8)]
 #[non_exhaustive]
 pub enum OverrideInstruction {
@@ -389,11 +381,9 @@ impl OverrideInstruction {
             ::pina::pinocchio::MAX_TX_ACCOUNTS,
         )
     };
-    /// Dispatches one instruction to its accounts struct.
-    ///
-    /// Pass this to `nostd_entrypoint!` as
-    /// `nostd_entrypoint!(Self::process_instruction)`. Program-specific behavior beyond
-    /// routing belongs in each accounts struct's `ProcessAccountInfos::process`.
+    /**Dispatches one instruction to its accounts struct.
+
+Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::process_instruction)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
     #[inline(always)]
     pub fn process_instruction(
         program_id: &::pina::Address,

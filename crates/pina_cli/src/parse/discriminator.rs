@@ -53,8 +53,13 @@ impl syn::parse::Parse for DiscriminatorArgs {
 					input.parse::<syn::Path>()?;
 					record_once(&mut seen, &name_text, name.span())?;
 				}
-				// Bare flags.
+				// Flags that also accept an explicit boolean, as the proc macro
+				// grammar does: `final`, `entrypoint = false`, and so on.
 				"final" | "entrypoint" | "capacity_test" => {
+					if input.peek(syn::Token![=]) {
+						input.parse::<syn::Token![=]>()?;
+						input.parse::<syn::LitBool>()?;
+					}
 					record_once(&mut seen, &name_text, name.span())?;
 				}
 				// `name = value` arguments the scanner validates but does not read.
@@ -440,6 +445,14 @@ mod tests {
 	fn argument_scanner_accepts_the_entrypoint_flag() {
 		parse_discriminator_args("entrypoint")
 			.unwrap_or_else(|error| panic!("the flag must parse: {error}"));
+	}
+
+	#[test]
+	fn argument_scanner_accepts_explicit_boolean_flags() {
+		// The proc macro accepts `entrypoint = true` and `capacity_test = false`,
+		// so the scanner must consume the value rather than rejecting it.
+		parse_discriminator_args("entrypoint = true, capacity_test = false, final = false")
+			.unwrap_or_else(|error| panic!("boolean flags must parse: {error}"));
 	}
 
 	#[test]
