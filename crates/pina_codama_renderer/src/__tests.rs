@@ -1661,3 +1661,33 @@ fn rejects_dangling_symlinked_generated_directory() {
 	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
 	assert!(!dangling_target.exists());
 }
+
+#[test]
+fn renders_typed_fixed_array_fields_as_native_arrays() {
+	let field = |ty: TypeNode| TypeNode::from(ArrayTypeNode::fixed(ty, 4));
+
+	let numbers = field(NumberTypeNode::le(NumberFormat::U64).into());
+	assert_eq!(
+		render_type_for_pod(&numbers, "State.weights").expect("typed numeric array renders"),
+		"[u64; 4]",
+	);
+
+	let flags = field(BooleanTypeNode::default().into());
+	assert_eq!(
+		render_type_for_pod(&flags, "State.flags").expect("boolean array renders"),
+		"[bool; 4]",
+	);
+
+	let owners = field(PublicKeyTypeNode::new().into());
+	assert_eq!(
+		render_type_for_pod(&owners, "State.owners").expect("key array renders"),
+		"[solana_pubkey::Pubkey; 4]",
+	);
+
+	// Nested typed arrays compose through the same path.
+	let nested = TypeNode::from(ArrayTypeNode::fixed(numbers, 2));
+	assert_eq!(
+		render_type_for_pod(&nested, "State.nested").expect("nested array renders"),
+		"[[u64; 4]; 2]",
+	);
+}

@@ -57,9 +57,15 @@ pub fn try_rust_type_to_codama_with_pinapod_enums(
 				let format = mapped?;
 				return Ok(NumberTypeNode::le(format).into());
 			}
-			// Handle fixed-size byte arrays like [u8; 32]
-			if let Some(size) = parse_byte_array(ty) {
-				Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
+			// Handle fixed-size arrays like `[u8; 32]` and typed arrays like
+			// `[PodU64; 4]`.
+			if let Some((elem, size)) = parse_fixed_array(ty) {
+				if elem == "u8" {
+					Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
+				} else {
+					let item = try_rust_type_to_codama_with_pinapod_enums(elem, pinapod_enums)?;
+					Ok(ArrayTypeNode::fixed(item, size as u64).into())
+				}
 			} else if let Some(node) = parse_pod_collection(ty, pinapod_enums)? {
 				Ok(node)
 			} else {
@@ -542,7 +548,7 @@ fn is_known_pinapod_storage_type(ty: &str) -> bool {
 			| "PodI128"
 			| "PodBool"
 			| "Address"
-	) || parse_byte_array(ty).is_some()
+	) || parse_fixed_array(ty).is_some_and(|(elem, _)| is_known_pinapod_storage_type(elem))
 		|| ty.starts_with("String<")
 		|| ty.starts_with("Vec<")
 		|| ty.starts_with("PodString<")
@@ -624,7 +630,8 @@ fn is_known_fixed_size_type(ty: &str, pinapod_enums: &[PinaPodEnumIr]) -> bool {
 			| "f32" | "f64"
 	) || fixed_point_number_format(ty).is_some_and(|mapped| mapped.is_ok())
 		|| pinapod_enums.iter().any(|item| item.name == ty)
-		|| parse_byte_array(ty).is_some()
+		|| parse_fixed_array(ty)
+			.is_some_and(|(elem, _)| is_known_fixed_size_type(elem, pinapod_enums))
 		|| ty.starts_with("String<")
 		|| ty.starts_with("Vec<")
 		|| ty.starts_with("Option<")
@@ -714,15 +721,16 @@ fn parse_generic_args(ty: &str) -> Option<(String, Vec<String>)> {
 	Some((name, args))
 }
 
-/// Try to parse `[u8; N]` and return `N`.
-fn parse_byte_array(ty: &str) -> Option<usize> {
+/// Try to parse `[T; N]` and return the element spelling with `N`.
+///
+/// The separator is the last `;` at any nesting depth, so `[[u8; 4]; 2]`
+/// splits into `[u8; 4]` and `2`.
+fn parse_fixed_array(ty: &str) -> Option<(&str, usize)> {
 	let ty = ty.trim();
 	let inner = ty.strip_prefix('[')?.strip_suffix(']')?;
-	let (elem, size) = inner.split_once(';')?;
-	if elem.trim() != "u8" {
-		return None;
-	}
-	size.trim().parse().ok()
+	let (elem, size) = inner.rsplit_once(';')?;
+	let size = size.trim().parse().ok()?;
+	Some((elem.trim(), size))
 }
 
 /// Map a `fixed` crate schema type to its backing little-endian number format.
@@ -868,6 +876,38 @@ mod tests {
 		let expected: TypeNode =
 			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 32).into();
 		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_typed_arrays_element_wise() {
+		let words = mapped("[u64; 4]");
+		let expected: TypeNode =
+			ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64), 4).into();
+		assert_eq!(words, expected);
+
+		// Pod-spelled elements map to the identical node.
+		assert_eq!(mapped("[PodU64; 4]"), expected);
+	}
+
+	#[test]
+	fn typed_arrays_nest_and_report_sizes() {
+		let nested = mapped("[[u8; 4]; 2]");
+		let inner: TypeNode = FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 4).into();
+		let expected: TypeNode = ArrayTypeNode::fixed(inner, 2).into();
+		assert_eq!(nested, expected);
+
+		let words = mapped("[u64; 8]");
+		assert_eq!(type_node_size(&words), Some(64));
+		assert_eq!(type_node_size(&nested), Some(8));
+	}
+
+	#[test]
+	fn typed_arrays_are_known_fixed_size_by_their_element() {
+		assert!(is_known_fixed_size_type("[u64; 4]", &[]));
+		assert!(is_known_fixed_size_type("[PodU64; 4]", &[]));
+		assert!(is_known_fixed_size_type("[[u8; 4]; 2]", &[]));
+		assert!(!is_known_fixed_size_type("[char; 4]", &[]));
+		assert!(!is_known_fixed_size_type("[u64; N]", &[]));
 	}
 
 	#[test]
