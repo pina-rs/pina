@@ -81,6 +81,12 @@ const DEFAULT_DRIVER_REPO: &str = "pina-rs/pina";
 /// How long one driver download may take, end to end.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Upper bound on a downloaded driver artifact.
+///
+/// A real driver is a few MiB. The cap exists so a hostile or misconfigured
+/// endpoint cannot stream until the process runs out of memory.
+const MAX_DOWNLOAD_BYTES: u64 = 256 * 1024 * 1024;
+
 /// How long the driver gets to start and report before it is considered hung.
 ///
 /// The probe only loads the compiler libraries and prints a line, so anything
@@ -176,6 +182,17 @@ pub enum DriverError {
 		 `{PINA_LINT_DRIVER_PATH}` to a driver you built."
 	)]
 	Download {
+		url: String,
+		toolchain: String,
+		message: String,
+	},
+
+	#[error(
+		"Refusing to install the lint driver for {toolchain}: the download from {url} could not \
+		 be verified. {message}\nRun `pina lint --build-driver` to build one with the active \
+		 toolchain instead, or set `{PINA_LINT_DRIVER_PATH}` to a driver you built."
+	)]
+	Checksum {
 		url: String,
 		toolchain: String,
 		message: String,
@@ -494,7 +511,8 @@ fn probe_output_with_timeout(
 	})
 }
 
-/// Fetch the driver artifact for `identity` and install it at `destination`.
+/// Fetch the driver artifact for `identity`, verify it, and install it at
+/// `destination`.
 ///
 /// The artifact URL is the negotiation: its name carries the host triple and
 /// the compiler commit hash, so the release only publishes a driver that
@@ -508,8 +526,85 @@ fn download_driver(destination: &Path, identity: &ToolchainIdentity) -> Result<(
 	let asset = driver_asset_name(&identity.host, &identity.commit_hash);
 	let url = format!("{base}/{asset}");
 
-	let driver = fetch(&url, identity)?;
+	let driver = fetch_verified(&url, identity)?;
 	install(destination, &driver)
+}
+
+/// A driver artifact whose bytes matched the digest published beside it.
+///
+/// Only [`fetch_verified`] constructs this, so a code path that skipped
+/// verification cannot reach [`install`]: the compiler rejects it. That keeps
+/// the guarantee structural rather than a convention a future edit can drop.
+#[derive(Debug)]
+struct VerifiedDriver(Vec<u8>);
+
+impl VerifiedDriver {
+	fn bytes(&self) -> &[u8] {
+		&self.0
+	}
+}
+
+/// Fetch `url` and its published `sha256`, then verify they agree.
+///
+/// The digest lives beside the asset in the same release, so the download is
+/// only trusted when the bytes the server returned hash to the value the
+/// release published for that exact asset name.
+fn fetch_verified(url: &str, identity: &ToolchainIdentity) -> Result<VerifiedDriver, DriverError> {
+	let driver = fetch(url, identity)?;
+	let checksum_url = format!("{url}.sha256");
+	let published = String::from_utf8(fetch(&checksum_url, identity)?).map_err(|error| {
+		DriverError::Checksum {
+			url: checksum_url.clone(),
+			toolchain: identity.to_string(),
+			message: format!("the published checksum is not valid UTF-8: {error}"),
+		}
+	})?;
+
+	let expected = parse_published_sha256(&published).ok_or_else(|| {
+		DriverError::Checksum {
+			url: checksum_url.clone(),
+			toolchain: identity.to_string(),
+			message: "the published checksum file does not contain a 64-character hex digest"
+				.to_string(),
+		}
+	})?;
+
+	let actual = sha256_hex(&driver);
+	if actual != expected {
+		return Err(DriverError::Checksum {
+			url: checksum_url,
+			toolchain: identity.to_string(),
+			message: format!("checksum mismatch: expected {expected}, downloaded {actual}"),
+		});
+	}
+
+	Ok(VerifiedDriver(driver))
+}
+
+/// Return the lowercase hex sha256 of `bytes`.
+fn sha256_hex(bytes: &[u8]) -> String {
+	use sha2::Digest;
+
+	let digest = sha2::Sha256::digest(bytes);
+	let mut hex = String::with_capacity(digest.len() * 2);
+	for byte in digest {
+		use core::fmt::Write;
+		let _ = write!(hex, "{byte:02x}");
+	}
+	hex
+}
+
+/// Extract the sha256 out of a published `sha256sum`-style checksum file.
+///
+/// `sha256sum` writes `<hex>  <filename>`; a bare 64-character hex line is also
+/// accepted. Comparison is case-insensitive so an uppercase digest still
+/// verifies.
+fn parse_published_sha256(contents: &str) -> Option<String> {
+	let token = contents.split_whitespace().next()?;
+	let is_sha256 =
+		token.len() == 64 && token.chars().all(|character| character.is_ascii_hexdigit());
+
+	is_sha256.then(|| token.to_ascii_lowercase())
 }
 
 /// Return the base URL driver assets are fetched from.
@@ -545,7 +640,7 @@ pub fn driver_asset_name(host: &str, commit_hash: &str) -> String {
 	}
 }
 
-/// Fetch `url` into memory.
+/// Fetch `url` into memory, refusing a body larger than [`MAX_DOWNLOAD_BYTES`].
 fn fetch(url: &str, identity: &ToolchainIdentity) -> Result<Vec<u8>, DriverError> {
 	let agent = ureq::Agent::config_builder()
 		.timeout_global(Some(DOWNLOAD_TIMEOUT))
@@ -569,20 +664,53 @@ fn fetch(url: &str, identity: &ToolchainIdentity) -> Result<Vec<u8>, DriverError
 		}
 	})?;
 
-	response.body_mut().read_to_vec().map_err(|error| {
+	let mut limited = response.body_mut().as_reader().take(MAX_DOWNLOAD_BYTES + 1);
+	let mut bytes = Vec::new();
+	std::io::Read::read_to_end(&mut limited, &mut bytes).map_err(|error| {
 		DriverError::Download {
 			url: url.to_owned(),
 			toolchain: identity.to_string(),
 			message: error.to_string(),
 		}
-	})
+	})?;
+
+	if bytes.len() as u64 > MAX_DOWNLOAD_BYTES {
+		return Err(DriverError::Download {
+			url: url.to_owned(),
+			toolchain: identity.to_string(),
+			message: format!(
+				"the download exceeded the {} MiB safety limit",
+				MAX_DOWNLOAD_BYTES / (1024 * 1024)
+			),
+		});
+	}
+
+	Ok(bytes)
+}
+
+/// Write a downloaded, checksum-verified `driver` to `destination`.
+///
+/// Only a [`VerifiedDriver`] is accepted, so a network download that skipped
+/// checksum verification cannot reach the filesystem: the compiler rejects it.
+/// A locally built driver goes through [`install_built`] instead, because no
+/// checksum is published for an artifact built on this machine.
+fn install(destination: &Path, driver: &VerifiedDriver) -> Result<(), DriverError> {
+	write_driver_atomically(destination, driver.bytes())
+}
+
+/// Write a driver compiled on this machine to `destination`.
+///
+/// The trust root here is the `cargo` build against the pinned `pina_lints`
+/// release, not a published checksum.
+fn install_built(destination: &Path, driver: &[u8]) -> Result<(), DriverError> {
+	write_driver_atomically(destination, driver)
 }
 
 /// Write `driver` to `destination` atomically.
 ///
 /// The staged file is renamed over the destination so a concurrent `pina lint`
 /// never runs a partially written driver.
-fn install(destination: &Path, driver: &[u8]) -> Result<(), DriverError> {
+fn write_driver_atomically(destination: &Path, driver: &[u8]) -> Result<(), DriverError> {
 	let directory = destination.parent().ok_or_else(|| {
 		DriverError::WriteDriver {
 			path: destination.to_path_buf(),
@@ -680,7 +808,7 @@ fn build_driver(destination: &Path, identity: &ToolchainIdentity) -> Result<(), 
 			});
 		}
 	};
-	install(destination, &driver)?;
+	install_built(destination, &driver)?;
 
 	// The build root is large and reproducible from crates.io; drop it once
 	// the driver is in the cache.
@@ -1077,11 +1205,57 @@ mod tests {
 	}
 
 	#[test]
+	fn parses_published_sha256_files() {
+		// `sha256sum` writes `<hex>  <filename>`.
+		assert_eq!(
+			parse_published_sha256(
+				"E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855  driver"
+			)
+			.as_deref(),
+			Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+		);
+		// A bare digest is accepted too.
+		assert_eq!(
+			parse_published_sha256(
+				"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			)
+			.as_deref(),
+			Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+		);
+		// Wrong length, non-hex, and empty input are rejected rather than
+		// silently compared against the wrong value.
+		assert_eq!(parse_published_sha256("abc driver"), None);
+		assert_eq!(parse_published_sha256(&"z".repeat(64)), None);
+		assert_eq!(parse_published_sha256(""), None);
+		assert_eq!(parse_published_sha256(&"a".repeat(63)), None);
+	}
+
+	#[test]
+	fn sha256_hex_is_stable_and_lowercase_hex() {
+		// Known-answer test for the empty input.
+		assert_eq!(
+			sha256_hex(b""),
+			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		);
+
+		let digest = sha256_hex(b"driver bytes");
+		assert_eq!(digest.len(), 64);
+		assert!(
+			digest
+				.chars()
+				.all(|character| character.is_ascii_digit() || ('a'..='f').contains(&character)),
+			"digest must be lowercase hex: {digest}"
+		);
+		// Distinct inputs must not collide through a formatting bug.
+		assert_ne!(digest, sha256_hex(b""), "different inputs must differ");
+	}
+
+	#[test]
 	fn install_writes_an_executable_driver_atomically() {
 		let directory = tempfile::tempdir().expect("temp directory");
 		let destination = directory.path().join("nested").join(driver_binary_name());
 
-		install(&destination, b"driver bytes").expect("install the driver");
+		install_built(&destination, b"driver bytes").expect("install the driver");
 
 		assert_eq!(
 			std::fs::read(&destination).expect("read installed driver"),
@@ -1100,9 +1274,9 @@ mod tests {
 	fn install_replaces_an_existing_driver_and_leaves_no_staging_file() {
 		let directory = tempfile::tempdir().expect("temp directory");
 		let destination = directory.path().join(driver_binary_name());
-		install(&destination, b"stale driver").expect("install the stale driver");
+		install_built(&destination, b"stale driver").expect("install the stale driver");
 
-		install(&destination, b"fresh driver").expect("replace the driver");
+		install_built(&destination, b"fresh driver").expect("replace the driver");
 
 		assert_eq!(
 			std::fs::read(&destination).expect("read installed driver"),
@@ -1208,10 +1382,70 @@ mod tests {
 
 		let identity = identity_fixture();
 		let body = fetch(&format!("{base}/pina-lint-driver-host"), &identity).expect("download");
-		install(&destination, &body).expect("install");
+		install_built(&destination, &body).expect("install");
 
 		assert_eq!(std::fs::read(&destination).expect("read driver"), payload);
 		assert!(is_executable(&destination));
+		let _ = server.join();
+	}
+
+	#[test]
+	fn verified_download_installs_when_the_checksum_matches() {
+		let payload = b"#!/bin/sh\nexit 0\n".to_vec();
+		let checksum = format!("{}  pina-lint-driver-host\n", sha256_hex(&payload));
+		let (base, server) = serve_responses(vec![payload.clone(), checksum.into_bytes()]);
+		let directory = tempfile::tempdir().expect("temp directory");
+		let destination = directory.path().join("cache").join(driver_binary_name());
+
+		let identity = identity_fixture();
+		let driver = fetch_verified(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect("verified download");
+		install(&destination, &driver).expect("install");
+
+		assert_eq!(std::fs::read(&destination).expect("read driver"), payload);
+		assert!(is_executable(&destination));
+		let _ = server.join();
+	}
+
+	#[test]
+	fn verified_download_rejects_a_mismatched_checksum() {
+		let payload = b"#!/bin/sh\necho pwned\n".to_vec();
+		// The digest belongs to different bytes, as a tampered artifact would.
+		let checksum = format!("{}  pina-lint-driver-host\n", sha256_hex(b"different"));
+		let (base, server) = serve_responses(vec![payload, checksum.into_bytes()]);
+		let directory = tempfile::tempdir().expect("temp directory");
+		let destination = directory.path().join("cache").join(driver_binary_name());
+
+		let identity = identity_fixture();
+		let error = fetch_verified(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect_err("a mismatched checksum must be rejected");
+
+		assert!(
+			matches!(error, DriverError::Checksum { .. }),
+			"expected a checksum error, got {error}"
+		);
+		assert!(
+			error.to_string().contains("checksum mismatch"),
+			"the error must explain the mismatch: {error}"
+		);
+		// Nothing was written: verification happens before installation.
+		assert!(!destination.exists(), "no driver may be installed");
+		let _ = server.join();
+	}
+
+	#[test]
+	fn verified_download_rejects_an_unparseable_checksum() {
+		let payload = b"driver".to_vec();
+		let (base, server) = serve_responses(vec![payload, b"not-a-digest\n".to_vec()]);
+		let identity = identity_fixture();
+
+		let error = fetch_verified(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect_err("a malformed checksum must be rejected");
+
+		assert!(
+			matches!(error, DriverError::Checksum { .. }),
+			"expected a checksum error, got {error}"
+		);
 		let _ = server.join();
 	}
 
@@ -1326,6 +1560,40 @@ mod tests {
 			let _ = stream.read(&mut request);
 			let _ = stream.write_all(response.as_bytes());
 			let _ = stream.shutdown(std::net::Shutdown::Write);
+		});
+		(format!("http://127.0.0.1:{port}"), server)
+	}
+
+	/// Serve `responses` in order, one connection each.
+	///
+	/// The verified download path makes two requests (the artifact, then its
+	/// published checksum), so tests that exercise it need a server that answers
+	/// both.
+	#[cfg(test)]
+	fn serve_responses(responses: Vec<Vec<u8>>) -> (String, std::thread::JoinHandle<()>) {
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.unwrap_or_else(|error| panic!("bind a local listener: {error}"));
+		let port = listener
+			.local_addr()
+			.unwrap_or_else(|error| panic!("local address: {error}"))
+			.port();
+		let server = std::thread::spawn(move || {
+			use std::io::Write as _;
+
+			for body in responses {
+				let Ok((mut stream, _)) = listener.accept() else {
+					return;
+				};
+				let mut request = [0_u8; 4096];
+				let _ = stream.read(&mut request);
+				let head = format!(
+					"HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+					body.len()
+				);
+				let _ = stream.write_all(head.as_bytes());
+				let _ = stream.write_all(&body);
+				let _ = stream.shutdown(std::net::Shutdown::Write);
+			}
 		});
 		(format!("http://127.0.0.1:{port}"), server)
 	}

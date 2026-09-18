@@ -215,6 +215,16 @@ jobs:
             --clobber
           echo "Uploaded $asset"
 
+          # `pina lint` verifies a downloaded driver against this file before
+          # installing it, so the checksum must ship beside the asset. The
+          # standalone driver has no archive, so the `checksum: sha256,sha512`
+          # option on the archive upload does not cover it.
+          sha256sum "$staged" | sed "s|$RUNNER_TEMP/||" > "$staged.sha256"
+          gh release upload "$RELEASE_TAG" "$staged.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          echo "Uploaded $asset.sha256"
+
   attest_assets:
     name: attest release assets
     # Require every direct asset-producing dependency to succeed before the
