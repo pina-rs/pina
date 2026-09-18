@@ -130,7 +130,23 @@ pub(crate) fn expand(
 		None => None,
 	};
 	let emit_helper = generate_emit_helper(&crate_path);
+	// `emit` materializes the complete record in one stack frame, so an
+	// oversized schema would exhaust the 4 KiB SBF stack at runtime instead of
+	// failing here. The bound is a public constant so the number a caller reads
+	// is the number the macro enforces.
+	let stack_budget_assertion = quote! {
+		const _: () = assert!(
+			#struct_name::SIZE <= #crate_path::MAX_EVENT_RECORD_BYTES,
+			concat!(
+				"event record for ",
+				stringify!(#struct_name),
+				" exceeds the SBF stack budget; reduce the payload or field count",
+			),
+		);
+	};
 	let implementations = quote! {
+		#stack_budget_assertion
+
 		impl #struct_name {
 			#view_helpers
 			#emit_helper
