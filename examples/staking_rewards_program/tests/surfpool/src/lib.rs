@@ -13,6 +13,7 @@ use pina_test::Pubkey;
 use pina_test::Signer;
 use pina_test::TestError;
 use program_under_test::ID;
+use program_under_test::REWARD_INDEX_SCALE;
 use program_under_test::StakingError;
 use program_under_test::StakingInstruction;
 
@@ -236,6 +237,74 @@ fn withdraw_instruction(
 
 /// PoolState content: [disc][admin 32][stake_mint 32][reward_mint 32]
 /// [total_staked 8][reward_index 8][paused][bump].
+fn set_reward_index_instruction(
+	program: &ProgramTest,
+	admin: &Pubkey,
+	pool: &Pubkey,
+	new_index: u64,
+) -> pina_test::Instruction {
+	let mut data = vec![StakingInstruction::SetRewardIndex as u8];
+	data.extend_from_slice(&new_index.to_le_bytes());
+
+	program.instruction(
+		&data,
+		vec![
+			AccountMeta::new_readonly(*admin, true),
+			AccountMeta::new(*pool, false),
+		],
+	)
+}
+
+fn claim_instruction(
+	program: &ProgramTest,
+	user: &Pubkey,
+	reward_mint: &Pubkey,
+	pool: &Pubkey,
+	position: &Pubkey,
+	user_reward_ata: &Pubkey,
+	reward_vault: &Pubkey,
+) -> pina_test::Instruction {
+	program.instruction(
+		&[StakingInstruction::Claim as u8],
+		vec![
+			AccountMeta::new(*user, true),
+			AccountMeta::new_readonly(*reward_mint, false),
+			AccountMeta::new_readonly(*pool, false),
+			AccountMeta::new(*position, false),
+			AccountMeta::new(*user_reward_ata, false),
+			AccountMeta::new(*reward_vault, false),
+			AccountMeta::new_readonly(ata_program_id(), false),
+			AccountMeta::new_readonly(token_program_id(), false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
+		],
+	)
+}
+
+/// SPL `MintTo` = tag 7.
+fn mint_into(
+	program: &ProgramTest,
+	mint: &Pubkey,
+	destination: &Pubkey,
+	authority: &Keypair,
+	amount: u64,
+) -> Result<(), TestError> {
+	let mut data = vec![7u8];
+	data.extend_from_slice(&amount.to_le_bytes());
+	let instruction = Instruction::new_with_bytes(
+		token_program_id(),
+		&data,
+		vec![
+			AccountMeta::new(*mint, false),
+			AccountMeta::new(*destination, false),
+			AccountMeta::new_readonly(authority.pubkey(), true),
+		],
+	);
+
+	program
+		.send_with_signers(instruction, &[authority])
+		.map(|_| ())
+}
+
 fn assert_pool(
 	account: &Account,
 	admin: &Pubkey,
@@ -491,25 +560,21 @@ fn pool_positions_and_stake_accounting() {
 		// this test exists to pin.
 		pina_test::assert_custom_error(&error, StakingError::InsufficientBalance as u32);
 
-		// The claim path creates the user's reward ATA address safely.
-		let claim = program.instruction(
-			&[StakingInstruction::Claim as u8],
-			vec![
-				AccountMeta::new(admin, true),
-				AccountMeta::new_readonly(reward_mint, false),
-				AccountMeta::new_readonly(pool, false),
-				AccountMeta::new(position, false),
-				AccountMeta::new(user_reward_ata, false),
-				AccountMeta::new_readonly(ata_program_id(), false),
-				AccountMeta::new_readonly(token_program_id(), false),
-				AccountMeta::new_readonly(Pubkey::default(), false),
-			],
-		);
-		program.send_instruction(claim).expect("execute Claim");
-		let reward_account = program
-			.account(&user_reward_ata)
-			.expect("reward ATA created by claim idempotent");
-		assert_eq!(vault_amount(&reward_account), 0, "no real reward payout");
+		// No reward index has moved, so the position has accrued nothing and a
+		// claim is refused rather than creating an empty payout. The reward
+		// release path has its own end-to-end test.
+		let error = program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect_err("a claim with no accrual is refused");
+		pina_test::assert_custom_error(&error, StakingError::NothingToClaim as u32);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -679,6 +744,175 @@ fn rejects_a_duplicate_position_at_a_noncanonical_bump() {
 		assert!(
 			program.account(&duplicate).is_err(),
 			"the duplicate position must not exist"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Rewards accrue per index movement and release once.
+///
+/// The previous version of this program credited `reward_index` on every claim
+/// with no per-position checkpoint and never transferred anything, so a claim
+/// could be repeated indefinitely. This test is the regression that pins the
+/// corrected behavior: one drip pays each unit of stake exactly once, a second
+/// claim without a new drip is refused, and the vault balance proves the
+/// payout left custody.
+#[test]
+#[ignore = "run with pina test"]
+fn rewards_accrue_once_per_index_and_release() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+		let user_stake_ata = ata_of(&admin, &stake_mint);
+		let user_reward_ata = ata_of(&admin, &reward_mint);
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		// Deposit first: the instruction creates the user's stake ATA, so a
+		// mint cannot target it until then.
+		let staked = 1_000u64;
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				staked,
+			))
+			.expect("execute Deposit");
+		mint_into(
+			&program,
+			&stake_mint,
+			&user_stake_ata,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+
+		// Fund the reward vault so a payout has something to release.
+		mint_into(&program, &reward_mint, &reward_vault, &mint_authority, FUND)
+			.expect("fund reward vault");
+		let vault_before =
+			vault_amount(&program.account(&reward_vault).expect("fetch reward vault"));
+
+		// A drip of one full index unit: one reward token per staked token.
+		let index = REWARD_INDEX_SCALE;
+		program
+			.send_instruction(set_reward_index_instruction(&program, &admin, &pool, index))
+			.expect("execute SetRewardIndex");
+
+		// The drip may not move rewards backwards: that is what would let a
+		// position re-claim rewards it already released.
+		let error = program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				index - 1,
+			))
+			.expect_err("reject a regressed reward index");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::Custom(StakingError::RewardIndexRegressed as u32)
+			)),
+			"a lower index must be refused with RewardIndexRegressed"
+		);
+
+		// Claim releases exactly the accrued amount.
+		program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect("execute Claim");
+
+		let expected = staked;
+		let claimed = vault_amount(&program.account(&user_reward_ata).expect("fetch reward ATA"));
+		assert_eq!(
+			claimed, expected,
+			"the position received its accrued rewards"
+		);
+		let vault_after =
+			vault_amount(&program.account(&reward_vault).expect("fetch reward vault"));
+		assert_eq!(
+			vault_before - vault_after,
+			expected,
+			"the vault released exactly the payout"
+		);
+
+		// A second claim with no new drip must be refused: the checkpoint was
+		// advanced, so nothing further has accrued.
+		let error = program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect_err("reject a second claim with no new accrual");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::Custom(StakingError::NothingToClaim as u32)
+			)),
+			"a claim with nothing accrued must be refused with NothingToClaim"
+		);
+		assert_eq!(
+			vault_amount(&program.account(&user_reward_ata).expect("fetch reward ATA")),
+			claimed,
+			"the refused claim moved no rewards"
 		);
 
 		program.stop().expect("stop isolated program test");

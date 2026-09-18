@@ -47,6 +47,10 @@ pub enum StakingError {
 	Unauthorized = 3,
 	/// The supplied account is not the pool this position belongs to.
 	InvalidPool = 4,
+	/// The supplied reward index would move rewards backwards.
+	RewardIndexRegressed = 5,
+	/// The position has accrued nothing to release.
+	NothingToClaim = 6,
 }
 
 #[discriminator(entrypoint)]
@@ -56,6 +60,7 @@ pub enum StakingInstruction {
 	Deposit = 2,
 	Withdraw = 3,
 	Claim = 4,
+	SetRewardIndex = 5,
 }
 
 #[discriminator]
@@ -110,6 +115,28 @@ pub struct WithdrawInstruction {
 #[instruction(discriminator = StakingInstruction::Claim)]
 pub struct ClaimInstruction {}
 
+#[instruction(discriminator = StakingInstruction::SetRewardIndex)]
+pub struct SetRewardIndexInstruction {
+	/// The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].
+	pub new_index: u64,
+}
+
+/// Rewards accrued for `staked` tokens between two index checkpoints.
+///
+/// The product of a scaled index delta and a stake is computed in `u128` so a
+/// large stake cannot overflow the multiplication, then divided down to base
+/// units with a floor. Flooring favors the pool: a position can never be
+/// released more than the index supports, and the discarded remainder stays
+/// claimable by the next checkpoint.
+fn accrued_rewards(staked: u64, index_delta: u64) -> Result<u64, ProgramError> {
+	let scaled = u128::from(index_delta)
+		.checked_mul(u128::from(staked))
+		.ok_or(ProgramError::ArithmeticOverflow)?
+		/ u128::from(REWARD_INDEX_SCALE);
+
+	u64::try_from(scaled).map_err(|_| ProgramError::ArithmeticOverflow.into())
+}
+
 #[derive(Accounts, Debug)]
 pub struct InitializePoolAccounts<'a> {
 	pub admin: &'a mut AccountView,
@@ -161,10 +188,25 @@ pub struct ClaimAccounts<'a> {
 	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
+	pub reward_vault: &'a AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
+
+#[derive(Accounts, Debug)]
+pub struct SetRewardIndexAccounts<'a> {
+	pub admin: &'a AccountView,
+	pub pool_state: &'a mut AccountView,
+}
+
+/// Scale applied to the pool's rewards-per-token index.
+///
+/// An integer index cannot express a fractional reward per token, so the index
+/// is fixed-point: a value of `REWARD_INDEX_SCALE` means one reward token per
+/// staked token. Integer division floors the accrued amount, which is why the
+/// scale is large enough to keep rounding dust negligible.
+pub const REWARD_INDEX_SCALE: u64 = 1_000_000_000_000;
 
 /// Seed prefix for pool PDAs.
 const SEED_POOL_PREFIX: &[u8] = b"pool";
@@ -377,19 +419,30 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			.get()
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-		let next_reward_debt = position_state
-			.reward_debt
-			.get()
-			.checked_add(amount)
-			.ok_or(ProgramError::ArithmeticOverflow)?;
 		let next_total_staked = pool_state
 			.total_staked
 			.get()
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
+		// Bank the rewards the existing stake has earned before the stake
+		// changes, so an amount deposited now cannot claim rewards from
+		// before it arrived, and the checkpoint advances with the index.
+		let index = pool_state.reward_index.get();
+		let banked = position_state
+			.pending_rewards
+			.get()
+			.checked_add(accrued_rewards(
+				position_state.staked_amount.get(),
+				index
+					.checked_sub(position_state.reward_debt.get())
+					.ok_or(StakingError::RewardIndexRegressed)?,
+			)?)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
 		position_state.staked_amount.set(next_staked);
-		position_state.reward_debt.set(next_reward_debt);
+		position_state.pending_rewards.set(banked);
+		position_state.reward_debt.set(index);
 		pool_state.total_staked.set(next_total_staked);
 		drop(position_state);
 		drop(pool_state);
@@ -455,6 +508,23 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			return Err(StakingError::InsufficientBalance.into());
 		}
 
+		// Bank the rewards the position has earned at its current stake, then
+		// advance the checkpoint, so a withdrawal cannot strand earned rewards
+		// and the reduced stake stops accruing from this index.
+		let index = pool_state.reward_index.get();
+		let banked = position_state
+			.pending_rewards
+			.get()
+			.checked_add(accrued_rewards(
+				staked_amount,
+				index
+					.checked_sub(position_state.reward_debt.get())
+					.ok_or(StakingError::RewardIndexRegressed)?,
+			)?)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		position_state.pending_rewards.set(banked);
+		position_state.reward_debt.set(index);
 		position_state.staked_amount.set(
 			staked_amount
 				.checked_sub(amount)
@@ -500,14 +570,29 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
 		assert_position_access(pool_handle, user_handle, &position_state)?;
 
-		// Calculate and update pending rewards
-		let next_pending = position_state
+		// Accrue the rewards earned since this position's last checkpoint, then
+		// advance the checkpoint to the current index. Zeroing `pending_rewards`
+		// and moving the debt together is what makes a second claim in the same
+		// state pay zero instead of paying the same index again.
+		let index = pool_state.reward_index.get();
+		let delta = index
+			.checked_sub(position_state.reward_debt.get())
+			.ok_or(StakingError::RewardIndexRegressed)?;
+		let payout = position_state
 			.pending_rewards
 			.get()
-			.checked_add(pool_state.reward_index.get())
+			.checked_add(accrued_rewards(position_state.staked_amount.get(), delta)?)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		position_state.pending_rewards.set(next_pending);
+		if payout == 0 {
+			return Err(StakingError::NothingToClaim.into());
+		}
+
+		position_state.pending_rewards.set(0);
+		position_state.reward_debt.set(index);
+		let pool_bump = pool_state.bump;
+		let pool_stake_mint = pool_state.stake_mint;
+		let pool_reward_mint = pool_state.reward_mint;
 		drop(position_state);
 		drop(pool_state);
 
@@ -522,6 +607,54 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		}
 		.invoke()?;
 
+		// Release the accrued rewards from the pool's reward vault. The pool is
+		// the vault's authority, so the pool PDA signs.
+		let pool_seeds = PoolState::seeds(&pool_stake_mint, &pool_reward_mint).with_bump(pool_bump);
+		let signer = pool_seeds.to_signer();
+		let signers = [signer.as_signer()];
+
+		let reward_decimals = {
+			let mint = self
+				.reward_mint
+				.as_token_mint_for_program(self.token_program.address())?;
+			mint.decimals()
+		};
+
+		token::instructions::TransferChecked::new(
+			self.reward_vault,
+			self.reward_mint,
+			self.user_reward_ata,
+			self.pool_state,
+			payout,
+			reward_decimals,
+		)
+		.invoke_signed_with_program(&signers, self.token_program.address())?;
+
+		Ok(())
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let args = SetRewardIndexInstruction::try_from_bytes(data)?;
+		let new_index = args.new_index.get();
+
+		self.admin.assert_signer()?;
+		self.pool_state.assert_not_empty()?;
+
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
+		self.admin.assert_address(&pool_state.admin)?;
+
+		let current = pool_state.reward_index.get();
+		// Monotonicity is the security core of this instruction: a lower index
+		// would let every position re-claim the rewards it already released,
+		// draining the vault repeatedly.
+		if new_index < current {
+			return Err(StakingError::RewardIndexRegressed.into());
+		}
+
+		pool_state.reward_index.set(new_index);
+
 		Ok(())
 	}
 }
@@ -531,12 +664,66 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn accrued_rewards_scale_and_floor() {
+		// One index unit (a full reward token per staked token) over 100 staked
+		// releases 100 reward tokens.
+		assert_eq!(
+			accrued_rewards(100, REWARD_INDEX_SCALE).unwrap_or_default(),
+			100
+		);
+		// Half an index unit releases half.
+		assert_eq!(
+			accrued_rewards(100, REWARD_INDEX_SCALE / 2).unwrap_or_default(),
+			50
+		);
+		// No index movement releases nothing, however large the stake.
+		assert_eq!(accrued_rewards(u64::MAX, 0).unwrap_or_default(), 0);
+		// A fractional result floors rather than rounds up.
+		assert_eq!(accrued_rewards(1, 1).unwrap_or_default(), 0);
+	}
+
+	#[test]
+	fn accrued_rewards_does_not_overflow_a_large_stake() {
+		// index_delta * staked would overflow a u64; the u128 intermediate
+		// keeps the product exact before the scaling division.
+		let reward = accrued_rewards(u64::MAX, REWARD_INDEX_SCALE).unwrap_or_default();
+		assert_eq!(reward, u64::MAX);
+	}
+
+	#[test]
 	fn discriminator_values() {
 		assert_eq!(StakingInstruction::InitializePool as u8, 0);
 		assert_eq!(StakingInstruction::OpenPosition as u8, 1);
 		assert_eq!(StakingInstruction::Deposit as u8, 2);
 		assert_eq!(StakingInstruction::Withdraw as u8, 3);
 		assert_eq!(StakingInstruction::Claim as u8, 4);
+		assert_eq!(StakingInstruction::SetRewardIndex as u8, 5);
+	}
+
+	#[test]
+	fn error_codes_are_stable() {
+		// These values are program ABI: clients match on them, so a reorder
+		// must be a deliberate, documented change.
+		assert_eq!(StakingError::InvalidAmount as u32, 0);
+		assert_eq!(StakingError::PoolPaused as u32, 1);
+		assert_eq!(StakingError::InsufficientBalance as u32, 2);
+		assert_eq!(StakingError::Unauthorized as u32, 3);
+		assert_eq!(StakingError::InvalidPool as u32, 4);
+		assert_eq!(StakingError::RewardIndexRegressed as u32, 5);
+		assert_eq!(StakingError::NothingToClaim as u32, 6);
+	}
+
+	#[test]
+	fn set_reward_index_instruction_roundtrip() {
+		let mut bytes = [0u8; SetRewardIndexInstruction::SIZE];
+		SetRewardIndexInstruction::initialize(&mut bytes, |instruction| {
+			instruction.new_index.set(REWARD_INDEX_SCALE);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+		let decoded = SetRewardIndexInstruction::try_from_bytes(&bytes)
+			.unwrap_or_else(|e| panic!("decode: {e:?}"));
+		assert_eq!(decoded.new_index.get(), REWARD_INDEX_SCALE);
 	}
 
 	#[test]

@@ -692,6 +692,13 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "rewardVault",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "associatedTokenProgram",
 						"isWritable": false,
 						"isSigner": false,
@@ -750,6 +757,69 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 4
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "setRewardIndex",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "admin",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "poolState",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 5
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "newIndex",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 5
 							}
 						}
 					}
@@ -864,6 +934,24 @@
 				"message": "The supplied account is not the pool this position belongs to.",
 				"docs": [
 					"The supplied account is not the pool this position belongs to."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "rewardIndexRegressed",
+				"code": 5,
+				"message": "The supplied reward index would move rewards backwards.",
+				"docs": [
+					"The supplied reward index would move rewards backwards."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "nothingToClaim",
+				"code": 6,
+				"message": "The position has accrued nothing to release.",
+				"docs": [
+					"The position has accrued nothing to release."
 				]
 			}
 		]
