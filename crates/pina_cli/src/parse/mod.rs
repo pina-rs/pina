@@ -139,16 +139,16 @@ pub(crate) fn parse_program_with_sources(
 	// than one declared entrypoint enum would emit competing `process_instruction`
 	// implementations, and none means the declared instructions are unreachable
 	// from the chain.
-	let entrypoint_enums: Vec<String> = syn_files
-		.iter()
-		.flat_map(|file| {
-			discriminator::extract_discriminator_enums(file).unwrap_or_else(|error| {
-				panic!("discriminator extraction validated earlier: {error:?}")
-			})
-		})
-		.filter(|enum_| enum_.entrypoint)
-		.map(|enum_| enum_.name)
-		.collect();
+	// Extraction cannot fail here: `assemble_program_ir_multi_with_auto` ran the
+	// same extractor over the same files and surfaced any error already.
+	let mut entrypoint_enums = Vec::new();
+	for file in &syn_files {
+		for enum_ in discriminator::extract_discriminator_enums(file)? {
+			if enum_.entrypoint {
+				entrypoint_enums.push(enum_.name);
+			}
+		}
+	}
 	if entrypoint_enums.len() > 1 {
 		return Err(IdlError::ambiguous_discriminator_entrypoint(
 			&entrypoint_enums.join(", "),

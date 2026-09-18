@@ -273,7 +273,7 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 			continue;
 		}
 
-		let repr_size = discriminator_repr_size(item_enum)?;
+		let (repr_size, entrypoint) = discriminator_facts(item_enum)?;
 		let mut variants = Vec::new();
 		for variant in &item_enum.variants {
 			if let Some((_, expr)) = &variant.discriminant
@@ -290,48 +290,34 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 			name: item_enum.ident.to_string(),
 			variants,
 			repr_size,
-			entrypoint: discriminator_entrypoint_flag(item_enum)?,
+			entrypoint,
 		});
 	}
 
 	Ok(result)
 }
 
-/// Whether the enum's `#[discriminator]` attribute declares `entrypoint`.
-fn discriminator_entrypoint_flag(item_enum: &syn::ItemEnum) -> Result<bool, IdlError> {
+/// Read the facts IDL extraction needs from `#[discriminator]`.
+///
+/// One parse yields both the repr size and whether the enum declares the
+/// program entrypoint, so the attribute is never read twice.
+fn discriminator_facts(item_enum: &syn::ItemEnum) -> Result<(usize, bool), IdlError> {
 	let Some(attr) = item_enum
 		.attrs
 		.iter()
 		.find(|attr| attr.path().is_ident("discriminator"))
 	else {
-		return Ok(false);
+		return Ok((1, false));
 	};
 	if matches!(attr.meta, syn::Meta::Path(_)) {
-		return Ok(false);
+		return Ok((1, false));
 	}
 	let args = attr
 		.parse_args::<DiscriminatorArgs>()
 		.map_err(|error| invalid_discriminator_enum(&item_enum.ident, error))?;
-	Ok(args.entrypoint)
-}
-
-/// Parse the backing primitive from the source-level attribute macro grammar.
-fn discriminator_repr_size(item_enum: &syn::ItemEnum) -> Result<usize, IdlError> {
-	let Some(attr) = item_enum
-		.attrs
-		.iter()
-		.find(|attr| attr.path().is_ident("discriminator"))
-	else {
-		return Ok(1);
-	};
-	if matches!(attr.meta, syn::Meta::Path(_)) {
-		return Ok(1);
-	}
-	let args = attr
-		.parse_args::<DiscriminatorArgs>()
-		.map_err(|error| invalid_discriminator_enum(&item_enum.ident, error))?;
+	let entrypoint = args.entrypoint;
 	let Some(primitive) = args.primitive else {
-		return Ok(1);
+		return Ok((1, entrypoint));
 	};
 	let syn::Expr::Path(primitive) = primitive else {
 		return Err(invalid_discriminator_enum(
@@ -343,13 +329,14 @@ fn discriminator_repr_size(item_enum: &syn::ItemEnum) -> Result<usize, IdlError>
 		return Err(invalid_primitive(&item_enum.ident));
 	};
 
-	Ok(match primitive.to_string().as_str() {
+	let size = match primitive.to_string().as_str() {
 		"u8" => 1,
 		"u16" => 2,
 		"u32" => 4,
 		"u64" => 8,
 		_ => return Err(invalid_primitive(&item_enum.ident)),
-	})
+	};
+	Ok((size, entrypoint))
 }
 
 fn invalid_primitive(enum_name: &syn::Ident) -> IdlError {
@@ -531,6 +518,66 @@ mod tests {
 		assert!(
 			enums[0].entrypoint,
 			"the flag must reach the extracted enum"
+		);
+	}
+
+	#[test]
+	fn discriminator_facts_read_repr_and_entrypoint_together() {
+		// No attribute at all: the defaults are a one-byte repr and no
+		// entrypoint declaration.
+		let file = syn::parse_file("pub enum Probe { A = 0 }")
+			.unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let enum_ = file
+			.items
+			.iter()
+			.find_map(|item| {
+				match item {
+					syn::Item::Enum(enum_) => Some(enum_),
+					_ => None,
+				}
+			})
+			.unwrap_or_else(|| panic!("the probe has one enum"));
+		assert_eq!(
+			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			(1, false)
+		);
+
+		// A bare attribute path yields the same defaults.
+		let file = syn::parse_file("#[discriminator] pub enum Probe { A = 0 }")
+			.unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let enum_ = file
+			.items
+			.iter()
+			.find_map(|item| {
+				match item {
+					syn::Item::Enum(enum_) => Some(enum_),
+					_ => None,
+				}
+			})
+			.unwrap_or_else(|| panic!("the probe has one enum"));
+		assert_eq!(
+			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			(1, false)
+		);
+
+		// An explicit primitive is read alongside the entrypoint flag.
+		let file = syn::parse_file(
+			"#[discriminator(primitive = u32, entrypoint)] pub enum Probe { A = 0 }",
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let enum_ = file
+			.items
+			.iter()
+			.find_map(|item| {
+				match item {
+					syn::Item::Enum(enum_) => Some(enum_),
+					_ => None,
+				}
+			})
+			.unwrap_or_else(|| panic!("the probe has one enum"));
+		assert_eq!(
+			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			(4, true)
 		);
 	}
 
