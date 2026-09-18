@@ -50,6 +50,8 @@ pub enum EscrowError {
 	OfferKeyMismatch = 0,
 	/// A supplied token account is not the one the offer references.
 	TokenAccountMismatch = 1,
+	/// One side of the offer is zero, so the exchange gives value away.
+	EmptyOffer = 2,
 }
 
 #[account(discriminator = EscrowAccount)]
@@ -102,6 +104,19 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = MakeInstruction::try_from_bytes(data)?;
+
+		// Reject an offer that gives nothing away before any CPI runs, because
+		// either zero amount makes the exchange one-sided: `amount_b == 0` lets
+		// the maker hand over token A for nothing, and `amount_a == 0` lets the
+		// taker take token A for nothing. Only the positive-value shape is a
+		// real offer. The check covers the requested amount, while the stored
+		// `amount_a` is the measured vault delta; both must be nonzero for the
+		// offer to be meaningful, so a requested zero is rejected here and an
+		// unmeasurable transfer is rejected by the delta subtraction below.
+		if args.amount_a.get() == 0 || args.amount_b.get() == 0 {
+			return Err(EscrowError::EmptyOffer.into());
+		}
+
 		let maker_address = *self.maker.address();
 		let escrow_seeds = EscrowState::seeds(&maker_address, args.seed.get());
 
@@ -265,7 +280,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
 
 		// Validate maker and mint accounts
-		self.maker.assert_address(&maker)?;
+		//
+		// The maker is credited twice — the vault close returns its rent and the
+		// escrow close returns the escrow's rent — so it must be writable. The
+		// `&mut AccountView` field already requires that at parse time; the
+		// explicit assert keeps the requirement in the handler and reports the
+		// framework's own error if the field type ever becomes shared.
+		self.maker.assert_address(&maker)?.assert_writable()?;
 		self.mint_a.assert_address(&mint_a)?;
 		let mint_a = self
 			.mint_a

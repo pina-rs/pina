@@ -64,10 +64,13 @@ The `#[error]` macro converts an enum into a set of `ProgramError::Custom` error
 pub enum EscrowError {
 	OfferKeyMismatch = 0,
 	TokenAccountMismatch = 1,
+	EmptyOffer = 2,
 }
 ```
 
 Each variant's numeric value becomes the custom error code. You can return these from any processor via `Err(EscrowError::OfferKeyMismatch.into())`.
+
+Wire values are part of the program ABI: add a new variant with the next value instead of reusing an existing code, and give every variant a doc comment, because the generated IDL uses it as the message that clients and explorers display. `Make` returns `EmptyOffer` before any CPI when either side of the offer is zero, so a fat-fingered amount cannot hand token A over for nothing.
 
 ## Escrow state account
 
