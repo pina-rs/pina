@@ -67,7 +67,18 @@ pub(crate) fn run(cli: Cli) {
 			mode,
 			no_scaffold,
 			npx,
-		} => run_cpi(idl.as_deref(), stdin, &output, mode, no_scaffold, &npx),
+			skip_unsupported_instructions,
+		} => {
+			run_cpi(
+				idl.as_deref(),
+				stdin,
+				&output,
+				mode,
+				no_scaffold,
+				&npx,
+				skip_unsupported_instructions,
+			);
+		}
 		Commands::Import {
 			name,
 			program_id,
@@ -77,6 +88,7 @@ pub(crate) fn run(cli: Cli) {
 			output,
 			mode,
 			npx,
+			skip_unsupported_instructions,
 		} => {
 			run_import(&ImportCommand {
 				name: &name,
@@ -87,6 +99,7 @@ pub(crate) fn run(cli: Cli) {
 				output: output.as_deref(),
 				mode,
 				npx: &npx,
+				skip_unsupported_instructions,
 			});
 		}
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
@@ -1016,6 +1029,7 @@ fn run_generate(
 	println!("  Clients {}", generated.clients_dir.display());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_cpi(
 	idl: Option<&Path>,
 	stdin: bool,
@@ -1023,6 +1037,7 @@ fn run_cpi(
 	mode: pina_cli::GenerationMode,
 	no_scaffold: bool,
 	npx: &str,
+	skip_unsupported_instructions: bool,
 ) {
 	let result = if stdin {
 		pina_cli::generate_cpi_crate_from_reader_with_config(
@@ -1039,6 +1054,7 @@ fn run_cpi(
 			mode,
 			scaffold: !no_scaffold,
 			npx: npx.to_string(),
+			skip_unsupported_instructions,
 		})
 	};
 
@@ -2502,6 +2518,7 @@ struct ImportCommand<'a> {
 	output: Option<&'a Path>,
 	mode: pina_cli::GenerationMode,
 	npx: &'a str,
+	skip_unsupported_instructions: bool,
 }
 
 /// Imports a foreign program's IDL as a CPI crate and stamps its provenance.
@@ -2518,6 +2535,7 @@ fn run_import(command: &ImportCommand<'_>) {
 		output,
 		mode,
 		npx,
+		skip_unsupported_instructions,
 	} = *command;
 
 	let output = output.map_or_else(|| PathBuf::from("clients/cpi"), Path::to_path_buf);
@@ -2535,6 +2553,7 @@ fn run_import(command: &ImportCommand<'_>) {
 			output: output.clone(),
 			mode,
 			npx: npx.to_string(),
+			skip_unsupported_instructions,
 		};
 		pina_cli::import_idl::import_idl(&options)
 	})

@@ -14,7 +14,7 @@
 //! cargo test -p counter_program_cli --test surfpool -- --ignored
 //! ```
 
-use std::io::Read;
+use std::io::BufRead;
 use std::process::Command;
 use std::process::Stdio;
 
@@ -160,19 +160,19 @@ fn write_keypair_file(payer: &Keypair) -> Result<String, Box<dyn std::error::Err
 }
 
 /// Reads the `READY <url>` line the bootstrap script prints once the surfnet
-/// is live and the program is deployed.
+/// is live and the program is deployed. Lines are consumed incrementally so a
+/// URL is acted on the moment it appears instead of after the process exits.
 fn wait_for_ready(child: &mut std::process::Child) -> Result<String, Box<dyn std::error::Error>> {
-	let mut stdout = String::new();
-	child
-		.stdout
-		.as_mut()
-		.expect("piped stdout")
-		.by_ref()
-		.read_to_string(&mut stdout)?;
-	stdout
-		.lines()
-		.find_map(|line| line.strip_prefix("READY "))
-		.map(str::trim)
-		.map(str::to_string)
-		.ok_or_else(|| format!("bootstrap did not report a URL: {stdout}").into())
+	let mut reader = std::io::BufReader::new(child.stdout.as_mut().expect("piped stdout"));
+	let mut line = String::new();
+	loop {
+		line.clear();
+		let read = reader.read_line(&mut line)?;
+		if read == 0 {
+			return Err("bootstrap did not report a URL before exiting".into());
+		}
+		if let Some(url) = line.strip_prefix("READY ") {
+			return Ok(url.trim().to_string());
+		}
+	}
 }

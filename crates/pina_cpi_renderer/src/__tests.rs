@@ -523,32 +523,38 @@ fn renders_runtime_signer_selection() {
 }
 
 #[test]
-fn refuses_a_non_trailing_omitted_optional_account() {
+fn refuses_the_omitted_optional_account_strategy() {
 	let mut root = load_fixture_root("vesting_program");
-	// `admin` is the first account, so dropping it under the `omitted`
-	// strategy would shift every account after the hole.
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::Omitted);
-	let error = render_program_to_files(&root).expect_err("refuses a mid-list omitted option");
+	let error = render_program_to_files(&root, &RenderConfig::default())
+		.err()
+		.expect("the omitted strategy cannot build a shortened account list");
 
-	assert!(error.to_string().contains("trailing optional accounts"));
-}
+	assert!(
+		error
+			.to_string()
+			.contains("omitted optional-account strategy")
+	);
 
-#[test]
-fn renders_trailing_omitted_optional_accounts() {
+	// Even trailing optionals are refused: a fixed-size handle set cannot drop
+	// them, and filling the slots would send accounts the callee does not
+	// expect under this strategy.
 	let mut root = load_fixture_root("vesting_program");
 	let mut witness = InstructionAccountNode::new("witness", false, IsSigner::False);
 	witness.is_optional = Some(true);
 	root.program.instructions[0].accounts.push(witness);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::Omitted);
-	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
-		.unwrap_or_else(|error| panic!("renders trailing optional account: {error}"));
-
-	// The generated builder still exposes the account, so a caller can supply
-	// it; omitting it leaves the placeholder the IDL's strategy expects.
-	assert!(page.contains("pub witness: Option<&'account AccountView>,"));
+	let error = render_program_to_files(&root, &RenderConfig::default())
+		.err()
+		.expect("trailing omitted optionals are refused as well");
+	assert!(
+		error
+			.to_string()
+			.contains("omitted optional-account strategy")
+	);
 }
 
 #[test]
@@ -556,7 +562,7 @@ fn refuses_optional_arguments() {
 	let mut root = load_fixture_root("vesting_program");
 	root.program.instructions[0].arguments[1].default_value_strategy =
 		Some(codama_nodes::DefaultValueStrategy::Optional);
-	let error = render_program_to_files(&root).expect_err("refuses");
+	let error = render_program_to_files(&root, &RenderConfig::default()).expect_err("refuses");
 	assert!(
 		error
 			.to_string()
@@ -599,7 +605,8 @@ fn refuses_field_discriminators_without_a_matching_argument() {
 			vec![],
 		)],
 	);
-	let error = render_program_to_files(&RootNode::new(program)).expect_err("refuses");
+	let error = render_program_to_files(&RootNode::new(program), &RenderConfig::default())
+		.expect_err("refuses");
 	assert!(error.to_string().contains("has no matching argument"));
 }
 
@@ -796,7 +803,7 @@ fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 			vec![],
 		)],
 	);
-	assert!(render_program_to_files(&RootNode::new(rejected)).is_err());
+	assert!(render_program_to_files(&RootNode::new(rejected), &RenderConfig::default()).is_err());
 }
 
 #[test]
@@ -891,7 +898,8 @@ fn renders_program_id_constants() {
 		"11111111111111111111111111111111",
 		vec![],
 	));
-	let files = render_program_to_files(&root).unwrap_or_else(|error| panic!("renders: {error}"));
+	let files = render_program_to_files(&root, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
 	let programs_rs = &files[&PathBuf::from("programs.rs")];
 
 	assert!(programs_rs.contains("pub const REGISTRY_ID: Address ="));
@@ -920,7 +928,7 @@ fn public_entrypoints_cover_files_programs_and_parse_errors() {
 		"11111111111111111111111111111111",
 		vec![],
 	));
-	let files = render_program_to_files(&empty)
+	let files = render_program_to_files(&empty, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("empty program should render: {error}"));
 	assert!(!files.contains_key(Path::new("instructions/mod.rs")));
 	let root_mod = &files[Path::new("mod.rs")];
@@ -1171,20 +1179,32 @@ fn renders_every_foreign_idl_fixture() {
 			"fixture `{name}` changed shape"
 		);
 
-		let files = render_program_to_files(&root)
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
 			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
 
-		// Every instruction gets a page, and the root module wires the result.
+		// Every rendered instruction gets a page, and the root module wires the
+		// result. Skipped instructions are recorded in `instructions/mod.rs`.
 		assert!(files.contains_key(Path::new("mod.rs")), "fixture `{name}`");
 		assert!(
 			files.contains_key(Path::new("programs.rs")),
 			"fixture `{name}`"
 		);
+		let instructions_mod = files
+			.get(Path::new("instructions/mod.rs"))
+			.unwrap_or_else(|| panic!("fixture `{name}` has no instructions module"));
 		for instruction in &root.program.instructions {
 			let page = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
+			let rendered = files.contains_key(Path::new(&page));
+			let skipped =
+				instructions_mod.contains(&format!("// Skipped `{}`", instruction.name.as_ref()));
 			assert!(
-				files.contains_key(Path::new(&page)),
-				"fixture `{name}` is missing `{page}`"
+				rendered || skipped,
+				"fixture `{name}` neither rendered nor skipped `{}`",
+				instruction.name.as_ref()
 			);
 		}
 	}
@@ -1194,7 +1214,14 @@ fn renders_every_foreign_idl_fixture() {
 fn generates_compilable_sources_for_every_foreign_idl() {
 	for (name, _) in FOREIGN_FIXTURES {
 		let root = foreign_fixture_root(name);
-		let files = render_program_to_files(&root)
+		// Real-world IDLs carry instructions whose account lists this renderer
+		// cannot express yet (Anchor's `omitted` strategy), so the fixture gate
+		// renders with skips allowed and the recorded skips stay visible.
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
 			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
 
 		// `render_program_to_files` already parses each page with `syn`, so a
@@ -1209,7 +1236,7 @@ fn generates_compilable_sources_for_every_foreign_idl() {
 #[test]
 fn switchboard_matches_the_hand_written_reference_crate() {
 	let root = foreign_fixture_root("switchboard_on_demand");
-	let files = render_program_to_files(&root)
+	let files = render_program_to_files(&root, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
 
 	// Discriminators pinned to the hand-written crate's unit tests.
@@ -1302,7 +1329,11 @@ fn documents_every_rejected_foreign_argument_shape() {
 fn renders_read_only_account_parsers_for_foreign_idls() {
 	for (name, _) in FOREIGN_FIXTURES {
 		let root = foreign_fixture_root(name);
-		let files = render_program_to_files(&root)
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
 			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
 
 		for account in &root.program.accounts {
@@ -1332,7 +1363,7 @@ fn renders_read_only_account_parsers_for_foreign_idls() {
 #[test]
 fn switchboard_account_parser_matches_the_hand_written_offsets() {
 	let root = foreign_fixture_root("switchboard_on_demand");
-	let files = render_program_to_files(&root)
+	let files = render_program_to_files(&root, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
 	let source = files
 		.get(Path::new("accounts/randomness_account_data.rs"))
@@ -1371,7 +1402,7 @@ fn switchboard_account_parser_matches_the_hand_written_offsets() {
 fn renders_examples_with_runtime_relative_account_layouts() {
 	for name in ["compact_accounts_program", "migrations_program"] {
 		let root = load_fixture_root(name);
-		let files = render_program_to_files(&root)
+		let files = render_program_to_files(&root, &RenderConfig::default())
 			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
 
 		for account in &root.program.accounts {
@@ -1406,7 +1437,7 @@ fn account_parsers_read_boolean_fields_from_the_buffer() {
 		"escrow_program",
 	] {
 		let root = load_fixture_root(name);
-		let files = render_program_to_files(&root)
+		let files = render_program_to_files(&root, &RenderConfig::default())
 			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
 
 		for (path, source) in &files {
@@ -1757,18 +1788,46 @@ mod foreign_fixture_accounts {
 
 	/// Accounts whose fields cannot all be located still ship their layout,
 	/// with the reason recorded instead of a parser that would misread.
+	///
+	/// Metaplex also carries one instruction using the `omitted`
+	/// optional-account strategy, which the fixed-size handle set cannot
+	/// express, so the render skips it and records the reason.
 	#[test]
 	fn renders_parser_unsupported_accounts_with_their_reason() {
 		let root = foreign_fixture_root("metaplex_token_metadata");
-		let mut types = TypeIndex::new(&root.program.defined_types);
-		let files =
-			render_program_to_files(&root).unwrap_or_else(|error| panic!("render: {error}"));
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
+			.unwrap_or_else(|error| panic!("render: {error}"));
 
 		let page = files
 			.get(Path::new("accounts/collection_authority_record.rs"))
 			.unwrap_or_else(|| panic!("missing collection authority record"));
 		assert!(page.contains("PARSER_UNSUPPORTED"));
 		assert!(page.contains("pub struct CollectionAuthorityRecord"));
+
+		let instructions_mod = files
+			.get(Path::new("instructions/mod.rs"))
+			.unwrap_or_else(|| panic!("missing instructions mod"));
+		assert!(instructions_mod.contains("Skipped `deprecatedMintNewEdition"));
+		assert!(instructions_mod.contains("omitted optional-account strategy"));
+		assert!(!instructions_mod.contains("pub(crate) mod r#deprecated_mint_new_edition"));
+	}
+
+	/// Without the skip flag an unsupported instruction fails the whole render.
+	#[test]
+	fn fails_closed_on_the_omitted_optional_account_strategy() {
+		let root = foreign_fixture_root("metaplex_token_metadata");
+		let error = render_program_to_files(&root, &RenderConfig::default())
+			.err()
+			.expect("the omitted strategy must fail a default render");
+		assert!(
+			error
+				.to_string()
+				.contains("omitted optional-account strategy")
+		);
 	}
 
 	/// A discriminated account with only fixed-width fields gets a complete
@@ -1776,8 +1835,8 @@ mod foreign_fixture_accounts {
 	#[test]
 	fn switchboard_parser_has_the_full_layout() {
 		let root = foreign_fixture_root("switchboard_on_demand");
-		let files =
-			render_program_to_files(&root).unwrap_or_else(|error| panic!("render: {error}"));
+		let files = render_program_to_files(&root, &RenderConfig::default())
+			.unwrap_or_else(|error| panic!("render: {error}"));
 		let page = files
 			.get(Path::new("accounts/randomness_account_data.rs"))
 			.unwrap_or_else(|| panic!("missing randomness account"));

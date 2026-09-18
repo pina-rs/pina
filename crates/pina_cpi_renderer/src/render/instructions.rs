@@ -17,23 +17,29 @@ use super::wire::TypeIndex;
 use crate::error::RenderError;
 use crate::error::Result;
 
-pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> String {
+pub(crate) fn render_instructions_mod(rendered: &[String], skipped: &[(String, String)]) -> String {
 	let mut lines = Vec::new();
 
-	for instruction in instructions {
+	// A skipped instruction is absent from the client, so the reason is
+	// recorded here where a reviewer of the generated crate sees it first.
+	for (name, reason) in skipped {
 		lines.push(format!(
-			"pub(crate) mod r#{};",
-			snake(instruction.name.as_ref())
+			"// Skipped `{name}`: {}",
+			reason.replace('\n', "\n// ")
 		));
+	}
+	if !skipped.is_empty() {
+		lines.push(String::new());
+	}
+
+	for name in rendered {
+		lines.push(format!("pub(crate) mod r#{name};"));
 	}
 
 	lines.push(String::new());
 
-	for instruction in instructions {
-		lines.push(format!(
-			"pub use self::r#{}::*;",
-			snake(instruction.name.as_ref())
-		));
+	for name in rendered {
+		lines.push(format!("pub use self::r#{name}::*;"));
 	}
 
 	lines.join("\n")
@@ -191,6 +197,11 @@ pub(crate) fn render_instruction_page(
 		);
 		lines.push("\t\tlet data = buffer;".to_string());
 		lines.push("\t\tlet mut offset = 0usize;".to_string());
+		lines.push(format!(
+			"\t\tif offset + {} > data.len() {{\n\t\t\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n\t\t}}",
+			discriminator.bytes.len()
+		));
 		lines.push(format!(
 			"\t\tdata[offset..offset + {}].copy_from_slice(&{});",
 			discriminator.bytes.len(),
@@ -426,42 +437,26 @@ impl RenderedAccount {
 /// Renders the CPI account list.
 ///
 /// Under Anchor's `omitted` strategy an absent optional account is dropped from
-/// the account list entirely rather than replaced by a placeholder. A
-/// fixed-size `[CpiHandle; N]` array cannot express that, so this renderer
-/// accepts `omitted` only when every optional account is trailing: the caller
-/// then truncates the list by passing `None`. Any other layout would silently
-/// shift the accounts after the hole, so it is rejected with the instruction
-/// named.
+/// the account list entirely rather than replaced by a placeholder. The
+/// generated handle set is a fixed-size `[CpiHandle; N]` array — the crate is
+/// `no_std`, so there is no allocation to shorten a list with — and every
+/// account slot has to be filled. Dropping an account is therefore impossible
+/// without silently shifting the accounts after it, so the strategy is
+/// rejected with the instruction named; regenerate against an IDL using the
+/// `programId` strategy, whose absent accounts the renderer can represent.
 fn render_accounts(instruction: &InstructionNode, context: &str) -> Result<Vec<RenderedAccount>> {
-	let omitted_strategy = instruction.optional_account_strategy.unwrap_or_default()
-		== OptionalAccountStrategy::Omitted;
-
-	if omitted_strategy {
-		let total = instruction.accounts.len();
-		let trailing_optionals = instruction
-			.accounts
-			.iter()
-			.rev()
-			.take_while(|account| account.is_optional == Some(true))
-			.count();
-		let leading = total - trailing_optionals;
-
-		// An optional account inside the leading run sits mid-list, so dropping
-		// it would shift every account that follows. The trailing run is
-		// optional by construction.
-		if instruction.accounts[..leading]
-			.iter()
-			.any(|account| account.is_optional == Some(true))
-		{
-			return Err(RenderError::UnsupportedAccount {
-				context: context.to_string(),
-				account: "optional accounts".to_string(),
-				reason: "the omitted optional-account strategy drops an account from the middle \
-				         of the account list, which would shift every account after it; this \
-				         renderer supports only trailing optional accounts"
-					.to_string(),
-			});
-		}
+	if instruction.optional_account_strategy.unwrap_or_default() == OptionalAccountStrategy::Omitted
+	{
+		return Err(RenderError::UnsupportedAccount {
+			context: context.to_string(),
+			account: "optional accounts".to_string(),
+			reason: "the omitted optional-account strategy drops an absent account from the \
+			         account list entirely, and a fixed-size handle set cannot express a \
+			         shortened list without shifting the accounts after the hole; this renderer \
+			         only supports the `programId` strategy, which replaces an absent account \
+			         with the program ID"
+				.to_string(),
+		});
 	}
 
 	instruction
@@ -566,7 +561,13 @@ fn render_argument_write(argument: &RenderedArgument) -> String {
 		.replace("{offset}", "offset")
 		.replace("{offset_end}", &format!("offset + {}", argument.wire_size));
 
-	format!("\t\t{write}\n\t\toffset += {};", argument.wire_size)
+	// The buffer is caller-owned and may be shorter than the instruction needs,
+	// so every write is bounds-checked instead of allowed to panic.
+	format!(
+		"\t\tif offset + {} > data.len() {{\n\t\t\treturn \
+		 Err(ProgramError::InvalidInstructionData);\n\t\t}}\n\t\t{write}\n\t\toffset += {};",
+		argument.wire_size, argument.wire_size
+	)
 }
 
 /// Renders one argument's write at its literal position.

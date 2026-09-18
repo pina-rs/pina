@@ -75,6 +75,7 @@ pub struct CpiGenerateOptions {
 	pub mode: GenerationMode,
 	pub scaffold: bool,
 	pub npx: String,
+	pub skip_unsupported_instructions: bool,
 }
 
 /// Errors produced while normalizing an IDL and rendering a CPI crate.
@@ -143,7 +144,13 @@ pub fn generate_cpi_crate(options: &CpiGenerateOptions) -> Result<(), CpiGenerat
 	let input = read_idl(&options.idl)?;
 	let root = normalize_idl(&input, &options.idl, &options.npx)?;
 
-	render_cpi_root(&root, &options.output, options.mode, options.scaffold)
+	render_cpi_root(
+		&root,
+		&options.output,
+		options.mode,
+		options.scaffold,
+		options.skip_unsupported_instructions,
+	)
 }
 
 /// Generate a standalone Pina CPI crate from a reader.
@@ -180,7 +187,7 @@ pub fn generate_cpi_crate_from_reader_with_config(
 		return Err(CpiGenerateError::ExpectedCodamaStdin);
 	};
 
-	render_cpi_root(&root, output, mode, scaffold)
+	render_cpi_root(&root, output, mode, scaffold, false)
 }
 
 fn read_idl(path: &Path) -> Result<Vec<u8>, CpiGenerateError> {
@@ -359,11 +366,13 @@ fn render_cpi_root(
 	output: &Path,
 	mode: GenerationMode,
 	scaffold: bool,
+	skip_unsupported_instructions: bool,
 ) -> Result<(), CpiGenerateError> {
 	validate_render_target(output)?;
 	let config = RenderConfig {
 		mode: cpi_render_mode(mode),
 		scaffold,
+		skip_unsupported_instructions,
 		..RenderConfig::default()
 	};
 	pina_cpi_renderer::render_root_node(root, output, &config).map_err(|source| {
@@ -433,6 +442,7 @@ mod tests {
 			mode: GenerationMode::Auto,
 			scaffold: true,
 			npx: "must-not-run".to_string(),
+			skip_unsupported_instructions: false,
 		})
 		.unwrap_or_else(|error| panic!("file generation failed: {error}"));
 		generate_cpi_crate_from_reader(Cursor::new(fixture_bytes()), &reader_output)
@@ -499,6 +509,7 @@ mod tests {
 				mode: GenerationMode::Auto,
 				scaffold: true,
 				npx: "npx".to_string(),
+				skip_unsupported_instructions: false,
 			}),
 			Err(CpiGenerateError::ReadIdl { .. })
 		));
@@ -517,6 +528,7 @@ mod tests {
 				&temp.path().join("invalid-program"),
 				GenerationMode::Auto,
 				true,
+				false,
 			),
 			Err(CpiGenerateError::Render { .. })
 		));
@@ -546,6 +558,7 @@ mod tests {
 				mode: GenerationMode::Auto,
 				scaffold: true,
 				npx: command.to_string_lossy().into_owned(),
+				skip_unsupported_instructions: false,
 			})
 			.unwrap_or_else(|error| panic!("{name} conversion failed: {error}"));
 			assert!(output.join("src/generated/mod.rs").is_file());

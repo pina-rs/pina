@@ -42,6 +42,9 @@ Options:
       --npx <COMMAND>
           Executable used to normalize Anchor IDLs. Defaults to npx
 
+      --skip-unsupported-instructions
+          Skip instructions the renderer cannot express instead of failing the render; skipped instructions are listed in the generated `instructions/mod.rs`
+
   -h, --help
           Print help (see a summary with '-h')
 

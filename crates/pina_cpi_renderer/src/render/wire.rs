@@ -77,6 +77,17 @@ impl TypeIndex {
 		self.types.get(name)
 	}
 
+	/// The name of the declared type a name ultimately resolves to, following
+	/// `definedTypeLinkNode` aliases. A name that is not a link to another
+	/// declared type is its own terminal.
+	pub(crate) fn terminal_name(&self, name: &str) -> String {
+		let mut current = name.to_string();
+		while let Some(TypeNode::Link(link)) = self.types.get(current.as_str()) {
+			current = link.name.as_ref().to_string();
+		}
+		current
+	}
+
 	/// Registers `name` as a type needing a generated Rust declaration.
 	fn register(&mut self, name: &str) {
 		if !self.named.iter().any(|existing| existing == name) {
@@ -241,16 +252,19 @@ pub(crate) fn plan(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> R
 		})?;
 
 		// Aliases resolve to whatever they ultimately name; structs and enums
-		// become generated Rust types with their own encoder.
+		// become generated Rust types with their own encoder. The generated
+		// declaration is keyed by the terminal type's own name, so an alias to
+		// a struct renders that struct's page rather than the link node.
 		let target = types.resolve(&declared, context)?;
 		match target {
 			TypeNode::Struct(_) | TypeNode::Enum(_) => {
-				types.register(&name);
+				let terminal = types.terminal_name(&name);
+				types.register(&terminal);
 				let size = plan_resolved(&target, types, context)?;
 
 				// A generated type takes `<'a>` only when one of its fields
 				// borrows, so the use site has to name that lifetime.
-				let mut rust_type = pascal(&name);
+				let mut rust_type = pascal(&terminal);
 				if size.borrows {
 					rust_type.push_str("<'argument>");
 				}
@@ -279,7 +293,10 @@ fn plan_resolved(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> Res
 				rust_type: "bool".to_string(),
 				fixed_size: Some(1),
 				max_size: 1,
-				encode: "data[offset] = u8::from(*self_value);\noffset += 1;".to_string(),
+				encode: "if offset + 1 > data.len() {\n\treturn \
+				         Err(ProgramError::InvalidInstructionData);\n}\ndata[offset] = \
+				         u8::from(*self_value);\noffset += 1;"
+					.to_string(),
 				borrows: false,
 			})
 		}
@@ -288,8 +305,9 @@ fn plan_resolved(r#type: &TypeNode, types: &mut TypeIndex, context: &str) -> Res
 				rust_type: "Address".to_string(),
 				fixed_size: Some(32),
 				max_size: 32,
-				encode: "data[offset..offset + 32].copy_from_slice(self_value.as_ref());\noffset \
-				         += 32;"
+				encode: "if offset + 32 > data.len() {\n\treturn \
+				         Err(ProgramError::InvalidInstructionData);\n}\ndata[offset..offset + \
+				         32].copy_from_slice(self_value.as_ref());\noffset += 32;"
 					.to_string(),
 				borrows: false,
 			})
@@ -377,8 +395,9 @@ fn plan_number(number: &NumberTypeNode, context: &str) -> Result<Encoded> {
 		fixed_size: Some(size),
 		max_size: size,
 		encode: format!(
-			"data[offset..offset + {size}].copy_from_slice(&(*self_value).to_le_bytes());\noffset \
-			 += {size};"
+			"if offset + {size} > data.len() {{\n\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+			 {size}].copy_from_slice(&(*self_value).to_le_bytes());\noffset += {size};"
 		),
 		borrows: false,
 	})
@@ -399,8 +418,9 @@ fn plan_fixed_size(
 				fixed_size: Some(size),
 				max_size: size,
 				encode: format!(
-					"data[offset..offset + {size}].copy_from_slice(&self_value[..]);\noffset += \
-					 {size};"
+					"if offset + {size} > data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+					 {size}].copy_from_slice(&self_value[..]);\noffset += {size};"
 				),
 				borrows: false,
 			})
@@ -412,8 +432,19 @@ fn plan_fixed_size(
 			match planned.fixed_size {
 				Some(inner_size) if inner_size == size => Ok(planned),
 				_ if planned.max_size <= size => {
+					// The window is authoritative: the payload writes at the
+					// cursor start, then the unused tail is zeroed so the
+					// next field stays at its declared offset.
 					Ok(Encoded {
+						fixed_size: Some(size),
 						max_size: size,
+						encode: format!(
+							"let window = offset;\n{}\nif offset > window + {size} || window + \
+							 {size} > data.len() {{\n\treturn \
+							 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..window \
+							 + {size}].fill(0);\noffset = window + {size};",
+							indent(&planned.encode, 0)
+						),
 						..planned
 					})
 				}
@@ -493,6 +524,8 @@ fn plan_array(count: &CountNode, item: &Encoded, context: &str) -> Result<Encode
 				max_size: width.saturating_add(maximum.saturating_mul(item.max_size)),
 				encode: format!(
 					"if self_value.len() > {maximum} {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\nif offset + {width} > \
+					 data.len() {{\n\treturn \
 					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 					 {width}].copy_from_slice(&(self_value.len() as \
 					 {prefix_type}).to_le_bytes());\noffset += {width};\nfor item in \
@@ -544,7 +577,8 @@ fn plan_map(count: &CountNode, key: &Encoded, value: &Encoded, context: &str) ->
 		max_size: width.saturating_add(maximum.saturating_mul(entry_max)),
 		encode: format!(
 			"if self_value.len() > {maximum} {{\n\treturn \
-			 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+			 Err(ProgramError::InvalidInstructionData);\n}}\nif offset + {width} > data.len() \
+			 {{\n\treturn Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 			 {width}].copy_from_slice(&(self_value.len() as \
 			 {prefix_type}).to_le_bytes());\noffset += {width};\n{entry_write}"
 		),
@@ -565,10 +599,26 @@ fn plan_option(
 	// The tag occupies the declared prefix width; `None` fills the whole
 	// declared window with zeros so the layout stays fixed.
 	let present = format!(
-		"data[offset..offset + {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset \
-		 += {width};"
+		"if offset + {width} > data.len() {{\n\treturn \
+		 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+		 {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset += {width};"
 	);
-	let absent = format!("data[offset..offset + {width}].fill(0);\n\t\t\toffset += {width};");
+	// A fixed option reserves the tag plus the payload span, so an absent value
+	// clears the entire window; a variable option only writes the tag.
+	let absent = if fixed == Some(true) {
+		let span = width.saturating_add(item.max_size);
+		format!(
+			"if offset + {span} > data.len() {{\n\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+			 {span}].fill(0);\n\t\t\toffset += {span};"
+		)
+	} else {
+		format!(
+			"if offset + {width} > data.len() {{\n\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+			 {width}].fill(0);\n\t\t\toffset += {width};"
+		)
+	};
 
 	Ok(Encoded {
 		rust_type: format!("Option<{}>", item.rust_type),
@@ -576,20 +626,11 @@ fn plan_option(
 			.filter(|fixed| *fixed)
 			.map(|_| width.saturating_add(item.max_size)),
 		max_size: width.saturating_add(item.max_size),
-		encode: if fixed == Some(true) {
-			format!(
-				"match self_value {{\n\tNone => {{\n\t\tdata[offset..offset + \
-				 {width}].fill(0);\n\t\toffset += {width};\n\t}}\n\tSome(value) => \
-				 {{\n\t\t{present}\n\t\t{}\n\t}}\n}}",
-				indent(&item.encode, 2)
-			)
-		} else {
-			format!(
-				"match self_value {{\n\tNone => {{\n\t\t{absent}\n\t}}\n\tSome(value) => \
-				 {{\n\t\t{present}\n\t\t{}\n\t}}\n}}",
-				indent(&item.encode, 2)
-			)
-		},
+		encode: format!(
+			"match self_value {{\n\tNone => {{\n\t\t{absent}\n\t}}\n\tSome(value) => \
+			 {{\n\t\t{present}\n\t\t{}\n\t}}\n}}",
+			indent(&item.encode, 2)
+		),
 		borrows: item.borrows,
 	})
 }
@@ -613,10 +654,16 @@ fn plan_size_prefix(
 				"&'argument str".to_string(),
 				max_for_prefix_width(width),
 				format!(
-					"let bytes = self_value.as_bytes();\ndata[offset..offset + \
+					"let bytes = self_value.as_bytes();\nif bytes.len() > {max} {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\nif offset + {width} > \
+					 data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 					 {width}].copy_from_slice(&(bytes.len() as \
-					 {prefix_type}).to_le_bytes());\noffset += {width};\ndata[offset..offset + \
-					 bytes.len()].copy_from_slice(bytes);\noffset += bytes.len();"
+					 {prefix_type}).to_le_bytes());\noffset += {width};\nif offset + bytes.len() \
+					 > data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+					 bytes.len()].copy_from_slice(bytes);\noffset += bytes.len();",
+					max = max_for_prefix_width(width)
 				),
 			)
 		}
@@ -632,9 +679,16 @@ fn plan_size_prefix(
 				"&'argument [u8]".to_string(),
 				max_for_prefix_width(width),
 				format!(
-					"data[offset..offset + {width}].copy_from_slice(&(self_value.len() as \
-					 {prefix_type}).to_le_bytes());\noffset += {width};\ndata[offset..offset + \
-					 self_value.len()].copy_from_slice(self_value);\noffset += self_value.len();"
+					"if self_value.len() > {max} {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\nif offset + {width} > \
+					 data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+					 {width}].copy_from_slice(&(self_value.len() as \
+					 {prefix_type}).to_le_bytes());\noffset += {width};\nif offset + \
+					 self_value.len() > data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+					 self_value.len()].copy_from_slice(self_value);\noffset += self_value.len();",
+					max = max_for_prefix_width(width)
 				),
 			)
 		}
@@ -663,10 +717,15 @@ fn plan_size_prefix(
 				count_width.saturating_add(count_max.saturating_mul(item_size)),
 				format!(
 					"if self_value.len() > {count_max} {{\n\treturn \
-					 Err(ProgramError::InvalidInstructionData);\n}}\nlet payload_len = \
-					 self_value.len() * {item_size};\ndata[offset..offset + \
+					 Err(ProgramError::InvalidInstructionData);\n}}\n// The outer length prefix \
+					 covers the inner count prefix and the payload.\nlet payload_len = \
+					 {count_width} + self_value.len() * {item_size};\nif offset + {width} > \
+					 data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 					 {width}].copy_from_slice(&(payload_len as \
-					 {prefix_type}).to_le_bytes());\noffset += {width};\ndata[offset..offset + \
+					 {prefix_type}).to_le_bytes());\noffset += {width};\nif offset + \
+					 {count_width} > data.len() {{\n\treturn \
+					 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 					 {count_width}].copy_from_slice(&(self_value.len() as \
 					 {count_type}).to_le_bytes());\noffset += {count_width};\nfor item in \
 					 self_value.iter() {{\n\t{}\n}}",
@@ -739,8 +798,10 @@ fn plan_enum(enumeration: &EnumTypeNode, types: &mut TypeIndex, context: &str) -
 	let mut payload_max = 0usize;
 	// The first payload establishes the width; every later one must match it.
 	// A mismatch marks the enum variable-length rather than unsupported, because
-	// Borsh writes the tag followed by whatever the variant carries.
-	let mut payload_width: Option<usize> = None;
+	// Borsh writes the tag followed by whatever the variant carries. The outer
+	// option distinguishes "no variant seen yet" from "a variable variant", so a
+	// variable variant followed by a fixed one still reads as mixed.
+	let mut payload_width: Option<Option<usize>> = None;
 	let mut uniform = true;
 	let mut borrows = false;
 
@@ -748,8 +809,9 @@ fn plan_enum(enumeration: &EnumTypeNode, types: &mut TypeIndex, context: &str) -
 		let payload = plan_variant_payload(variant, types, context)?;
 		let combined = combine(&payload);
 		match (payload_width, combined.fixed_size) {
-			(None, size) => payload_width = size,
-			(Some(current), Some(size)) if current == size => {}
+			(None, size) => payload_width = Some(size),
+			(Some(Some(current)), Some(size)) if current == size => {}
+			(Some(None), None) => {}
 			(..) => uniform = false,
 		}
 		payload_max = payload_max.max(combined.max_size);
@@ -759,7 +821,9 @@ fn plan_enum(enumeration: &EnumTypeNode, types: &mut TypeIndex, context: &str) -
 	Ok(Encoded {
 		rust_type: String::new(),
 		fixed_size: if uniform {
-			payload_width.map(|size| tag_width.saturating_add(size))
+			payload_width
+				.flatten()
+				.map(|size| tag_width.saturating_add(size))
 		} else {
 			None
 		},
@@ -983,6 +1047,7 @@ mod tests {
 	use codama_nodes::DefinedTypeLinkNode;
 	use codama_nodes::EnumEmptyVariantTypeNode;
 	use codama_nodes::EnumStructVariantTypeNode;
+	use codama_nodes::EnumTupleVariantTypeNode;
 	use codama_nodes::FixedSizeTypeNode;
 	use codama_nodes::NumberFormat;
 	use codama_nodes::NumberTypeNode;
@@ -1434,16 +1499,167 @@ mod tests {
 			.expect_err("an undersized window must be rejected");
 		assert!(error.to_string().contains("cannot hold a payload"));
 
-		// A window that holds the payload maximum is accepted; the payload
-		// inside stays variable because its prefix is a maximum.
+		// A window that holds the payload maximum is accepted, and the window
+		// itself is authoritative: the field is fixed at 256 bytes, the unused
+		// tail is zeroed, and the cursor lands at the window end.
 		let prefixed = codama_nodes::ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::U8),
 			NumberTypeNode::le(NumberFormat::U8),
 		);
 		let loose = FixedSizeTypeNode::new(TypeNode::Array(prefixed), 256);
 		let planned = plan(&loose.into(), &mut types, "test").expect("loose window should plan");
-		assert_eq!(planned.fixed_size, None);
+		assert_eq!(planned.fixed_size, Some(256));
 		assert_eq!(planned.max_size, 256);
+		assert!(planned.encode.contains("let window = offset;"));
+		assert!(
+			planned
+				.encode
+				.contains("data[offset..window + 256].fill(0)")
+		);
+		assert!(planned.encode.contains("offset = window + 256"));
+	}
+
+	#[test]
+	fn an_alias_registers_the_terminal_struct_not_the_link() {
+		let mut types = index(&[
+			DefinedTypeNode::new("alias", DefinedTypeLinkNode::new("point")),
+			DefinedTypeNode::new(
+				"point",
+				StructTypeNode::new(vec![StructFieldTypeNode::new(
+					"x",
+					NumberTypeNode::le(NumberFormat::U64),
+				)]),
+			),
+		]);
+
+		let planned = plan(
+			&DefinedTypeLinkNode::new("alias").into(),
+			&mut types,
+			"test",
+		)
+		.expect("alias to a struct should plan");
+		// The generated declaration is keyed by the terminal name, so the use
+		// site references the rendered `Point` type, and `render_type_page`
+		// receives the struct node it can actually render.
+		assert_eq!(planned.rust_type, "Point");
+		assert_eq!(types.named(), ["point"]);
+	}
+
+	#[test]
+	fn a_variable_variant_makes_the_enum_variable_width() {
+		let mut types = index(&[]);
+		let enumerated = codama_nodes::EnumTypeNode {
+			variants: vec![
+				codama_nodes::EnumStructVariantTypeNode::new(
+					"fixed",
+					StructTypeNode::new(vec![StructFieldTypeNode::new(
+						"amount",
+						NumberTypeNode::le(NumberFormat::U64),
+					)]),
+				)
+				.into(),
+				codama_nodes::EnumStructVariantTypeNode::new(
+					"grows",
+					StructTypeNode::new(vec![StructFieldTypeNode::new(
+						"uri",
+						codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+							StringTypeNode::utf8(),
+							NumberTypeNode::le(NumberFormat::U32),
+						),
+					)]),
+				)
+				.into(),
+				codama_nodes::EnumStructVariantTypeNode::new(
+					"also_fixed",
+					StructTypeNode::new(vec![StructFieldTypeNode::new(
+						"amount",
+						NumberTypeNode::le(NumberFormat::U64),
+					)]),
+				)
+				.into(),
+			],
+			size: NumberTypeNode::le(NumberFormat::U8).into(),
+		};
+		let planned = plan(&enumerated.into(), &mut types, "test")
+			.expect("a mixed enum still has an encoding");
+
+		// The first variant is fixed and a later one matches it, but the
+		// variable variant in between means the enum as a whole is not fixed.
+		assert_eq!(planned.fixed_size, None);
+	}
+
+	#[test]
+	fn size_prefix_encoders_validate_lengths_and_buffer_space() {
+		let mut types = index(&[]);
+		let node = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U8),
+		);
+		let planned =
+			plan(&node.into(), &mut types, "test").expect("u8-prefixed string should plan");
+
+		// A caller-supplied string longer than the prefix can describe is
+		// rejected in the generated code instead of truncating silently.
+		assert!(planned.encode.contains("if bytes.len() > 255"));
+		// Every write checks the caller-owned buffer first.
+		assert!(planned.encode.contains("if offset + 1 > data.len()"));
+		assert!(
+			planned
+				.encode
+				.contains("if offset + bytes.len() > data.len()")
+		);
+
+		let mut types = index(&[]);
+		let node = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			codama_nodes::BytesTypeNode::new(),
+			NumberTypeNode::le(NumberFormat::U8),
+		);
+		let planned =
+			plan(&node.into(), &mut types, "test").expect("u8-prefixed bytes should plan");
+		assert!(planned.encode.contains("if self_value.len() > 255"));
+	}
+
+	#[test]
+	fn a_prefixed_array_length_covers_the_inner_count_prefix() {
+		let mut types = index(&[]);
+		let node = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
+			codama_nodes::ArrayTypeNode::prefixed(
+				NumberTypeNode::le(NumberFormat::U8),
+				NumberTypeNode::le(NumberFormat::U32),
+			),
+			NumberTypeNode::le(NumberFormat::U32),
+		);
+		let planned =
+			plan(&node.into(), &mut types, "test").expect("nested prefixed array should plan");
+
+		// The outer prefix describes everything after itself, so it counts the
+		// inner count prefix too.
+		assert!(
+			planned
+				.encode
+				.contains("let payload_len = 4 + self_value.len() * 1;")
+		);
+	}
+
+	#[test]
+	fn a_fixed_option_none_clears_the_whole_declared_window() {
+		let mut types = index(&[]);
+		let item = plan(
+			&TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+			&mut types,
+			"test",
+		)
+		.expect("u64 should plan");
+		let planned = plan_option(
+			&NumberTypeNode::le(NumberFormat::U8),
+			&item,
+			Some(true),
+			"test",
+		)
+		.expect("a fixed option should plan");
+
+		assert!(planned.encode.contains("data[offset..offset + 9].fill(0)"));
+		assert!(planned.encode.contains("offset += 9"));
 	}
 
 	#[test]

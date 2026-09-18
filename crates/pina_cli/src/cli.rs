@@ -279,6 +279,11 @@ pub(crate) enum Commands {
 			value_name = "COMMAND"
 		)]
 		npx: String,
+		/// Skip instructions the renderer cannot express instead of failing
+		/// the render; skipped instructions are listed in the generated
+		/// `instructions/mod.rs`.
+		#[arg(long, default_value_t = false)]
+		skip_unsupported_instructions: bool,
 	},
 
 	/// Import a foreign program's IDL as a supported CPI crate.
@@ -335,6 +340,11 @@ pub(crate) enum Commands {
 			value_name = "COMMAND"
 		)]
 		npx: String,
+		/// Skip instructions the renderer cannot express instead of failing
+		/// the render; skipped instructions are listed in the generated
+		/// `instructions/mod.rs`.
+		#[arg(long, default_value_t = false)]
+		skip_unsupported_instructions: bool,
 	},
 
 	/// Generate, inspect, and publish canonical Codama IDLs.

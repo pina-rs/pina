@@ -118,6 +118,9 @@ pub struct ImportOptions {
 	pub output: PathBuf,
 	pub mode: GenerationMode,
 	pub npx: String,
+	/// Skip instructions the renderer cannot express instead of failing the
+	/// import.
+	pub skip_unsupported_instructions: bool,
 }
 
 /// Errors raised while importing a foreign IDL.
@@ -194,6 +197,7 @@ pub fn import_idl(options: &ImportOptions) -> Result<ImportOutcome, ImportError>
 	let config = RenderConfig {
 		mode: render_mode(options.mode),
 		package_name: Some(options.name.clone()),
+		skip_unsupported_instructions: options.skip_unsupported_instructions,
 		..RenderConfig::default()
 	};
 
@@ -522,6 +526,7 @@ mod tests {
 			output,
 			mode: GenerationMode::Auto,
 			npx: "must-not-run".to_string(),
+			skip_unsupported_instructions: false,
 		}
 	}
 

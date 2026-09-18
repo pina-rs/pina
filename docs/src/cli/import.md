@@ -8,16 +8,17 @@ Call another on-chain program from your own without hand-writing its wire format
 pina import <NAME> --program-id <PUBKEY> [OPTIONS]
 ```
 
-| Input             | Default        | Meaning                                              |
-| ----------------- | -------------- | ---------------------------------------------------- |
-| `<NAME>`          | required       | Crate name; written to `clients/cpi/<NAME>`.         |
-| `--program-id`    | required       | Program ID the crate targets.                        |
-| `--idl <FILE>`    | none           | Read the IDL from a local file.                      |
-| `--url <URL>`     | none           | Fetch the IDL over HTTP(S).                          |
-| `--cluster`       | `mainnet-beta` | Fetch the on-chain canonical IDL for this cluster.   |
-| `--output <DIR>`  | `clients/cpi`  | Directory to write the crate into.                   |
-| `--mode <MODE>`   | `auto`         | `auto`, `create`, `update`, or complete `overwrite`. |
-| `--npx <COMMAND>` | `npx`          | Runner for Anchor IDL conversion.                    |
+| Input                             | Default        | Meaning                                                                                                                         |
+| --------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `<NAME>`                          | required       | Crate name; written to `clients/cpi/<NAME>`.                                                                                    |
+| `--program-id`                    | required       | Program ID the crate targets.                                                                                                   |
+| `--idl <FILE>`                    | none           | Read the IDL from a local file.                                                                                                 |
+| `--url <URL>`                     | none           | Fetch the IDL over HTTP(S).                                                                                                     |
+| `--cluster`                       | `mainnet-beta` | Fetch the on-chain canonical IDL for this cluster.                                                                              |
+| `--output <DIR>`                  | `clients/cpi`  | Directory to write the crate into.                                                                                              |
+| `--mode <MODE>`                   | `auto`         | `auto`, `create`, `update`, or complete `overwrite`.                                                                            |
+| `--npx <COMMAND>`                 | `npx`          | Runner for Anchor IDL conversion.                                                                                               |
+| `--skip-unsupported-instructions` | off            | Skip instructions the renderer cannot express instead of failing; each skip is recorded in the generated `instructions/mod.rs`. |
 
 Give one of `--idl`, `--url`, or `--cluster`. Passing `--idl` with `--url` is rejected rather than silently preferring one.
 
@@ -124,7 +125,7 @@ Rejected, with the reason in the error message:
 
 Anchor's `programId` strategy — where an absent optional account becomes the program ID — is supported directly.
 
-The `omitted` strategy, where an absent account is dropped from the list, is supported only when every optional account is trailing. A fixed-size CPI account array cannot express a hole in the middle of a list, so a mid-list optional account fails with the instruction named rather than silently shifting the accounts after it.
+The `omitted` strategy, where an absent account is dropped from the list entirely, cannot be expressed by a fixed-size CPI account array — filling the slot with a placeholder would send the callee an account it does not expect. Instructions using this strategy therefore fail the import with the instruction named. Pass `--skip-unsupported-instructions` to import the rest of the program: the skipped instructions and the reasons are written into the generated `instructions/mod.rs`, so the gap is visible to every reviewer of the crate.
 
 ## Verifying an import
 

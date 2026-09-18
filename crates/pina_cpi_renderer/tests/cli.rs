@@ -13,12 +13,14 @@ fn fixture() -> String {
 		.into_owned()
 }
 
-fn unique_dir(prefix: &str) -> String {
-	let unique = std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap_or_default()
-		.as_nanos();
-	format!("{prefix}-{unique}")
+/// A scratch root that is removed when the returned handle drops, so a
+/// failing assertion cannot leak a generated crate into the repository.
+fn scratch() -> tempfile::TempDir {
+	tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir should be created: {error}"))
+}
+
+fn unique_dir(root: &tempfile::TempDir, prefix: &str) -> String {
+	root.path().join(prefix).to_string_lossy().into_owned()
 }
 
 fn run(arguments: &[&str]) -> (bool, String, String) {
@@ -36,7 +38,8 @@ fn run(arguments: &[&str]) -> (bool, String, String) {
 
 #[test]
 fn renders_a_single_idl_into_a_standalone_crate() {
-	let output = unique_dir("pina-cpi-cli");
+	let scratch = scratch();
+	let output = unique_dir(&scratch, "pina-cpi-cli");
 
 	let (success, stdout, stderr) = run(&[
 		"--idl",
@@ -56,14 +59,12 @@ fn renders_a_single_idl_into_a_standalone_crate() {
 			.join("src/generated/instructions/hello.rs")
 			.is_file()
 	);
-
-	std::fs::remove_dir_all(&output)
-		.unwrap_or_else(|error| panic!("failed to clean generated crate: {error}"));
 }
 
 #[test]
 fn renders_a_directory_of_idls_into_sibling_crates() {
-	let root = unique_dir("pina-cpi-cli-dir");
+	let scratch = scratch();
+	let root = unique_dir(&scratch, "pina-cpi-cli-dir");
 	let idl_dir = Path::new(&root).join("idls");
 	std::fs::create_dir_all(&idl_dir)
 		.unwrap_or_else(|error| panic!("failed to create idl dir: {error}"));
@@ -95,9 +96,6 @@ fn renders_a_directory_of_idls_into_sibling_crates() {
 			.join("counter_program/src/generated/mod.rs")
 			.is_file()
 	);
-
-	std::fs::remove_dir_all(&root)
-		.unwrap_or_else(|error| panic!("failed to clean generated crates: {error}"));
 }
 
 #[test]
@@ -109,7 +107,8 @@ fn rejects_a_missing_idl_and_an_unusable_output_path() {
 
 #[test]
 fn rejects_invocations_without_an_idl_source() {
-	let output = unique_dir("pina-cpi-cli-empty");
+	let scratch = scratch();
+	let output = unique_dir(&scratch, "pina-cpi-cli-empty");
 	let (success, _, stderr) = run(&["--output", &output]);
 	assert!(!success);
 	assert!(stderr.contains("provide at least one --idl"));
@@ -117,7 +116,8 @@ fn rejects_invocations_without_an_idl_source() {
 
 #[test]
 fn mode_update_refreshes_an_existing_crate() {
-	let output = unique_dir("pina-cpi-cli-update");
+	let scratch = scratch();
+	let output = unique_dir(&scratch, "pina-cpi-cli-update");
 
 	let (success, _, stderr) = run(&["--idl", &fixture(), "--output", &output, "--mode", "create"]);
 	assert!(success, "{stderr}");
@@ -125,14 +125,12 @@ fn mode_update_refreshes_an_existing_crate() {
 	let (success, stdout, _) = run(&["--idl", &fixture(), "--output", &output, "--mode", "update"]);
 	assert!(success, "{stdout}");
 	assert!(Path::new(&output).join("Cargo.toml").is_file());
-
-	std::fs::remove_dir_all(&output)
-		.unwrap_or_else(|error| panic!("failed to clean generated crate: {error}"));
 }
 
 #[test]
 fn mode_overwrite_replaces_the_whole_crate() {
-	let output = unique_dir("pina-cpi-cli-overwrite");
+	let scratch = scratch();
+	let output = unique_dir(&scratch, "pina-cpi-cli-overwrite");
 	std::fs::create_dir_all(&output)
 		.unwrap_or_else(|error| panic!("failed to create output: {error}"));
 	std::fs::write(Path::new(&output).join("stale.txt"), "old")
@@ -149,14 +147,12 @@ fn mode_overwrite_replaces_the_whole_crate() {
 	assert!(success, "{stderr}");
 	assert!(Path::new(&output).join("src/generated/mod.rs").is_file());
 	assert!(!Path::new(&output).join("stale.txt").exists());
-
-	std::fs::remove_dir_all(&output)
-		.unwrap_or_else(|error| panic!("failed to clean generated crate: {error}"));
 }
 
 #[test]
 fn rejects_an_idl_directory_that_is_a_file() {
-	let file = unique_dir("pina-cpi-cli-not-a-dir");
+	let scratch = scratch();
+	let file = unique_dir(&scratch, "pina-cpi-cli-not-a-dir");
 	std::fs::write(&file, "not a directory")
 		.unwrap_or_else(|error| panic!("failed to write: {error}"));
 
@@ -164,7 +160,7 @@ fn rejects_an_idl_directory_that_is_a_file() {
 		"--idl-dir",
 		&file,
 		"--output",
-		&unique_dir("pina-cpi-cli-unused"),
+		&unique_dir(&scratch, "pina-cpi-cli-unused"),
 	]);
 	assert!(!success);
 	assert!(stderr.contains("failed to read IDL directory"));
@@ -174,7 +170,8 @@ fn rejects_an_idl_directory_that_is_a_file() {
 
 #[test]
 fn rejects_an_idl_with_an_unusable_program_id() {
-	let root = unique_dir("pina-cpi-cli-bad-key");
+	let scratch = scratch();
+	let root = unique_dir(&scratch, "pina-cpi-cli-bad-key");
 	std::fs::create_dir_all(&root).unwrap_or_else(|error| panic!("failed to create root: {error}"));
 	let idl = Path::new(&root).join("broken.json");
 	std::fs::write(
@@ -183,10 +180,8 @@ fn rejects_an_idl_with_an_unusable_program_id() {
 	)
 	.unwrap_or_else(|error| panic!("failed to write idl: {error}"));
 
-	let unused = unique_dir("pina-cpi-cli-bad-out");
+	let unused = unique_dir(&scratch, "pina-cpi-cli-bad-out");
 	let (success, _, stderr) = run(&["--idl", &idl.to_string_lossy(), "--output", &unused]);
 	assert!(!success);
 	assert!(stderr.contains("failed to render") || stderr.contains("invalid"));
-
-	std::fs::remove_dir_all(&root).unwrap_or_else(|error| panic!("failed to clean: {error}"));
 }

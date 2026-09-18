@@ -6294,6 +6294,7 @@ dependencies = [
  "serde_json",
  "solana-pubkey 4.2.1",
  "syn 3.0.5",
+ "tempfile",
  "thiserror 2.0.20",
 ]
 

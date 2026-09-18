@@ -34,6 +34,11 @@ struct Args {
 	/// How to handle an existing output directory.
 	#[arg(long, value_enum, default_value = "auto")]
 	mode: Mode,
+
+	/// Skip instructions the renderer cannot express instead of failing; the
+	/// skipped instructions are listed in the generated `instructions/mod.rs`.
+	#[arg(long, default_value_t = false)]
+	skip_unsupported_instructions: bool,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -93,6 +98,7 @@ fn main() {
 		let config = RenderConfig {
 			package_name: single_idl.then(|| args.package_name.clone()).flatten(),
 			mode: args.mode.into(),
+			skip_unsupported_instructions: args.skip_unsupported_instructions,
 			..RenderConfig::default()
 		};
 

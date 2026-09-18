@@ -54,14 +54,24 @@ for fixture in "${FIXTURES[@]}"; do
 	echo "=== $name ==="
 
 	# Fail loudly: a renderer that cannot produce the crate is a gate failure,
-	# not something to paper over with a different check.
+	# not something to paper over with a different check. Instructions whose
+	# account lists the fixed-size handle set cannot express (Anchor's
+	# `omitted` optional-account strategy) are skipped, and the skip reasons
+	# are recorded in the generated `instructions/mod.rs`.
 	cargo run --locked --quiet -p pina_cpi_renderer --bin pina_cpi_renderer -- \
 		--idl "$fixture" \
-		--output "$crate_dir"
+		--output "$crate_dir" \
+		--skip-unsupported-instructions
 
 	if [ ! -f "$crate_dir/src/generated/mod.rs" ]; then
 		echo "$name: renderer produced no crate at $crate_dir" >&2
 		exit 1
+	fi
+
+	skipped_marker="$crate_dir/src/generated/instructions/mod.rs"
+	if [ -f "$skipped_marker" ] && grep -q "^// Skipped" "$skipped_marker"; then
+		echo "$name: skipped instructions:"
+		grep "^// Skipped" "$skipped_marker" | sed 's/^/  /'
 	fi
 
 	mkdir -p "$crate_dir/.cargo"

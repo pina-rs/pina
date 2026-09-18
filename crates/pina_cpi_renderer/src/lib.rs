@@ -83,6 +83,13 @@ pub struct RenderConfig {
 	pub package_name: Option<String>,
 	pub mode: RenderMode,
 	pub scaffold: bool,
+	/// Skip instructions this renderer cannot express instead of failing.
+	///
+	/// When false (the default), an unsupported instruction fails the whole
+	/// render. When true, the instruction is left out of the generated crate
+	/// and its name plus the reason are recorded in `instructions/mod.rs`, so
+	/// a reviewer can see exactly what the client does not cover.
+	pub skip_unsupported_instructions: bool,
 }
 
 impl Default for RenderConfig {
@@ -93,6 +100,7 @@ impl Default for RenderConfig {
 			package_name: None,
 			mode: RenderMode::Auto,
 			scaffold: true,
+			skip_unsupported_instructions: false,
 		}
 	}
 }
@@ -140,7 +148,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	validate_generated_folder(&config.generated_folder)?;
-	let files = render_program_to_files(root)?;
+	let files = render_program_to_files(root, config)?;
 	validate_generated_sources(&files)?;
 	let crate_handle = open_crate_dir(crate_dir)?;
 	validate_generated_path(&crate_handle, crate_dir, &config.generated_folder)?;
@@ -277,7 +285,10 @@ pub fn render_program(
 }
 
 /// Renders a program into an in-memory file map without touching disk.
-pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
+pub fn render_program_to_files(
+	root: &RootNode,
+	config: &RenderConfig,
+) -> Result<BTreeMap<PathBuf, String>> {
 	let program = &root.program;
 	let mut files = BTreeMap::new();
 	let mut program_constants = Vec::new();
@@ -300,11 +311,16 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 	// instructions render before the type pages that back them.
 	let mut types = TypeIndex::new(&program.defined_types);
 	let mut instruction_pages = Vec::new();
+	let mut skipped_instructions = Vec::new();
 	for instruction in &program.instructions {
-		instruction_pages.push((
-			snake(instruction.name.as_ref()),
-			render_instruction_page(instruction, &mut types)?,
-		));
+		match render_instruction_page(instruction, &mut types) {
+			Ok(page) => instruction_pages.push((snake(instruction.name.as_ref()), page)),
+			Err(error) if config.skip_unsupported_instructions => {
+				skipped_instructions
+					.push((instruction.name.as_ref().to_string(), error.to_string()));
+			}
+			Err(error) => return Err(error),
+		}
 	}
 
 	// Accounts render after instructions so argument planning has already
@@ -330,7 +346,13 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 	if !program.instructions.is_empty() {
 		files.insert(
 			PathBuf::from("instructions/mod.rs"),
-			page(&render_instructions_mod(&program.instructions)),
+			page(&render_instructions_mod(
+				&instruction_pages
+					.iter()
+					.map(|(name, _)| name.clone())
+					.collect::<Vec<_>>(),
+				&skipped_instructions,
+			)),
 		);
 
 		for (name, content) in &instruction_pages {

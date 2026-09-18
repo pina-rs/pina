@@ -178,9 +178,13 @@ fn render_enum(
 			})
 		})
 		.collect::<Vec<_>>();
-	let uniform = !payload_widths.is_empty()
+	// A uniform enum encodes one tag plus ONE variant payload, so its fixed
+	// length is the tag width plus the shared payload width, not their sum.
+	let uniform_width = (!payload_widths.is_empty()
 		&& payload_widths.iter().all(Option::is_some)
-		&& payload_widths.windows(2).all(|pair| pair[0] == pair[1]);
+		&& payload_widths.windows(2).all(|pair| pair[0] == pair[1]))
+	.then(|| payload_widths[0])
+	.flatten();
 	let maximum = variants
 		.iter()
 		.map(|variant| {
@@ -230,7 +234,7 @@ fn render_enum(
 
 	lines.push(format!("impl{generics} {name}{generics} {{"));
 	lines.extend(render_size_constants(
-		uniform.then(|| tag_width.saturating_add(payload_widths.iter().flatten().sum())),
+		uniform_width.map(|width| tag_width.saturating_add(width)),
 		maximum,
 	));
 	lines.push(String::new());
@@ -247,7 +251,8 @@ fn render_enum(
 				_ => format!("Self::{} {{ {} }}", variant.name, fields.join(", ")),
 			};
 			let mut lines = vec![format!(
-				"let tag: {tag_type} = {};\ndata[offset..offset + \
+				"let tag: {tag_type} = {};\nif offset + {tag_width} > data.len() {{\n\treturn \
+				 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
 				 {tag_width}].copy_from_slice(&tag.to_le_bytes());\noffset += {tag_width};",
 				variant.discriminator
 			)];

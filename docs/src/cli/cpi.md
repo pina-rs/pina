@@ -27,7 +27,9 @@ Instruction arguments may be little-endian native integers (`u8`-`u128` and `i8`
 
 Floating point, `shortU16`, bare (unprefixed) strings and byte slices, and big-endian integers are rejected before rendering, each with the reason in the error message.
 
-An instruction whose arguments are all fixed-width returns `[u8; LEN]` from `to_bytes()`. When an argument's length depends on caller-supplied data the instruction instead exposes `MAX_DATA_LEN` and takes a caller-owned buffer through `encode_into` and `invoke_signed`, so the crate stays `no_std` and allocator-free either way.
+An instruction whose arguments are all fixed-width returns `[u8; LEN]` from `to_bytes()`. When an argument's length depends on caller-supplied data the instruction instead exposes `MAX_DATA_LEN` and takes a caller-owned buffer through `encode_into` — which bounds-checks every write and returns `ProgramError::InvalidInstructionData` instead of panicking when the buffer is too short or an argument exceeds its declared limit — before `invoke_signed` sends the encoded bytes, so the crate stays `no_std` and allocator-free either way.
+
+Instructions using Anchor's `omitted` optional-account strategy are rejected with the instruction named — a fixed-size CPI account array cannot drop an absent account the way that strategy requires. Pass `--skip-unsupported-instructions` to render the remaining instructions anyway; each skip and its reason is recorded in the generated `instructions/mod.rs`.
 
 Accounts from the IDL render into a `generated/accounts` module with a struct, the account discriminator, an encoded-size constant, a `matches` guard, and — when every field has a fixed offset — a `parse` function.
 
