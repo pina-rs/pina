@@ -49,6 +49,10 @@ pub struct Claim<'account> {
 	/// Required privileges: read-only.
 	pub token_program: &'account AccountView,
 
+	/// CPI account `clock`.
+	/// Required privileges: read-only.
+	pub clock: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `claim`.
 	pub ix: ClaimIx,
 }
@@ -89,7 +93,7 @@ impl<'account> Claim<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 8] = [
+		let accounts: [CpiHandle<'_>; 9] = [
 			CpiHandle::writable_signer(self.beneficiary)?,
 			CpiHandle::readonly(self.mint),
 			CpiHandle::writable(self.vesting_state)?,
@@ -98,6 +102,7 @@ impl<'account> Claim<'account> {
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
+			CpiHandle::readonly(self.clock),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

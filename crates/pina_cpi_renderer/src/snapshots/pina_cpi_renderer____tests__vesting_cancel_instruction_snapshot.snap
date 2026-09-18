@@ -18,7 +18,7 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Cancel<'account> {
 	/// CPI account `admin`.
-	/// Required privileges: read-only and signer.
+	/// Required privileges: writable and signer.
 	pub admin: &'account AccountView,
 
 	/// CPI account `mint`.
@@ -29,9 +29,21 @@ pub struct Cancel<'account> {
 	/// Required privileges: writable.
 	pub vesting_state: &'account AccountView,
 
+	/// CPI account `adminAta`.
+	/// Required privileges: writable.
+	pub admin_ata: &'account AccountView,
+
 	/// CPI account `vault`.
 	/// Required privileges: writable.
 	pub vault: &'account AccountView,
+
+	/// CPI account `associatedTokenProgram`.
+	/// Required privileges: read-only.
+	pub associated_token_program: &'account AccountView,
+
+	/// CPI account `systemProgram`.
+	/// Required privileges: read-only.
+	pub system_program: &'account AccountView,
 
 	/// CPI account `tokenProgram`.
 	/// Required privileges: read-only.
@@ -73,11 +85,14 @@ impl<'account> Cancel<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 5] = [
-			CpiHandle::readonly_signer(self.admin),
+		let accounts: [CpiHandle<'_>; 8] = [
+			CpiHandle::writable_signer(self.admin)?,
 			CpiHandle::readonly(self.mint),
 			CpiHandle::writable(self.vesting_state)?,
+			CpiHandle::writable(self.admin_ata)?,
 			CpiHandle::writable(self.vault)?,
+			CpiHandle::readonly(self.associated_token_program),
+			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
 		];
 		let data = self.ix.to_bytes()?;
