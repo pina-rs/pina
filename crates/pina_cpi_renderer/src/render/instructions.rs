@@ -8,38 +8,54 @@ use codama_nodes::OptionalAccountStrategy;
 use heck::ToSnakeCase;
 
 use super::args::RenderedArgument;
-use super::args::render_argument;
 use super::discriminator::render_constant_discriminator;
 use super::helpers::pascal;
 use super::helpers::render_docs;
 use super::helpers::rust_identifier;
 use super::helpers::snake;
+use super::wire::TypeIndex;
 use crate::error::RenderError;
 use crate::error::Result;
 
-pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> String {
+pub(crate) fn render_instructions_mod(rendered: &[String], skipped: &[(String, String)]) -> String {
 	let mut lines = Vec::new();
 
-	for instruction in instructions {
+	// A skipped instruction is absent from the client, so the reason is
+	// recorded here where a reviewer of the generated crate sees it first.
+	for (name, reason) in skipped {
 		lines.push(format!(
-			"pub(crate) mod r#{};",
-			snake(instruction.name.as_ref())
+			"// Skipped `{name}`: {}",
+			reason.replace('\n', "\n// ")
 		));
+	}
+	if !skipped.is_empty() {
+		lines.push(String::new());
+	}
+
+	for name in rendered {
+		lines.push(format!("pub(crate) mod r#{name};"));
 	}
 
 	lines.push(String::new());
 
-	for instruction in instructions {
-		lines.push(format!(
-			"pub use self::r#{}::*;",
-			snake(instruction.name.as_ref())
-		));
+	for name in rendered {
+		lines.push(format!("pub use self::r#{name}::*;"));
 	}
 
 	lines.join("\n")
 }
 
-pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<String> {
+/// Renders one instruction page.
+///
+/// Arguments first try the terse fixed-layout renderer. Anything it rejects is
+/// re-planned through [`super::wire`], which knows how to encode `definedTypes`
+/// references, structs, enums, options, and length-prefixed collections. A
+/// wire plan that is genuinely variable-length switches the instruction to a
+/// caller-buffer encoder, so the CPI still runs without an allocator.
+pub(crate) fn render_instruction_page(
+	instruction: &InstructionNode,
+	types: &mut TypeIndex,
+) -> Result<String> {
 	let snake_name = snake(instruction.name.as_ref());
 	let struct_name = pascal(instruction.name.as_ref());
 	let ix_name = format!("{struct_name}Ix");
@@ -51,13 +67,20 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 		&context,
 	)?;
 
-	let arguments = render_arguments(&instruction.arguments, &context)?;
+	let arguments = render_arguments(&instruction.arguments, types, &context)?;
 	let accounts = render_accounts(instruction, &context)?;
-	let wire_size = discriminator.bytes.len()
-		+ arguments
-			.iter()
-			.map(|argument| argument.wire_size)
-			.sum::<usize>();
+	let variable = arguments.iter().any(|argument| argument.variable);
+	// `definedTypes` arguments write through a cursor; instructions whose
+	// arguments are all fixed-layout keep their literal per-argument offsets,
+	// which keeps previously generated clients byte-identical.
+	let planned = arguments.iter().any(|argument| argument.planned);
+	let disc_len = discriminator.bytes.len();
+	// Saturating so an unbounded length prefix (whose declared maximum is
+	// `usize::MAX`) reports a ceiling instead of overflowing. A variable
+	// instruction sizes its buffer from this ceiling.
+	let wire_size = arguments.iter().fold(disc_len, |total, argument| {
+		total.saturating_add(argument.wire_size)
+	});
 	let has_accounts = !accounts.is_empty();
 	let has_addresses = arguments
 		.iter()
@@ -87,6 +110,13 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 		"use crate::ProgramAccount;".to_string(),
 		String::new(),
 	]);
+	if planned {
+		// Generated argument types live in a sibling module, which only
+		// carries content once an argument references the IDL's `definedTypes`.
+		lines.push("#[allow(unused_imports)]".to_string());
+		lines.push("use crate::generated_types::*;".to_string());
+		lines.push(String::new());
+	}
 
 	lines.extend(render_docs(&instruction.docs, 0));
 	lines.push(format!("/// CPI call for the `{snake_name}` instruction."));
@@ -143,38 +173,111 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 		"\t/// Number of bytes in the encoded instruction, including its discriminator."
 			.to_string(),
 	);
-	lines.push(format!("\tpub const LEN: usize = {wire_size};"));
-	lines.push(String::new());
-	lines.push("\t/// Encodes the discriminator and instruction arguments for CPI.".to_string());
-	lines.push("\t#[inline(always)]".to_string());
-	lines.push(format!(
-		"\tpub fn to_bytes(&self) -> Result<[u8; {wire_size}], ProgramError> {{"
-	));
-	lines.push(format!("\t\tlet mut data = [0u8; {wire_size}];"));
-	lines.push(format!(
-		"\t\tdata[..{}].copy_from_slice(&{});",
-		discriminator.bytes.len(),
-		discriminator.name
-	));
-	let mut offset = discriminator.bytes.len();
-	for argument in &arguments {
-		lines.push(render_argument_write(argument, offset));
-		offset += argument.wire_size;
+	if variable {
+		lines.push(
+			"\t/// Largest encoded instruction length, including its discriminator.".to_string(),
+		);
+		lines.push(format!("\tpub const MAX_DATA_LEN: usize = {wire_size};"));
+		lines.push(String::new());
+		lines.push(
+			"\t/// Encodes the discriminator and arguments into `buffer`, returning the bytes \
+			 written."
+				.to_string(),
+		);
+		lines.push("\t///".to_string());
+		lines.push(
+			"\t/// The caller owns the buffer because these arguments carry caller-supplied \
+			 lengths."
+				.to_string(),
+		);
+		lines.push("\t#[inline(always)]".to_string());
+		lines.push(
+			"\tpub fn encode_into(&self, buffer: &mut [u8]) -> Result<usize, ProgramError> {"
+				.to_string(),
+		);
+		lines.push("\t\tlet data = buffer;".to_string());
+		lines.push("\t\tlet mut offset = 0usize;".to_string());
+		lines.push(format!(
+			"\t\tif offset + {} > data.len() {{\n\t\t\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n\t\t}}",
+			discriminator.bytes.len()
+		));
+		lines.push(format!(
+			"\t\tdata[offset..offset + {}].copy_from_slice(&{});",
+			discriminator.bytes.len(),
+			discriminator.name
+		));
+		lines.push(format!("\t\toffset += {};", discriminator.bytes.len()));
+		for argument in &arguments {
+			lines.push(render_argument_write(argument));
+		}
+		lines.push(String::new());
+		lines.push("\t\tOk(offset)".to_string());
+		lines.push("\t}".to_string());
+	} else {
+		lines.push(format!("\tpub const LEN: usize = {wire_size};"));
+		lines.push(String::new());
+		lines
+			.push("\t/// Encodes the discriminator and instruction arguments for CPI.".to_string());
+		lines.push("\t#[inline(always)]".to_string());
+		lines.push(format!(
+			"\tpub fn to_bytes(&self) -> Result<[u8; {wire_size}], ProgramError> {{"
+		));
+		lines.push(format!("\t\tlet mut data = [0u8; {wire_size}];"));
+		lines.push(format!(
+			"\t\tdata[..{}].copy_from_slice(&{});",
+			discriminator.bytes.len(),
+			discriminator.name
+		));
+		if planned {
+			// A planned argument writes through a cursor, so every argument
+			// shares it and advances it by its own width.
+			lines.push(format!(
+				"\t\t#[allow(unused_mut, unused_variables)]\n\t\tlet mut offset = {}usize;",
+				discriminator.bytes.len()
+			));
+			for argument in &arguments {
+				lines.push(render_argument_write(argument));
+			}
+		} else {
+			let mut offset = discriminator.bytes.len();
+			for argument in &arguments {
+				lines.push(render_argument_write_at(argument, offset));
+				offset += argument.wire_size;
+			}
+		}
+		lines.push(String::new());
+		lines.push("\t\tOk(data)".to_string());
+		lines.push("\t}".to_string());
 	}
-	lines.push(String::new());
-	lines.push("\t\tOk(data)".to_string());
-	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 	lines.push(String::new());
 
 	let builder_impl = impl_header(&struct_name, has_accounts, has_borrowed_arguments);
 	lines.push(format!("{builder_impl} {{"));
 	lines.push("\t/// Invokes the instruction with no PDA seeds.".to_string());
+	if variable {
+		lines.push("\t///".to_string());
+		lines.push(
+			"\t/// `buffer` receives the encoded instruction data and must be at least \
+			 [`Self::MAX_DATA_LEN`] bytes."
+				.to_string(),
+		);
+	}
 	lines.push("\t#[inline(always)]".to_string());
-	lines.push(
-		"\tpub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {".to_string(),
-	);
-	lines.push("\t\tself.invoke_signed(program, &[])".to_string());
+	if variable {
+		lines.push(
+			"\tpub fn invoke(\n\t\t&self,\n\t\tprogram: &ProgramAccount<'_>,\n\t\tbuffer: &mut \
+			 [u8],\n\t) -> ProgramResult {"
+				.to_string(),
+		);
+		lines.push("\t\tself.invoke_signed(program, &[], buffer)".to_string());
+	} else {
+		lines.push(
+			"\tpub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {".to_string(),
+		);
+		lines.push("\t\tself.invoke_signed(program, &[])".to_string());
+	}
 	lines.push("\t}".to_string());
 	lines.push(String::new());
 	lines.push("\t/// Invokes the instruction, signing with the provided PDA seeds.".to_string());
@@ -183,12 +286,22 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	lines.push("\t\t&self,".to_string());
 	lines.push("\t\tprogram: &ProgramAccount<'_>,".to_string());
 	lines.push("\t\tsigners: &[Signer<'_, '_>],".to_string());
+	if variable {
+		lines.push("\t\tbuffer: &mut [u8],".to_string());
+	}
 	lines.push("\t) -> ProgramResult {".to_string());
 	lines.extend(render_account_handles(&accounts));
-	lines.push("\t\tlet data = self.ix.to_bytes()?;".to_string());
-	lines.push("\t\tlet context = CpiContext::new(*program, accounts);".to_string());
-	lines.push(String::new());
-	lines.push("\t\tcontext.invoke_signed(&data, signers)".to_string());
+	if variable {
+		lines.push("\t\tlet len = self.ix.encode_into(buffer)?;".to_string());
+		lines.push("\t\tlet context = CpiContext::new(*program, accounts);".to_string());
+		lines.push(String::new());
+		lines.push("\t\tcontext.invoke_signed(&buffer[..len], signers)".to_string());
+	} else {
+		lines.push("\t\tlet data = self.ix.to_bytes()?;".to_string());
+		lines.push("\t\tlet context = CpiContext::new(*program, accounts);".to_string());
+		lines.push(String::new());
+		lines.push("\t\tcontext.invoke_signed(&data, signers)".to_string());
+	}
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 	lines.push(String::new());
@@ -321,19 +434,27 @@ impl RenderedAccount {
 	}
 }
 
+/// Renders the CPI account list.
+///
+/// Under Anchor's `omitted` strategy an absent optional account is dropped from
+/// the account list entirely rather than replaced by a placeholder. The
+/// generated handle set is a fixed-size `[CpiHandle; N]` array — the crate is
+/// `no_std`, so there is no allocation to shorten a list with — and every
+/// account slot has to be filled. Dropping an account is therefore impossible
+/// without silently shifting the accounts after it, so the strategy is
+/// rejected with the instruction named; regenerate against an IDL using the
+/// `programId` strategy, whose absent accounts the renderer can represent.
 fn render_accounts(instruction: &InstructionNode, context: &str) -> Result<Vec<RenderedAccount>> {
-	if instruction
-		.accounts
-		.iter()
-		.any(|account| account.is_optional == Some(true))
-		&& instruction.optional_account_strategy.unwrap_or_default()
-			== OptionalAccountStrategy::Omitted
+	if instruction.optional_account_strategy.unwrap_or_default() == OptionalAccountStrategy::Omitted
 	{
 		return Err(RenderError::UnsupportedAccount {
 			context: context.to_string(),
 			account: "optional accounts".to_string(),
-			reason: "the omitted optional-account strategy cannot use a fixed-size CPI account \
-			         array"
+			reason: "the omitted optional-account strategy drops an absent account from the \
+			         account list entirely, and a fixed-size handle set cannot express a \
+			         shortened list without shifting the accounts after the hole; this renderer \
+			         only supports the `programId` strategy, which replaces an absent account \
+			         with the program ID"
 				.to_string(),
 		});
 	}
@@ -380,6 +501,7 @@ fn render_account(account: &InstructionAccountNode, context: &str) -> Result<Ren
 
 fn render_arguments(
 	arguments: &[InstructionArgumentNode],
+	types: &mut TypeIndex,
 	context: &str,
 ) -> Result<Vec<RenderedArgument>> {
 	arguments
@@ -390,12 +512,13 @@ fn render_arguments(
 				Some(codama_nodes::DefaultValueStrategy::Omitted)
 			)
 		})
-		.map(|argument| render_argument_with_docs(argument, context))
+		.map(|argument| render_argument_with_docs(argument, types, context))
 		.collect()
 }
 
 fn render_argument_with_docs(
 	argument: &InstructionArgumentNode,
+	types: &mut TypeIndex,
 	context: &str,
 ) -> Result<RenderedArgument> {
 	if matches!(
@@ -412,7 +535,8 @@ fn render_argument_with_docs(
 		});
 	}
 
-	let mut rendered = render_argument(argument.name.as_ref(), &argument.r#type, context)?;
+	let mut rendered =
+		RenderedArgument::render(argument.name.as_ref(), &argument.r#type, types, context)?;
 	rendered.docs = vec![format!(
 		"\t/// Instruction argument `{}`.",
 		argument.name.as_ref()
@@ -422,11 +546,48 @@ fn render_argument_with_docs(
 	Ok(rendered)
 }
 
-fn render_argument_write(argument: &RenderedArgument, offset: usize) -> String {
+/// Renders one argument's write when every argument shares a cursor.
+///
+/// The cursor starts just past the discriminator. A planned argument advances
+/// it itself; a terse one writes at the cursor and advances it by its width.
+fn render_argument_write(argument: &RenderedArgument) -> String {
+	// A terse write is identified by its `{offset}` placeholders.
+	if !argument.write.contains("{offset}") {
+		return indent(&argument.write, 2);
+	}
+
+	let write = argument
+		.write
+		.replace("{offset}", "offset")
+		.replace("{offset_end}", &format!("offset + {}", argument.wire_size));
+
+	// The buffer is caller-owned and may be shorter than the instruction needs,
+	// so every write is bounds-checked instead of allowed to panic.
+	format!(
+		"\t\tif offset + {} > data.len() {{\n\t\t\treturn \
+		 Err(ProgramError::InvalidInstructionData);\n\t\t}}\n\t\t{write}\n\t\toffset += {};",
+		argument.wire_size, argument.wire_size
+	)
+}
+
+/// Renders one argument's write at its literal position.
+///
+/// Used when no argument needs the general planner, so the generated
+/// instruction data keeps the exact offsets this renderer has always emitted.
+fn render_argument_write_at(argument: &RenderedArgument, offset: usize) -> String {
 	let write = argument
 		.write
 		.replace("{offset}", &offset.to_string())
 		.replace("{offset_end}", &(offset + argument.wire_size).to_string());
 
 	format!("\t\t{write}")
+}
+
+fn indent(body: &str, levels: usize) -> String {
+	let tab = "\t".repeat(levels);
+
+	body.lines()
+		.map(|line| format!("{tab}{line}"))
+		.collect::<Vec<_>>()
+		.join("\n")
 }

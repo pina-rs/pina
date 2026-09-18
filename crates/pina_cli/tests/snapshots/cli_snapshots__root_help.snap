@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 139
 info:
   program: pina
   args:
@@ -11,7 +10,7 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt another program's IDL as one, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
@@ -26,6 +25,8 @@ Commands:
           Generate configured clients for the current Pina program
   cpi
           Generate a standalone Pina CPI crate from a Codama or Anchor IDL
+  import
+          Import a foreign program's IDL as a supported CPI crate
   idl
           Generate, inspect, and publish canonical Codama IDLs
   docs
@@ -73,6 +74,7 @@ Examples:
   pina doctor --json
   pina keys
   pina cpi --idl ./idl.json --output ./clients/program-cpi
+  pina import switchboard --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
   pina profile ./target/deploy/counter_program.so --json
   pina deploy --cluster localnet --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json --dry-run

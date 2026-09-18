@@ -17,6 +17,7 @@ use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::IsSigner;
+use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
@@ -29,6 +30,8 @@ use codama_nodes::U8;
 use codama_nodes::U64;
 use codama_nodes::ValueNode;
 
+use super::render::wire;
+use super::render::wire::TypeIndex;
 use super::*;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -61,7 +64,8 @@ fn render_fixture_instruction(name: &str, instruction: &str) -> String {
 		.iter()
 		.find(|candidate| candidate.name.as_ref() == instruction)
 		.unwrap_or_else(|| panic!("fixture `{name}` has no `{instruction}` instruction"));
-	render_instruction_page(page).unwrap_or_else(|error| panic!("renders: {error}"))
+	render_instruction_page(page, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"))
 }
 
 fn program_node(name: &str, public_key: &str, instructions: Vec<InstructionNode>) -> ProgramNode {
@@ -488,7 +492,7 @@ fn renders_program_id_optional_accounts() {
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
-	let page = render_instruction_page(&root.program.instructions[0])
+	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders optional account: {error}"));
 
 	assert!(page.contains("pub admin: Option<&'account AccountView>,"));
@@ -506,7 +510,7 @@ fn renders_runtime_signer_selection() {
 	root.program.instructions[0].accounts.push(witness);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
-	let page = render_instruction_page(&root.program.instructions[0])
+	let page = render_instruction_page(&root.program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders runtime signer: {error}"));
 
 	assert!(page.contains("pub admin: (&'account AccountView, bool),"));
@@ -519,13 +523,33 @@ fn renders_runtime_signer_selection() {
 }
 
 #[test]
-fn refuses_omitted_optional_accounts() {
+fn refuses_the_omitted_optional_account_strategy() {
 	let mut root = load_fixture_root("vesting_program");
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
 	root.program.instructions[0].optional_account_strategy =
 		Some(codama_nodes::OptionalAccountStrategy::Omitted);
-	let error = render_program_to_files(&root).expect_err("refuses omitted optional accounts");
+	let error = render_program_to_files(&root, &RenderConfig::default())
+		.err()
+		.expect("the omitted strategy cannot build a shortened account list");
 
+	assert!(
+		error
+			.to_string()
+			.contains("omitted optional-account strategy")
+	);
+
+	// Even trailing optionals are refused: a fixed-size handle set cannot drop
+	// them, and filling the slots would send accounts the callee does not
+	// expect under this strategy.
+	let mut root = load_fixture_root("vesting_program");
+	let mut witness = InstructionAccountNode::new("witness", false, IsSigner::False);
+	witness.is_optional = Some(true);
+	root.program.instructions[0].accounts.push(witness);
+	root.program.instructions[0].optional_account_strategy =
+		Some(codama_nodes::OptionalAccountStrategy::Omitted);
+	let error = render_program_to_files(&root, &RenderConfig::default())
+		.err()
+		.expect("trailing omitted optionals are refused as well");
 	assert!(
 		error
 			.to_string()
@@ -538,7 +562,7 @@ fn refuses_optional_arguments() {
 	let mut root = load_fixture_root("vesting_program");
 	root.program.instructions[0].arguments[1].default_value_strategy =
 		Some(codama_nodes::DefaultValueStrategy::Optional);
-	let error = render_program_to_files(&root).expect_err("refuses");
+	let error = render_program_to_files(&root, &RenderConfig::default()).expect_err("refuses");
 	assert!(
 		error
 			.to_string()
@@ -560,8 +584,8 @@ fn renders_non_omitted_arguments_only() {
 			)
 		})
 		.count();
-	let page =
-		render_instruction_page(initialize).unwrap_or_else(|error| panic!("renders: {error}"));
+	let page = render_instruction_page(initialize, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	// The wire buffer also reserves the migration version byte that the
 	// fixture IDL carries between the discriminator and the payload.
@@ -581,7 +605,8 @@ fn refuses_field_discriminators_without_a_matching_argument() {
 			vec![],
 		)],
 	);
-	let error = render_program_to_files(&RootNode::new(program)).expect_err("refuses");
+	let error = render_program_to_files(&RootNode::new(program), &RenderConfig::default())
+		.expect_err("refuses");
 	assert!(error.to_string().contains("has no matching argument"));
 }
 
@@ -608,7 +633,7 @@ fn renders_anchor_field_discriminators() {
 			vec![discriminator],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains(
@@ -632,7 +657,7 @@ fn renders_byte_array_arguments() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub digest: [u8; 32]"));
@@ -658,7 +683,7 @@ fn renders_base16_discriminators() {
 			vec![],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("const OPEN_DISCRIMINATOR: [u8; 4] = [222, 173, 190, 239];"));
@@ -687,7 +712,7 @@ fn renders_public_key_bool_and_number_arguments() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub sponsor: &'argument Address,"));
@@ -723,7 +748,7 @@ fn renders_signed_number_arguments() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	for (field, rust_type) in [
@@ -761,7 +786,7 @@ fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("keyword fields should render: {error}"));
 	assert!(page.contains("pub r#match: &'account AccountView,"));
 	assert!(page.contains("pub r#type: u64,"));
@@ -778,7 +803,7 @@ fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
 			vec![],
 		)],
 	);
-	assert!(render_program_to_files(&RootNode::new(rejected)).is_err());
+	assert!(render_program_to_files(&RootNode::new(rejected), &RenderConfig::default()).is_err());
 }
 
 #[test]
@@ -793,7 +818,7 @@ fn renders_address_only_instruction_lifetimes() {
 			vec![InstructionArgumentNode::new("owner", PublicKeyTypeNode {})],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders address-only instruction: {error}"));
 
 	assert!(page.contains("pub struct SetOwner<'argument> {"));
@@ -804,7 +829,7 @@ fn renders_address_only_instruction_lifetimes() {
 
 #[test]
 fn shares_one_argument_lifetime_for_addresses_and_pinapod_strings() {
-	let string = codama_nodes::SizePrefixTypeNode::<codama_nodes::TypeNode>::new(
+	let string = codama_nodes::SizePrefixTypeNode::<TypeNode>::new(
 		codama_nodes::StringTypeNode::utf8(),
 		NumberTypeNode::le(U8),
 	);
@@ -822,7 +847,7 @@ fn shares_one_argument_lifetime_for_addresses_and_pinapod_strings() {
 			],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders address and String arguments: {error}"));
 
 	assert!(page.contains("pub struct SetProfile<'argument> {"));
@@ -847,7 +872,7 @@ fn renders_fixed_size_byte_arguments() {
 			)],
 		)],
 	);
-	let page = render_instruction_page(&program.instructions[0])
+	let page = render_instruction_page(&program.instructions[0], &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
 	assert!(page.contains("pub digest: [u8; 32]"));
@@ -873,7 +898,8 @@ fn renders_program_id_constants() {
 		"11111111111111111111111111111111",
 		vec![],
 	));
-	let files = render_program_to_files(&root).unwrap_or_else(|error| panic!("renders: {error}"));
+	let files = render_program_to_files(&root, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
 	let programs_rs = &files[&PathBuf::from("programs.rs")];
 
 	assert!(programs_rs.contains("pub const REGISTRY_ID: Address ="));
@@ -902,7 +928,7 @@ fn public_entrypoints_cover_files_programs_and_parse_errors() {
 		"11111111111111111111111111111111",
 		vec![],
 	));
-	let files = render_program_to_files(&empty)
+	let files = render_program_to_files(&empty, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("empty program should render: {error}"));
 	assert!(!files.contains_key(Path::new("instructions/mod.rs")));
 	let root_mod = &files[Path::new("mod.rs")];
@@ -1124,4 +1150,950 @@ fn scaffold_and_generated_writes_refuse_symlink_targets() {
 	);
 
 	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans symlink test: {error}"));
+}
+
+/// Loads a checked-in foreign IDL fixture.
+fn foreign_fixture_root(name: &str) -> RootNode {
+	let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("fixtures")
+		.join(format!("{name}.json"));
+	read_root_node(&fixture_path)
+		.unwrap_or_else(|error| panic!("failed to load foreign fixture `{name}`: {error}"))
+}
+
+/// Every checked-in foreign IDL, as `(fixture name, instruction count)`.
+const FOREIGN_FIXTURES: &[(&str, usize)] = &[
+	("switchboard_on_demand", 4),
+	("metaplex_token_metadata", 58),
+	("meteora_dlmm", 76),
+	("squads_v4_multisig", 36),
+];
+
+#[test]
+fn renders_every_foreign_idl_fixture() {
+	for (name, expected_instructions) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		assert_eq!(
+			root.program.instructions.len(),
+			*expected_instructions,
+			"fixture `{name}` changed shape"
+		);
+
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		// Every rendered instruction gets a page, and the root module wires the
+		// result. Skipped instructions are recorded in `instructions/mod.rs`.
+		assert!(files.contains_key(Path::new("mod.rs")), "fixture `{name}`");
+		assert!(
+			files.contains_key(Path::new("programs.rs")),
+			"fixture `{name}`"
+		);
+		let instructions_mod = files
+			.get(Path::new("instructions/mod.rs"))
+			.unwrap_or_else(|| panic!("fixture `{name}` has no instructions module"));
+		for instruction in &root.program.instructions {
+			let page = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
+			let rendered = files.contains_key(Path::new(&page));
+			let skipped =
+				instructions_mod.contains(&format!("// Skipped `{}`", instruction.name.as_ref()));
+			assert!(
+				rendered || skipped,
+				"fixture `{name}` neither rendered nor skipped `{}`",
+				instruction.name.as_ref()
+			);
+		}
+	}
+}
+
+#[test]
+fn generates_compilable_sources_for_every_foreign_idl() {
+	for (name, _) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		// Real-world IDLs carry instructions whose account lists this renderer
+		// cannot express yet (Anchor's `omitted` strategy), so the fixture gate
+		// renders with skips allowed and the recorded skips stay visible.
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		// `render_program_to_files` already parses each page with `syn`, so a
+		// pass here means every generated file is syntactically valid Rust.
+		assert!(!files.is_empty(), "fixture `{name}` produced no files");
+	}
+}
+
+/// Switchboard is the flagship case from the hardening issue, and the
+/// hand-written `pina-rs/lootbox` crate is its capability benchmark. These
+/// values are pinned to that crate and to the deployed program's Anchor IDL.
+#[test]
+fn switchboard_matches_the_hand_written_reference_crate() {
+	let root = foreign_fixture_root("switchboard_on_demand");
+	let files = render_program_to_files(&root, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
+
+	// Discriminators pinned to the hand-written crate's unit tests.
+	let expected = [
+		(
+			"randomness_init",
+			"[9, 9, 204, 33, 50, 116, 113, 15]",
+			13,
+			16,
+		),
+		(
+			"randomness_commit",
+			"[52, 170, 152, 201, 179, 133, 242, 141]",
+			5,
+			8,
+		),
+		(
+			"randomness_reveal",
+			"[197, 181, 187, 10, 30, 58, 20, 73]",
+			12,
+			105,
+		),
+		(
+			"randomness_close",
+			"[146, 101, 14, 74, 225, 246, 0, 156]",
+			10,
+			8,
+		),
+	];
+
+	for (instruction, discriminator, accounts, encoded_len) in expected {
+		let page = format!("instructions/{instruction}.rs");
+		let source = files
+			.get(Path::new(&page))
+			.unwrap_or_else(|| panic!("switchboard is missing `{page}`"));
+
+		assert!(
+			source.contains(discriminator),
+			"`{instruction}` discriminator drifted: expected {discriminator}"
+		);
+		assert_eq!(
+			source.matches("CpiHandle::").count(),
+			accounts,
+			"`{instruction}` account list drifted"
+		);
+		assert!(
+			source.contains(&format!("pub const LEN: usize = {encoded_len};")),
+			"`{instruction}` encoded length drifted: expected {encoded_len}"
+		);
+	}
+}
+
+#[test]
+fn documents_every_rejected_foreign_argument_shape() {
+	// The issue requires a deliberate, recorded decision for each type the
+	// renderer refuses. These are the shapes it must never accept silently.
+	let cases = [
+		(
+			"shortU16",
+			NumberTypeNode::le(NumberFormat::ShortU16),
+			"variable-length prefix",
+		),
+		(
+			"f32",
+			NumberTypeNode::le(NumberFormat::F32),
+			"floating-point",
+		),
+		(
+			"big-endian u16",
+			NumberTypeNode::be(NumberFormat::U16),
+			"little-endian",
+		),
+	];
+
+	for (label, node, expected_reason) in cases {
+		let error = wire::plan(
+			&node.into(),
+			&mut TypeIndex::default(),
+			"documented rejection",
+		)
+		.expect_err(&format!("`{label}` must be rejected"));
+		assert!(
+			error.to_string().contains(expected_reason),
+			"`{label}` rejection must explain `{expected_reason}`, got: {error}"
+		);
+	}
+}
+
+#[test]
+fn renders_read_only_account_parsers_for_foreign_idls() {
+	for (name, _) in FOREIGN_FIXTURES {
+		let root = foreign_fixture_root(name);
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
+			.unwrap_or_else(|error| panic!("fixture `{name}` failed to render: {error}"));
+
+		for account in &root.program.accounts {
+			let module = snake(account.name.as_ref());
+			let page = format!("accounts/{module}.rs");
+			let source = files
+				.get(Path::new(&page))
+				.unwrap_or_else(|| panic!("fixture `{name}` is missing `{page}`"));
+
+			// Every account gets its declared layout plus a discriminator guard,
+			// whether or not a parser could be generated for it.
+			assert!(
+				source.contains("pub fn matches("),
+				"`{page}` has no discriminator guard"
+			);
+			assert!(
+				source.contains("pub const LEN: usize")
+					|| source.contains("pub const MAX_LEN: usize"),
+				"`{page}` declares no encoded size"
+			);
+		}
+	}
+}
+
+/// The Switchboard randomness account is the parser the hardening issue calls
+/// out: `pina-rs/lootbox` hand-wrote 408 bytes of offset arithmetic for it.
+#[test]
+fn switchboard_account_parser_matches_the_hand_written_offsets() {
+	let root = foreign_fixture_root("switchboard_on_demand");
+	let files = render_program_to_files(&root, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("switchboard should render: {error}"));
+	let source = files
+		.get(Path::new("accounts/randomness_account_data.rs"))
+		.unwrap_or_else(|| panic!("switchboard has no randomness account parser"));
+
+	// Size pinned to `RandomnessAccountData` in `switchboard-on-demand` 0.13.0.
+	assert!(source.contains("pub const LEN: usize = 408;"));
+	// Account discriminator pinned to the deployed program, and to the
+	// hand-written crate's `RANDOMNESS_ACCOUNT_DISCRIMINATOR`.
+	assert!(source.contains("[10, 66, 229, 135, 220, 239, 217, 114]"));
+	assert!(source.contains("pub fn parse(data: &[u8])"));
+	assert!(source.contains("pub fn matches(data: &[u8]) -> bool"));
+
+	// Each field the hand-written parser reads must be present.
+	for field in [
+		"authority",
+		"queue",
+		"seed_slothash",
+		"seed_slot",
+		"oracle",
+		"reveal_slot",
+		"value",
+	] {
+		assert!(
+			source.contains(&format!("pub {field}:")),
+			"missing `{field}`"
+		);
+	}
+}
+
+/// Pina's own compact accounts use `preOffset`/`postOffset` nodes and a
+/// discriminator at a non-zero offset. Neither has a statically known position,
+/// so the account ships its layout without a parser instead of failing to
+/// render — a regression that previously broke `test:idl` for every example.
+#[test]
+fn renders_examples_with_runtime_relative_account_layouts() {
+	for name in ["compact_accounts_program", "migrations_program"] {
+		let root = load_fixture_root(name);
+		let files = render_program_to_files(&root, &RenderConfig::default())
+			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
+
+		for account in &root.program.accounts {
+			let page = format!("accounts/{}.rs", snake(account.name.as_ref()));
+			let source = files
+				.get(Path::new(&page))
+				.unwrap_or_else(|| panic!("`{name}` is missing `{page}`"));
+
+			// The layout ships either way; a parser is optional.
+			assert!(
+				source.contains("pub struct "),
+				"`{page}` has no layout struct"
+			);
+			if !source.contains("pub fn parse(") {
+				assert!(
+					source.contains("PARSER_UNSUPPORTED"),
+					"`{page}` omits its parser without recording why"
+				);
+			}
+		}
+	}
+}
+
+/// Boolean account fields previously decoded as `let value = value;`, which
+/// referenced itself and failed to compile. Every committed example with a
+/// boolean account field must produce a parser that reads it from the buffer.
+#[test]
+fn account_parsers_read_boolean_fields_from_the_buffer() {
+	for name in [
+		"role_registry_program",
+		"validation_program",
+		"escrow_program",
+	] {
+		let root = load_fixture_root(name);
+		let files = render_program_to_files(&root, &RenderConfig::default())
+			.unwrap_or_else(|error| panic!("`{name}` should render: {error}"));
+
+		for (path, source) in &files {
+			if !path.starts_with("accounts") || !source.contains("pub fn parse(") {
+				continue;
+			}
+			// A self-referential binding is the failure this guards against.
+			assert!(
+				!source.contains("let value = value;"),
+				"`{name}` {path:?} decodes a field into itself"
+			);
+			for line in source.lines() {
+				let trimmed = line.trim();
+				if let Some(rest) = trimmed.strip_prefix("let ") {
+					if let Some((name, value)) = rest.split_once(" = ") {
+						let name = name.trim_end_matches(':').trim();
+						assert_ne!(
+							name,
+							value.trim_end_matches(';').trim(),
+							"`{name}` {path:?} binds `{name}` to itself"
+						);
+					}
+				}
+			}
+		}
+	}
+}
+
+mod account_planning {
+	use codama_nodes::StructFieldTypeNode;
+
+	use super::render::accounts;
+	use super::*;
+
+	fn account_node(name: &str, fields: Vec<StructFieldTypeNode>) -> codama_nodes::AccountNode {
+		codama_nodes::AccountNode {
+			name: name.into(),
+			data: codama_nodes::NestedTypeNode::Value(codama_nodes::StructTypeNode::new(fields)),
+			discriminators: Vec::new().into(),
+			docs: Vec::new().into(),
+			pda: None,
+			size: None,
+		}
+	}
+
+	fn field(name: &str, r#type: TypeNode) -> StructFieldTypeNode {
+		StructFieldTypeNode::new(name, r#type)
+	}
+
+	/// A discriminator field: present in the layout, but baked into the program
+	/// with an omitted default the account parser can read its bytes from.
+	fn omitted_field(name: &str, default: ValueNode) -> StructFieldTypeNode {
+		let mut node = StructFieldTypeNode::new(name, NumberTypeNode::le(NumberFormat::U64));
+		node.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		node.default_value = Box::new(Some(default));
+		node
+	}
+
+	fn discriminated_account(
+		name: &str,
+		fields: Vec<StructFieldTypeNode>,
+		discriminators: Vec<DiscriminatorNode>,
+	) -> codama_nodes::AccountNode {
+		codama_nodes::AccountNode {
+			discriminators: discriminators.into(),
+			..account_node(name, fields)
+		}
+	}
+
+	fn amount_field() -> StructFieldTypeNode {
+		field(
+			"amount",
+			TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+		)
+	}
+
+	fn field_discriminator(name: &str, offset: u64) -> DiscriminatorNode {
+		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new(name, offset))
+	}
+
+	#[test]
+	fn uses_the_declared_field_name_or_a_positional_fallback() {
+		let named = field("authority", TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		let unnamed = field("", TypeNode::Number(NumberTypeNode::le(NumberFormat::U8)));
+		assert_eq!(accounts::field_name(&named, 0), "authority");
+		assert_eq!(accounts::field_name(&unnamed, 1), "field_1");
+	}
+
+	#[test]
+	fn reads_field_discriminator_bytes_from_every_literal_shape() {
+		let mut types = TypeIndex::default();
+		let account = discriminated_account(
+			"tagged",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Bytes(BytesValueNode::base16("a1b2c3d4e5f6a7b8")),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("bytes discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("TAGGED_DISCRIMINATOR"));
+		assert!(page.contains("161, 178, 195, 212, 229, 246, 167, 184"));
+
+		let account = discriminated_account(
+			"numbered",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("number discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[1, 0, 0, 0, 0, 0, 0, 0]"));
+
+		let account = discriminated_account(
+			"signed",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::SignedInteger(-1))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("signed discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[255, 255, 255, 255, 255, 255, 255, 255]"));
+	}
+
+	#[test]
+	fn rejects_unusable_field_discriminators() {
+		// A field discriminator naming a field the layout does not carry.
+		let account = discriminated_account(
+			"ghosted",
+			vec![amount_field()],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a missing discriminator field must be rejected");
+		assert!(error.to_string().contains("not present"));
+
+		// A discriminator field without an omitted default has no bytes to read.
+		let account = discriminated_account(
+			"optional",
+			vec![amount_field()],
+			vec![field_discriminator("amount", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a non-omitted discriminator field must be rejected");
+		assert!(error.to_string().contains("no omitted default value"));
+
+		// A float literal has no integer byte representation.
+		let account = discriminated_account(
+			"floated",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::Number(NumberValueNode::new(Number::Float(1.5))),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a float discriminator must be rejected");
+		assert!(error.to_string().contains("float"));
+
+		// A boolean default is not a byte or number literal.
+		let account = discriminated_account(
+			"flagged",
+			vec![
+				omitted_field(
+					"tag",
+					ValueNode::String(codama_nodes::StringValueNode::new("nope")),
+				),
+				amount_field(),
+			],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a non-literal discriminator must be rejected");
+		assert!(error.to_string().contains("byte or number literal"));
+	}
+
+	#[test]
+	fn constant_discriminators_accept_bytes_and_numbers_only() {
+		let mut types = TypeIndex::default();
+		let number_constant = || {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(7))),
+				),
+				0,
+			))
+		};
+
+		let account =
+			discriminated_account("stamped", vec![amount_field()], vec![number_constant()]);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("constant number discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("STAMPED_DISCRIMINATOR"));
+		assert!(page.contains("[7, 0, 0, 0, 0, 0, 0, 0]"));
+
+		let account = discriminated_account(
+			"branded",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Bytes(codama_nodes::BytesTypeNode::new()),
+					ValueNode::Bytes(BytesValueNode::base16("a1b2c3d4")),
+				),
+				0,
+			))],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("constant bytes discriminator should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("BRANDED_DISCRIMINATOR"));
+		assert!(page.contains("161, 178, 195, 212"));
+
+		let account = discriminated_account(
+			"seedy",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::String(codama_nodes::StringTypeNode::utf8()),
+					ValueNode::String(codama_nodes::StringValueNode::new("anchor")),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a string constant discriminator must be rejected");
+		assert!(error.to_string().contains("byte or number literals"));
+
+		let account = discriminated_account(
+			"floated",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::F64)),
+					ValueNode::Number(NumberValueNode::new(Number::Float(1.5))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a float constant discriminator must be rejected");
+		assert!(error.to_string().contains("float"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_nonzero_field_discriminator_offset() {
+		// A field discriminator that does not continue from offset zero cannot
+		// gate a parser, because no byte prefix identifies the account.
+		let account = discriminated_account(
+			"late",
+			vec![amount_field()],
+			vec![field_discriminator("amount", 8)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("LATE_DISCRIMINATOR"));
+		assert!(page.contains("!data.is_empty()"));
+	}
+
+	#[test]
+	fn combines_adjacent_constant_discriminators_into_one_prefix() {
+		// Migration-aware IDLs tag an account with several adjacent one-byte
+		// constants (the program discriminator plus a migration version), which
+		// together form the guard's prefix.
+		let number_constant = |offset: u64, value: u64| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U8)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(value))),
+				),
+				offset,
+			))
+		};
+		let account = discriminated_account(
+			"migrated",
+			vec![amount_field()],
+			vec![number_constant(0, 1), number_constant(1, 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("adjacent constants should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("MIGRATED_DISCRIMINATOR: [u8; 2] = [1, 0]"));
+		assert!(page.contains("data.len() >= 2"));
+
+		let account = discriminated_account(
+			"skipped",
+			vec![amount_field()],
+			vec![number_constant(0, 1), number_constant(2, 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("a gapped prefix should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SKIPPED_DISCRIMINATOR"));
+	}
+
+	#[test]
+	fn narrows_discriminator_bytes_to_the_declared_width() {
+		let mut types = TypeIndex::default();
+		let constant = |format: NumberFormat, value: Number| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(format)),
+					ValueNode::Number(NumberValueNode::new(value)),
+				),
+				0,
+			))
+		};
+
+		// Each declared width produces exactly that many bytes.
+		for (format, expected) in [
+			(NumberFormat::U8, "[9]"),
+			(NumberFormat::U16, "[9, 0]"),
+			(NumberFormat::U32, "[9, 0, 0, 0]"),
+			(NumberFormat::U64, "[9, 0, 0, 0, 0, 0, 0, 0]"),
+		] {
+			let account = discriminated_account(
+				"sized",
+				vec![amount_field()],
+				vec![constant(format, Number::UnsignedInteger(9))],
+			);
+			let planned = accounts::plan_account(&account, &mut types)
+				.unwrap_or_else(|error| panic!("{format:?} should plan: {error}"));
+			let page = accounts::render_planned_account(&planned);
+			assert!(
+				page.contains(expected),
+				"{format:?} rendered:
+{page}"
+			);
+		}
+
+		// A signed literal keeps its two's-complement pattern.
+		let account = discriminated_account(
+			"negative",
+			vec![amount_field()],
+			vec![constant(NumberFormat::U8, Number::SignedInteger(-1))],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("a signed literal should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[255]"));
+	}
+
+	#[test]
+	fn rejects_discriminators_that_do_not_fit_their_declared_width() {
+		let constant = |format: NumberFormat, value: Number| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(format)),
+					ValueNode::Number(NumberValueNode::new(value)),
+				),
+				0,
+			))
+		};
+
+		// 256 does not fit a u8, and a signed -1 does not fit a u8 either once
+		// narrowed; both are reported instead of silently truncating.
+		for value in [Number::UnsignedInteger(256), Number::SignedInteger(-129)] {
+			let account = discriminated_account(
+				"overflow",
+				vec![amount_field()],
+				vec![constant(NumberFormat::U8, value.clone())],
+			);
+			let error = accounts::plan_account(&account, &mut TypeIndex::default())
+				.err()
+				.expect("an out-of-range discriminator must be rejected");
+			assert!(error.to_string().contains("does not fit"));
+		}
+
+		// Big-endian and unsupported widths are rejected with their reasons.
+		let account = discriminated_account(
+			"big_endian",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::be(NumberFormat::U8)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("big-endian discriminators must be rejected");
+		assert!(error.to_string().contains("little-endian"));
+
+		let account = discriminated_account(
+			"wide",
+			vec![amount_field()],
+			vec![constant(NumberFormat::U128, Number::UnsignedInteger(1))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("u128 discriminators must be rejected");
+		assert!(error.to_string().contains("at most 8 bytes"));
+	}
+
+	#[test]
+	fn rejects_number_literals_whose_declared_type_is_not_a_number() {
+		// A malformed IDL can pair a number literal with a non-number type; the
+		// mismatch is reported rather than assumed to be eight bytes.
+		let mut field =
+			StructFieldTypeNode::new("tag", TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		field.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode::new(
+			Number::UnsignedInteger(1),
+		))));
+		let account = discriminated_account(
+			"mismatched",
+			vec![field, amount_field()],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a number literal without a number type must be rejected");
+		assert!(error.to_string().contains("must declare a number type"));
+
+		// The same mismatch on a constant discriminator.
+		let account = discriminated_account(
+			"constant_mismatch",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::PublicKey(PublicKeyTypeNode::new()),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a number constant without a number type must be rejected");
+		assert!(error.to_string().contains("must declare a number type"));
+	}
+
+	#[test]
+	fn only_a_whole_address_identifier_pulls_in_the_import() {
+		// A type whose name merely contains `Address` must not trigger the
+		// import, or the generated page fails a `-D warnings` build.
+		assert!(accounts::test_mentions_address("Address"));
+		assert!(accounts::test_mentions_address("Option<Address>"));
+		assert!(accounts::test_mentions_address("&'argument Address"));
+		assert!(!accounts::test_mentions_address("AddressBook"));
+		assert!(!accounts::test_mentions_address("[AddressLike; 4]"));
+		assert!(!accounts::test_mentions_address("u64"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_size_discriminator() {
+		// A size discriminator is metadata, not bytes this client can check.
+		let account = discriminated_account(
+			"sized",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Size(
+				codama_nodes::SizeDiscriminatorNode::new(8),
+			)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SIZED_DISCRIMINATOR"));
+	}
+
+	#[test]
+	fn withholds_the_parser_for_a_nonzero_constant_discriminator() {
+		// A constant discriminator at a non-zero offset cannot gate a parser.
+		let account = discriminated_account(
+			"shifted",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U64)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(7))),
+				),
+				8,
+			))],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("the layout should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SHIFTED_DISCRIMINATOR"));
+	}
+
+	#[test]
+	fn renders_accounts_without_a_discriminator_or_parser() {
+		let root = load_fixture_root("vesting_program");
+		// The vesting IDL has no accounts module; exercise the renderer through
+		// a minimal synthetic account with an unsupported field.
+		let mut types = TypeIndex::default();
+		let account = account_node(
+			"opaque",
+			vec![field(
+				"payload",
+				TypeNode::String(codama_nodes::StringTypeNode::utf8()),
+			)],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("pub struct Opaque"));
+		// A bare string has no fixed size, so the account reports a ceiling.
+		assert!(page.contains("pub const MAX_LEN") || page.contains("pub const LEN"));
+	}
+}
+
+mod foreign_fixture_accounts {
+	use super::render::accounts;
+	use super::*;
+
+	/// Accounts whose fields cannot all be located still ship their layout,
+	/// with the reason recorded instead of a parser that would misread.
+	///
+	/// Metaplex also carries one instruction using the `omitted`
+	/// optional-account strategy, which the fixed-size handle set cannot
+	/// express, so the render skips it and records the reason.
+	#[test]
+	fn renders_parser_unsupported_accounts_with_their_reason() {
+		let root = foreign_fixture_root("metaplex_token_metadata");
+		let config = RenderConfig {
+			skip_unsupported_instructions: true,
+			..RenderConfig::default()
+		};
+		let files = render_program_to_files(&root, &config)
+			.unwrap_or_else(|error| panic!("render: {error}"));
+
+		let page = files
+			.get(Path::new("accounts/collection_authority_record.rs"))
+			.unwrap_or_else(|| panic!("missing collection authority record"));
+		assert!(page.contains("PARSER_UNSUPPORTED"));
+		assert!(page.contains("pub struct CollectionAuthorityRecord"));
+
+		let instructions_mod = files
+			.get(Path::new("instructions/mod.rs"))
+			.unwrap_or_else(|| panic!("missing instructions mod"));
+		assert!(instructions_mod.contains("Skipped `deprecatedMintNewEdition"));
+		assert!(instructions_mod.contains("omitted optional-account strategy"));
+		assert!(!instructions_mod.contains("pub(crate) mod r#deprecated_mint_new_edition"));
+	}
+
+	/// Without the skip flag an unsupported instruction fails the whole render.
+	#[test]
+	fn fails_closed_on_the_omitted_optional_account_strategy() {
+		let root = foreign_fixture_root("metaplex_token_metadata");
+		let error = render_program_to_files(&root, &RenderConfig::default())
+			.err()
+			.expect("the omitted strategy must fail a default render");
+		assert!(
+			error
+				.to_string()
+				.contains("omitted optional-account strategy")
+		);
+	}
+
+	/// A discriminated account with only fixed-width fields gets a complete
+	/// parser and a LEN that matches the on-chain layout.
+	#[test]
+	fn switchboard_parser_has_the_full_layout() {
+		let root = foreign_fixture_root("switchboard_on_demand");
+		let files = render_program_to_files(&root, &RenderConfig::default())
+			.unwrap_or_else(|error| panic!("render: {error}"));
+		let page = files
+			.get(Path::new("accounts/randomness_account_data.rs"))
+			.unwrap_or_else(|| panic!("missing randomness account"));
+		assert!(page.contains("pub const LEN: usize = 408;"));
+		assert!(page.contains("pub fn parse(data: &[u8])"));
+	}
+}
+
+mod defined_type_pages {
+	use codama_nodes::DefinedTypeNode;
+	use codama_nodes::StructFieldTypeNode;
+
+	use super::*;
+
+	#[test]
+	fn rejects_defined_types_that_are_not_structs_or_enums() {
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new("plain", NumberTypeNode::le(NumberFormat::U64));
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("scalar defined types must be rejected");
+		assert!(error.to_string().contains("become Rust types"));
+	}
+
+	#[test]
+	fn propagates_field_planning_errors_from_struct_pages() {
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new(
+			"broken",
+			codama_nodes::StructTypeNode::new(vec![StructFieldTypeNode::new(
+				"bare",
+				codama_nodes::StringTypeNode::utf8(),
+			)]),
+		);
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("bare strings must be rejected");
+		assert!(error.to_string().contains("length prefix"));
+	}
+
+	#[test]
+	fn renders_enum_pages_with_wide_discriminants() {
+		for format in [
+			NumberFormat::U8,
+			NumberFormat::U16,
+			NumberFormat::U32,
+			NumberFormat::U64,
+		] {
+			let mut types = TypeIndex::default();
+			let defined = DefinedTypeNode::new(
+				"sized",
+				codama_nodes::EnumTypeNode {
+					variants: vec![codama_nodes::EnumEmptyVariantTypeNode::new("only").into()],
+					size: NumberTypeNode::le(format).into(),
+				},
+			);
+			let page = render::types::render_type_page(&defined, &mut types)
+				.unwrap_or_else(|error| panic!("{format:?} should render: {error}"));
+			assert!(page.contains("pub enum Sized"));
+		}
+
+		let mut types = TypeIndex::default();
+		let defined = DefinedTypeNode::new(
+			"bad",
+			codama_nodes::EnumTypeNode {
+				variants: vec![codama_nodes::EnumEmptyVariantTypeNode::new("only").into()],
+				size: NumberTypeNode::le(NumberFormat::U128).into(),
+			},
+		);
+		let error = render::types::render_type_page(&defined, &mut types)
+			.expect_err("u128 discriminants must be rejected");
+		assert!(error.to_string().contains("discriminants must be"));
+	}
 }

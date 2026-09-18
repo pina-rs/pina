@@ -6287,12 +6287,14 @@ version = "0.18.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
+ "clap",
  "codama-nodes",
  "heck 0.5.0",
  "insta",
  "serde_json",
  "solana-pubkey 4.2.1",
  "syn 3.0.5",
+ "tempfile",
  "thiserror 2.0.20",
 ]
 

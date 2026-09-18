@@ -24,3 +24,42 @@ impl CpiProgramId for CompactAccountsProgram {
 
 /// A validated executable account for the `compactAccountsProgram` program.
 pub type ProgramAccount<'a> = Program<'a, CompactAccountsProgram>;
+
+/// Whether `address` is the `compactAccountsProgram` program this crate calls.
+///
+/// Check this before a CPI when the address arrives from caller input, so a
+/// call can never be redirected to a program this crate was not imported
+/// for.
+#[inline(always)]
+pub fn is_expected_program(address: &Address) -> bool {
+	*address == COMPACT_ACCOUNTS_PROGRAM_ID
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Binds the compiled-in ID to a literal.
+	///
+	/// A swapped dependency could otherwise retarget every CPI in this crate
+	/// without the source changing, so the expected address is asserted here in
+	/// full rather than only through the constant.
+	#[test]
+	fn binds_the_expected_program_id() {
+		assert_eq!(
+			COMPACT_ACCOUNTS_PROGRAM_ID,
+			pina::address!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn")
+		);
+		assert_eq!(CompactAccountsProgram::ID, COMPACT_ACCOUNTS_PROGRAM_ID);
+		assert!(is_expected_program(&COMPACT_ACCOUNTS_PROGRAM_ID));
+	}
+
+	#[test]
+	fn rejects_a_foreign_program_id() {
+		let mut foreign_bytes = COMPACT_ACCOUNTS_PROGRAM_ID.to_bytes();
+		foreign_bytes[0] ^= 0xFF;
+		let foreign = pina::Address::new_from_array(foreign_bytes);
+		assert_ne!(foreign, COMPACT_ACCOUNTS_PROGRAM_ID);
+		assert!(!is_expected_program(&foreign));
+	}
+}

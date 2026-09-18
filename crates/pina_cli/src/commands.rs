@@ -67,7 +67,41 @@ pub(crate) fn run(cli: Cli) {
 			mode,
 			no_scaffold,
 			npx,
-		} => run_cpi(idl.as_deref(), stdin, &output, mode, no_scaffold, &npx),
+			skip_unsupported_instructions,
+		} => {
+			run_cpi(
+				idl.as_deref(),
+				stdin,
+				&output,
+				mode,
+				no_scaffold,
+				&npx,
+				skip_unsupported_instructions,
+			);
+		}
+		Commands::Import {
+			name,
+			program_id,
+			idl,
+			url,
+			cluster,
+			output,
+			mode,
+			npx,
+			skip_unsupported_instructions,
+		} => {
+			run_import(&ImportCommand {
+				name: &name,
+				program_id: &program_id,
+				idl: idl.as_deref(),
+				url: url.as_deref(),
+				cluster: &cluster,
+				output: output.as_deref(),
+				mode,
+				npx: &npx,
+				skip_unsupported_instructions,
+			});
+		}
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
@@ -995,6 +1029,7 @@ fn run_generate(
 	println!("  Clients {}", generated.clients_dir.display());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_cpi(
 	idl: Option<&Path>,
 	stdin: bool,
@@ -1002,6 +1037,7 @@ fn run_cpi(
 	mode: pina_cli::GenerationMode,
 	no_scaffold: bool,
 	npx: &str,
+	skip_unsupported_instructions: bool,
 ) {
 	let result = if stdin {
 		pina_cli::generate_cpi_crate_from_reader_with_config(
@@ -1009,6 +1045,7 @@ fn run_cpi(
 			output,
 			mode,
 			!no_scaffold,
+			skip_unsupported_instructions,
 		)
 	} else {
 		let idl = idl.unwrap_or_else(|| unreachable!("clap requires --idl or --stdin"));
@@ -1018,6 +1055,7 @@ fn run_cpi(
 			mode,
 			scaffold: !no_scaffold,
 			npx: npx.to_string(),
+			skip_unsupported_instructions,
 		})
 	};
 
@@ -2469,4 +2507,71 @@ mod size_profile_tests {
 		// `--no-size-profile` leaves the program's own release profile alone.
 		assert_eq!(size_profile(false, true, false), SizeProfile::None);
 	}
+}
+
+/// The flags `pina import` collected for one run.
+struct ImportCommand<'a> {
+	name: &'a str,
+	program_id: &'a str,
+	idl: Option<&'a Path>,
+	url: Option<&'a str>,
+	cluster: &'a str,
+	output: Option<&'a Path>,
+	mode: pina_cli::GenerationMode,
+	npx: &'a str,
+	skip_unsupported_instructions: bool,
+}
+
+/// Imports a foreign program's IDL as a CPI crate and stamps its provenance.
+fn run_import(command: &ImportCommand<'_>) {
+	use pina_cli::import_idl::ImportOptions;
+	use pina_cli::import_idl::ImportSource;
+
+	let ImportCommand {
+		name,
+		program_id,
+		idl,
+		url,
+		cluster,
+		output,
+		mode,
+		npx,
+		skip_unsupported_instructions,
+	} = *command;
+
+	let output = output.map_or_else(|| PathBuf::from("clients/cpi"), Path::to_path_buf);
+	let outcome = ImportSource::select(
+		idl.map(Path::to_path_buf),
+		url.map(str::to_string),
+		cluster,
+		program_id,
+	)
+	.and_then(|source| {
+		let options = ImportOptions {
+			name: name.to_string(),
+			program_id: program_id.to_string(),
+			source,
+			output: output.clone(),
+			mode,
+			npx: npx.to_string(),
+			skip_unsupported_instructions,
+		};
+		pina_cli::import_idl::import_idl(&options)
+	})
+	.unwrap_or_else(|error| {
+		eprintln!("{} {error}", "Error".red().bold());
+		std::process::exit(1);
+	});
+
+	let state = if outcome.changed {
+		"Imported".green().bold().to_string()
+	} else {
+		"Already up to date".green().to_string()
+	};
+	println!(
+		"{state} {name} -> {}\n  IDL sha256: {}\n  source: {}",
+		outcome.crate_dir.display(),
+		outcome.idl_sha256,
+		outcome.source
+	);
 }

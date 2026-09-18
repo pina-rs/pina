@@ -30,7 +30,12 @@ pub enum RenderError {
 		reason: &'static str,
 	},
 	#[error("generated Rust source `{path}` is invalid: {reason}")]
-	InvalidGeneratedSource { path: PathBuf, reason: String },
+	InvalidGeneratedSource {
+		path: PathBuf,
+		reason: String,
+		/// The rejected source, kept so a renderer bug stays debuggable.
+		rejected: Option<String>,
+	},
 	#[error("unsupported type `{kind}` at `{context}`: {reason}")]
 	UnsupportedType {
 		context: String,

@@ -24,3 +24,42 @@ impl CpiProgramId for HelloSolanaProgram {
 
 /// A validated executable account for the `helloSolanaProgram` program.
 pub type ProgramAccount<'a> = Program<'a, HelloSolanaProgram>;
+
+/// Whether `address` is the `helloSolanaProgram` program this crate calls.
+///
+/// Check this before a CPI when the address arrives from caller input, so a
+/// call can never be redirected to a program this crate was not imported
+/// for.
+#[inline(always)]
+pub fn is_expected_program(address: &Address) -> bool {
+	*address == HELLO_SOLANA_PROGRAM_ID
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Binds the compiled-in ID to a literal.
+	///
+	/// A swapped dependency could otherwise retarget every CPI in this crate
+	/// without the source changing, so the expected address is asserted here in
+	/// full rather than only through the constant.
+	#[test]
+	fn binds_the_expected_program_id() {
+		assert_eq!(
+			HELLO_SOLANA_PROGRAM_ID,
+			pina::address!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A")
+		);
+		assert_eq!(HelloSolanaProgram::ID, HELLO_SOLANA_PROGRAM_ID);
+		assert!(is_expected_program(&HELLO_SOLANA_PROGRAM_ID));
+	}
+
+	#[test]
+	fn rejects_a_foreign_program_id() {
+		let mut foreign_bytes = HELLO_SOLANA_PROGRAM_ID.to_bytes();
+		foreign_bytes[0] ^= 0xFF;
+		let foreign = pina::Address::new_from_array(foreign_bytes);
+		assert_ne!(foreign, HELLO_SOLANA_PROGRAM_ID);
+		assert!(!is_expected_program(&foreign));
+	}
+}

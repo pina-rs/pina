@@ -78,6 +78,14 @@ pina cpi --idl ./idl.json --output ./clients/program-cpi --mode update
 
 Codama IDLs render without Node.js. Raw Anchor IDLs require Node.js with `npx`, or a compatible command supplied through `--npx`, to run the pinned converter.
 
+Adopt another program's interface with provenance recorded:
+
+```bash
+pina import switchboard \
+  --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv \
+  --idl ./idls/on_demand.json
+```
+
 ### `pina verify`
 
 Build deterministically, compare the artifact with a deployed program, and publish a source record:

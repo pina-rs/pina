@@ -44,6 +44,9 @@ use codama_nodes::ProgramNode;
 use codama_nodes::RootNode;
 pub use error::RenderError;
 pub use error::Result;
+use render::accounts::plan_account;
+use render::accounts::render_accounts_mod;
+use render::accounts::render_planned_account;
 use render::helpers::GENERATED_HEADER;
 use render::helpers::canonical_pubkey;
 use render::helpers::page;
@@ -57,6 +60,9 @@ use render::mods::render_root_mod;
 use render::scaffold::ensure_crate_scaffold;
 use render::scaffold::open_crate_dir;
 use render::scaffold::write_files;
+use render::types::render_type_page;
+use render::types::render_types_mod;
+use render::wire::TypeIndex;
 
 mod error;
 mod render;
@@ -77,6 +83,13 @@ pub struct RenderConfig {
 	pub package_name: Option<String>,
 	pub mode: RenderMode,
 	pub scaffold: bool,
+	/// Skip instructions this renderer cannot express instead of failing.
+	///
+	/// When false (the default), an unsupported instruction fails the whole
+	/// render. When true, the instruction is left out of the generated crate
+	/// and its name plus the reason are recorded in `instructions/mod.rs`, so
+	/// a reviewer can see exactly what the client does not cover.
+	pub skip_unsupported_instructions: bool,
 }
 
 impl Default for RenderConfig {
@@ -87,6 +100,7 @@ impl Default for RenderConfig {
 			package_name: None,
 			mode: RenderMode::Auto,
 			scaffold: true,
+			skip_unsupported_instructions: false,
 		}
 	}
 }
@@ -134,7 +148,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	validate_generated_folder(&config.generated_folder)?;
-	let files = render_program_to_files(root)?;
+	let files = render_program_to_files(root, config)?;
 	validate_generated_sources(&files)?;
 	let crate_handle = open_crate_dir(crate_dir)?;
 	validate_generated_path(&crate_handle, crate_dir, &config.generated_folder)?;
@@ -271,7 +285,10 @@ pub fn render_program(
 }
 
 /// Renders a program into an in-memory file map without touching disk.
-pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
+pub fn render_program_to_files(
+	root: &RootNode,
+	config: &RenderConfig,
+) -> Result<BTreeMap<PathBuf, String>> {
 	let program = &root.program;
 	let mut files = BTreeMap::new();
 	let mut program_constants = Vec::new();
@@ -285,23 +302,95 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 		));
 	}
 
-	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
 	files.insert(
 		PathBuf::from("programs.rs"),
 		page(&render_programs_mod(program, &program_constants)),
 	);
 
+	// Instruction arguments register the `definedTypes` they reference, so
+	// instructions render before the type pages that back them.
+	let mut types = TypeIndex::new(&program.defined_types);
+	let mut instruction_pages = Vec::new();
+	let mut skipped_instructions = Vec::new();
+	for instruction in &program.instructions {
+		match render_instruction_page(instruction, &mut types) {
+			Ok(page) => instruction_pages.push((snake(instruction.name.as_ref()), page)),
+			Err(error) if config.skip_unsupported_instructions => {
+				skipped_instructions
+					.push((instruction.name.as_ref().to_string(), error.to_string()));
+			}
+			Err(error) => return Err(error),
+		}
+	}
+
+	// Accounts render after instructions so argument planning has already
+	// registered every `definedTypes` name the module needs.
+	let mut account_names = Vec::new();
+	let mut account_pages = Vec::new();
+	for account in &program.accounts {
+		let planned = plan_account(account, &mut types)?;
+		account_names.push(planned.module.clone());
+		account_pages.push((planned.module.clone(), render_planned_account(&planned)));
+	}
+
+	let named = types.named().to_vec();
+	files.insert(
+		PathBuf::from("mod.rs"),
+		page(&render_root_mod(
+			program,
+			!named.is_empty(),
+			!account_names.is_empty(),
+		)),
+	);
+
 	if !program.instructions.is_empty() {
 		files.insert(
 			PathBuf::from("instructions/mod.rs"),
-			page(&render_instructions_mod(&program.instructions)),
+			page(&render_instructions_mod(
+				&instruction_pages
+					.iter()
+					.map(|(name, _)| name.clone())
+					.collect::<Vec<_>>(),
+				&skipped_instructions,
+			)),
 		);
 
-		for instruction in &program.instructions {
-			let filename = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
-			let instruction_content = render_instruction_page(instruction)?;
+		for (name, content) in &instruction_pages {
+			files.insert(
+				PathBuf::from(format!("instructions/{name}.rs")),
+				page(content),
+			);
+		}
+	}
 
-			files.insert(PathBuf::from(filename), page(&instruction_content));
+	if !account_names.is_empty() {
+		files.insert(
+			PathBuf::from("accounts/mod.rs"),
+			page(&render_accounts_mod(&account_names)),
+		);
+		for (module, content) in &account_pages {
+			files.insert(
+				PathBuf::from(format!("accounts/{module}.rs")),
+				page(content),
+			);
+		}
+	}
+
+	if !named.is_empty() {
+		files.insert(
+			PathBuf::from("types/mod.rs"),
+			page(&render_types_mod(&named)),
+		);
+		// Only types some instruction or account actually uses get a page, and
+		// pages follow the IDL's own `definedTypes` order.
+		for defined_type in &program.defined_types {
+			if !named.iter().any(|name| name == defined_type.name.as_ref()) {
+				continue;
+			}
+			files.insert(
+				PathBuf::from(format!("types/{}.rs", snake(defined_type.name.as_ref()))),
+				page(&render_type_page(defined_type, &mut types)?),
+			);
 		}
 	}
 
@@ -361,6 +450,9 @@ fn validate_generated_sources(files: &BTreeMap<PathBuf, String>) -> Result<()> {
 			RenderError::InvalidGeneratedSource {
 				path: path.clone(),
 				reason: error.to_string(),
+				// The rejected text is kept so a renderer bug is diagnosable
+				// from the error alone.
+				rejected: Some(source.clone()),
 			}
 		})?;
 	}
