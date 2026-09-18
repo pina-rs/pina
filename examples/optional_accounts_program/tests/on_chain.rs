@@ -34,6 +34,7 @@ const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 const INIT: u8 = 0;
 const TOUCH: u8 = 1;
 const INSPECT: u8 = 2;
+const CURRENT_VERSION: u8 = 0;
 
 fn create_mollusk() -> Mollusk {
 	let so_name = "optional_accounts_program.so";
@@ -63,7 +64,7 @@ fn derive_store(authority: &Pubkey) -> (Pubkey, u8) {
 fn init_ix(authority: &Pubkey, store: &Pubkey, bump: u8) -> Instruction {
 	Instruction::new_with_bytes(
 		PROGRAM_ID,
-		&[INIT, bump],
+		&[INIT, CURRENT_VERSION, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*store, false),
@@ -82,7 +83,7 @@ fn touch_ix(authority: &Pubkey, store: Option<&Pubkey>) -> Instruction {
 
 	Instruction::new_with_bytes(
 		PROGRAM_ID,
-		&[TOUCH],
+		&[TOUCH, CURRENT_VERSION],
 		vec![AccountMeta::new_readonly(*authority, true), store_meta],
 	)
 }
@@ -99,7 +100,7 @@ fn inspect_ix(authority: &Pubkey, store: Option<&Pubkey>, witness: Option<&Pubke
 		Some(witness) => metas.push(AccountMeta::new_readonly(*witness, true)),
 		None => metas.push(AccountMeta::new_readonly(PROGRAM_ID, false)),
 	}
-	Instruction::new_with_bytes(PROGRAM_ID, &[INSPECT], metas)
+	Instruction::new_with_bytes(PROGRAM_ID, &[INSPECT, CURRENT_VERSION], metas)
 }
 
 fn payer_account() -> Account {
@@ -107,10 +108,11 @@ fn payer_account() -> Account {
 }
 
 fn store_account(bump: u8, count: u64, lamports: u64) -> Account {
-	let mut data = vec![0u8; 10];
+	let mut data = vec![0u8; 11];
 	data[0] = 1; // StoreState discriminator.
-	data[1] = bump;
-	data[2..10].copy_from_slice(&count.to_le_bytes());
+	data[1] = CURRENT_VERSION;
+	data[2] = bump;
+	data[3..11].copy_from_slice(&count.to_le_bytes());
 	Account {
 		lamports,
 		data,
@@ -127,7 +129,7 @@ fn touch_with_omitted_optional_slot_parses_as_none_on_chain() {
 
 	let authority = Pubkey::new_unique();
 	let (store, bump) = derive_store(&authority);
-	let lamports = mollusk.sysvars.rent.minimum_balance(10);
+	let lamports = mollusk.sysvars.rent.minimum_balance(11);
 
 	mollusk.process_and_validate_instruction(
 		&init_ix(&authority, &store, bump),
@@ -156,7 +158,7 @@ fn touch_with_omitted_optional_slot_parses_as_none_on_chain() {
 		.find(|(key, _)| *key == store)
 		.expect("store account in results")
 		.1;
-	assert_eq!(stored.data[2..10], 0u64.to_le_bytes());
+	assert_eq!(stored.data[3..11], 0u64.to_le_bytes());
 }
 
 #[test]
@@ -166,7 +168,7 @@ fn touch_with_provided_optional_slot_increments_the_counter() {
 
 	let authority = Pubkey::new_unique();
 	let (store, bump) = derive_store(&authority);
-	let lamports = mollusk.sysvars.rent.minimum_balance(10);
+	let lamports = mollusk.sysvars.rent.minimum_balance(11);
 
 	mollusk.process_and_validate_instruction(
 		&init_ix(&authority, &store, bump),
@@ -193,7 +195,7 @@ fn touch_with_provided_optional_slot_increments_the_counter() {
 		.find(|(key, _)| *key == store)
 		.expect("store account in results")
 		.1;
-	assert_eq!(stored.data[2..10], 1u64.to_le_bytes());
+	assert_eq!(stored.data[3..11], 1u64.to_le_bytes());
 }
 
 #[test]
@@ -204,7 +206,7 @@ fn inspect_enforces_signer_only_when_witness_is_provided() {
 	let authority = Pubkey::new_unique();
 	let unsigned_witness = Pubkey::new_unique();
 	let (store, bump) = derive_store(&authority);
-	let lamports = mollusk.sysvars.rent.minimum_balance(10);
+	let lamports = mollusk.sysvars.rent.minimum_balance(11);
 
 	mollusk.process_and_validate_instruction(
 		&init_ix(&authority, &store, bump),
