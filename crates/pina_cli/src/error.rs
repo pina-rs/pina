@@ -69,7 +69,7 @@ impl IdlError {
 		))
 	}
 
-	pub(crate) fn ambiguous_discriminator_entrypoint(names: String) -> Self {
+	pub(crate) fn ambiguous_discriminator_entrypoint(names: &str) -> Self {
 		Self::Other(format!(
 			"`entrypoint` was declared on {names}; exactly one discriminator enum per program may \
 			 declare it"

@@ -151,7 +151,7 @@ pub(crate) fn parse_program_with_sources(
 		.collect();
 	if entrypoint_enums.len() > 1 {
 		return Err(IdlError::ambiguous_discriminator_entrypoint(
-			entrypoint_enums.join(", "),
+			&entrypoint_enums.join(", "),
 		));
 	}
 

@@ -274,7 +274,6 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 		}
 
 		let repr_size = discriminator_repr_size(item_enum)?;
-		let entrypoint = discriminator_entrypoint_flag(item_enum)?;
 		let mut variants = Vec::new();
 		for variant in &item_enum.variants {
 			if let Some((_, expr)) = &variant.discriminant

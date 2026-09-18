@@ -1815,7 +1815,7 @@ mod tests {
 	}
 
 	fn write_manifest(program_dir: &Path, source: &[u8]) -> PathBuf {
-		let path = program_dir.join(pina_abi::MANIFEST_PATH);
+		let path = program_dir.join(MANIFEST_PATH);
 		let parent = path
 			.parent()
 			.unwrap_or_else(|| panic!("manifest path has a parent directory"));
@@ -1881,7 +1881,7 @@ mod tests {
 		let root = std::fs::canonicalize(temp.path())
 			.unwrap_or_else(|error| panic!("canonical temp: {error}"));
 		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
-		let path = root.join(pina_abi::MANIFEST_PATH);
+		let path = root.join(MANIFEST_PATH);
 		let ladder = manifest_account_ladder_at(&enum_name, &path)
 			.unwrap_or_else(|error| panic!("derive ladder: {error}"));
 
@@ -1972,7 +1972,7 @@ mod tests {
 		// A directory at the manifest path fails every read except `NotFound`,
 		// so the resolution failure is reported instead of a silent "no
 		// policy". The message must not claim that `State` opted into anything.
-		let path = temp.path().join(pina_abi::MANIFEST_PATH);
+		let path = temp.path().join(MANIFEST_PATH);
 		std::fs::create_dir_all(&path)
 			.unwrap_or_else(|error| panic!("create manifest directory: {error}"));
 
@@ -2038,12 +2038,7 @@ mod tests {
 			"message: {message}"
 		);
 		assert!(
-			message.contains(
-				&program_dir
-					.join(pina_abi::MANIFEST_PATH)
-					.display()
-					.to_string()
-			),
+			message.contains(&program_dir.join(MANIFEST_PATH).display().to_string()),
 			"message: {message}"
 		);
 
