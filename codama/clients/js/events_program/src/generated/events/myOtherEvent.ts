@@ -28,6 +28,7 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const MY_OTHER_EVENT_EVENT_DISCRIMINATOR = 2;
@@ -36,8 +37,15 @@ export function getMyOtherEventEventDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MY_OTHER_EVENT_EVENT_DISCRIMINATOR);
 }
 
+export const MY_OTHER_EVENT_EVENT_DISCRIMINATOR2 = 0;
+
+export function getMyOtherEventEventDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(MY_OTHER_EVENT_EVENT_DISCRIMINATOR2);
+}
+
 export type MyOtherEventEvent = {
 	discriminator: number;
+	migrationVersion: number;
 	data: bigint;
 	label: ReadonlyUint8Array;
 };
@@ -52,11 +60,13 @@ export function getMyOtherEventEventEncoder(): FixedSizeEncoder<
 	MyOtherEventEventArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"data",
-			getU64Encoder(),
-		], ["label", fixPinaPodEncoderSize(getBytesEncoder(), 8)]]),
-		(value) => ({ ...value, discriminator: 2 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["data", getU64Encoder()],
+			["label", fixPinaPodEncoderSize(getBytesEncoder(), 8)],
+		]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
@@ -72,6 +82,7 @@ export function getMyOtherEventEventDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["data", getU64Decoder()],
 		["label", fixDecoderSize(getBytesDecoder(), 8)],
 	]);
@@ -97,6 +108,11 @@ export function parseMyOtherEventEvent(
 			data,
 			getU8Encoder().encode(MY_OTHER_EVENT_EVENT_DISCRIMINATOR),
 			0,
+		) &&
+		containsBytes(
+			data,
+			getU8Encoder().encode(MY_OTHER_EVENT_EVENT_DISCRIMINATOR2),
+			1,
 		)
 	) return getMyOtherEventEventDecoder().decode(data);
 	throw new Error(

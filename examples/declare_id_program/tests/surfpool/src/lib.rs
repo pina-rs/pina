@@ -21,7 +21,7 @@ fn initialize_runs_on_surfpool() {
 
 		for _ in 0..3 {
 			program
-				.send(&[DeclareIdInstruction::Initialize as u8], Vec::new())
+				.send(&[DeclareIdInstruction::Initialize as u8, 0u8], Vec::new())
 				.expect("execute Initialize");
 		}
 
@@ -73,7 +73,7 @@ fn accepts_extra_signers() {
 			.expect("fund bystander");
 
 		let instruction = program.instruction(
-			&[DeclareIdInstruction::Initialize as u8],
+			&[DeclareIdInstruction::Initialize as u8, 0u8],
 			// A required signer meta adds the bystander to the message.
 			vec![AccountMeta::new_readonly(bystander.pubkey(), true)],
 		);

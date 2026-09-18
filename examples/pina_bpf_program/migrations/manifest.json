@@ -1,0 +1,281 @@
+{
+	"formatVersion": 4,
+	"programId": "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "State",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "43124b1aa7c67081addd4259a24fbc507a54bca9953fea6e38dadfaceee4a8ef",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "HelloInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "ForwardRotateWithSignerInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "7e3464012832d8790c4e8c2587f24806bda884d16b036b72be60e80a4e32d373",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "new_authority",
+								"rustType": "Address"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 32,
+							"fields": [
+								{
+									"name": "new_authority",
+									"offset": 0,
+									"size": 32
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "oracle",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "prop_amm_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "f3065a62928b04ddf3f59072e5c6d850ca27aed64bc74c824a7a3dcc2d0308b1",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "ForwardRotateWithPdaInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "595674dac4b815dcb18a6d93dab9825a62c0730b5c9af93814c9bd7b36e17e79",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "new_authority",
+								"rustType": "Address"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 33,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "new_authority",
+									"offset": 1,
+									"size": 32
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "oracle",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "authority"
+							},
+							{
+								"name": "prop_amm_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "68c07ba5e350f6888c1328cc18569bae38b1322a130c1904271f8976db00f982",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:03": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "CreatePdaInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "43124b1aa7c67081addd4259a24fbc507a54bca9953fea6e38dadfaceee4a8ef",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "state",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "state"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "3235f4f1824914d9389c57f7e353c897767722028a5442b827b5c89768b04d48",
+					"transition": null
+				}
+			]
+		}
+	}
+}

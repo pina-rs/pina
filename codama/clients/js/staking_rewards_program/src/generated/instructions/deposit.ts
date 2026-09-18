@@ -36,13 +36,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const DEPOSIT_DISCRIMINATOR = 2;
 
 export function getDepositDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR);
+}
+
+export const DEPOSIT_DISCRIMINATOR2 = 0;
+
+export function getDepositDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR2);
 }
 
 export type DepositInstruction<
@@ -89,7 +98,11 @@ export type DepositInstruction<
 		]
 	>;
 
-export type DepositInstructionData = { discriminator: number; amount: bigint };
+export type DepositInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+	amount: bigint;
+};
 
 export type DepositInstructionDataArgs = { amount: number | bigint };
 
@@ -98,20 +111,24 @@ export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"amount",
-			getU64Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 2 }),
+			"migrationVersion",
+			getU8Encoder(),
+		], ["amount", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
 export function getDepositInstructionDataDecoder(): FixedSizeDecoder<
 	DepositInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
-	], ["amount", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["amount", getU64Decoder()],
+	]);
 }
 
 export function getDepositInstructionDataCodec(): FixedSizeCodec<

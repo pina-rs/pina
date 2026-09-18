@@ -1,0 +1,215 @@
+{
+	"formatVersion": 4,
+	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "HelloInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "HelloNoMsgInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "HelloNextInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:03": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "RequireEqInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:04": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "04"
+			},
+			"rustName": "RequireNeqInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:05": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "05"
+			},
+			"rustName": "RequireGtInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:06": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "06"
+			},
+			"rustName": "RequireGteInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		}
+	}
+}

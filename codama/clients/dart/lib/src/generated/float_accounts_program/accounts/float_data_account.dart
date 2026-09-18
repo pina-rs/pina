@@ -17,9 +17,11 @@ class FloatDataAccount {
     required this.dataF64,
     required this.dataF32,
     required this.authority,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final BigInt dataF64;
   final int dataF32;
   final Address authority;
@@ -30,21 +32,24 @@ class FloatDataAccount {
       other is FloatDataAccount &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           dataF64 == other.dataF64 &&
           dataF32 == other.dataF32 &&
           authority == other.authority;
 
   @override
-  int get hashCode => Object.hash(discriminator, dataF64, dataF32, authority);
+  int get hashCode =>
+      Object.hash(discriminator, migrationVersion, dataF64, dataF32, authority);
 
   @override
   String toString() =>
-      'FloatDataAccount(discriminator: $discriminator, dataF64: $dataF64, dataF32: $dataF32, authority: $authority)';
+      'FloatDataAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, dataF64: $dataF64, dataF32: $dataF32, authority: $authority)';
 }
 
 Encoder<FloatDataAccount> getFloatDataAccountEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('dataF64', getU64Encoder()),
     ('dataF32', getU32Encoder()),
     ('authority', getAddressEncoder()),
@@ -54,6 +59,7 @@ Encoder<FloatDataAccount> getFloatDataAccountEncoder() {
     structEncoder,
     (FloatDataAccount value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'dataF64': value.dataF64,
       'dataF32': value.dataF32,
       'authority': value.authority,
@@ -64,6 +70,7 @@ Encoder<FloatDataAccount> getFloatDataAccountEncoder() {
 Decoder<FloatDataAccount> getFloatDataAccountDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('dataF64', getU64Decoder()),
     ('dataF32', getU32Decoder()),
     ('authority', getAddressDecoder()),
@@ -79,6 +86,14 @@ Decoder<FloatDataAccount> getFloatDataAccountDecoder() {
 
   (FloatDataAccount, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -122,4 +137,21 @@ Account<FloatDataAccount> decodeFloatDataAccount(
   EncodedAccount encodedAccount,
 ) {
   return decodeAccount(encodedAccount, getFloatDataAccountDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int floatDataAccountMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `FloatDataAccount` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool floatDataAccountNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

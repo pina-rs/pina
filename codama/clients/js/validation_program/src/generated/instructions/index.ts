@@ -8,3 +8,4 @@
 
 export * from "./checkPolicy";
 export * from "./initializePolicy";
+export * from "./migrate";

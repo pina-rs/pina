@@ -13,25 +13,31 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class RotateAdminInstructionData {
-  const RotateAdminInstructionData() : discriminator = 4;
+  const RotateAdminInstructionData() : discriminator = 4, migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
 }
 
 Encoder<RotateAdminInstructionData> getRotateAdminInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (RotateAdminInstructionData value) => <String, Object?>{'discriminator': 4},
+    (RotateAdminInstructionData value) => <String, Object?>{
+      'discriminator': 4,
+      'migrationVersion': 0,
+    },
   );
 }
 
 Decoder<RotateAdminInstructionData> getRotateAdminInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -44,6 +50,7 @@ Decoder<RotateAdminInstructionData> getRotateAdminInstructionDataDecoder() {
 
   (RotateAdminInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

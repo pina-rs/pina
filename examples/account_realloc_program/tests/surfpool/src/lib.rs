@@ -9,8 +9,9 @@ use program_under_test::ReallocInstruction;
 /// Seed prefix for sample PDAs, mirroring `SEED_SAMPLE` in the program.
 const SEED_SAMPLE: &[u8] = b"sample";
 
-/// The Sample header is discriminator + bump + authority + u16 value count.
-const SAMPLE_HEADER_LEN: usize = 36;
+/// The Sample header is discriminator + migration version + bump + authority +
+/// u16 value count. `tests/abi_layout.rs` pins the same envelope geometry.
+const SAMPLE_HEADER_LEN: usize = 37;
 
 /// Maximum bytes occupied by the compact tail's 64 u64 values.
 const MAX_COMPACT_TAIL_LEN: u16 = 512;
@@ -32,7 +33,8 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[ReallocInstruction::Initialize as u8, bump],
+		// discriminator + migration version + bump.
+		&[ReallocInstruction::Initialize as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*sample, false),
@@ -47,7 +49,8 @@ fn realloc_instruction(
 	sample: &Pubkey,
 	len: u16,
 ) -> pina_test::Instruction {
-	let mut data = vec![ReallocInstruction::Realloc as u8];
+	// discriminator + migration version, then the u16 length.
+	let mut data = vec![ReallocInstruction::Realloc as u8, 0u8];
 	data.extend_from_slice(&len.to_le_bytes());
 
 	program.instruction(
@@ -67,7 +70,8 @@ fn realloc2_instruction(
 	second: &Pubkey,
 ) -> pina_test::Instruction {
 	// Realloc2 carries a legacy ignored `len` field in its wire format.
-	let mut data = vec![ReallocInstruction::Realloc2 as u8];
+	// discriminator + migration version + the ignored u16 length.
+	let mut data = vec![ReallocInstruction::Realloc2 as u8, 0u8];
 	data.extend_from_slice(&0u16.to_le_bytes());
 
 	program.instruction(
@@ -81,7 +85,7 @@ fn realloc2_instruction(
 	)
 }
 
-/// Initialize creates the sample PDA with the fixed 36-byte compact header.
+/// Initialize creates the sample PDA with the fixed 37-byte compact header.
 #[test]
 #[ignore = "run with pina test"]
 fn initializes_the_sample_account() {
@@ -103,9 +107,10 @@ fn initializes_the_sample_account() {
 		assert_eq!(account.owner, program_id);
 		assert_eq!(account.data.len(), SAMPLE_HEADER_LEN);
 		assert_eq!(account.data[0], 1, "account discriminator is Sample");
-		assert_eq!(account.data[1], bump);
-		assert_eq!(&account.data[2..34], authority.to_bytes());
-		assert_eq!(&account.data[34..36], &[0, 0]);
+		assert_eq!(account.data[1], 0, "stored migration version is current");
+		assert_eq!(account.data[2], bump);
+		assert_eq!(&account.data[3..35], authority.to_bytes());
+		assert_eq!(&account.data[35..37], &[0, 0]);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -146,7 +151,7 @@ fn realloc_grows_within_the_increase_limit() {
 			grown,
 			"realloc moved the account length on-chain"
 		);
-		assert_eq!(&account.data[34..36], &64u16.to_le_bytes());
+		assert_eq!(&account.data[35..37], &64u16.to_le_bytes());
 		for (index, value) in account.data[SAMPLE_HEADER_LEN..]
 			.chunks_exact(8)
 			.enumerate()

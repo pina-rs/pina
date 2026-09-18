@@ -46,7 +46,10 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[CounterInstruction::Initialize as u8, bump],
+		// discriminator + migration version + bump. The program envelopes
+		// instructions, so the payload carries the version byte; the generated
+		// `InitializeInstruction::SIZE` pins the same length.
+		&[CounterInstruction::Initialize as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*counter, false),
@@ -62,7 +65,8 @@ fn increment_instruction(
 	counter: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[CounterInstruction::Increment as u8],
+		// discriminator + migration version; Increment takes no arguments.
+		&[CounterInstruction::Increment as u8, 0u8],
 		vec![
 			AccountMeta::new_readonly(*authority, true),
 			AccountMeta::new(*counter, false),
@@ -89,14 +93,17 @@ fn initializes_the_counter_pda_with_zeroed_state() {
 
 		let account = program.account(&counter).expect("fetch counter account");
 		assert_eq!(account.owner, program_id, "counter is owned by the program");
-		assert_eq!(account.data.len(), 10, "counter state layout is 10 bytes");
+		// The account carries the envelope: discriminator, migration version,
+		// bump, then the count. `tests/abi_layout.rs` pins the same geometry.
+		assert_eq!(account.data.len(), 11, "counter state layout is 11 bytes");
 		assert_eq!(account.data[0], 1, "account discriminator is CounterState");
+		assert_eq!(account.data[1], 0, "stored migration version is current");
 		assert_eq!(
-			account.data[1], bump,
+			account.data[2], bump,
 			"stored bump matches the canonical bump"
 		);
 		assert_eq!(
-			account.data[2..],
+			account.data[3..],
 			0u64.to_le_bytes(),
 			"fresh counters start at zero"
 		);
@@ -129,7 +136,7 @@ fn increments_persist_across_transactions() {
 
 			let account = program.account(&counter).expect("fetch counter account");
 			assert_eq!(
-				account.data[2..],
+				account.data[3..],
 				expected.to_le_bytes(),
 				"counter value after {expected} increments"
 			);
@@ -191,7 +198,7 @@ fn cannot_initialize_an_existing_counter() {
 
 		let account = program.account(&counter).expect("fetch counter account");
 		assert_eq!(
-			account.data[2..],
+			account.data[3..],
 			0u64.to_le_bytes(),
 			"state survives the failed tx"
 		);
@@ -242,7 +249,8 @@ fn counters_are_isolated_per_authority() {
 			}
 
 			let account = program.account(&counter).expect("fetch counter account");
-			assert_eq!(account.data[2..], 1u64.to_le_bytes());
+			// Envelope: discriminator, migration version, bump, then the count.
+			assert_eq!(account.data[3..], 1u64.to_le_bytes());
 		}
 
 		// The first authority's counter still reads 1 while the second was
@@ -251,7 +259,8 @@ fn counters_are_isolated_per_authority() {
 		let account = program
 			.account(&first_counter)
 			.expect("fetch first counter");
-		assert_eq!(account.data[2..], 1u64.to_le_bytes());
+		// Envelope: discriminator, migration version, bump, then the count.
+		assert_eq!(account.data[3..], 1u64.to_le_bytes());
 
 		program.stop().expect("stop isolated program test");
 	});

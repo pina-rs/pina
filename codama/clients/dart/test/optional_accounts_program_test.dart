@@ -165,7 +165,8 @@ void main() {
     });
 
     test('store state codec round-trips the on-chain layout', () {
-      final bytes = Uint8List.fromList([1, 42, 7, 0, 0, 0, 0, 0, 0, 0]);
+      // Envelope: discriminator, migration version, bump, then the count.
+      final bytes = Uint8List.fromList([1, 0, 42, 7, 0, 0, 0, 0, 0, 0, 0]);
       final state = getStoreStateCodec().decode(bytes);
       expect(state.discriminator, 1);
       expect(state.bump, 42);

@@ -58,14 +58,14 @@ pub struct CpiTransferIx {
 
 impl CpiTransferIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 9;
+	pub const LEN: usize = 10;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 9], ProgramError> {
-		let mut data = [0u8; 9];
-		data[..1].copy_from_slice(&CPI_TRANSFER_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 10], ProgramError> {
+		let mut data = [0u8; 10];
+		data[..2].copy_from_slice(&CPI_TRANSFER_DISCRIMINATOR);
+		data[2..10].copy_from_slice(&self.amount.to_le_bytes());
 
 		Ok(data)
 	}
@@ -97,4 +97,4 @@ impl<'account> CpiTransfer<'account> {
 	}
 }
 
-const CPI_TRANSFER_DISCRIMINATOR: [u8; 1] = [0];
+const CPI_TRANSFER_DISCRIMINATOR: [u8; 2] = [0, 0];

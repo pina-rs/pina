@@ -9,6 +9,7 @@
 )]
 
 pub const UPDATE_ROLE_DISCRIMINATOR: u8 = 2u8;
+pub const UPDATE_ROLE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -72,6 +73,7 @@ impl UpdateRoleInstructionData {
 		<UpdateRoleInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_ROLE_DISCRIMINATOR;
+			data.migration_version = UPDATE_ROLE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -85,5 +87,6 @@ impl UpdateRoleInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct UpdateRoleInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub permissions: u64,
 }

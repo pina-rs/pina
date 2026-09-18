@@ -12,7 +12,9 @@ Every opted-in contract writes:
 
 - The version sits immediately after the discriminator, is little-endian, and is never written by application source. Macros inject it from `migrations/manifest.json`.
 - Version `0` is the first captured shape. `pina migrations make` allocates later versions; source code never declares a number.
-- The width is program-wide through `[migrations].version-type` in `pina.toml`: `"u8"` (default), `"u16"`, or `"u32"`. `"u64"` is rejected at configuration parse; discriminator width is a separate setting that does support `u64`.
+- Versions are counted per contract, not per program: every account, instruction, and event owns an independent history that starts at `0`, so a program can hold one contract at version `3` and another at `0`.
+- The width is program-wide through `[migrations].version_type` in `pina.toml`: `"u8"` (the default and the recommendation), `"u16"`, or `"u32"`. `"u64"` is rejected at configuration parse; discriminator width is a separate setting that does support `u64`.
+- Prefer `u8`: 255 versions of one contract is not a realistic ceiling, and it is the cheapest envelope. Choose a wider width before the first release only when one contract is expected to exceed 255 versions.
 - The width freezes at the first persistent publication, so changing it after release is breaking for every migration-aware contract.
 
 ## Opt in
@@ -31,7 +33,7 @@ Whole kinds, through `pina.toml`:
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = true # every kind, or ["accounts", "events", "instructions"], or false
 ```
 
@@ -76,7 +78,7 @@ pina migrations make --rename value:points    # preserve the stored bytes
 pina migrations make --assume-removed value   # discard them; the new field starts zeroed
 ```
 
-Answers persist in `[migrations.answers]` in `pina.toml` (`rename = ["value:points"]`, `assume-removed = []`), so fresh clones and CI replay a local decision. With `--json`, `--no-interactive`, or no terminal, an unanswered question is a hard failure: the question array prints on stdout, the human-readable error on stderr, exit status 1.
+Answers persist in `[migrations.answers]` in `pina.toml` (`rename = ["value:points"]`, `assume_removed = []`), so fresh clones and CI replay a local decision. With `--json`, `--no-interactive`, or no terminal, an unanswered question is a hard failure: the question array prints on stdout, the human-readable error on stderr, exit status 1.
 
 ## Cost preview
 
@@ -151,6 +153,14 @@ If a writable touch genuinely cannot be scheduled, generated accounts expose a r
 Also expect `MigrationRequired` (a stale account was touched without a migration path) and `InvalidMigrationVersion` (the stored version is unknown or newer than the program).
 
 Builds before the split reported the workspace, growth, and lamport failures as the aggregate `MigrationBudgetExceeded` (`0xFFFF_FFF5`). That code stays reserved so published binaries remain decodable; clients must decode the aggregate code and the three split codes.
+
+## Version exhaustion
+
+Versions are counted per contract, not per program: each account, instruction, and event owns an independent history starting at `0`, so a `u8` program gives every contract its own 255-version budget. `pina migrations status` prints what is left (`account State v3 (published, 252 version(s) remaining)`), and `status --json`/`check --json` carry it as `versionsRemaining`.
+
+The width is program-wide and freezes at the first persistent publication, so it cannot be widened after release. Pre-launch, the only widening path is deleting `migrations/` and re-running `make` with the wider setting, which re-baselines history; there is nothing deployed to stay compatible with yet.
+
+Reaching the ceiling is terminal for that contract. `make` fails closed with `VersionExhausted` and the on-chain path rejects out-of-range versions instead of truncating, so no version number is ever reused. The remedy is a successor contract: a new discriminator with a fresh version-0 history, plus a bridge instruction that reads the exhausted account through the current loaders and writes the successor, with clients sweeping accounts lazily. History cannot be pruned, because a program cannot enumerate its own accounts.
 
 ## Honest limits
 

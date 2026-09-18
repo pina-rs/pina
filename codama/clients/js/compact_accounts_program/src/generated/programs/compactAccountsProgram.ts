@@ -51,6 +51,8 @@ import {
 	type ResizeAsyncInput,
 	type WriteAsyncInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findJournalPda } from "../pdas";
 
 export const COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
@@ -66,9 +68,10 @@ export function identifyCompactAccountsProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): CompactAccountsProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return CompactAccountsProgramAccount.Journal;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CompactAccountsProgramAccount.Journal;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "compactAccountsProgram" },
@@ -86,18 +89,22 @@ export function identifyCompactAccountsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): CompactAccountsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return CompactAccountsProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return CompactAccountsProgramInstruction.Resize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return CompactAccountsProgramInstruction.Write;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return CompactAccountsProgramInstruction.Rename;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CompactAccountsProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CompactAccountsProgramInstruction.Resize;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CompactAccountsProgramInstruction.Write;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CompactAccountsProgramInstruction.Rename;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "compactAccountsProgram" },
@@ -216,6 +223,8 @@ export function compactAccountsProgramProgram() {
 			compactAccountsProgram: <CompactAccountsProgramPlugin> {
 				accounts: { journal: addSelfFetchFunctions(client, getJournalCodec()) },
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

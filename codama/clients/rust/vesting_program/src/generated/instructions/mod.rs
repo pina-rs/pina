@@ -11,7 +11,9 @@
 pub(crate) mod r#cancel;
 pub(crate) mod r#claim;
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 
 pub use self::r#cancel::*;
 pub use self::r#claim::*;
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;

@@ -55,17 +55,17 @@ pub struct InitializePolicyIx {
 
 impl InitializePolicyIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 19;
+	pub const LEN: usize = 20;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 19], ProgramError> {
-		let mut data = [0u8; 19];
-		data[..1].copy_from_slice(&INITIALIZE_POLICY_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..10].copy_from_slice(&self.minimum.to_le_bytes());
-		data[10..18].copy_from_slice(&self.maximum.to_le_bytes());
-		data[18..19].copy_from_slice(&self.required_approvals.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 20], ProgramError> {
+		let mut data = [0u8; 20];
+		data[..2].copy_from_slice(&INITIALIZE_POLICY_DISCRIMINATOR);
+		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
+		data[3..11].copy_from_slice(&self.minimum.to_le_bytes());
+		data[11..19].copy_from_slice(&self.maximum.to_le_bytes());
+		data[19..20].copy_from_slice(&self.required_approvals.to_le_bytes());
 
 		Ok(data)
 	}
@@ -97,4 +97,4 @@ impl<'account> InitializePolicy<'account> {
 	}
 }
 
-const INITIALIZE_POLICY_DISCRIMINATOR: [u8; 1] = [0];
+const INITIALIZE_POLICY_DISCRIMINATOR: [u8; 2] = [0, 0];

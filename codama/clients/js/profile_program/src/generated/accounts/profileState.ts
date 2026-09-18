@@ -53,6 +53,7 @@ import {
 	fixPinaPodEncoderSize,
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 	getPinaPodOptionTagDecoder,
 	getPinaPodStringDecoder,
 } from "../pinaPodCodecs";
@@ -61,6 +62,12 @@ export const PROFILE_STATE_DISCRIMINATOR = 1;
 
 export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(PROFILE_STATE_DISCRIMINATOR);
+}
+
+export const PROFILE_STATE_DISCRIMINATOR2 = 0;
+
+export function getProfileStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(PROFILE_STATE_DISCRIMINATOR2);
 }
 
 /**
@@ -89,6 +96,7 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  */
 export type ProfileState = {
 	discriminator: number;
+	migrationVersion: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/** UTF-8 display name with 32 bytes of inline capacity. */
@@ -127,32 +135,38 @@ export type ProfileStateArgs = {
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], [
-			"name",
-			fixPinaPodEncoderSize(
-				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-				33,
-			),
-		], [
-			"bio",
-			fixPinaPodEncoderSize(
-				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-				129,
-			),
-		], [
-			"tags",
-			fixPinaPodEncoderSize(
-				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
-				66,
-			),
-		], [
-			"favoriteTag",
-			getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
-		], ["active", getBooleanEncoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			[
+				"name",
+				fixPinaPodEncoderSize(
+					addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+					33,
+				),
+			],
+			[
+				"bio",
+				fixPinaPodEncoderSize(
+					addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+					129,
+				),
+			],
+			[
+				"tags",
+				fixPinaPodEncoderSize(
+					getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
+					66,
+				),
+			],
+			[
+				"favoriteTag",
+				getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+			],
+			["active", getBooleanEncoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -166,6 +180,7 @@ export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["name", getPinaPodStringDecoder(getU8Decoder(), 33)],
 		["bio", getPinaPodStringDecoder(getU8Decoder(), 129)],
@@ -270,4 +285,32 @@ export async function fetchMaybeProfileStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findProfilePda(seeds, { programAddress });
 	return await fetchMaybeProfileState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const PROFILE_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `ProfileState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (profileStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ profileState: address, payer }).make());
+ * }
+ * ```
+ */
+export function profileStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

@@ -30,13 +30,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR = 2;
 
 export function getAllowsDuplicateReadonlyDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR);
+}
+
+export const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR2 = 0;
+
+export function getAllowsDuplicateReadonlyDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR2);
 }
 
 export type AllowsDuplicateReadonlyInstruction<
@@ -58,7 +67,10 @@ export type AllowsDuplicateReadonlyInstruction<
 		]
 	>;
 
-export type AllowsDuplicateReadonlyInstructionData = { discriminator: number };
+export type AllowsDuplicateReadonlyInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+};
 
 export type AllowsDuplicateReadonlyInstructionDataArgs = {};
 
@@ -66,8 +78,11 @@ export function getAllowsDuplicateReadonlyInstructionDataEncoder(): FixedSizeEnc
 	AllowsDuplicateReadonlyInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 2 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
@@ -80,6 +95,9 @@ export function getAllowsDuplicateReadonlyInstructionDataDecoder(): FixedSizeDec
 			ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR,
 			getU8Decoder(),
 		),
+	], [
+		"migrationVersion",
+		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

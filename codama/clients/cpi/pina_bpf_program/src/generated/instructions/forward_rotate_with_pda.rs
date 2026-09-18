@@ -50,15 +50,15 @@ pub struct ForwardRotateWithPdaIx<'argument> {
 
 impl<'argument> ForwardRotateWithPdaIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 34;
+	pub const LEN: usize = 35;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 34], ProgramError> {
-		let mut data = [0u8; 34];
-		data[..1].copy_from_slice(&FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..34].copy_from_slice(self.new_authority.as_ref());
+	pub fn to_bytes(&self) -> Result<[u8; 35], ProgramError> {
+		let mut data = [0u8; 35];
+		data[..2].copy_from_slice(&FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR);
+		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
+		data[3..35].copy_from_slice(self.new_authority.as_ref());
 
 		Ok(data)
 	}
@@ -90,4 +90,4 @@ impl<'account, 'argument> ForwardRotateWithPda<'account, 'argument> {
 	}
 }
 
-const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR: [u8; 1] = [2];
+const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR: [u8; 2] = [2, 0];

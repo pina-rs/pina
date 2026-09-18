@@ -21,15 +21,48 @@ import {
 	type MyOtherEventEvent,
 } from "./myOtherEvent.js";
 
+interface MyEventEventProjectionStep {
+	readonly from: number;
+	readonly to: number;
+	readonly automatic: boolean;
+	readonly sourcePayloadSize: number;
+	readonly destinationPayloadSize: number;
+	readonly moves: readonly (readonly [number, number, number])[];
+}
+
 /**
- * Decode one current-layout event record: the event has no version envelope; only its current layout decodes.
+ * Adjacent projections derived from the checked-in migration manifest.
+ * Adjacent steps compose, mirroring the runtime's `normalize_event_data`.
+ */
+const MY_EVENT_EVENT_PROJECTION_STEPS: readonly MyEventEventProjectionStep[] =
+	[];
+
+/** Versions whose adjacent transition is manual and not derivable in clients. */
+const MY_EVENT_EVENT_MANUAL_VERSIONS: readonly number[] = [];
+
+const MY_EVENT_EVENT_HEADER_SIZE = 2;
+const MY_EVENT_EVENT_CURRENT_VERSION = 0;
+
+/** Raw event bytes with their source version and whether a projection ran. */
+export type NormalizedMyEventEvent = {
+	name: "myEvent";
+	data: MyEventEvent;
+	sourceVersion: number;
+	wasMigrated: boolean;
+};
+
+/**
+ * Decode one event record, projecting historical versions into the current
+ * shape and retaining the version that actually wrote the bytes.
+ *
+ * Unknown, future, and non-projectable versions fail closed with the reason.
  */
 export function normalizeMyEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): DecodedMyEventEvent {
+): NormalizedMyEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getMyEventEventDiscriminatorBytes();
-	if (bytes.length < 1) {
+	if (bytes.length < MY_EVENT_EVENT_HEADER_SIZE) {
 		throw new RangeError(
 			`the provided data is too short for the "MyEventEvent" event envelope`,
 		);
@@ -41,15 +74,37 @@ export function normalizeMyEventEvent(
 			);
 		}
 	}
-	return { name: "myEvent", data: getMyEventEventDecoder().decode(bytes) };
+	const sourceVersion = bytes[1];
+	if (sourceVersion === MY_EVENT_EVENT_CURRENT_VERSION) {
+		return {
+			name: "myEvent",
+			data: getMyEventEventDecoder().decode(bytes),
+			sourceVersion,
+			wasMigrated: false,
+		};
+	}
+	if (sourceVersion > MY_EVENT_EVENT_CURRENT_VERSION) {
+		throw new RangeError(
+			`event migration version mismatch: expected 0, received ${sourceVersion} (the log was written by a newer program; upgrade this client)`,
+		);
+	}
+	const projected = projectMyEventEvent(bytes, sourceVersion);
+	return {
+		name: "myEvent",
+		data: getMyEventEventDecoder().decode(projected),
+		sourceVersion,
+		wasMigrated: true,
+	};
 }
 
 /** One log entry that named this event. */
-export type DecodedMyEventEvent = { name: "myEvent"; data: MyEventEvent };
+export type DecodedMyEventEvent = NormalizedMyEventEvent;
 
 /**
  * Decode a `Program data:` log line, or return `null` when the line is not
  * this event.
+ *
+ * Lines that name the event but carry an unprojectable version throw.
  */
 export function parseMyEventEventFromLog(
 	log: string,
@@ -71,15 +126,91 @@ export function parseMyEventEventFromLog(
 	return normalizeMyEventEvent(bytes);
 }
 
+function projectMyEventEvent(
+	bytes: Uint8Array,
+	sourceVersion: number,
+): Uint8Array {
+	const discriminatorBytes = getMyEventEventDiscriminatorBytes();
+	let version = sourceVersion;
+	let payload = bytes.slice(MY_EVENT_EVENT_HEADER_SIZE);
+	while (version !== MY_EVENT_EVENT_CURRENT_VERSION) {
+		const step = MY_EVENT_EVENT_PROJECTION_STEPS.find(
+			(candidate) => candidate.from === version,
+		);
+		if (step === undefined || !step.automatic) {
+			const reason = MY_EVENT_EVENT_MANUAL_VERSIONS.includes(version)
+				? "its adjacent transition is manual, so only an on-chain projection or a client generated from that schema can represent it"
+				: "this client has no checked-in projection for it";
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (${reason})`,
+			);
+		}
+		if (payload.length !== step.sourcePayloadSize) {
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (the log length does not match the v${version} schema)`,
+			);
+		}
+		const destination = new Uint8Array(step.destinationPayloadSize);
+		for (const [sourceOffset, destinationOffset, size] of step.moves) {
+			destination.set(
+				payload.subarray(sourceOffset, sourceOffset + size),
+				destinationOffset,
+			);
+		}
+		payload = destination;
+		version = step.to;
+	}
+
+	const projected = new Uint8Array(MY_EVENT_EVENT_HEADER_SIZE + payload.length);
+	projected.set(discriminatorBytes, 0);
+	const header = 1;
+	projected[header] = 0;
+	projected.set(payload, MY_EVENT_EVENT_HEADER_SIZE);
+	return projected;
+}
+
+interface MyOtherEventEventProjectionStep {
+	readonly from: number;
+	readonly to: number;
+	readonly automatic: boolean;
+	readonly sourcePayloadSize: number;
+	readonly destinationPayloadSize: number;
+	readonly moves: readonly (readonly [number, number, number])[];
+}
+
 /**
- * Decode one current-layout event record: the event has no version envelope; only its current layout decodes.
+ * Adjacent projections derived from the checked-in migration manifest.
+ * Adjacent steps compose, mirroring the runtime's `normalize_event_data`.
+ */
+const MY_OTHER_EVENT_EVENT_PROJECTION_STEPS:
+	readonly MyOtherEventEventProjectionStep[] = [];
+
+/** Versions whose adjacent transition is manual and not derivable in clients. */
+const MY_OTHER_EVENT_EVENT_MANUAL_VERSIONS: readonly number[] = [];
+
+const MY_OTHER_EVENT_EVENT_HEADER_SIZE = 2;
+const MY_OTHER_EVENT_EVENT_CURRENT_VERSION = 0;
+
+/** Raw event bytes with their source version and whether a projection ran. */
+export type NormalizedMyOtherEventEvent = {
+	name: "myOtherEvent";
+	data: MyOtherEventEvent;
+	sourceVersion: number;
+	wasMigrated: boolean;
+};
+
+/**
+ * Decode one event record, projecting historical versions into the current
+ * shape and retaining the version that actually wrote the bytes.
+ *
+ * Unknown, future, and non-projectable versions fail closed with the reason.
  */
 export function normalizeMyOtherEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
-): DecodedMyOtherEventEvent {
+): NormalizedMyOtherEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	const discriminatorBytes = getMyOtherEventEventDiscriminatorBytes();
-	if (bytes.length < 1) {
+	if (bytes.length < MY_OTHER_EVENT_EVENT_HEADER_SIZE) {
 		throw new RangeError(
 			`the provided data is too short for the "MyOtherEventEvent" event envelope`,
 		);
@@ -91,21 +222,37 @@ export function normalizeMyOtherEventEvent(
 			);
 		}
 	}
+	const sourceVersion = bytes[1];
+	if (sourceVersion === MY_OTHER_EVENT_EVENT_CURRENT_VERSION) {
+		return {
+			name: "myOtherEvent",
+			data: getMyOtherEventEventDecoder().decode(bytes),
+			sourceVersion,
+			wasMigrated: false,
+		};
+	}
+	if (sourceVersion > MY_OTHER_EVENT_EVENT_CURRENT_VERSION) {
+		throw new RangeError(
+			`event migration version mismatch: expected 0, received ${sourceVersion} (the log was written by a newer program; upgrade this client)`,
+		);
+	}
+	const projected = projectMyOtherEventEvent(bytes, sourceVersion);
 	return {
 		name: "myOtherEvent",
-		data: getMyOtherEventEventDecoder().decode(bytes),
+		data: getMyOtherEventEventDecoder().decode(projected),
+		sourceVersion,
+		wasMigrated: true,
 	};
 }
 
 /** One log entry that named this event. */
-export type DecodedMyOtherEventEvent = {
-	name: "myOtherEvent";
-	data: MyOtherEventEvent;
-};
+export type DecodedMyOtherEventEvent = NormalizedMyOtherEventEvent;
 
 /**
  * Decode a `Program data:` log line, or return `null` when the line is not
  * this event.
+ *
+ * Lines that name the event but carry an unprojectable version throw.
  */
 export function parseMyOtherEventEventFromLog(
 	log: string,
@@ -125,6 +272,51 @@ export function parseMyOtherEventEventFromLog(
 		}
 	}
 	return normalizeMyOtherEventEvent(bytes);
+}
+
+function projectMyOtherEventEvent(
+	bytes: Uint8Array,
+	sourceVersion: number,
+): Uint8Array {
+	const discriminatorBytes = getMyOtherEventEventDiscriminatorBytes();
+	let version = sourceVersion;
+	let payload = bytes.slice(MY_OTHER_EVENT_EVENT_HEADER_SIZE);
+	while (version !== MY_OTHER_EVENT_EVENT_CURRENT_VERSION) {
+		const step = MY_OTHER_EVENT_EVENT_PROJECTION_STEPS.find(
+			(candidate) => candidate.from === version,
+		);
+		if (step === undefined || !step.automatic) {
+			const reason = MY_OTHER_EVENT_EVENT_MANUAL_VERSIONS.includes(version)
+				? "its adjacent transition is manual, so only an on-chain projection or a client generated from that schema can represent it"
+				: "this client has no checked-in projection for it";
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (${reason})`,
+			);
+		}
+		if (payload.length !== step.sourcePayloadSize) {
+			throw new RangeError(
+				`event migration version mismatch: expected 0, received ${version} (the log length does not match the v${version} schema)`,
+			);
+		}
+		const destination = new Uint8Array(step.destinationPayloadSize);
+		for (const [sourceOffset, destinationOffset, size] of step.moves) {
+			destination.set(
+				payload.subarray(sourceOffset, sourceOffset + size),
+				destinationOffset,
+			);
+		}
+		payload = destination;
+		version = step.to;
+	}
+
+	const projected = new Uint8Array(
+		MY_OTHER_EVENT_EVENT_HEADER_SIZE + payload.length,
+	);
+	projected.set(discriminatorBytes, 0);
+	const header = 1;
+	projected[header] = 0;
+	projected.set(payload, MY_OTHER_EVENT_EVENT_HEADER_SIZE);
+	return projected;
 }
 
 /** Every event this program can emit, as decoded from a log line. */

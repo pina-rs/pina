@@ -18,6 +18,7 @@
 /// | 1      | 8    | amount (u64)  |
 /// ```
 pub const CPI_TRANSFER_DISCRIMINATOR: u8 = 0u8;
+pub const CPI_TRANSFER_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ impl CpiTransferInstructionData {
 		<CpiTransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CPI_TRANSFER_DISCRIMINATOR;
+			data.migration_version = CPI_TRANSFER_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -91,5 +93,6 @@ impl CpiTransferInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CpiTransferInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub amount: u64,
 }

@@ -59,26 +59,26 @@ pub struct InitializeIx<'argument> {
 
 impl<'argument> InitializeIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 164;
+	pub const LEN: usize = 165;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 164], ProgramError> {
-		let mut data = [0u8; 164];
-		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 165], ProgramError> {
+		let mut data = [0u8; 165];
+		data[..2].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
+		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
 		let value = self.name.as_bytes();
 		if value.len() > 32 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[2..2 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
-		data[2 + 1..2 + 1 + value.len()].copy_from_slice(value);
+		data[3..3 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[3 + 1..3 + 1 + value.len()].copy_from_slice(value);
 		let value = self.bio.as_bytes();
 		if value.len() > 128 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[35..35 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
-		data[35 + 1..35 + 1 + value.len()].copy_from_slice(value);
+		data[36..36 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[36 + 1..36 + 1 + value.len()].copy_from_slice(value);
 
 		Ok(data)
 	}
@@ -110,4 +110,4 @@ impl<'account, 'argument> Initialize<'account, 'argument> {
 	}
 }
 
-const INITIALIZE_DISCRIMINATOR: [u8; 1] = [0];
+const INITIALIZE_DISCRIMINATOR: [u8; 2] = [0, 0];

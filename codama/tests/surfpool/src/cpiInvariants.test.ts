@@ -69,10 +69,12 @@ function instructionData(
 		? getAddressEncoder().encode(address(newAuthority))
 		: new Uint8Array();
 	const bumpBytes = bump === undefined ? new Uint8Array() : Uint8Array.of(bump);
-	const data = new Uint8Array(1 + bumpBytes.length + addressBytes.length);
+	// The envelope inserts the migration version byte after the discriminator.
+	const data = new Uint8Array(2 + bumpBytes.length + addressBytes.length);
 	data[0] = discriminator;
-	data.set(bumpBytes, 1);
-	data.set(addressBytes, 1 + bumpBytes.length);
+	data[1] = 0;
+	data.set(bumpBytes, 2);
+	data.set(addressBytes, 2 + bumpBytes.length);
 
 	return data;
 }
@@ -183,9 +185,10 @@ function deployCpiPrograms(surfnet: Surfnet): void {
 
 function createOracle(surfnet: Surfnet, authority: string): string {
 	const oracle = Surfnet.newKeypair().publicKey;
-	const data = new Uint8Array(1 + 32 + 8);
+	const data = new Uint8Array(2 + 32 + 8);
 	data[0] = 1;
-	data.set(getAddressEncoder().encode(address(authority)), 1);
+	data[1] = 0;
+	data.set(getAddressEncoder().encode(address(authority)), 2);
 	surfnet.setAccount(
 		oracle,
 		1_000_000,
@@ -247,7 +250,7 @@ test("generated CPI preserves a transaction signer requirement", async () => {
 
 		const data = await fetchAccountData(surfnet, oracle);
 		assert.deepEqual(
-			data.slice(1, 33),
+			data.slice(2, 34),
 			getAddressEncoder().encode(address(nextAuthority)),
 		);
 	});
@@ -286,7 +289,7 @@ test("generated CPI lets invoke_signed satisfy a PDA signer requirement", async 
 
 		const data = await fetchAccountData(surfnet, oracle);
 		assert.deepEqual(
-			data.slice(1, 33),
+			data.slice(2, 34),
 			getAddressEncoder().encode(address(nextAuthority)),
 		);
 	});
@@ -414,7 +417,8 @@ test("PDA creation accepts the canonical target", async () => {
 		);
 		const data = await fetchAccountData(surfnet, state);
 		assert.equal(data[0], 1);
-		assert.equal(data[1], bump);
+		assert.equal(data[1], 0);
+		assert.equal(data[2], bump);
 	});
 });
 

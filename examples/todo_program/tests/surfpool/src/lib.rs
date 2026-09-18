@@ -28,7 +28,8 @@ fn initialize_instruction(
 	bump: u8,
 	digest: [u8; 32],
 ) -> pina_test::Instruction {
-	let mut data = vec![TodoInstruction::Initialize as u8, bump];
+	// discriminator + migration version + bump, then the 32-byte digest.
+	let mut data = vec![TodoInstruction::Initialize as u8, 0u8, bump];
 	data.extend_from_slice(&digest);
 
 	program.instruction(
@@ -65,17 +66,18 @@ fn initializes_the_todo_account() {
 
 		let account = program.account(&todo).expect("fetch todo account");
 		assert_eq!(account.owner, program_id);
-		assert_eq!(account.data.len(), 67, "TodoState layout is 67 bytes");
+		assert_eq!(account.data.len(), 68, "TodoState layout is 68 bytes");
 		assert_eq!(account.data[0], 1, "account discriminator is TodoState");
-		// owner: 1..33
+		assert_eq!(account.data[1], 0, "stored migration version is current");
+		// owner: 2..34
 		assert_eq!(
-			account.data[1..33],
+			account.data[2..34],
 			owner.to_bytes(),
 			"stored owner matches"
 		);
-		assert_eq!(account.data[33], bump);
-		assert_eq!(account.data[34], 0, "fresh todo is not completed");
-		assert_eq!(account.data[35..67], digest, "digest round-trips on-chain");
+		assert_eq!(account.data[34], bump);
+		assert_eq!(account.data[35], 0, "fresh todo is not completed");
+		assert_eq!(account.data[36..68], digest, "digest round-trips on-chain");
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -106,7 +108,7 @@ fn toggling_updates_the_completion_flag() {
 			.expect("first Toggle");
 		let account = program.account(&todo).expect("fetch todo account");
 		assert_eq!(
-			account.data[34], 1,
+			account.data[35], 1,
 			"todo is completed after the first toggle"
 		);
 
@@ -114,7 +116,7 @@ fn toggling_updates_the_completion_flag() {
 			.send_instruction(toggle_instruction(&program, &owner, &todo))
 			.expect("second Toggle");
 		let account = program.account(&todo).expect("fetch todo account");
-		assert_eq!(account.data[34], 0, "second toggle restores the flag");
+		assert_eq!(account.data[35], 0, "second toggle restores the flag");
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -126,7 +128,7 @@ fn toggle_instruction(
 	todo: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[TodoInstruction::ToggleCompleted as u8],
+		&[TodoInstruction::ToggleCompleted as u8, 0u8],
 		vec![
 			AccountMeta::new_readonly(*owner, true),
 			AccountMeta::new(*todo, false),
@@ -154,7 +156,7 @@ fn digest_updates_replace_the_stored_value() {
 			.expect("execute Initialize");
 
 		let next_digest = [9u8; 32];
-		let mut data = vec![TodoInstruction::UpdateDigest as u8];
+		let mut data = vec![TodoInstruction::UpdateDigest as u8, 0u8];
 		data.extend_from_slice(&next_digest);
 
 		program
@@ -162,7 +164,7 @@ fn digest_updates_replace_the_stored_value() {
 			.expect("execute UpdateDigest");
 
 		let account = program.account(&todo).expect("fetch todo account");
-		assert_eq!(account.data[35..], next_digest, "digest replaced on-chain");
+		assert_eq!(account.data[36..], next_digest, "digest replaced on-chain");
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -212,7 +214,7 @@ fn rejects_malformed_update_payloads() {
 
 		let account = program.account(&todo).expect("fetch todo account");
 		assert_eq!(
-			account.data[35..],
+			account.data[36..],
 			[1u8; 32],
 			"state survives the failed instruction"
 		);
@@ -251,7 +253,7 @@ fn cannot_initialize_twice() {
 
 		// The original digest must survive the failed instruction.
 		let account = program.account(&todo).expect("fetch todo account");
-		assert_eq!(account.data[35..], [2u8; 32]);
+		assert_eq!(account.data[36..], [2u8; 32]);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -282,7 +284,7 @@ fn rejects_a_signer_who_is_not_the_stored_owner() {
 			.fund(&impostor.pubkey(), 1_000_000_000)
 			.expect("fund impostor");
 
-		let mut payload = vec![TodoInstruction::UpdateDigest as u8];
+		let mut payload = vec![TodoInstruction::UpdateDigest as u8, 0u8];
 		payload.extend_from_slice(&[9u8; 32]);
 
 		let instruction = program.instruction(
@@ -299,7 +301,7 @@ fn rejects_a_signer_who_is_not_the_stored_owner() {
 		assert_eq!(error.operation(), "execute program instruction");
 
 		let account = program.account(&todo).expect("fetch todo account");
-		assert_eq!(account.data[35..], [3u8; 32], "digest is untouched");
+		assert_eq!(account.data[36..], [3u8; 32], "digest is untouched");
 
 		program.stop().expect("stop isolated program test");
 	});

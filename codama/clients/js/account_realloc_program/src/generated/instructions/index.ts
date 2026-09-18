@@ -7,5 +7,6 @@
  */
 
 export * from "./initialize";
+export * from "./migrate";
 export * from "./realloc";
 export * from "./realloc2";

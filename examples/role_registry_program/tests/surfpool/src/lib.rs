@@ -29,7 +29,8 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[RegistryInstruction::Initialize as u8, bump],
+		// discriminator + migration version + bump.
+		&[RegistryInstruction::Initialize as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*admin, true),
 			AccountMeta::new(*registry, false),
@@ -49,7 +50,8 @@ fn add_role_instruction(
 	permissions: u64,
 	bump: u8,
 ) -> pina_test::Instruction {
-	let mut data = vec![RegistryInstruction::AddRole as u8];
+	// discriminator + migration version, then role id, permissions, and bump.
+	let mut data = vec![RegistryInstruction::AddRole as u8, 0u8];
 	data.extend_from_slice(&role_id.to_le_bytes());
 	data.extend_from_slice(&permissions.to_le_bytes());
 	data.push(bump);
@@ -90,9 +92,10 @@ fn initialize_creates_the_registry_config() {
 			account.data[0], 1,
 			"account discriminator is RegistryConfig"
 		);
-		assert_eq!(&account.data[1..33], admin.to_bytes(), "stored admin");
-		assert_eq!(&account.data[33..41], 0u64.to_le_bytes(), "role_count zero");
-		assert_eq!(account.data[41], bump);
+		assert_eq!(account.data[1], 0, "stored migration version is current");
+		assert_eq!(&account.data[2..34], admin.to_bytes(), "stored admin");
+		assert_eq!(&account.data[34..42], 0u64.to_le_bytes(), "role_count zero");
+		assert_eq!(account.data[42], bump);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -135,20 +138,22 @@ fn add_update_deactivate_role_lifecycle() {
 
 		let entry = program.account(&role_entry).expect("fetch role entry");
 		assert_eq!(entry.data[0], 2, "account discriminator is RoleEntry");
-		assert_eq!(&entry.data[1..33], registry.to_bytes());
-		assert_eq!(&entry.data[33..41], 1u64.to_le_bytes());
-		assert_eq!(&entry.data[41..73], grantee.to_bytes());
-		assert_eq!(&entry.data[73..81], 0b0101u64.to_le_bytes());
-		assert_eq!(entry.data[81], 1, "role starts active");
+		// Envelope: discriminator, migration version, then the payload.
+		assert_eq!(entry.data[1], 0, "stored migration version is current");
+		assert_eq!(&entry.data[2..34], registry.to_bytes());
+		assert_eq!(&entry.data[34..42], 1u64.to_le_bytes());
+		assert_eq!(&entry.data[42..74], grantee.to_bytes());
+		assert_eq!(&entry.data[74..82], 0b0101u64.to_le_bytes());
+		assert_eq!(entry.data[82], 1, "role starts active");
 		let registry_account = program.account(&registry).expect("fetch registry");
 		assert_eq!(
-			&registry_account.data[33..41],
+			&registry_account.data[34..42],
 			1u64.to_le_bytes(),
 			"role_count = 1"
 		);
 
 		// UpdateRole: new permissions for an existing active role.
-		let mut data = vec![RegistryInstruction::UpdateRole as u8];
+		let mut data = vec![RegistryInstruction::UpdateRole as u8, 0u8];
 		data.extend_from_slice(&0b1001u64.to_le_bytes());
 		let update = program.instruction(
 			&data,
@@ -162,11 +167,11 @@ fn add_update_deactivate_role_lifecycle() {
 			.send_instruction(update)
 			.expect("execute UpdateRole");
 		let entry = program.account(&role_entry).expect("fetch role entry");
-		assert_eq!(&entry.data[73..81], 0b1001u64.to_le_bytes());
+		assert_eq!(&entry.data[74..82], 0b1001u64.to_le_bytes());
 
 		// DeactivateRole clears the active flag.
 		let deactivate = program.instruction(
-			&[RegistryInstruction::DeactivateRole as u8],
+			&[RegistryInstruction::DeactivateRole as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(admin, true),
 				AccountMeta::new_readonly(registry, false),
@@ -177,10 +182,10 @@ fn add_update_deactivate_role_lifecycle() {
 			.send_instruction(deactivate)
 			.expect("execute DeactivateRole");
 		let entry = program.account(&role_entry).expect("fetch role entry");
-		assert_eq!(entry.data[80], 0);
+		assert_eq!(entry.data[82], 0);
 
 		// Updating an inactive role must fail with RoleInactive (custom 2).
-		let mut data = vec![RegistryInstruction::UpdateRole as u8];
+		let mut data = vec![RegistryInstruction::UpdateRole as u8, 0u8];
 		data.extend_from_slice(&0b1111u64.to_le_bytes());
 		let update = program.instruction(
 			&data,
@@ -290,7 +295,7 @@ fn rotate_admin_and_verify_the_new_admin() {
 			.expect("fund new admin");
 
 		let rotate = program.instruction(
-			&[RegistryInstruction::RotateAdmin as u8],
+			&[RegistryInstruction::RotateAdmin as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(admin, true),
 				AccountMeta::new_readonly(new_admin, false),
@@ -302,7 +307,7 @@ fn rotate_admin_and_verify_the_new_admin() {
 			.expect("execute RotateAdmin");
 
 		let account = program.account(&registry).expect("fetch registry");
-		assert_eq!(&account.data[1..33], new_admin.to_bytes(), "admin rotated");
+		assert_eq!(&account.data[2..34], new_admin.to_bytes(), "admin rotated");
 
 		program.stop().expect("stop isolated program test");
 	});

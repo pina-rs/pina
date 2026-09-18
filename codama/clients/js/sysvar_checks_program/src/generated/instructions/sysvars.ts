@@ -30,13 +30,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const SYSVARS_DISCRIMINATOR = 0;
 
 export function getSysvarsDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SYSVARS_DISCRIMINATOR);
+}
+
+export const SYSVARS_DISCRIMINATOR2 = 0;
+
+export function getSysvarsDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(SYSVARS_DISCRIMINATOR2);
 }
 
 export type SysvarsInstruction<
@@ -61,7 +70,10 @@ export type SysvarsInstruction<
 		]
 	>;
 
-export type SysvarsInstructionData = { discriminator: number };
+export type SysvarsInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+};
 
 export type SysvarsInstructionDataArgs = {};
 
@@ -69,8 +81,11 @@ export function getSysvarsInstructionDataEncoder(): FixedSizeEncoder<
 	SysvarsInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
 	);
 }
 
@@ -80,6 +95,9 @@ export function getSysvarsInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(SYSVARS_DISCRIMINATOR, getU8Decoder()),
+	], [
+		"migrationVersion",
+		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

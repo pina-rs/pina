@@ -34,13 +34,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
 export function getOpenPositionDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(OPEN_POSITION_DISCRIMINATOR);
+}
+
+export const OPEN_POSITION_DISCRIMINATOR2 = 0;
+
+export function getOpenPositionDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(OPEN_POSITION_DISCRIMINATOR2);
 }
 
 export type OpenPositionInstruction<
@@ -73,6 +82,7 @@ export type OpenPositionInstruction<
 
 export type OpenPositionInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	bump: number;
 };
 
@@ -83,20 +93,27 @@ export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
+			"migrationVersion",
 			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		], ["bump", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
 export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
 	OpenPositionInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(OPEN_POSITION_DISCRIMINATOR, getU8Decoder()),
-	], ["bump", getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				OPEN_POSITION_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+	]);
 }
 
 export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<

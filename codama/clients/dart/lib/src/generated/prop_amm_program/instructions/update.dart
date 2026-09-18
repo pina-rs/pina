@@ -13,15 +13,19 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class UpdateInstructionData {
-  const UpdateInstructionData({required this.newPrice}) : discriminator = 1;
+  const UpdateInstructionData({required this.newPrice})
+    : discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final BigInt newPrice;
 }
 
 Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('newPrice', getU64Encoder()),
   ]);
 
@@ -29,6 +33,7 @@ Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
     structEncoder,
     (UpdateInstructionData value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'newPrice': value.newPrice,
     },
   );
@@ -37,6 +42,7 @@ Encoder<UpdateInstructionData> getUpdateInstructionDataEncoder() {
 Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('newPrice', getU64Decoder()),
   ]);
 
@@ -50,6 +56,7 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
 
   (UpdateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

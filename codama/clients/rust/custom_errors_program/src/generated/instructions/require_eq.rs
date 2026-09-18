@@ -9,6 +9,7 @@
 )]
 
 pub const REQUIRE_EQ_DISCRIMINATOR: u8 = 3u8;
+pub const REQUIRE_EQ_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -52,6 +53,7 @@ impl RequireEqInstructionData {
 		<RequireEqInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_EQ_DISCRIMINATOR;
+			data.migration_version = REQUIRE_EQ_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -65,4 +67,5 @@ impl RequireEqInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequireEqInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

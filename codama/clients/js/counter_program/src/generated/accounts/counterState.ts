@@ -33,12 +33,21 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { type CounterSeeds, findCounterPda } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;
 
 export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(COUNTER_STATE_DISCRIMINATOR);
+}
+
+export const COUNTER_STATE_DISCRIMINATOR2 = 0;
+
+export function getCounterStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(COUNTER_STATE_DISCRIMINATOR2);
 }
 
 /**
@@ -63,6 +72,7 @@ export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
  */
 export type CounterState = {
 	discriminator: number;
+	migrationVersion: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
@@ -85,11 +95,13 @@ export type CounterStateArgs = {
 /** Gets the encoder for {@link CounterStateArgs} account data. */
 export function getCounterStateEncoder(): FixedSizeEncoder<CounterStateArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], ["count", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["count", getU64Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -103,6 +115,7 @@ export function getCounterStateDecoder(): FixedSizeDecoder<CounterState> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["count", getU64Decoder()],
 	]);
@@ -191,4 +204,32 @@ export async function fetchMaybeCounterStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findCounterPda(seeds, { programAddress });
 	return await fetchMaybeCounterState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const COUNTER_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `CounterState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (counterStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ counterState: address, payer }).make());
+ * }
+ * ```
+ */
+export function counterStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

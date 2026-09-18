@@ -20,9 +20,11 @@ class PositionState {
     required this.rewardDebt,
     required this.pendingRewards,
     required this.bump,
-  }) : discriminator = 2;
+  }) : discriminator = 2,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address pool;
   final Address owner;
   final BigInt stakedAmount;
@@ -36,6 +38,7 @@ class PositionState {
       other is PositionState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           pool == other.pool &&
           owner == other.owner &&
           stakedAmount == other.stakedAmount &&
@@ -46,6 +49,7 @@ class PositionState {
   @override
   int get hashCode => Object.hash(
     discriminator,
+    migrationVersion,
     pool,
     owner,
     stakedAmount,
@@ -56,12 +60,13 @@ class PositionState {
 
   @override
   String toString() =>
-      'PositionState(discriminator: $discriminator, pool: $pool, owner: $owner, stakedAmount: $stakedAmount, rewardDebt: $rewardDebt, pendingRewards: $pendingRewards, bump: $bump)';
+      'PositionState(discriminator: $discriminator, migrationVersion: $migrationVersion, pool: $pool, owner: $owner, stakedAmount: $stakedAmount, rewardDebt: $rewardDebt, pendingRewards: $pendingRewards, bump: $bump)';
 }
 
 Encoder<PositionState> getPositionStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('pool', getAddressEncoder()),
     ('owner', getAddressEncoder()),
     ('stakedAmount', getU64Encoder()),
@@ -74,6 +79,7 @@ Encoder<PositionState> getPositionStateEncoder() {
     structEncoder,
     (PositionState value) => <String, Object?>{
       'discriminator': 2,
+      'migrationVersion': 0,
       'pool': value.pool,
       'owner': value.owner,
       'stakedAmount': value.stakedAmount,
@@ -87,6 +93,7 @@ Encoder<PositionState> getPositionStateEncoder() {
 Decoder<PositionState> getPositionStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('pool', getAddressDecoder()),
     ('owner', getAddressDecoder()),
     ('stakedAmount', getU64Decoder()),
@@ -105,6 +112,14 @@ Decoder<PositionState> getPositionStateDecoder() {
 
   (PositionState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -145,4 +160,21 @@ Codec<PositionState, PositionState> getPositionStateCodec() {
 
 Account<PositionState> decodePositionState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getPositionStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int positionStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `PositionState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool positionStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 2) {
+    return false;
+  }
+  return data[1] < 0;
 }

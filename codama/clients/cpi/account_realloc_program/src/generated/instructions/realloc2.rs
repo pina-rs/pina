@@ -55,14 +55,14 @@ pub struct Realloc2Ix {
 
 impl Realloc2Ix {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 3;
+	pub const LEN: usize = 4;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 3], ProgramError> {
-		let mut data = [0u8; 3];
-		data[..1].copy_from_slice(&REALLOC2_DISCRIMINATOR);
-		data[1..3].copy_from_slice(&self.len.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 4], ProgramError> {
+		let mut data = [0u8; 4];
+		data[..2].copy_from_slice(&REALLOC2_DISCRIMINATOR);
+		data[2..4].copy_from_slice(&self.len.to_le_bytes());
 
 		Ok(data)
 	}
@@ -95,4 +95,4 @@ impl<'account> Realloc2<'account> {
 	}
 }
 
-const REALLOC2_DISCRIMINATOR: [u8; 1] = [1];
+const REALLOC2_DISCRIMINATOR: [u8; 2] = [1, 0];

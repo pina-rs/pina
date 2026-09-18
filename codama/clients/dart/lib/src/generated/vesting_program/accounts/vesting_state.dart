@@ -24,9 +24,11 @@ class VestingState {
     required this.endTs,
     required this.cancelled,
     required this.bump,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address admin;
   final Address beneficiary;
   final Address mint;
@@ -44,6 +46,7 @@ class VestingState {
       other is VestingState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           admin == other.admin &&
           beneficiary == other.beneficiary &&
           mint == other.mint &&
@@ -58,6 +61,7 @@ class VestingState {
   @override
   int get hashCode => Object.hash(
     discriminator,
+    migrationVersion,
     admin,
     beneficiary,
     mint,
@@ -72,12 +76,13 @@ class VestingState {
 
   @override
   String toString() =>
-      'VestingState(discriminator: $discriminator, admin: $admin, beneficiary: $beneficiary, mint: $mint, totalAmount: $totalAmount, claimedAmount: $claimedAmount, startTs: $startTs, cliffTs: $cliffTs, endTs: $endTs, cancelled: $cancelled, bump: $bump)';
+      'VestingState(discriminator: $discriminator, migrationVersion: $migrationVersion, admin: $admin, beneficiary: $beneficiary, mint: $mint, totalAmount: $totalAmount, claimedAmount: $claimedAmount, startTs: $startTs, cliffTs: $cliffTs, endTs: $endTs, cancelled: $cancelled, bump: $bump)';
 }
 
 Encoder<VestingState> getVestingStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('admin', getAddressEncoder()),
     ('beneficiary', getAddressEncoder()),
     ('mint', getAddressEncoder()),
@@ -94,6 +99,7 @@ Encoder<VestingState> getVestingStateEncoder() {
     structEncoder,
     (VestingState value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'admin': value.admin,
       'beneficiary': value.beneficiary,
       'mint': value.mint,
@@ -111,6 +117,7 @@ Encoder<VestingState> getVestingStateEncoder() {
 Decoder<VestingState> getVestingStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('admin', getAddressDecoder()),
     ('beneficiary', getAddressDecoder()),
     ('mint', getAddressDecoder()),
@@ -133,6 +140,14 @@ Decoder<VestingState> getVestingStateDecoder() {
 
   (VestingState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -177,4 +192,21 @@ Codec<VestingState, VestingState> getVestingStateCodec() {
 
 Account<VestingState> decodeVestingState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getVestingStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int vestingStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `VestingState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool vestingStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

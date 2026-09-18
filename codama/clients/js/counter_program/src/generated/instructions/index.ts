@@ -8,3 +8,4 @@
 
 export * from "./increment";
 export * from "./initialize";
+export * from "./migrate";

@@ -13,7 +13,8 @@ const STAKE_HISTORY: &str = "SysvarStakeHistory1111111111111111111111111";
 
 fn sysvar_instruction(program: &ProgramTest, clock: &Pubkey) -> pina_test::Instruction {
 	program.instruction(
-		&[SysvarsInstruction::Sysvars as u8],
+		// discriminator + migration version; Sysvars takes no arguments.
+		&[SysvarsInstruction::Sysvars as u8, 0u8],
 		vec![
 			AccountMeta::new_readonly(*clock, false),
 			AccountMeta::new_readonly(Pubkey::from_str_const(RENT), false),

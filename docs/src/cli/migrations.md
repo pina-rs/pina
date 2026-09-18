@@ -4,7 +4,7 @@ Migration support is opt-in. Configure one version width for the program:
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 ```
 
 Add `migrations` to each account, instruction payload, or event that Pina must track:
@@ -25,7 +25,7 @@ A program that wants every contract versioned can opt in by kind instead of anno
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
 ```
 

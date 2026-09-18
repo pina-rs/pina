@@ -57,7 +57,7 @@ fn event_instructions_emit_decodable_log_records() {
 
 		for (index, (instruction, discriminator)) in expected.into_iter().enumerate() {
 			let logs = program
-				.simulate_logs(&[instruction as u8], Vec::new())
+				.simulate_logs(&[instruction as u8, 0u8], Vec::new())
 				.expect("simulate event instruction");
 			let records = decoded_event_records(&logs);
 			assert_eq!(
@@ -90,7 +90,7 @@ fn generated_client_decodes_the_emitted_record() {
 			.expect("start isolated program test");
 
 		let logs = program
-			.simulate_logs(&[EventsInstruction::Initialize as u8], Vec::new())
+			.simulate_logs(&[EventsInstruction::Initialize as u8, 0u8], Vec::new())
 			.expect("simulate event instruction");
 		let records = decoded_event_records(&logs);
 		let record = records
@@ -123,7 +123,7 @@ fn event_emitting_instructions_confirm() {
 			EventsInstruction::TestEventCpi,
 		] {
 			program
-				.send(&[instruction as u8], Vec::new())
+				.send(&[instruction as u8, 0u8], Vec::new())
 				.expect("event instruction confirms");
 		}
 

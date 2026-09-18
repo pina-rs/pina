@@ -9,9 +9,11 @@
 )]
 
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 pub(crate) mod r#rotate_authority;
 pub(crate) mod r#update;
 
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;
 pub use self::r#rotate_authority::*;
 pub use self::r#update::*;

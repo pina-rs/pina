@@ -259,8 +259,9 @@ mod tests {
 
 	#[test]
 	fn cpi_transfer_instruction_layout() {
-		// CpiTransferInstruction: 1 (discriminator) + 8 (amount) = 9 bytes.
-		assert_eq!(CpiTransferInstruction::SIZE, 9);
+		// CpiTransferInstruction: 1 (discriminator) + 1 (migration version) +
+		// 8 (amount) = 10 bytes.
+		assert_eq!(CpiTransferInstruction::SIZE, 10);
 		assert!(CpiTransferInstruction::matches_discriminator(&[
 			TransferInstruction::CpiTransfer as u8
 		]));
@@ -268,8 +269,9 @@ mod tests {
 
 	#[test]
 	fn direct_transfer_instruction_layout() {
-		// DirectTransferInstruction: 1 (discriminator) + 8 (amount) = 9 bytes.
-		assert_eq!(DirectTransferInstruction::SIZE, 9);
+		// DirectTransferInstruction: 1 (discriminator) + 1 (migration version) +
+		// 8 (amount) = 10 bytes.
+		assert_eq!(DirectTransferInstruction::SIZE, 10);
 		assert!(DirectTransferInstruction::matches_discriminator(&[
 			TransferInstruction::DirectTransfer as u8
 		]));
@@ -277,10 +279,11 @@ mod tests {
 
 	#[test]
 	fn cpi_transfer_instruction_deserialize() {
-		let mut data = [0u8; 9];
+		let mut data = [0u8; 10];
 		data[0] = TransferInstruction::CpiTransfer as u8;
+		// data[1] is the migration version; the payload follows the envelope.
 		// Amount = 1_000_000 in little-endian.
-		data[1..9].copy_from_slice(&1_000_000u64.to_le_bytes());
+		data[2..10].copy_from_slice(&1_000_000u64.to_le_bytes());
 
 		let ix = CpiTransferInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
@@ -289,9 +292,10 @@ mod tests {
 
 	#[test]
 	fn direct_transfer_instruction_deserialize() {
-		let mut data = [0u8; 9];
+		let mut data = [0u8; 10];
 		data[0] = TransferInstruction::DirectTransfer as u8;
-		data[1..9].copy_from_slice(&500_000u64.to_le_bytes());
+		// data[1] is the migration version; the payload follows the envelope.
+		data[2..10].copy_from_slice(&500_000u64.to_le_bytes());
 
 		let ix = DirectTransferInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
@@ -302,14 +306,14 @@ mod tests {
 	fn wrong_discriminator_detected_cpi() {
 		// `matches_discriminator` detects wrong discriminators. The actual
 		// dispatch check happens in `parse_instruction` at the entrypoint.
-		let mut data = [0u8; 9];
+		let mut data = [0u8; 10];
 		data[0] = TransferInstruction::DirectTransfer as u8; // Wrong for CPI.
 		assert!(!CpiTransferInstruction::matches_discriminator(&data));
 	}
 
 	#[test]
 	fn wrong_discriminator_detected_direct() {
-		let mut data = [0u8; 9];
+		let mut data = [0u8; 10];
 		data[0] = TransferInstruction::CpiTransfer as u8; // Wrong for direct.
 		assert!(!DirectTransferInstruction::matches_discriminator(&data));
 	}

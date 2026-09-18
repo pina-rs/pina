@@ -1,0 +1,58 @@
+{
+	"formatVersion": 4,
+	"programId": "Dec1areProgram11111111111111111111111111111",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "ValidateExternalProgramInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "external_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "f0d2112a664996ea944ddada7fd3a81cfa56de1c73d0d7dc0cc3781e6b210667",
+					"transition": null
+				}
+			]
+		}
+	}
+}

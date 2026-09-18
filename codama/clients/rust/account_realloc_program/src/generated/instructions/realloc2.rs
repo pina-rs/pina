@@ -14,6 +14,7 @@
 /// instruction always rejects with `AccountDuplicateReallocs` before any
 /// account is resized. It is intentionally not a two-target mutation API.
 pub const REALLOC2_DISCRIMINATOR: u8 = 1u8;
+pub const REALLOC2_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ impl Realloc2InstructionData {
 		<Realloc2InstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC2_DISCRIMINATOR;
+			data.migration_version = REALLOC2_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -91,6 +93,7 @@ impl Realloc2InstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct Realloc2InstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub len: u16,
 }
 

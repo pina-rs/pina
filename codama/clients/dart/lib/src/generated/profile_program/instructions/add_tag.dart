@@ -13,15 +13,19 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class AddTagInstructionData {
-  const AddTagInstructionData({required this.tag}) : discriminator = 2;
+  const AddTagInstructionData({required this.tag})
+    : discriminator = 2,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final BigInt tag;
 }
 
 Encoder<AddTagInstructionData> getAddTagInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('tag', getU64Encoder()),
   ]);
 
@@ -29,6 +33,7 @@ Encoder<AddTagInstructionData> getAddTagInstructionDataEncoder() {
     structEncoder,
     (AddTagInstructionData value) => <String, Object?>{
       'discriminator': 2,
+      'migrationVersion': 0,
       'tag': value.tag,
     },
   );
@@ -37,6 +42,7 @@ Encoder<AddTagInstructionData> getAddTagInstructionDataEncoder() {
 Decoder<AddTagInstructionData> getAddTagInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('tag', getU64Decoder()),
   ]);
 
@@ -50,6 +56,7 @@ Decoder<AddTagInstructionData> getAddTagInstructionDataDecoder() {
 
   (AddTagInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

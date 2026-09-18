@@ -26,10 +26,12 @@ enum FloatAccountsProgramInstruction { create, update }
 FloatAccountsProgramInstruction identifyFloatAccountsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return FloatAccountsProgramInstruction.create;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return FloatAccountsProgramInstruction.update;
   }
 

@@ -38,13 +38,22 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findPolicyPda } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_POLICY_DISCRIMINATOR = 0;
 
 export function getInitializePolicyDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_POLICY_DISCRIMINATOR);
+}
+
+export const INITIALIZE_POLICY_DISCRIMINATOR2 = 0;
+
+export function getInitializePolicyDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INITIALIZE_POLICY_DISCRIMINATOR2);
 }
 
 export type InitializePolicyInstruction<
@@ -74,6 +83,7 @@ export type InitializePolicyInstruction<
 
 export type InitializePolicyInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	bump: number;
 	minimum: bigint;
 	maximum: bigint;
@@ -93,12 +103,13 @@ export function getInitializePolicyInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["minimum", getU64Encoder()],
 			["maximum", getU64Encoder()],
 			["requiredApprovals", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 0 }),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
 	);
 }
 
@@ -113,6 +124,7 @@ export function getInitializePolicyInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["minimum", getU64Decoder()],
 		["maximum", getU64Decoder()],

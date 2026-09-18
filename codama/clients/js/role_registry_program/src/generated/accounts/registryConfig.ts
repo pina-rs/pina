@@ -35,7 +35,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findRegistryConfigPda, type RegistryConfigSeeds } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;
 
@@ -43,8 +46,15 @@ export function getRegistryConfigDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REGISTRY_CONFIG_DISCRIMINATOR);
 }
 
+export const REGISTRY_CONFIG_DISCRIMINATOR2 = 0;
+
+export function getRegistryConfigDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(REGISTRY_CONFIG_DISCRIMINATOR2);
+}
+
 export type RegistryConfig = {
 	discriminator: number;
+	migrationVersion: number;
 	admin: Address;
 	roleCount: bigint;
 	bump: number;
@@ -63,11 +73,12 @@ export function getRegistryConfigEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["admin", getAddressEncoder()],
 			["roleCount", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -81,6 +92,7 @@ export function getRegistryConfigDecoder(): FixedSizeDecoder<RegistryConfig> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["admin", getAddressDecoder()],
 		["roleCount", getU64Decoder()],
 		["bump", getU8Decoder()],
@@ -178,4 +190,34 @@ export async function fetchMaybeRegistryConfigFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findRegistryConfigPda(seeds, { programAddress });
 	return await fetchMaybeRegistryConfig(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const REGISTRY_CONFIG_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `RegistryConfig` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (registryConfigNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ registryConfig: address, payer }).make());
+ * }
+ * ```
+ */
+export function registryConfigNeedsMigration(
+	data: ReadonlyUint8Array,
+): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

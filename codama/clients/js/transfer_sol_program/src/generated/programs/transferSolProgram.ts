@@ -51,12 +51,14 @@ export function identifyTransferSolProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): TransferSolProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return TransferSolProgramInstruction.CpiTransfer;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return TransferSolProgramInstruction.DirectTransfer;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return TransferSolProgramInstruction.CpiTransfer;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return TransferSolProgramInstruction.DirectTransfer;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "transferSolProgram" },

@@ -26,13 +26,16 @@ enum DuplicateMutableAccountsProgramInstruction {
 /// Identifies the type of a DuplicateMutableAccountsProgram instruction.
 DuplicateMutableAccountsProgramInstruction
 identifyDuplicateMutableAccountsProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return DuplicateMutableAccountsProgramInstruction.failsDuplicateMutable;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return DuplicateMutableAccountsProgramInstruction.allowsDuplicateMutable;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return DuplicateMutableAccountsProgramInstruction.allowsDuplicateReadonly;
   }
 

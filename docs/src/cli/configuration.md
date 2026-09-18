@@ -19,6 +19,17 @@ scaffold = true
 [lints]
 require_canonical_instruction_dispatch_for_idl = "deny"
 
+# Optional ABI migrations. `version_type` is `u8` (default and recommended),
+# `u16`, or `u32`; it freezes at the first published release.
+[migrations]
+version_type = "u8"
+auto = true
+
+# Optional persisted disambiguation answers for `pina migrations make`.
+[migrations.answers]
+rename = ["value:points"]
+assume_removed = []
+
 # Optional target-specific overrides.
 [clients.cpi]
 output = "onchain/cpi"
@@ -28,20 +39,24 @@ scaffold = false
 mode = "update"
 ```
 
-| Field                       | Required | Default                    | Meaning                                                                           |
-| --------------------------- | -------- | -------------------------- | --------------------------------------------------------------------------------- |
-| `project.program`           | no       | `.`                        | Directory containing the program `Cargo.toml`.                                    |
-| `project.idl_dir`           | no       | Cargo target directory/idl | Override for generated IDL files.                                                 |
-| `clients.output`            | no       | `clients`                  | Root directory for generated client ecosystems.                                   |
-| `clients.languages`         | no       | `rust`, `typescript`       | Any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`. |
-| `clients.mode`              | no       | `auto`                     | Default destination policy for every selected client.                             |
-| `clients.scaffold`          | no       | `true`                     | Whether missing manifests and entrypoints are initialized.                        |
-| `clients.<target>.output`   | no       | target name                | Target directory beneath `clients.output`.                                        |
-| `clients.<target>.mode`     | no       | `clients.mode`             | Destination policy for one target.                                                |
-| `clients.<target>.scaffold` | no       | `clients.scaffold`         | Scaffold policy for one target.                                                   |
-| `lints.<lint-name>`         | no       | built-in level             | Per-lint override: `allow`, `warn`, or `deny`.                                    |
+| Field                               | Required | Default                    | Meaning                                                                           |
+| ----------------------------------- | -------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `project.program`                   | no       | `.`                        | Directory containing the program `Cargo.toml`.                                    |
+| `project.idl_dir`                   | no       | Cargo target directory/idl | Override for generated IDL files.                                                 |
+| `clients.output`                    | no       | `clients`                  | Root directory for generated client ecosystems.                                   |
+| `clients.languages`                 | no       | `rust`, `typescript`       | Any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`. |
+| `clients.mode`                      | no       | `auto`                     | Default destination policy for every selected client.                             |
+| `clients.scaffold`                  | no       | `true`                     | Whether missing manifests and entrypoints are initialized.                        |
+| `clients.<target>.output`           | no       | target name                | Target directory beneath `clients.output`.                                        |
+| `clients.<target>.mode`             | no       | `clients.mode`             | Destination policy for one target.                                                |
+| `clients.<target>.scaffold`         | no       | `clients.scaffold`         | Scaffold policy for one target.                                                   |
+| `lints.<lint-name>`                 | no       | built-in level             | Per-lint override: `allow`, `warn`, or `deny`.                                    |
+| `migrations.version_type`           | no       | `u8`                       | Version envelope width: `u8`, `u16`, or `u32`. Frozen at first publication.       |
+| `migrations.auto`                   | no       | `false`                    | Kinds enveloped automatically: `true`, `false`, or a list of kind names.          |
+| `migrations.answers.rename`         | no       | `[]`                       | Persisted `from:to` rename answers for `pina migrations make`.                    |
+| `migrations.answers.assume_removed` | no       | `[]`                       | Persisted data-dropping acknowledgements.                                         |
 
-`<target>` is `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, or `cli-dart`. Dart is the Dart and Flutter target; there is no separate Flutter generator. Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients.cli-rust`, `clients.cli-ts`, and `clients.cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program.
+| `<target>` is `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, or `cli-dart`. Dart is the Dart and Flutter target; there is no separate Flutter generator. Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients/cli-rust`, `clients/cli-ts`, and `clients/cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program. Override a CLI target under the matching table (`[clients.cli_rust]`, `[clients.cli_ts]`, `[clients.cli_dart]`), using the kebab spelling as a deprecated alias (`[clients.cli-rust]`).
 
 Lint levels are validated against the bundled lint catalog; see [Run Security Lints](./lint.md) for the full lint-level workflow.
 

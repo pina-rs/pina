@@ -1,0 +1,133 @@
+{
+	"formatVersion": 4,
+	"programId": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "FailsDuplicateMutableInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "account1",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "account2",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "244f43e23cd96cd5e94346c9282e52bf11dd60130f301469e8857ca573d06979",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "AllowsDuplicateMutableInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "AllowsDuplicateReadonlyInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "account1",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "account2",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "045b3e67367470e662fa79983e2cb173e6bd261c603e6c00d82e417b2a5e27e7",
+					"transition": null
+				}
+			]
+		}
+	}
+}

@@ -45,9 +45,10 @@ export function identifyDeclareIdProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): DeclareIdProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return DeclareIdProgramInstruction.Initialize;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return DeclareIdProgramInstruction.Initialize;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "declareIdProgram" },

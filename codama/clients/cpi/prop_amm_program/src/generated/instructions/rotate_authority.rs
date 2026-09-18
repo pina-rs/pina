@@ -43,14 +43,14 @@ pub struct RotateAuthorityIx<'argument> {
 
 impl<'argument> RotateAuthorityIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 33;
+	pub const LEN: usize = 34;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 33], ProgramError> {
-		let mut data = [0u8; 33];
-		data[..1].copy_from_slice(&ROTATE_AUTHORITY_DISCRIMINATOR);
-		data[1..33].copy_from_slice(self.new_authority.as_ref());
+	pub fn to_bytes(&self) -> Result<[u8; 34], ProgramError> {
+		let mut data = [0u8; 34];
+		data[..2].copy_from_slice(&ROTATE_AUTHORITY_DISCRIMINATOR);
+		data[2..34].copy_from_slice(self.new_authority.as_ref());
 
 		Ok(data)
 	}
@@ -81,4 +81,4 @@ impl<'account, 'argument> RotateAuthority<'account, 'argument> {
 	}
 }
 
-const ROTATE_AUTHORITY_DISCRIMINATOR: [u8; 1] = [2];
+const ROTATE_AUTHORITY_DISCRIMINATOR: [u8; 2] = [2, 0];

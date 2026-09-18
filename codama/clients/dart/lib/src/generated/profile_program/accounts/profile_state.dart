@@ -20,9 +20,11 @@ class ProfileState {
     required this.tags,
     required this.favoriteTag,
     required this.active,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int bump;
   final String name;
   final String bio;
@@ -36,6 +38,7 @@ class ProfileState {
       other is ProfileState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           bump == other.bump &&
           name == other.name &&
           bio == other.bio &&
@@ -44,17 +47,26 @@ class ProfileState {
           active == other.active;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, bump, name, bio, tags, favoriteTag, active);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    bump,
+    name,
+    bio,
+    tags,
+    favoriteTag,
+    active,
+  );
 
   @override
   String toString() =>
-      'ProfileState(discriminator: $discriminator, bump: $bump, name: $name, bio: $bio, tags: $tags, favoriteTag: $favoriteTag, active: $active)';
+      'ProfileState(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, name: $name, bio: $bio, tags: $tags, favoriteTag: $favoriteTag, active: $active)';
 }
 
 Encoder<ProfileState> getProfileStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     (
       'name',
@@ -97,6 +109,7 @@ Encoder<ProfileState> getProfileStateEncoder() {
     structEncoder,
     (ProfileState value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'bump': value.bump,
       'name': value.name,
       'bio': value.bio,
@@ -110,6 +123,7 @@ Encoder<ProfileState> getProfileStateEncoder() {
 Decoder<ProfileState> getProfileStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     (
       'name',
@@ -155,6 +169,14 @@ Decoder<ProfileState> getProfileStateDecoder() {
 
   (ProfileState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -195,4 +217,21 @@ Codec<ProfileState, ProfileState> getProfileStateCodec() {
 
 Account<ProfileState> decodeProfileState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getProfileStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int profileStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `ProfileState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool profileStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

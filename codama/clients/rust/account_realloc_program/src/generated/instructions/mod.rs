@@ -9,9 +9,11 @@
 )]
 
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 pub(crate) mod r#realloc;
 pub(crate) mod r#realloc2;
 
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;
 pub use self::r#realloc::*;
 pub use self::r#realloc2::*;

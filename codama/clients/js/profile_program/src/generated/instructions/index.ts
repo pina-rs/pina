@@ -8,5 +8,6 @@
 
 export * from "./addTag";
 export * from "./initialize";
+export * from "./migrate";
 export * from "./removeTag";
 export * from "./updateProfile";

@@ -79,17 +79,17 @@ pub struct MakeIx {
 
 impl MakeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 26;
+	pub const LEN: usize = 27;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 26], ProgramError> {
-		let mut data = [0u8; 26];
-		data[..1].copy_from_slice(&MAKE_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.seed.to_le_bytes());
-		data[9..17].copy_from_slice(&self.amount_a.to_le_bytes());
-		data[17..25].copy_from_slice(&self.amount_b.to_le_bytes());
-		data[25..26].copy_from_slice(&self.bump.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 27], ProgramError> {
+		let mut data = [0u8; 27];
+		data[..2].copy_from_slice(&MAKE_DISCRIMINATOR);
+		data[2..10].copy_from_slice(&self.seed.to_le_bytes());
+		data[10..18].copy_from_slice(&self.amount_a.to_le_bytes());
+		data[18..26].copy_from_slice(&self.amount_b.to_le_bytes());
+		data[26..27].copy_from_slice(&self.bump.to_le_bytes());
 
 		Ok(data)
 	}
@@ -127,4 +127,4 @@ impl<'account> Make<'account> {
 	}
 }
 
-const MAKE_DISCRIMINATOR: [u8; 1] = [1];
+const MAKE_DISCRIMINATOR: [u8; 2] = [1, 0];

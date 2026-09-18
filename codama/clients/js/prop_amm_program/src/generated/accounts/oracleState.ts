@@ -34,7 +34,10 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const ORACLE_STATE_DISCRIMINATOR = 1;
 
@@ -42,8 +45,15 @@ export function getOracleStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ORACLE_STATE_DISCRIMINATOR);
 }
 
+export const ORACLE_STATE_DISCRIMINATOR2 = 0;
+
+export function getOracleStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ORACLE_STATE_DISCRIMINATOR2);
+}
+
 export type OracleState = {
 	discriminator: number;
+	migrationVersion: number;
 	authority: Address;
 	price: bigint;
 };
@@ -53,11 +63,13 @@ export type OracleStateArgs = { authority: Address; price: number | bigint };
 /** Gets the encoder for {@link OracleStateArgs} account data. */
 export function getOracleStateEncoder(): FixedSizeEncoder<OracleStateArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"authority",
-			getAddressEncoder(),
-		], ["price", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["authority", getAddressEncoder()],
+			["price", getU64Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -71,6 +83,7 @@ export function getOracleStateDecoder(): FixedSizeDecoder<OracleState> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["authority", getAddressDecoder()],
 		["price", getU64Decoder()],
 	]);
@@ -135,4 +148,32 @@ export async function fetchAllMaybeOracleState(
 ): Promise<MaybeAccount<OracleState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeOracleState(maybeAccount));
+}
+
+/** The account schema version this client was generated from. */
+export const ORACLE_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `OracleState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (oracleStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ oracleState: address, payer }).make());
+ * }
+ * ```
+ */
+export function oracleStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

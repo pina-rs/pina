@@ -41,12 +41,42 @@
 							"kind": "numberValueNode",
 							"number": 0
 						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
 					}
 				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
 						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
 						"constant": {
 							"kind": "constantValueNode",
 							"type": {

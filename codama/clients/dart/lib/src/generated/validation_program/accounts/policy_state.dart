@@ -17,9 +17,11 @@ class PolicyState {
     required this.minimum,
     required this.maximum,
     required this.requiredApprovals,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int bump;
   final BigInt minimum;
   final BigInt maximum;
@@ -31,23 +33,31 @@ class PolicyState {
       other is PolicyState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           bump == other.bump &&
           minimum == other.minimum &&
           maximum == other.maximum &&
           requiredApprovals == other.requiredApprovals;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, bump, minimum, maximum, requiredApprovals);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    bump,
+    minimum,
+    maximum,
+    requiredApprovals,
+  );
 
   @override
   String toString() =>
-      'PolicyState(discriminator: $discriminator, bump: $bump, minimum: $minimum, maximum: $maximum, requiredApprovals: $requiredApprovals)';
+      'PolicyState(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, minimum: $minimum, maximum: $maximum, requiredApprovals: $requiredApprovals)';
 }
 
 Encoder<PolicyState> getPolicyStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('minimum', getU64Encoder()),
     ('maximum', getU64Encoder()),
@@ -58,6 +68,7 @@ Encoder<PolicyState> getPolicyStateEncoder() {
     structEncoder,
     (PolicyState value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'bump': value.bump,
       'minimum': value.minimum,
       'maximum': value.maximum,
@@ -69,6 +80,7 @@ Encoder<PolicyState> getPolicyStateEncoder() {
 Decoder<PolicyState> getPolicyStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('minimum', getU64Decoder()),
     ('maximum', getU64Decoder()),
@@ -85,6 +97,14 @@ Decoder<PolicyState> getPolicyStateDecoder() {
 
   (PolicyState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -123,4 +143,21 @@ Codec<PolicyState, PolicyState> getPolicyStateCodec() {
 
 Account<PolicyState> decodePolicyState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getPolicyStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int policyStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `PolicyState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool policyStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

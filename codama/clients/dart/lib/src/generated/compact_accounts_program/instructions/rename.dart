@@ -14,9 +14,11 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class RenameInstructionData {
   const RenameInstructionData({required this.titleLen, required this.title})
-    : discriminator = 3;
+    : discriminator = 3,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int titleLen;
   final Uint8List title;
 }
@@ -24,6 +26,7 @@ class RenameInstructionData {
 Encoder<RenameInstructionData> getRenameInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('titleLen', getU8Encoder()),
     ('title', fixEncoderSize(getBytesEncoder(), 24, allowTruncation: false)),
   ]);
@@ -32,6 +35,7 @@ Encoder<RenameInstructionData> getRenameInstructionDataEncoder() {
     structEncoder,
     (RenameInstructionData value) => <String, Object?>{
       'discriminator': 3,
+      'migrationVersion': 0,
       'titleLen': value.titleLen,
       'title': value.title,
     },
@@ -41,6 +45,7 @@ Encoder<RenameInstructionData> getRenameInstructionDataEncoder() {
 Decoder<RenameInstructionData> getRenameInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('titleLen', getU8Decoder()),
     ('title', fixDecoderSize(getBytesDecoder(), 24)),
   ]);
@@ -55,6 +60,7 @@ Decoder<RenameInstructionData> getRenameInstructionDataDecoder() {
 
   (RenameInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

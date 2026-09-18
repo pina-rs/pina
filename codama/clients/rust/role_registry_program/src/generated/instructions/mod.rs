@@ -11,11 +11,13 @@
 pub(crate) mod r#add_role;
 pub(crate) mod r#deactivate_role;
 pub(crate) mod r#initialize;
+pub(crate) mod r#migrate;
 pub(crate) mod r#rotate_admin;
 pub(crate) mod r#update_role;
 
 pub use self::r#add_role::*;
 pub use self::r#deactivate_role::*;
 pub use self::r#initialize::*;
+pub use self::r#migrate::*;
 pub use self::r#rotate_admin::*;
 pub use self::r#update_role::*;

@@ -287,8 +287,9 @@ fn initialize_rejects_invalid_utf8() {
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
 
-	// Name with an invalid UTF-8 byte (0xff)
-	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
+	// Name with an invalid UTF-8 byte (0xff). The envelope's version byte
+	// sits between the discriminator and the payload.
+	let mut data = vec![ProfileInstruction::Initialize as u8, 0, bump];
 	data.extend_from_slice(&[1u8, 0xff]);
 	data.extend_from_slice(&[0u8; 31]);
 	data.extend_from_slice(&[0u8; 129]);
@@ -452,11 +453,14 @@ fn requires_signer() {
 }
 
 /// The account and instruction layouts must match the documented sizes.
+///
+/// Migrations are on, so each size includes the 2-byte envelope (discriminator
+/// plus version). The generated `tests/abi_layout.rs` pins the same geometry.
 #[test]
 fn account_layout_matches_state() {
-	assert_eq!(ProfileState::SIZE, 240);
-	assert_eq!(InitializeInstruction::SIZE, 164);
-	assert_eq!(UpdateProfileInstruction::SIZE, 163);
-	assert_eq!(AddTagInstruction::SIZE, 9);
-	assert_eq!(RemoveTagInstruction::SIZE, 9);
+	assert_eq!(ProfileState::SIZE, 241);
+	assert_eq!(InitializeInstruction::SIZE, 165);
+	assert_eq!(UpdateProfileInstruction::SIZE, 164);
+	assert_eq!(AddTagInstruction::SIZE, 10);
+	assert_eq!(RemoveTagInstruction::SIZE, 10);
 }

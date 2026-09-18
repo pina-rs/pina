@@ -51,6 +51,8 @@ import {
 	parseForwardRotateWithSignerInstruction,
 	parseHelloInstruction,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findAuthorityPda, findStatePda } from "../pdas";
 
 export const PINA_BPF_PROGRAM_PROGRAM_ADDRESS =
@@ -66,9 +68,10 @@ export function identifyPinaBpfProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PinaBpfProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return PinaBpfProgramAccount.State;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PinaBpfProgramAccount.State;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "pinaBpfProgram" },
@@ -86,18 +89,22 @@ export function identifyPinaBpfProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PinaBpfProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return PinaBpfProgramInstruction.Hello;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return PinaBpfProgramInstruction.ForwardRotateWithSigner;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return PinaBpfProgramInstruction.ForwardRotateWithPda;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return PinaBpfProgramInstruction.CreatePda;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PinaBpfProgramInstruction.Hello;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PinaBpfProgramInstruction.ForwardRotateWithSigner;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PinaBpfProgramInstruction.ForwardRotateWithPda;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PinaBpfProgramInstruction.CreatePda;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "pinaBpfProgram" },
@@ -215,6 +222,8 @@ export function pinaBpfProgramProgram() {
 			pinaBpfProgram: <PinaBpfProgramPlugin> {
 				accounts: { state: addSelfFetchFunctions(client, getStateCodec()) },
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					hello: (input) =>
 						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
 					forwardRotateWithSigner: (input) =>

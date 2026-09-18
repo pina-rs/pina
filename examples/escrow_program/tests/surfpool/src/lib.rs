@@ -182,7 +182,8 @@ fn make_instruction(
 	seed: u64,
 	bump: u8,
 ) -> pina_test::Instruction {
-	let mut data = vec![EscrowInstruction::Make as u8];
+	// discriminator + migration version, then seed, amounts, and bump.
+	let mut data = vec![EscrowInstruction::Make as u8, 0u8];
 	data.extend_from_slice(&seed.to_le_bytes());
 	data.extend_from_slice(&OFFER_A.to_le_bytes());
 	data.extend_from_slice(&OFFER_B.to_le_bytes());
@@ -217,7 +218,7 @@ fn take_instruction(
 	vault: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[EscrowInstruction::Take as u8],
+		&[EscrowInstruction::Take as u8, 0u8],
 		vec![
 			AccountMeta::new(*taker, true),
 			AccountMeta::new_readonly(*mint_a, false),
@@ -235,8 +236,9 @@ fn take_instruction(
 	)
 }
 
-/// Escrow layout: 1 discriminator + maker 32 + mint_a 32 + mint_b 32 +
-/// amount_a 8 + amount_b 8 + seed 8 + bump.
+/// Escrow layout: discriminator + migration version + maker 32 + mint_a 32 +
+/// mint_b 32 + amount_a 8 + amount_b 8 + seed 8 + bump. `tests/abi_layout.rs`
+/// pins the same envelope geometry.
 fn assert_escrow(
 	account: &Account,
 	maker: &Pubkey,
@@ -247,15 +249,16 @@ fn assert_escrow(
 	seed: u64,
 	bump: u8,
 ) {
-	assert_eq!(account.data.len(), 122);
+	assert_eq!(account.data.len(), 123);
 	assert_eq!(account.data[0], 1, "discriminator is EscrowState");
-	assert_eq!(&account.data[1..33], maker.to_bytes());
-	assert_eq!(&account.data[33..65], mint_a.to_bytes());
-	assert_eq!(&account.data[65..97], mint_b.to_bytes());
-	assert_eq!(&account.data[97..105], amount_a.to_le_bytes());
-	assert_eq!(&account.data[105..113], amount_b.to_le_bytes());
-	assert_eq!(&account.data[113..121], seed.to_le_bytes());
-	assert_eq!(account.data[121], bump);
+	assert_eq!(account.data[1], 0, "stored migration version is current");
+	assert_eq!(&account.data[2..34], maker.to_bytes());
+	assert_eq!(&account.data[34..66], mint_a.to_bytes());
+	assert_eq!(&account.data[66..98], mint_b.to_bytes());
+	assert_eq!(&account.data[98..106], amount_a.to_le_bytes());
+	assert_eq!(&account.data[106..114], amount_b.to_le_bytes());
+	assert_eq!(&account.data[114..122], seed.to_le_bytes());
+	assert_eq!(account.data[122], bump);
 }
 
 fn token_amount(account: &Account) -> u64 {

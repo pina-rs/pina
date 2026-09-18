@@ -24,10 +24,12 @@ enum CounterProgramInstruction { initialize, increment }
 
 /// Identifies the type of a CounterProgram instruction.
 CounterProgramInstruction identifyCounterProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CounterProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CounterProgramInstruction.increment;
   }
 

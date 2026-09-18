@@ -9,7 +9,9 @@
 )]
 
 pub(crate) mod r#make;
+pub(crate) mod r#migrate;
 pub(crate) mod r#take;
 
 pub use self::r#make::*;
+pub use self::r#migrate::*;
 pub use self::r#take::*;

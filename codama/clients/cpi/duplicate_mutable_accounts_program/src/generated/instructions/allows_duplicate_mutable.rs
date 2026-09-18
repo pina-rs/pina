@@ -30,13 +30,13 @@ pub struct AllowsDuplicateMutableIx;
 
 impl AllowsDuplicateMutableIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 1;
+	pub const LEN: usize = 2;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 1], ProgramError> {
-		let mut data = [0u8; 1];
-		data[..1].copy_from_slice(&ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR);
+	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
+		let mut data = [0u8; 2];
+		data[..2].copy_from_slice(&ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR);
 
 		Ok(data)
 	}
@@ -64,4 +64,4 @@ impl AllowsDuplicateMutable {
 	}
 }
 
-const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR: [u8; 1] = [1];
+const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR: [u8; 2] = [1, 0];

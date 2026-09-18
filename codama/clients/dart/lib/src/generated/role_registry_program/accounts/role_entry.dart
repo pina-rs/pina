@@ -20,9 +20,11 @@ class RoleEntry {
     required this.permissions,
     required this.active,
     required this.bump,
-  }) : discriminator = 2;
+  }) : discriminator = 2,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address registry;
   final BigInt roleId;
   final Address grantee;
@@ -36,6 +38,7 @@ class RoleEntry {
       other is RoleEntry &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           registry == other.registry &&
           roleId == other.roleId &&
           grantee == other.grantee &&
@@ -46,6 +49,7 @@ class RoleEntry {
   @override
   int get hashCode => Object.hash(
     discriminator,
+    migrationVersion,
     registry,
     roleId,
     grantee,
@@ -56,12 +60,13 @@ class RoleEntry {
 
   @override
   String toString() =>
-      'RoleEntry(discriminator: $discriminator, registry: $registry, roleId: $roleId, grantee: $grantee, permissions: $permissions, active: $active, bump: $bump)';
+      'RoleEntry(discriminator: $discriminator, migrationVersion: $migrationVersion, registry: $registry, roleId: $roleId, grantee: $grantee, permissions: $permissions, active: $active, bump: $bump)';
 }
 
 Encoder<RoleEntry> getRoleEntryEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('registry', getAddressEncoder()),
     ('roleId', getU64Encoder()),
     ('grantee', getAddressEncoder()),
@@ -74,6 +79,7 @@ Encoder<RoleEntry> getRoleEntryEncoder() {
     structEncoder,
     (RoleEntry value) => <String, Object?>{
       'discriminator': 2,
+      'migrationVersion': 0,
       'registry': value.registry,
       'roleId': value.roleId,
       'grantee': value.grantee,
@@ -87,6 +93,7 @@ Encoder<RoleEntry> getRoleEntryEncoder() {
 Decoder<RoleEntry> getRoleEntryDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('registry', getAddressDecoder()),
     ('roleId', getU64Decoder()),
     ('grantee', getAddressDecoder()),
@@ -105,6 +112,14 @@ Decoder<RoleEntry> getRoleEntryDecoder() {
 
   (RoleEntry, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -145,4 +160,21 @@ Codec<RoleEntry, RoleEntry> getRoleEntryCodec() {
 
 Account<RoleEntry> decodeRoleEntry(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getRoleEntryDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int roleEntryMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `RoleEntry` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool roleEntryNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 2) {
+    return false;
+  }
+  return data[1] < 0;
 }
