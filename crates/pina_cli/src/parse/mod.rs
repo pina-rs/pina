@@ -690,17 +690,15 @@ mod tests {
 	/// Write a minimal crate whose `src/lib.rs` is `source`, for the
 	/// program-level validation that needs a real file tree.
 	fn write_crate(source: &str) -> tempfile::TempDir {
-		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
-		std::fs::create_dir_all(temp.path().join("src"))
-			.unwrap_or_else(|error| panic!("src dir: {error}"));
+		let temp = tempfile::TempDir::new().expect("temp dir");
+		std::fs::create_dir_all(temp.path().join("src")).expect("src dir");
 		std::fs::write(
 			temp.path().join("Cargo.toml"),
 			"[package]\nname = \"fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[lib]\nname \
 			 = \"fixture\"\npath = \"src/lib.rs\"\n",
 		)
-		.unwrap_or_else(|error| panic!("manifest: {error}"));
-		std::fs::write(temp.path().join("src/lib.rs"), source)
-			.unwrap_or_else(|error| panic!("lib.rs: {error}"));
+		.expect("manifest");
+		std::fs::write(temp.path().join("src/lib.rs"), source).expect("lib.rs");
 		temp
 	}
 

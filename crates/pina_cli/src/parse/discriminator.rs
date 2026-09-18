@@ -510,8 +510,7 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let enums = extract_discriminator_enums(&file)
-			.unwrap_or_else(|error| panic!("extraction must succeed: {error}"));
+		let enums = extract_discriminator_enums(&file).expect("extraction succeeds");
 
 		assert_eq!(enums.len(), 1);
 		assert_eq!(enums[0].variants.len(), 2);
@@ -521,64 +520,50 @@ mod tests {
 		);
 	}
 
+	/// Parse one enum out of `source` and return its discriminator facts.
+	fn facts_of(source: &str) -> (usize, bool) {
+		let file = syn::parse_file(source).expect("test source parses");
+		let enum_ = file
+			.items
+			.iter()
+			.find_map(|item| {
+				match item {
+					syn::Item::Enum(enum_) => Some(enum_),
+					_ => None,
+				}
+			})
+			.expect("test source declares one enum");
+		discriminator_facts(enum_).expect("facts resolve")
+	}
+
 	#[test]
 	fn discriminator_facts_read_repr_and_entrypoint_together() {
-		// No attribute at all: the defaults are a one-byte repr and no
-		// entrypoint declaration.
-		let file = syn::parse_file("pub enum Probe { A = 0 }")
-			.unwrap_or_else(|error| panic!("parse failed: {error}"));
-		let enum_ = file
-			.items
-			.iter()
-			.find_map(|item| {
-				match item {
-					syn::Item::Enum(enum_) => Some(enum_),
-					_ => None,
-				}
-			})
-			.unwrap_or_else(|| panic!("the probe has one enum"));
+		// No attribute: a one-byte repr and no entrypoint declaration. A
+		// preceding non-enum item proves the scan skips other item kinds.
 		assert_eq!(
-			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			facts_of("pub const IGNORED: u8 = 0;\npub enum Probe { A = 0 }"),
 			(1, false)
 		);
-
 		// A bare attribute path yields the same defaults.
-		let file = syn::parse_file("#[discriminator] pub enum Probe { A = 0 }")
-			.unwrap_or_else(|error| panic!("parse failed: {error}"));
-		let enum_ = file
-			.items
-			.iter()
-			.find_map(|item| {
-				match item {
-					syn::Item::Enum(enum_) => Some(enum_),
-					_ => None,
-				}
-			})
-			.unwrap_or_else(|| panic!("the probe has one enum"));
 		assert_eq!(
-			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			facts_of("#[discriminator] pub enum Probe { A = 0 }"),
 			(1, false)
 		);
-
-		// An explicit primitive is read alongside the entrypoint flag.
-		let file = syn::parse_file(
-			"#[discriminator(primitive = u32, entrypoint)] pub enum Probe { A = 0 }",
-		)
-		.unwrap_or_else(|error| panic!("parse failed: {error}"));
-		let enum_ = file
-			.items
-			.iter()
-			.find_map(|item| {
-				match item {
-					syn::Item::Enum(enum_) => Some(enum_),
-					_ => None,
-				}
-			})
-			.unwrap_or_else(|| panic!("the probe has one enum"));
+		// The primitive and the entrypoint flag are read in one parse.
 		assert_eq!(
-			discriminator_facts(enum_).unwrap_or_else(|error| panic!("facts: {error}")),
+			facts_of("#[discriminator(primitive = u32, entrypoint)] pub enum Probe { A = 0 }"),
 			(4, true)
 		);
+		// Every accepted primitive width is reported.
+		for (primitive, width) in [("u8", 1), ("u16", 2), ("u32", 4), ("u64", 8)] {
+			assert_eq!(
+				facts_of(&format!(
+					"#[discriminator(primitive = {primitive})] pub enum Probe {{ A = 0 }}"
+				)),
+				(width, false),
+				"wrong width for {primitive}"
+			);
+		}
 	}
 
 	#[test]
@@ -600,8 +585,7 @@ mod tests {
 			("#[discriminator(final)] pub enum Probe { A = 0 }", false),
 		] {
 			let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-			let enums = extract_discriminator_enums(&file)
-				.unwrap_or_else(|error| panic!("extraction must succeed: {error}"));
+			let enums = extract_discriminator_enums(&file).expect("extraction succeeds");
 
 			assert_eq!(enums[0].entrypoint, expected, "wrong flag for `{source}`");
 		}
