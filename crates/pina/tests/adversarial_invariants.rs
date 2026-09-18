@@ -30,6 +30,34 @@ pub struct BalanceState {
 }
 
 #[allow(dead_code)]
+#[derive(PinaPod)]
+struct MigrationAwareState {
+	discriminator: [u8; 1],
+	migration_version: u8,
+	value: u64,
+}
+
+impl PinaAccount for MigrationAwareState {
+	fn write_zc_discriminator(value: &mut Self::Zc) {
+		Self::write_discriminator(&mut value.discriminator);
+	}
+
+	fn require_current_migration_envelope(data: &[u8]) -> ProgramResult {
+		match data.get(1).copied() {
+			Some(1) => Ok(()),
+			Some(0) => Err(PinaProgramError::MigrationRequired.into()),
+			_ => Err(PinaProgramError::InvalidMigrationVersion.into()),
+		}
+	}
+}
+
+impl HasDiscriminator for MigrationAwareState {
+	type Type = u8;
+
+	const VALUE: u8 = 2;
+}
+
+#[allow(dead_code)]
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 struct DuplicateMutablePair<'a> {
@@ -154,6 +182,14 @@ fn build_balance_state_bytes(amount: u64) -> Vec<u8> {
 		Ok(())
 	})
 	.expect("valid account storage");
+	bytes
+}
+
+fn build_migration_aware_state_bytes(version: u8) -> Vec<u8> {
+	let mut bytes = vec![0u8; MigrationAwareState::SIZE];
+	MigrationAwareState::write_discriminator(&mut bytes);
+	bytes[1] = version;
+
 	bytes
 }
 
@@ -740,6 +776,44 @@ fn assert_type_rejects_long_fixed_account_data_with_an_exact_size_error() {
 	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
 
 	assert_eq!(result, Err(PinaProgramError::InvalidAccountSize.into()));
+}
+
+#[test]
+fn assert_type_rejects_stale_migration_envelopes() {
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(26))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&build_migration_aware_state_bytes(0)),
+		AccountBuilder::new()
+			.address(fake_address(27))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&build_migration_aware_state_bytes(1)),
+		AccountBuilder::new()
+			.address(fake_address(28))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&build_migration_aware_state_bytes(2)),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+
+	assert_eq!(
+		account_views[0].assert_type::<MigrationAwareState>(&TEST_PROGRAM_ID),
+		Err(PinaProgramError::MigrationRequired.into())
+	);
+	assert!(
+		account_views[1]
+			.assert_type::<MigrationAwareState>(&TEST_PROGRAM_ID)
+			.is_ok()
+	);
+	assert_eq!(
+		account_views[2].assert_type::<MigrationAwareState>(&TEST_PROGRAM_ID),
+		Err(PinaProgramError::InvalidMigrationVersion.into())
+	);
 }
 
 #[test]

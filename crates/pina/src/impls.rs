@@ -166,6 +166,8 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		return Err(PinaProgramError::InvalidDiscriminator.into());
 	}
 
+	T::require_current_migration_envelope(&data)?;
+
 	#[cfg(not(feature = "validation"))]
 	{
 		if <T as crate::PinaPodFixed>::validate_exact(&data).is_err() {
