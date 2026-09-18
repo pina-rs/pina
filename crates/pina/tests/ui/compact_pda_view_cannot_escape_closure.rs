@@ -22,7 +22,7 @@ fn leak_view<'account>(
 	account: &'account AccountView,
 	authority: &Address,
 ) -> Result<CompactStateRef<'account>, ProgramError> {
-	CompactState::with_pda(account, authority, &ID, |state| Ok(state))
+	CompactState::with_stored_bump_pda(account, authority, &ID, |state| Ok(state))
 }
 
 fn main() {}

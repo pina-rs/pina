@@ -308,7 +308,7 @@ pub(crate) fn expand(
 			quote! {
 				#(#with_doc_attributes)*
 				#[inline(always)]
-				pub fn with_pda<R>(
+				pub fn with_stored_bump_pda<R>(
 					account: &#crate_path::AccountView,
 					#(#find_seed_params,)*
 					program_id: &#crate_path::Address,
@@ -334,6 +334,27 @@ pub(crate) fn expand(
 							use_account(state)
 						},
 					)
+				}
+
+				/// Deprecated alias for the stored-bump loader.
+				///
+				/// This name predates the split that gave the two compact PDA loaders
+				/// distinct names. It verifies only the address the stored bump derives,
+				/// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
+				/// an untrusted caller chooses which account the handler loads.
+				#[deprecated(
+					note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
+				)]
+				#[inline(always)]
+				pub fn with_pda<R>(
+					account: &#crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+					use_account: impl FnOnce(
+						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
+					) -> ::core::result::Result<R, #crate_path::ProgramError>,
+				) -> ::core::result::Result<R, #crate_path::ProgramError> {
+					Self::with_stored_bump_pda(account, #(#seed_param_names,)* program_id, use_account)
 				}
 
 				#(#checked_doc_attributes)*

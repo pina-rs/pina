@@ -354,15 +354,16 @@ fn compact_pda_view_keeps_the_runtime_borrow_for_the_closure_under_miri() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 
-	let value = CompactState::with_pda(&account, &authority, &TEST_PROGRAM_ID, |state| {
-		assert!(matches!(
-			shadow.try_borrow_mut(),
-			Err(ProgramError::AccountBorrowFailed)
-		));
+	let value =
+		CompactState::with_stored_bump_pda(&account, &authority, &TEST_PROGRAM_ID, |state| {
+			assert!(matches!(
+				shadow.try_borrow_mut(),
+				Err(ProgramError::AccountBorrowFailed)
+			));
 
-		Ok(state.values()[1].get())
-	})
-	.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+			Ok(state.values()[1].get())
+		})
+		.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
 
 	assert_eq!(value, 21);
 	assert!(shadow.try_borrow_mut().is_ok());

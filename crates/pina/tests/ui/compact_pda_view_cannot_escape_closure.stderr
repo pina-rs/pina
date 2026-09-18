@@ -1,8 +1,8 @@
 error: lifetime may not live long enough
-  --> tests/ui/compact_pda_view_cannot_escape_closure.rs:25:58
+  --> tests/ui/compact_pda_view_cannot_escape_closure.rs:25:70
    |
-25 |     CompactState::with_pda(account, authority, &ID, |state| Ok(state))
-   |                                                      ------ ^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
-   |                                                      |    |
-   |                                                      |    return type of closure is Result<CompactStateRef<'2>, pina::ProgramError>
-   |                                                      has type `CompactStateRef<'1>`
+25 |     CompactState::with_stored_bump_pda(account, authority, &ID, |state| Ok(state))
+   |                                                                  ------ ^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+   |                                                                  |    |
+   |                                                                  |    return type of closure is Result<CompactStateRef<'2>, pina::ProgramError>
+   |                                                                  has type `CompactStateRef<'1>`

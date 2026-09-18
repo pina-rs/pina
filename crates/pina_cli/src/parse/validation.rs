@@ -529,7 +529,8 @@ fn collect_assertions_from_expr(
 							| "assert_seeds_with_bump"
 							| "assert_canonical_bump"
 							| "load_pda" | "load_pda_mut"
-							| "with_pda" | "with_checked_pda"
+							| "with_pda" | "with_stored_bump_pda"
+							| "with_checked_pda"
 					)
 				) && let Some(first_arg) = call.args.first()
 					&& let Some(field_name) = resolve_self_field(first_arg, bindings)
@@ -648,6 +649,7 @@ fn apply_assertion(
 		| "assert_canonical_bump"
 		| "load_pda"
 		| "with_pda"
+		| "with_stored_bump_pda"
 		| "with_checked_pda" => {
 			props.is_pda = true;
 		}
@@ -920,7 +922,7 @@ mod tests {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
 				fn process(self, data: &[u8]) -> ProgramResult {
-					CounterState::with_pda(
+					CounterState::with_stored_bump_pda(
 						self.counter,
 						self.authority.address(),
 						&ID,

@@ -487,7 +487,7 @@ fn compact_pda_loader_validates_data_and_address_in_one_borrow() {
 	}
 
 	let mut aliased_account = account;
-	let loaded = CompactPdaState::with_pda(&account, &authority, &OWNER, |state| {
+	let loaded = CompactPdaState::with_stored_bump_pda(&account, &authority, &OWNER, |state| {
 		assert!(aliased_account.try_borrow_mut().is_err());
 
 		Ok((state.bump, state.authority, state.values()[1].get()))
@@ -512,7 +512,7 @@ fn compact_pda_loader_rejects_a_wrong_owner_before_running_the_closure() {
 	let account = stored.view();
 	let mut closure_ran = false;
 
-	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+	let result = CompactPdaState::with_stored_bump_pda(&account, &authority, &OWNER, |_| {
 		closure_ran = true;
 		Ok(())
 	});
@@ -536,7 +536,7 @@ fn compact_pda_loader_rejects_a_wrong_stored_bump_before_running_the_closure() {
 	let account = stored.view();
 	let mut closure_ran = false;
 
-	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+	let result = CompactPdaState::with_stored_bump_pda(&account, &authority, &OWNER, |_| {
 		closure_ran = true;
 		Ok(())
 	});
@@ -584,8 +584,9 @@ fn compact_pda_loader_loads_the_address_the_stored_bump_derives() {
 	let (mut stored, bump) = shadow_compact_pda(authority);
 	let account = stored.view();
 
-	let loaded = CompactPdaState::with_pda(&account, &authority, &OWNER, |state| Ok(state.bump))
-		.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+	let loaded =
+		CompactPdaState::with_stored_bump_pda(&account, &authority, &OWNER, |state| Ok(state.bump))
+			.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
 
 	assert_eq!(loaded, bump);
 }
@@ -668,7 +669,7 @@ fn compact_pda_loader_rejects_invalid_data_before_running_the_closure() {
 	let account = stored.view();
 	let mut closure_ran = false;
 
-	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+	let result = CompactPdaState::with_stored_bump_pda(&account, &authority, &OWNER, |_| {
 		closure_ran = true;
 		Ok(())
 	});
