@@ -68,6 +68,29 @@ fn account_prelude(uses_address: bool) -> Vec<String> {
 	lines
 }
 
+/// Exposed for tests: whether a rendered type names `Address` itself.
+#[cfg(test)]
+pub(crate) fn test_mentions_address(rust_type: &str) -> bool {
+	mentions_address(rust_type)
+}
+
+/// Whether a rendered Rust type names `Address` as a whole identifier.
+fn mentions_address(rust_type: &str) -> bool {
+	let mut search = rust_type;
+	while let Some(index) = search.find("Address") {
+		let before = search[..index].chars().next_back();
+		let after = search[index + "Address".len()..].chars().next();
+		let borders_identifier = |character: Option<char>| {
+			character.is_some_and(|character| character.is_alphanumeric() || character == '_')
+		};
+		if !borders_identifier(before) && !borders_identifier(after) {
+			return true;
+		}
+		search = &search[index + "Address".len()..];
+	}
+	false
+}
+
 /// The Rust field name for an account field, falling back to a positional one
 /// when the IDL omits the name.
 pub(crate) fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize) -> String {
@@ -392,10 +415,13 @@ pub(crate) fn plan_account(account: &AccountNode, types: &mut TypeIndex) -> Resu
 /// Renders a planned account's read-only parser page.
 pub(crate) fn render_planned_account(account: &PlannedAccount) -> String {
 	let name = &account.name;
+	// A type like `AddressBook` merely contains the substring, so the check is
+	// for the identifier itself: `Address` bordered by anything that cannot be
+	// part of a Rust identifier path.
 	let uses_address = account
 		.fields
 		.iter()
-		.any(|(_, encoded)| encoded.rust_type.contains("Address"));
+		.any(|(_, encoded)| mentions_address(&encoded.rust_type));
 	let mut lines = account_prelude(uses_address);
 	lines.extend(render_docs(&account.docs, 0));
 	// An account struct owns its decoded values, so a borrowed field type is

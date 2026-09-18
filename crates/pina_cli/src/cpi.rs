@@ -166,7 +166,7 @@ pub fn generate_cpi_crate_from_reader(
 	reader: impl Read,
 	output: &Path,
 ) -> Result<(), CpiGenerateError> {
-	generate_cpi_crate_from_reader_with_config(reader, output, GenerationMode::Auto, true)
+	generate_cpi_crate_from_reader_with_config(reader, output, GenerationMode::Auto, true, false)
 }
 
 /// Generate a standalone Pina CPI crate from a reader with explicit output settings.
@@ -179,6 +179,7 @@ pub fn generate_cpi_crate_from_reader_with_config(
 	output: &Path,
 	mode: GenerationMode,
 	scaffold: bool,
+	skip_unsupported_instructions: bool,
 ) -> Result<(), CpiGenerateError> {
 	let path = PathBuf::from("<stdin>");
 	let input = read_bounded(reader, &path)?;
@@ -187,7 +188,7 @@ pub fn generate_cpi_crate_from_reader_with_config(
 		return Err(CpiGenerateError::ExpectedCodamaStdin);
 	};
 
-	render_cpi_root(&root, output, mode, scaffold, false)
+	render_cpi_root(&root, output, mode, scaffold, skip_unsupported_instructions)
 }
 
 fn read_idl(path: &Path) -> Result<Vec<u8>, CpiGenerateError> {

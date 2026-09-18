@@ -1045,6 +1045,7 @@ fn run_cpi(
 			output,
 			mode,
 			!no_scaffold,
+			skip_unsupported_instructions,
 		)
 	} else {
 		let idl = idl.unwrap_or_else(|| unreachable!("clap requires --idl or --stdin"));

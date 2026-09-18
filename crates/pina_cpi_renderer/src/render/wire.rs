@@ -599,13 +599,24 @@ fn plan_option(
 	// The arm binds `value` from a borrowed `Option`, so it is already a
 	// reference, matching the convention every encoder assumes.
 	let item = item.clone().with_value("value");
-	// The tag occupies the declared prefix width; `None` fills the whole
-	// declared window with zeros so the layout stays fixed.
-	let present = format!(
-		"if offset + {width} > data.len() {{\n\treturn \
-		 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
-		 {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset += {width};"
-	);
+	// The tag occupies the declared prefix width; a fixed option also reserves
+	// the payload span, so the `Some` arm pads the payload to that span and the
+	// cursor always lands at the window end.
+	let present = if fixed == Some(true) {
+		let span = width.saturating_add(item.max_size);
+		format!(
+			"if offset + {span} > data.len() {{\n\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n}}\nlet window = \
+			 offset;\ndata[offset..offset + \
+			 {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset += {width};"
+		)
+	} else {
+		format!(
+			"if offset + {width} > data.len() {{\n\treturn \
+			 Err(ProgramError::InvalidInstructionData);\n}}\ndata[offset..offset + \
+			 {width}].copy_from_slice(&1u128.to_le_bytes()[..{width}]);\noffset += {width};"
+		)
+	};
 	// A fixed option reserves the tag plus the payload span, so an absent value
 	// clears the entire window; a variable option only writes the tag.
 	let absent = if fixed == Some(true) {
@@ -631,8 +642,16 @@ fn plan_option(
 		max_size: width.saturating_add(item.max_size),
 		encode: format!(
 			"match self_value {{\n\tNone => {{\n\t\t{absent}\n\t}}\n\tSome(value) => \
-			 {{\n\t\t{present}\n\t\t{}\n\t}}\n}}",
-			indent(&item.encode, 2)
+			 {{\n\t\t{present}\n\t\t{}{pad}\n\t}}\n}}",
+			indent(&item.encode, 2),
+			pad = if fixed == Some(true) {
+				format!(
+					"\n\t\tdata[offset..window + {span}].fill(0);\n\t\toffset = window + {span};",
+					span = width.saturating_add(item.max_size)
+				)
+			} else {
+				String::new()
+			}
 		),
 		borrows: item.borrows,
 	})
@@ -1663,8 +1682,13 @@ mod tests {
 		)
 		.expect("a fixed option should plan");
 
+		// An absent value clears the whole window and a present one pads the
+		// payload to it, so the cursor lands at the window end either way.
 		assert!(planned.encode.contains("data[offset..offset + 9].fill(0)"));
 		assert!(planned.encode.contains("offset += 9"));
+		assert!(planned.encode.contains("let window = offset;"));
+		assert!(planned.encode.contains("data[offset..window + 9].fill(0)"));
+		assert!(planned.encode.contains("offset = window + 9"));
 	}
 
 	#[test]

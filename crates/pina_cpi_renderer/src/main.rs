@@ -64,19 +64,11 @@ fn main() {
 	let args = Args::parse();
 	let mut idls = args.idls;
 	if let Some(dir) = &args.idl_dir {
-		let entries = std::fs::read_dir(dir).unwrap_or_else(|error| {
-			eprintln!("failed to read IDL directory `{}`: {error}", dir.display());
-			std::process::exit(1);
-		});
-		// Unreadable entries are skipped; if nothing usable remains, the
-		// empty-source check below reports it.
-		for entry in entries.flatten() {
-			let path = entry.path();
-			if path
-				.extension()
-				.is_some_and(|extension| extension == "json")
-			{
-				idls.push(path);
+		match json_idls_in_dir(dir) {
+			Ok(paths) => idls.extend(paths),
+			Err(error) => {
+				eprintln!("{error}");
+				std::process::exit(1);
 			}
 		}
 	}
@@ -113,6 +105,35 @@ fn main() {
 			display_relative(&crate_dir)
 		);
 	}
+}
+
+/// Every `*.json` file in one IDL directory, in a stable order.
+///
+/// An iteration error would silently drop the IDLs after it, so the whole read
+/// is reported instead of skipped.
+fn json_idls_in_dir(dir: &Path) -> Result<Vec<PathBuf>, String> {
+	let entries = std::fs::read_dir(dir).map_err(|error| dir_read_error(dir, &error))?;
+
+	let mut paths = Vec::new();
+	for entry in entries {
+		let entry = entry.map_err(|error| dir_read_error(dir, &error))?;
+		let path = entry.path();
+		if path
+			.extension()
+			.is_some_and(|extension| extension == "json")
+		{
+			paths.push(path);
+		}
+	}
+
+	paths.sort();
+
+	Ok(paths)
+}
+
+/// The message for a directory that cannot be read or iterated.
+fn dir_read_error(dir: &Path, error: &std::io::Error) -> String {
+	format!("failed to read IDL directory `{}`: {error}", dir.display())
 }
 
 /// The crate directory for one IDL inside a multi-IDL output root.
@@ -158,6 +179,33 @@ mod tests {
 			RenderMode::Overwrite
 		));
 		assert!(Args::command().has_subcommands() || true);
+	}
+
+	#[test]
+	fn reads_only_json_entries_from_an_idl_directory() {
+		let temp = tempfile::tempdir().expect("temp dir");
+		std::fs::write(temp.path().join("b.json"), "{}").expect("write");
+		std::fs::write(temp.path().join("a.json"), "{}").expect("write");
+		std::fs::write(temp.path().join("notes.txt"), "ignored").expect("write");
+
+		let paths = json_idls_in_dir(temp.path()).expect("directory should be readable");
+		let names: Vec<String> = paths
+			.iter()
+			.map(|path| {
+				path.file_name()
+					.unwrap_or_default()
+					.to_string_lossy()
+					.into_owned()
+			})
+			.collect();
+		assert_eq!(names, ["a.json", "b.json"]);
+
+		// A missing directory is reported rather than silently producing none.
+		let error = json_idls_in_dir(&temp.path().join("missing")).expect_err("missing dir");
+		assert!(error.contains("failed to read IDL directory"));
+
+		let shared = dir_read_error(temp.path(), &std::io::Error::other("unreadable"));
+		assert!(shared.contains("failed to read IDL directory"));
 	}
 
 	#[test]

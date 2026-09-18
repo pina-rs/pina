@@ -50,7 +50,7 @@ RandomnessReveal {
     queue,
     ix: RandomnessRevealIx { signature, recovery_id, value },
 }
-.invoke_signed(&[signer])?;
+.invoke_signed(program, &[signer])?;
 ```
 
 Each account in the IDL also gets a read-only parser:

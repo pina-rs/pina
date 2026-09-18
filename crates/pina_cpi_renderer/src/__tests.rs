@@ -1901,6 +1901,18 @@ mod account_planning {
 	}
 
 	#[test]
+	fn only_a_whole_address_identifier_pulls_in_the_import() {
+		// A type whose name merely contains `Address` must not trigger the
+		// import, or the generated page fails a `-D warnings` build.
+		assert!(accounts::test_mentions_address("Address"));
+		assert!(accounts::test_mentions_address("Option<Address>"));
+		assert!(accounts::test_mentions_address("&'argument Address"));
+		assert!(!accounts::test_mentions_address("AddressBook"));
+		assert!(!accounts::test_mentions_address("[AddressLike; 4]"));
+		assert!(!accounts::test_mentions_address("u64"));
+	}
+
+	#[test]
 	fn withholds_the_parser_for_a_size_discriminator() {
 		// A size discriminator is metadata, not bytes this client can check.
 		let account = discriminated_account(

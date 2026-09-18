@@ -35,6 +35,17 @@ if ! rustup component list --toolchain "$TOOLCHAIN" 2>/dev/null | grep -q '^rust
 	rustup component add rust-src --toolchain "$TOOLCHAIN"
 fi
 
+# Instructions each fixture is expected to skip. `--skip-unsupported-instructions`
+# keeps the gate compiling a crate whose IDL uses a strategy this renderer cannot
+# express, but a new skip would mean a previously-rendered instruction silently
+# disappeared, so the count is pinned here and compared below.
+declare -A EXPECTED_SKIPS=(
+	[metaplex_token_metadata]=22
+	[meteora_dlmm]=0
+	[squads_v4_multisig]=0
+	[switchboard_on_demand]=0
+)
+
 mapfile -t FIXTURES < <(find "$FIXTURE_DIR" -maxdepth 1 -type f -name '*.json' | sort)
 
 if [ "${#FIXTURES[@]}" -eq 0 ]; then
@@ -69,10 +80,24 @@ for fixture in "${FIXTURES[@]}"; do
 	fi
 
 	skipped_marker="$crate_dir/src/generated/instructions/mod.rs"
-	if [ -f "$skipped_marker" ] && grep -q "^// Skipped" "$skipped_marker"; then
-		echo "$name: skipped instructions:"
-		grep "^// Skipped" "$skipped_marker" | sed 's/^/  /'
+	observed_skips=0
+	if [ -f "$skipped_marker" ]; then
+		if grep -q "^// Skipped" "$skipped_marker"; then
+			echo "$name: skipped instructions:"
+			grep "^// Skipped" "$skipped_marker" | sed 's/^/  /'
+		fi
+		observed_skips="$(grep -c "^// Skipped" "$skipped_marker" || true)"
 	fi
+	expected_skips="${EXPECTED_SKIPS[$name]:-missing}"
+	if [ "$expected_skips" = "missing" ]; then
+		echo "$name: no expected-skip baseline; add one to EXPECTED_SKIPS" >&2
+		exit 1
+	fi
+	if [ "$observed_skips" != "$expected_skips" ]; then
+		echo "$name: skipped $observed_skips instruction(s), expected $expected_skips" >&2
+		exit 1
+	fi
+	echo "$name: $observed_skips skipped instruction(s), matching the baseline"
 
 	mkdir -p "$crate_dir/.cargo"
 	cat >"$crate_dir/.cargo/config.toml" <<EOF
@@ -80,22 +105,19 @@ for fixture in "${FIXTURES[@]}"; do
 rustflags = ["-C", "linker=sbpf-linker", "-C", "panic=abort"]
 EOF
 
-	# The fixtures are standalone temp crates, so the script writes their
-	# manifests itself, pointing `pina` at the in-repo crate; nothing rendered
-	# is discarded.
-	cat >"$crate_dir/Cargo.toml" <<EOF
-[package]
-name = "${name}_cpi"
-version = "0.0.0"
-edition = "2021"
-publish = false
-
-# Standalone: never adopt a parent manifest as a workspace.
-[workspace]
-
-[dependencies]
-pina = { path = "$ROOT/crates/pina", default-features = false }
-EOF
+	# Keep the renderer's own manifest so a regression in it still fails this
+	# gate; only the `pina` registry dependency is redirected to the in-repo
+	# crate, and the manifest is isolated from any parent workspace.
+	generated_manifest="$crate_dir/Cargo.toml"
+	if [ ! -f "$generated_manifest" ]; then
+		echo "$name: renderer produced no Cargo.toml at $generated_manifest" >&2
+		exit 1
+	fi
+	if ! grep -q '^pina = ' "$generated_manifest"; then
+		echo "$name: generated manifest declares no pina dependency" >&2
+		exit 1
+	fi
+	node "$ROOT/scripts/point-pina-dependency.ts" "$generated_manifest" "$ROOT/crates/pina"
 
 	(
 		cd "$crate_dir"
