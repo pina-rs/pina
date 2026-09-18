@@ -552,7 +552,22 @@ impl VerifiedDriver {
 fn fetch_verified(url: &str, identity: &ToolchainIdentity) -> Result<VerifiedDriver, DriverError> {
 	let driver = fetch(url, identity)?;
 	let checksum_url = format!("{url}.sha256");
-	let published = String::from_utf8(fetch(&checksum_url, identity)?).map_err(|error| {
+	// A release predating the checksum publication has the driver but not its
+	// `.sha256` sibling; that is a different failure from a driver the release
+	// never published, so it gets its own message instead of the host-triple
+	// one `fetch` attaches to a 404.
+	let published = String::from_utf8(fetch(&checksum_url, identity).map_err(|error| {
+		DriverError::Checksum {
+			url: checksum_url.clone(),
+			toolchain: identity.to_string(),
+			message: format!(
+					"the published checksum could not be downloaded: {error}. Releases built \
+					 before 				 the driver checksum was published do not carry one; build the \
+					 driver with 				 `--build-driver` instead"
+				),
+		}
+	})?)
+	.map_err(|error| {
 		DriverError::Checksum {
 			url: checksum_url.clone(),
 			toolchain: identity.to_string(),

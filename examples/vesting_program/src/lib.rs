@@ -359,6 +359,20 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		if next_claimed > vested {
 			return Err(VestingError::ClaimTooLarge.into());
 		}
+		// The vault is the schedule's funding source; a release it cannot cover
+		// is the schedule's own error to report rather than a raw token-program
+		// failure. This mirrors how `Cancel` reads the refund balance.
+		let vault_balance = self
+			.vault
+			.as_associated_token_account(
+				self.vesting_state.address(),
+				self.mint.address(),
+				self.token_program.address(),
+			)?
+			.amount();
+		if vault_balance < amount {
+			return Err(VestingError::InsufficientVaultBalance.into());
+		}
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.claimed_amount.set(next_claimed);
