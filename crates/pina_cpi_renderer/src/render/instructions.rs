@@ -11,6 +11,7 @@ use super::args::RenderedArgument;
 use super::args::render_argument;
 use super::discriminator::render_constant_discriminator;
 use super::helpers::pascal;
+use super::helpers::render_doc;
 use super::helpers::render_docs;
 use super::helpers::rust_identifier;
 use super::helpers::snake;
@@ -347,7 +348,10 @@ fn render_accounts(instruction: &InstructionNode, context: &str) -> Result<Vec<R
 
 fn render_account(account: &InstructionAccountNode, context: &str) -> Result<RenderedAccount> {
 	let name = account.name.as_ref().to_string();
-	let mut docs = vec![format!("\t/// CPI account `{name}`.")];
+	// Names come from the input IDL, which is untrusted. Route the line through
+	// `render_doc` so an embedded newline becomes another comment line instead
+	// of escaping the comment and emitting source.
+	let mut docs = render_doc(&format!("CPI account `{name}`."), 1);
 	docs.extend(render_docs(&account.docs, 1));
 	let privilege = match (account.is_writable, account.is_signer) {
 		(true, IsSigner::True) => "Required privileges: writable and signer.",
@@ -413,10 +417,12 @@ fn render_argument_with_docs(
 	}
 
 	let mut rendered = render_argument(argument.name.as_ref(), &argument.r#type, context)?;
-	rendered.docs = vec![format!(
-		"\t/// Instruction argument `{}`.",
-		argument.name.as_ref()
-	)];
+	// See `render_account`: the argument name is untrusted IDL input, so it goes
+	// through the newline-splitting helper rather than a raw format.
+	rendered.docs = render_doc(
+		&format!("Instruction argument `{}`.", argument.name.as_ref()),
+		1,
+	);
 	rendered.docs.extend(render_docs(&argument.docs, 1));
 
 	Ok(rendered)
