@@ -23,6 +23,9 @@ pub(crate) struct MigrationExpansion {
 	discriminator_bytes: u8,
 	discriminator_value: u64,
 	history: ContractHistory,
+	/// `../` segments locating the program directory from the crate that
+	/// expands this declaration.
+	manifest_prefix: String,
 }
 
 #[derive(Clone, Copy)]
@@ -39,6 +42,7 @@ impl MigrationExpansion {
 		layout: LayoutKind,
 		manifest: &MigrationManifest,
 		program_dir: &std::path::Path,
+		manifest_prefix: &str,
 	) -> syn::Result<Self> {
 		let history = manifest
 			.contract_for_source(kind, &item.ident.to_string())
@@ -56,13 +60,13 @@ impl MigrationExpansion {
 			.identity
 			.discriminator_value()
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
-
 		Ok(Self {
 			current_version,
 			version_type: manifest.version_type,
 			discriminator_bytes,
 			discriminator_value,
 			history: history.clone(),
+			manifest_prefix: manifest_prefix.to_owned(),
 		})
 	}
 
@@ -102,11 +106,15 @@ impl MigrationExpansion {
 		let current = self.current_version;
 		let discriminator_bytes = self.discriminator_bytes;
 		let discriminator_value = self.discriminator_value;
+		let manifest_path = proc_macro2::Literal::string(&format!(
+			"/{}migrations/manifest.json",
+			self.manifest_prefix
+		));
 
 		quote! {
 			const _: &[u8] = include_bytes!(concat!(
 				env!("CARGO_MANIFEST_DIR"),
-				"/migrations/manifest.json",
+				#manifest_path
 			));
 
 			const _: () = {
@@ -219,7 +227,7 @@ impl MigrationExpansion {
 				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
 					.to_string_lossy()
 					.replace('\\', "/");
-			let include_path = format!("/{relative}");
+			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
 				pub(crate) mod #name {
@@ -492,7 +500,7 @@ impl MigrationExpansion {
 				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
 					.to_string_lossy()
 					.replace('\\', "/");
-			let include_path = format!("/{relative}");
+			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
 				pub(crate) mod #name {
@@ -818,7 +826,7 @@ impl MigrationExpansion {
 				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
 					.to_string_lossy()
 					.replace('\\', "/");
-			let include_path = format!("/{relative}");
+			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
 				pub(crate) mod #name {
@@ -1112,16 +1120,39 @@ pub(crate) fn resolve_opt_in(
 /// in diagnostics.
 pub(crate) fn read_manifest(
 	item: &ItemStruct,
-) -> syn::Result<(Option<MigrationManifest>, PathBuf)> {
-	let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
-		syn::Error::new_spanned(
-			item,
-			"could not locate Cargo manifest for migration-aware schema",
-		)
-	})?;
-	let program_dir = PathBuf::from(manifest_dir);
+) -> syn::Result<(Option<MigrationManifest>, PathBuf, String)> {
+	let Some((program_dir, prefix)) = discover_program_dir() else {
+		return Ok((
+			None,
+			PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default()),
+			String::new(),
+		));
+	};
 	let manifest = read_manifest_at(item, &program_dir)?;
-	Ok((manifest, program_dir))
+	Ok((manifest, program_dir, prefix))
+}
+
+/// Locate the program directory that owns `migrations/manifest.json`.
+///
+/// Starts at `CARGO_MANIFEST_DIR` and walks up. A crate that source-includes a
+/// program (`#[path = "../../src/lib.rs"]`, as Surfpool harnesses do) expands
+/// the program's macros with the harness's manifest directory, so a direct
+/// lookup would miss the manifest and silently compile the program
+/// unenveloped. Returns the discovered directory and the `../` prefix that
+/// resolves generated file paths from the expanding crate.
+pub(crate) fn discover_program_dir() -> Option<(PathBuf, String)> {
+	let start = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR")?);
+	let mut current = start.clone();
+	let mut prefix = String::new();
+	loop {
+		if current.join(MANIFEST_PATH).is_file() {
+			return Some((current, prefix));
+		}
+		if !current.pop() {
+			return None;
+		}
+		prefix.push_str("../");
+	}
 }
 
 /// Read and validate `migrations/manifest.json` under `program_dir`.
@@ -1174,11 +1205,19 @@ pub(crate) fn expansion(
 	layout: LayoutKind,
 	declared: Option<bool>,
 ) -> syn::Result<Option<MigrationExpansion>> {
-	let (manifest, program_dir) = read_manifest(item)?;
+	let (manifest, program_dir, manifest_prefix) = read_manifest(item)?;
 	let Some(manifest) = resolve_manifest(item, kind, declared, manifest, &program_dir)? else {
 		return Ok(None);
 	};
-	MigrationExpansion::load(item, kind, layout, &manifest, &program_dir).map(Some)
+	MigrationExpansion::load(
+		item,
+		kind,
+		layout,
+		&manifest,
+		&program_dir,
+		&manifest_prefix,
+	)
+	.map(Some)
 }
 
 /// Resolve the opt-in and require a manifest when the declaration is enabled.
@@ -1736,11 +1775,10 @@ mod tests {
 	#[test]
 	fn read_manifest_reports_the_absent_program_manifest() {
 		let item = item_struct("State");
-		let (manifest, program_dir) =
+		let (manifest, _program_dir, _prefix) =
 			read_manifest(&item).unwrap_or_else(|error| panic!("read absent manifest: {error}"));
 
 		assert!(manifest.is_none());
-		assert_eq!(program_dir, PathBuf::from(env!("CARGO_MANIFEST_DIR")));
 	}
 
 	#[test]
