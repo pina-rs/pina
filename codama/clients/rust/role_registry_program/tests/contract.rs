@@ -53,7 +53,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		init_ix.accounts[2],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,),
 	);
-	assert_eq!(init_ix.data, vec![0, 7]);
+	assert_eq!(init_ix.data, vec![0, 0, 7]);
 
 	let add_role = AddRole::new(admin, grantee, registry_config, role_entry);
 	let add_payload = AddRoleInstructionData::new(|data| {
@@ -75,7 +75,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		add_ix.accounts[4],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
-	let mut expected_add = vec![1];
+	let mut expected_add = vec![1, 0];
 	expected_add.extend_from_slice(&11u64.to_le_bytes());
 	expected_add.extend_from_slice(&42u64.to_le_bytes());
 	expected_add.push(3);
@@ -94,7 +94,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(update_ix.accounts[2], AccountMeta::new(role_entry, false));
-	let mut expected_update = vec![2];
+	let mut expected_update = vec![2, 0];
 	expected_update.extend_from_slice(&99u64.to_le_bytes());
 	assert_eq!(update_ix.data, expected_update);
 
@@ -106,7 +106,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		deactivate_ix.accounts[1],
 		AccountMeta::new_readonly(registry_config, false)
 	);
-	assert_eq!(deactivate_ix.data, vec![3]);
+	assert_eq!(deactivate_ix.data, vec![3, 0]);
 
 	let rotate = RotateAdmin::new(admin, new_admin, registry_config);
 	let rotate_payload = RotateAdminInstructionData::new(|_| {}).unwrap();
@@ -124,5 +124,5 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		rotate_ix.accounts[2],
 		AccountMeta::new(registry_config, false)
 	);
-	assert_eq!(rotate_ix.data, vec![4]);
+	assert_eq!(rotate_ix.data, vec![4, 0]);
 }
