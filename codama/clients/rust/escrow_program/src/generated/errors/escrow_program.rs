@@ -21,6 +21,10 @@ pub enum EscrowProgramError {
 	/// 1 - A supplied token account is not the one the offer references.
 	#[error("A supplied token account is not the one the offer references.")]
 	TokenAccountMismatch = 0x1,
+	/// One side of the offer is zero, so the exchange gives value away.
+	/// 2 - One side of the offer is zero, so the exchange gives value away.
+	#[error("One side of the offer is zero, so the exchange gives value away.")]
+	EmptyOffer = 0x2,
 }
 
 impl From<EscrowProgramError> for solana_program_error::ProgramError {

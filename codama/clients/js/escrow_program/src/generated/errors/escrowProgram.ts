@@ -18,14 +18,19 @@ import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 export const ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH = 0x0; // 0
 /** A supplied token account is not the one the offer references. */
 export const ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH = 0x1; // 1
+/** One side of the offer is zero, so the exchange gives value away. */
+export const ESCROW_PROGRAM_ERROR__EMPTY_OFFER = 0x2; // 2
 
 export type EscrowProgramError =
+	| typeof ESCROW_PROGRAM_ERROR__EMPTY_OFFER
 	| typeof ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH
 	| typeof ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH;
 
 let escrowProgramErrorMessages: Record<EscrowProgramError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
 	escrowProgramErrorMessages = {
+		[ESCROW_PROGRAM_ERROR__EMPTY_OFFER]:
+			`One side of the offer is zero, so the exchange gives value away.`,
 		[ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]:
 			`The token accounts do not match the offer's recorded mint and maker.`,
 		[ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]:
