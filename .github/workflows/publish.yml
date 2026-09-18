@@ -18,7 +18,7 @@ on:
         type: boolean
         default: false
       checkout_ref:
-        description: "Ref to check out instead of the tag. Dry runs against a release PR pass its branch here so the exact PR commit is validated."
+        description: "Ref to build when it points at the same commit as `tag`. A dry run against a release PR passes its branch here so the exact PR commit is validated; the resolve step rejects the run when the two disagree."
         required: false
         type: string
   push:
@@ -41,8 +41,89 @@ env:
   RELEASE_ASSET_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
+  # Resolve the release to exactly one commit before anything is checked out.
+  # `checkout_ref` exists so a dry run can validate the release commit before
+  # the tag exists; left unconstrained it would also let a manual retry build
+  # from an arbitrary ref, and the assets this workflow uploads are the ones
+  # users install. Every downstream job takes its `ref:` and `sha:` from here
+  # instead of re-deriving a symbolic ref.
+  resolve_revision:
+    name: resolve release revision
+    if: >-
+      github.repository_owner == 'pina-rs' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    permissions:
+      contents: read # Resolve the tag and the requested ref to commit SHAs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: resolve tag and checkout ref to one commit
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REQUESTED_REF: ${{ inputs.checkout_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Resolve a ref to a commit SHA. `gh api` exits non-zero on an
+          # unknown ref but still prints an error body to stdout, so the exit
+          # status — not the output — decides success. Callers must be able to
+          # tell "no such ref" from "resolved", and a swallowed status would
+          # turn an error body into a bogus SHA.
+          resolve_sha() {
+            local ref="$1" payload
+            if ! payload="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ref" 2>/dev/null)"; then
+              return 1
+            fi
+            printf '%s' "$payload" | jq -r '.sha'
+          }
+
+          requested="${REQUESTED_REF:-$RELEASE_TAG}"
+
+          # A pre-tag dry run legitimately has no tag yet. Every other path
+          # must resolve one, so a missing tag cannot silently widen the ref
+          # this workflow accepts.
+          #
+          # The tag is resolved through its fully-qualified `refs/tags/` name.
+          # A bare name would also match a branch that happens to share the
+          # tag's name, so a branch created alongside a release tag could
+          # satisfy the equality check below while the real tag pointed
+          # somewhere else.
+          tag_sha=""
+          if candidate="$(resolve_sha "refs/tags/$RELEASE_TAG")"; then
+            tag_sha="$candidate"
+          elif [[ "$DRY_RUN" != "true" ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not resolve to a commit." >&2
+            exit 1
+          fi
+
+          if ! resolved_sha="$(resolve_sha "$requested")"; then
+            echo "::error::Checkout ref '$requested' does not resolve to a commit." >&2
+            exit 1
+          fi
+
+          # The published revision must be the tagged one. A mismatch means
+          # the tag and the requested ref disagree about what is being
+          # released, so stop rather than build the wrong tree.
+          if [[ -n "$tag_sha" && "$tag_sha" != "$resolved_sha" ]]; then
+            echo "::error::$RELEASE_TAG is at $tag_sha but '$requested' is at $resolved_sha; refusing to build a revision the tag does not point at." >&2
+            exit 1
+          fi
+
+          if [[ -z "$tag_sha" ]]; then
+            echo "Release tag '$RELEASE_TAG' does not exist yet; pinning this dry run to $resolved_sha."
+          fi
+          echo "sha=$resolved_sha" >> "$GITHUB_OUTPUT"
+          echo "Releasing $RELEASE_TAG from $resolved_sha"
+
   upload_assets:
     name: build ${{ matrix.target }}
+    needs:
+      - resolve_revision
     if: >-
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
@@ -124,7 +205,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
+          ref: ${{ needs.resolve_revision.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: install rust toolchain
@@ -165,7 +246,7 @@ jobs:
           bin: pina
           manifest-path: crates/pina_cli/Cargo.toml
           profile: release
-          ref: ${{ inputs.checkout_ref || format('refs/tags/{0}', env.RELEASE_TAG) }}
+          ref: ${{ needs.resolve_revision.outputs.sha }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
           include: ${{ matrix.lint_driver == true && (endsWith(matrix.target, '-windows-msvc') && format('target/{0}/release/pina_lint_driver.exe', matrix.target) || format('target/{0}/release/pina_lint_driver', matrix.target)) || '' }}
@@ -221,11 +302,13 @@ jobs:
     # release archives are attested.
     # Nothing was uploaded in a dry run, so there is nothing to attest.
     if: >-
+      needs.resolve_revision.result == 'success' &&
       needs.upload_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v') &&
       (inputs.dry_run != true)
     needs:
+      - resolve_revision
       - upload_assets
     # Read release archives, then attach OIDC-backed provenance attestations.
     permissions:
@@ -238,7 +321,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.resolve_revision.outputs.sha }}
           persist-credentials: false
       - name: download all release archives for attestation
         env:
@@ -291,7 +374,17 @@ jobs:
 
   publish:
     name: publish packages and release
-    needs: attest_assets
+    needs:
+      - resolve_revision
+      - attest_assets
+    # Repository setting this job depends on: the `publisher` environment MUST
+    # require reviewers for every deployment. That protection rule is the only
+    # thing standing between a workflow_dispatch retry and a registry publish,
+    # because this job holds `id-token: write` and exchanges it for crates.io
+    # and npm trusted-publishing credentials. The rule lives in repository
+    # settings rather than in this file, so it cannot be reviewed here: keep it
+    # configured, and treat its removal as a security regression rather than a
+    # CI configuration change.
     environment: publisher
     # Use OIDC for registry publishing, then publish the draft GitHub release.
     permissions:
@@ -301,6 +394,7 @@ jobs:
     # A dry run stops here: assets are built and attested against the draft
     # release but no registry publish happens and the release stays draft.
     if: >-
+      needs.resolve_revision.result == 'success' &&
       needs.attest_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v') &&
@@ -319,7 +413,7 @@ jobs:
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.checkout_ref || env.RELEASE_TAG }}
+          ref: ${{ needs.resolve_revision.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: setup
@@ -347,7 +441,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm install --frozen-lockfile
+          # --ignore-scripts matches PR CI. This job runs with `id-token:
+          # write` in the publisher environment, so a dependency lifecycle
+          # script would execute with credentials that can publish to the
+          # registries. Any dependency that genuinely needs an install script
+          # must be reviewed explicitly before it is allowed to run here --
+          # do not drop this flag to make a build pass. The build tools this
+          # step invokes (esbuild via tsup) ship their platform binary as an
+          # optional dependency and need no install script.
+          pnpm install --frozen-lockfile --ignore-scripts
           pnpm run build:codama-nodes
           pnpm run build:codama-renderer-cpi
           pnpm run check:npm-packages
