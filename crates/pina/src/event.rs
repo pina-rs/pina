@@ -7,6 +7,25 @@
 //! [`emit_event`]. The `#[event]` macro generates an `emit` associated function
 //! that builds a validated record and calls this function.
 
+/// Largest event record the generated `emit` helper can build on the SBF
+/// stack.
+///
+/// The generated `emit` function materializes the complete record in one
+/// frame (`let mut record = [0u8; Self::SIZE];`) and then calls into the
+/// runtime, so the record occupies the frame for the whole emission. The SBF
+/// runtime allows 4 KiB of stack per frame, and the call itself needs room for
+/// the frame it pushes: this bound leaves 512 bytes of that budget for the
+/// callee and the caller's own frame. Keeping the record below the limit
+/// means an oversized `#[event]` schema fails the build instead of exhausting
+/// the stack at runtime, where the failure is a silent frame overflow.
+///
+/// The bound follows [`crate::MAX_MIGRATION_WORKSPACE`], which applies the
+/// same rule to the historical-normalization workspace: reserve part of the
+/// frame budget for the code the frame calls into, and turn the rest into a
+/// compile-time limit. It is larger because a record's frame is a single flat
+/// byte array rather than nested transition workspaces.
+pub const MAX_EVENT_RECORD_BYTES: usize = 4096 - 512;
+
 /// Emit one complete event record to the transaction log.
 ///
 /// `record` must be the full `[discriminator][schema version][payload]`
