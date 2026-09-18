@@ -1268,9 +1268,20 @@ in
         set -euo pipefail
         # cargo-deny 0.20+ auto-discovers deny.toml from the working directory;
         # the --config flag was removed from the CLI.
+        #
+        # Advisories run with --workspace. A virtual manifest roots cargo-deny's
+        # default graph at the workspace members' normal dependencies, which
+        # omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime)
+        # where every advisory deny.toml suppresses actually lives. Without
+        # --workspace the advisories check cannot see them at all, so an
+        # unreviewed advisory in that stack would pass unnoticed.
+        cargo-deny --workspace check advisories
+        # bans/licenses/sources keep the default scope: rooting them at every
+        # workspace member reports the dev/test stack's duplicate versions and
+        # unpublished crates, which are not what this gate is for.
         cargo-deny check bans licenses sources
       '';
-      description = "Run cargo-deny checks (bans, licenses, sources).";
+      description = "Run cargo-deny checks (advisories, bans, licenses, sources).";
       binary = "bash";
     };
     "security:audit" = {
@@ -1280,23 +1291,36 @@ in
         # partial clone from a cache restore makes cargo-audit refuse to
         # (re)initialize it. Remove it so the clone always starts fresh.
         rm -rf "$DEVENV_ROOT/target/advisory-db-audit"
-        # Ignore Surfpool host-stack advisories. These crates only run inside
-        # the host-side Surfpool test harness and are never shipped in an
-        # on-chain program, so the published programs inherit none of them.
+        # deny.toml is the single source of advisory policy. cargo-audit has no
+        # config-file support for suppressions, so its --ignore flags are read
+        # out of deny.toml's [advisories] ignore array rather than kept as a
+        # second list that can drift from it. Every id there carries a
+        # reachability justification; anything not listed fails this task.
+        audit_ignores=()
+        while IFS= read -r advisory_id; do
+          audit_ignores+=(--ignore "$advisory_id")
+        done < <(awk '
+          /^\[advisories\]/ { in_advisories = 1; next }
+          /^\[/             { in_advisories = 0; in_ignore = 0 }
+          in_advisories && /^ignore[ \t]*=[ \t]*\[/ { in_ignore = 1; next }
+          in_ignore && /^\]/ { in_ignore = 0 }
+          in_ignore {
+            line = $0
+            while (match(line, /"RUSTSEC-[0-9]+-[0-9]+"/)) {
+              printf "%s\n", substr(line, RSTART + 1, RLENGTH - 2)
+              line = substr(line, RSTART + RLENGTH)
+            }
+          }
+        ' "$DEVENV_ROOT/deny.toml")
+
         cargo-audit audit \
           --db "$DEVENV_ROOT/target/advisory-db-audit" \
           --url "https://github.com/RustSec/advisory-db.git" \
           --deny yanked \
-          --ignore RUSTSEC-2022-0093 \
-          --ignore RUSTSEC-2024-0344 \
-          --ignore RUSTSEC-2024-0421 \
-          --ignore RUSTSEC-2026-0098 \
-          --ignore RUSTSEC-2026-0099 \
-          --ignore RUSTSEC-2026-0104 \
-          --ignore RUSTSEC-2026-0258 \
+          "''${audit_ignores[@]}" \
           --file "$DEVENV_ROOT/Cargo.lock"
       '';
-      description = "Run RustSec advisory audit for Cargo.lock.";
+      description = "Run RustSec advisory audit using deny.toml's ignore policy.";
       binary = "bash";
     };
     "security:npm-audit" = {
