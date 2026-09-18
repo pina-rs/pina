@@ -2673,7 +2673,7 @@ impl CompactState {
     ///
     /// Prefer `with_checked_pda` when an untrusted caller chooses which account the handler loads. This method accepts any address the stored bump derives, including a shadow account created at a noncanonical bump, so it cannot on its own prove the namespace is unique.
     #[inline(always)]
-    pub fn with_pda<R>(
+    pub fn with_stored_bump_pda<R>(
         account: &pina::AccountView,
         authority: &Address,
         program_id: &pina::Address,
@@ -2700,6 +2700,26 @@ impl CompactState {
                 use_account(state)
             },
         )
+    }
+    /// Deprecated alias for the stored-bump loader.
+    ///
+    /// This name predates the split that gave the two compact PDA loaders
+    /// distinct names. It verifies only the address the stored bump derives,
+    /// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
+    /// an untrusted caller chooses which account the handler loads.
+    #[deprecated(
+        note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
+    )]
+    #[inline(always)]
+    pub fn with_pda<R>(
+        account: &pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+        use_account: impl FnOnce(
+            <Self as pina::PinaCompactAccount>::Ref<'_>,
+        ) -> ::core::result::Result<R, pina::ProgramError>,
+    ) -> ::core::result::Result<R, pina::ProgramError> {
+        Self::with_stored_bump_pda(account, authority, program_id, use_account)
     }
     /// Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
     ///
