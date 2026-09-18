@@ -20,6 +20,7 @@ use crate::args::CapacityTestArg;
 use crate::args::DiscriminatorArgs;
 use crate::args::DispatchVariantArgs;
 use crate::args::InlineArg;
+use crate::args::Primitive;
 
 /// Suffix appended to a variant name to find its accounts struct.
 const ACCOUNTS_SUFFIX: &str = "Accounts";
@@ -346,8 +347,8 @@ pub(crate) fn expand(
 
 /// Resolve the optional reserved-`Migrate` routing.
 ///
-/// Returns the `process_migrate` helper and the `is_migrate_instruction`
-/// guard, or `None` when the program declares no migratable contract.
+/// Returns the `process_migrate` helper and the reserved-discriminator guard,
+/// or `None` when the program declares no migratable contract.
 fn resolve_migrations(
 	args: &DiscriminatorArgs,
 	enum_name: &Ident,
@@ -386,6 +387,7 @@ fn resolve_migrations(
 
 	Ok(Some(migrate_emission(
 		crate_path,
+		args.primitive,
 		ladder,
 		max_lamports,
 		&args
@@ -402,6 +404,7 @@ fn resolve_migrations(
 /// without a manifest on disk.
 fn migrate_emission(
 	crate_path: &Path,
+	primitive: Primitive,
 	ladder: &[Path],
 	max_lamports: &Expr,
 	program_id: &Expr,
@@ -414,6 +417,17 @@ fn migrate_emission(
 			migrate.run_optional::<#account>(#index)?;
 		}
 	});
+
+	// The reserved value is the all-ones value of the instruction
+	// discriminator's own width, so the guard must test the same width. A
+	// one-byte check against a `u16` enum's `0xffff` never matches, which would
+	// make the reserved path unreachable.
+	let is_migrate_instruction = match primitive {
+		Primitive::U8 => quote!(is_migrate_instruction),
+		Primitive::U16 => quote!(is_migrate_instruction_u16),
+		Primitive::U32 => quote!(is_migrate_instruction_u32),
+		Primitive::U64 => quote!(is_migrate_instruction_u64),
+	};
 
 	let helper = quote! {
 		/// Routes the reserved framework `Migrate` instruction.
@@ -447,9 +461,11 @@ fn migrate_emission(
 	};
 
 	// The reserved instruction is detected before `parse_instruction`, which
-	// would reject it: `#[discriminator]` reserves the all-ones value.
+	// would reject it: `#[discriminator]` reserves the all-ones value. The
+	// guard matches the enum's own width, so a wider program's `0xffff` (or
+	// `0xffff_ffff`, and so on) is recognized rather than only `0xff`.
 	let prelude = quote! {
-		if #crate_path::is_migrate_instruction(data) {
+		if #crate_path::#is_migrate_instruction(data) {
 			return Self::process_migrate(program_id, accounts);
 		}
 	};
@@ -681,7 +697,8 @@ mod tests {
 			ladder_of("CompactState"),
 			ladder_of("State"),
 		];
-		let (helper, prelude) = migrate_emission(&crate_path, &ladder, &budget, &program_id);
+		let (helper, prelude) =
+			migrate_emission(&crate_path, Primitive::U8, &ladder, &budget, &program_id);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());
 
@@ -697,6 +714,41 @@ mod tests {
 		// The prelude routes through the associated helper.
 		assert!(prelude.contains("is_migrate_instruction(data)"));
 		assert!(prelude.contains("Self::process_migrate(program_id,accounts)"));
+	}
+
+	#[test]
+	fn migration_emission_matches_the_guard_to_the_discriminator_width() {
+		// The reserved value is the all-ones value of the enum's own width, so a
+		// one-byte guard on a `u16` program never matches and the reserved path
+		// is unreachable. Each width must select the helper that tests it.
+		let crate_path: Path = syn::parse_quote!(::pina);
+		let budget: Expr = syn::parse_quote!(BUDGET);
+		let program_id: Expr = syn::parse_quote!(ID);
+		let ladder = [ladder_of("State")];
+
+		for (primitive, expected) in [
+			(Primitive::U8, "::pina::is_migrate_instruction(data)"),
+			(Primitive::U16, "::pina::is_migrate_instruction_u16(data)"),
+			(Primitive::U32, "::pina::is_migrate_instruction_u32(data)"),
+			(Primitive::U64, "::pina::is_migrate_instruction_u64(data)"),
+		] {
+			let (_, prelude) =
+				migrate_emission(&crate_path, primitive, &ladder, &budget, &program_id);
+			let prelude = squeezed(&prelude.to_string());
+
+			assert!(
+				prelude.contains(expected),
+				"`{primitive:?}` must guard with `{expected}`; got: {prelude}"
+			);
+			// Exact spelling only: the wider helper names contain the one-byte
+			// name as a prefix, so a substring check would pass on the wrong one.
+			if !matches!(primitive, Primitive::U8) {
+				assert!(
+					!prelude.contains("is_migrate_instruction("),
+					"`{primitive:?}` must use its own width's helper: {prelude}"
+				);
+			}
+		}
 	}
 
 	#[test]

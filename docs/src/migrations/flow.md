@@ -230,6 +230,8 @@ if is_migrate_instruction(data) {
 }
 ```
 
+The trigger must match the program's own discriminator width. `is_migrate_instruction` tests one byte, so a program whose instruction enum uses `primitive = u16` (or `u32`, or `u64`) matches with `is_migrate_instruction_u16` (or `_u32`, `_u64`) instead — the one-byte helper never matches a two-byte `0xffff`, which would leave the reserved path unreachable. Generated entrypoints select the matching helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` needs no hand-written guard at all.
+
 Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
 
 That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
