@@ -188,6 +188,11 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let instruction = RelayInstruction::try_from_bytes(data)?;
+		// The deployed self-CPI validates this account in `UpdateAccounts`. Keep
+		// the well-known default visible to source-based IDL generation without
+		// repeating that check on-chain.
+		#[cfg(not(feature = "bpf-entrypoint"))]
+		self.system_program.assert_address(&system::ID)?;
 		let program = Program::<MigrationProgram>::try_new(self.migration_program)?;
 
 		let mut historical = [0_u8; 10];
