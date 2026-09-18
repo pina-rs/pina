@@ -17,9 +17,12 @@ pub struct CompactState<'data> {
 	pub tags: &'data [u16],
 }
 
+/// Account discriminator declared by the program's IDL.
+pub const COMPACT_STATE_DISCRIMINATOR: [u8; 2] = [3, 1];
+
 impl<'data> CompactState<'data> {
 	/// Largest encoded size of this account's data.
-	pub const MAX_LEN: usize = 131328;
+	pub const MAX_LEN: usize = 131330;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str =
 		"unsupported type `accountNode` at `account `CompactState` field `name``: this field's \
@@ -28,6 +31,6 @@ impl<'data> CompactState<'data> {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		!data.is_empty()
+		data.len() >= 2 && data[..2] == COMPACT_STATE_DISCRIMINATOR
 	}
 }

@@ -21,16 +21,16 @@ pub struct FloatDataAccount {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl FloatDataAccount {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 52;
+	pub const LEN: usize = 46;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == FLOAT_DATA_ACCOUNT_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == FLOAT_DATA_ACCOUNT_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -43,7 +43,7 @@ impl FloatDataAccount {
 		}
 
 		let mut cursor = 0usize;
-		cursor += 8;
+		cursor += 2;
 
 		let data_f64: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;

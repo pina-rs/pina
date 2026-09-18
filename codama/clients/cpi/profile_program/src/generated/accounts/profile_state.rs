@@ -39,11 +39,11 @@ pub struct ProfileState {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const PROFILE_STATE_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const PROFILE_STATE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl ProfileState {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 9;
+	pub const LEN: usize = 3;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str =
 		"unsupported type `fixedSizeTypeNode` at `account `ProfileState` field `name``: a 33-byte \
@@ -52,6 +52,6 @@ impl ProfileState {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == PROFILE_STATE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == PROFILE_STATE_DISCRIMINATOR
 	}
 }

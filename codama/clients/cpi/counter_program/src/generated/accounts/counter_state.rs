@@ -36,16 +36,16 @@ pub struct CounterState {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const COUNTER_STATE_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const COUNTER_STATE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl CounterState {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 17;
+	pub const LEN: usize = 11;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == COUNTER_STATE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == COUNTER_STATE_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -58,7 +58,7 @@ impl CounterState {
 		}
 
 		let mut cursor = 0usize;
-		cursor += 8;
+		cursor += 2;
 
 		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;

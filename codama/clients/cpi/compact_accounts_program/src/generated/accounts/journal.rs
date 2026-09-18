@@ -31,7 +31,7 @@ pub struct Journal<'data> {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const JOURNAL_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const JOURNAL_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl<'data> Journal<'data> {
 	/// Largest encoded size of this account's data.
@@ -45,6 +45,6 @@ impl<'data> Journal<'data> {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == JOURNAL_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == JOURNAL_DISCRIMINATOR
 	}
 }

@@ -24,16 +24,16 @@ pub struct RoleEntry {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const ROLE_ENTRY_DISCRIMINATOR: [u8; 8] = [2, 0, 0, 0, 0, 0, 0, 0];
+pub const ROLE_ENTRY_DISCRIMINATOR: [u8; 2] = [2, 0];
 
 impl RoleEntry {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 90;
+	pub const LEN: usize = 84;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == ROLE_ENTRY_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == ROLE_ENTRY_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -46,7 +46,7 @@ impl RoleEntry {
 		}
 
 		let mut cursor = 0usize;
-		cursor += 8;
+		cursor += 2;
 
 		let registry = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;

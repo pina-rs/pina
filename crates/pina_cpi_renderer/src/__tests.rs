@@ -1711,7 +1711,8 @@ mod account_planning {
 
 	#[test]
 	fn withholds_the_parser_for_a_nonzero_field_discriminator_offset() {
-		// A field discriminator at a non-zero offset cannot gate a parser.
+		// A field discriminator that does not continue from offset zero cannot
+		// gate a parser, because no byte prefix identifies the account.
 		let account = discriminated_account(
 			"late",
 			vec![amount_field()],
@@ -1722,6 +1723,181 @@ mod account_planning {
 		let page = accounts::render_planned_account(&planned);
 		assert!(!page.contains("LATE_DISCRIMINATOR"));
 		assert!(page.contains("!data.is_empty()"));
+	}
+
+	#[test]
+	fn combines_adjacent_constant_discriminators_into_one_prefix() {
+		// Migration-aware IDLs tag an account with several adjacent one-byte
+		// constants (the program discriminator plus a migration version), which
+		// together form the guard's prefix.
+		let number_constant = |offset: u64, value: u64| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(NumberFormat::U8)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(value))),
+				),
+				offset,
+			))
+		};
+		let account = discriminated_account(
+			"migrated",
+			vec![amount_field()],
+			vec![number_constant(0, 1), number_constant(1, 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("adjacent constants should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("MIGRATED_DISCRIMINATOR: [u8; 2] = [1, 0]"));
+		assert!(page.contains("data.len() >= 2"));
+
+		let account = discriminated_account(
+			"skipped",
+			vec![amount_field()],
+			vec![number_constant(0, 1), number_constant(2, 0)],
+		);
+		let planned = accounts::plan_account(&account, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("a gapped prefix should still plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(!page.contains("SKIPPED_DISCRIMINATOR"));
+	}
+
+	#[test]
+	fn narrows_discriminator_bytes_to_the_declared_width() {
+		let mut types = TypeIndex::default();
+		let constant = |format: NumberFormat, value: Number| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(format)),
+					ValueNode::Number(NumberValueNode::new(value)),
+				),
+				0,
+			))
+		};
+
+		// Each declared width produces exactly that many bytes.
+		for (format, expected) in [
+			(NumberFormat::U8, "[9]"),
+			(NumberFormat::U16, "[9, 0]"),
+			(NumberFormat::U32, "[9, 0, 0, 0]"),
+			(NumberFormat::U64, "[9, 0, 0, 0, 0, 0, 0, 0]"),
+		] {
+			let account = discriminated_account(
+				"sized",
+				vec![amount_field()],
+				vec![constant(format, Number::UnsignedInteger(9))],
+			);
+			let planned = accounts::plan_account(&account, &mut types)
+				.unwrap_or_else(|error| panic!("{format:?} should plan: {error}"));
+			let page = accounts::render_planned_account(&planned);
+			assert!(
+				page.contains(expected),
+				"{format:?} rendered:
+{page}"
+			);
+		}
+
+		// A signed literal keeps its two's-complement pattern.
+		let account = discriminated_account(
+			"negative",
+			vec![amount_field()],
+			vec![constant(NumberFormat::U8, Number::SignedInteger(-1))],
+		);
+		let planned = accounts::plan_account(&account, &mut types)
+			.unwrap_or_else(|error| panic!("a signed literal should plan: {error}"));
+		let page = accounts::render_planned_account(&planned);
+		assert!(page.contains("[255]"));
+	}
+
+	#[test]
+	fn rejects_discriminators_that_do_not_fit_their_declared_width() {
+		let constant = |format: NumberFormat, value: Number| {
+			DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::le(format)),
+					ValueNode::Number(NumberValueNode::new(value)),
+				),
+				0,
+			))
+		};
+
+		// 256 does not fit a u8, and a signed -1 does not fit a u8 either once
+		// narrowed; both are reported instead of silently truncating.
+		for value in [Number::UnsignedInteger(256), Number::SignedInteger(-129)] {
+			let account = discriminated_account(
+				"overflow",
+				vec![amount_field()],
+				vec![constant(NumberFormat::U8, value.clone())],
+			);
+			let error = accounts::plan_account(&account, &mut TypeIndex::default())
+				.err()
+				.expect("an out-of-range discriminator must be rejected");
+			assert!(error.to_string().contains("does not fit"));
+		}
+
+		// Big-endian and unsupported widths are rejected with their reasons.
+		let account = discriminated_account(
+			"big_endian",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::Number(NumberTypeNode::be(NumberFormat::U8)),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("big-endian discriminators must be rejected");
+		assert!(error.to_string().contains("little-endian"));
+
+		let account = discriminated_account(
+			"wide",
+			vec![amount_field()],
+			vec![constant(NumberFormat::U128, Number::UnsignedInteger(1))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("u128 discriminators must be rejected");
+		assert!(error.to_string().contains("at most 8 bytes"));
+	}
+
+	#[test]
+	fn rejects_number_literals_whose_declared_type_is_not_a_number() {
+		// A malformed IDL can pair a number literal with a non-number type; the
+		// mismatch is reported rather than assumed to be eight bytes.
+		let mut field =
+			StructFieldTypeNode::new("tag", TypeNode::PublicKey(PublicKeyTypeNode::new()));
+		field.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		field.default_value = Box::new(Some(ValueNode::Number(NumberValueNode::new(
+			Number::UnsignedInteger(1),
+		))));
+		let account = discriminated_account(
+			"mismatched",
+			vec![field, amount_field()],
+			vec![field_discriminator("tag", 0)],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a number literal without a number type must be rejected");
+		assert!(error.to_string().contains("must declare a number type"));
+
+		// The same mismatch on a constant discriminator.
+		let account = discriminated_account(
+			"constant_mismatch",
+			vec![amount_field()],
+			vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(
+					TypeNode::PublicKey(PublicKeyTypeNode::new()),
+					ValueNode::Number(NumberValueNode::new(Number::UnsignedInteger(1))),
+				),
+				0,
+			))],
+		);
+		let error = accounts::plan_account(&account, &mut TypeIndex::default())
+			.err()
+			.expect("a number constant without a number type must be rejected");
+		assert!(error.to_string().contains("must declare a number type"));
 	}
 
 	#[test]

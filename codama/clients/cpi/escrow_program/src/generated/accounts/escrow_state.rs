@@ -25,16 +25,16 @@ pub struct EscrowState {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const ESCROW_STATE_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const ESCROW_STATE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl EscrowState {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 129;
+	pub const LEN: usize = 123;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == ESCROW_STATE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == ESCROW_STATE_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -47,7 +47,7 @@ impl EscrowState {
 		}
 
 		let mut cursor = 0usize;
-		cursor += 8;
+		cursor += 2;
 
 		let maker = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;

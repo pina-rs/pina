@@ -81,21 +81,47 @@ pub(crate) fn field_name(field: &codama_nodes::StructFieldTypeNode, index: usize
 
 /// Resolves an account's discriminator, if one can gate a read-only parser.
 ///
-/// A discriminator that is not a simple constant prefix at offset zero returns
-/// `None` rather than failing: the layout still renders, and the parser's
-/// guard degrades to a non-empty check instead of the program's bytes.
+/// Migration-aware IDLs spread a multi-byte discriminator across several
+/// adjacent one-byte constants (a version tag included), so parts are sorted
+/// and combined while they continue each other from offset zero, exactly as
+/// the instruction path does. A gap or a non-zero start returns `None` rather
+/// than failing: the layout still renders, and the parser's guard degrades to
+/// a non-empty check instead of the program's bytes.
 fn account_discriminator(
 	account: &AccountNode,
 	context: &str,
 ) -> Result<Option<RenderedDiscriminator>> {
-	let mut constant = None;
+	// A size discriminator states the layout's length rather than bytes, so it
+	// contributes nothing to the guard. The remaining parts each carry the
+	// offset their bytes belong at.
+	let mut parts: Vec<(u64, Part<'_>)> = account
+		.discriminators
+		.iter()
+		.filter_map(|discriminator| {
+			match discriminator {
+				DiscriminatorNode::Field(field) => Some((field.offset, Part::Field(field))),
+				DiscriminatorNode::Constant(node) => Some((node.offset, Part::Constant(node))),
+				DiscriminatorNode::Size(_) => None,
+			}
+		})
+		.collect();
+	if parts.is_empty() {
+		return Ok(None);
+	}
 
-	for discriminator in &account.discriminators {
-		match discriminator {
-			DiscriminatorNode::Field(field) => {
-				if field.offset != 0 {
-					return Ok(None);
-				}
+	// Migration-aware IDLs tag an account with several adjacent constants (a
+	// program byte plus a version byte), which together form the prefix. Parts
+	// that do not continue each other from offset zero leave no byte range that
+	// identifies the account, so the guard is withheld rather than guessed.
+	parts.sort_by_key(|(offset, _)| *offset);
+
+	let mut combined = Vec::new();
+	for (offset, part) in parts {
+		if offset != combined.len() as u64 {
+			return Ok(None);
+		}
+		match part {
+			Part::Field(field) => {
 				let Some(data) = account
 					.data
 					.get_nested_type_node()
@@ -109,27 +135,27 @@ fn account_discriminator(
 						"the discriminated field is not present in this account's data layout",
 					));
 				};
-				constant = Some(field_discriminator_bytes(data, context)?);
+				combined.extend_from_slice(&field_discriminator_bytes(data, context)?);
 			}
-			DiscriminatorNode::Constant(node) => {
-				if node.offset != 0 {
-					return Ok(None);
-				}
-				constant = Some(constant_discriminator_bytes(node, context)?);
+			Part::Constant(node) => {
+				combined.extend_from_slice(&constant_discriminator_bytes(node, context)?);
 			}
-			DiscriminatorNode::Size(_) => {}
 		}
 	}
 
-	Ok(constant.map(|bytes| {
-		RenderedDiscriminator {
-			name: format!(
-				"{}_DISCRIMINATOR",
-				snake(account.name.as_ref()).to_uppercase()
-			),
-			bytes,
-		}
+	Ok(Some(RenderedDiscriminator {
+		name: format!(
+			"{}_DISCRIMINATOR",
+			snake(account.name.as_ref()).to_uppercase()
+		),
+		bytes: combined,
 	}))
+}
+
+/// One byte-carrying part of an account's discriminator.
+enum Part<'a> {
+	Field(&'a codama_nodes::FieldDiscriminatorNode),
+	Constant(&'a codama_nodes::ConstantDiscriminatorNode),
 }
 
 pub(crate) struct RenderedDiscriminator {
@@ -137,24 +163,73 @@ pub(crate) struct RenderedDiscriminator {
 	bytes: Vec<u8>,
 }
 
-/// The little-endian bytes of an integer discriminator literal, rejecting
-/// floats, which have no integer byte representation.
+/// The little-endian bytes of an integer discriminator literal, narrowed to
+/// the width its declared type describes.
+///
+/// Migration-aware IDLs tag an account with several adjacent one-byte
+/// constants, so the width has to come from the declared type rather than from
+/// the widest integer that happens to hold the value. Signed literals keep
+/// their two's-complement bit pattern, so a `-1` discriminator is still eight
+/// `0xFF` bytes.
 fn integer_literal_bytes(
 	number: codama_nodes::Number,
+	width: &codama_nodes::NumberTypeNode,
 	kind: &'static str,
 	context: &str,
 ) -> Result<Vec<u8>> {
-	match number {
-		codama_nodes::Number::UnsignedInteger(number) => Ok(number.to_le_bytes().to_vec()),
-		codama_nodes::Number::SignedInteger(number) => Ok(number.to_le_bytes().to_vec()),
-		codama_nodes::Number::Float(_) => {
-			Err(unsupported(
+	use codama_nodes::Number;
+	use codama_nodes::NumberFormat;
+
+	if !matches!(width.endian, codama_nodes::Endianness::Le) {
+		return Err(unsupported(
+			context,
+			kind,
+			"only little-endian discriminators are supported",
+		));
+	}
+
+	let (bits, signed) = match number {
+		Number::UnsignedInteger(value) => (value, false),
+		Number::SignedInteger(value) => (value as u64, true),
+		Number::Float(_) => {
+			return Err(unsupported(
 				context,
 				kind,
 				"a float discriminator has no integer byte representation",
-			))
+			));
 		}
+	};
+
+	let (byte_width, unsigned_max, signed_min) = match width.format {
+		NumberFormat::U8 => (1usize, u128::from(u8::MAX), -128i128),
+		NumberFormat::U16 => (2, u128::from(u16::MAX), -32_768),
+		NumberFormat::U32 => (4, u128::from(u32::MAX), -2_147_483_648),
+		NumberFormat::U64 => (8, u128::from(u64::MAX), i128::from(i64::MIN)),
+		_ => {
+			return Err(unsupported(
+				context,
+				kind,
+				"discriminators must be an integer of at most 8 bytes",
+			));
+		}
+	};
+
+	let fits = if signed {
+		i128::from(bits as i64) >= signed_min
+	} else {
+		u128::from(bits) <= unsigned_max
+	};
+	if !fits {
+		return Err(unsupported(
+			context,
+			kind,
+			&format!(
+				"the value `{bits}` does not fit the declared {byte_width}-byte discriminator"
+			),
+		));
 	}
+
+	Ok(bits.to_le_bytes()[..byte_width].to_vec())
 }
 
 fn field_discriminator_bytes(
@@ -175,12 +250,19 @@ fn field_discriminator_bytes(
 		));
 	}
 
-	match field.default_value.as_ref().as_ref() {
-		Some(ValueNode::Bytes(value)) => {
+	match (field.default_value.as_ref().as_ref(), field.r#type.as_ref()) {
+		(Some(ValueNode::Bytes(value)), _) => {
 			crate::render::helpers::decode_base16(&value.data, context)
 		}
-		Some(ValueNode::Number(value)) => {
-			integer_literal_bytes(value.number, "fieldDiscriminatorNode", context)
+		(Some(ValueNode::Number(value)), codama_nodes::TypeNode::Number(width)) => {
+			integer_literal_bytes(value.number, width, "fieldDiscriminatorNode", context)
+		}
+		(Some(ValueNode::Number(_)), _) => {
+			Err(unsupported(
+				context,
+				"fieldDiscriminatorNode",
+				"a number discriminator field must declare a number type",
+			))
 		}
 		_ => {
 			Err(unsupported(
@@ -198,12 +280,19 @@ fn constant_discriminator_bytes(
 ) -> Result<Vec<u8>> {
 	use codama_nodes::ValueNode;
 
-	match node.constant.value.as_ref() {
-		ValueNode::Bytes(value) => crate::render::helpers::decode_base16(&value.data, context),
-		ValueNode::Number(value) => {
-			integer_literal_bytes(value.number, "constantDiscriminatorNode", context)
+	match (node.constant.value.as_ref(), node.constant.r#type.as_ref()) {
+		(ValueNode::Bytes(value), _) => crate::render::helpers::decode_base16(&value.data, context),
+		(ValueNode::Number(value), codama_nodes::TypeNode::Number(width)) => {
+			integer_literal_bytes(value.number, width, "constantDiscriminatorNode", context)
 		}
-		other => {
+		(ValueNode::Number(_), _) => {
+			Err(unsupported(
+				context,
+				"constantDiscriminatorNode",
+				"a number discriminator must declare a number type",
+			))
+		}
+		(other, _) => {
 			Err(unsupported(
 				context,
 				other.kind(),

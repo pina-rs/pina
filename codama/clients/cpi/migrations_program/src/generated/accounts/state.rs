@@ -21,14 +21,17 @@ pub struct State {
 	pub revision: u8,
 }
 
+/// Account discriminator declared by the program's IDL.
+pub const STATE_DISCRIMINATOR: [u8; 2] = [1, 2];
+
 impl State {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 42;
+	pub const LEN: usize = 44;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		!data.is_empty()
+		data.len() >= 2 && data[..2] == STATE_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -41,6 +44,8 @@ impl State {
 		}
 
 		let mut cursor = 0usize;
+		cursor += 2;
+
 		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
 		let value: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);

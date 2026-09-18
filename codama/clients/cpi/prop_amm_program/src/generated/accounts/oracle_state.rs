@@ -20,16 +20,16 @@ pub struct OracleState {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const ORACLE_STATE_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const ORACLE_STATE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl OracleState {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 48;
+	pub const LEN: usize = 42;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == ORACLE_STATE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == ORACLE_STATE_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -42,7 +42,7 @@ impl OracleState {
 		}
 
 		let mut cursor = 0usize;
-		cursor += 8;
+		cursor += 2;
 
 		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;

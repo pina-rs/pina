@@ -22,11 +22,11 @@ pub struct Sample<'data> {
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const SAMPLE_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+pub const SAMPLE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl<'data> Sample<'data> {
 	/// Largest encoded size of this account's data.
-	pub const MAX_LEN: usize = 524323;
+	pub const MAX_LEN: usize = 524317;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str =
 		"unsupported type `accountNode` at `account `Sample` field `values``: this field's width \
@@ -35,6 +35,6 @@ impl<'data> Sample<'data> {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 8 && data[..8] == SAMPLE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == SAMPLE_DISCRIMINATOR
 	}
 }
