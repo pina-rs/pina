@@ -188,7 +188,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let instruction = RelayInstruction::try_from_bytes(data)?;
-		self.system_program.assert_address(&system::ID)?;
 		let program = Program::<MigrationProgram>::try_new(self.migration_program)?;
 
 		let mut historical = [0_u8; 10];
@@ -211,7 +210,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 		// The writable CPI may have resized and rewritten this account. Construct a
 		// fresh typed guard instead of retaining any pre-CPI view.
 		let state = self.state.as_account::<State>(&ID)?;
-		if state.value.get() != instruction.value.get() || !bool::from(state.enabled) {
+		if state.value != instruction.value || state.enabled.is_false() {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
