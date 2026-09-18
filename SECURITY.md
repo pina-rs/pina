@@ -70,12 +70,24 @@ Because the project is still unaudited, the safest option is to track the latest
 
 **Do not open a public GitHub issue for an undisclosed vulnerability.**
 
-Please report sensitive findings privately by email:
+### Preferred: GitHub private vulnerability reporting
+
+Report the finding through GitHub's private advisory form:
+
+- **Private advisory:** <https://github.com/pina-rs/pina/security/advisories/new>
+
+This opens a draft security advisory that only you and the maintainers can see, keeps the discussion, reproduction, and fix attached to the repository, and lets the fix be released before the advisory is published. It also gives you a private thread to verify the remediation.
+
+If the form is unavailable to you, or you cannot use GitHub, fall back to email.
+
+### Alternative: email
 
 - **Email:** `ifiokotung@gmail.com`
 - **Subject suggestion:** `Pina security report: <short summary>`
 
-Please include as much of the following as you can:
+### What to include
+
+Please include as much of the following as you can, whichever channel you use:
 
 - affected crate(s), version(s), and commit SHA if known,
 - impact and attacker assumptions,
@@ -93,7 +105,7 @@ The intended process is:
 4. Release or merge the fix.
 5. Publish a disclosure note or changelog entry once users have a remediation path.
 
-Please avoid sharing exploit details publicly until maintainers confirm that a fix or mitigation is available.
+A GitHub private advisory follows the same sequence: the draft advisory stays private while the fix is validated, and it is published on the same schedule as any other disclosure. Please avoid sharing exploit details publicly until maintainers confirm that a fix or mitigation is available.
 
 ## Security resources
 
