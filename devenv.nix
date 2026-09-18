@@ -38,7 +38,6 @@ in
       curl
       custom.agave
       custom.mdt
-      custom.sbpf-linker
       custom.surfpool
       custom.wait-for-them
       dart
@@ -89,9 +88,8 @@ in
     CXX = "${llvm.clang}/bin/clang++";
     PROTOC = "${pkgs.protobuf}/bin/protoc";
     LD_LIBRARY_PATH = "${config.env.DEVENV_PROFILE}/lib";
-    # Single source of truth for the BPF/SBF Rust toolchain pin. The
-    # compute-units workflow and the profile script read this instead of
-    # hardcoding the version themselves.
+    # Rust toolchain used by the no-link `bpfel-unknown-none` check for
+    # generated CPI crates. Deployable programs use cargo-build-sbf instead.
     PINA_BPF_TOOLCHAIN = "nightly-2025-11-20";
     # Shared by the program-e2e and Surfpool builders so every SBF artifact is
     # produced with the same pinned platform tools.
@@ -687,20 +685,6 @@ in
           -p profile_program \
           -p validation_program
 
-        # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
-        # Build the BPF artifact with a Rust toolchain that also uses LLVM 21
-        # to avoid producer/reader attribute mismatches at link time.
-        # The toolchain version is pinned once in the env section above.
-        BPF_TOOLCHAIN="$PINA_BPF_TOOLCHAIN"
-        if ! rustup toolchain list | grep -q "^$BPF_TOOLCHAIN"; then
-          rustup toolchain install "$BPF_TOOLCHAIN" --profile minimal --component rust-src
-        else
-          rustup component add rust-src --toolchain "$BPF_TOOLCHAIN"
-        fi
-
-        PATH="${custom.sbpf-linker-21}/bin:$PATH" \
-          cargo +"$BPF_TOOLCHAIN" build-bpf
-
         if [ -z "''${HOME:-}" ]; then
           export HOME="$DEVENV_ROOT/.cache/home"
         fi
@@ -740,6 +724,12 @@ in
 
           "$cargo_build_sbf_real" \
             --force-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/pina_bpf_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint,cpi-runtime-tests
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
             --tools-version v1.54 \
             --manifest-path examples/escrow_program/Cargo.toml \
             --sbf-out-dir target/deploy \
@@ -781,6 +771,7 @@ in
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
         else
+          cargo build-pina-bpf-program
           cargo build-escrow-program
           cargo build-migrations-program
           cargo build-optional-accounts-program
@@ -789,7 +780,7 @@ in
           cargo build-staking-rewards-program
           cargo build-vesting-program
         fi
-        cargo test --locked -p pina_bpf_program bpf_build_ -- --ignored
+        cargo test --locked -p pina_bpf_program sbf_build_ -- --ignored
 
         # Run mollusk-svm e2e tests against the compiled SBF binaries.
         # These verify that generated clients produce valid instructions

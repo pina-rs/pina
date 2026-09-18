@@ -2,7 +2,7 @@
 
 ## Building for SBF
 
-Programs are compiled to `bpfel-unknown-none` using `sbpf-linker`.
+Programs are compiled with Agave's `cargo-build-sbf`, which owns its SBF target and linker toolchain.
 
 Example:
 
@@ -16,7 +16,7 @@ This expands to:
 cargo build-sbf --manifest-path examples/escrow_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint
 ```
 
-Linker flags and the `bpfel-unknown-none` target are configured in `.cargo/config.toml`. The `build-bpf` alias builds the standalone `pina_bpf` crate with `build-std` instead.
+The `build-pina-bpf-program` alias uses the same `cargo-build-sbf` path for the standalone `pina_bpf_program` example.
 
 ## `bpf-entrypoint` feature
 

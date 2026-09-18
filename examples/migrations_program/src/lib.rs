@@ -188,13 +188,17 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let instruction = RelayInstruction::try_from_bytes(data)?;
+		// The deployed self-CPI validates this account in `UpdateAccounts`. Keep
+		// the well-known default visible to source-based IDL generation without
+		// repeating that check on-chain.
+		#[cfg(not(feature = "bpf-entrypoint"))]
 		self.system_program.assert_address(&system::ID)?;
 		let program = Program::<MigrationProgram>::try_new(self.migration_program)?;
 
 		let mut historical = [0_u8; 10];
 		historical[0] = MigrationInstruction::Update as u8;
 		historical[1] = 0;
-		historical[2..].copy_from_slice(&instruction.value.get().to_le_bytes());
+		historical[2..].copy_from_slice(instruction.value.as_ref());
 
 		CpiContext::new(
 			program,
@@ -211,7 +215,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 		// The writable CPI may have resized and rewritten this account. Construct a
 		// fresh typed guard instead of retaining any pre-CPI view.
 		let state = self.state.as_account::<State>(&ID)?;
-		if state.value.get() != instruction.value.get() || !bool::from(state.enabled) {
+		if state.value != instruction.value || state.enabled.is_false() {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
