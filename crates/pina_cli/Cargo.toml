@@ -47,7 +47,6 @@ serde_json = { workspace = true, default-features = true }
 sha2 = { workspace = true, default-features = true }
 solana-address = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit", "printing"] }
-tar = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 termimad = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
