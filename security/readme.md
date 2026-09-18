@@ -40,4 +40,4 @@ Each **secure** crate is a workspace member and compiles with `cargo build`. Eac
 cargo build --manifest-path security/00-signer-authorization/insecure/Cargo.toml
 ```
 
-Read each category's readme for a detailed explanation of the vulnerability and how to avoid it. Lessons 11 and 12 are grounded in real incidents from the last three years; see [incidents-2023-2026.md](incidents-2023-2026.md) for the full research.
+Read each category's readme for a detailed explanation of the vulnerability and how to avoid it. Lessons 11 and 12 are grounded in real incidents from recent years; see [incidents-2023-2026.md](incidents-2023-2026.md) for the full research.
