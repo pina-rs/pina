@@ -109,7 +109,9 @@ impl GenerationMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientGenerationConfig {
-	/// Output path relative to the shared `clients.output` directory.
+	/// Destination directory. Relative paths sit beneath the shared
+	/// `clients.output` directory; `{{...}}`-anchored paths resolve to
+	/// absolute destinations.
 	pub output: PathBuf,
 	/// Destination lifecycle policy.
 	pub mode: GenerationMode,
@@ -200,15 +202,20 @@ pub struct MigrationsAnswersConfig {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct ProgramConfig {
-	program: PathBuf,
-	idl_dir: Option<PathBuf>,
+	program: String,
+	idl_dir: Option<String>,
+	/// Named path anchors declared as `[project.paths]`, usable as
+	/// `{{ name }}` in any configured path. Values may only reference the
+	/// built-in `{{root}}` repository anchor.
+	paths: BTreeMap<String, String>,
 }
 
 impl Default for ProgramConfig {
 	fn default() -> Self {
 		Self {
-			program: PathBuf::from("."),
+			program: ".".to_owned(),
 			idl_dir: None,
+			paths: BTreeMap::new(),
 		}
 	}
 }
@@ -216,7 +223,7 @@ impl Default for ProgramConfig {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct ClientsConfig {
-	output: PathBuf,
+	output: String,
 	languages: Vec<ClientLanguage>,
 	mode: GenerationMode,
 	scaffold: bool,
@@ -237,7 +244,7 @@ struct ClientsConfig {
 impl Default for ClientsConfig {
 	fn default() -> Self {
 		Self {
-			output: PathBuf::from("clients"),
+			output: "clients".to_owned(),
 			languages: vec![ClientLanguage::Rust, ClientLanguage::Typescript],
 			mode: GenerationMode::Auto,
 			scaffold: true,
@@ -255,35 +262,15 @@ impl Default for ClientsConfig {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct ClientGenerationOverride {
-	output: Option<PathBuf>,
+	output: Option<String>,
 	mode: Option<GenerationMode>,
 	scaffold: Option<bool>,
 }
 
 impl ClientsConfig {
-	fn generation_for(&self, language: ClientLanguage) -> ClientGenerationConfig {
-		let overrides = match language {
-			ClientLanguage::Cpi => &self.cpi,
-			ClientLanguage::Rust => &self.rust,
-			ClientLanguage::Typescript => &self.typescript,
-			ClientLanguage::Dart => &self.dart,
-			ClientLanguage::CliRust => &self.cli_rust,
-			ClientLanguage::CliTs => &self.cli_ts,
-			ClientLanguage::CliDart => &self.cli_dart,
-		};
-
-		ClientGenerationConfig {
-			output: overrides
-				.output
-				.clone()
-				.unwrap_or_else(|| PathBuf::from(language.as_str())),
-			mode: overrides.mode.unwrap_or(self.mode),
-			scaffold: overrides.scaffold.unwrap_or(self.scaffold),
-		}
-	}
-
 	fn resolved_generation(
 		&self,
+		templates: &PathTemplates,
 		clients_dir: &Path,
 	) -> Result<BTreeMap<ClientLanguage, ClientGenerationConfig>, ProjectError> {
 		let mut resolved = BTreeMap::new();
@@ -297,7 +284,15 @@ impl ClientsConfig {
 			ClientLanguage::CliTs,
 			ClientLanguage::CliDart,
 		] {
-			let generation = self.generation_for(language);
+			let overrides = match language {
+				ClientLanguage::Cpi => &self.cpi,
+				ClientLanguage::Rust => &self.rust,
+				ClientLanguage::Typescript => &self.typescript,
+				ClientLanguage::Dart => &self.dart,
+				ClientLanguage::CliRust => &self.cli_rust,
+				ClientLanguage::CliTs => &self.cli_ts,
+				ClientLanguage::CliDart => &self.cli_dart,
+			};
 			let field = match language {
 				ClientLanguage::Cpi => "clients.cpi.output",
 				ClientLanguage::Rust => "clients.rust.output",
@@ -307,8 +302,18 @@ impl ClientsConfig {
 				ClientLanguage::CliTs => "clients.cli_ts.output",
 				ClientLanguage::CliDart => "clients.cli_dart.output",
 			};
-			resolve_output_config_path(clients_dir, field, &generation.output)?;
-			resolved.insert(language, generation);
+			let raw_output = overrides
+				.output
+				.clone()
+				.unwrap_or_else(|| language.as_str().to_owned());
+			resolved.insert(
+				language,
+				ClientGenerationConfig {
+					output: templates.resolve_output(clients_dir, field, &raw_output)?,
+					mode: overrides.mode.unwrap_or(self.mode),
+					scaffold: overrides.scaffold.unwrap_or(self.scaffold),
+				},
+			);
 		}
 
 		Ok(resolved)
@@ -345,6 +350,16 @@ pub enum ProjectError {
 		path: PathBuf,
 		reason: &'static str,
 	},
+
+	#[error("Unknown path anchor `{{{variable}}}` in `{field}`; known anchors: {known}")]
+	UnknownTemplateAnchor {
+		field: &'static str,
+		variable: String,
+		known: String,
+	},
+
+	#[error("Invalid `[project.paths]` entry `{name}`: {reason}")]
+	InvalidPathsEntry { name: String, reason: String },
 
 	#[error("Cargo metadata discovery failed from {path}: {message}")]
 	CargoMetadata { path: PathBuf, message: String },
@@ -423,21 +438,15 @@ impl Project {
 				source,
 			}
 		})?;
+		let templates = PathTemplates::new(root.clone(), config.project.paths.clone())?;
 		let configured_program =
-			resolve_config_path(&root, "project.program", &config.project.program)?;
+			templates.resolve_dir(&root, "project.program", &config.project.program)?;
 		let program_dir = std::fs::canonicalize(&configured_program).map_err(|source| {
 			ProjectError::InspectPath {
 				path: configured_program,
 				source,
 			}
 		})?;
-		if !program_dir.starts_with(&root) {
-			return Err(ProjectError::InvalidConfigPath {
-				field: "project.program",
-				path: config.project.program,
-				reason: "the resolved program directory must remain inside the project root",
-			});
-		}
 		let manifest_path = program_dir.join("Cargo.toml");
 		if !manifest_path.is_file() {
 			return Err(ProjectError::MissingManifest {
@@ -455,12 +464,13 @@ impl Project {
 			.project
 			.idl_dir
 			.as_deref()
-			.map(|path| resolve_output_config_path(&root, "project.idl_dir", path))
+			.map(|raw| templates.resolve_dir(&root, "project.idl_dir", raw))
 			.transpose()?
 			.unwrap_or_else(|| target_dir.join("idl"));
-		let clients_dir =
-			resolve_output_config_path(&root, "clients.output", &config.clients.output)?;
-		let client_generation = config.clients.resolved_generation(&clients_dir)?;
+		let clients_dir = templates.resolve_dir(&root, "clients.output", &config.clients.output)?;
+		let client_generation = config
+			.clients
+			.resolved_generation(&templates, &clients_dir)?;
 		let lint_levels = resolve_lint_levels(config.lints.0)?;
 		let migration_auto = resolve_migration_auto(config.migrations.auto.as_ref())?;
 
@@ -530,7 +540,8 @@ impl Project {
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
 		let clients_dir = root.join("clients");
 		let clients_config = ClientsConfig::default();
-		let client_generation = clients_config.resolved_generation(&clients_dir)?;
+		let client_generation = clients_config
+			.resolved_generation(&PathTemplates::empty(root.clone()), &clients_dir)?;
 
 		Ok(Self {
 			program_dir: root.clone(),
@@ -563,24 +574,428 @@ impl Project {
 	}
 }
 
-fn resolve_config_path(
-	root: &Path,
-	field: &'static str,
-	path: &Path,
-) -> Result<PathBuf, ProjectError> {
-	if path.as_os_str().is_empty()
-		|| path
-			.components()
-			.any(|component| !matches!(component, Component::CurDir | Component::Normal(_)))
-	{
-		return Err(ProjectError::InvalidConfigPath {
-			field,
-			path: path.to_path_buf(),
-			reason: "paths must be non-empty, relative, and cannot contain `..`",
-		});
+/// The builtin repository anchor and every declared `[project.paths]` name.
+const BUILTIN_ANCHOR: &str = "root";
+
+/// Resolves `{{ name }}` anchors in configured paths.
+///
+/// `{{root}}` expands to the git repository root (the working-tree top level,
+/// so linked worktrees resolve to the worktree itself). Every `[project.paths]`
+/// entry declares one additional anchor whose value may only reference
+/// `{{root}}`. The git root is discovered lazily, so configurations without
+/// anchors never invoke git.
+struct PathTemplates {
+	/// Directory used to discover the repository root; the `pina.toml` folder.
+	discovery_dir: PathBuf,
+	variables: BTreeMap<String, String>,
+	git_root: std::cell::RefCell<Option<PathBuf>>,
+}
+
+impl PathTemplates {
+	/// Build a resolver from declared `[project.paths]` entries, validating
+	/// anchor names and values.
+	fn new(
+		discovery_dir: PathBuf,
+		variables: BTreeMap<String, String>,
+	) -> Result<Self, ProjectError> {
+		for (name, value) in &variables {
+			if name == BUILTIN_ANCHOR {
+				return Err(ProjectError::InvalidPathsEntry {
+					name: name.clone(),
+					reason: format!(
+						"`{BUILTIN_ANCHOR}` is reserved by the `{{{{{BUILTIN_ANCHOR}}}}}` \
+						 repository anchor"
+					),
+				});
+			}
+			if !is_valid_anchor_name(name) {
+				return Err(ProjectError::InvalidPathsEntry {
+					name: name.clone(),
+					reason: "anchor names must match [A-Za-z_][A-Za-z0-9_-]*".to_owned(),
+				});
+			}
+			let anchors = extract_anchors(value).map_err(|reason| {
+				ProjectError::InvalidPathsEntry {
+					name: name.clone(),
+					reason: reason.to_owned(),
+				}
+			})?;
+			for anchor in anchors {
+				if anchor != BUILTIN_ANCHOR {
+					return Err(ProjectError::InvalidPathsEntry {
+						name: name.clone(),
+						reason: format!(
+							"path anchors may only reference `{{{{{BUILTIN_ANCHOR}}}}}`"
+						),
+					});
+				}
+			}
+		}
+
+		Ok(Self {
+			discovery_dir,
+			variables,
+			git_root: std::cell::RefCell::new(None),
+		})
 	}
 
-	Ok(root.join(path))
+	/// Build a resolver without declared anchors; used when no `pina.toml`
+	/// exists and every path is a Pina default.
+	fn empty(discovery_dir: PathBuf) -> Self {
+		Self {
+			discovery_dir,
+			variables: BTreeMap::new(),
+			git_root: std::cell::RefCell::new(None),
+		}
+	}
+
+	fn known_anchors(&self) -> String {
+		let mut names = Vec::with_capacity(self.variables.len() + 1);
+		names.push(format!("`{BUILTIN_ANCHOR}`"));
+		names.extend(self.variables.keys().map(|name| format!("`{name}`")));
+		names.join(", ")
+	}
+
+	/// Expand every `{{ name }}` anchor in `raw`.
+	fn substitute(&self, field: &'static str, raw: &str) -> Result<String, ProjectError> {
+		self.expand(field, raw, true)
+	}
+
+	/// Expand anchors in `raw`; declared variables resolve to one nested
+	/// expansion pass because their values may only reference `{{root}}`.
+	fn expand(
+		&self,
+		field: &'static str,
+		raw: &str,
+		allow_variables: bool,
+	) -> Result<String, ProjectError> {
+		let mut result = String::with_capacity(raw.len());
+		let mut rest = raw;
+
+		while let Some(start) = rest.find("{{") {
+			result.push_str(&rest[..start]);
+			let after = &rest[start + 2..];
+			let Some(end) = after.find("}}") else {
+				return Err(ProjectError::InvalidConfigPath {
+					field,
+					path: PathBuf::from(raw),
+					reason: "found `{{` without a closing `}}`",
+				});
+			};
+			let name = after[..end].trim();
+			if !is_valid_anchor_name(name) {
+				return Err(ProjectError::InvalidConfigPath {
+					field,
+					path: PathBuf::from(raw),
+					reason: "anchor names must match [A-Za-z_][A-Za-z0-9_-]*",
+				});
+			}
+
+			if name == BUILTIN_ANCHOR {
+				result.push_str(&self.git_root(field, raw)?.to_string_lossy());
+			} else if allow_variables {
+				match self.variables.get(name) {
+					Some(value) => result.push_str(&self.expand(field, value, false)?),
+					None => {
+						return Err(ProjectError::UnknownTemplateAnchor {
+							field,
+							variable: name.to_owned(),
+							known: self.known_anchors(),
+						});
+					}
+				}
+			} else {
+				return Err(ProjectError::UnknownTemplateAnchor {
+					field,
+					variable: name.to_owned(),
+					known: self.known_anchors(),
+				});
+			}
+			rest = &after[end + 2..];
+		}
+
+		result.push_str(rest);
+		Ok(result)
+	}
+
+	/// Return the cached git repository root, discovering it on first use.
+	fn git_root(&self, field: &'static str, raw: &str) -> Result<PathBuf, ProjectError> {
+		if let Some(root) = self.git_root.borrow().as_ref() {
+			return Ok(root.clone());
+		}
+
+		let discovered = discover_git_root(&self.discovery_dir).ok_or_else(|| {
+			ProjectError::InvalidConfigPath {
+				field,
+				path: PathBuf::from(raw),
+				reason: "the `{{root}}` anchor needs a git repository; run inside a repository or \
+				         add a `.git` entry to an ancestor directory",
+			}
+		})?;
+		*self.git_root.borrow_mut() = Some(discovered.clone());
+		Ok(discovered)
+	}
+
+	/// Resolve a directory-valued path field to a normalized absolute path.
+	///
+	/// `raw` is relative to the configuration directory unless an anchor makes
+	/// it absolute.
+	fn resolve_dir(
+		&self,
+		base: &Path,
+		field: &'static str,
+		raw: &str,
+	) -> Result<PathBuf, ProjectError> {
+		let (_, joined, _) = self.resolve_raw(base, field, raw)?;
+		let normalized = normalize_absolute(&joined, field, raw)?;
+		self.reject_symlink_prefix(&normalized, field, raw)?;
+		Ok(normalized)
+	}
+
+	/// Resolve a per-target client output path.
+	///
+	/// Relative results stay relative so generation joins them beneath the
+	/// shared clients directory; anchored results are absolute.
+	fn resolve_output(
+		&self,
+		base: &Path,
+		field: &'static str,
+		raw: &str,
+	) -> Result<PathBuf, ProjectError> {
+		let (substituted, joined, anchored) = self.resolve_raw(base, field, raw)?;
+		let normalized = normalize_absolute(&joined, field, raw)?;
+		self.reject_symlink_prefix(&normalized, field, raw)?;
+
+		if anchored {
+			Ok(normalized)
+		} else {
+			Ok(normalize_relative(&substituted))
+		}
+	}
+
+	/// Substitute anchors and join the result onto `base` unless it is
+	/// already absolute.
+	///
+	/// Returns the substituted path and the path joined onto `base`, plus
+	/// whether substitution produced an absolute path.
+	fn resolve_raw(
+		&self,
+		base: &Path,
+		field: &'static str,
+		raw: &str,
+	) -> Result<(PathBuf, PathBuf, bool), ProjectError> {
+		if raw.trim().is_empty() {
+			return Err(ProjectError::InvalidConfigPath {
+				field,
+				path: PathBuf::from(raw),
+				reason: "paths must be non-empty",
+			});
+		}
+		if Path::new(raw).is_absolute() {
+			return Err(ProjectError::InvalidConfigPath {
+				field,
+				path: PathBuf::from(raw),
+				reason: "paths must be relative or anchored with `{{root}}`",
+			});
+		}
+
+		let substituted = self.substitute(field, raw)?;
+		let substituted_path = PathBuf::from(&substituted);
+		let anchored = substituted_path.is_absolute();
+		let joined = if anchored {
+			substituted_path.clone()
+		} else {
+			base.join(&substituted_path)
+		};
+		Ok((substituted_path, joined, anchored))
+	}
+
+	/// Reject symlinked components between the trusted walk base and the
+	/// normalized path. Paths that leave the walk base lexically (`..`) are
+	/// checked only up to that point; generation-time validation still
+	/// refuses symlinked destinations.
+	fn reject_symlink_prefix(
+		&self,
+		normalized: &Path,
+		field: &'static str,
+		raw: &str,
+	) -> Result<(), ProjectError> {
+		let walk_base = if normalized.is_absolute() && self.git_root_is_known() {
+			// Anchored paths are walked from the repository root they name;
+			// the repository root itself is allowed to be reached through
+			// links (macOS temp dirs, worktree indirection).
+			self.git_root(field, raw)?
+		} else {
+			// Discover the git root without erroring for unanchored paths.
+			match self.git_root.borrow().as_ref() {
+				Some(root) => root.clone(),
+				None => self.discovery_dir.clone(),
+			}
+		};
+
+		let Ok(remainder) = normalized.strip_prefix(&walk_base) else {
+			return Ok(());
+		};
+
+		let mut current = walk_base;
+		for component in remainder.components() {
+			current.push(component);
+			match std::fs::symlink_metadata(&current) {
+				Ok(metadata) if is_link_like(&metadata) => {
+					return Err(ProjectError::InvalidConfigPath {
+						field,
+						path: PathBuf::from(raw),
+						reason: "configured paths cannot traverse symbolic links",
+					});
+				}
+				Ok(_) => {}
+				Err(source) if source.kind() == std::io::ErrorKind::NotFound => break,
+				Err(source) => {
+					return Err(ProjectError::InspectPath {
+						path: current,
+						source,
+					});
+				}
+			}
+		}
+
+		Ok(())
+	}
+
+	fn git_root_is_known(&self) -> bool {
+		self.git_root.borrow().is_some()
+	}
+}
+
+/// Return whether `name` can be used as a `{{ name }}` anchor.
+fn is_valid_anchor_name(name: &str) -> bool {
+	let mut characters = name.chars();
+	let valid_start = characters
+		.next()
+		.is_some_and(|first| first.is_ascii_alphabetic() || first == '_');
+
+	valid_start && characters.all(|rest| rest.is_ascii_alphanumeric() || rest == '_' || rest == '-')
+}
+
+/// Extract every `{{ name }}` anchor from a template value.
+///
+/// Returns an error message when a `{{` is never closed.
+fn extract_anchors(raw: &str) -> Result<Vec<&str>, &'static str> {
+	let mut anchors = Vec::new();
+	let mut rest = raw;
+
+	while let Some(start) = rest.find("{{") {
+		let after = &rest[start + 2..];
+		let Some(end) = after.find("}}") else {
+			return Err("found `{{` without a closing `}}`");
+		};
+		anchors.push(after[..end].trim());
+		rest = &after[end + 2..];
+	}
+
+	Ok(anchors)
+}
+
+/// Find the git repository root for `start`.
+///
+/// Prefers `git rev-parse --show-toplevel`, which resolves linked worktrees
+/// to the worktree itself, and falls back to the nearest ancestor containing
+/// a `.git` entry (a directory for repositories, a file for worktrees).
+fn discover_git_root(start: &Path) -> Option<PathBuf> {
+	if let Ok(output) = std::process::Command::new("git")
+		.arg("-C")
+		.arg(start)
+		.args(["rev-parse", "--show-toplevel"])
+		.output()
+		&& output.status.success()
+	{
+		let text = String::from_utf8_lossy(&output.stdout);
+		let trimmed = text.trim();
+		if !trimmed.is_empty() {
+			return Some(PathBuf::from(trimmed));
+		}
+	}
+
+	let mut current = Some(start);
+	while let Some(directory) = current {
+		if directory.join(".git").symlink_metadata().is_ok() {
+			return Some(directory.to_path_buf());
+		}
+		current = directory.parent();
+	}
+
+	None
+}
+
+/// Collapse `.`, resolve `..`, and keep the path absolute.
+///
+/// Returns an error when `..` climbs above the filesystem root.
+fn normalize_absolute(
+	path: &Path,
+	field: &'static str,
+	raw: &str,
+) -> Result<PathBuf, ProjectError> {
+	let mut normalized = PathBuf::new();
+	let mut floor = 0usize;
+
+	for component in path.components() {
+		match component {
+			Component::Prefix(_) | Component::RootDir => {
+				normalized.push(component);
+				floor = normalized.components().count();
+			}
+			Component::CurDir => {}
+			Component::Normal(part) => normalized.push(part),
+			Component::ParentDir => {
+				if normalized.components().count() <= floor || !normalized.pop() {
+					return Err(ProjectError::InvalidConfigPath {
+						field,
+						path: PathBuf::from(raw),
+						reason: "the resolved path traverses above the filesystem root",
+					});
+				}
+			}
+		}
+	}
+
+	Ok(normalized)
+}
+
+/// Collapse `.` and resolve `..` in a relative path, keeping leading `..`
+/// components so the result stays relative.
+fn normalize_relative(path: &Path) -> PathBuf {
+	enum Part {
+		Parent,
+		Name(OsString),
+	}
+
+	let mut parts: Vec<Part> = Vec::new();
+	for component in path.components() {
+		match component {
+			Component::CurDir | Component::Prefix(_) | Component::RootDir => {}
+			Component::ParentDir => {
+				match parts.last() {
+					Some(Part::Name(_)) => {
+						parts.pop();
+					}
+					Some(Part::Parent) | None => parts.push(Part::Parent),
+				}
+			}
+			Component::Normal(name) => parts.push(Part::Name(name.to_os_string())),
+		}
+	}
+
+	let mut normalized = PathBuf::new();
+	for part in parts {
+		match part {
+			Part::Parent => normalized.push(".."),
+			Part::Name(name) => normalized.push(name),
+		}
+	}
+	if normalized.as_os_str().is_empty() {
+		normalized.push(".");
+	}
+	normalized
 }
 
 /// Validate the `[lints]` table and return the resolved level overrides.
@@ -673,41 +1088,6 @@ fn resolve_migration_auto_entries(entries: &[toml::Value]) -> Result<MigrationAu
 		}
 	}
 	Ok(auto)
-}
-
-fn resolve_output_config_path(
-	root: &Path,
-	field: &'static str,
-	path: &Path,
-) -> Result<PathBuf, ProjectError> {
-	let resolved = resolve_config_path(root, field, path)?;
-	let mut current = root.to_path_buf();
-
-	for component in path.components() {
-		if component == Component::CurDir {
-			continue;
-		}
-		current.push(component);
-		match std::fs::symlink_metadata(&current) {
-			Ok(metadata) if is_link_like(&metadata) => {
-				return Err(ProjectError::InvalidConfigPath {
-					field,
-					path: path.to_path_buf(),
-					reason: "configured output paths cannot traverse symbolic links",
-				});
-			}
-			Ok(_) => {}
-			Err(source) if source.kind() == std::io::ErrorKind::NotFound => break,
-			Err(source) => {
-				return Err(ProjectError::InspectPath {
-					path: current,
-					source,
-				});
-			}
-		}
-	}
-
-	Ok(resolved)
 }
 
 fn is_link_like(metadata: &std::fs::Metadata) -> bool {
@@ -1097,29 +1477,19 @@ mode = "overwrite"
 	}
 
 	#[test]
-	fn config_rejects_absolute_and_parent_paths_for_every_path_field() {
+	fn config_rejects_absolute_paths_for_every_path_field() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		write_program(temp.path(), "counter");
 		let cases = [
 			("project.program", "[project]\nprogram = \"/outside\"\n"),
-			("project.program", "[project]\nprogram = \"../outside\"\n"),
 			(
 				"project.idl_dir",
 				"[project]\nprogram = \".\"\nidl_dir = \"/outside\"\n",
 			),
-			(
-				"project.idl_dir",
-				"[project]\nprogram = \".\"\nidl_dir = \"../outside\"\n",
-			),
 			("clients.output", "[clients]\noutput = \"/outside\"\n"),
-			("clients.output", "[clients]\noutput = \"../outside\"\n"),
 			(
 				"clients.cpi.output",
 				"[clients.cpi]\noutput = \"/outside\"\n",
-			),
-			(
-				"clients.cpi.output",
-				"[clients.cpi]\noutput = \"../outside\"\n",
 			),
 		];
 
@@ -1133,6 +1503,184 @@ mode = "overwrite"
 				"unexpected error for {field}: {error}"
 			);
 		}
+	}
+
+	#[test]
+	fn config_allows_parent_directory_paths() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project_dir = temp.path().join("proj");
+		let sibling_program = temp.path().join("other");
+		write_program(&project_dir, "configured-program");
+		write_program(&sibling_program, "sibling-program");
+		fs::write(
+			project_dir.join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \"../other\"\n\n[clients]\noutput = \"../clients\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let project = Project::discover(&project_dir)
+			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		let temp = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+
+		assert_eq!(project.program_dir, temp.join("other"));
+		assert_eq!(project.clients_dir, temp.join("clients"));
+	}
+
+	#[test]
+	fn config_resolves_root_anchor_to_repository_root() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project_dir = temp.path().join("proj");
+		write_program(&project_dir, "counter");
+		// A `.git` entry in the nearest ancestor anchors `{{root}}` without
+		// requiring a real git repository.
+		fs::create_dir(temp.path().join(".git"))
+			.unwrap_or_else(|error| panic!("failed to create .git: {error}"));
+		fs::write(
+			project_dir.join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\nidl_dir = \"{{root}}/idls\"\n\n[clients]\noutput = \
+			 \"{{root}}/clients\"\n\n[clients.rust]\noutput = \"{{root}}/clients/rust\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let project = Project::discover(&project_dir)
+			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		let temp = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+
+		assert_eq!(project.idl_dir, temp.join("idls"));
+		assert_eq!(project.clients_dir, temp.join("clients"));
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Rust].output,
+			temp.join("clients/rust")
+		);
+	}
+
+	#[test]
+	fn config_resolves_declared_path_anchors() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project_dir = temp.path().join("proj");
+		write_program(&project_dir, "counter");
+		fs::create_dir(temp.path().join(".git"))
+			.unwrap_or_else(|error| panic!("failed to create .git: {error}"));
+		fs::write(
+			project_dir.join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[project.paths]\ncrates = \"{{root}}/crates\"\nshared \
+			 = \"clients/shared\"\n\n[clients]\noutput = \
+			 \"{{root}}/clients\"\n\n[clients.rust]\noutput = \"{{ crates \
+			 }}\"\n\n[clients.typescript]\noutput = \"{{ shared }}\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let project = Project::discover(&project_dir)
+			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		let temp = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Rust].output,
+			temp.join("crates")
+		);
+		// Anchors may also hold plain relative paths.
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Typescript].output,
+			PathBuf::from("clients/shared")
+		);
+	}
+
+	#[test]
+	fn config_rejects_unknown_path_anchors() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[project.paths]\ncrates = \
+			 \"{{root}}/crates\"\n\n[clients]\noutput = \"{{ nope }}\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let error = Project::discover(temp.path()).expect_err("unknown anchors should fail closed");
+		let message = error.to_string();
+
+		assert!(
+			matches!(error, ProjectError::UnknownTemplateAnchor { variable, .. } if variable == "nope"),
+			"unexpected error: {message}"
+		);
+		assert!(
+			message.contains("`root`") && message.contains("`crates`"),
+			"error lists the known anchors: {message}"
+		);
+	}
+
+	#[test]
+	fn config_rejects_unterminated_path_anchors() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[clients]\noutput = \"{{root}/clients\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+		let error =
+			Project::discover(temp.path()).expect_err("unterminated anchors should fail closed");
+
+		assert!(matches!(
+			error,
+			ProjectError::InvalidConfigPath {
+				field: "clients.output",
+				..
+			}
+		));
+	}
+
+	#[test]
+	fn config_rejects_invalid_paths_entries() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		let cases = [
+			(
+				"`root` is reserved",
+				"[project.paths]\nroot = \"{{root}}/x\"\n",
+			),
+			(
+				"anchor names must match",
+				"[project.paths]\n\"1bad\" = \"{{root}}/x\"\n",
+			),
+			(
+				"may only reference",
+				"[project.paths]\ncrates = \"{{ packages }}/x\"\n",
+			),
+			("closing `}}`", "[project.paths]\ncrates = \"{{root}/x\"\n"),
+		];
+
+		for (expected, config) in cases {
+			fs::write(temp.path().join(CONFIG_FILE_NAME), config)
+				.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+			let error = Project::discover(temp.path())
+				.expect_err("invalid `[project.paths]` entries should fail closed");
+			let message = error.to_string();
+
+			assert!(
+				matches!(error, ProjectError::InvalidPathsEntry { .. }),
+				"unexpected error kind: {message}"
+			);
+			assert!(
+				message.contains(expected),
+				"error should mention {expected}: {message}"
+			);
+		}
+	}
+
+	#[test]
+	fn relative_normalization_keeps_leading_parent_components() {
+		assert_eq!(normalize_relative(Path::new("a/../b")), PathBuf::from("b"));
+		assert_eq!(normalize_relative(Path::new("../x")), PathBuf::from("../x"));
+		assert_eq!(
+			normalize_relative(Path::new("a/../../b")),
+			PathBuf::from("../b")
+		);
+		assert_eq!(normalize_relative(Path::new("./a/.")), PathBuf::from("a"));
 	}
 
 	#[cfg(unix)]
@@ -1338,14 +1886,16 @@ mode = "overwrite"
 
 		let root = fs::canonicalize(temp.path())
 			.unwrap_or_else(|error| panic!("failed to canonicalize root: {error}"));
+		let templates = PathTemplates::empty(root.clone());
 		assert_eq!(
-			resolve_output_config_path(&root, "clients.output", Path::new("."))
+			templates
+				.resolve_output(&root, "clients.output", ".")
 				.unwrap_or_else(|error| panic!("dot output should resolve: {error}")),
-			root
+			PathBuf::from(".")
 		);
-		let too_long = PathBuf::from("x".repeat(32 * 1024));
+		let too_long = "x".repeat(32 * 1024);
 		assert!(matches!(
-			resolve_output_config_path(&root, "clients.output", &too_long),
+			templates.resolve_output(&root, "clients.output", &too_long),
 			Err(ProjectError::InspectPath { .. })
 		));
 
