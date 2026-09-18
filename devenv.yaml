@@ -9,11 +9,6 @@ inputs:
     url: github:NixOS/nixpkgs/nixpkgs-unstable
   ifiokjr-nixpkgs:
     url: github:ifiokjr/nixpkgs
-  ifiokjr-nixpkgs-sbpf-21:
-    # The bpfel-unknown-none build still needs the LLVM 21 gallery linker.
-    # The current package set only ships sbpf-linker 0.2.1, whose supported
-    # target is sbpf-solana-solana.
-    url: github:ifiokjr/nixpkgs/bda29f0f7d912571fcc7413e4ab3458235d0beb0
   rust-overlay:
     url: github:oxalica/rust-overlay
     overlays:
