@@ -1244,6 +1244,64 @@ fn resolve_manifest(
 	})
 }
 
+/// Derive the reserved-`Migrate` ladder from the checked-in manifest.
+///
+/// Every enveloped account contract becomes a slot, in the manifest's
+/// identity-sorted key order — the same order generated clients compose, so
+/// the endpoint and its callers can never disagree about slot assignment.
+/// Instruction and event contracts are skipped: only accounts migrate.
+/// Returns an empty ladder when no manifest exists (the program has not
+/// opted into migrations).
+pub(crate) fn manifest_account_ladder(
+	enum_name: &syn::Ident,
+) -> syn::Result<Vec<proc_macro2::Ident>> {
+	let Some((program_dir, _prefix)) = discover_program_dir() else {
+		return Ok(Vec::new());
+	};
+	manifest_account_ladder_at(enum_name, &program_dir.join(MANIFEST_PATH))
+}
+
+/// Pure variant for tests: derive the ladder from the manifest at `path`.
+fn manifest_account_ladder_at(
+	enum_name: &syn::Ident,
+	path: &std::path::Path,
+) -> syn::Result<Vec<proc_macro2::Ident>> {
+	let source = match std::fs::read(path) {
+		Ok(source) => source,
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+		Err(error) => {
+			return Err(syn::Error::new_spanned(
+				enum_name,
+				format!(
+					"the reserved `Migrate` routing cannot read {} ({error}); repair the file, or \
+					 delete it if the program should not opt into migrations",
+					path.display()
+				),
+			));
+		}
+	};
+	let manifest: MigrationManifest = pina_abi::decode_manifest(&source).map_err(|error| {
+		syn::Error::new_spanned(
+			enum_name,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+	manifest.validate().map_err(|error| {
+		syn::Error::new_spanned(
+			enum_name,
+			format!("invalid migration manifest {}: {error}", path.display()),
+		)
+	})?;
+
+	let ladder = manifest
+		.contracts
+		.values()
+		.filter(|history| history.identity.kind == ContractKind::Account)
+		.map(|history| syn::Ident::new(&history.rust_name, enum_name.span()))
+		.collect();
+	Ok(ladder)
+}
+
 /// Verify that every contract named by a dispatch migration ladder is
 /// recorded in the checked-in manifest.
 ///
@@ -1757,7 +1815,7 @@ mod tests {
 	}
 
 	fn write_manifest(program_dir: &Path, source: &[u8]) -> PathBuf {
-		let path = program_dir.join(pina_abi::MANIFEST_PATH);
+		let path = program_dir.join(MANIFEST_PATH);
 		let parent = path
 			.parent()
 			.unwrap_or_else(|| panic!("manifest path has a parent directory"));
@@ -1770,6 +1828,64 @@ mod tests {
 	fn encode(manifest: &MigrationManifest) -> Vec<u8> {
 		pina_abi::encode_manifest_for_format(manifest, pina_abi::MANIFEST_FORMAT_VERSION)
 			.unwrap_or_else(|error| panic!("encode manifest: {error}"))
+	}
+
+	#[test]
+	fn derived_ladder_keeps_account_contracts_in_identity_order() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		let root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonical temp: {error}"));
+
+		// Two accounts plus an event: only accounts become slots, and manifest
+		// key order (`account:1:01` < `account:1:02`) decides their order,
+		// matching the order generated clients compose.
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		for (name, kind, value) in [
+			("Zebra", ContractKind::Account, 1u64),
+			("Alpha", ContractKind::Account, 2u64),
+			("Runner", ContractKind::Event, 3u64),
+		] {
+			let item = item_struct(name);
+			let schema = pina_abi::data_schema(&item, LayoutKind::Fixed)
+				.unwrap_or_else(|error| panic!("schema: {error}"));
+			let identity = ContractIdentity::try_new(kind, 1, value)
+				.unwrap_or_else(|error| panic!("identity: {error}"));
+			manifest.contracts.insert(
+				identity.key(),
+				ContractHistory {
+					identity,
+					rust_name: name.to_owned(),
+					versions: vec![SchemaVersion {
+						version: 0,
+						schema_sha256: schema.sha256(),
+						schema,
+						process: None,
+						process_sha256: None,
+						transition: None,
+					}],
+				},
+			);
+		}
+		let path = write_manifest(&root, &encode(&manifest));
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		let ladder = manifest_account_ladder_at(&enum_name, &path)
+			.unwrap_or_else(|error| panic!("derive ladder: {error}"));
+
+		let names: Vec<String> = ladder.iter().map(ToString::to_string).collect();
+		assert_eq!(names, vec!["Zebra".to_owned(), "Alpha".to_owned()]);
+	}
+
+	#[test]
+	fn absent_manifest_derives_an_empty_ladder() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		let root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonical temp: {error}"));
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		let path = root.join(MANIFEST_PATH);
+		let ladder = manifest_account_ladder_at(&enum_name, &path)
+			.unwrap_or_else(|error| panic!("derive ladder: {error}"));
+
+		assert!(ladder.is_empty());
 	}
 
 	#[test]
@@ -1856,7 +1972,7 @@ mod tests {
 		// A directory at the manifest path fails every read except `NotFound`,
 		// so the resolution failure is reported instead of a silent "no
 		// policy". The message must not claim that `State` opted into anything.
-		let path = temp.path().join(pina_abi::MANIFEST_PATH);
+		let path = temp.path().join(MANIFEST_PATH);
 		std::fs::create_dir_all(&path)
 			.unwrap_or_else(|error| panic!("create manifest directory: {error}"));
 
@@ -1922,12 +2038,7 @@ mod tests {
 			"message: {message}"
 		);
 		assert!(
-			message.contains(
-				&program_dir
-					.join(pina_abi::MANIFEST_PATH)
-					.display()
-					.to_string()
-			),
+			message.contains(&program_dir.join(MANIFEST_PATH).display().to_string()),
 			"message: {message}"
 		);
 

@@ -69,6 +69,13 @@ impl IdlError {
 		))
 	}
 
+	pub(crate) fn ambiguous_discriminator_entrypoint(names: &str) -> Self {
+		Self::Other(format!(
+			"`entrypoint` was declared on {names}; exactly one discriminator enum per program may \
+			 declare it"
+		))
+	}
+
 	pub(crate) fn invalid_pda(account: &str, message: impl std::fmt::Display) -> Self {
 		Self::Other(format!("Could not extract PDA `{account}`: {message}"))
 	}

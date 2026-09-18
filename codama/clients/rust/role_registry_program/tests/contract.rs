@@ -53,6 +53,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		init_ix.accounts[2],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,),
 	);
+	// Envelope: discriminator, migration version, bump.
 	assert_eq!(init_ix.data, vec![0, 0, 7]);
 
 	let add_role = AddRole::new(admin, grantee, registry_config, role_entry);
@@ -75,6 +76,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		add_ix.accounts[4],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
+	// Envelope: discriminator, migration version, then the payload fields.
 	let mut expected_add = vec![1, 0];
 	expected_add.extend_from_slice(&11u64.to_le_bytes());
 	expected_add.extend_from_slice(&42u64.to_le_bytes());

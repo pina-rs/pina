@@ -24,6 +24,9 @@ token = [
 	"dep:pinocchio-token-2022",
 ]
 memo = ["dep:pinocchio-memo"]
+# Account reallocation. Required by the reserved `Migrate` route that
+# `#[discriminator(entrypoint)]` generates, so `pina init` scaffolds it; a
+# program whose accounts never grow can leave it off.
 account-resize = ["pinocchio/account-resize", "pinocchio-system/account-resize"]
 derive = ["dep:pina_macros"]
 compact = ["derive", "pina_macros/compact"]

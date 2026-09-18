@@ -16,7 +16,7 @@ crate-type = ["cdylib", "lib"]
 bpf-entrypoint = []
 
 [dependencies]
-pina = { workspace = true, features = ["logs", "derive", "token"] }
+pina = { workspace = true, features = ["account-resize", "logs", "derive", "token"] }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true, default-features = true }
