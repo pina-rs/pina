@@ -2,9 +2,9 @@
 
 <br>
 
-Vesting schedule-state and account-validation scaffold.
+Vesting schedule with a cliff, linear unlock, token release, and cancellation refund.
 
-> **Not production-ready:** Claim and cancel mutate schedule bookkeeping but do not use the clock or transfer tokens. Do not deploy or fork this example as a vesting product without completing the entitlement and custody model described below.
+> **Review before deploying:** the entitlement and custody model is complete, but the example still omits the policy a specific product needs (amendment, recovery, insolvency, and multi-schedule administration). See the production-readiness checklist below.
 
 ## What it covers
 
@@ -12,17 +12,17 @@ Vesting schedule-state and account-validation scaffold.
 
 - Vesting schedule initialization with a PDA-owned state account.
 - Vault ATA creation for the schedule account.
-- Claim and cancel bookkeeping with explicit validation chains.
-- Token-program account validation and ATA scaffolding.
+- Claim with a Clock-sysvar check: a claim before `cliff_ts` is rejected, and the vested entitlement grows linearly to `end_ts`, rounding down so the beneficiary can never be released more than the curve supports.
+- Token release from the vault signed by the vesting PDA, with the vault and beneficiary balances asserted by the Surfpool suite.
+- Cancel: refund of the unclaimed remainder to the admin and closure of the vault, so no value is stranded.
 
-The `tests/e2e.rs` file exercises the schedule-state lifecycle through Mollusk. It does not prove cliff enforcement, vested-amount calculation, token release, or cancellation refunds. The tests report a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
+The `tests/surfpool` suite funds the vault through a real SPL mint and asserts the exact balances around every step, which is what proves the release and the refund actually move tokens. It reports a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
 
 ## Deliberately out of scope
 
-- Clock-sysvar validation and cliff or linear-unlock calculations.
-- Funding the vault and transferring vested tokens to the beneficiary.
-- Returning or preserving tokens after cancellation.
-- Rounding, amendment, closure, recovery, and insolvency policy.
+- Amendment, early termination, or re-issuance of an existing schedule.
+- Recovery when the mint is frozen or the vault is short of the entitlement.
+- Multiple concurrent schedules per `(admin, beneficiary, mint)` pair.
 
 See the book's [Production Readiness](../../docs/src/production-readiness.md) checklist for the invariants and adversarial tests a real vesting program needs.
 
