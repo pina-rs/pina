@@ -873,7 +873,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "rewardVault",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
 					},

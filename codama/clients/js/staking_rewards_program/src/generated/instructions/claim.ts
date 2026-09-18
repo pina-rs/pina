@@ -84,7 +84,7 @@ export type ClaimInstruction<
 			TAccountUserRewardAta extends string
 				? WritableAccount<TAccountUserRewardAta>
 				: TAccountUserRewardAta,
-			TAccountRewardVault extends string ? ReadonlyAccount<TAccountRewardVault>
+			TAccountRewardVault extends string ? WritableAccount<TAccountRewardVault>
 				: TAccountRewardVault,
 			TAccountAssociatedTokenProgram extends string
 				? ReadonlyAccount<TAccountAssociatedTokenProgram>
@@ -210,7 +210,7 @@ export function getClaimInstruction<
 		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
-		rewardVault: { value: input.rewardVault ?? null, isWritable: false },
+		rewardVault: { value: input.rewardVault ?? null, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isWritable: false,

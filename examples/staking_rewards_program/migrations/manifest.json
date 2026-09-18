@@ -632,7 +632,7 @@
 							},
 							{
 								"name": "reward_vault",
-								"writable": false,
+								"writable": true,
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
@@ -664,7 +664,7 @@
 							}
 						]
 					},
-					"processSha256": "a119c4a9e435a0643727102a3d7960f10f572b2572a2f0e78e8c19c78f3d7f8c",
+					"processSha256": "b986859ccb024db7e5138178b829c208125643f41829916850c5cfc1c0f6dfe3",
 					"transition": null
 				}
 			]

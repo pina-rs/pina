@@ -153,17 +153,20 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	assert_eq!(withdraw_ix.data, expected_withdraw);
 
 	let user_reward_ata = Pubkey::new_unique();
+	let reward_vault = Pubkey::new_unique();
 	let claim = Claim::new(
 		admin,
 		reward_mint,
 		pool_state,
 		position_state,
 		user_reward_ata,
+		reward_vault,
 		token_program,
 	);
 	let claim_payload = ClaimInstructionData::new(|_| {}).unwrap();
 	let claim_ix = claim.instruction(claim_payload);
-	assert_eq!(claim_ix.accounts.len(), 8);
+	assert_eq!(claim_ix.accounts.len(), 9);
+	assert_eq!(claim_ix.accounts[5], AccountMeta::new(reward_vault, false));
 	assert_eq!(claim_ix.accounts[0], AccountMeta::new(admin, true));
 	assert_eq!(
 		claim_ix.accounts[1],

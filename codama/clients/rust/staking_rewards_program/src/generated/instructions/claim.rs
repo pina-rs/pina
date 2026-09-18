@@ -78,7 +78,7 @@ impl Claim {
 			self.user_reward_ata,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.reward_vault,
 			false,
 		));

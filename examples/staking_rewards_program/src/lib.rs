@@ -188,7 +188,7 @@ pub struct ClaimAccounts<'a> {
 	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
-	pub reward_vault: &'a AccountView,
+	pub reward_vault: &'a mut AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,

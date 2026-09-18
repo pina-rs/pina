@@ -42,7 +42,7 @@ pub struct Claim<'account> {
 	pub user_reward_ata: &'account AccountView,
 
 	/// CPI account `rewardVault`.
-	/// Required privileges: read-only.
+	/// Required privileges: writable.
 	pub reward_vault: &'account AccountView,
 
 	/// CPI account `associatedTokenProgram`.
@@ -99,7 +99,7 @@ impl<'account> Claim<'account> {
 			CpiHandle::readonly(self.pool_state),
 			CpiHandle::writable(self.position_state)?,
 			CpiHandle::writable(self.user_reward_ata)?,
-			CpiHandle::readonly(self.reward_vault),
+			CpiHandle::writable(self.reward_vault)?,
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.system_program),
