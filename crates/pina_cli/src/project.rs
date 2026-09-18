@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 
 use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
@@ -614,6 +615,21 @@ impl PathTemplates {
 					reason: "anchor names must match [A-Za-z_][A-Za-z0-9_-]*".to_owned(),
 				});
 			}
+
+			if value.trim().is_empty() {
+				return Err(ProjectError::InvalidPathsEntry {
+					name: name.clone(),
+					reason: "anchor values must be non-empty".to_owned(),
+				});
+			}
+
+			if has_root_or_prefix(Path::new(value)) {
+				return Err(ProjectError::InvalidPathsEntry {
+					name: name.clone(),
+					reason: "anchor values must be relative or anchored with `{{root}}`".to_owned(),
+				});
+			}
+
 			let anchors = extract_anchors(value).map_err(|reason| {
 				ProjectError::InvalidPathsEntry {
 					name: name.clone(),
@@ -693,23 +709,16 @@ impl PathTemplates {
 
 			if name == BUILTIN_ANCHOR {
 				result.push_str(&self.git_root(field, raw)?.to_string_lossy());
-			} else if allow_variables {
-				match self.variables.get(name) {
-					Some(value) => result.push_str(&self.expand(field, value, false)?),
-					None => {
-						return Err(ProjectError::UnknownTemplateAnchor {
-							field,
-							variable: name.to_owned(),
-							known: self.known_anchors(),
-						});
-					}
-				}
 			} else {
-				return Err(ProjectError::UnknownTemplateAnchor {
-					field,
-					variable: name.to_owned(),
-					known: self.known_anchors(),
-				});
+				let Some(value) = allow_variables.then(|| self.variables.get(name)).flatten()
+				else {
+					return Err(ProjectError::UnknownTemplateAnchor {
+						field,
+						variable: name.to_owned(),
+						known: self.known_anchors(),
+					});
+				};
+				result.push_str(&self.expand(field, value, false)?);
 			}
 			rest = &after[end + 2..];
 		}
@@ -791,7 +800,7 @@ impl PathTemplates {
 				reason: "paths must be non-empty",
 			});
 		}
-		if Path::new(raw).is_absolute() {
+		if has_root_or_prefix(Path::new(raw)) {
 			return Err(ProjectError::InvalidConfigPath {
 				field,
 				path: PathBuf::from(raw),
@@ -820,17 +829,13 @@ impl PathTemplates {
 		field: &'static str,
 		raw: &str,
 	) -> Result<(), ProjectError> {
-		let walk_base = if normalized.is_absolute() && self.git_root_is_known() {
+		let walk_base = if self.git_root_is_known() {
 			// Anchored paths are walked from the repository root they name;
 			// the repository root itself is allowed to be reached through
 			// links (macOS temp dirs, worktree indirection).
 			self.git_root(field, raw)?
 		} else {
-			// Discover the git root without erroring for unanchored paths.
-			match self.git_root.borrow().as_ref() {
-				Some(root) => root.clone(),
-				None => self.discovery_dir.clone(),
-			}
+			self.discovery_dir.clone()
 		};
 
 		let Ok(remainder) = normalized.strip_prefix(&walk_base) else {
@@ -865,6 +870,15 @@ impl PathTemplates {
 	fn git_root_is_known(&self) -> bool {
 		self.git_root.borrow().is_some()
 	}
+}
+
+/// Return whether a configured path starts with a filesystem root or a
+/// platform prefix such as a Windows drive or UNC share.
+fn has_root_or_prefix(path: &Path) -> bool {
+	matches!(
+		path.components().next(),
+		Some(Component::Prefix(_) | Component::RootDir)
+	)
 }
 
 /// Return whether `name` can be used as a `{{ name }}` anchor.
@@ -902,7 +916,10 @@ fn extract_anchors(raw: &str) -> Result<Vec<&str>, &'static str> {
 /// to the worktree itself, and falls back to the nearest ancestor containing
 /// a `.git` entry (a directory for repositories, a file for worktrees).
 fn discover_git_root(start: &Path) -> Option<PathBuf> {
-	if let Ok(output) = std::process::Command::new("git")
+	let mut command = Command::new("git");
+	sanitize_git_environment(&mut command);
+
+	if let Ok(output) = command
 		.arg("-C")
 		.arg(start)
 		.args(["rev-parse", "--show-toplevel"])
@@ -910,10 +927,7 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 		&& output.status.success()
 	{
 		let text = String::from_utf8_lossy(&output.stdout);
-		let trimmed = text.trim();
-		if !trimmed.is_empty() {
-			return Some(PathBuf::from(trimmed));
-		}
+		return Some(PathBuf::from(text.trim()));
 	}
 
 	let mut current = Some(start);
@@ -925,6 +939,36 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 	}
 
 	None
+}
+
+fn sanitize_git_environment(command: &mut Command) {
+	for variable in [
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+		"GIT_COMMON_DIR",
+		"GIT_CONFIG",
+		"GIT_CONFIG_COUNT",
+		"GIT_CONFIG_PARAMETERS",
+		"GIT_DIR",
+		"GIT_GRAFT_FILE",
+		"GIT_IMPLICIT_WORK_TREE",
+		"GIT_INDEX_FILE",
+		"GIT_INTERNAL_SUPER_PREFIX",
+		"GIT_NO_REPLACE_OBJECTS",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_PREFIX",
+		"GIT_REPLACE_REF_BASE",
+		"GIT_SHALLOW_FILE",
+		"GIT_WORK_TREE",
+	] {
+		command.env_remove(variable);
+	}
+	for (variable, _) in std::env::vars_os() {
+		if variable.to_str().is_some_and(|variable| {
+			variable.starts_with("GIT_CONFIG_KEY_") || variable.starts_with("GIT_CONFIG_VALUE_")
+		}) {
+			command.env_remove(variable);
+		}
+	}
 }
 
 /// Collapse `.`, resolve `..`, and keep the path absolute.
@@ -940,11 +984,10 @@ fn normalize_absolute(
 
 	for component in path.components() {
 		match component {
-			Component::Prefix(_) | Component::RootDir => {
+			component @ (Component::Prefix(_) | Component::RootDir | Component::CurDir) => {
 				normalized.push(component);
 				floor = normalized.components().count();
 			}
-			Component::CurDir => {}
 			Component::Normal(part) => normalized.push(part),
 			Component::ParentDir => {
 				if normalized.components().count() <= floor || !normalized.pop() {
@@ -1507,7 +1550,7 @@ mode = "overwrite"
 
 	#[test]
 	fn config_allows_parent_directory_paths() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		let project_dir = temp.path().join("proj");
 		let sibling_program = temp.path().join("other");
 		write_program(&project_dir, "configured-program");
@@ -1516,12 +1559,10 @@ mode = "overwrite"
 			project_dir.join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \"../other\"\n\n[clients]\noutput = \"../clients\"\n",
 		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		.expect("write config");
 
-		let project = Project::discover(&project_dir)
-			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
-		let temp = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+		let project = Project::discover(&project_dir).expect("discover project");
+		let temp = fs::canonicalize(temp.path()).expect("canonicalize temp dir");
 
 		assert_eq!(project.program_dir, temp.join("other"));
 		assert_eq!(project.clients_dir, temp.join("clients"));
@@ -1529,24 +1570,21 @@ mode = "overwrite"
 
 	#[test]
 	fn config_resolves_root_anchor_to_repository_root() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		let project_dir = temp.path().join("proj");
 		write_program(&project_dir, "counter");
 		// A `.git` entry in the nearest ancestor anchors `{{root}}` without
 		// requiring a real git repository.
-		fs::create_dir(temp.path().join(".git"))
-			.unwrap_or_else(|error| panic!("failed to create .git: {error}"));
+		fs::create_dir(temp.path().join(".git")).expect("create .git directory");
 		fs::write(
 			project_dir.join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \".\"\nidl_dir = \"{{root}}/idls\"\n\n[clients]\noutput = \
 			 \"{{root}}/clients\"\n\n[clients.rust]\noutput = \"{{root}}/clients/rust\"\n",
 		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		.expect("write config");
 
-		let project = Project::discover(&project_dir)
-			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
-		let temp = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+		let project = Project::discover(&project_dir).expect("discover project");
+		let temp = fs::canonicalize(temp.path()).expect("canonicalize temp dir");
 
 		assert_eq!(project.idl_dir, temp.join("idls"));
 		assert_eq!(project.clients_dir, temp.join("clients"));
@@ -1558,11 +1596,10 @@ mode = "overwrite"
 
 	#[test]
 	fn config_resolves_declared_path_anchors() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		let project_dir = temp.path().join("proj");
 		write_program(&project_dir, "counter");
-		fs::create_dir(temp.path().join(".git"))
-			.unwrap_or_else(|error| panic!("failed to create .git: {error}"));
+		fs::create_dir(temp.path().join(".git")).expect("create .git directory");
 		fs::write(
 			project_dir.join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \".\"\n\n[project.paths]\ncrates = \"{{root}}/crates\"\nshared \
@@ -1570,12 +1607,10 @@ mode = "overwrite"
 			 \"{{root}}/clients\"\n\n[clients.rust]\noutput = \"{{ crates \
 			 }}\"\n\n[clients.typescript]\noutput = \"{{ shared }}\"\n",
 		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		.expect("write config");
 
-		let project = Project::discover(&project_dir)
-			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
-		let temp = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("failed to canonicalize temp: {error}"));
+		let project = Project::discover(&project_dir).expect("discover project");
+		let temp = fs::canonicalize(temp.path()).expect("canonicalize temp dir");
 
 		assert_eq!(
 			project.client_generation[&ClientLanguage::Rust].output,
@@ -1590,14 +1625,14 @@ mode = "overwrite"
 
 	#[test]
 	fn config_rejects_unknown_path_anchors() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		write_program(temp.path(), "counter");
 		fs::write(
 			temp.path().join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \".\"\n\n[project.paths]\ncrates = \
 			 \"{{root}}/crates\"\n\n[clients]\noutput = \"{{ nope }}\"\n",
 		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		.expect("write config");
 
 		let error = Project::discover(temp.path()).expect_err("unknown anchors should fail closed");
 		let message = error.to_string();
@@ -1614,13 +1649,13 @@ mode = "overwrite"
 
 	#[test]
 	fn config_rejects_unterminated_path_anchors() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		write_program(temp.path(), "counter");
 		fs::write(
 			temp.path().join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \".\"\n\n[clients]\noutput = \"{{root}/clients\"\n",
 		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		.expect("write config");
 
 		let error =
 			Project::discover(temp.path()).expect_err("unterminated anchors should fail closed");
@@ -1635,8 +1670,73 @@ mode = "overwrite"
 	}
 
 	#[test]
+	fn config_rejects_invalid_path_anchor_names() {
+		let temp = TempDir::new().expect("create temp dir");
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[clients]\noutput = \"{{ 1bad }}\"\n",
+		)
+		.expect("write config");
+
+		let error =
+			Project::discover(temp.path()).expect_err("invalid anchor names should fail closed");
+
+		assert!(matches!(
+			error,
+			ProjectError::InvalidConfigPath {
+				field: "clients.output",
+				..
+			}
+		));
+	}
+
+	#[test]
+	fn config_rejects_empty_paths() {
+		let temp = TempDir::new().expect("create temp dir");
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \"\"\n",
+		)
+		.expect("write config");
+
+		let error = Project::discover(temp.path()).expect_err("empty paths should fail closed");
+
+		assert!(matches!(
+			error,
+			ProjectError::InvalidConfigPath {
+				field: "project.program",
+				..
+			}
+		));
+	}
+
+	#[test]
+	fn config_rejects_root_anchor_outside_a_git_repository() {
+		let temp = TempDir::new().expect("create temp dir");
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[clients]\noutput = \"{{root}}/clients\"\n",
+		)
+		.expect("write config");
+
+		let error =
+			Project::discover(temp.path()).expect_err("root anchor without git should fail closed");
+
+		assert!(matches!(
+			error,
+			ProjectError::InvalidConfigPath {
+				field: "clients.output",
+				..
+			}
+		));
+	}
+
+	#[test]
 	fn config_rejects_invalid_paths_entries() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp = TempDir::new().expect("create temp dir");
 		write_program(temp.path(), "counter");
 		let cases = [
 			(
@@ -1651,12 +1751,19 @@ mode = "overwrite"
 				"may only reference",
 				"[project.paths]\ncrates = \"{{ packages }}/x\"\n",
 			),
+			(
+				"anchor values must be non-empty",
+				"[project.paths]\nempty = \"\"\n",
+			),
+			(
+				"anchor values must be relative or anchored",
+				"[project.paths]\nabsolute = \"/outside\"\n",
+			),
 			("closing `}}`", "[project.paths]\ncrates = \"{{root}/x\"\n"),
 		];
 
 		for (expected, config) in cases {
-			fs::write(temp.path().join(CONFIG_FILE_NAME), config)
-				.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+			fs::write(temp.path().join(CONFIG_FILE_NAME), config).expect("write config");
 			let error = Project::discover(temp.path())
 				.expect_err("invalid `[project.paths]` entries should fail closed");
 			let message = error.to_string();
@@ -1681,6 +1788,79 @@ mode = "overwrite"
 			PathBuf::from("../b")
 		);
 		assert_eq!(normalize_relative(Path::new("./a/.")), PathBuf::from("a"));
+	}
+
+	#[test]
+	fn absolute_normalization_rejects_traversal_above_root() {
+		let error = normalize_absolute(Path::new("/../outside"), "test.path", "/../outside")
+			.expect_err("traversal above the filesystem root should fail closed");
+
+		assert!(matches!(
+			error,
+			ProjectError::InvalidConfigPath {
+				field: "test.path",
+				..
+			}
+		));
+	}
+
+	#[test]
+	fn git_root_discovery_prefers_git_for_the_current_worktree() {
+		let root = discover_git_root(Path::new(env!("CARGO_MANIFEST_DIR")))
+			.expect("current crate belongs to a git worktree");
+
+		assert!(root.join(".git").exists());
+		assert!(root.join("Cargo.toml").is_file());
+	}
+
+	#[test]
+	fn git_root_discovery_ignores_parent_repository_environment() {
+		const CHILD_MARKER: &str = "PINA_TEST_GIT_ENVIRONMENT_ISOLATION";
+
+		if std::env::var_os(CHILD_MARKER).is_some() {
+			let temp = TempDir::new().expect("create temp dir");
+			assert_eq!(discover_git_root(temp.path()), None);
+			return;
+		}
+
+		let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+		let git_dir = Command::new("git")
+			.current_dir(crate_root)
+			.args(["rev-parse", "--absolute-git-dir"])
+			.output()
+			.expect("discover git directory");
+		let work_tree = Command::new("git")
+			.current_dir(crate_root)
+			.args(["rev-parse", "--show-toplevel"])
+			.output()
+			.expect("discover git worktree");
+		assert!(git_dir.status.success());
+		assert!(work_tree.status.success());
+
+		let output = Command::new(std::env::current_exe().expect("locate test binary"))
+			.args([
+				"project::tests::git_root_discovery_ignores_parent_repository_environment",
+				"--exact",
+				"--nocapture",
+			])
+			.env(CHILD_MARKER, "1")
+			.env("GIT_CONFIG_COUNT", "1")
+			.env("GIT_CONFIG_KEY_0", "user.name")
+			.env("GIT_CONFIG_VALUE_0", "Injected")
+			.env("GIT_DIR", String::from_utf8_lossy(&git_dir.stdout).trim())
+			.env(
+				"GIT_WORK_TREE",
+				String::from_utf8_lossy(&work_tree.stdout).trim(),
+			)
+			.output()
+			.expect("run isolated git environment test");
+
+		assert!(
+			output.status.success(),
+			"isolated child failed:\n{}\n{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		);
 	}
 
 	#[cfg(unix)]
