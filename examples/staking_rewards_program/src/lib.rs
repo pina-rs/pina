@@ -616,7 +616,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		let reward_decimals = {
 			let mint = self
 				.reward_mint
-				.as_token_mint_for_program(self.token_program.address())?;
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
 			mint.decimals()
 		};
 
