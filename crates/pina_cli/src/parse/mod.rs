@@ -135,6 +135,26 @@ pub(crate) fn parse_program_with_sources(
 		return Err(IdlError::NoEntrypoint);
 	}
 
+	// `#[discriminator(entrypoint)]` generates the program's dispatch, so more
+	// than one declared entrypoint enum would emit competing `process_instruction`
+	// implementations, and none means the declared instructions are unreachable
+	// from the chain.
+	let entrypoint_enums: Vec<String> = syn_files
+		.iter()
+		.flat_map(|file| {
+			discriminator::extract_discriminator_enums(file).unwrap_or_else(|error| {
+				panic!("discriminator extraction validated earlier: {error:?}")
+			})
+		})
+		.filter(|enum_| enum_.entrypoint)
+		.map(|enum_| enum_.name)
+		.collect();
+	if entrypoint_enums.len() > 1 {
+		return Err(IdlError::ambiguous_discriminator_entrypoint(
+			entrypoint_enums.join(", "),
+		));
+	}
+
 	let program = assemble_program_ir_multi_with_auto(
 		&syn_files,
 		name_override.unwrap_or(&package_name),
@@ -667,6 +687,65 @@ mod tests {
 	use super::*;
 	use crate::ir::PdaSeedIr;
 
+	/// Write a minimal crate whose `src/lib.rs` is `source`, for the
+	/// program-level validation that needs a real file tree.
+	fn write_crate(source: &str) -> tempfile::TempDir {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+		std::fs::create_dir_all(temp.path().join("src"))
+			.unwrap_or_else(|error| panic!("src dir: {error}"));
+		std::fs::write(
+			temp.path().join("Cargo.toml"),
+			"[package]\nname = \"fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[lib]\nname \
+			 = \"fixture\"\npath = \"src/lib.rs\"\n",
+		)
+		.unwrap_or_else(|error| panic!("manifest: {error}"));
+		std::fs::write(temp.path().join("src/lib.rs"), source)
+			.unwrap_or_else(|error| panic!("lib.rs: {error}"));
+		temp
+	}
+
+	#[test]
+	fn two_entrypoint_enums_are_rejected_in_a_realistic_program() {
+		// The same program parses with one entrypoint enum, so the failure above
+		// is the second declaration and not the fixture's shape.
+		let source = r#"
+declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+#[discriminator(entrypoint)]
+pub enum OnlyInstruction {
+	Run = 0,
+}
+
+#[instruction(discriminator = OnlyInstruction::Run)]
+pub struct RunInstruction {
+	pub value: u64,
+}
+
+#[derive(Accounts)]
+pub struct RunAccounts<'a> {
+	pub authority: &'a AccountView,
+}
+"#;
+		let temp = write_crate(source);
+		let parsed = parse_program_with_auto(temp.path(), None, &pina_abi::MigrationAuto::none());
+		assert!(parsed.is_ok(), "one entrypoint must parse: {parsed:?}");
+
+		let duplicated = source.replace(
+			"pub enum OnlyInstruction {",
+			"#[discriminator(entrypoint)]\npub enum SecondInstruction {\n\tStop = \
+			 1,\n}\n\n#[discriminator(entrypoint)]\npub enum OnlyInstruction {",
+		);
+		let temp = write_crate(&duplicated);
+		let error = parse_program_with_auto(temp.path(), None, &pina_abi::MigrationAuto::none())
+			.expect_err("a second entrypoint enum must fail closed");
+		let message = error.to_string();
+		assert!(message.contains("entrypoint"), "message: {message}");
+		assert!(
+			message.contains("OnlyInstruction") && message.contains("SecondInstruction"),
+			"the error names both enums: {message}"
+		);
+	}
+
 	#[test]
 	fn infer_pda_name_for_field_matches_exact_name() {
 		let pdas = vec![
@@ -1061,6 +1140,7 @@ mod tests {
 				value: 1,
 			}],
 			repr_size: 1,
+			entrypoint: false,
 		};
 		let account = account_state::AccountStruct {
 			name: "VaultState".to_owned(),

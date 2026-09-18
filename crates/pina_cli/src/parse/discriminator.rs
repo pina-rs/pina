@@ -11,6 +11,8 @@ pub struct DiscriminatorEnum {
 	pub variants: Vec<DiscriminatorVariant>,
 	/// The repr size in bytes (1 for u8, 2 for u16, etc.). Defaults to 1.
 	pub repr_size: usize,
+	/// Whether this enum declares the program entrypoint.
+	pub entrypoint: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +24,7 @@ pub struct DiscriminatorVariant {
 #[derive(Debug, Default)]
 struct DiscriminatorArgs {
 	primitive: Option<syn::Expr>,
+	entrypoint: bool,
 }
 
 impl syn::parse::Parse for DiscriminatorArgs {
@@ -55,10 +58,20 @@ impl syn::parse::Parse for DiscriminatorArgs {
 				}
 				// Flags that also accept an explicit boolean, as the proc macro
 				// grammar does: `final`, `entrypoint = false`, and so on.
-				"final" | "entrypoint" | "capacity_test" => {
+				"final" | "capacity_test" => {
 					if input.peek(syn::Token![=]) {
 						input.parse::<syn::Token![=]>()?;
 						input.parse::<syn::LitBool>()?;
+					}
+					record_once(&mut seen, &name_text, name.span())?;
+				}
+				"entrypoint" => {
+					if input.peek(syn::Token![=]) {
+						input.parse::<syn::Token![=]>()?;
+						let value = input.parse::<syn::LitBool>()?;
+						args.entrypoint = value.value;
+					} else {
+						args.entrypoint = true;
 					}
 					record_once(&mut seen, &name_text, name.span())?;
 				}
@@ -261,6 +274,7 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 		}
 
 		let repr_size = discriminator_repr_size(item_enum)?;
+		let entrypoint = discriminator_entrypoint_flag(item_enum)?;
 		let mut variants = Vec::new();
 		for variant in &item_enum.variants {
 			if let Some((_, expr)) = &variant.discriminant
@@ -277,10 +291,29 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 			name: item_enum.ident.to_string(),
 			variants,
 			repr_size,
+			entrypoint: discriminator_entrypoint_flag(item_enum)?,
 		});
 	}
 
 	Ok(result)
+}
+
+/// Whether the enum's `#[discriminator]` attribute declares `entrypoint`.
+fn discriminator_entrypoint_flag(item_enum: &syn::ItemEnum) -> Result<bool, IdlError> {
+	let Some(attr) = item_enum
+		.attrs
+		.iter()
+		.find(|attr| attr.path().is_ident("discriminator"))
+	else {
+		return Ok(false);
+	};
+	if matches!(attr.meta, syn::Meta::Path(_)) {
+		return Ok(false);
+	}
+	let args = attr
+		.parse_args::<DiscriminatorArgs>()
+		.map_err(|error| invalid_discriminator_enum(&item_enum.ident, error))?;
+	Ok(args.entrypoint)
 }
 
 /// Parse the backing primitive from the source-level attribute macro grammar.
@@ -496,5 +529,35 @@ mod tests {
 
 		assert_eq!(enums.len(), 1);
 		assert_eq!(enums[0].variants.len(), 2);
+		assert!(
+			enums[0].entrypoint,
+			"the flag must reach the extracted enum"
+		);
+	}
+
+	#[test]
+	fn entrypoint_flag_reads_bare_and_explicit_boolean_spellings() {
+		for (source, expected) in [
+			(
+				"#[discriminator(entrypoint)] pub enum Probe { A = 0 }",
+				true,
+			),
+			(
+				"#[discriminator(entrypoint = true)] pub enum Probe { A = 0 }",
+				true,
+			),
+			(
+				"#[discriminator(entrypoint = false)] pub enum Probe { A = 0 }",
+				false,
+			),
+			("#[discriminator] pub enum Probe { A = 0 }", false),
+			("#[discriminator(final)] pub enum Probe { A = 0 }", false),
+		] {
+			let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+			let enums = extract_discriminator_enums(&file)
+				.unwrap_or_else(|error| panic!("extraction must succeed: {error}"));
+
+			assert_eq!(enums[0].entrypoint, expected, "wrong flag for `{source}`");
+		}
 	}
 }

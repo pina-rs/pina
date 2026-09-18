@@ -346,47 +346,66 @@ pub(crate) fn expand(
 
 /// Resolve the optional reserved-`Migrate` routing.
 ///
-/// Returns the `process_migrate` helper and the `is_migrate_instruction`
-/// guard, or `None` when the program declares no migratable contract.
+/// The ladder is derived from the checked-in manifest: every enveloped account
+/// contract becomes an optional reserved-instruction slot, in the manifest's
+/// identity-sorted order — the same order generated clients compose. Returns
+/// the `process_migrate` helper and the `is_migrate_instruction` guard, or
+/// `None` when the program has no manifest or no migratable accounts.
 fn resolve_migrations(
 	args: &DiscriminatorArgs,
 	enum_name: &Ident,
 ) -> syn::Result<Option<(proc_macro2::TokenStream, proc_macro2::TokenStream)>> {
 	let crate_path = &args.crate_path;
-	let Some(ladder) = &args.migrations else {
-		if args.migrations_max_lamports.is_some() {
+	let declared_ladder = &args.migrations;
+	let Some(max_lamports) = &args.migrations_max_lamports else {
+		// Declaring a ladder without a budget would route migrations with no
+		// cap on the rent the program may pull, so it stays an error.
+		if declared_ladder.is_some() {
 			return Err(syn::Error::new_spanned(
 				enum_name,
-				"`migrations_max_lamports` requires `migrations(Account, ...)`",
+				"`migrations(...)` requires `migrations_max_lamports = EXPR`: the budget is \
+				 program policy, and a default would silently misprice rent transfers",
 			));
 		}
-
 		return Ok(None);
 	};
 
-	if ladder.is_empty() {
-		return Err(syn::Error::new_spanned(
-			enum_name,
-			"`migrations(...)` must name at least one migratable contract",
-		));
-	}
-
-	let Some(max_lamports) = &args.migrations_max_lamports else {
-		return Err(syn::Error::new_spanned(
-			enum_name,
-			"`migrations(...)` requires `migrations_max_lamports = EXPR`: the budget is program \
-			 policy, and a default would silently misprice rent transfers",
-		));
+	// An explicit list overrides the derived ladder: it is the only way to
+	// expose several accounts of the same contract in one sweep, because the
+	// manifest records contracts, not account instances. Without a list, the
+	// ladder is derived from the manifest — one slot per enveloped account
+	// contract, in the identity-sorted order generated clients compose.
+	let ladder: Vec<proc_macro2::TokenStream> = match declared_ladder {
+		Some(ladder) => {
+			if ladder.is_empty() {
+				return Err(syn::Error::new_spanned(
+					enum_name,
+					"`migrations(...)` must name at least one migratable contract",
+				));
+			}
+			// A named contract without a checked-in history would fail later as
+			// an unsatisfied trait bound; report the remedy here instead.
+			crate::migration::verify_migration_contracts(enum_name, ladder)?;
+			ladder
+				.iter()
+				.map(::quote::ToTokens::to_token_stream)
+				.collect()
+		}
+		None => {
+			crate::migration::manifest_account_ladder(enum_name)?
+				.into_iter()
+				.map(|ident| ::quote::ToTokens::to_token_stream(&ident))
+				.collect()
+		}
 	};
 
-	// Every listed contract must carry a checked-in history, because the
-	// generated ladder calls `MigratableAccount` and a missing manifest entry
-	// surfaces later as an unsatisfied trait bound instead of the remedy.
-	crate::migration::verify_migration_contracts(enum_name, ladder)?;
+	if ladder.is_empty() {
+		return Ok(None);
+	}
 
 	Ok(Some(migrate_emission(
 		crate_path,
-		ladder,
+		&ladder,
 		max_lamports,
 		&args
 			.program_id
@@ -402,7 +421,7 @@ fn resolve_migrations(
 /// without a manifest on disk.
 fn migrate_emission(
 	crate_path: &Path,
-	ladder: &[Path],
+	ladder: &[proc_macro2::TokenStream],
 	max_lamports: &Expr,
 	program_id: &Expr,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
@@ -615,20 +634,20 @@ mod tests {
 	}
 
 	#[test]
-	fn migrations_budget_without_a_ladder_is_rejected() {
+	fn budget_without_explicit_ladder_compiles_without_routing() {
+		// No manifest in the unit-test environment, so the derived ladder is
+		// empty and the migration endpoint is simply not generated.
 		let args = args(quote!(entrypoint, migrations_max_lamports = 20_000));
 		let mut item_enum = enum_of(quote!(
 			pub enum Instruction {
 				Run = 0,
 			}
 		));
-		let error = expand(&args, &mut item_enum).unwrap_err();
+		let expanded = expand(&args, &mut item_enum).unwrap();
+		let implementation = squeezed(&expanded.implementation.to_string());
 
-		assert!(
-			error
-				.to_string()
-				.contains("requires `migrations(Account, ...)`")
-		);
+		assert!(!implementation.contains("process_migrate"));
+		assert!(!implementation.contains("is_migrate_instruction"));
 	}
 
 	#[test]
@@ -680,7 +699,8 @@ mod tests {
 			ladder_of("ManualState"),
 			ladder_of("CompactState"),
 			ladder_of("State"),
-		];
+		]
+		.map(|path| ::quote::ToTokens::to_token_stream(&path));
 		let (helper, prelude) = migrate_emission(&crate_path, &ladder, &budget, &program_id);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());

@@ -29,6 +29,17 @@ Per contract, add the `migrations` token to the schema attribute:
 
 `migrations = true` is equivalent. `migrations = false` opts one contract out.
 
+Wire the reserved `Migrate` route by adding the lamport budget to the entrypoint enum. The slot ladder is derived from `migrations/manifest.json` (one slot per enveloped account contract, in identity-sorted order, matching generated clients); an explicit `migrations(A, B)` list is an optional override for batching several accounts of one contract in a single sweep:
+
+```rust
+#[discriminator(entrypoint, migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS)]
+pub enum ProgramInstruction {
+	// …
+}
+```
+
+Exactly one discriminator enum per program may carry `entrypoint`; `pina build` fails closed when two declare it. An unset `migrations_max_lamports` generates no reserved route, because the cap is program policy.
+
 Whole kinds, through `pina.toml`:
 
 ```toml
