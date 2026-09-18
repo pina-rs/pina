@@ -88,6 +88,7 @@ fn vesting_program_client_has_expected_contract_shape() {
 	assert_eq!(parsed_state.admin, admin);
 	assert_eq!(parsed_state.total_amount.get(), 1_000);
 
+	let clock = Pubkey::new_unique();
 	let claim = Claim::new(
 		beneficiary,
 		mint,
@@ -95,22 +96,29 @@ fn vesting_program_client_has_expected_contract_shape() {
 		Pubkey::new_unique(),
 		vault,
 		token_program,
+		clock,
 	);
 	let claim_payload = ClaimInstructionData::new(|data| data.amount.set(10)).unwrap();
 	let claim_ix = claim.instruction(claim_payload);
-	assert_eq!(claim_ix.accounts.len(), 8);
+	assert_eq!(claim_ix.accounts.len(), 9);
 	assert_eq!(claim_ix.accounts[0], AccountMeta::new(beneficiary, true));
 	assert_eq!(
 		claim_ix.accounts[5],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
+	assert_eq!(
+		claim_ix.accounts[8],
+		AccountMeta::new_readonly(clock, false)
+	);
 	let mut expected_claim = vec![1, 0];
 	expected_claim.extend_from_slice(&10u64.to_le_bytes());
 	assert_eq!(claim_ix.data, expected_claim);
 
-	let cancel = Cancel::new(admin, mint, vesting_state, vault, token_program);
+	let admin_ata = Pubkey::new_unique();
+	let cancel = Cancel::new(admin, mint, vesting_state, admin_ata, vault, token_program);
 	let cancel_payload = CancelInstructionData::new(|_| {}).unwrap();
 	let cancel_ix = cancel.instruction(cancel_payload);
-	assert_eq!(cancel_ix.accounts.len(), 5);
+	assert_eq!(cancel_ix.accounts.len(), 8);
+	assert_eq!(cancel_ix.accounts[3], AccountMeta::new(admin_ata, false));
 	assert_eq!(cancel_ix.data, vec![2, 0]);
 }
