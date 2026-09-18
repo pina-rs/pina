@@ -237,9 +237,9 @@ mod tests {
 
 	use super::*;
 
-	fn bpf_binary_path() -> String {
+	fn sbf_binary_path() -> String {
 		format!(
-			"{}/../../target/bpfel-unknown-none/release/libpina_bpf_program.so",
+			"{}/../../target/deploy/pina_bpf_program.so",
 			env!("CARGO_MANIFEST_DIR")
 		)
 	}
@@ -261,7 +261,8 @@ mod tests {
 
 	#[test]
 	fn process_hello_accepts_instruction_data() {
-		let data = [PinaBpfInstruction::Hello as u8];
+		// discriminator + migration version.
+		let data = [PinaBpfInstruction::Hello as u8, 0u8];
 		assert!(process_hello(&data).is_ok());
 	}
 
@@ -279,19 +280,19 @@ mod tests {
 	}
 
 	#[test]
-	#[ignore = "requires `cargo +nightly build-bpf` artifact"]
-	fn bpf_build_produces_artifact() {
-		let artifact = bpf_binary_path();
+	#[ignore = "requires `cargo build-pina-bpf-program` artifact"]
+	fn sbf_build_produces_artifact() {
+		let artifact = sbf_binary_path();
 		assert!(
 			Path::new(&artifact).is_file(),
-			"missing BPF artifact at {artifact}; run `cargo +nightly build-bpf`"
+			"missing SBF artifact at {artifact}; run `cargo build-pina-bpf-program`"
 		);
 	}
 
 	#[test]
-	#[ignore = "requires `cargo +nightly build-bpf` artifact"]
-	fn bpf_build_artifact_is_elf() {
-		let artifact = bpf_binary_path();
+	#[ignore = "requires `cargo build-pina-bpf-program` artifact"]
+	fn sbf_build_artifact_is_elf() {
+		let artifact = sbf_binary_path();
 		let bytes = fs::read(&artifact)
 			.unwrap_or_else(|error| panic!("failed to read BPF artifact at {artifact}: {error}"));
 		assert!(

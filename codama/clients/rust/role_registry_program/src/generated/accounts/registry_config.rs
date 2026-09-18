@@ -13,12 +13,15 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RegistryConfig {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub admin: solana_pubkey::Pubkey,
 	pub role_count: u64,
 	pub bump: u8,
 }
 
 pub const REGISTRY_CONFIG_DISCRIMINATOR: u8 = 1u8;
+
+pub const REGISTRY_CONFIG_MIGRATION_VERSION: u8 = 0u8;
 
 impl RegistryConfig {
 	pub const LEN: usize = core::mem::size_of::<RegistryConfigZc>();
@@ -33,6 +36,7 @@ impl RegistryConfig {
 		<Self as pina::PinaPodFixed>::initialize(data, |account| {
 			configure(account);
 			account.discriminator = REGISTRY_CONFIG_DISCRIMINATOR;
+			account.migration_version = REGISTRY_CONFIG_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
@@ -46,6 +50,9 @@ impl RegistryConfig {
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		if account.migration_version != REGISTRY_CONFIG_MIGRATION_VERSION {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
 		Ok(account)
 	}
 
@@ -55,6 +62,9 @@ impl RegistryConfig {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		if account.migration_version != REGISTRY_CONFIG_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -77,5 +87,93 @@ impl RegistryConfig {
 			&["registry".as_bytes(), admin.as_ref(), &[bump]],
 			&crate::ROLE_REGISTRY_PROGRAM_ID,
 		)
+	}
+}
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`REGISTRY_CONFIG_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+///
+/// Version 0 is the initial version, so no bytes can ever be stale.
+pub fn registry_config_needs_migration(_data: &[u8]) -> bool {
+	false
+}
+
+/// Why `RegistryConfig::try_from_bytes` rejected account bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RegistryConfigVersionError {
+	/// The bytes do not decode as this account's layout at all.
+	InvalidData,
+	/// The envelope names this account but the stored version predates this client: migrate the account on-chain, then retry.
+	Stale { stored: u8 },
+	/// The envelope names this account but the stored version is newer than this client's schema: upgrade this client.
+	Future { stored: u8 },
+}
+
+impl core::fmt::Display for RegistryConfigVersionError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::InvalidData => write!(f, "invalid RegistryConfig account data"),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data predates \
+					 this client; migrate it by sending a transaction to the program, or decode \
+					 it with a client generated from an older IDL)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data was \
+					 written by a newer program; upgrade this client)"
+				)
+			}
+		}
+	}
+}
+
+impl RegistryConfig {
+	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`RegistryConfig::from_bytes`].
+	pub fn try_from_bytes(data: &[u8]) -> Result<&RegistryConfigZc, RegistryConfigVersionError> {
+		let account = <Self as pina::PinaPodFixed>::read_exact(data)
+			.map_err(|_| RegistryConfigVersionError::InvalidData)?;
+		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
+			return Err(RegistryConfigVersionError::InvalidData);
+		}
+		if account.migration_version > REGISTRY_CONFIG_MIGRATION_VERSION {
+			return Err(RegistryConfigVersionError::Future {
+				stored: account.migration_version,
+			});
+		}
+		Ok(account)
+	}
+}
+
+#[cfg(test)]
+mod registry_config_version_error_tests {
+	use super::*;
+
+	fn envelope(version: u8) -> Vec<u8> {
+		let mut data = vec![0_u8; core::mem::size_of::<RegistryConfigZc>()];
+		data[..1].copy_from_slice(&[1]);
+		data[1..2].copy_from_slice(&version.to_le_bytes());
+		data
+	}
+
+	#[test]
+	fn stale_and_future_versions_are_distinguishable() {
+		let error = RegistryConfig::try_from_bytes(&envelope(1 as u8))
+			.err()
+			.expect("a future envelope must fail");
+		assert_eq!(error, RegistryConfigVersionError::Future { stored: 1 });
+		assert_eq!(
+			RegistryConfigVersionError::Future { stored: 1 }.to_string(),
+			"migration version mismatch: expected 0, received 1 (the data was written by a newer \
+			 program; upgrade this client)"
+		);
+		assert!(
+			RegistryConfig::try_from_bytes(&envelope(0 as u8)).is_ok(),
+			"the current version must decode",
+		);
 	}
 }

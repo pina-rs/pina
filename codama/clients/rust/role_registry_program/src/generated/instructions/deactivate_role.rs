@@ -9,6 +9,7 @@
 )]
 
 pub const DEACTIVATE_ROLE_DISCRIMINATOR: u8 = 3u8;
+pub const DEACTIVATE_ROLE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -75,6 +76,7 @@ impl DeactivateRoleInstructionData {
 		<DeactivateRoleInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DEACTIVATE_ROLE_DISCRIMINATOR;
+			data.migration_version = DEACTIVATE_ROLE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -88,4 +90,5 @@ impl DeactivateRoleInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DeactivateRoleInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

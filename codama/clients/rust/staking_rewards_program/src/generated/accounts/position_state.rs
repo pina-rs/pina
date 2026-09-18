@@ -13,6 +13,7 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct PositionState {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub pool: solana_pubkey::Pubkey,
 	pub owner: solana_pubkey::Pubkey,
 	pub staked_amount: u64,
@@ -22,6 +23,8 @@ pub struct PositionState {
 }
 
 pub const POSITION_STATE_DISCRIMINATOR: u8 = 2u8;
+
+pub const POSITION_STATE_MIGRATION_VERSION: u8 = 0u8;
 
 impl PositionState {
 	pub const LEN: usize = core::mem::size_of::<PositionStateZc>();
@@ -36,6 +39,7 @@ impl PositionState {
 		<Self as pina::PinaPodFixed>::initialize(data, |account| {
 			configure(account);
 			account.discriminator = POSITION_STATE_DISCRIMINATOR;
+			account.migration_version = POSITION_STATE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
@@ -47,6 +51,9 @@ impl PositionState {
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		if account.migration_version != POSITION_STATE_MIGRATION_VERSION {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
 		Ok(account)
 	}
 
@@ -56,6 +63,9 @@ impl PositionState {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		if account.migration_version != POSITION_STATE_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -87,5 +97,93 @@ impl PositionState {
 			],
 			&crate::STAKING_REWARDS_PROGRAM_ID,
 		)
+	}
+}
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`POSITION_STATE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+///
+/// Version 0 is the initial version, so no bytes can ever be stale.
+pub fn position_state_needs_migration(_data: &[u8]) -> bool {
+	false
+}
+
+/// Why `PositionState::try_from_bytes` rejected account bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PositionStateVersionError {
+	/// The bytes do not decode as this account's layout at all.
+	InvalidData,
+	/// The envelope names this account but the stored version predates this client: migrate the account on-chain, then retry.
+	Stale { stored: u8 },
+	/// The envelope names this account but the stored version is newer than this client's schema: upgrade this client.
+	Future { stored: u8 },
+}
+
+impl core::fmt::Display for PositionStateVersionError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::InvalidData => write!(f, "invalid PositionState account data"),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data predates \
+					 this client; migrate it by sending a transaction to the program, or decode \
+					 it with a client generated from an older IDL)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data was \
+					 written by a newer program; upgrade this client)"
+				)
+			}
+		}
+	}
+}
+
+impl PositionState {
+	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`PositionState::from_bytes`].
+	pub fn try_from_bytes(data: &[u8]) -> Result<&PositionStateZc, PositionStateVersionError> {
+		let account = <Self as pina::PinaPodFixed>::read_exact(data)
+			.map_err(|_| PositionStateVersionError::InvalidData)?;
+		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
+			return Err(PositionStateVersionError::InvalidData);
+		}
+		if account.migration_version > POSITION_STATE_MIGRATION_VERSION {
+			return Err(PositionStateVersionError::Future {
+				stored: account.migration_version,
+			});
+		}
+		Ok(account)
+	}
+}
+
+#[cfg(test)]
+mod position_state_version_error_tests {
+	use super::*;
+
+	fn envelope(version: u8) -> Vec<u8> {
+		let mut data = vec![0_u8; core::mem::size_of::<PositionStateZc>()];
+		data[..1].copy_from_slice(&[2]);
+		data[1..2].copy_from_slice(&version.to_le_bytes());
+		data
+	}
+
+	#[test]
+	fn stale_and_future_versions_are_distinguishable() {
+		let error = PositionState::try_from_bytes(&envelope(1 as u8))
+			.err()
+			.expect("a future envelope must fail");
+		assert_eq!(error, PositionStateVersionError::Future { stored: 1 });
+		assert_eq!(
+			PositionStateVersionError::Future { stored: 1 }.to_string(),
+			"migration version mismatch: expected 0, received 1 (the data was written by a newer \
+			 program; upgrade this client)"
+		);
+		assert!(
+			PositionState::try_from_bytes(&envelope(0 as u8)).is_ok(),
+			"the current version must decode",
+		);
 	}
 }

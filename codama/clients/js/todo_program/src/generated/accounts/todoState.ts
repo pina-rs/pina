@@ -43,6 +43,7 @@ import {
 	fixPinaPodEncoderSize,
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const TODO_STATE_DISCRIMINATOR = 1;
@@ -51,8 +52,15 @@ export function getTodoStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TODO_STATE_DISCRIMINATOR);
 }
 
+export const TODO_STATE_DISCRIMINATOR2 = 0;
+
+export function getTodoStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(TODO_STATE_DISCRIMINATOR2);
+}
+
 export type TodoState = {
 	discriminator: number;
+	migrationVersion: number;
 	owner: Address;
 	bump: number;
 	completed: boolean;
@@ -71,12 +79,13 @@ export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["owner", getAddressEncoder()],
 			["bump", getU8Encoder()],
 			["completed", getBooleanEncoder()],
 			["digest", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -87,6 +96,7 @@ export function getTodoStateDecoder(): FixedSizeDecoder<TodoState> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["owner", getAddressDecoder()],
 		["bump", getU8Decoder()],
 		["completed", getPinaPodBooleanDecoder()],
@@ -170,4 +180,32 @@ export async function fetchMaybeTodoStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findTodoPda(seeds, { programAddress });
 	return await fetchMaybeTodoState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const TODO_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `TodoState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (todoStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ todoState: address, payer }).make());
+ * }
+ * ```
+ */
+export function todoStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

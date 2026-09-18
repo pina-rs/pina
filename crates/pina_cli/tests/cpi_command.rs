@@ -175,12 +175,15 @@ fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {
 	);
 	fs::write(output_dir.join("Cargo.toml"), manifest)
 		.unwrap_or_else(|error| panic!("generated manifest rewrite failed: {error}"));
-	let check = Command::new("cargo")
+	let mut check = Command::new("cargo");
+	check
 		.args(["check", "--quiet", "--manifest-path"])
 		.arg(output_dir.join("Cargo.toml"))
 		.args(["--target-dir"])
 		.arg(temp.path().join("cargo-target"))
-		.current_dir(workspace_root())
+		.current_dir(workspace_root());
+	sanitize_coverage_environment(&mut check);
+	let check = check
 		.output()
 		.unwrap_or_else(|error| panic!("generated crate check failed to launch: {error}"));
 	assert!(
@@ -188,6 +191,33 @@ fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {
 		"generated Anchor CPI crate did not compile: {}",
 		String::from_utf8_lossy(&check.stderr)
 	);
+}
+
+/// Strip the instrumentation environment inherited from a parent
+/// `cargo llvm-cov` run.
+///
+/// The nested `cargo check` below compiles a crate that path-depends on `pina`
+/// while `cargo-llvm-cov` has exported itself as `RUSTC_WRAPPER`. Left in place,
+/// every crate the nested build compiles is instrumented in turn, and the
+/// wrapper re-enters a full parallel cargo build for each one — the fan-out
+/// grows instead of converging and exhausts the machine. The nested build only
+/// needs to prove the generated crate compiles, so it runs uninstrumented.
+fn sanitize_coverage_environment(command: &mut Command) {
+	for variable in [
+		"CARGO_ENCODED_RUSTFLAGS",
+		"CARGO_LLVM_COV",
+		"CARGO_LLVM_COV_BUILD_DIR",
+		"CARGO_LLVM_COV_SHOW_ENV",
+		"CARGO_LLVM_COV_TARGET_DIR",
+		"LLVM_PROFILE_FILE",
+		"RUSTC_WRAPPER",
+		"RUSTFLAGS",
+		"__CARGO_LLVM_COV_RUSTC_WRAPPER",
+		"__CARGO_LLVM_COV_RUSTC_WRAPPER_CRATE_NAMES",
+		"__CARGO_LLVM_COV_RUSTC_WRAPPER_RUSTFLAGS",
+	] {
+		command.env_remove(variable);
+	}
 }
 
 #[test]

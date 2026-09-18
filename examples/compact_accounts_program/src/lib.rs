@@ -395,9 +395,11 @@ mod tests {
 
 	#[test]
 	fn size_formula_covers_empty_partial_and_full_accounts() {
-		assert_eq!(Journal::HEADER_SIZE, 59);
+		// Migrations are on, so each constant includes the 2-byte envelope the
+		// generated `tests/abi_layout.rs` records as MIGRATION_HEADER_SIZE.
+		assert_eq!(Journal::HEADER_SIZE, 60);
 		assert_eq!(Journal::MIN_SIZE, Journal::HEADER_SIZE);
-		assert_eq!(Journal::MAX_SIZE, 220);
+		assert_eq!(Journal::MAX_SIZE, 221);
 		assert_eq!(Journal::TAIL_ALIGNMENT, 1);
 		assert_eq!(Journal::TITLE_CAPACITY, 24);
 		assert_eq!(Journal::ENTRIES_CAPACITY, 8);

@@ -11,6 +11,7 @@
   - [Verify a Deployed Program](./cli/verify.md)
   - [Generate Clients](./cli/generate.md)
   - [Generate a CPI Crate](./cli/cpi.md)
+  - [Import a Foreign Program](./cli/import.md)
   - [Project Configuration](./cli/configuration.md)
   - [Test a Program](./cli/test.md)
   - [Run a Development Surfnet](./cli/dev.md)

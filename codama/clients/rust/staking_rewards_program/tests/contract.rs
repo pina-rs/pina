@@ -75,7 +75,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		init_ix.accounts[8],
 		AccountMeta::new_readonly(token_program, false)
 	);
-	assert_eq!(init_ix.data, vec![0, 8]);
+	assert_eq!(init_ix.data, vec![0, 0, 8]);
 
 	let position_state = Pubkey::new_unique();
 	let open_position = OpenPosition::new(admin, pool_state, position_state);
@@ -88,7 +88,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		AccountMeta::new_readonly(pool_state, false)
 	);
 	assert_eq!(open_ix.accounts[2], AccountMeta::new(position_state, false));
-	assert_eq!(open_ix.data, vec![1, 5]);
+	assert_eq!(open_ix.data, vec![1, 0, 5]);
 
 	let user_stake_ata = Pubkey::new_unique();
 	let deposit = Deposit::new(
@@ -120,7 +120,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		deposit_ix.accounts[6],
 		AccountMeta::new_readonly(token_program, false)
 	);
-	let mut expected_deposit = vec![2];
+	let mut expected_deposit = vec![2, 0];
 	expected_deposit.extend_from_slice(&250u64.to_le_bytes());
 	assert_eq!(deposit_ix.data, expected_deposit);
 
@@ -148,7 +148,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		withdraw_ix.accounts[6],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
-	let mut expected_withdraw = vec![3];
+	let mut expected_withdraw = vec![3, 0];
 	expected_withdraw.extend_from_slice(&125u64.to_le_bytes());
 	assert_eq!(withdraw_ix.data, expected_withdraw);
 
@@ -185,5 +185,5 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		claim_ix.accounts[7],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
-	assert_eq!(claim_ix.data, vec![4]);
+	assert_eq!(claim_ix.data, vec![4, 0]);
 }

@@ -36,13 +36,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR = 1;
 
 export function getForwardRotateWithSignerDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR);
+}
+
+export const FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR2 = 0;
+
+export function getForwardRotateWithSignerDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR2);
 }
 
 export type ForwardRotateWithSignerInstruction<
@@ -71,6 +80,7 @@ export type ForwardRotateWithSignerInstruction<
 
 export type ForwardRotateWithSignerInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	newAuthority: Address;
 };
 
@@ -83,23 +93,27 @@ export function getForwardRotateWithSignerInstructionDataEncoder(): FixedSizeEnc
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"newAuthority",
-			getAddressEncoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1 }),
+			"migrationVersion",
+			getU8Encoder(),
+		], ["newAuthority", getAddressEncoder()]]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
 export function getForwardRotateWithSignerInstructionDataDecoder(): FixedSizeDecoder<
 	ForwardRotateWithSignerInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(
-			FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR,
-			getU8Decoder(),
-		),
-	], ["newAuthority", getAddressDecoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["newAuthority", getAddressDecoder()],
+	]);
 }
 
 export function getForwardRotateWithSignerInstructionDataCodec(): FixedSizeCodec<

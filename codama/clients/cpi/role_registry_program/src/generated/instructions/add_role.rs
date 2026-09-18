@@ -60,16 +60,16 @@ pub struct AddRoleIx {
 
 impl AddRoleIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 18;
+	pub const LEN: usize = 19;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 18], ProgramError> {
-		let mut data = [0u8; 18];
-		data[..1].copy_from_slice(&ADD_ROLE_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.role_id.to_le_bytes());
-		data[9..17].copy_from_slice(&self.permissions.to_le_bytes());
-		data[17..18].copy_from_slice(&self.bump.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 19], ProgramError> {
+		let mut data = [0u8; 19];
+		data[..2].copy_from_slice(&ADD_ROLE_DISCRIMINATOR);
+		data[2..10].copy_from_slice(&self.role_id.to_le_bytes());
+		data[10..18].copy_from_slice(&self.permissions.to_le_bytes());
+		data[18..19].copy_from_slice(&self.bump.to_le_bytes());
 
 		Ok(data)
 	}
@@ -103,4 +103,4 @@ impl<'account> AddRole<'account> {
 	}
 }
 
-const ADD_ROLE_DISCRIMINATOR: [u8; 1] = [1];
+const ADD_ROLE_DISCRIMINATOR: [u8; 2] = [1, 0];

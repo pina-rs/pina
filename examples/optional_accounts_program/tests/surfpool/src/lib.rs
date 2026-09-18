@@ -26,7 +26,8 @@ fn init_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[OptionalInstruction::Init as u8, bump],
+		// discriminator + migration version + bump.
+		&[OptionalInstruction::Init as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*store, false),
@@ -56,11 +57,12 @@ fn init_creates_the_store_pda_at_zero() {
 
 		let account = program.account(&store).expect("fetch store account");
 		assert_eq!(account.owner, program_id);
-		assert_eq!(account.data.len(), 10, "StoreState layout is 10 bytes");
+		assert_eq!(account.data.len(), 11, "StoreState layout is 11 bytes");
 		assert_eq!(account.data[0], 1, "account discriminator is StoreState");
-		assert_eq!(account.data[1], bump);
+		assert_eq!(account.data[1], 0, "stored migration version is current");
+		assert_eq!(account.data[2], bump);
 		assert_eq!(
-			account.data[2..],
+			account.data[3..],
 			0u64.to_le_bytes(),
 			"count starts at zero"
 		);
@@ -90,7 +92,7 @@ fn touch_increments_only_when_the_store_is_present() {
 
 		let present = |program: &ProgramTest| {
 			program.instruction(
-				&[OptionalInstruction::Touch as u8],
+				&[OptionalInstruction::Touch as u8, 0u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new(store, false),
@@ -102,13 +104,14 @@ fn touch_increments_only_when_the_store_is_present() {
 			.expect("Touch with the store present");
 		let account = program.account(&store).expect("fetch store account");
 		assert_eq!(
-			account.data[2..],
+			// Envelope: discriminator, migration version, bump, then the count.
+			account.data[3..],
 			1u64.to_le_bytes(),
 			"one provided touch adds 1"
 		);
 
 		let omitted = program.instruction(
-			&[OptionalInstruction::Touch as u8],
+			&[OptionalInstruction::Touch as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(program_id, false),
@@ -119,7 +122,8 @@ fn touch_increments_only_when_the_store_is_present() {
 			.expect("Touch with the store omitted");
 		let account = program.account(&store).expect("fetch store account");
 		assert_eq!(
-			account.data[2..],
+			// Envelope: discriminator, migration version, bump, then the count.
+			account.data[3..],
 			1u64.to_le_bytes(),
 			"omitted slot leaves the counter untouched"
 		);
@@ -129,7 +133,8 @@ fn touch_increments_only_when_the_store_is_present() {
 			.expect("second provided Touch");
 		let account = program.account(&store).expect("fetch store account");
 		assert_eq!(
-			account.data[2..],
+			// Envelope: discriminator, migration version, bump, then the count.
+			account.data[3..],
 			2u64.to_le_bytes(),
 			"the counter reaches 2 of 3 touches"
 		);
@@ -162,7 +167,7 @@ fn touch_rejects_a_wrong_type_store() {
 			.expect("fund impostor");
 
 		let instruction = program.instruction(
-			&[OptionalInstruction::Touch as u8],
+			&[OptionalInstruction::Touch as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new(impostor, false),
@@ -202,7 +207,7 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 		program.fund(&witness, 1_000_000_000).expect("fund witness");
 
 		let instruction = program.instruction(
-			&[OptionalInstruction::Inspect as u8],
+			&[OptionalInstruction::Inspect as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(store, false),
@@ -217,7 +222,7 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 		eprintln!("unsigned witness error: {}", error.message());
 
 		let note = program.instruction(
-			&[OptionalInstruction::Note as u8],
+			&[OptionalInstruction::Note as u8, 0u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(program_id, false),

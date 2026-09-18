@@ -49,15 +49,15 @@ pub struct CreateIx {
 
 impl CreateIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 13;
+	pub const LEN: usize = 14;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 13], ProgramError> {
-		let mut data = [0u8; 13];
-		data[..1].copy_from_slice(&CREATE_DISCRIMINATOR);
-		data[1..5].copy_from_slice(&self.data_f32.to_le_bytes());
-		data[5..13].copy_from_slice(&self.data_f64.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 14], ProgramError> {
+		let mut data = [0u8; 14];
+		data[..2].copy_from_slice(&CREATE_DISCRIMINATOR);
+		data[2..6].copy_from_slice(&self.data_f32.to_le_bytes());
+		data[6..14].copy_from_slice(&self.data_f64.to_le_bytes());
 
 		Ok(data)
 	}
@@ -89,4 +89,4 @@ impl<'account> Create<'account> {
 	}
 }
 
-const CREATE_DISCRIMINATOR: [u8; 1] = [0];
+const CREATE_DISCRIMINATOR: [u8; 2] = [0, 0];

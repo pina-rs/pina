@@ -1899,10 +1899,15 @@ mod tests {
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module(&program, &facts);
 
-		assert!(module.contains("class MyEventEvent extends EventsProgramEvent {"));
+		// The program envelopes events, so the emitted class is the enveloped
+		// current shape: it carries the discriminator and migration version as
+		// fields, and with no recorded history there are no projection steps.
+		assert!(module.contains("class MyEventEvent {"));
+		assert!(module.contains("required this.discriminator,"));
+		assert!(module.contains("required this.migrationVersion,"));
 		assert!(module.contains("Uint8List label;"));
+		assert!(module.contains("const myEventEventMigrationVersion = 0;"));
 		assert!(!module.contains("ProjectionSteps"));
-		assert!(!module.contains("sourceVersion"));
 	}
 
 	#[test]

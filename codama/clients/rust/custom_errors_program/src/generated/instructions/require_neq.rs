@@ -9,6 +9,7 @@
 )]
 
 pub const REQUIRE_NEQ_DISCRIMINATOR: u8 = 4u8;
+pub const REQUIRE_NEQ_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -52,6 +53,7 @@ impl RequireNeqInstructionData {
 		<RequireNeqInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_NEQ_DISCRIMINATOR;
+			data.migration_version = REQUIRE_NEQ_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -65,4 +67,5 @@ impl RequireNeqInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequireNeqInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

@@ -134,7 +134,7 @@ fn accrued_rewards(staked: u64, index_delta: u64) -> Result<u64, ProgramError> {
 		.ok_or(ProgramError::ArithmeticOverflow)?
 		/ u128::from(REWARD_INDEX_SCALE);
 
-	u64::try_from(scaled).map_err(|_| ProgramError::ArithmeticOverflow.into())
+	u64::try_from(scaled).map_err(|_| ProgramError::ArithmeticOverflow)
 }
 
 #[derive(Accounts, Debug)]

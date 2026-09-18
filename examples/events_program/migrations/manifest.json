@@ -1,0 +1,189 @@
+{
+	"formatVersion": 4,
+	"programId": "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"event:1:01": {
+			"identity": {
+				"kind": "event",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "MyEvent",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "272ad57970d70ac98ea434dc44a8db86a9bfacc1ebf8f2705a46e78ace38e5fa",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "data",
+								"rustType": "u64"
+							},
+							{
+								"name": "label",
+								"rustType": "[u8; 8]"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 16,
+							"fields": [
+								{
+									"name": "data",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "label",
+									"offset": 8,
+									"size": 8
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"event:1:02": {
+			"identity": {
+				"kind": "event",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "MyOtherEvent",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "272ad57970d70ac98ea434dc44a8db86a9bfacc1ebf8f2705a46e78ace38e5fa",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "data",
+								"rustType": "u64"
+							},
+							{
+								"name": "label",
+								"rustType": "[u8; 8]"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 16,
+							"fields": [
+								{
+									"name": "data",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "label",
+									"offset": 8,
+									"size": 8
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "InitializeInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "TestEventInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "TestEventCpiInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		}
+	}
+}

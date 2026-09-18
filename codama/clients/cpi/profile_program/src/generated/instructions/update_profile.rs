@@ -48,25 +48,25 @@ pub struct UpdateProfileIx<'argument> {
 
 impl<'argument> UpdateProfileIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 163;
+	pub const LEN: usize = 164;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 163], ProgramError> {
-		let mut data = [0u8; 163];
-		data[..1].copy_from_slice(&UPDATE_PROFILE_DISCRIMINATOR);
+	pub fn to_bytes(&self) -> Result<[u8; 164], ProgramError> {
+		let mut data = [0u8; 164];
+		data[..2].copy_from_slice(&UPDATE_PROFILE_DISCRIMINATOR);
 		let value = self.name.as_bytes();
 		if value.len() > 32 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[1..1 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
-		data[1 + 1..1 + 1 + value.len()].copy_from_slice(value);
+		data[2..2 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[2 + 1..2 + 1 + value.len()].copy_from_slice(value);
 		let value = self.bio.as_bytes();
 		if value.len() > 128 {
 			return Err(ProgramError::InvalidInstructionData);
 		}
-		data[34..34 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
-		data[34 + 1..34 + 1 + value.len()].copy_from_slice(value);
+		data[35..35 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[35 + 1..35 + 1 + value.len()].copy_from_slice(value);
 
 		Ok(data)
 	}
@@ -97,4 +97,4 @@ impl<'account, 'argument> UpdateProfile<'account, 'argument> {
 	}
 }
 
-const UPDATE_PROFILE_DISCRIMINATOR: [u8; 1] = [1];
+const UPDATE_PROFILE_DISCRIMINATOR: [u8; 2] = [1, 0];

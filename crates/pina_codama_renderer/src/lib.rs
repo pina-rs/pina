@@ -149,6 +149,7 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 /// Honors [`RenderConfig::mode`] against the destination current state, writes the
 /// generated sources, and scaffolds manifests when [`RenderConfig::scaffold`] is set.
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
+	validate_output_path_components(crate_dir)?;
 	let mode = resolve_render_mode(crate_dir, config.mode)?;
 
 	if mode == RenderMode::Overwrite {
@@ -233,6 +234,8 @@ fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
 		return Ok(());
 	}
 
+	validate_output_path_components(crate_dir)?;
+
 	let absolute =
 		fs::canonicalize(crate_dir).map_err(|source| read_file_error(crate_dir, source))?;
 	let current_dir =
@@ -252,6 +255,68 @@ fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
 
 	validate_tree_has_no_symlinks(crate_dir)?;
 	fs::remove_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))
+}
+
+fn validate_output_path_components(path: &Path) -> Result<()> {
+	let absolute = std::path::absolute(path).map_err(|source| read_file_error(path, source))?;
+	let mut current = PathBuf::new();
+
+	for component in absolute.components() {
+		current.push(component);
+
+		if matches!(component, Component::Prefix(_) | Component::RootDir) {
+			continue;
+		}
+
+		let metadata = match fs::symlink_metadata(&current) {
+			Ok(metadata) => metadata,
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+			Err(source) => return Err(read_file_error(&current, source)),
+		};
+
+		if is_user_controlled_link_like(&metadata) {
+			return Err(RenderError::UnsafeOutputPath {
+				path: path.to_path_buf(),
+				reason: format!(
+					"client destinations cannot traverse symbolic link {}",
+					current.display()
+				),
+			});
+		}
+	}
+
+	Ok(())
+}
+
+fn is_link_like(metadata: &fs::Metadata) -> bool {
+	#[cfg(windows)]
+	{
+		use std::os::windows::fs::MetadataExt;
+
+		const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+		metadata.file_type().is_symlink()
+			|| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+	}
+
+	#[cfg(not(windows))]
+	metadata.file_type().is_symlink()
+}
+
+fn is_user_controlled_link_like(metadata: &fs::Metadata) -> bool {
+	if !is_link_like(metadata) {
+		return false;
+	}
+
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::MetadataExt as _;
+
+		metadata.uid() != 0
+	}
+
+	#[cfg(not(unix))]
+	true
 }
 
 fn read_file_error(path: &Path, source: std::io::Error) -> RenderError {

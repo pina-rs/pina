@@ -28,7 +28,7 @@ fn every_instruction_returns_the_documented_custom_error() {
 
 		for (instruction, code) in cases {
 			let error = program
-				.send(&[instruction as u8], Vec::new())
+				.send(&[instruction as u8, 0u8], Vec::new())
 				.expect_err("the instruction always fails with a custom error");
 
 			assert_eq!(error.operation(), "execute program instruction");

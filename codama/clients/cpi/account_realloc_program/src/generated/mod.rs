@@ -8,6 +8,8 @@
 )]
 
 mod instructions;
+pub(crate) mod generated_types {}
+pub mod accounts;
 mod programs;
 
 pub use instructions::*;

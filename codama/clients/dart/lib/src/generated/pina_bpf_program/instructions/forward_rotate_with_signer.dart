@@ -14,9 +14,11 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class ForwardRotateWithSignerInstructionData {
   const ForwardRotateWithSignerInstructionData({required this.newAuthority})
-    : discriminator = 1;
+    : discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address newAuthority;
 }
 
@@ -24,6 +26,7 @@ Encoder<ForwardRotateWithSignerInstructionData>
 getForwardRotateWithSignerInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('newAuthority', getAddressEncoder()),
   ]);
 
@@ -31,6 +34,7 @@ getForwardRotateWithSignerInstructionDataEncoder() {
     structEncoder,
     (ForwardRotateWithSignerInstructionData value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'newAuthority': value.newAuthority,
     },
   );
@@ -40,6 +44,7 @@ Decoder<ForwardRotateWithSignerInstructionData>
 getForwardRotateWithSignerInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('newAuthority', getAddressDecoder()),
   ]);
 
@@ -56,6 +61,7 @@ getForwardRotateWithSignerInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

@@ -22,23 +22,26 @@ use pina_cli::GenerationMode;
 	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
 	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
 	              for explicit cluster deployment, and 'pina verify' for deployed-program \
-	              verification. Use 'pina cpi' for standalone CPI crates, 'pina doctor' for \
-	              agent-readable diagnostics, 'pina keys' for program identity, and 'pina \
-	              completions' for shell integration. Low-level IDL, profiling, terminal \
-	              documentation, and the legacy repository-wide Codama workflow remain available.",
+	              verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt \
+	              another program's IDL as one, 'pina doctor' for agent-readable diagnostics, \
+	              'pina keys' for program identity, and 'pina completions' for shell integration. \
+	              Low-level IDL, profiling, terminal documentation, and the legacy \
+	              repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
 	              pina lint\n  pina test\n  pina test --unit\n  pina dev --yes\n  pina generate \
 	              --client rust --client typescript\n  pina doctor --json\n  pina keys\n  pina \
-	              cpi --idl ./idl.json --output ./clients/program-cpi\n  pina idl --path \
-	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
-	              ./target/deploy/counter_program.so --json\n  pina deploy --cluster localnet \
-	              --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json \
-	              --dry-run\n\nAgent discovery:\n  Run 'pina <command> --help' for \
-	              command-specific inputs, outputs, and examples.\n  Run 'pina docs' to list the \
-	              bundled architecture and IDL reference topics.\n  For deployment verification, \
-	              run 'pina verify --help' and then inspect the selected leaf command."
+	              cpi --idl ./idl.json --output ./clients/program-cpi\n  pina import switchboard \
+	              --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json\n  \
+	              pina idl --path ./programs/counter_program --output \
+	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
+	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
+	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
+	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
+	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
+	              topics.\n  For deployment verification, run 'pina verify --help' and then \
+	              inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -194,7 +197,8 @@ pub(crate) enum Commands {
 		              ./programs/counter --output ./generated\n  pina generate --mode update \
 		              --no-scaffold\n\nConfiguration:\n  [clients]\n  output = \"clients\"\n  \
 		              languages = [\"cpi\", \"rust\", \"cli-rust\"]\n  mode = \"auto\"\n  \
-		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\""
+		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\"\n\n  \
+		              [clients.cli_rust]\n  output = \"clients/rust-cli\""
 	)]
 	Generate {
 		/// Directory inside the project to discover. Defaults to the current directory.
@@ -275,6 +279,72 @@ pub(crate) enum Commands {
 			value_name = "COMMAND"
 		)]
 		npx: String,
+		/// Skip instructions the renderer cannot express instead of failing
+		/// the render; skipped instructions are listed in the generated
+		/// `instructions/mod.rs`.
+		#[arg(long, default_value_t = false)]
+		skip_unsupported_instructions: bool,
+	},
+
+	/// Import a foreign program's IDL as a supported CPI crate.
+	///
+	/// Fetches the IDL from a file, a URL, or the program's on-chain canonical
+	/// metadata, renders a standalone Pina CPI crate, and stamps the generated
+	/// README with provenance: the IDL's SHA-256, where it came from, and the
+	/// generator version. Re-running against an unchanged IDL is a no-op, and
+	/// running it against a changed one rewrites the crate and updates the
+	/// provenance block.
+	#[command(after_help = "Examples:\n  pina import switchboard --program-id \
+		              SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl \
+		              ./idls/on_demand.json\n  pina import metaplex --program-id \
+		              metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s --url \
+		              https://example.com/token_metadata.json\n  pina import squads \
+		              --program-id SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf --cluster \
+		              mainnet-beta\n\nProvenance:\n  The generated README records the IDL \
+		              SHA-256, the source it came from, and the generator version, so a \
+		              reviewer can tell what a committed CPI crate was built from.")]
+	Import {
+		/// Name for the imported crate, used as `clients/cpi/<name>`.
+		#[arg(value_name = "NAME")]
+		name: String,
+
+		/// Program ID the CPI crate targets.
+		#[arg(long, value_name = "PUBKEY")]
+		program_id: String,
+
+		/// Read the IDL from a local file.
+		#[arg(long, value_name = "FILE", conflicts_with_all = ["url", "cluster"])]
+		idl: Option<PathBuf>,
+
+		/// Fetch the IDL from an HTTP(S) URL.
+		#[arg(long, value_name = "URL", conflicts_with = "cluster")]
+		url: Option<String>,
+
+		/// Fetch the IDL from a cluster's canonical program metadata.
+		#[arg(long, value_name = "CLUSTER", default_value = "mainnet-beta")]
+		cluster: String,
+
+		/// Directory to write the crate into. Defaults to `clients/cpi`.
+		#[arg(long, value_name = "DIR")]
+		output: Option<PathBuf>,
+
+		/// How to handle an existing output directory.
+		#[arg(long, value_enum, default_value = "auto", value_name = "MODE")]
+		mode: GenerationMode,
+
+		/// Executable used to normalize Anchor IDLs. Defaults to npx.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+		/// Skip instructions the renderer cannot express instead of failing
+		/// the render; skipped instructions are listed in the generated
+		/// `instructions/mod.rs`.
+		#[arg(long, default_value_t = false)]
+		skip_unsupported_instructions: bool,
 	},
 
 	/// Generate, inspect, and publish canonical Codama IDLs.

@@ -149,7 +149,8 @@ fn initialize_pool_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[StakingInstruction::InitializePool as u8, bump],
+		// discriminator + migration version + bump.
+		&[StakingInstruction::InitializePool as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*admin, true),
 			AccountMeta::new_readonly(*stake_mint, false),
@@ -172,7 +173,8 @@ fn open_position_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[StakingInstruction::OpenPosition as u8, bump],
+		// discriminator + migration version + bump.
+		&[StakingInstruction::OpenPosition as u8, 0u8, bump],
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*pool, false),
@@ -191,7 +193,8 @@ fn deposit_instruction(
 	user_stake_ata: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![StakingInstruction::Deposit as u8];
+	// discriminator + migration version, then the u64 amount.
+	let mut data = vec![StakingInstruction::Deposit as u8, 0u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -218,7 +221,7 @@ fn withdraw_instruction(
 	user_stake_ata: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![StakingInstruction::Withdraw as u8];
+	let mut data = vec![StakingInstruction::Withdraw as u8, 0u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -235,15 +238,16 @@ fn withdraw_instruction(
 	)
 }
 
-/// PoolState content: [disc][admin 32][stake_mint 32][reward_mint 32]
-/// [total_staked 8][reward_index 8][paused][bump].
+/// PoolState content: [disc][version][admin 32][stake_mint 32][reward_mint 32]
+/// [total_staked 8][reward_index 8][paused][bump]. `tests/abi_layout.rs` pins
+/// the same envelope geometry.
 fn set_reward_index_instruction(
 	program: &ProgramTest,
 	admin: &Pubkey,
 	pool: &Pubkey,
 	new_index: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![StakingInstruction::SetRewardIndex as u8];
+	let mut data = vec![StakingInstruction::SetRewardIndex as u8, 0u8];
 	data.extend_from_slice(&new_index.to_le_bytes());
 
 	program.instruction(
@@ -265,7 +269,7 @@ fn claim_instruction(
 	reward_vault: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[StakingInstruction::Claim as u8],
+		&[StakingInstruction::Claim as u8, 0u8],
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*reward_mint, false),
@@ -314,31 +318,33 @@ fn assert_pool(
 	bump: u8,
 ) {
 	assert_eq!(account.data[0], 1, "discriminator is PoolState");
-	assert_eq!(&account.data[1..33], admin.to_bytes());
-	assert_eq!(&account.data[33..65], stake_mint.to_bytes());
-	assert_eq!(&account.data[65..97], reward_mint.to_bytes());
+	assert_eq!(account.data[1], 0, "stored migration version is current");
+	assert_eq!(&account.data[2..34], admin.to_bytes());
+	assert_eq!(&account.data[34..66], stake_mint.to_bytes());
+	assert_eq!(&account.data[66..98], reward_mint.to_bytes());
 	assert_eq!(
-		&account.data[97..105],
+		&account.data[98..106],
 		total_staked.to_le_bytes(),
 		"total_staked on-chain"
 	);
 	assert_eq!(
-		&account.data[105..113],
+		&account.data[106..114],
 		0u64.to_le_bytes(),
 		"reward_index zero"
 	);
-	assert_eq!(account.data[113], 0, "pool is unpaused");
-	assert_eq!(account.data[114], bump);
+	assert_eq!(account.data[114], 0, "pool is unpaused");
+	assert_eq!(account.data[115], bump);
 }
 
-/// PositionState content: [disc][pool 32][owner 32][staked 8][reward_debt 8]
-/// [pending 8][bump].
+/// PositionState content: [disc][version][pool 32][owner 32][staked 8]
+/// [reward_debt 8][pending 8][bump].
 fn assert_position(account: &Account, pool: &Pubkey, owner: &Pubkey, staked: u64, bump: u8) {
 	assert_eq!(account.data[0], 2, "discriminator is PositionState");
-	assert_eq!(&account.data[1..33], pool.to_bytes());
-	assert_eq!(&account.data[33..65], owner.to_bytes());
-	assert_eq!(&account.data[65..73], staked.to_le_bytes());
-	assert_eq!(account.data[89], bump);
+	assert_eq!(account.data[1], 0, "stored migration version is current");
+	assert_eq!(&account.data[2..34], pool.to_bytes());
+	assert_eq!(&account.data[34..66], owner.to_bytes());
+	assert_eq!(&account.data[66..74], staked.to_le_bytes());
+	assert_eq!(account.data[90], bump);
 }
 
 fn vault_amount(account: &Account) -> u64 {

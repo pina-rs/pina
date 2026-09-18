@@ -47,6 +47,8 @@ import {
 	parseTakeInstruction,
 	type TakeInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findEscrowPda } from "../pdas";
 
 export const ESCROW_PROGRAM_PROGRAM_ADDRESS =
@@ -62,9 +64,10 @@ export function identifyEscrowProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): EscrowProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return EscrowProgramAccount.EscrowState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return EscrowProgramAccount.EscrowState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "escrowProgram" },
@@ -80,12 +83,14 @@ export function identifyEscrowProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): EscrowProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return EscrowProgramInstruction.Make;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return EscrowProgramInstruction.Take;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return EscrowProgramInstruction.Make;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return EscrowProgramInstruction.Take;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "escrowProgram" },
@@ -173,6 +178,8 @@ export function escrowProgramProgram() {
 					escrowState: addSelfFetchFunctions(client, getEscrowStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					make: (input) =>
 						addSelfPlanAndSendFunctions(client, getMakeInstruction(input)),
 					take: (input) =>

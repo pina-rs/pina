@@ -44,7 +44,9 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: changes
-    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    # A monochange release PR contains generated release state for changes that
+    # were already checked against their latest release tags on their own PRs.
+    if: ${{ !failure() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'release') && (needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -407,13 +407,13 @@ Add `migrations` to an account, instruction, or event attribute to opt one contr
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
 ```
 
 `auto` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations make` records the resolved policy in `migrations/manifest.json` and snapshots every contract of the listed kinds. Macros read the policy from the manifest rather than `pina.toml`, so a new struct still fails the build with "run `pina migrations make`" until it has a snapshot. Once a policy is recorded, `make` also scaffolds a `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, so flipping the policy re-expands every contract without editing source. Add `migrations = false` to keep one contract out of an auto policy; removing an envelope the manifest already records is an error instead of a silent opt-out, because stripping an envelope is itself a wire-format change.
 
-Pina places the version field immediately after the discriminator. The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default. The width is program-wide and freezes at the first published release, so it is deliberately the narrowest set that covers any realistic migration history. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
+Pina places the version field immediately after the discriminator. The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default and the recommended choice. Versions are tracked per contract, not per program: each account, instruction, and event owns an independent history that starts at version `0`, so `u8` gives every contract its own 255-version budget. Rewriting one contract 255 times is not a realistic outcome, and the narrower field costs one byte in every enveloped account. Choose a wider encoding before the first release only when you expect a single contract to exceed 255 versions. The width is program-wide and freezes at the first published release, so it cannot be widened afterwards. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
 
 Run `pina migrations make` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 

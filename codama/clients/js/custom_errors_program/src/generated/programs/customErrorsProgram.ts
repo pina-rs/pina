@@ -75,27 +75,34 @@ export function identifyCustomErrorsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): CustomErrorsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return CustomErrorsProgramInstruction.Hello;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return CustomErrorsProgramInstruction.HelloNoMsg;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return CustomErrorsProgramInstruction.HelloNext;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return CustomErrorsProgramInstruction.RequireEq;
-	}
-	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
-		return CustomErrorsProgramInstruction.RequireNeq;
-	}
-	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
-		return CustomErrorsProgramInstruction.RequireGt;
-	}
-	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
-		return CustomErrorsProgramInstruction.RequireGte;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.Hello;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.HelloNoMsg;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.HelloNext;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.RequireEq;
+	if (
+		containsBytes(data, getU8Encoder().encode(4), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.RequireNeq;
+	if (
+		containsBytes(data, getU8Encoder().encode(5), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.RequireGt;
+	if (
+		containsBytes(data, getU8Encoder().encode(6), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CustomErrorsProgramInstruction.RequireGte;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "customErrorsProgram" },

@@ -347,49 +347,60 @@ pub(crate) fn expand(
 
 /// Resolve the optional reserved-`Migrate` routing.
 ///
-/// Returns the `process_migrate` helper and the reserved-discriminator guard,
-/// or `None` when the program declares no migratable contract.
+/// The ladder is derived from the checked-in manifest: every enveloped account
+/// contract becomes an optional reserved-instruction slot, in the manifest's
+/// identity-sorted order — the same order generated clients compose. Returns
+/// the `process_migrate` helper and the width-matched `is_migrate_instruction`
+/// guard, or `None` when the program has no manifest or no migratable accounts.
 fn resolve_migrations(
 	args: &DiscriminatorArgs,
 	enum_name: &Ident,
 ) -> syn::Result<Option<(proc_macro2::TokenStream, proc_macro2::TokenStream)>> {
 	let crate_path = &args.crate_path;
-	let Some(ladder) = &args.migrations else {
-		if args.migrations_max_lamports.is_some() {
-			return Err(syn::Error::new_spanned(
-				enum_name,
-				"`migrations_max_lamports` requires `migrations(Account, ...)`",
-			));
-		}
+	let declared_ladder = &args.migrations;
+	// The budget is optional: with no declared ceiling the reserved route
+	// enforces none, because a transfer is already bounded by the rent deficit
+	// of a growth the runtime caps. Declaring one only tightens that.
+	let max_lamports = &args.migrations_max_lamports;
 
-		return Ok(None);
+	// An explicit list overrides the derived ladder: it is the only way to
+	// expose several accounts of the same contract in one sweep, because the
+	// manifest records contracts, not account instances. Without a list, the
+	// ladder is derived from the manifest — one slot per enveloped account
+	// contract, in the identity-sorted order generated clients compose.
+	let ladder: Vec<proc_macro2::TokenStream> = match declared_ladder {
+		Some(ladder) => {
+			if ladder.is_empty() {
+				return Err(syn::Error::new_spanned(
+					enum_name,
+					"`migrations(...)` must name at least one migratable contract",
+				));
+			}
+			// A named contract without a checked-in history would fail later as
+			// an unsatisfied trait bound; report the remedy here instead.
+			crate::migration::verify_migration_contracts(enum_name, ladder)?;
+			ladder
+				.iter()
+				.map(::quote::ToTokens::to_token_stream)
+				.collect()
+		}
+		None => {
+			crate::migration::manifest_account_ladder(enum_name)?
+				.into_iter()
+				.map(|ident| ::quote::ToTokens::to_token_stream(&ident))
+				.collect()
+		}
 	};
 
 	if ladder.is_empty() {
-		return Err(syn::Error::new_spanned(
-			enum_name,
-			"`migrations(...)` must name at least one migratable contract",
-		));
+		return Ok(None);
 	}
-
-	let Some(max_lamports) = &args.migrations_max_lamports else {
-		return Err(syn::Error::new_spanned(
-			enum_name,
-			"`migrations(...)` requires `migrations_max_lamports = EXPR`: the budget is program \
-			 policy, and a default would silently misprice rent transfers",
-		));
-	};
-
-	// Every listed contract must carry a checked-in history, because the
-	// generated ladder calls `MigratableAccount` and a missing manifest entry
-	// surfaces later as an unsatisfied trait bound instead of the remedy.
-	crate::migration::verify_migration_contracts(enum_name, ladder)?;
 
 	Ok(Some(migrate_emission(
 		crate_path,
 		args.primitive,
-		ladder,
-		max_lamports,
+		&ladder,
+		max_lamports.as_ref(),
 		&args
 			.program_id
 			.clone()
@@ -400,15 +411,24 @@ fn resolve_migrations(
 /// Emit the reserved-`Migrate` helper and the dispatch prelude for a validated
 /// ladder.
 ///
+/// `max_lamports` tightens the route when present; `None` emits a call with no
+/// declared ceiling.
+///
 /// Split from [`resolve_migrations`] so the emitted shape is unit-testable
 /// without a manifest on disk.
 fn migrate_emission(
 	crate_path: &Path,
 	primitive: Primitive,
-	ladder: &[Path],
-	max_lamports: &Expr,
+	ladder: &[proc_macro2::TokenStream],
+	max_lamports: Option<&Expr>,
 	program_id: &Expr,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+	// `None` states the absence of a declared ceiling rather than inventing
+	// one; the executor then enforces none.
+	let budget = max_lamports.map_or_else(
+		|| quote!(::core::option::Option::None),
+		|expr| quote!(::core::option::Option::Some(#expr)),
+	);
 	let steps = ladder.iter().enumerate().map(|(position, account)| {
 		// Slots 0 and 1 are the payer and the system program.
 		let index = Literal::usize_unsuffixed(position + 2);
@@ -446,6 +466,12 @@ fn migrate_emission(
 			program_id: & #crate_path::Address,
 			accounts: &mut [#crate_path::AccountView],
 		) -> #crate_path::ProgramResult {
+			// The route calls the `account-resize` executor, so assert the
+			// feature is on. The constant is named after the remedy, which
+			// makes an unresolved symbol say what to enable instead of
+			// reporting a bare `MigrateContext` lookup failure.
+			const _: () = #crate_path::ACCOUNT_RESIZE_FEATURE_REQUIRED_FOR_MIGRATE_ROUTE;
+
 			// The reserved path bypasses `parse_instruction`, so the configured
 			// id is checked here: a mismatched program id must fail before any
 			// account is migrated, exactly as ordinary instructions reject it.
@@ -453,7 +479,7 @@ fn migrate_emission(
 				return Err(#crate_path::ProgramError::IncorrectProgramId);
 			}
 
-			let mut migrate = #crate_path::MigrateContext::new(program_id, accounts, #max_lamports)?;
+			let mut migrate = #crate_path::MigrateContext::new(program_id, accounts, #budget)?;
 			#(#steps)*
 
 			Ok(())
@@ -631,20 +657,20 @@ mod tests {
 	}
 
 	#[test]
-	fn migrations_budget_without_a_ladder_is_rejected() {
+	fn budget_without_explicit_ladder_compiles_without_routing() {
+		// No manifest in the unit-test environment, so the derived ladder is
+		// empty and the migration endpoint is simply not generated.
 		let args = args(quote!(entrypoint, migrations_max_lamports = 20_000));
 		let mut item_enum = enum_of(quote!(
 			pub enum Instruction {
 				Run = 0,
 			}
 		));
-		let error = expand(&args, &mut item_enum).unwrap_err();
+		let expanded = expand(&args, &mut item_enum).unwrap();
+		let implementation = squeezed(&expanded.implementation.to_string());
 
-		assert!(
-			error
-				.to_string()
-				.contains("requires `migrations(Account, ...)`")
-		);
+		assert!(!implementation.contains("process_migrate"));
+		assert!(!implementation.contains("is_migrate_instruction"));
 	}
 
 	#[test]
@@ -669,7 +695,11 @@ mod tests {
 	}
 
 	#[test]
-	fn ladder_without_a_budget_is_rejected() {
+	fn an_explicit_ladder_without_a_budget_still_requires_a_manifest() {
+		// Dropping the budget made it optional, not the history: naming
+		// contracts still demands a checked-in snapshot, so the unit-test
+		// environment (no manifest) reports the `make` remedy rather than
+		// expanding a ladder it cannot verify.
 		let args = args(quote!(entrypoint, migrations(State)));
 		let mut item_enum = enum_of(quote!(
 			pub enum Instruction {
@@ -678,12 +708,10 @@ mod tests {
 		));
 		let error = expand(&args, &mut item_enum).unwrap_err();
 
-		let message = error.to_string();
 		assert!(
-			message.contains("migrations_max_lamports"),
-			"message: {message}"
+			error.to_string().contains("pina migrations make"),
+			"unexpected message: {error}"
 		);
-		assert!(message.contains("program policy"), "message: {message}");
 	}
 
 	#[test]
@@ -696,14 +724,30 @@ mod tests {
 			ladder_of("ManualState"),
 			ladder_of("CompactState"),
 			ladder_of("State"),
-		];
-		let (helper, prelude) =
-			migrate_emission(&crate_path, Primitive::U8, &ladder, &budget, &program_id);
+		]
+		.map(|path| ::quote::ToTokens::to_token_stream(&path));
+		let (helper, prelude) = migrate_emission(
+			&crate_path,
+			Primitive::U8,
+			&ladder,
+			Some(&budget),
+			&program_id,
+		);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());
 
 		assert!(helper.contains("pubfnprocess_migrate("));
-		assert!(helper.contains("MigrateContext::new(program_id,accounts,BUDGET)"));
+		// The route depends on the `account-resize` executor, and the constant
+		// it references is named after the feature so a missing one is
+		// self-describing.
+		assert!(
+			helper.contains("ACCOUNT_RESIZE_FEATURE_REQUIRED_FOR_MIGRATE_ROUTE"),
+			"the route must declare its `account-resize` dependency: {helper}"
+		);
+		// A declared budget is passed through as `Some`.
+		assert!(helper.contains(
+			"MigrateContext::new(program_id,accounts,::core::option::Option::Some(BUDGET))"
+		));
 		// Slots start at 2: the payer and the system program precede them.
 		assert!(helper.contains("run_optional::<State>(2)"));
 		assert!(helper.contains("run_optional::<ManualState>(3)"));
@@ -724,7 +768,7 @@ mod tests {
 		let crate_path: Path = syn::parse_quote!(::pina);
 		let budget: Expr = syn::parse_quote!(BUDGET);
 		let program_id: Expr = syn::parse_quote!(ID);
-		let ladder = [ladder_of("State")];
+		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
 
 		for (primitive, expected) in [
 			(Primitive::U8, "::pina::is_migrate_instruction(data)"),
@@ -733,7 +777,7 @@ mod tests {
 			(Primitive::U64, "::pina::is_migrate_instruction_u64(data)"),
 		] {
 			let (_, prelude) =
-				migrate_emission(&crate_path, primitive, &ladder, &budget, &program_id);
+				migrate_emission(&crate_path, primitive, &ladder, Some(&budget), &program_id);
 			let prelude = squeezed(&prelude.to_string());
 
 			assert!(
@@ -749,6 +793,24 @@ mod tests {
 				);
 			}
 		}
+	}
+
+	#[test]
+	fn migration_emission_without_a_budget_declares_no_ceiling() {
+		let crate_path: Path = syn::parse_quote!(::pina);
+		let program_id: Expr = syn::parse_quote!(ID);
+		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
+		let (helper, _) = migrate_emission(&crate_path, Primitive::U8, &ladder, None, &program_id);
+		let helper = squeezed(&helper.to_string());
+
+		// No ceiling is stated as `None` rather than a sentinel maximum, and the
+		// ladder still routes.
+		assert!(
+			helper
+				.contains("MigrateContext::new(program_id,accounts,::core::option::Option::None)"),
+			"helper: {helper}"
+		);
+		assert!(helper.contains("run_optional::<State>(2)"));
 	}
 
 	#[test]

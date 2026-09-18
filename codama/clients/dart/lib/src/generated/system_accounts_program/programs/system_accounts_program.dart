@@ -23,7 +23,8 @@ enum SystemAccountsProgramInstruction { initialize }
 SystemAccountsProgramInstruction identifySystemAccountsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return SystemAccountsProgramInstruction.initialize;
   }
 

@@ -6,15 +6,22 @@
 		"commands": [
 			{
 				"command": "rustfmt --unstable-features --edition 2024",
-				"exts": ["rs"]
+				"exts": [
+					"rs"
+				]
 			},
 			{
 				"command": "nixfmt",
-				"exts": ["nix"]
+				"exts": [
+					"nix"
+				]
 			},
 			{
 				"command": "shfmt --filename {{file_path}} -i 0",
-				"exts": ["sh", "bash"]
+				"exts": [
+					"sh",
+					"bash"
+				]
 			}
 		]
 	},
@@ -52,7 +59,8 @@
 		".bin/",
 		".local-cache/",
 		"**/dist/**",
-		"**/pkg/"
+		"**/pkg/",
+		"**/abi_layout.rs"
 	],
 	"plugins": [
 		"https://plugins.dprint.dev/typescript-0.95.13.wasm",

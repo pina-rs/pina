@@ -39,7 +39,7 @@ const fixture = JSON.parse(
 ) as ContractFixture;
 
 describe("Dart and JavaScript PinaPod contract parity", () => {
-	test("profile state matches the shared 240-byte golden", () => {
+	test("profile state matches the shared 241-byte golden", () => {
 		const encoded = getProfileStateEncoder().encode({
 			active: true,
 			bio: "bio",
@@ -55,7 +55,7 @@ describe("Dart and JavaScript PinaPod contract parity", () => {
 		);
 	});
 
-	test("initialize data matches the shared 164-byte golden", () => {
+	test("initialize data matches the shared 165-byte golden", () => {
 		const encoded = getInitializeInstructionDataEncoder().encode({
 			bio: "bio",
 			bump: 9,
@@ -127,7 +127,7 @@ describe("Dart and JavaScript PinaPod contract parity", () => {
 
 		for (
 			let index = fixture.profileState.invalidOptionOffset + 1;
-			index < 239;
+			index < 240;
 			index += 1
 		) {
 			encoded[index] = 0xa5;

@@ -9,6 +9,7 @@
 )]
 
 pub const FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR: u8 = 1u8;
+pub const FORWARD_ROTATE_WITH_SIGNER_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ impl ForwardRotateWithSignerInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR;
+				data.migration_version = FORWARD_ROTATE_WITH_SIGNER_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -92,5 +94,6 @@ impl ForwardRotateWithSignerInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ForwardRotateWithSignerInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub new_authority: solana_pubkey::Pubkey,
 }

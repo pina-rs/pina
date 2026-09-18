@@ -9,6 +9,7 @@
 )]
 
 pub const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR: u8 = 0u8;
+pub const VALIDATE_EXTERNAL_PROGRAM_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -71,6 +72,7 @@ impl ValidateExternalProgramInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR;
+				data.migration_version = VALIDATE_EXTERNAL_PROGRAM_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -85,4 +87,5 @@ impl ValidateExternalProgramInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ValidateExternalProgramInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

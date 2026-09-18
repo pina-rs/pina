@@ -98,7 +98,7 @@ Nix-provided binaries: `cargo-insta`, `cargo-llvm-cov`, `cargo-nextest`.
 
 Defined in `.cargo/config.toml`:
 
-- `cargo build-bpf` — SBF build for the `pina_bpf` crate
+- `cargo build-pina-bpf-program` — SBF build for the `pina_bpf_program` crate
 - `cargo build-escrow-program` (and the other `build-*-program` example aliases) — `cargo build-sbf` per example
 - `cargo semver-checks`
 - `cargo workspaces`

@@ -40,6 +40,7 @@ import { findPoolPda, type PoolSeeds } from "../pdas";
 import {
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
@@ -48,8 +49,15 @@ export function getPoolStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POOL_STATE_DISCRIMINATOR);
 }
 
+export const POOL_STATE_DISCRIMINATOR2 = 0;
+
+export function getPoolStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_STATE_DISCRIMINATOR2);
+}
+
 export type PoolState = {
 	discriminator: number;
+	migrationVersion: number;
 	admin: Address;
 	stakeMint: Address;
 	rewardMint: Address;
@@ -74,6 +82,7 @@ export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["admin", getAddressEncoder()],
 			["stakeMint", getAddressEncoder()],
 			["rewardMint", getAddressEncoder()],
@@ -82,7 +91,7 @@ export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
 			["paused", getBooleanEncoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -93,6 +102,7 @@ export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["admin", getAddressDecoder()],
 		["stakeMint", getAddressDecoder()],
 		["rewardMint", getAddressDecoder()],
@@ -179,4 +189,32 @@ export async function fetchMaybePoolStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findPoolPda(seeds, { programAddress });
 	return await fetchMaybePoolState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const POOL_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `PoolState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (poolStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ poolState: address, payer }).make());
+ * }
+ * ```
+ */
+export function poolStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

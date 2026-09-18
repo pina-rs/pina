@@ -33,7 +33,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findStorePda, type StoreSeeds } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const STORE_STATE_DISCRIMINATOR = 1;
 
@@ -41,23 +44,36 @@ export function getStoreStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(STORE_STATE_DISCRIMINATOR);
 }
 
+export const STORE_STATE_DISCRIMINATOR2 = 0;
+
+export function getStoreStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(STORE_STATE_DISCRIMINATOR2);
+}
+
 /**
  * On-chain store state touched through the optional mutable slot.
  *
  * Layout (10 bytes): 1 discriminator + 1 bump + 8 count.
  */
-export type StoreState = { discriminator: number; bump: number; count: bigint };
+export type StoreState = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+	count: bigint;
+};
 
 export type StoreStateArgs = { bump: number; count: number | bigint };
 
 /** Gets the encoder for {@link StoreStateArgs} account data. */
 export function getStoreStateEncoder(): FixedSizeEncoder<StoreStateArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], ["count", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["count", getU64Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -68,6 +84,7 @@ export function getStoreStateDecoder(): FixedSizeDecoder<StoreState> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(STORE_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["count", getU64Decoder()],
 	]);
@@ -152,4 +169,32 @@ export async function fetchMaybeStoreStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findStorePda(seeds, { programAddress });
 	return await fetchMaybeStoreState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const STORE_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `StoreState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (storeStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ storeState: address, payer }).make());
+ * }
+ * ```
+ */
+export function storeStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

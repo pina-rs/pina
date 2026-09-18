@@ -40,6 +40,7 @@ import { findRoleEntryPda, type RoleEntrySeeds } from "../pdas";
 import {
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const ROLE_ENTRY_DISCRIMINATOR = 2;
@@ -48,8 +49,15 @@ export function getRoleEntryDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ROLE_ENTRY_DISCRIMINATOR);
 }
 
+export const ROLE_ENTRY_DISCRIMINATOR2 = 0;
+
+export function getRoleEntryDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ROLE_ENTRY_DISCRIMINATOR2);
+}
+
 export type RoleEntry = {
 	discriminator: number;
+	migrationVersion: number;
 	registry: Address;
 	roleId: bigint;
 	grantee: Address;
@@ -72,6 +80,7 @@ export function getRoleEntryEncoder(): FixedSizeEncoder<RoleEntryArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["registry", getAddressEncoder()],
 			["roleId", getU64Encoder()],
 			["grantee", getAddressEncoder()],
@@ -79,7 +88,7 @@ export function getRoleEntryEncoder(): FixedSizeEncoder<RoleEntryArgs> {
 			["active", getBooleanEncoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 2 }),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
@@ -90,6 +99,7 @@ export function getRoleEntryDecoder(): FixedSizeDecoder<RoleEntry> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["registry", getAddressDecoder()],
 		["roleId", getU64Decoder()],
 		["grantee", getAddressDecoder()],
@@ -175,4 +185,32 @@ export async function fetchMaybeRoleEntryFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findRoleEntryPda(seeds, { programAddress });
 	return await fetchMaybeRoleEntry(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const ROLE_ENTRY_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `RoleEntry` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (roleEntryNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ roleEntry: address, payer }).make());
+ * }
+ * ```
+ */
+export function roleEntryNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 2) {
+		return false;
+	}
+	return data[1]! < 0;
 }

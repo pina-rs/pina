@@ -21,7 +21,8 @@ enum DeclareProgramInstruction { validateExternalProgram }
 
 /// Identifies the type of a DeclareProgram instruction.
 DeclareProgramInstruction identifyDeclareProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return DeclareProgramInstruction.validateExternalProgram;
   }
 

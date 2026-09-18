@@ -1,0 +1,206 @@
+{
+	"formatVersion": 4,
+	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "FloatDataAccount",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "120eba9c4197a411cb027c3337652d02d9c8ca01fdada5eb77a42c1efde23b9c",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "data_f64",
+								"rustType": "u64"
+							},
+							{
+								"name": "data_f32",
+								"rustType": "u32"
+							},
+							{
+								"name": "authority",
+								"rustType": "Address"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 44,
+							"fields": [
+								{
+									"name": "data_f64",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "data_f32",
+									"offset": 8,
+									"size": 4
+								},
+								{
+									"name": "authority",
+									"offset": 12,
+									"size": 32
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "CreateInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "data_f32",
+								"rustType": "u32"
+							},
+							{
+								"name": "data_f64",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 12,
+							"fields": [
+								{
+									"name": "data_f32",
+									"offset": 0,
+									"size": 4
+								},
+								{
+									"name": "data_f64",
+									"offset": 4,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "account",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "021b62f9f4f86369028d81f5b4d68f23b7d94d6dffe7a98066a568b9ca03aaa2",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "UpdateInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "data_f32",
+								"rustType": "u32"
+							},
+							{
+								"name": "data_f64",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 12,
+							"fields": [
+								{
+									"name": "data_f32",
+									"offset": 0,
+									"size": 4
+								},
+								{
+									"name": "data_f64",
+									"offset": 4,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "account",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6cc241a695b4e826dcf2417b04ef7fa98a76182fd9315e82747de341e76779c2",
+					"transition": null
+				}
+			]
+		}
+	}
+}

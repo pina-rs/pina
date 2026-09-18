@@ -62,6 +62,8 @@ import {
 	type RotateAdminInput,
 	type UpdateRoleInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findRegistryConfigPda, findRoleEntryPda } from "../pdas";
 
 export const ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS =
@@ -78,12 +80,14 @@ export function identifyRoleRegistryProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): RoleRegistryProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return RoleRegistryProgramAccount.RegistryConfig;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return RoleRegistryProgramAccount.RoleEntry;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramAccount.RegistryConfig;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramAccount.RoleEntry;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "roleRegistryProgram" },
@@ -102,21 +106,26 @@ export function identifyRoleRegistryProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): RoleRegistryProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return RoleRegistryProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return RoleRegistryProgramInstruction.AddRole;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return RoleRegistryProgramInstruction.UpdateRole;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return RoleRegistryProgramInstruction.DeactivateRole;
-	}
-	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
-		return RoleRegistryProgramInstruction.RotateAdmin;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramInstruction.AddRole;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramInstruction.UpdateRole;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramInstruction.DeactivateRole;
+	if (
+		containsBytes(data, getU8Encoder().encode(4), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return RoleRegistryProgramInstruction.RotateAdmin;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "roleRegistryProgram" },
@@ -254,6 +263,8 @@ export function roleRegistryProgramProgram() {
 					roleEntry: addSelfFetchFunctions(client, getRoleEntryCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

@@ -31,25 +31,32 @@ enum CustomErrorsProgramInstruction {
 CustomErrorsProgramInstruction identifyCustomErrorsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.hello;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.helloNoMsg;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.helloNext;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.requireEq;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.requireNeq;
   }
-  if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.requireGt;
   }
-  if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(6), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return CustomErrorsProgramInstruction.requireGte;
   }
 

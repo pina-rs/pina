@@ -21,12 +21,12 @@ describe("compact generated codecs", () => {
 			note: "ok",
 		});
 
-		expect(encoded).toHaveLength(80);
-		expect(Array.from(encoded.slice(48, 50))).toEqual([2, 0]);
-		expect(Array.from(encoded.slice(50, 58))).toEqual([2, 0, 0, 0, 0, 0, 0, 0]);
-		expect(encoded[58]).toBe(1);
-		expect(Array.from(encoded.slice(59, 67))).toEqual([5, 0, 0, 0, 0, 0, 0, 0]);
-		expect(Array.from(encoded.slice(75, 80))).toEqual([21, 34, 2, 111, 107]);
+		expect(encoded).toHaveLength(81);
+		expect(Array.from(encoded.slice(49, 51))).toEqual([2, 0]);
+		expect(Array.from(encoded.slice(51, 59))).toEqual([2, 0, 0, 0, 0, 0, 0, 0]);
+		expect(encoded[59]).toBe(1);
+		expect(Array.from(encoded.slice(60, 68))).toEqual([5, 0, 0, 0, 0, 0, 0, 0]);
+		expect(Array.from(encoded.slice(76, 81))).toEqual([21, 34, 2, 111, 107]);
 
 		const decoded = getJournalDecoder().decode(encoded);
 		expect(decoded.entries).toEqual([5n, 8n]);
@@ -72,11 +72,11 @@ describe("compact generated codecs", () => {
 			note: null,
 		});
 		const excessiveEntries = Uint8Array.from(empty);
-		excessiveEntries[48] = 9;
+		excessiveEntries[49] = 9;
 		const excessiveMarkers = Uint8Array.from(empty);
-		excessiveMarkers[50] = 9;
+		excessiveMarkers[51] = 9;
 		const invalidOption = Uint8Array.from(empty);
-		invalidOption[58] = 2;
+		invalidOption[59] = 2;
 		const invalidDiscriminator = Uint8Array.from(empty);
 		invalidDiscriminator[0] = 2;
 		const invalidUtf8 = Uint8Array.from(
@@ -91,7 +91,7 @@ describe("compact generated codecs", () => {
 				note: "x",
 			}),
 		);
-		invalidUtf8[60] = 0xff;
+		invalidUtf8[61] = 0xff;
 		expect(() => getJournalDecoder().decode(excessiveEntries)).toThrow(
 			/capacity/,
 		);

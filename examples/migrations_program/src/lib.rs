@@ -13,15 +13,17 @@ const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
 
 /// Instruction discriminator.
 ///
-/// The `migrations(...)` list is the reserved `Migrate` instruction's slot
-/// order: `[payer, systemProgram, state, manualState, compactState,
-/// spareState]`. The trailing `spareState` slot shows several accounts of the
-/// same contract migrating in one sweep under one shared lamport budget.
-/// Declaring the order here makes it typed instead of a comment beside a run of
-/// `run_optional` calls, and generated clients derive the same order from the
-/// IDL.
+/// The reserved `Migrate` instruction's ladder is derived from the manifest:
+/// one optional slot per enveloped account contract, in identity-sorted
+/// order — `[payer, systemProgram, state, manualState, compactState]` — the
+/// same order generated clients compose. An explicit `migrations(State, ...)`
+/// list remains available when a program needs several same-contract slots in
+/// one sweep under a shared lamport budget.
 #[discriminator(
 	entrypoint,
+	// The explicit list keeps the batching demo alive: two `State` accounts
+	// share one sweep under one lamport budget. Derived ladders (the default)
+	// expose one slot per contract instead.
 	migrations(State, ManualState, CompactState, State),
 	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS,
 	// This program was measured with `#[inline]`; the unconditional hint adds
@@ -138,7 +140,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 				account: state,
 				payer,
 				program_id: &ID,
-				max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 			}
 			.invoke::<State>()?;
 
@@ -149,7 +151,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 					account: manual_state,
 					payer,
 					program_id: &ID,
-					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 				}
 				.invoke::<ManualState>()?;
 				manual_state.with_compact_account::<ManualState, _>(&ID, |manual| {
@@ -164,7 +166,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 					account: compact_state,
 					payer,
 					program_id: &ID,
-					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 				}
 				.invoke::<CompactState>()?;
 			}
@@ -186,13 +188,17 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let instruction = RelayInstruction::try_from_bytes(data)?;
+		// The deployed self-CPI validates this account in `UpdateAccounts`. Keep
+		// the well-known default visible to source-based IDL generation without
+		// repeating that check on-chain.
+		#[cfg(not(feature = "bpf-entrypoint"))]
 		self.system_program.assert_address(&system::ID)?;
 		let program = Program::<MigrationProgram>::try_new(self.migration_program)?;
 
 		let mut historical = [0_u8; 10];
 		historical[0] = MigrationInstruction::Update as u8;
 		historical[1] = 0;
-		historical[2..].copy_from_slice(&instruction.value.get().to_le_bytes());
+		historical[2..].copy_from_slice(instruction.value.as_ref());
 
 		CpiContext::new(
 			program,
@@ -209,7 +215,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 		// The writable CPI may have resized and rewritten this account. Construct a
 		// fresh typed guard instead of retaining any pre-CPI view.
 		let state = self.state.as_account::<State>(&ID)?;
-		if state.value.get() != instruction.value.get() || !bool::from(state.enabled) {
+		if state.value != instruction.value || state.enabled.is_false() {
 			return Err(ProgramError::InvalidAccountData);
 		}
 

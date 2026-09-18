@@ -114,11 +114,11 @@ async function deriveStore(authority: string): Promise<string> {
 	return store;
 }
 
-/** Instruction data is discriminator-only except `init` (discriminator +
- * bump). */
+/** Instruction data is discriminator + migration version, plus `bump` for
+ * `init`. */
 function instructionData(discriminator: number, bump?: number): Uint8Array {
-	if (bump === undefined) return Uint8Array.of(discriminator);
-	return Uint8Array.of(discriminator, bump);
+	if (bump === undefined) return Uint8Array.of(discriminator, 0);
+	return Uint8Array.of(discriminator, 0, bump);
 }
 
 function touchInstruction(
@@ -154,7 +154,7 @@ test("omitted optional slots keep the account count fixed and parse as None", as
 		});
 		await submit({
 			programAddress: address(PROGRAM_ID),
-			data: Uint8Array.of(0, bump),
+			data: Uint8Array.of(0, 0, bump),
 			accounts: [
 				{ address: address(authority), role: AccountRole.WRITABLE_SIGNER },
 				{ address: address(store), role: AccountRole.WRITABLE },
@@ -177,7 +177,7 @@ test("omitted optional slots keep the account count fixed and parse as None", as
 		// Layout: 1 discriminator + 1 bump + u64 count. Count stays zero when
 		// the optional slot was filled with the program address.
 		const view = new DataView(bytes.buffer, bytes.byteOffset);
-		assert.equal(view.getBigUint64(2, true), 0n);
+		assert.equal(view.getBigUint64(3, true), 0n);
 
 		// Touch with the store present increments on-chain.
 		await submit(touchInstruction(authority, store));
@@ -193,7 +193,7 @@ test("omitted optional slots keep the account count fixed and parse as None", as
 			touchedBytes.buffer,
 			touchedBytes.byteOffset,
 		);
-		assert.equal(touchedView.getBigUint64(2, true), 1n);
+		assert.equal(touchedView.getBigUint64(3, true), 1n);
 	});
 });
 

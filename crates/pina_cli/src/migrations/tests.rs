@@ -589,7 +589,7 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 	let fixture = migration_fixture();
 	std::fs::write(
 		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\nauto = true\n",
+		"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\nauto = true\n",
 	)
 	.unwrap_or_else(|error| panic!("write auto policy: {error}"));
 	std::fs::write(
@@ -729,7 +729,7 @@ fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
 		.unwrap_or_else(|error| panic!("restore program identity: {error}"));
 	std::fs::write(
 		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n[migrations]\nversion-type = \"u16\"\n",
+		"[project]\nprogram = \".\"\n[migrations]\nversion_type = \"u16\"\n",
 	)
 	.unwrap_or_else(|error| panic!("write changed version type: {error}"));
 	assert!(matches!(
@@ -3034,7 +3034,7 @@ fn abi_layout_test_records_manifest_geometry() {
 		.unwrap_or_else(|error| panic!("read generated abi layout test: {error}"));
 
 	// The fixture is one account with a single `u64` field behind a
-	// `version-type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
+	// `version_type = "u8"` envelope: a 1-byte discriminator, a 1-byte version,
 	// and an 8-byte payload. Asserting the exact values pins the geometry
 	// rather than merely finding the words "SIZE" or a digit somewhere.
 	for expected in [
@@ -3111,6 +3111,44 @@ fn check_rejects_a_stale_abi_layout_test() {
 		error.to_string().contains("abi_layout") || error.to_string().contains("layout test"),
 		"the error must name the stale layout test: {error}"
 	);
+}
+
+/// Formatting the guard file must not make it stale.
+///
+/// `rustfmt` re-wraps the long `SCHEMA_SHA256` constants past 100 columns, so a
+/// formatted file is never byte-identical to generator output. `fix:format` runs
+/// on every checkout, so byte equality would leave `make` and the formatter
+/// fighting: format, then `check`, then `make`, forever.
+#[test]
+fn formatting_the_abi_layout_test_keeps_it_current() {
+	let fixture = publication_fixture();
+	let answers = MigrationAnswers {
+		no_interactive: true,
+		..MigrationAnswers::default()
+	};
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make: {error}"));
+	check_migrations_with_abi_layout(&fixture.root)
+		.unwrap_or_else(|error| panic!("freshly generated guard must pass: {error}"));
+
+	// Emulate the wrapping rustfmt applies to a long constant, without invoking
+	// the toolchain from a unit test.
+	let path = fixture.root.join(ABI_LAYOUT_TEST_PATH);
+	let generated = std::fs::read_to_string(&path)
+		.unwrap_or_else(|error| panic!("read generated guard: {error}"));
+	let formatted = generated.replace(
+		"pub const SCHEMA_SHA256: &str = \"",
+		"pub const SCHEMA_SHA256: &str =\n\t\t\"",
+	);
+	assert_ne!(
+		formatted, generated,
+		"the fixture must contain a schema hash to wrap"
+	);
+	std::fs::write(&path, &formatted)
+		.unwrap_or_else(|error| panic!("write formatted guard: {error}"));
+
+	check_migrations_with_abi_layout(&fixture.root)
+		.unwrap_or_else(|error| panic!("formatting must not report drift: {error}"));
 }
 
 /// A missing generated test is also stale: the account has migration history,

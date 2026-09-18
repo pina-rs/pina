@@ -18,9 +18,11 @@ class InitializePolicyInstructionData {
     required this.minimum,
     required this.maximum,
     required this.requiredApprovals,
-  }) : discriminator = 0;
+  }) : discriminator = 0,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int bump;
   final BigInt minimum;
   final BigInt maximum;
@@ -31,6 +33,7 @@ Encoder<InitializePolicyInstructionData>
 getInitializePolicyInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('minimum', getU64Encoder()),
     ('maximum', getU64Encoder()),
@@ -41,6 +44,7 @@ getInitializePolicyInstructionDataEncoder() {
     structEncoder,
     (InitializePolicyInstructionData value) => <String, Object?>{
       'discriminator': 0,
+      'migrationVersion': 0,
       'bump': value.bump,
       'minimum': value.minimum,
       'maximum': value.maximum,
@@ -53,6 +57,7 @@ Decoder<InitializePolicyInstructionData>
 getInitializePolicyInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('minimum', getU64Decoder()),
     ('maximum', getU64Decoder()),
@@ -72,6 +77,7 @@ getInitializePolicyInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

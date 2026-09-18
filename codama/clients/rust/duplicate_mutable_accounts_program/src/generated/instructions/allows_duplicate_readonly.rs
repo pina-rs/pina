@@ -9,6 +9,7 @@
 )]
 
 pub const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR: u8 = 2u8;
+pub const ALLOWS_DUPLICATE_READONLY_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -68,6 +69,7 @@ impl AllowsDuplicateReadonlyInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR;
+				data.migration_version = ALLOWS_DUPLICATE_READONLY_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -82,4 +84,5 @@ impl AllowsDuplicateReadonlyInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllowsDuplicateReadonlyInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

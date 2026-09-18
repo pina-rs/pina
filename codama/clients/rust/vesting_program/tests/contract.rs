@@ -58,7 +58,7 @@ fn vesting_program_client_has_expected_contract_shape() {
 		init_ix.accounts[5],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
-	let mut expected_init = vec![0];
+	let mut expected_init = vec![0, 0];
 	expected_init.extend_from_slice(&1_000u64.to_le_bytes());
 	expected_init.extend_from_slice(&200u64.to_le_bytes());
 	expected_init.extend_from_slice(&300u64.to_le_bytes());
@@ -104,7 +104,7 @@ fn vesting_program_client_has_expected_contract_shape() {
 		claim_ix.accounts[5],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
-	let mut expected_claim = vec![1];
+	let mut expected_claim = vec![1, 0];
 	expected_claim.extend_from_slice(&10u64.to_le_bytes());
 	assert_eq!(claim_ix.data, expected_claim);
 
@@ -112,5 +112,5 @@ fn vesting_program_client_has_expected_contract_shape() {
 	let cancel_payload = CancelInstructionData::new(|_| {}).unwrap();
 	let cancel_ix = cancel.instruction(cancel_payload);
 	assert_eq!(cancel_ix.accounts.len(), 5);
-	assert_eq!(cancel_ix.data, vec![2]);
+	assert_eq!(cancel_ix.data, vec![2, 0]);
 }

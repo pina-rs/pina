@@ -47,6 +47,8 @@ import {
 	type Realloc2Input,
 	type ReallocInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findSamplePda } from "../pdas";
 
 export const ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS =
@@ -62,9 +64,10 @@ export function identifyAccountReallocProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): AccountReallocProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return AccountReallocProgramAccount.Sample;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return AccountReallocProgramAccount.Sample;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "accountReallocProgram" },
@@ -81,15 +84,18 @@ export function identifyAccountReallocProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): AccountReallocProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return AccountReallocProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return AccountReallocProgramInstruction.Realloc;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return AccountReallocProgramInstruction.Realloc2;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return AccountReallocProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return AccountReallocProgramInstruction.Realloc;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return AccountReallocProgramInstruction.Realloc2;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "accountReallocProgram" },
@@ -192,6 +198,8 @@ export function accountReallocProgramProgram() {
 			accountReallocProgram: <AccountReallocProgramPlugin> {
 				accounts: { sample: addSelfFetchFunctions(client, getSampleCodec()) },
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

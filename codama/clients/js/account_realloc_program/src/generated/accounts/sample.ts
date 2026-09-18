@@ -44,6 +44,7 @@ import {
 	getPinaPodBoundedArrayEncoder,
 	getPinaPodBoundedCountDecoder,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
 export const SAMPLE_DISCRIMINATOR = 1;
@@ -52,9 +53,16 @@ export function getSampleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SAMPLE_DISCRIMINATOR);
 }
 
+export const SAMPLE_DISCRIMINATOR2 = 0;
+
+export function getSampleDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(SAMPLE_DISCRIMINATOR2);
+}
+
 /** A compact account whose active values occupy only the bytes they need. */
 export type Sample = {
 	discriminator: number;
+	migrationVersion: number;
 	/** Canonical PDA bump, persisted for inexpensive validation on resize. */
 	bump: number;
 	/** The only signer permitted to resize this sample. */
@@ -77,6 +85,7 @@ export function getSampleEncoder(): Encoder<SampleArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["authority", getAddressEncoder()],
 			[
@@ -87,7 +96,7 @@ export function getSampleEncoder(): Encoder<SampleArgs> {
 				),
 			],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -98,6 +107,7 @@ export function getSampleDecoder(): Decoder<Sample> {
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(SAMPLE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
 		[
@@ -187,4 +197,32 @@ export async function fetchMaybeSampleFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findSamplePda(seeds, { programAddress });
 	return await fetchMaybeSample(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const SAMPLE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `Sample` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (sampleNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ sample: address, payer }).make());
+ * }
+ * ```
+ */
+export function sampleNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

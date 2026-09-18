@@ -36,7 +36,10 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR = 1;
 
@@ -44,8 +47,15 @@ export function getFloatDataAccountDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FLOAT_DATA_ACCOUNT_DISCRIMINATOR);
 }
 
+export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR2 = 0;
+
+export function getFloatDataAccountDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(FLOAT_DATA_ACCOUNT_DISCRIMINATOR2);
+}
+
 export type FloatDataAccount = {
 	discriminator: number;
+	migrationVersion: number;
 	dataF64: bigint;
 	dataF32: number;
 	authority: Address;
@@ -64,11 +74,12 @@ export function getFloatDataAccountEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["dataF64", getU64Encoder()],
 			["dataF32", getU32Encoder()],
 			["authority", getAddressEncoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1 }),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -84,6 +95,7 @@ export function getFloatDataAccountDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["dataF64", getU64Decoder()],
 		["dataF32", getU32Decoder()],
 		["authority", getAddressDecoder()],
@@ -162,4 +174,34 @@ export async function fetchAllMaybeFloatDataAccount(
 	return maybeAccounts.map((maybeAccount) =>
 		decodeFloatDataAccount(maybeAccount)
 	);
+}
+
+/** The account schema version this client was generated from. */
+export const FLOAT_DATA_ACCOUNT_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `FloatDataAccount` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (floatDataAccountNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ floatDataAccount: address, payer }).make());
+ * }
+ * ```
+ */
+export function floatDataAccountNeedsMigration(
+	data: ReadonlyUint8Array,
+): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 1) {
+		return false;
+	}
+	return data[1]! < 0;
 }

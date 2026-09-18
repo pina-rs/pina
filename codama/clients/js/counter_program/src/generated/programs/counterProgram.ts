@@ -47,6 +47,8 @@ import {
 	parseIncrementInstruction,
 	parseInitializeInstruction,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findCounterPda } from "../pdas";
 
 export const COUNTER_PROGRAM_PROGRAM_ADDRESS =
@@ -62,9 +64,10 @@ export function identifyCounterProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): CounterProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return CounterProgramAccount.CounterState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CounterProgramAccount.CounterState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "counterProgram" },
@@ -80,12 +83,14 @@ export function identifyCounterProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): CounterProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return CounterProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return CounterProgramInstruction.Increment;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CounterProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return CounterProgramInstruction.Increment;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "counterProgram" },
@@ -177,6 +182,8 @@ export function counterProgramProgram() {
 					counterState: addSelfFetchFunctions(client, getCounterStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

@@ -47,6 +47,7 @@ import {
 	parseUpdateInstruction,
 	type UpdateInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
 export const FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS =
 	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
@@ -61,9 +62,10 @@ export function identifyFloatAccountsProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): FloatAccountsProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return FloatAccountsProgramAccount.FloatDataAccount;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return FloatAccountsProgramAccount.FloatDataAccount;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "floatAccountsProgram" },
@@ -79,12 +81,14 @@ export function identifyFloatAccountsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): FloatAccountsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return FloatAccountsProgramInstruction.Create;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return FloatAccountsProgramInstruction.Update;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return FloatAccountsProgramInstruction.Create;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return FloatAccountsProgramInstruction.Update;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "floatAccountsProgram" },
@@ -175,6 +179,8 @@ export function floatAccountsProgramProgram() {
 					),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					create: (input) =>
 						addSelfPlanAndSendFunctions(client, getCreateInstruction(input)),
 					update: (input) =>

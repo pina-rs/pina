@@ -36,13 +36,22 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findJournalPda } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const RESIZE_DISCRIMINATOR = 1;
 
 export function getResizeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(RESIZE_DISCRIMINATOR);
+}
+
+export const RESIZE_DISCRIMINATOR2 = 0;
+
+export function getResizeDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(RESIZE_DISCRIMINATOR2);
 }
 
 export type ResizeInstruction<
@@ -72,6 +81,7 @@ export type ResizeInstruction<
 
 export type ResizeInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	entryCount: number;
 	markerCount: number;
 };
@@ -85,11 +95,13 @@ export function getResizeInstructionDataEncoder(): FixedSizeEncoder<
 	ResizeInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"entryCount",
-			getU8Encoder(),
-		], ["markerCount", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["entryCount", getU8Encoder()],
+			["markerCount", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -101,6 +113,7 @@ export function getResizeInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(RESIZE_DISCRIMINATOR, getU8Decoder()),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["entryCount", getU8Decoder()],
 		["markerCount", getU8Decoder()],
 	]);

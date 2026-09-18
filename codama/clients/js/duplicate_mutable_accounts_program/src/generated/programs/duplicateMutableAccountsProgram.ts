@@ -56,15 +56,18 @@ export function identifyDuplicateMutableAccountsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): DuplicateMutableAccountsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return DuplicateMutableAccountsProgramInstruction.FailsDuplicateMutable;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateMutable;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return DuplicateMutableAccountsProgramInstruction.AllowsDuplicateReadonly;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "duplicateMutableAccountsProgram" },

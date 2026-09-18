@@ -14,7 +14,7 @@ fn initialize_instruction(
 	oracle: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[PropAmmInstruction::Initialize as u8],
+		&[PropAmmInstruction::Initialize as u8, 0u8],
 		vec![
 			AccountMeta::new(*payer, true),
 			AccountMeta::new(*oracle, true),
@@ -29,7 +29,7 @@ fn update_instruction(
 	authority: &Pubkey,
 	new_price: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![PropAmmInstruction::Update as u8];
+	let mut data = vec![PropAmmInstruction::Update as u8, 0u8];
 	data.extend_from_slice(&new_price.to_le_bytes());
 
 	program.instruction(
@@ -47,7 +47,7 @@ fn rotate_instruction(
 	authority: &Pubkey,
 	new_authority: &Pubkey,
 ) -> pina_test::Instruction {
-	let mut data = vec![PropAmmInstruction::RotateAuthority as u8];
+	let mut data = vec![PropAmmInstruction::RotateAuthority as u8, 0u8];
 	data.extend_from_slice(new_authority.as_ref());
 
 	program.instruction(
@@ -59,11 +59,13 @@ fn rotate_instruction(
 	)
 }
 
-fn oracle_bytes(authority: &Pubkey, price: u64) -> [u8; 41] {
-	let mut data = [0u8; 41];
+/// The full encoded `OracleState` image: discriminator, migration version,
+/// authority, then price.
+fn oracle_bytes(authority: &Pubkey, price: u64) -> [u8; 42] {
+	let mut data = [0u8; 42];
 	data[0] = 1;
-	data[1..33].copy_from_slice(authority.as_ref());
-	data[33..41].copy_from_slice(&price.to_le_bytes());
+	data[2..34].copy_from_slice(authority.as_ref());
+	data[34..42].copy_from_slice(&price.to_le_bytes());
 
 	data
 }
@@ -93,7 +95,7 @@ fn initialize_records_the_payer_as_authority() {
 		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
 		assert_eq!(account.owner, program_id);
 		assert_eq!(
-			account.data[0..41],
+			account.data[0..42],
 			oracle_bytes(&payer, 0),
 			"oracle state records the payer and zero price"
 		);
@@ -180,7 +182,7 @@ fn rotate_hands_over_the_oracle_authority() {
 
 		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
 		assert_eq!(
-			account.data[1..33],
+			account.data[2..34],
 			new_authority.pubkey().to_bytes(),
 			"the oracle authority is rotated on-chain"
 		);

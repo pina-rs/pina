@@ -11,13 +11,14 @@ fn semantic_strings_encode_the_exact_pinapod_wire() {
 	.to_bytes()
 	.unwrap_or_else(|error| panic!("semantic strings should encode: {error:?}"));
 
-	assert_eq!(bytes.len(), 164);
-	assert_eq!(&bytes[..3], &[0, 7, 4]);
-	assert_eq!(&bytes[3..7], b"Pina");
-	assert!(bytes[7..35].iter().all(|byte| *byte == 0));
-	assert_eq!(bytes[35], 4);
-	assert_eq!(&bytes[36..40], b"Rust");
-	assert!(bytes[40..].iter().all(|byte| *byte == 0));
+	// Envelope: discriminator, migration version, bump, then the payload.
+	assert_eq!(bytes.len(), 165);
+	assert_eq!(&bytes[..4], &[0, 0, 7, 4]);
+	assert_eq!(&bytes[4..8], b"Pina");
+	assert!(bytes[8..36].iter().all(|byte| *byte == 0));
+	assert_eq!(bytes[36], 4);
+	assert_eq!(&bytes[37..41], b"Rust");
+	assert!(bytes[41..].iter().all(|byte| *byte == 0));
 }
 
 #[test]
@@ -30,7 +31,7 @@ fn semantic_string_limits_are_measured_in_utf8_bytes() {
 	}
 	.to_bytes()
 	.unwrap_or_else(|error| panic!("32 UTF-8 bytes should encode: {error:?}"));
-	assert_eq!(bytes[2], 32);
+	assert_eq!(bytes[3], 32);
 
 	let oversized = "é".repeat(17);
 	let Err(error) = InitializeIx {

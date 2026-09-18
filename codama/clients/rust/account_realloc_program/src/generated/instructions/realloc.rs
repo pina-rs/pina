@@ -12,6 +12,7 @@
 ///
 /// `len` must equal `Sample::projected_bytes` for an active value count.
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
+pub const REALLOC_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -71,6 +72,7 @@ impl ReallocInstructionData {
 		<ReallocInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC_DISCRIMINATOR;
+			data.migration_version = REALLOC_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -84,6 +86,7 @@ impl ReallocInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ReallocInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub len: u16,
 }
 

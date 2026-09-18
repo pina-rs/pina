@@ -13,6 +13,7 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct PolicyChecked {
 	pub discriminator: u8,
+	pub migration_version: u8,
 	pub amount: u64,
 	pub memo: pina::String<64>,
 	pub approvals: pina::Vec<u8, 4>,
@@ -20,6 +21,8 @@ pub struct PolicyChecked {
 }
 
 pub const POLICY_CHECKED_DISCRIMINATOR: u8 = 1u8;
+
+pub const POLICY_CHECKED_MIGRATION_VERSION: u8 = 0u8;
 
 impl PolicyChecked {
 	/// Exact size of the current event representation.
@@ -34,6 +37,256 @@ impl PolicyChecked {
 		if event.discriminator != POLICY_CHECKED_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidArgument);
 		}
+		if event.migration_version != POLICY_CHECKED_MIGRATION_VERSION {
+			return Err(solana_program_error::ProgramError::InvalidArgument);
+		}
 		Ok(event)
+	}
+}
+
+/// Why `PolicyChecked::try_from_bytes` rejected event bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PolicyCheckedVersionError {
+	/// The bytes do not decode as this event's layout at all.
+	InvalidData,
+	/// The envelope names this event but the stored version predates this client.
+	Stale { stored: u8 },
+	/// The envelope names this event but the stored version is newer than this client's schema: upgrade this client.
+	Future { stored: u8 },
+}
+
+impl core::fmt::Display for PolicyCheckedVersionError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::InvalidData => write!(f, "invalid PolicyChecked event data"),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"event migration version mismatch: expected 0, received {stored} (the log \
+					 predates this client; project it with the checked-in event history or decode \
+					 it with a client generated from the schema that wrote it)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"event migration version mismatch: expected 0, received {stored} (the log was \
+					 written by a newer program; upgrade this client)"
+				)
+			}
+		}
+	}
+}
+
+impl std::error::Error for PolicyCheckedVersionError {}
+
+impl PolicyChecked {
+	/// Decode one event record and tell stale logs apart from future ones. The failure message mirrors the generated JavaScript decoder.
+	pub fn try_from_bytes(data: &[u8]) -> Result<&PolicyCheckedZc, PolicyCheckedVersionError> {
+		let event = <Self as pina::PinaPodFixed>::read_exact(data)
+			.map_err(|_| PolicyCheckedVersionError::InvalidData)?;
+		if event.discriminator != POLICY_CHECKED_DISCRIMINATOR {
+			return Err(PolicyCheckedVersionError::InvalidData);
+		}
+		if event.migration_version > POLICY_CHECKED_MIGRATION_VERSION {
+			return Err(PolicyCheckedVersionError::Future {
+				stored: event.migration_version,
+			});
+		}
+		Ok(event)
+	}
+}
+
+/// Why `PolicyChecked::project_from_bytes` could not produce current bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PolicyCheckedProjectionError {
+	/// The bytes do not decode as this event's envelope.
+	InvalidData,
+	/// The record's payload length does not match the schema for its version.
+	InvalidLength { stored: u32 },
+	/// The log names this event but its adjacent transition is manual, so generated clients cannot project it.
+	Manual { from: u32, to: u32 },
+	/// The log names a version this client ships no checked-in projection for.
+	Unknown { stored: u32 },
+}
+
+impl core::fmt::Display for PolicyCheckedProjectionError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::InvalidData => write!(f, "invalid PolicyChecked event data"),
+			Self::InvalidLength { stored } => {
+				write!(
+					f,
+					"event migration version mismatch: expected 0, received {stored} (the log \
+					 length does not match the v{stored} schema)"
+				)
+			}
+			Self::Manual { from, to } => {
+				write!(
+					f,
+					"event migration version mismatch: expected 0, received {from} (the v{from} \
+					 to v{to} transition is manual, so only an on-chain projection or a client \
+					 generated from that schema can represent it)"
+				)
+			}
+			Self::Unknown { stored } => {
+				write!(
+					f,
+					"event migration version mismatch: expected 0, received {stored} (this client \
+					 has no checked-in projection for it)"
+				)
+			}
+		}
+	}
+}
+
+impl std::error::Error for PolicyCheckedProjectionError {}
+
+/// Current-shape event bytes paired with the version that actually wrote them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProjectedPolicyChecked {
+	bytes: Vec<u8>,
+	source_version: u8,
+	was_migrated: bool,
+}
+
+impl ProjectedPolicyChecked {
+	/// The exact current-version event bytes.
+	#[must_use]
+	pub fn bytes(&self) -> &[u8] {
+		&self.bytes
+	}
+
+	/// The version carried by the immutable log record, matching the runtime's `CurrentEventData::source_version`.
+	#[must_use]
+	pub const fn source_version(&self) -> u8 {
+		self.source_version
+	}
+
+	/// Whether a historical projection ran.
+	#[must_use]
+	pub const fn was_migrated(&self) -> bool {
+		self.was_migrated
+	}
+
+	/// Decode the projected bytes as the current event shape.
+	pub fn data(&self) -> Result<&PolicyCheckedZc, PolicyCheckedVersionError> {
+		PolicyChecked::try_from_bytes(&self.bytes)
+	}
+}
+
+/// Adjacent projections from the checked-in migration manifest: `(from, to, automatic, source payload size, destination payload size, moves)`.
+#[allow(clippy::type_complexity)]
+const POLICY_CHECKED_PROJECTION_STEPS: &[(
+	u32,
+	u32,
+	bool,
+	usize,
+	usize,
+	&[(usize, usize, usize)],
+)] = &[];
+
+impl PolicyChecked {
+	/// Project current or historical event bytes into the current shape, mirroring the runtime's `normalize_event_data`.
+	///
+	/// Unknown, future, non-exact historical lengths, and manual transitions fail closed. The returned bytes always carry the current version and are decoded by [`Self::try_from_bytes`].
+	pub fn project_from_bytes(
+		data: &[u8],
+	) -> Result<ProjectedPolicyChecked, PolicyCheckedProjectionError> {
+		if data.len() < 2 {
+			return Err(PolicyCheckedProjectionError::InvalidData);
+		}
+		if data[..1] != [1] {
+			return Err(PolicyCheckedProjectionError::InvalidData);
+		}
+		let mut version = u8::from_le_bytes(
+			data[1..2]
+				.try_into()
+				.map_err(|_| PolicyCheckedProjectionError::InvalidData)?,
+		);
+		let expected = POLICY_CHECKED_MIGRATION_VERSION;
+		if version > expected {
+			return Err(PolicyCheckedProjectionError::Unknown {
+				stored: u32::from(version),
+			});
+		}
+		let source_version = version;
+		let mut payload = data[2..].to_vec();
+		while version != expected {
+			let Some((from, to, automatic, source_size, destination_size, moves)) =
+				POLICY_CHECKED_PROJECTION_STEPS
+					.iter()
+					.find(|(from, ..)| *from == u32::from(version))
+			else {
+				return Err(PolicyCheckedProjectionError::Unknown {
+					stored: u32::from(version),
+				});
+			};
+			if !*automatic {
+				return Err(PolicyCheckedProjectionError::Manual {
+					from: *from,
+					to: *to,
+				});
+			}
+			if payload.len() != *source_size {
+				return Err(PolicyCheckedProjectionError::InvalidLength {
+					stored: u32::from(version),
+				});
+			}
+			let mut destination = vec![0_u8; *destination_size];
+			for (source_offset, destination_offset, size) in *moves {
+				destination[*destination_offset..*destination_offset + *size]
+					.copy_from_slice(&payload[*source_offset..*source_offset + *size]);
+			}
+			payload = destination;
+			version = u8::try_from(*to)
+				.map_err(|_| PolicyCheckedProjectionError::Unknown { stored: *to })?;
+		}
+		let mut bytes = Vec::with_capacity(2 + payload.len());
+		bytes.extend_from_slice(&POLICY_CHECKED_DISCRIMINATOR.to_le_bytes()[..1]);
+		bytes.extend_from_slice(&0u8.to_le_bytes()[..1]);
+		bytes.extend_from_slice(&payload);
+		Ok(ProjectedPolicyChecked {
+			bytes,
+			source_version,
+			was_migrated: source_version != expected,
+		})
+	}
+}
+
+#[cfg(test)]
+mod policy_checked_projection_tests {
+	use super::*;
+
+	fn record(version: u8, payload: &[u8]) -> Vec<u8> {
+		let mut data = vec![0_u8; 2 + payload.len()];
+		data[..1].copy_from_slice(&[1]);
+		data[1..2].copy_from_slice(&version.to_le_bytes()[..1]);
+		data[2..].copy_from_slice(payload);
+		data
+	}
+
+	#[test]
+	fn future_versions_fail_closed() {
+		let future: u8 = 1;
+		let error = PolicyChecked::project_from_bytes(&record(future, &[]))
+			.err()
+			.expect("a future version must fail");
+		assert_eq!(
+			error,
+			PolicyCheckedProjectionError::Unknown {
+				stored: u32::from(future)
+			}
+		);
+	}
+
+	#[test]
+	fn wrong_lengths_and_discriminators_fail_closed() {
+		let mut foreign = record(0, &[]);
+		foreign[0] = foreign[0].wrapping_add(1);
+		assert_eq!(
+			PolicyChecked::project_from_bytes(&foreign).err(),
+			Some(PolicyCheckedProjectionError::InvalidData),
+		);
 	}
 }

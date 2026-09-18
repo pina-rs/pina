@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 76
 expression: idl
 ---
 {
@@ -31,6 +30,20 @@ expression: idl
               "defaultValue": {
                 "kind": "numberValueNode",
                 "number": 1
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "migrationVersion",
+              "defaultValueStrategy": "omitted",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "defaultValue": {
+                "kind": "numberValueNode",
+                "number": 0
               }
             },
             {
@@ -116,6 +129,22 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 1
+              }
+            }
+          },
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 1,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
               }
             }
           }
@@ -216,6 +245,20 @@ expression: idl
           },
           {
             "kind": "instructionArgumentNode",
+            "name": "migrationVersion",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
             "name": "seed",
             "type": {
               "kind": "numberTypeNode",
@@ -265,6 +308,22 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 1
+              }
+            }
+          },
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 1,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
               }
             }
           }
@@ -381,6 +440,20 @@ expression: idl
               "kind": "numberValueNode",
               "number": 2
             }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "migrationVersion",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            }
           }
         ],
         "discriminators": [
@@ -397,6 +470,22 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 2
+              }
+            }
+          },
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 1,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
               }
             }
           }

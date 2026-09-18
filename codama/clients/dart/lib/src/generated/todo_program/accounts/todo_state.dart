@@ -18,9 +18,11 @@ class TodoState {
     required this.bump,
     required this.completed,
     required this.digest,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address owner;
   final int bump;
   final bool completed;
@@ -32,23 +34,31 @@ class TodoState {
       other is TodoState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           owner == other.owner &&
           bump == other.bump &&
           completed == other.completed &&
           digest == other.digest;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, owner, bump, completed, digest);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    owner,
+    bump,
+    completed,
+    digest,
+  );
 
   @override
   String toString() =>
-      'TodoState(discriminator: $discriminator, owner: $owner, bump: $bump, completed: $completed, digest: $digest)';
+      'TodoState(discriminator: $discriminator, migrationVersion: $migrationVersion, owner: $owner, bump: $bump, completed: $completed, digest: $digest)';
 }
 
 Encoder<TodoState> getTodoStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('owner', getAddressEncoder()),
     ('bump', getU8Encoder()),
     ('completed', getBooleanEncoder()),
@@ -59,6 +69,7 @@ Encoder<TodoState> getTodoStateEncoder() {
     structEncoder,
     (TodoState value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'owner': value.owner,
       'bump': value.bump,
       'completed': value.completed,
@@ -70,6 +81,7 @@ Encoder<TodoState> getTodoStateEncoder() {
 Decoder<TodoState> getTodoStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('owner', getAddressDecoder()),
     ('bump', getU8Decoder()),
     ('completed', getBooleanDecoder()),
@@ -86,6 +98,14 @@ Decoder<TodoState> getTodoStateDecoder() {
 
   (TodoState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -124,4 +144,21 @@ Codec<TodoState, TodoState> getTodoStateCodec() {
 
 Account<TodoState> decodeTodoState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getTodoStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int todoStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `TodoState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool todoStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

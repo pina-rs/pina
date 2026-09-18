@@ -14,15 +14,18 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class UpdateRoleInstructionData {
   const UpdateRoleInstructionData({required this.permissions})
-    : discriminator = 2;
+    : discriminator = 2,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final BigInt permissions;
 }
 
 Encoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('permissions', getU64Encoder()),
   ]);
 
@@ -30,6 +33,7 @@ Encoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataEncoder() {
     structEncoder,
     (UpdateRoleInstructionData value) => <String, Object?>{
       'discriminator': 2,
+      'migrationVersion': 0,
       'permissions': value.permissions,
     },
   );
@@ -38,6 +42,7 @@ Encoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataEncoder() {
 Decoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('permissions', getU64Decoder()),
   ]);
 
@@ -51,6 +56,7 @@ Decoder<UpdateRoleInstructionData> getUpdateRoleInstructionDataDecoder() {
 
   (UpdateRoleInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

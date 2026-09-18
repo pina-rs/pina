@@ -24,16 +24,20 @@ enum ProfileProgramInstruction { initialize, updateProfile, addTag, removeTag }
 
 /// Identifies the type of a ProfileProgram instruction.
 ProfileProgramInstruction identifyProfileProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return ProfileProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return ProfileProgramInstruction.updateProfile;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return ProfileProgramInstruction.addTag;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return ProfileProgramInstruction.removeTag;
   }
 

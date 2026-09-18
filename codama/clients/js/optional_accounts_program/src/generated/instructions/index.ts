@@ -8,5 +8,6 @@
 
 export * from "./init";
 export * from "./inspect";
+export * from "./migrate";
 export * from "./note";
 export * from "./touch";

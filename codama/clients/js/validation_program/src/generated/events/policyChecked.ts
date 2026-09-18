@@ -34,6 +34,7 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 	getPinaPodStringDecoder,
 } from "../pinaPodCodecs";
 
@@ -43,8 +44,15 @@ export function getPolicyCheckedEventDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POLICY_CHECKED_EVENT_DISCRIMINATOR);
 }
 
+export const POLICY_CHECKED_EVENT_DISCRIMINATOR2 = 0;
+
+export function getPolicyCheckedEventDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POLICY_CHECKED_EVENT_DISCRIMINATOR2);
+}
+
 export type PolicyCheckedEvent = {
 	discriminator: number;
+	migrationVersion: number;
 	amount: bigint;
 	memo: string;
 	approvals: Array<number>;
@@ -63,23 +71,27 @@ export function getPolicyCheckedEventEncoder(): FixedSizeEncoder<
 	PolicyCheckedEventArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"amount",
-			getU64Encoder(),
-		], [
-			"memo",
-			fixPinaPodEncoderSize(
-				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-				65,
-			),
-		], [
-			"approvals",
-			fixPinaPodEncoderSize(
-				getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
-				6,
-			),
-		], ["requiredApprovals", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 1 }),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["amount", getU64Encoder()],
+			[
+				"memo",
+				fixPinaPodEncoderSize(
+					addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+					65,
+				),
+			],
+			[
+				"approvals",
+				fixPinaPodEncoderSize(
+					getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
+					6,
+				),
+			],
+			["requiredApprovals", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
@@ -95,6 +107,7 @@ export function getPolicyCheckedEventDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["amount", getU64Decoder()],
 		["memo", getPinaPodStringDecoder(getU8Decoder(), 65)],
 		[
@@ -128,6 +141,11 @@ export function parsePolicyCheckedEvent(
 			data,
 			getU8Encoder().encode(POLICY_CHECKED_EVENT_DISCRIMINATOR),
 			0,
+		) &&
+		containsBytes(
+			data,
+			getU8Encoder().encode(POLICY_CHECKED_EVENT_DISCRIMINATOR2),
+			1,
 		)
 	) return getPolicyCheckedEventDecoder().decode(data);
 	throw new Error(

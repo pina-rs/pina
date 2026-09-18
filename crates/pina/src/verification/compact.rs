@@ -112,7 +112,10 @@ fn compact_initialize_accepts_every_valid_aligned_size_and_starts_empty() {
 }
 
 #[kani::proof]
-#[kani::unwind(32)]
+// Performance: Eight unwindings cover every loop reachable through these
+// two-element tails. Kani's unwinding assertions guard the bound, while 32
+// expands pinapod's nested array validation enough to time out this proof.
+#[kani::unwind(8)]
 fn compact_every_shorter_prefix_rejects_active_tail_truncation() {
 	let byte_values: [u8; 2] = kani::any();
 	let word_values = [
@@ -142,7 +145,9 @@ fn compact_every_shorter_prefix_rejects_active_tail_truncation() {
 }
 
 #[kani::proof]
-#[kani::unwind(32)]
+// Performance: Keep this bound aligned with the truncation proof above. Every
+// reachable loop stays within it, and Kani fails the proof if that changes.
+#[kani::unwind(8)]
 fn compact_offsets_are_ordered_disjoint_and_within_the_committed_prefix() {
 	let byte_values: [u8; 2] = kani::any();
 	let word_values = [
@@ -193,7 +198,9 @@ fn compact_offsets_are_ordered_disjoint_and_within_the_committed_prefix() {
 }
 
 #[kani::proof]
-#[kani::unwind(32)]
+// Performance: Keep this bound aligned with the truncation proof above. Every
+// reachable loop stays within it, and Kani fails the proof if that changes.
+#[kani::unwind(8)]
 fn compact_changing_an_earlier_tail_preserves_and_shifts_every_later_tail() {
 	let initial_bytes: [u8; 2] = kani::any();
 	let replacement_bytes: [u8; 2] = kani::any();

@@ -34,13 +34,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CLAIM_DISCRIMINATOR = 4;
 
 export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
+}
+
+export const CLAIM_DISCRIMINATOR2 = 0;
+
+export function getClaimDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CLAIM_DISCRIMINATOR2);
 }
 
 export type ClaimInstruction<
@@ -87,7 +96,10 @@ export type ClaimInstruction<
 		]
 	>;
 
-export type ClaimInstructionData = { discriminator: number };
+export type ClaimInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+};
 
 export type ClaimInstructionDataArgs = {};
 
@@ -95,8 +107,11 @@ export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
 	ClaimInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 4 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
 	);
 }
 
@@ -106,6 +121,9 @@ export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+	], [
+		"migrationVersion",
+		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

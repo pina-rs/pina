@@ -24,10 +24,12 @@ enum EscrowProgramInstruction { make, take }
 
 /// Identifies the type of a EscrowProgram instruction.
 EscrowProgramInstruction identifyEscrowProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return EscrowProgramInstruction.make;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
     return EscrowProgramInstruction.take;
   }
 

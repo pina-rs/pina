@@ -21,9 +21,11 @@ class EscrowState {
     required this.amountB,
     required this.seed,
     required this.bump,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final Address maker;
   final Address mintA;
   final Address mintB;
@@ -38,6 +40,7 @@ class EscrowState {
       other is EscrowState &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           maker == other.maker &&
           mintA == other.mintA &&
           mintB == other.mintB &&
@@ -49,6 +52,7 @@ class EscrowState {
   @override
   int get hashCode => Object.hash(
     discriminator,
+    migrationVersion,
     maker,
     mintA,
     mintB,
@@ -60,12 +64,13 @@ class EscrowState {
 
   @override
   String toString() =>
-      'EscrowState(discriminator: $discriminator, maker: $maker, mintA: $mintA, mintB: $mintB, amountA: $amountA, amountB: $amountB, seed: $seed, bump: $bump)';
+      'EscrowState(discriminator: $discriminator, migrationVersion: $migrationVersion, maker: $maker, mintA: $mintA, mintB: $mintB, amountA: $amountA, amountB: $amountB, seed: $seed, bump: $bump)';
 }
 
 Encoder<EscrowState> getEscrowStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('maker', getAddressEncoder()),
     ('mintA', getAddressEncoder()),
     ('mintB', getAddressEncoder()),
@@ -79,6 +84,7 @@ Encoder<EscrowState> getEscrowStateEncoder() {
     structEncoder,
     (EscrowState value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'maker': value.maker,
       'mintA': value.mintA,
       'mintB': value.mintB,
@@ -93,6 +99,7 @@ Encoder<EscrowState> getEscrowStateEncoder() {
 Decoder<EscrowState> getEscrowStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('maker', getAddressDecoder()),
     ('mintA', getAddressDecoder()),
     ('mintB', getAddressDecoder()),
@@ -112,6 +119,14 @@ Decoder<EscrowState> getEscrowStateDecoder() {
 
   (EscrowState, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -153,4 +168,21 @@ Codec<EscrowState, EscrowState> getEscrowStateCodec() {
 
 Account<EscrowState> decodeEscrowState(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getEscrowStateDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int escrowStateMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `EscrowState` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool escrowStateNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

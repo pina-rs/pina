@@ -47,6 +47,8 @@ import {
 	type ParsedInitializePolicyInstruction,
 	parseInitializePolicyInstruction,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
+
 import { findPolicyPda } from "../pdas";
 
 export const VALIDATION_PROGRAM_PROGRAM_ADDRESS =
@@ -62,9 +64,10 @@ export function identifyValidationProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ValidationProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ValidationProgramAccount.PolicyState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ValidationProgramAccount.PolicyState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "validationProgram" },
@@ -79,9 +82,10 @@ export function identifyValidationProgramEvent(
 	event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ValidationProgramEvent {
 	const data = "data" in event ? event.data : event;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ValidationProgramEvent.PolicyChecked;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ValidationProgramEvent.PolicyChecked;
 	throw new Error(
 		"The provided event could not be identified as a validationProgram event.",
 	);
@@ -96,12 +100,14 @@ export function identifyValidationProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ValidationProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return ValidationProgramInstruction.InitializePolicy;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return ValidationProgramInstruction.CheckPolicy;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ValidationProgramInstruction.InitializePolicy;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return ValidationProgramInstruction.CheckPolicy;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "validationProgram" },
@@ -193,6 +199,8 @@ export function validationProgramProgram() {
 					policyState: addSelfFetchFunctions(client, getPolicyStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initializePolicy: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

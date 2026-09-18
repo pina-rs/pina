@@ -16,9 +16,11 @@ class ResizeInstructionData {
   const ResizeInstructionData({
     required this.entryCount,
     required this.markerCount,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int entryCount;
   final int markerCount;
 }
@@ -26,6 +28,7 @@ class ResizeInstructionData {
 Encoder<ResizeInstructionData> getResizeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('entryCount', getU8Encoder()),
     ('markerCount', getU8Encoder()),
   ]);
@@ -34,6 +37,7 @@ Encoder<ResizeInstructionData> getResizeInstructionDataEncoder() {
     structEncoder,
     (ResizeInstructionData value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'entryCount': value.entryCount,
       'markerCount': value.markerCount,
     },
@@ -43,6 +47,7 @@ Encoder<ResizeInstructionData> getResizeInstructionDataEncoder() {
 Decoder<ResizeInstructionData> getResizeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('entryCount', getU8Decoder()),
     ('markerCount', getU8Decoder()),
   ]);
@@ -57,6 +62,7 @@ Decoder<ResizeInstructionData> getResizeInstructionDataDecoder() {
 
   (ResizeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

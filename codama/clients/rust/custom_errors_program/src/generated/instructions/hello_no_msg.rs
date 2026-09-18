@@ -9,6 +9,7 @@
 )]
 
 pub const HELLO_NO_MSG_DISCRIMINATOR: u8 = 1u8;
+pub const HELLO_NO_MSG_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -52,6 +53,7 @@ impl HelloNoMsgInstructionData {
 		<HelloNoMsgInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_NO_MSG_DISCRIMINATOR;
+			data.migration_version = HELLO_NO_MSG_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -65,4 +67,5 @@ impl HelloNoMsgInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct HelloNoMsgInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

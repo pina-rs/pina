@@ -24,3 +24,42 @@ impl CpiProgramId for EscrowProgram {
 
 /// A validated executable account for the `escrowProgram` program.
 pub type ProgramAccount<'a> = Program<'a, EscrowProgram>;
+
+/// Whether `address` is the `escrowProgram` program this crate calls.
+///
+/// Check this before a CPI when the address arrives from caller input, so a
+/// call can never be redirected to a program this crate was not imported
+/// for.
+#[inline(always)]
+pub fn is_expected_program(address: &Address) -> bool {
+	*address == ESCROW_PROGRAM_ID
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Binds the compiled-in ID to a literal.
+	///
+	/// A swapped dependency could otherwise retarget every CPI in this crate
+	/// without the source changing, so the expected address is asserted here in
+	/// full rather than only through the constant.
+	#[test]
+	fn binds_the_expected_program_id() {
+		assert_eq!(
+			ESCROW_PROGRAM_ID,
+			pina::address!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT")
+		);
+		assert_eq!(EscrowProgram::ID, ESCROW_PROGRAM_ID);
+		assert!(is_expected_program(&ESCROW_PROGRAM_ID));
+	}
+
+	#[test]
+	fn rejects_a_foreign_program_id() {
+		let mut foreign_bytes = ESCROW_PROGRAM_ID.to_bytes();
+		foreign_bytes[0] ^= 0xFF;
+		let foreign = pina::Address::new_from_array(foreign_bytes);
+		assert_ne!(foreign, ESCROW_PROGRAM_ID);
+		assert!(!is_expected_program(&foreign));
+	}
+}

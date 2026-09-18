@@ -25,8 +25,13 @@ pub const RERUN_DIRECTIVE: &str = "cargo:rerun-if-changed=migrations/manifest.js
 const RERUN_LITERAL: &str = "\"cargo:rerun-if-changed=migrations/manifest.json\"";
 
 /// Canonical build script scaffold written when none exists.
-const SCAFFOLD: &str =
-	"fn main() {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n";
+///
+/// The crate-level doc comment matters: workspaces that lint with
+/// `-D warnings` reject a build script without one, so the scaffold must be
+/// warning-clean in the programs it lands in.
+const SCAFFOLD: &str = "//! Re-expand Pina macros when the migration manifest changes.\n\nfn \
+                        main() {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\
+                        \n}\n";
 
 /// What the current build script says about migration freshness.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

@@ -9,6 +9,7 @@
 )]
 
 pub const CLAIM_DISCRIMINATOR: u8 = 4u8;
+pub const CLAIM_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -108,6 +109,7 @@ impl ClaimInstructionData {
 		<ClaimInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CLAIM_DISCRIMINATOR;
+			data.migration_version = CLAIM_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -121,4 +123,5 @@ impl ClaimInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ClaimInstructionWire {
 	pub discriminator: u8,
+	pub migration_version: u8,
 }

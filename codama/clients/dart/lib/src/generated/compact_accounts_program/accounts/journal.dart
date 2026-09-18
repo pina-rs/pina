@@ -24,9 +24,11 @@ class Journal {
     required this.entries,
     required this.markers,
     required this.note,
-  }) : discriminator = 1;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int bump;
   final Address authority;
   final int revision;
@@ -42,6 +44,7 @@ class Journal {
       other is Journal &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
+          migrationVersion == other.migrationVersion &&
           bump == other.bump &&
           authority == other.authority &&
           revision == other.revision &&
@@ -54,6 +57,7 @@ class Journal {
   @override
   int get hashCode => Object.hash(
     discriminator,
+    migrationVersion,
     bump,
     authority,
     revision,
@@ -66,12 +70,13 @@ class Journal {
 
   @override
   String toString() =>
-      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers, note: $note)';
+      'Journal(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers, note: $note)';
 }
 
 Encoder<Journal> getJournalEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('authority', getAddressEncoder()),
     ('revision', getU32Encoder()),
@@ -91,7 +96,7 @@ Encoder<Journal> getJournalEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU8Encoder(),
-                OffsetConfig(preOffset: (scope) => 47),
+                OffsetConfig(preOffset: (scope) => 48),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -110,7 +115,7 @@ Encoder<Journal> getJournalEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 48),
+                OffsetConfig(preOffset: (scope) => 49),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -128,7 +133,7 @@ Encoder<Journal> getJournalEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU64Encoder(),
-                OffsetConfig(preOffset: (scope) => 50),
+                OffsetConfig(preOffset: (scope) => 51),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -148,7 +153,7 @@ Encoder<Journal> getJournalEncoder() {
           (String value) => value,
         ),
         prefix: offsetEncoder(
-          offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 58)),
+          offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 59)),
           OffsetConfig(postOffset: (scope) => scope.preOffset),
         ),
       ),
@@ -159,6 +164,7 @@ Encoder<Journal> getJournalEncoder() {
     structEncoder,
     (Journal value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'bump': value.bump,
       'authority': value.authority,
       'revision': value.revision,
@@ -174,6 +180,7 @@ Encoder<Journal> getJournalEncoder() {
 Decoder<Journal> getJournalDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('authority', getAddressDecoder()),
     ('revision', getU32Decoder()),
@@ -194,7 +201,7 @@ Decoder<Journal> getJournalDecoder() {
               offsetDecoder(
                 offsetDecoder(
                   getU8Decoder(),
-                  OffsetConfig(preOffset: (scope) => 47),
+                  OffsetConfig(preOffset: (scope) => 48),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -215,7 +222,7 @@ Decoder<Journal> getJournalDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 48),
+                OffsetConfig(preOffset: (scope) => 49),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -225,7 +232,7 @@ Decoder<Journal> getJournalDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 48),
+              OffsetConfig(preOffset: (scope) => 49),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -243,7 +250,7 @@ Decoder<Journal> getJournalDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU64Decoder(),
-                OffsetConfig(preOffset: (scope) => 50),
+                OffsetConfig(preOffset: (scope) => 51),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -253,7 +260,7 @@ Decoder<Journal> getJournalDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU64Decoder(),
-              OffsetConfig(preOffset: (scope) => 50),
+              OffsetConfig(preOffset: (scope) => 51),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -273,7 +280,7 @@ Decoder<Journal> getJournalDecoder() {
           64,
         ),
         prefix: offsetDecoder(
-          offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 58)),
+          offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 59)),
           OffsetConfig(postOffset: (scope) => scope.preOffset),
         ),
       ),
@@ -290,6 +297,14 @@ Decoder<Journal> getJournalDecoder() {
 
   (Journal, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
+    if (storedMigrationVersion != 0) {
+      throw StateError(
+        storedMigrationVersion < 0
+            ? 'migration version mismatch: expected 0, received $storedMigrationVersion (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)'
+            : 'migration version mismatch: expected 0, received $storedMigrationVersion (the data was written by a newer program; upgrade this client)',
+      );
+    }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
@@ -331,4 +346,21 @@ Codec<Journal, Journal> getJournalCodec() {
 
 Account<Journal> decodeJournal(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getJournalDecoder());
+}
+
+/// The account schema version this client was generated from.
+const int journalMigrationVersion = 0;
+
+/// Cheap envelope check for fetched `Journal` bytes: returns true only when
+/// the bytes carry this account's discriminator and a migration version older
+/// than this client's schema — exactly the accounts [getMigrateInstruction]
+/// can bring current. Decoding reports every other mismatch.
+bool journalNeedsMigration(List<int> data) {
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

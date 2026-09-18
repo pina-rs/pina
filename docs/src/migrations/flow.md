@@ -16,7 +16,7 @@ One contract opts in with the `migrations` token; a whole program opts in throug
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = true # or ["accounts", "events", "instructions"], or a staged subset
 ```
 
@@ -102,7 +102,7 @@ Disambiguation answers do not have to travel as flags every run. A `[migrations.
 ```toml
 [migrations.answers]
 rename = ["value:points"]
-assume-removed = []
+assume_removed = []
 ```
 
 `make` consults the table before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename (for example `--assume-removed value` when the file renames `value`) fails closed. Fresh clones and CI therefore replay an answer made locally without anyone re-deriving flag lists, and `--json` failures print a machine-actionable envelope carrying the message plus the exact outstanding questions.
@@ -230,9 +230,27 @@ if is_migrate_instruction(data) {
 }
 ```
 
-The trigger must match the program's own discriminator width. `is_migrate_instruction` tests one byte, so a program whose instruction enum uses `primitive = u16` (or `u32`, or `u64`) matches with `is_migrate_instruction_u16` (or `_u32`, `_u64`) instead — the one-byte helper never matches a two-byte `0xffff`, which would leave the reserved path unreachable. Generated entrypoints select the matching helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` needs no hand-written guard at all.
+The trigger must match the program's own discriminator width. `is_migrate_instruction` tests one byte, so a program whose instruction enum uses `primitive = u16` (or `u32`, or `u64`) matches with `is_migrate_instruction_u16` (or `_u32`, `_u64`) instead — the one-byte helper never matches a two-byte `0xffff`, which would leave the reserved path unreachable. Generated entrypoints select the matching helper from the enum's `primitive`, so `#[discriminator(entrypoint)]` needs no hand-written guard at all.
 
-Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
+Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account.
+
+**The ladder is derived, not declared.** `#[discriminator(entrypoint)]` wires the route on its own: the slots are read from `migrations/manifest.json`, one per enveloped account contract, in the manifest's identity-sorted order — exactly the order generated clients compose. Declaring a contract list is optional and only needed to batch several accounts of the _same_ contract in one sweep, because the manifest records contracts rather than account instances:
+
+The route calls the resize executor, so a program that serves migrations needs `pina`'s `account-resize` feature. `pina init` scaffolds it; the generated code names it when it is missing.
+
+```rust,ignore
+#[discriminator(entrypoint)]
+pub enum Instruction { /* … */ }
+
+// Optional ceiling, and optional slot override for same-contract batching.
+#[discriminator(
+	entrypoint,
+	migrations(State, State),
+	migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS,
+)]
+```
+
+`migrations_max_lamports` is optional and off by default. Declaring one caps the total lamports the reserved instruction may transfer; leaving it out enforces no ceiling, which is safe because a transfer is never more than the rent deficit of a growth the runtime already caps at `MAX_PERMITTED_DATA_INCREASE`. Declare one to refuse an expensive migration rather than to permit it. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
 
 That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
 
@@ -423,6 +441,34 @@ Rolling back the _binary_ to a previous executable does not roll back accounts. 
 **Implemented: the program.** Inline, on-demand, per-account — the transaction that touches a stale account performs its migration before the handler runs, funded by the payer that transaction already declared.
 
 **Implemented: the reserved prefix.** A program wires the reserved `Migrate` instruction (see "The reserved Migrate instruction" above) so a client can prepend `[Migrate { payer }, …real instructions]` when an account is stale and the business instruction declares no payer. Still designed, not built (ADR 0008, tracked in #339): the generated `migrateIfNeeded` helper that fetches accounts, compares the version constant it already embeds, and prepends the migration only when needed. Until that ships, any instruction that can touch a migratable account during a growth step must also declare an optional `migration_payer` slot, and current clients pass it.
+
+## Version exhaustion
+
+Run out of versions and nothing can fix it afterwards. Two facts decide how much this matters.
+
+**Versions are counted per contract, not per program.** Every account, instruction, and event owns an independent history that starts at `0`, keyed by its own discriminator in `migrations/manifest.json`. A program can hold one account at version `3` and another still at `0`; they do not share a counter, and exhausting one says nothing about the rest. So the budget is "255 versions of _this one contract_", not "255 versions of the program".
+
+**The width is program-wide and freezes at the first publication.** `[migrations].version_type` chooses one width for every contract, and once a version appears in a publication receipt it cannot be changed: `make` and `check` both fail with `VersionTypeChanged`, and receipts pin the manifest hash. Before the first release the width is still yours to choose — delete the `migrations/` directory and re-run `make` with the wider setting to re-baseline. After the first release there is no widening path.
+
+That combination makes `u8` the right default. 255 versions of a single account type is not a realistic lifetime for a program that migrates sensibly, and it costs one byte per enveloped account; `u16` costs two and is worth choosing up front only if you expect a single contract to exceed 255 revisions.
+
+`pina migrations status` reports the remaining budget per contract so drift toward the ceiling is visible:
+
+```text
+account State v3 (published, 252 version(s) remaining)
+```
+
+### When a contract does reach its ceiling
+
+`pina migrations make` fails closed with `VersionExhausted` rather than wrapping. There is no silent reuse of version numbers, and the on-chain side rejects out-of-range versions via `try_from_u32` instead of truncating, so a wrapped version can never be written or misread.
+
+The remedy is a **successor contract**, not a larger counter:
+
+1. Declare a new discriminator variant for the successor account and give it a fresh version-0 history. It is a new contract identity, so it gets its own full budget.
+2. Add a bridge instruction that loads the exhausted account through the current loaders and writes the successor account, then closes or drains the old one.
+3. Migrate accounts lazily: the bridge runs once per account, driven by a client sweep, the same way the reserved `Migrate` route works.
+
+Old history cannot be pruned to make room. A program cannot enumerate its own accounts — Solana offers no such primitive — so retiring history requires an external proof that every account of that type has been converted. Plan the successor before the ceiling, because the bridge needs the old layout to still be readable by the binary you ship.
 
 ## Seeing it live
 

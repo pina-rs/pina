@@ -42,6 +42,7 @@ import { findTodoPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -49,6 +50,12 @@ export const UPDATE_DIGEST_DISCRIMINATOR = 2;
 
 export function getUpdateDigestDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DIGEST_DISCRIMINATOR);
+}
+
+export const UPDATE_DIGEST_DISCRIMINATOR2 = 0;
+
+export function getUpdateDigestDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(UPDATE_DIGEST_DISCRIMINATOR2);
 }
 
 export type UpdateDigestInstruction<
@@ -73,6 +80,7 @@ export type UpdateDigestInstruction<
 
 export type UpdateDigestInstructionData = {
 	discriminator: number;
+	migrationVersion: number;
 	digest: ReadonlyUint8Array;
 };
 
@@ -83,20 +91,27 @@ export function getUpdateDigestInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"digest",
-			fixPinaPodEncoderSize(getBytesEncoder(), 32),
-		]]),
-		(value) => ({ ...value, discriminator: 2 }),
+			"migrationVersion",
+			getU8Encoder(),
+		], ["digest", fixPinaPodEncoderSize(getBytesEncoder(), 32)]]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
 export function getUpdateDigestInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateDigestInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(UPDATE_DIGEST_DISCRIMINATOR, getU8Decoder()),
-	], ["digest", fixDecoderSize(getBytesDecoder(), 32)]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				UPDATE_DIGEST_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["digest", fixDecoderSize(getBytesDecoder(), 32)],
+	]);
 }
 
 export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<

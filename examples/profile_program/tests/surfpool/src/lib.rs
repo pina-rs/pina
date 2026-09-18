@@ -8,9 +8,10 @@ use pina_test::Signer;
 use program_under_test::ID;
 use program_under_test::ProfileInstruction;
 
-/// On-chain `ProfileState` field offsets (after the 1-byte discriminator).
-const BUMP_AT: usize = 1;
-const NAME_AT: usize = 2;
+/// On-chain `ProfileState` field offsets, after the discriminator and the
+/// migration version byte. `tests/abi_layout.rs` pins the same geometry.
+const BUMP_AT: usize = 2;
+const NAME_AT: usize = 3;
 const BIO_AT: usize = NAME_AT + 33;
 const TAGS_AT: usize = BIO_AT + 129;
 /// Option<u64> occupies a 1-byte tag plus an 8-byte slot on-chain.
@@ -41,7 +42,8 @@ fn initialize_instruction(
 	name: &str,
 	bio: &str,
 ) -> pina_test::Instruction {
-	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
+	// discriminator + migration version + bump, then the bounded text fields.
+	let mut data = vec![ProfileInstruction::Initialize as u8, 0u8, bump];
 	data.extend_from_slice(&bounded_text::<33>(name));
 	data.extend_from_slice(&bounded_text::<129>(bio));
 
@@ -55,7 +57,8 @@ fn initialize_instruction(
 	)
 }
 
-/// `payload` excludes the discriminator byte; it is prepended here.
+/// `payload` excludes the discriminator byte; the discriminator and migration
+/// version byte are prepended here.
 fn with_payload(
 	program: &ProgramTest,
 	authority: &Pubkey,
@@ -63,7 +66,7 @@ fn with_payload(
 	kind: ProfileInstruction,
 	payload: &[u8],
 ) -> pina_test::Instruction {
-	let mut data = vec![kind as u8];
+	let mut data = vec![kind as u8, 0u8];
 	data.extend_from_slice(payload);
 
 	program.instruction(
@@ -113,6 +116,7 @@ fn initialize_writes_name_bio_and_active_flag() {
 		let account = program.account(&profile).expect("fetch profile account");
 		assert_eq!(account.owner, program_id);
 		assert_eq!(account.data[0], 1, "account discriminator is ProfileState");
+		assert_eq!(account.data[1], 0, "stored migration version is current");
 		assert_eq!(account.data[BUMP_AT], bump);
 		assert_eq!(
 			&account.data[NAME_AT..NAME_AT + 33],
@@ -124,7 +128,7 @@ fn initialize_writes_name_bio_and_active_flag() {
 			&bounded_text::<129>("ships unique things"),
 			"bio stored"
 		);
-		assert_eq!(account.data.len(), 240, "ProfileState layout");
+		assert_eq!(account.data.len(), 241, "ProfileState layout");
 		assert_eq!(
 			&account.data[TAGS_AT..TAGS_AT + 2],
 			0u16.to_le_bytes(),

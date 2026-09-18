@@ -54,16 +54,16 @@ pub struct InitializeIx {
 
 impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 4;
+	pub const LEN: usize = 5;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 4], ProgramError> {
-		let mut data = [0u8; 4];
-		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..3].copy_from_slice(&self.entry_count.to_le_bytes());
-		data[3..4].copy_from_slice(&self.marker_count.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 5], ProgramError> {
+		let mut data = [0u8; 5];
+		data[..2].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
+		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
+		data[3..4].copy_from_slice(&self.entry_count.to_le_bytes());
+		data[4..5].copy_from_slice(&self.marker_count.to_le_bytes());
 
 		Ok(data)
 	}
@@ -95,4 +95,4 @@ impl<'account> Initialize<'account> {
 	}
 }
 
-const INITIALIZE_DISCRIMINATOR: [u8; 1] = [0];
+const INITIALIZE_DISCRIMINATOR: [u8; 2] = [0, 0];

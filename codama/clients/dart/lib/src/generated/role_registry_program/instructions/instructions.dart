@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+export 'migrate.dart';
 export 'add_role.dart';
 export 'deactivate_role.dart';
 export 'initialize.dart';

@@ -9,7 +9,9 @@
 )]
 
 pub(crate) mod r#create;
+pub(crate) mod r#migrate;
 pub(crate) mod r#update;
 
 pub use self::r#create::*;
+pub use self::r#migrate::*;
 pub use self::r#update::*;

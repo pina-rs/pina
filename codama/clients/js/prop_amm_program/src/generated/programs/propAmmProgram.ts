@@ -51,6 +51,7 @@ import {
 	type RotateAuthorityInput,
 	type UpdateInput,
 } from "../instructions";
+import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
 export const PROP_AMM_PROGRAM_PROGRAM_ADDRESS =
 	"55555555555555555555555555555555555555555555" as Address<
@@ -65,9 +66,10 @@ export function identifyPropAmmProgramAccount(
 	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PropAmmProgramAccount {
 	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return PropAmmProgramAccount.OracleState;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PropAmmProgramAccount.OracleState;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 		{ accountData: data, programName: "propAmmProgram" },
@@ -84,15 +86,18 @@ export function identifyPropAmmProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PropAmmProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return PropAmmProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return PropAmmProgramInstruction.Update;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return PropAmmProgramInstruction.RotateAuthority;
-	}
+	if (
+		containsBytes(data, getU8Encoder().encode(0), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PropAmmProgramInstruction.Initialize;
+	if (
+		containsBytes(data, getU8Encoder().encode(1), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PropAmmProgramInstruction.Update;
+	if (
+		containsBytes(data, getU8Encoder().encode(2), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return PropAmmProgramInstruction.RotateAuthority;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "propAmmProgram" },
@@ -191,6 +196,8 @@ export function propAmmProgramProgram() {
 					oracleState: addSelfFetchFunctions(client, getOracleStateCodec()),
 				},
 				instructions: {
+					migrate: (input: MigrateInput) =>
+						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,

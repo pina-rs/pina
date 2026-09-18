@@ -36,13 +36,22 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CLAIM_DISCRIMINATOR = 1;
 
 export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
+}
+
+export const CLAIM_DISCRIMINATOR2 = 0;
+
+export function getClaimDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CLAIM_DISCRIMINATOR2);
 }
 
 export type ClaimInstruction<
@@ -90,7 +99,11 @@ export type ClaimInstruction<
 		]
 	>;
 
-export type ClaimInstructionData = { discriminator: number; amount: bigint };
+export type ClaimInstructionData = {
+	discriminator: number;
+	migrationVersion: number;
+	amount: bigint;
+};
 
 export type ClaimInstructionDataArgs = { amount: number | bigint };
 
@@ -99,20 +112,24 @@ export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"amount",
-			getU64Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1 }),
+			"migrationVersion",
+			getU8Encoder(),
+		], ["amount", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
 	);
 }
 
 export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
 	ClaimInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
-	], ["amount", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["amount", getU64Decoder()],
+	]);
 }
 
 export function getClaimInstructionDataCodec(): FixedSizeCodec<

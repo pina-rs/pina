@@ -13,15 +13,19 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class Realloc2InstructionData {
-  const Realloc2InstructionData({required this.len}) : discriminator = 1;
+  const Realloc2InstructionData({required this.len})
+    : discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
+  final int migrationVersion;
   final int len;
 }
 
 Encoder<Realloc2InstructionData> getRealloc2InstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
+    ('migrationVersion', getU8Encoder()),
     ('len', getU16Encoder()),
   ]);
 
@@ -29,6 +33,7 @@ Encoder<Realloc2InstructionData> getRealloc2InstructionDataEncoder() {
     structEncoder,
     (Realloc2InstructionData value) => <String, Object?>{
       'discriminator': 1,
+      'migrationVersion': 0,
       'len': value.len,
     },
   );
@@ -37,6 +42,7 @@ Encoder<Realloc2InstructionData> getRealloc2InstructionDataEncoder() {
 Decoder<Realloc2InstructionData> getRealloc2InstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
+    ('migrationVersion', getU8Decoder()),
     ('len', getU16Decoder()),
   ]);
 
@@ -50,6 +56,7 @@ Decoder<Realloc2InstructionData> getRealloc2InstructionDataDecoder() {
 
   (Realloc2InstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

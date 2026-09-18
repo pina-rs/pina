@@ -35,7 +35,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findPositionPda, type PositionSeeds } from "../pdas";
-import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
@@ -43,8 +46,15 @@ export function getPositionStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POSITION_STATE_DISCRIMINATOR);
 }
 
+export const POSITION_STATE_DISCRIMINATOR2 = 0;
+
+export function getPositionStateDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POSITION_STATE_DISCRIMINATOR2);
+}
+
 export type PositionState = {
 	discriminator: number;
+	migrationVersion: number;
 	pool: Address;
 	owner: Address;
 	stakedAmount: bigint;
@@ -67,6 +77,7 @@ export function getPositionStateEncoder(): FixedSizeEncoder<PositionStateArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
 			["pool", getAddressEncoder()],
 			["owner", getAddressEncoder()],
 			["stakedAmount", getU64Encoder()],
@@ -74,7 +85,7 @@ export function getPositionStateEncoder(): FixedSizeEncoder<PositionStateArgs> {
 			["pendingRewards", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 2 }),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
 	);
 }
 
@@ -88,6 +99,7 @@ export function getPositionStateDecoder(): FixedSizeDecoder<PositionState> {
 				getU8Decoder(),
 			),
 		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["pool", getAddressDecoder()],
 		["owner", getAddressDecoder()],
 		["stakedAmount", getU64Decoder()],
@@ -184,4 +196,32 @@ export async function fetchMaybePositionStateFromSeeds(
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findPositionPda(seeds, { programAddress });
 	return await fetchMaybePositionState(rpc, address, fetchConfig);
+}
+
+/** The account schema version this client was generated from. */
+export const POSITION_STATE_MIGRATION_VERSION = 0;
+
+/**
+ * Cheap envelope check for a fetched `PositionState` account: `true` only when the
+ * bytes name this account's discriminator and a migration version older than
+ * this client's schema. Those are exactly the accounts
+ * {@link getMigrateInstruction} can bring current; every other mismatch is
+ * reported by the decoder when the account is decoded.
+ *
+ * ```ts
+ * const { data } = await fetchEncodedAccount(rpc, address);
+ * if (positionStateNeedsMigration(data)) {
+ * 	// Migrate first, then retry the instruction that failed.
+ * 	await send(getMigrateInstruction({ positionState: address, payer }).make());
+ * }
+ * ```
+ */
+export function positionStateNeedsMigration(data: ReadonlyUint8Array): boolean {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] !== 2) {
+		return false;
+	}
+	return data[1]! < 0;
 }

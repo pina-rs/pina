@@ -15,6 +15,7 @@
 pub struct Sample {
 	/// A compact account whose active values occupy only the bytes they need.
 	pub discriminator: u8,
+	pub migration_version: u8,
 	/// Canonical PDA bump, persisted for inexpensive validation on resize.
 	pub bump: u8,
 	/// The only signer permitted to resize this sample.
@@ -25,6 +26,8 @@ pub struct Sample {
 
 pub const SAMPLE_DISCRIMINATOR: u8 = 1u8;
 
+pub const SAMPLE_MIGRATION_VERSION: u8 = 0u8;
+
 impl Sample {
 	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
@@ -34,6 +37,7 @@ impl Sample {
 	) -> Result<usize, solana_program_error::ProgramError> {
 		patch
 			.discriminator(SAMPLE_DISCRIMINATOR)
+			.migration_version(SAMPLE_MIGRATION_VERSION)
 			.initialize(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
@@ -42,6 +46,9 @@ impl Sample {
 		let account = SampleRef::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != SAMPLE_DISCRIMINATOR {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		if account.migration_version != SAMPLE_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -65,4 +72,12 @@ impl Sample {
 			&crate::ACCOUNT_REALLOC_PROGRAM_ID,
 		)
 	}
+}
+
+/// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
+/// [`SAMPLE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+///
+/// Version 0 is the initial version, so no bytes can ever be stale.
+pub fn sample_needs_migration(_data: &[u8]) -> bool {
+	false
 }

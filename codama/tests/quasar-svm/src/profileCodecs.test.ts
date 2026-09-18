@@ -14,7 +14,7 @@ import {
 } from "../../../clients/js/profile_program/src/generated/pinaPodCodecs";
 
 describe("profile generated codecs", () => {
-	test("instruction encoders prepend their discriminator", () => {
+	test("instruction encoders prepend their migration envelope", () => {
 		const initialize = getInitializeInstructionDataEncoder().encode({
 			bump: 42,
 			name: "A",
@@ -22,19 +22,19 @@ describe("profile generated codecs", () => {
 		});
 		const addTag = getAddTagInstructionDataEncoder().encode({ tag: 10 });
 
-		expect(initialize).toHaveLength(164);
-		expect(Array.from(initialize.slice(0, 4))).toEqual([0, 42, 1, 65]);
-		expect(addTag).toHaveLength(9);
-		expect(Array.from(addTag.slice(0, 2))).toEqual([2, 10]);
+		expect(initialize).toHaveLength(165);
+		expect(Array.from(initialize.slice(0, 5))).toEqual([0, 0, 42, 1, 65]);
+		expect(addTag).toHaveLength(10);
+		expect(Array.from(addTag.slice(0, 3))).toEqual([2, 0, 10]);
 	});
 
-	test("account decoder consumes the discriminator before state", () => {
-		const data = new Uint8Array(240);
+	test("account decoder consumes the migration envelope before state", () => {
+		const data = new Uint8Array(241);
 		data[0] = 1;
-		data[1] = 42;
-		data[2] = 1;
-		data[3] = "A".charCodeAt(0);
-		data[239] = 1;
+		data[2] = 42;
+		data[3] = 1;
+		data[4] = "A".charCodeAt(0);
+		data[240] = 1;
 
 		const state = getProfileStateDecoder().decode(data);
 
@@ -48,13 +48,13 @@ describe("profile generated codecs", () => {
 	});
 
 	test("semantic decoders reject bounded lengths beyond capacity", () => {
-		const invalidName = new Uint8Array(240);
+		const invalidName = new Uint8Array(241);
 		invalidName[0] = 1;
-		invalidName[2] = 33;
+		invalidName[3] = 33;
 
-		const invalidTags = new Uint8Array(240);
+		const invalidTags = new Uint8Array(241);
 		invalidTags[0] = 1;
-		invalidTags[164] = 9;
+		invalidTags[165] = 9;
 
 		expect(() => getProfileStateDecoder().decode(invalidName)).toThrow();
 		expect(() => getProfileStateDecoder().decode(invalidTags)).toThrow();
@@ -82,13 +82,13 @@ describe("profile generated codecs", () => {
 	});
 
 	test("decoders reject the wrong discriminator and non-canonical booleans", () => {
-		const wrongInstruction = new Uint8Array(164);
+		const wrongInstruction = new Uint8Array(165);
 		wrongInstruction[0] = 1;
 		expect(() => getInitializeInstructionDataDecoder().decode(wrongInstruction))
 			.toThrow(/invalid discriminator/);
 
 		const account = emptyProfileAccount();
-		account[239] = 2;
+		account[240] = 2;
 		expect(() => getProfileStateDecoder().decode(account)).toThrow(
 			/invalid PinaPod boolean/,
 		);
@@ -103,7 +103,7 @@ describe("profile generated codecs", () => {
 			favoriteTag: 42n,
 			active: true,
 		});
-		expect(Array.from(encoded.slice(230, 239))).toEqual([
+		expect(Array.from(encoded.slice(231, 240))).toEqual([
 			1,
 			42,
 			0,
@@ -121,13 +121,13 @@ describe("profile generated codecs", () => {
 		}
 
 		const invalid = emptyProfileAccount();
-		invalid[230] = 2;
+		invalid[231] = 2;
 		expect(() => getProfileStateDecoder().decode(invalid)).toThrow(
 			/invalid PinaPod option tag/,
 		);
 
 		const inactivePayload = emptyProfileAccount();
-		inactivePayload.fill(0xff, 231, 239);
+		inactivePayload.fill(0xff, 232, 240);
 		expect(
 			isNone(getProfileStateDecoder().decode(inactivePayload).favoriteTag),
 		).toBe(true);
@@ -147,10 +147,10 @@ describe("profile generated codecs", () => {
 
 	test("bounded text validation is strict UTF-8 and preserves embedded NULs", () => {
 		const account = emptyProfileAccount();
-		account.set([3, 65, 0, 66], 2);
+		account.set([3, 65, 0, 66], 3);
 		expect(getProfileStateDecoder().decode(account).name).toBe("A\0B");
 
-		account.set([1, 0xff, 0, 0], 2);
+		account.set([1, 0xff, 0, 0], 3);
 		expect(() => getProfileStateDecoder().decode(account)).toThrow();
 	});
 
@@ -164,7 +164,7 @@ describe("profile generated codecs", () => {
 });
 
 function emptyProfileAccount(): Uint8Array {
-	const account = new Uint8Array(240);
+	const account = new Uint8Array(241);
 	account[0] = 1;
 	return account;
 }

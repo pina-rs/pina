@@ -7,5 +7,6 @@
  */
 
 export * from "./initialize";
+export * from "./migrate";
 export * from "./rotateAuthority";
 export * from "./update";

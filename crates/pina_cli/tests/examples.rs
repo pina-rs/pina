@@ -102,12 +102,14 @@ fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 		.pointer("/program/accounts/0/data/fields")
 		.and_then(Value::as_array)
 		.expect("compact account fields");
-	assert_eq!(fields.len(), 9);
-	let featured_entry = &fields[4];
-	let title = &fields[5];
-	let entries = &fields[6];
-	let markers = &fields[7];
-	let note = &fields[8];
+	assert_eq!(fields.len(), 10);
+	// `migrationVersion` is inserted after the discriminator, shifting every
+	// payload field by one index.
+	let featured_entry = &fields[5];
+	let title = &fields[6];
+	let entries = &fields[7];
+	let markers = &fields[8];
+	let note = &fields[9];
 
 	assert_eq!(
 		featured_entry.pointer("/name").and_then(Value::as_str),
