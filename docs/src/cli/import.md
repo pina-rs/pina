@@ -13,7 +13,7 @@ pina import <NAME> --program-id <PUBKEY> [OPTIONS]
 | `<NAME>`                          | required       | Crate name; written to `clients/cpi/<NAME>`.                                                                                    |
 | `--program-id`                    | required       | Program ID the crate targets.                                                                                                   |
 | `--idl <FILE>`                    | none           | Read the IDL from a local file.                                                                                                 |
-| `--url <URL>`                     | none           | Fetch the IDL over HTTP(S).                                                                                                     |
+| `--url <URL>`                     | none           | Fetch the IDL over HTTPS. Plain HTTP is accepted only from `localhost`/`127.0.0.1` for development.                             |
 | `--cluster`                       | `mainnet-beta` | Fetch the on-chain canonical IDL for this cluster.                                                                              |
 | `--output <DIR>`                  | `clients/cpi`  | Directory to write the crate into.                                                                                              |
 | `--mode <MODE>`                   | `auto`         | `auto`, `create`, `update`, or complete `overwrite`.                                                                            |

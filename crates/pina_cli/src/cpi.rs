@@ -223,7 +223,11 @@ fn read_bounded(mut reader: impl Read, path: &Path) -> Result<Vec<u8>, CpiGenera
 	Ok(bytes)
 }
 
-fn normalize_idl(input: &[u8], path: &Path, npx: &str) -> Result<RootNode, CpiGenerateError> {
+/// Normalizes a raw Codama or Anchor IDL into a Codama root node.
+///
+/// The Anchor path runs the pinned converter from the isolated `npx`
+/// environment, never from the working directory's `node_modules`.
+pub fn normalize_idl(input: &[u8], path: &Path, npx: &str) -> Result<RootNode, CpiGenerateError> {
 	let value = parse_json(input, path)?;
 
 	match parse_codama(&value, path)? {

@@ -60,6 +60,19 @@ impl RenderedArgument {
 			return Ok(argument);
 		}
 		let planned = super::wire::plan(argument_type, types, context)?;
+		// The layout planner can position a value relative to its container's
+		// total size, which only exists inside a struct; as an instruction
+		// argument there is no container, and the planner would emit a
+		// placeholder comment instead of bytes.
+		if planned.encode.starts_with("//") {
+			return Err(RenderError::UnsupportedType {
+				context: context.to_string(),
+				kind: "relative offset",
+				reason: "an instruction argument must encode its own bytes; relative offsets only \
+				         make sense inside a larger layout"
+					.to_string(),
+			});
+		}
 		let variable = planned.is_variable();
 		let field = rust_identifier(&name.to_snake_case(), context)?;
 		Ok(Self {
@@ -505,6 +518,24 @@ fn render_array_argument(
 
 #[cfg(test)]
 mod tests {
+	#[test]
+	fn rejects_relative_offset_arguments() {
+		let offset = TypeNode::PreOffset(codama_nodes::PreOffsetTypeNode::<TypeNode>::new(
+			NumberTypeNode::le(NumberFormat::U64),
+			codama_nodes::PreOffsetStrategy::Relative,
+			0,
+		));
+		let error = RenderedArgument::render(
+			"amount",
+			&offset,
+			&mut super::super::wire::TypeIndex::default(),
+			"test",
+		)
+		.err()
+		.expect("a relative-offset argument must be rejected");
+		assert!(error.to_string().contains("relative offsets"));
+	}
+
 	use codama_nodes::BooleanTypeNode;
 	use codama_nodes::BytesTypeNode;
 	use codama_nodes::F32;

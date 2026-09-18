@@ -509,7 +509,10 @@ fn plan_array(count: &CountNode, item: &Encoded, context: &str) -> Result<Encode
 					"for item in self_value.iter() {{\n\t{}\n}}",
 					indent(&item.encode, 1)
 				),
-				borrows: false,
+				// An element with a borrowed payload (a prefixed string, for
+				// example) keeps the `'argument` in the array's Rust type, so
+				// the array borrows too.
+				borrows: item.borrows,
 			})
 		}
 		CountNode::Prefixed(count) => {
@@ -984,16 +987,18 @@ fn integer_type_name(number: &NumberTypeNode, context: &str) -> Result<&'static 
 }
 
 fn prefix_width(number: &NumberTypeNode, context: &str) -> Result<usize> {
+	// Lengths are counts, so a signed prefix would cast a valid length to a
+	// negative number; only unsigned formats are accepted here.
 	Ok(match integer_type_name(number, context)? {
-		"u8" | "i8" => 1,
-		"u16" | "i16" => 2,
-		"u32" | "i32" => 4,
-		"u64" | "i64" => 8,
+		"u8" => 1,
+		"u16" => 2,
+		"u32" => 4,
+		"u64" => 8,
 		_ => {
 			return Err(unsupported(
 				context,
 				"numberTypeNode",
-				"length prefixes must be an integer of at most 8 bytes",
+				"length prefixes must be an unsigned integer of at most 8 bytes",
 			));
 		}
 	})

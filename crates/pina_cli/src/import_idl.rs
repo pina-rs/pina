@@ -9,11 +9,9 @@
 //! program's interface: without a recorded digest, a reviewed crate can be
 //! regenerated from a different IDL without the change being visible.
 
-use std::ffi::OsStr;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use pina_cpi_renderer::RenderConfig;
 use pina_cpi_renderer::RenderMode;
@@ -27,38 +25,6 @@ use crate::project::GenerationMode;
 /// Bounding the input keeps a hostile or accidental URL from exhausting memory
 /// before the renderer ever sees the document.
 const MAX_IDL_BYTES: u64 = 16 * 1024 * 1024;
-
-/// Pinned Anchor-to-Codama converter, matching the `pina cpi` pipeline.
-const NODES_FROM_ANCHOR_PACKAGE: &str = "@codama/nodes-from-anchor@1.5.5";
-
-const ANCHOR_CONVERT_SCRIPT: &str = r#"
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { delimiter, dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
-
-const packageName = "@codama/nodes-from-anchor";
-const idlPath = process.argv[1];
-const pathRoots = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map(dirname);
-const searchRoots = [process.cwd(), ...pathRoots];
-let rootNodeFromAnchor;
-
-for (const root of searchRoots) {
-	try {
-		const require = createRequire(join(root, "package.json"));
-		const entry = require.resolve(packageName);
-		({ rootNodeFromAnchor } = await import(pathToFileURL(entry)));
-		break;
-	} catch {}
-}
-
-if (!rootNodeFromAnchor) {
-	throw new Error(`could not resolve ${packageName}`);
-}
-
-const idl = JSON.parse(readFileSync(idlPath, "utf8"));
-process.stdout.write(JSON.stringify(rootNodeFromAnchor(idl)));
-"#;
 
 /// Where an import's IDL came from.
 #[derive(Clone, Debug)]
@@ -352,6 +318,21 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 		});
 	}
 
+	// The fetched IDL becomes generated code, so the transport must be
+	// authenticated against tampering; plain HTTP is only for loopback
+	// development against a local server.
+	let loopback = parsed
+		.host_str()
+		.is_some_and(|host| host == "localhost" || host == "127.0.0.1" || host == "[::1]");
+	if parsed.scheme() == "http" && !loopback {
+		return Err(ImportError::Fetch {
+			reason: format!(
+				"`{url}` uses plain HTTP; only HTTPS may fetch IDLs from remote hosts (use 				 \
+				 `https`, or `http` against localhost for development)"
+			),
+		});
+	}
+
 	let response = ureq::get(url)
 		.config()
 		.timeout_global(Some(std::time::Duration::from_secs(30)))
@@ -416,39 +397,16 @@ fn normalize_to_codama(bytes: &[u8], npx: &str) -> Result<Value, ImportError> {
 	let idl_path = temp.path().join("idl.json");
 	std::fs::write(&idl_path, bytes).map_err(scratch_write_error(idl_path.clone()))?;
 
-	convert_anchor(&idl_path, npx)
-}
-
-fn convert_anchor(path: &Path, npx: &str) -> Result<Value, ImportError> {
-	let mut command = if Path::new(npx).file_stem() == Some(OsStr::new("node")) {
-		Command::new(npx)
-	} else {
-		let mut command = Command::new(npx);
-		command.args(["-y", "-p", NODES_FROM_ANCHOR_PACKAGE, "node"]);
-		command
-	};
-	command
-		.args(["--input-type=module", "--eval", ANCHOR_CONVERT_SCRIPT])
-		.arg(path);
-
-	let output = command.output().map_err(|error| {
+	// The converter runs from the isolated `npx` environment via the same
+	// pipeline as `pina cpi`, so a project-local `node_modules` copy of the
+	// converter can never be executed instead of the pinned one.
+	let root = crate::cpi::normalize_idl(bytes, &idl_path, npx).map_err(|error| {
 		ImportError::Fetch {
-			reason: format!("could not run `{npx}` to normalize the Anchor IDL: {error}"),
+			reason: error.to_string(),
 		}
 	})?;
 
-	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr);
-		return Err(ImportError::Fetch {
-			reason: format!(
-				"Anchor IDL conversion failed with status {}: {}",
-				output.status.code().unwrap_or(-1),
-				stderr.trim()
-			),
-		});
-	}
-
-	serde_json::from_slice(&output.stdout).map_err(|source| ImportError::InvalidJson { source })
+	serde_json::to_value(root).map_err(|source| ImportError::InvalidJson { source })
 }
 
 /// Overrides a converted root's program ID with the address the caller passed.
@@ -775,6 +733,16 @@ mod coverage {
 	}
 
 	#[test]
+	fn rejects_plain_http_from_remote_hosts() {
+		// The fetched IDL becomes generated code, so a remote fetch over plain
+		// HTTP is rejected before any connection is made.
+		let error = fetch_url("http://example.com/idl.json")
+			.err()
+			.expect("plain HTTP from a remote host must be rejected");
+		assert!(error.to_string().contains("plain HTTP"));
+	}
+
+	#[test]
 	fn routes_fetching_through_the_selected_source() {
 		let error = fetch_idl(
 			&ImportSource::Url("http://127.0.0.1:1/x.json".to_string()),
@@ -976,15 +944,16 @@ mod coverage {
 		let error = normalize_to_codama(anchor_idl, &npx.to_string_lossy())
 			.err()
 			.expect("a failing converter must be reported");
-		assert!(error.to_string().contains("conversion failed"));
+		assert!(error.to_string().contains("failed with status 3"));
 		assert!(error.to_string().contains("converter exploded"));
 
-		// A converter that exits successfully without JSON is a parse failure.
+		// A converter that exits successfully without a Codama root is a parse
+		// failure.
 		let npx = fake_script(temp.path(), "fake-npx-quiet", "printf 'not json at all'");
 		let error = normalize_to_codama(anchor_idl, &npx.to_string_lossy())
 			.err()
 			.expect("non-JSON converter output must be reported");
-		assert!(error.to_string().contains("not valid JSON"));
+		assert!(error.to_string().contains("invalid Codama root"));
 	}
 
 	#[test]
@@ -993,7 +962,7 @@ mod coverage {
 		let error = normalize_to_codama(anchor_idl, "./definitely-not-installed")
 			.err()
 			.expect("a missing converter must be reported");
-		assert!(error.to_string().contains("could not run"));
+		assert!(error.to_string().contains("Failed to run"));
 	}
 
 	#[cfg(unix)]
