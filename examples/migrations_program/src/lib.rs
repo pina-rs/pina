@@ -194,7 +194,7 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 		let mut historical = [0_u8; 10];
 		historical[0] = MigrationInstruction::Update as u8;
 		historical[1] = 0;
-		historical[2..].copy_from_slice(&instruction.value.get().to_le_bytes());
+		historical[2..].copy_from_slice(instruction.value.as_ref());
 
 		CpiContext::new(
 			program,
