@@ -39,7 +39,10 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 		.duration_since(UNIX_EPOCH)
 		.unwrap_or_default()
 		.as_nanos();
-	std::env::temp_dir().join(format!("{prefix}-{nanos}"))
+	let temp_root = fs::canonicalize(std::env::temp_dir())
+		.unwrap_or_else(|error| panic!("failed to resolve temp dir: {error}"));
+
+	temp_root.join(format!("{prefix}-{nanos}"))
 }
 
 fn repo_root() -> PathBuf {
@@ -384,6 +387,22 @@ fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
 		render_root_node(&root, &linked, &RenderConfig::default()),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
+
+	let external_crate = real.join("generated");
+	let external_sentinel = external_crate.join("sentinel.txt");
+	fs::create_dir_all(&external_crate)
+		.unwrap_or_else(|error| panic!("failed to create external crate: {error}"));
+	fs::write(&external_sentinel, "preserve")
+		.unwrap_or_else(|error| panic!("failed to create external sentinel: {error}"));
+	let overwrite = RenderConfig {
+		mode: RenderMode::Overwrite,
+		..RenderConfig::default()
+	};
+	assert!(matches!(
+		render_root_node(&root, &linked.join("generated"), &overwrite),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert!(external_sentinel.is_file());
 
 	let git_tree = output.join("git-tree");
 	fs::create_dir_all(git_tree.join(".git"))

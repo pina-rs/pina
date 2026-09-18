@@ -11,6 +11,25 @@ use std::path::PathBuf;
 /// on unix, `NotFound` on Windows), so that case is reported as an error in
 /// both.
 pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Error> {
+	has_component_matching(path, is_link_like)
+}
+
+/// Return whether an existing path component is a link controlled by a
+/// non-root user.
+///
+/// Unix platforms can expose stable, root-owned aliases such as macOS's
+/// `/var` link. Those aliases are not replaceable by the invoking user and do
+/// not create the output-boundary escape this check prevents. Windows reparse
+/// points remain rejected because their owner is not available through the
+/// portable metadata API.
+pub(crate) fn has_user_controlled_link_like_component(path: &Path) -> Result<bool, std::io::Error> {
+	has_component_matching(path, is_user_controlled_link_like)
+}
+
+fn has_component_matching(
+	path: &Path,
+	matches: impl Fn(&fs::Metadata) -> bool,
+) -> Result<bool, std::io::Error> {
 	let absolute = if path.is_absolute() {
 		path.to_path_buf()
 	} else {
@@ -30,7 +49,7 @@ pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Erro
 		}
 
 		match fs::symlink_metadata(&current) {
-			Ok(metadata) if is_link_like(&metadata) => return Ok(true),
+			Ok(metadata) if matches(&metadata) => return Ok(true),
 			Ok(metadata) => parent_is_directory = metadata.is_dir(),
 			// Plain misses below an existing directory are not link-like.
 			// Everything else through this lookup is either a real error or a
@@ -51,6 +70,22 @@ pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Erro
 	}
 
 	Ok(false)
+}
+
+fn is_user_controlled_link_like(metadata: &fs::Metadata) -> bool {
+	if !is_link_like(metadata) {
+		return false;
+	}
+
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::MetadataExt as _;
+
+		metadata.uid() != 0
+	}
+
+	#[cfg(not(unix))]
+	true
 }
 
 pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
@@ -94,6 +129,10 @@ mod tests {
 			!has_link_like_component(Path::new("."))
 				.unwrap_or_else(|error| panic!("relative path inspection failed: {error}"))
 		);
+		assert!(
+			!has_user_controlled_link_like_component(&ordinary)
+				.expect("ordinary path inspection should succeed")
+		);
 	}
 
 	#[test]
@@ -132,6 +171,10 @@ mod tests {
 		assert!(
 			has_link_like_component(&link.join("secret.json"))
 				.unwrap_or_else(|error| { panic!("link inspection failed: {error}") })
+		);
+		assert!(
+			has_user_controlled_link_like_component(&link.join("secret.json"))
+				.expect("link inspection should succeed")
 		);
 	}
 
