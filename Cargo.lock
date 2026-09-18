@@ -6243,7 +6243,6 @@ dependencies = [
  "sha2 0.11.0",
  "solana-address 2.6.1",
  "syn 3.0.5",
- "tar",
  "tempfile",
  "termimad",
  "thiserror 2.0.20",
