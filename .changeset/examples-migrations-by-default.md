@@ -2,6 +2,7 @@
 pina_cli: none
 pina_codama_nodes: docs
 pina_codama_renderer: docs
+pina_macros: fix
 pina_cpi_renderer: docs
 ---
 
