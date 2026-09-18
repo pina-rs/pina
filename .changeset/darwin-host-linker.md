@@ -1,5 +1,5 @@
 ---
-pina: patch
+pina: fix
 ---
 
 # Link host binaries with Apple's toolchain on Darwin
