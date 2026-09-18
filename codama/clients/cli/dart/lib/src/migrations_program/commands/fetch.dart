@@ -6,15 +6,18 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/migrations_program.dart';
 
 final class FetchStateCommand extends Command<void> {
   FetchStateCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -38,24 +41,21 @@ final class FetchStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeState(encoded);
-    printFields(
-      context.json,
-      'state',
-      address,
-      <String, Object?>{
-        'authority': account.data.authority,
-        'value': account.data.value,
-        'enabled': account.data.enabled,
-        'revision': account.data.revision,
-      },
-    );
+    printFields(context.json, 'state', address, <String, Object?>{
+      'authority': account.data.authority,
+      'value': account.data.value,
+      'enabled': account.data.enabled,
+      'revision': account.data.revision,
+    });
   }
 }
 
 final class FetchManualStateCommand extends Command<void> {
   FetchManualStateCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -79,21 +79,18 @@ final class FetchManualStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeManualState(encoded);
-    printFields(
-      context.json,
-      'manual-state',
-      address,
-      <String, Object?>{
-        'code': account.data.code,
-      },
-    );
+    printFields(context.json, 'manual-state', address, <String, Object?>{
+      'code': account.data.code,
+    });
   }
 }
 
 final class FetchCompactStateCommand extends Command<void> {
   FetchCompactStateCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -117,15 +114,10 @@ final class FetchCompactStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeCompactState(encoded);
-    printFields(
-      context.json,
-      'compact-state',
-      address,
-      <String, Object?>{
-        'name': account.data.name,
-        'tags': account.data.tags,
-      },
-    );
+    printFields(context.json, 'compact-state', address, <String, Object?>{
+      'name': account.data.name,
+      'tags': account.data.tags,
+    });
   }
 }
 

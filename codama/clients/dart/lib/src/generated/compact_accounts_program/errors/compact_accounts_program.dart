@@ -17,9 +17,12 @@ const int compactAccountsProgramErrorAuthorityMismatch = 0x1b5a; // 7002
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _compactAccountsProgramErrorMessages = {
-    compactAccountsProgramErrorCapacityExceeded: 'The write would exceed the collection\'s declared capacity.',
-    compactAccountsProgramErrorIndexOutOfBounds: 'The requested index is past the end of the active collection.',
-    compactAccountsProgramErrorAuthorityMismatch: 'The signer is not the authority recorded on the account.',
+  compactAccountsProgramErrorCapacityExceeded:
+      'The write would exceed the collection\'s declared capacity.',
+  compactAccountsProgramErrorIndexOutOfBounds:
+      'The requested index is past the end of the active collection.',
+  compactAccountsProgramErrorAuthorityMismatch:
+      'The signer is not the authority recorded on the account.',
 };
 
 /// Get the error message for a CompactAccountsProgram program error code.

@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/events_program.dart';
 
 final class TestEventCommand extends Command<void> {
   TestEventCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +20,7 @@ final class TestEventCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getTestEventInstruction(
       programAddress: context.programAddress,

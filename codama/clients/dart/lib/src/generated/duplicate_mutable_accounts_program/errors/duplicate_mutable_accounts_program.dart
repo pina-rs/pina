@@ -5,11 +5,14 @@
 
 /// Two mutable account fields point at the same runtime account.
 /// Message: "Two mutable account fields point at the same runtime account."
-const int duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount = 0x7f8; // 2040
+const int
+duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount =
+    0x7f8; // 2040
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _duplicateMutableAccountsProgramErrorMessages = {
-    duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount: 'Two mutable account fields point at the same runtime account.',
+  duplicateMutableAccountsProgramErrorConstraintDuplicateMutableAccount:
+      'Two mutable account fields point at the same runtime account.',
 };
 
 /// Get the error message for a DuplicateMutableAccountsProgram program error code.

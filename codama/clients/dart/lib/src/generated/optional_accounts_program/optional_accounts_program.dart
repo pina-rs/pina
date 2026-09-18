@@ -5,4 +5,3 @@ export 'accounts/accounts.dart';
 export 'instructions/instructions.dart';
 export 'pdas/pdas.dart';
 export 'programs/programs.dart';
-

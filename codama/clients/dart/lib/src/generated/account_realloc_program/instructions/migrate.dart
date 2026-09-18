@@ -6,13 +6,13 @@ import 'dart:typed_data';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-import '../programs/account_realloc_program.dart' show accountReallocProgramProgramAddress;
+import '../programs/account_realloc_program.dart'
+    show accountReallocProgramProgramAddress;
 
 /// Discriminator reserved by Pina for the framework `Migrate` instruction.
 const migrateDiscriminator = 255;
 
-Uint8List getMigrateDiscriminatorBytes() =>
-    Uint8List.fromList(const [255]);
+Uint8List getMigrateDiscriminatorBytes() => Uint8List.fromList(const [255]);
 
 /// Creates the framework-owned `Migrate` instruction: it runs the program's
 /// on-demand account migrations on their own, so the payer authorizes exactly
@@ -36,7 +36,10 @@ Instruction getMigrateInstruction({
       address: payer ?? resolvedProgram,
       role: payer == null ? AccountRole.readonly : AccountRole.writableSigner,
     ),
-    AccountMeta(address: systemProgram ?? resolvedProgram, role: AccountRole.readonly),
+    AccountMeta(
+      address: systemProgram ?? resolvedProgram,
+      role: AccountRole.readonly,
+    ),
     AccountMeta(
       address: sample ?? resolvedProgram,
       role: sample == null ? AccountRole.readonly : AccountRole.writable,

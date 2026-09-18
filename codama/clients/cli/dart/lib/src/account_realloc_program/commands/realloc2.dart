@@ -13,7 +13,11 @@ final class Realloc2Command extends Command<void> {
   Realloc2Command() {
     argParser
       ..addOption('len', mandatory: true, help: "len")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
       ..addOption('sample1', mandatory: true, help: "The sample1 account")
       ..addOption('sample2', mandatory: true, help: "The sample2 account");
   }
@@ -22,7 +26,8 @@ final class Realloc2Command extends Command<void> {
   String get name => 'realloc2';
 
   @override
-  String get description => "Exercises Anchor's duplicate-reallocation guard.  Both sample accounts must be the same canonical PDA for the signer, so the instruction always rejects with `AccountDuplicateReallocs` before any account is resized. It is intentionally not a two-target mutation API.";
+  String get description =>
+      "Exercises Anchor's duplicate-reallocation guard.  Both sample accounts must be the same canonical PDA for the signer, so the instruction always rejects with `AccountDuplicateReallocs` before any account is resized. It is intentionally not a two-target mutation API.";
 
   @override
   Future<void> run() async {

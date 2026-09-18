@@ -10,8 +10,16 @@ import 'package:pina_codama_clients/declare_program.dart';
 final class ValidateExternalProgramCommand extends Command<void> {
   ValidateExternalProgramCommand() {
     argParser
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('external_program', mandatory: true, help: "The external_program account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'external_program',
+        mandatory: true,
+        help: "The external_program account",
+      );
   }
 
   @override
@@ -27,7 +35,10 @@ final class ValidateExternalProgramCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final externalProgram = pubkey('--external-program', results['external_program']! as String);
+    final externalProgram = pubkey(
+      '--external-program',
+      results['external_program']! as String,
+    );
 
     final instruction = getValidateExternalProgramInstruction(
       programAddress: context.programAddress,

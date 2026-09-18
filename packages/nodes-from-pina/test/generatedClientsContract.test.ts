@@ -150,6 +150,7 @@ describe("vesting JS client contracts", () => {
 		expect(initializeData.bump).toBe(9);
 		expect(parseInitializeInstruction(initialize).data.totalAmount).toBe(500n);
 
+		const clock = "ClockSysvar1111111111111111111111111111111";
 		const claim = getClaimInstruction({
 			beneficiary,
 			mint,
@@ -157,6 +158,7 @@ describe("vesting JS client contracts", () => {
 			beneficiaryAta,
 			vault,
 			tokenProgram,
+			clock,
 			amount: 25n,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
@@ -168,24 +170,30 @@ describe("vesting JS client contracts", () => {
 			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
+			{ address: clock, role: READONLY },
 		]);
 		expect(getClaimInstructionDataDecoder().decode(claim.data).amount).toBe(
 			25n,
 		);
 		expect(parseClaimInstruction(claim).data.amount).toBe(25n);
 
+		const adminAta = "AdminAta11111111111111111111111111111111111";
 		const cancel = getCancelInstruction({
 			admin,
 			mint,
 			vestingState,
+			adminAta,
 			vault,
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(cancel.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
+			{ address: adminAta, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
+			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
 		expect(Array.from(cancel.data)).toEqual([
@@ -479,6 +487,7 @@ describe("staking rewards JS client contracts", () => {
 			poolState,
 			positionState,
 			userRewardAta,
+			rewardVault,
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
@@ -487,6 +496,7 @@ describe("staking rewards JS client contracts", () => {
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
+			{ address: rewardVault, role: WRITABLE },
 			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
