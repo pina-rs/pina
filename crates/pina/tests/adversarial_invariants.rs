@@ -791,6 +791,11 @@ fn assert_type_rejects_stale_migration_envelopes() {
 			.owner(TEST_PROGRAM_ID)
 			.lamports(100)
 			.data(&build_migration_aware_state_bytes(1)),
+		AccountBuilder::new()
+			.address(fake_address(28))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&build_migration_aware_state_bytes(2)),
 	];
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
@@ -804,6 +809,10 @@ fn assert_type_rejects_stale_migration_envelopes() {
 		account_views[1]
 			.assert_type::<MigrationAwareState>(&TEST_PROGRAM_ID)
 			.is_ok()
+	);
+	assert_eq!(
+		account_views[2].assert_type::<MigrationAwareState>(&TEST_PROGRAM_ID),
+		Err(PinaProgramError::InvalidMigrationVersion.into())
 	);
 }
 
