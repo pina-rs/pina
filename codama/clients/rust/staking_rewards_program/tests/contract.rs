@@ -181,11 +181,15 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		AccountMeta::new(user_reward_ata, false)
 	);
 	assert_eq!(
-		claim_ix.accounts[5],
+		claim_ix.accounts[6],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
 	assert_eq!(
 		claim_ix.accounts[7],
+		AccountMeta::new_readonly(token_program, false)
+	);
+	assert_eq!(
+		claim_ix.accounts[8],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
 	assert_eq!(claim_ix.data, vec![4, 0]);
