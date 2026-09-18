@@ -771,6 +771,7 @@ fn run_client_error(
 }
 
 fn extract_raw_hex(output: &[u8]) -> Result<Vec<u8>, IdlMetadataError> {
+	const MAX_RAW_HEX_BYTES: usize = 8 * 1024 * 1024;
 	let output = std::str::from_utf8(output).map_err(|_| IdlMetadataError::NonUtf8)?;
 	let line = output
 		.lines()
@@ -783,9 +784,9 @@ fn extract_raw_hex(output: &[u8]) -> Result<Vec<u8>, IdlMetadataError> {
 			}
 		})?;
 
-	if line.len() > 8 * 1024 * 1024 {
+	if line.len() > MAX_RAW_HEX_BYTES {
 		return Err(IdlMetadataError::UnsupportedContent {
-			reason: "raw compressed IDL exceeds the 4 MiB safety limit".to_owned(),
+			reason: format!("raw compressed IDL exceeds the {MAX_RAW_HEX_BYTES}-byte safety limit"),
 		});
 	}
 
@@ -1650,7 +1651,15 @@ mod tests {
 		));
 		assert!(extract_raw_hex(b"abc\n").is_err());
 		assert!(extract_raw_hex(b"zz\n").is_err());
-		assert!(extract_raw_hex(&vec![b'a'; 8 * 1024 * 1024 + 1]).is_err());
+		// The reported limit must match the enforced one: an off-by-a-factor
+		// message previously claimed 4 MiB while rejecting at 8 MiB.
+		let error = extract_raw_hex(&vec![b'a'; 8 * 1024 * 1024 + 1])
+			.err()
+			.unwrap_or_else(|| panic!("oversized input must fail"));
+		assert!(
+			error.to_string().contains("8388608-byte"),
+			"message must state the enforced 8 MiB limit: {error}"
+		);
 	}
 
 	#[cfg(unix)]
