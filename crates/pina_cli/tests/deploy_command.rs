@@ -322,7 +322,7 @@ fn build_failure_stops_before_final_planning() {
 
 #[cfg(unix)]
 #[test]
-fn local_deployment_passes_the_exact_modeled_arguments_to_solana() {
+fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() {
 	use std::os::unix::fs::PermissionsExt;
 
 	let fixture = ProjectFixture::new();
@@ -333,7 +333,9 @@ fn local_deployment_passes_the_exact_modeled_arguments_to_solana() {
 	fs::write(
 		&solana,
 		"#!/bin/sh\nset -eu\npwd > \"$PINA_DEPLOY_TEST_CWD\"\nprintf '%s\\n' \"$@\" > \
-		 \"$PINA_DEPLOY_TEST_LOG\"\n",
+		 \"$PINA_DEPLOY_TEST_LOG\"\ncat \"$3\" > \"$PINA_DEPLOY_TEST_PROGRAM\"\ncat \"$5\" > \
+		 \"$PINA_DEPLOY_TEST_PROGRAM_KEYPAIR\"\ncat \"$7\" > \"$PINA_DEPLOY_TEST_AUTHORITY\"\ncat \
+		 \"$9\" > \"$PINA_DEPLOY_TEST_PAYER\"\n",
 	)
 	.unwrap_or_else(|error| panic!("write fake solana: {error}"));
 	let mut permissions = fs::metadata(&solana)
@@ -354,6 +356,19 @@ fn local_deployment_passes_the_exact_modeled_arguments_to_solana() {
 		.env("PATH", joined_path)
 		.env("PINA_DEPLOY_TEST_CWD", fixture.root.join("solana-cwd.txt"))
 		.env("PINA_DEPLOY_TEST_LOG", &log)
+		.env("PINA_DEPLOY_TEST_PROGRAM", fixture.root.join("executed.so"))
+		.env(
+			"PINA_DEPLOY_TEST_PROGRAM_KEYPAIR",
+			fixture.root.join("executed-program-keypair.json"),
+		)
+		.env(
+			"PINA_DEPLOY_TEST_AUTHORITY",
+			fixture.root.join("executed-authority.json"),
+		)
+		.env(
+			"PINA_DEPLOY_TEST_PAYER",
+			fixture.root.join("executed-payer.json"),
+		)
 		.output()
 		.unwrap_or_else(|error| panic!("run local deployment: {error}"));
 
@@ -364,14 +379,48 @@ fn local_deployment_passes_the_exact_modeled_arguments_to_solana() {
 	);
 	let args = fs::read_to_string(&log)
 		.unwrap_or_else(|error| panic!("read fake Solana arguments: {error}"));
-	let expected = format!(
-		"program\ndeploy\n{}\n--program-id\n{}\n--upgrade-authority\n{}\n--fee-payer\n{}\n--url\nhttp://127.0.0.1:8899\n",
-		canonical(&fixture.program),
-		canonical(&fixture.program_keypair),
-		canonical(&fixture.authority),
-		canonical(&fixture.payer),
+	let args = args.lines().collect::<Vec<_>>();
+	assert_eq!(
+		[
+			args[0], args[1], args[3], args[5], args[7], args[9], args[10]
+		],
+		[
+			"program",
+			"deploy",
+			"--program-id",
+			"--upgrade-authority",
+			"--fee-payer",
+			"--url",
+			"http://127.0.0.1:8899",
+		]
 	);
-	assert_eq!(args, expected);
+	for (actual, original, name) in [
+		(args[2], &fixture.program, "program.so"),
+		(args[4], &fixture.program_keypair, "program-keypair.json"),
+		(args[6], &fixture.authority, "upgrade-authority.json"),
+		(args[8], &fixture.payer, "payer.json"),
+	] {
+		assert_ne!(actual, canonical(original));
+		assert!(actual.ends_with(name));
+		assert!(!Path::new(actual).exists());
+	}
+	for (executed, original) in [
+		(fixture.root.join("executed.so"), &fixture.program),
+		(
+			fixture.root.join("executed-program-keypair.json"),
+			&fixture.program_keypair,
+		),
+		(
+			fixture.root.join("executed-authority.json"),
+			&fixture.authority,
+		),
+		(fixture.root.join("executed-payer.json"), &fixture.payer),
+	] {
+		assert_eq!(
+			fs::read(executed).unwrap_or_else(|error| panic!("read executed input: {error}")),
+			fs::read(original).unwrap_or_else(|error| panic!("read original input: {error}")),
+		);
+	}
 	let cwd = fs::read_to_string(fixture.root.join("solana-cwd.txt"))
 		.unwrap_or_else(|error| panic!("read fake Solana working directory: {error}"));
 	assert_eq!(cwd.trim(), canonical(&fixture.root));

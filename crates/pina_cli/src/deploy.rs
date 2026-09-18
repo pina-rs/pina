@@ -156,6 +156,106 @@ struct InputFingerprint {
 	payer: [u8; 32],
 }
 
+struct DeploymentInputSnapshot {
+	_directory: tempfile::TempDir,
+	program: String,
+	program_keypair: String,
+	upgrade_authority: String,
+	payer: String,
+}
+
+impl DeploymentInputSnapshot {
+	fn capture(plan: &DeploymentPlan) -> Result<Self, DeployError> {
+		plan.revalidate()?;
+		let directory = deployment_snapshot_directory(
+			plan.project_root(),
+			tempfile::Builder::new().prefix("pina-deploy-").tempdir(),
+		)?;
+		let program_path = snapshot_input(
+			Path::new(plan.program()),
+			&directory.path().join("program.so"),
+			"program",
+		)?;
+		let program_keypair_path = snapshot_input(
+			Path::new(plan.program_keypair()),
+			&directory.path().join("program-keypair.json"),
+			"program keypair",
+		)?;
+		let upgrade_authority_path = snapshot_input(
+			Path::new(plan.upgrade_authority()),
+			&directory.path().join("upgrade-authority.json"),
+			"upgrade authority",
+		)?;
+		let payer_path = snapshot_input(
+			Path::new(plan.payer()),
+			&directory.path().join("payer.json"),
+			"fee payer",
+		)?;
+		protect_snapshot_keypair(&program_keypair_path, "program keypair")?;
+		protect_snapshot_keypair(&upgrade_authority_path, "upgrade authority")?;
+		protect_snapshot_keypair(&payer_path, "fee payer")?;
+
+		let program_keypair_bytes = read_keypair(&program_keypair_path, "program keypair")?;
+		validate_keypair(&upgrade_authority_path, "upgrade authority")?;
+		validate_keypair(&payer_path, "fee payer")?;
+		let keypair_program_id = bs58::encode(&program_keypair_bytes[32..]).into_string();
+		let fingerprint = InputFingerprint {
+			program: file_digest(&program_path, "program")?,
+			program_keypair: file_digest(&program_keypair_path, "program keypair")?,
+			upgrade_authority: file_digest(&upgrade_authority_path, "upgrade authority")?,
+			payer: file_digest(&payer_path, "fee payer")?,
+		};
+
+		validate_snapshot_matches_plan(plan, &keypair_program_id, &fingerprint)?;
+
+		Ok(Self {
+			program: path_string(&program_path, "program snapshot")?,
+			program_keypair: path_string(&program_keypair_path, "program keypair snapshot")?,
+			upgrade_authority: path_string(&upgrade_authority_path, "upgrade authority snapshot")?,
+			payer: path_string(&payer_path, "fee payer snapshot")?,
+			_directory: directory,
+		})
+	}
+
+	fn command(&self, plan: &DeploymentPlan) -> CommandPlan {
+		match &plan.remote_command {
+			Some(command) => {
+				let facts = DeploymentFacts {
+					program: &self.program,
+					program_id: plan.program_id(),
+					program_keypair: &self.program_keypair,
+					upgrade_authority: &self.upgrade_authority,
+					payer: &self.payer,
+					rpc_url: plan.rpc_url(),
+					cluster: &plan.target.cluster,
+				};
+				override_command(&facts, command)
+			}
+			None => {
+				deploy_command(
+					&self.program,
+					&self.program_keypair,
+					&self.upgrade_authority,
+					&self.payer,
+					plan.rpc_url(),
+				)
+			}
+		}
+	}
+}
+
+fn validate_snapshot_matches_plan(
+	plan: &DeploymentPlan,
+	keypair_program_id: &str,
+	fingerprint: &InputFingerprint,
+) -> Result<(), DeployError> {
+	if keypair_program_id != plan.program_id || fingerprint != &plan.input_fingerprint {
+		return Err(DeployError::InputsChanged);
+	}
+
+	Ok(())
+}
+
 #[derive(Serialize)]
 struct SerializableDeploymentPlan<'a> {
 	project_root: &'a str,
@@ -786,14 +886,10 @@ pub struct ApprovedDeployment<'plan> {
 }
 
 impl ApprovedDeployment<'_> {
-	/// Revalidate every planned input and execute the remote command.
+	/// Execute the command from private copies that match every planned input.
 	pub fn execute(self, runner: &mut impl CommandRunner) -> Result<(), DeployError> {
-		self.plan.revalidate()?;
-		let command = self
-			.plan
-			.commands()
-			.pop()
-			.expect("a deployment plan always carries exactly one command");
+		let snapshot = DeploymentInputSnapshot::capture(self.plan)?;
+		let command = snapshot.command(self.plan);
 		run_command(&command, Path::new(self.plan.project_root()), runner)
 	}
 }
@@ -1015,6 +1111,49 @@ fn canonical_file(
 
 fn validate_keypair(path: &Path, kind: &'static str) -> Result<(), DeployError> {
 	read_keypair(path, kind).map(|_| ())
+}
+
+fn deployment_snapshot_directory(
+	project_root: &str,
+	directory: io::Result<tempfile::TempDir>,
+) -> Result<tempfile::TempDir, DeployError> {
+	directory.map_err(|error| {
+		DeployError::Project {
+			path: PathBuf::from(project_root),
+			reason: format!("could not create a private deployment snapshot: {error}"),
+		}
+	})
+}
+
+fn snapshot_input(
+	source: &Path,
+	destination: &Path,
+	kind: &'static str,
+) -> Result<PathBuf, DeployError> {
+	fs::copy(source, destination).map_err(|_| {
+		DeployError::InvalidFile {
+			kind,
+			path: source.to_path_buf(),
+		}
+	})?;
+	Ok(destination.to_path_buf())
+}
+
+#[cfg(unix)]
+fn protect_snapshot_keypair(path: &Path, kind: &'static str) -> Result<(), DeployError> {
+	use std::os::unix::fs::PermissionsExt as _;
+
+	fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|_| {
+		DeployError::InvalidKeypair {
+			kind,
+			path: path.to_path_buf(),
+		}
+	})
+}
+
+#[cfg(not(unix))]
+fn protect_snapshot_keypair(_: &Path, _: &'static str) -> Result<(), DeployError> {
+	Ok(())
 }
 
 fn file_digest(path: &Path, kind: &'static str) -> Result<[u8; 32], DeployError> {
@@ -1341,6 +1480,57 @@ mod tests {
 				success: true,
 				code: Some(0),
 			}))
+		}
+	}
+
+	struct InputSwapRunner {
+		originals: Vec<PathBuf>,
+		observed_paths: Vec<PathBuf>,
+		observed_contents: Vec<Vec<u8>>,
+	}
+
+	impl CommandRunner for InputSwapRunner {
+		fn run(
+			&mut self,
+			program: &OsStr,
+			args: &[OsString],
+			env: &[(String, String)],
+			_current_dir: &Path,
+		) -> io::Result<CommandStatus> {
+			for original in &self.originals {
+				fs::write(original, b"attacker-controlled replacement")?;
+			}
+
+			self.observed_paths = if program == OsStr::new("solana") {
+				[2, 4, 6, 8]
+					.into_iter()
+					.map(|index| PathBuf::from(&args[index]))
+					.collect()
+			} else {
+				[
+					"PINA_DEPLOY_PROGRAM",
+					"PINA_DEPLOY_PROGRAM_KEYPAIR",
+					"PINA_DEPLOY_UPGRADE_AUTHORITY",
+					"PINA_DEPLOY_PAYER",
+				]
+				.into_iter()
+				.map(|name| {
+					env.iter()
+						.find_map(|(key, value)| (key == name).then(|| PathBuf::from(value)))
+						.expect("deployment fact should be present")
+				})
+				.collect()
+			};
+			self.observed_contents = self
+				.observed_paths
+				.iter()
+				.map(fs::read)
+				.collect::<io::Result<_>>()?;
+
+			Ok(CommandStatus {
+				success: true,
+				code: Some(0),
+			})
 		}
 	}
 
@@ -2106,6 +2296,85 @@ mod tests {
 			file_digest(&fixture.root.join("missing.so"), "program"),
 			Err(DeployError::InvalidFile { .. })
 		));
+	}
+
+	#[test]
+	fn execution_uses_private_snapshots_for_local_and_override_commands() {
+		for remote_command in [None, Some("deploy-wrapper --verbose".to_owned())] {
+			let fixture = Fixture::new();
+			let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+			request.remote_command = remote_command;
+			let plan = prepare_deployment(&request).expect("deployment should prepare");
+			let originals = [
+				plan.program(),
+				plan.program_keypair(),
+				plan.upgrade_authority(),
+				plan.payer(),
+			]
+			.into_iter()
+			.map(PathBuf::from)
+			.collect::<Vec<_>>();
+			let expected_contents = originals
+				.iter()
+				.map(fs::read)
+				.collect::<io::Result<Vec<_>>>()
+				.expect("deployment inputs should be readable");
+			let mut runner = InputSwapRunner {
+				originals: originals.clone(),
+				observed_paths: Vec::new(),
+				observed_contents: Vec::new(),
+			};
+
+			execute_deployment(&plan, false, false, &mut runner, &mut rejecting_confirmer())
+				.expect("deployment should execute");
+
+			assert_eq!(runner.observed_contents, expected_contents);
+			assert!(
+				runner
+					.observed_paths
+					.iter()
+					.zip(&originals)
+					.all(|(observed, original)| observed != original)
+			);
+			assert!(runner.observed_paths.iter().all(|path| !path.exists()));
+		}
+	}
+
+	#[test]
+	fn snapshot_failures_are_reported_and_input_drift_is_rejected() {
+		let directory_error = deployment_snapshot_directory(
+			"/project",
+			Err(io::Error::other("snapshot directory unavailable")),
+		)
+		.expect_err("snapshot creation should fail");
+		assert!(matches!(directory_error, DeployError::Project { .. }));
+
+		let temp = tempfile::tempdir().expect("temporary directory should be created");
+		let missing = temp.path().join("missing");
+		let copy_error = snapshot_input(&missing, &temp.path().join("copy"), "program")
+			.expect_err("a missing source should fail closed");
+		assert!(matches!(copy_error, DeployError::InvalidFile { .. }));
+
+		#[cfg(unix)]
+		{
+			let permission_error = protect_snapshot_keypair(&missing, "fee payer")
+				.expect_err("a missing keypair should not be protected");
+			assert!(matches!(
+				permission_error,
+				DeployError::InvalidKeypair { .. }
+			));
+		}
+
+		let fixture = Fixture::new();
+		let mut plan =
+			prepare_deployment(&fixture.request(DeploymentTarget::Cluster(Cluster::Localnet)))
+				.expect("deployment should prepare");
+		let approved_fingerprint = plan.input_fingerprint.clone();
+		plan.input_fingerprint.program[0] ^= 1;
+		let drift_error =
+			validate_snapshot_matches_plan(&plan, plan.program_id(), &approved_fingerprint)
+				.expect_err("a mismatched fingerprint should fail closed");
+		assert!(matches!(drift_error, DeployError::InputsChanged));
 	}
 
 	#[test]
