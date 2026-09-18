@@ -9,6 +9,8 @@ let
   currentDir = builtins.dirOf __curPos.file;
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
+  sbpfLinker21 =
+    inputs.ifiokjr-nixpkgs-sbpf-21.packages.${pkgs.stdenv.hostPlatform.system}.sbpf-linker-21;
   kaniToolchain = pkgs.rust-bin.nightly."2025-11-21".minimal;
   kani = custom.kani.overrideAttrs (old: {
     buildInputs = (old.buildInputs or [ ]) ++ lib.optionals pkgs.stdenv.isLinux [ kaniToolchain ];
@@ -698,7 +700,7 @@ in
           rustup component add rust-src --toolchain "$BPF_TOOLCHAIN"
         fi
 
-        PATH="${custom.sbpf-linker-21}/bin:$PATH" \
+        PATH="${sbpfLinker21}/bin:$PATH" \
           cargo +"$BPF_TOOLCHAIN" build-bpf
 
         if [ -z "''${HOME:-}" ]; then
