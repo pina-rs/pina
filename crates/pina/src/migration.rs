@@ -42,19 +42,26 @@ pub const MAX_MIGRATION_WORKSPACE: usize = 1024;
 /// }
 /// ```
 ///
-/// Programs with wider instruction discriminators compare against the matching
-/// constant with an explicit length check (`data == [0xff, 0xff]` and friends
-/// compile to a `memcmp` call on SBF, which costs more compute than a direct
-/// byte comparison).
+/// The reserved value is the all-ones value of the instruction discriminator's
+/// own width, so the trigger must be the matching width too: a program with a
+/// `u16` discriminator reserves `0xffff` and matches it with
+/// [`is_migrate_instruction_u16`], not the one-byte [`is_migrate_instruction`],
+/// which only tests a single byte. Each constant below pairs with the helper of
+/// the same width. Comparing against the constant directly is also supported,
+/// but a slice equality against its `to_le_bytes()` form compiles to a `memcmp`
+/// call on SBF, which costs more compute than the helper's load-and-compare.
 pub const MIGRATE_DISCRIMINATOR_U8: u8 = u8::MAX;
 
-/// Two-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+/// Two-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`]. Match it
+/// with [`is_migrate_instruction_u16`].
 pub const MIGRATE_DISCRIMINATOR_U16: u16 = u16::MAX;
 
-/// Four-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+/// Four-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`]. Match it
+/// with [`is_migrate_instruction_u32`].
 pub const MIGRATE_DISCRIMINATOR_U32: u32 = u32::MAX;
 
-/// Eight-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`].
+/// Eight-byte reserved discriminator; see [`MIGRATE_DISCRIMINATOR_U8`]. Match it
+/// with [`is_migrate_instruction_u64`].
 pub const MIGRATE_DISCRIMINATOR_U64: u64 = u64::MAX;
 
 /// Whether `data` carries exactly the reserved `Migrate` discriminator for a
@@ -67,6 +74,44 @@ pub const MIGRATE_DISCRIMINATOR_U64: u64 = u64::MAX;
 #[must_use]
 pub fn is_migrate_instruction(data: &[u8]) -> bool {
 	data.len() == 1 && data[0] == MIGRATE_DISCRIMINATOR_U8
+}
+
+/// Whether `data` carries exactly the reserved `Migrate` discriminator for a
+/// two-byte instruction space.
+///
+/// The length guard makes the trigger width-exact: `[0xff, 0xff]` matches,
+/// while the one-byte `[0xff]` and any longer payload do not. Generated
+/// entrypoints select this helper when the instruction discriminator's
+/// primitive is `u16`.
+///
+/// Like [`is_migrate_instruction`], the comparison stays inline. Comparing the
+/// decoded little-endian value keeps it a load-and-compare rather than the
+/// `memcmp` call a slice equality against `MIGRATE_DISCRIMINATOR_U16.to_le_bytes()`
+/// would emit.
+#[inline]
+#[must_use]
+pub fn is_migrate_instruction_u16(data: &[u8]) -> bool {
+	data.len() == 2 && u16::from_le_bytes([data[0], data[1]]) == MIGRATE_DISCRIMINATOR_U16
+}
+
+/// Whether `data` carries exactly the reserved `Migrate` discriminator for a
+/// four-byte instruction space; see [`is_migrate_instruction_u16`].
+#[inline]
+#[must_use]
+pub fn is_migrate_instruction_u32(data: &[u8]) -> bool {
+	data.len() == 4
+		&& u32::from_le_bytes([data[0], data[1], data[2], data[3]]) == MIGRATE_DISCRIMINATOR_U32
+}
+
+/// Whether `data` carries exactly the reserved `Migrate` discriminator for an
+/// eight-byte instruction space; see [`is_migrate_instruction_u16`].
+#[inline]
+#[must_use]
+pub fn is_migrate_instruction_u64(data: &[u8]) -> bool {
+	data.len() == 8
+		&& u64::from_le_bytes([
+			data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+		]) == MIGRATE_DISCRIMINATOR_U64
 }
 
 /// Integer encoding used by the program-wide migration version envelope.
@@ -1248,6 +1293,66 @@ mod tests {
 			MIGRATE_DISCRIMINATOR_U8,
 			MIGRATE_DISCRIMINATOR_U8
 		]));
+	}
+
+	#[test]
+	fn reserved_instruction_identification_matches_each_declared_width_exactly() {
+		// Each width names its own trigger, and only that width. A bare prefix
+		// match would let the all-ones byte alone trigger every wider program,
+		// and a wrong-width guard would leave the reserved path unreachable.
+		assert!(is_migrate_instruction_u16(
+			&MIGRATE_DISCRIMINATOR_U16.to_le_bytes()
+		));
+		assert!(is_migrate_instruction_u32(
+			&MIGRATE_DISCRIMINATOR_U32.to_le_bytes()
+		));
+		assert!(is_migrate_instruction_u64(
+			&MIGRATE_DISCRIMINATOR_U64.to_le_bytes()
+		));
+
+		// Wrong lengths are rejected rather than prefix-matched.
+		assert!(!is_migrate_instruction_u16(&[]));
+		assert!(!is_migrate_instruction_u16(&[0xff]));
+		assert!(!is_migrate_instruction_u16(&[0xff, 0xff, 0xff]));
+		assert!(!is_migrate_instruction_u32(&[0xff, 0xff]));
+		assert!(!is_migrate_instruction_u32(&[0xff; 5]));
+		assert!(!is_migrate_instruction_u64(&[0xff; 4]));
+		assert!(!is_migrate_instruction_u64(&[0xff; 9]));
+
+		// A same-length payload that is not all-ones is not the reserved value.
+		assert!(!is_migrate_instruction_u16(&[0xff, 0x00]));
+		assert!(!is_migrate_instruction_u16(&[0x00, 0xff]));
+		assert!(!is_migrate_instruction_u32(&[0xff, 0xff, 0xff, 0x00]));
+		assert!(!is_migrate_instruction_u64(&[
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00
+		]));
+
+		// The one-byte trigger must not satisfy a wider width: it is a
+		// different instruction space.
+		assert!(!is_migrate_instruction_u16(&[MIGRATE_DISCRIMINATOR_U8]));
+		assert!(!is_migrate_instruction_u32(&[MIGRATE_DISCRIMINATOR_U8]));
+		assert!(!is_migrate_instruction_u64(&[MIGRATE_DISCRIMINATOR_U8]));
+
+		// And the wider trigger is not a one-byte instruction.
+		assert!(!is_migrate_instruction(
+			&MIGRATE_DISCRIMINATOR_U16.to_le_bytes()
+		));
+		assert!(!is_migrate_instruction(
+			&MIGRATE_DISCRIMINATOR_U32.to_le_bytes()
+		));
+		assert!(!is_migrate_instruction(
+			&MIGRATE_DISCRIMINATOR_U64.to_le_bytes()
+		));
+	}
+
+	#[test]
+	fn each_reserved_constant_is_the_all_ones_value_of_its_width() {
+		// The helper pairs are written against these constants, so the
+		// constants themselves are the contract the guard matches.
+		assert_eq!(MIGRATE_DISCRIMINATOR_U8, 0xff);
+		assert_eq!(MIGRATE_DISCRIMINATOR_U16, 0xffff);
+		assert_eq!(MIGRATE_DISCRIMINATOR_U32, 0xffff_ffff);
+		assert_eq!(MIGRATE_DISCRIMINATOR_U64, 0xffff_ffff_ffff_ffff);
 	}
 
 	struct U8Versioned;
