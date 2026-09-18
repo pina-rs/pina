@@ -128,12 +128,14 @@ fn initialize_instruction(
 	vesting_state: &Pubkey,
 	vault: &Pubkey,
 	bump: u8,
+	schedule: (u64, u64, u64),
 ) -> pina_test::Instruction {
+	let (start_ts, cliff_ts, end_ts) = schedule;
 	let mut data = vec![VestingInstruction::Initialize as u8];
 	data.extend_from_slice(&TOTAL.to_le_bytes());
-	data.extend_from_slice(&0u64.to_le_bytes()); // start_ts
-	data.extend_from_slice(&0u64.to_le_bytes()); // cliff_ts
-	data.extend_from_slice(&u64::MAX.to_le_bytes()); // end_ts
+	data.extend_from_slice(&start_ts.to_le_bytes());
+	data.extend_from_slice(&cliff_ts.to_le_bytes());
+	data.extend_from_slice(&end_ts.to_le_bytes());
 	data.push(bump);
 
 	program.instruction(
@@ -174,6 +176,7 @@ fn claim_instruction(
 			AccountMeta::new_readonly(ata_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
+			AccountMeta::new_readonly(clock_sysvar_id(), false),
 		],
 	)
 }
@@ -184,17 +187,62 @@ fn cancel_instruction(
 	mint: &Pubkey,
 	vesting_state: &Pubkey,
 	vault: &Pubkey,
+	admin_ata: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
 		&[VestingInstruction::Cancel as u8],
 		vec![
-			AccountMeta::new_readonly(*admin, true),
+			AccountMeta::new(*admin, true),
 			AccountMeta::new_readonly(*mint, false),
 			AccountMeta::new(*vesting_state, false),
+			AccountMeta::new(*admin_ata, false),
 			AccountMeta::new(*vault, false),
+			AccountMeta::new_readonly(ata_program_id(), false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
 		],
 	)
+}
+
+fn clock_sysvar_id() -> Pubkey {
+	Pubkey::from_str_const("SysvarC1ock11111111111111111111111111111111")
+}
+
+/// SPL token amount: u64 LE at byte offset 64 of the token account.
+fn token_amount(program: &ProgramTest, address: &Pubkey) -> u64 {
+	let account: Account = program.account(address).expect("fetch token account");
+	let raw: [u8; 8] = account
+		.data
+		.get(64..72)
+		.expect("token account data covers the amount field")
+		.try_into()
+		.expect("amount slice is 8 bytes");
+	u64::from_le_bytes(raw)
+}
+
+fn mint_into(
+	program: &ProgramTest,
+	mint: &Pubkey,
+	destination: &Pubkey,
+	authority: &Keypair,
+	amount: u64,
+) -> Result<(), TestError> {
+	// SPL `MintTo` = tag 7.
+	let mut data = vec![7u8];
+	data.extend_from_slice(&amount.to_le_bytes());
+	let instruction = Instruction::new_with_bytes(
+		token_program_id(),
+		&data,
+		vec![
+			AccountMeta::new(*mint, false),
+			AccountMeta::new(*destination, false),
+			AccountMeta::new_readonly(authority.pubkey(), true),
+		],
+	);
+
+	program
+		.send_with_signers(instruction, &[authority])
+		.map(|_| ())
 }
 
 fn assert_vesting(
@@ -245,6 +293,9 @@ fn initialize_claim_and_cancel() {
 		let vault = ata_of(&vesting_state, &mint);
 		assert_ne!(bump, 0, "a canonical bump exists on the host");
 
+		// A schedule that is already fully elapsed vests the whole allocation
+		// from the first claim, which is the simple path this test exercises.
+		// The cliff and linear-unlock paths get their own cases below.
 		program
 			.send_with_signers(
 				initialize_instruction(
@@ -255,6 +306,7 @@ fn initialize_claim_and_cancel() {
 					&vesting_state,
 					&vault,
 					bump,
+					(0, 0, 0),
 				),
 				&[&admin],
 			)
@@ -271,7 +323,16 @@ fn initialize_claim_and_cancel() {
 			false,
 			bump,
 		);
+
+		// Fund the vault with the full allocation so releases are observable.
 		let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
+		mint_into(&program, &mint, &vault, &mint_authority, TOTAL).expect("fund vault");
+		assert_eq!(
+			token_amount(&program, &vault),
+			TOTAL,
+			"vault holds the allocation"
+		);
+
 		program
 			.send_with_signers(
 				claim_instruction(
@@ -298,10 +359,32 @@ fn initialize_claim_and_cancel() {
 			false,
 			bump,
 		);
+		// The claim must have moved tokens: this assertion is what the
+		// previous version of this suite could not make.
+		assert_eq!(
+			token_amount(&program, &beneficiary_ata),
+			CLAIM_AMOUNT,
+			"the beneficiary received the released amount"
+		);
+		assert_eq!(
+			token_amount(&program, &vault),
+			TOTAL - CLAIM_AMOUNT,
+			"the vault released exactly the claimed amount"
+		);
 
+		// Cancelling refunds the unclaimed remainder to the admin and closes
+		// the vault, so no value is stranded.
+		let admin_ata = ata_of(&admin.pubkey(), &mint);
 		program
 			.send_with_signers(
-				cancel_instruction(&program, &admin.pubkey(), &mint, &vesting_state, &vault),
+				cancel_instruction(
+					&program,
+					&admin.pubkey(),
+					&mint,
+					&vesting_state,
+					&vault,
+					&admin_ata,
+				),
 				&[&admin],
 			)
 			.expect("execute Cancel");
@@ -316,6 +399,18 @@ fn initialize_claim_and_cancel() {
 			CLAIM_AMOUNT,
 			true,
 			bump,
+		);
+		assert_eq!(
+			token_amount(&program, &admin_ata),
+			TOTAL - CLAIM_AMOUNT,
+			"the admin recovered the unclaimed remainder"
+		);
+		// Closing an SPL account deletes it outright: the account no longer
+		// exists, so any later read must fail. This is what proves no value is
+		// stranded, since the refund had to complete before the close.
+		assert!(
+			program.account(&vault).is_err(),
+			"the vault must be closed and removed after refunding"
 		);
 
 		program.stop().expect("stop isolated program test");
