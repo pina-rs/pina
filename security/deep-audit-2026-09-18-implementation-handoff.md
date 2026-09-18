@@ -59,6 +59,16 @@ Independent, but two orderings matter:
 
 Suggested sequence for the rest: the two example fixes (H1, H2) carry the largest user-visible value and the largest benchmark discussion, so start their CI early; then M3/M2 (smallest diffs, host-side security); then the macro batch; then the hygiene and CI items.
 
+## Merge state and pull request
+
+All sixteen branches were integrated onto one integration branch through sixteen merge commits, in an order chosen to keep the generated snapshot files (`tests/expand/*.expanded.rs`) consistent: hygiene and docs first, then the host-tooling fixes, then the examples, then the macro batch whose members share snapshots. This pull request carries that integration branch; merging it lands the whole remediation as one reviewable unit, and the per-branch history remains readable through the merge commits.
+
+Integration-time verification, all on the integrated tree: every affected crate's suite was re-run after its merge; the `pina_root` expansion snapshots were regenerated once (`MACROTEST=overwrite`) when the three-way merge of independently generated snapshots drifted by one line; the `pina_cli` examples IDL snapshot for `escrow_program` was refreshed to carry the new `EmptyOffer` error (the one integration conflict that was a real drift rather than formatting); `security:deny` and `security:audit` pass; the merged `publish.yml` keeps both the L8 resolver job and the M4 checksum upload; and the full `cargo test --workspace --all-features` run is the gate this PR's checks re-run in CI.
+
+Rollback point before integration: `backup/pre-merge-audit-2026-09-18`. The sixteen source branches and their worktrees still exist and can be deleted once this pull request merges.
+
+What this pull request cannot prove by itself: the consolidated performance benchmark report, the coverage gate, and the Kani proofs all run as CI checks on it and must be read before merging — the benchmark gate in particular applies to the vesting, staking, and escrow changes, which grow real instruction paths (new accounts and CPIs), plus the M1 loader rename, which is `no_std` code compiled into every downstream program.
+
 ## Verification commands per branch
 
 ```sh
