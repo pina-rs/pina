@@ -193,9 +193,14 @@ impl SeedType {
 	}
 
 	/// The Rust type used for the constructor parameter.
-	pub(crate) fn param_type(self) -> Type {
+	///
+	/// `crate_path` qualifies the `Address` spelling. A bare `Address` would
+	/// resolve to whatever the user's own scope happens to import, so a struct
+	/// or type named `Address` in the program crate would silently change the
+	/// generated signature.
+	pub(crate) fn param_type(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&Address),
+			SeedType::Address => syn::parse_quote!(&#crate_path::Address),
 			SeedType::U8 => syn::parse_quote!(u8),
 			SeedType::U16 => syn::parse_quote!(u16),
 			SeedType::U32 => syn::parse_quote!(u32),
@@ -205,19 +210,19 @@ impl SeedType {
 	}
 
 	/// The constructor parameter type with an explicit lifetime, used by the
-	/// `seeds()` method so multiple `&Address` parameters can share one
-	/// lifetime.
-	pub(crate) fn param_type_lt(self) -> Type {
+	/// `seeds()` method so multiple `&#crate_path::Address` parameters can
+	/// share one lifetime.
+	pub(crate) fn param_type_lt(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&'a Address),
-			_ => self.param_type(),
+			SeedType::Address => syn::parse_quote!(&'a #crate_path::Address),
+			_ => self.param_type(crate_path),
 		}
 	}
 
 	/// The field type stored in the generated seeds struct.
-	pub(crate) fn field_type(self) -> Type {
+	pub(crate) fn field_type(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&'a Address),
+			SeedType::Address => syn::parse_quote!(&'a #crate_path::Address),
 			SeedType::U8 => syn::parse_quote!([u8; 1]),
 			SeedType::U16 => syn::parse_quote!([u8; 2]),
 			SeedType::U32 => syn::parse_quote!([u8; 4]),
