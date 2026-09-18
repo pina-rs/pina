@@ -2,7 +2,7 @@
 pina_cli: fix
 ---
 
-# Correct the raw IDL size message and reject traversal in `pina docs`
+# Fix the IDL size message and sanitize doc topics
 
 `pina idl fetch` rejected raw client output above 8 MiB but reported the limit as "4 MiB". The check and the message now share one constant, `MAX_RAW_HEX_BYTES`, so the two cannot drift again, and the message states the true 8 MiB limit.
 

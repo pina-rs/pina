@@ -6,8 +6,7 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
-    hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/role_registry_program.dart';
@@ -33,7 +32,9 @@ final class FetchRegistryConfigCommand extends Command<void> {
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findRegistryConfigPda(
-            seeds: RegistryConfigSeeds(admin: adminValue),
+            seeds: RegistryConfigSeeds(
+              admin: adminValue,
+            ),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -46,11 +47,16 @@ final class FetchRegistryConfigCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeRegistryConfig(encoded);
-    printFields(context.json, 'registry-config', address, <String, Object?>{
-      'admin': account.data.admin,
-      'role_count': account.data.roleCount,
-      'bump': account.data.bump,
-    });
+    printFields(
+      context.json,
+      'registry-config',
+      address,
+      <String, Object?>{
+        'admin': account.data.admin,
+        'role_count': account.data.roleCount,
+        'bump': account.data.bump,
+      },
+    );
   }
 }
 
@@ -77,7 +83,10 @@ final class FetchRoleEntryCommand extends Command<void> {
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findRoleEntryPda(
-            seeds: RoleEntrySeeds(registry: registryValue, roleId: roleIdValue),
+            seeds: RoleEntrySeeds(
+              registry: registryValue,
+              roleId: roleIdValue,
+            ),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -90,14 +99,19 @@ final class FetchRoleEntryCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeRoleEntry(encoded);
-    printFields(context.json, 'role-entry', address, <String, Object?>{
-      'registry': account.data.registry,
-      'role_id': account.data.roleId,
-      'grantee': account.data.grantee,
-      'permissions': account.data.permissions,
-      'active': account.data.active,
-      'bump': account.data.bump,
-    });
+    printFields(
+      context.json,
+      'role-entry',
+      address,
+      <String, Object?>{
+        'registry': account.data.registry,
+        'role_id': account.data.roleId,
+        'grantee': account.data.grantee,
+        'permissions': account.data.permissions,
+        'active': account.data.active,
+        'bump': account.data.bump,
+      },
+    );
   }
 }
 

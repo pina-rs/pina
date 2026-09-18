@@ -25,6 +25,14 @@ pub enum VestingProgramError {
 	/// 2 - The vesting account was already cancelled and holds nothing to claim.
 	#[error("The vesting account was already cancelled and holds nothing to claim.")]
 	AlreadyCancelled = 0x2,
+	/// The schedule has not reached its cliff, so nothing has vested yet.
+	/// 3 - The schedule has not reached its cliff, so nothing has vested yet.
+	#[error("The schedule has not reached its cliff, so nothing has vested yet.")]
+	CliffNotReached = 0x3,
+	/// The vault holds fewer tokens than the claim must release.
+	/// 4 - The vault holds fewer tokens than the claim must release.
+	#[error("The vault holds fewer tokens than the claim must release.")]
+	InsufficientVaultBalance = 0x4,
 }
 
 impl From<VestingProgramError> for solana_program_error::ProgramError {

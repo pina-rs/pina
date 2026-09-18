@@ -9,6 +9,7 @@
 )]
 
 use clap::Args;
+use solana_sdk::pubkey::Pubkey;
 use vesting_program_client::instructions::Cancel;
 use vesting_program_client::instructions::CancelInstructionData;
 
@@ -26,6 +27,9 @@ pub struct CancelArgs {
 	/// The `vesting_state` account
 	#[arg(long)]
 	vesting_state: String,
+	/// The `admin_ata` account
+	#[arg(long)]
+	admin_ata: String,
 	/// The `vault` account
 	#[arg(long)]
 	vault: String,
@@ -41,6 +45,7 @@ pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError
 	};
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let vesting_state = CliContext::pubkey("--vesting_state", &args.vesting_state)?;
+	let admin_ata = CliContext::pubkey("--admin_ata", &args.admin_ata)?;
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = CancelInstructionData::new(|_data| {}).map_err(|_| {
@@ -53,7 +58,12 @@ pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError
 		admin,
 		mint,
 		vesting_state,
+		admin_ata,
 		vault,
+		associated_token_program: Pubkey::from_str_const(
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+		),
+		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 		token_program,
 	};
 

@@ -23,18 +23,23 @@ const int stakingRewardsProgramErrorUnauthorized = 0x3; // 3
 /// Message: "The supplied account is not the pool this position belongs to."
 const int stakingRewardsProgramErrorInvalidPool = 0x4; // 4
 
+/// The supplied reward index would move rewards backwards.
+/// Message: "The supplied reward index would move rewards backwards."
+const int stakingRewardsProgramErrorRewardIndexRegressed = 0x5; // 5
+
+/// The position has accrued nothing to release.
+/// Message: "The position has accrued nothing to release."
+const int stakingRewardsProgramErrorNothingToClaim = 0x6; // 6
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _stakingRewardsProgramErrorMessages = {
-  stakingRewardsProgramErrorInvalidAmount:
-      'The amount is zero, or it leaves a position below the pool minimum.',
-  stakingRewardsProgramErrorPoolPaused:
-      'The pool is paused, so deposits and withdrawals are refused.',
-  stakingRewardsProgramErrorInsufficientBalance:
-      'The position holds less than the requested withdrawal.',
-  stakingRewardsProgramErrorUnauthorized:
-      'The signer is not the pool authority this instruction requires.',
-  stakingRewardsProgramErrorInvalidPool:
-      'The supplied account is not the pool this position belongs to.',
+    stakingRewardsProgramErrorInvalidAmount: 'The amount is zero, or it leaves a position below the pool minimum.',
+    stakingRewardsProgramErrorPoolPaused: 'The pool is paused, so deposits and withdrawals are refused.',
+    stakingRewardsProgramErrorInsufficientBalance: 'The position holds less than the requested withdrawal.',
+    stakingRewardsProgramErrorUnauthorized: 'The signer is not the pool authority this instruction requires.',
+    stakingRewardsProgramErrorInvalidPool: 'The supplied account is not the pool this position belongs to.',
+    stakingRewardsProgramErrorRewardIndexRegressed: 'The supplied reward index would move rewards backwards.',
+    stakingRewardsProgramErrorNothingToClaim: 'The position has accrued nothing to release.',
 };
 
 /// Get the error message for a StakingRewardsProgram program error code.

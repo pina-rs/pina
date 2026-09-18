@@ -24,12 +24,18 @@ export const STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE = 0x2; // 2
 export const STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED = 0x3; // 3
 /** The supplied account is not the pool this position belongs to. */
 export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL = 0x4; // 4
+/** The supplied reward index would move rewards backwards. */
+export const STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED = 0x5; // 5
+/** The position has accrued nothing to release. */
+export const STAKING_REWARDS_PROGRAM_ERROR__NOTHING_TO_CLAIM = 0x6; // 6
 
 export type StakingRewardsProgramError =
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__NOTHING_TO_CLAIM
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED;
 
 let stakingRewardsProgramErrorMessages:
@@ -43,8 +49,12 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The amount is zero, or it leaves a position below the pool minimum.`,
 		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL]:
 			`The supplied account is not the pool this position belongs to.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__NOTHING_TO_CLAIM]:
+			`The position has accrued nothing to release.`,
 		[STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]:
 			`The pool is paused, so deposits and withdrawals are refused.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED]:
+			`The supplied reward index would move rewards backwards.`,
 		[STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]:
 			`The signer is not the pool authority this instruction requires.`,
 	};

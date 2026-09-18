@@ -22,6 +22,7 @@ export const cancelCommand = registerGlobals(new Command("cancel"))
 		"--vesting-state <vestingState>",
 		"The `vesting_state` account",
 	)
+	.requiredOption("--admin-ata <adminAta>", "The `admin_ata` account")
 	.requiredOption("--vault <vault>", "The `vault` account")
 	.requiredOption(
 		"--token-program <tokenProgram>",
@@ -33,6 +34,7 @@ export const cancelCommand = registerGlobals(new Command("cancel"))
 			admin: context.payer,
 			mint: pubkey("--mint", options.mint),
 			vestingState: pubkey("--vesting-state", options.vestingState),
+			adminAta: pubkey("--admin-ata", options.adminAta),
 			vault: pubkey("--vault", options.vault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};

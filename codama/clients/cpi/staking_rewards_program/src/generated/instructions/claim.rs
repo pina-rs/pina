@@ -41,6 +41,10 @@ pub struct Claim<'account> {
 	/// Required privileges: writable.
 	pub user_reward_ata: &'account AccountView,
 
+	/// CPI account `rewardVault`.
+	/// Required privileges: read-only.
+	pub reward_vault: &'account AccountView,
+
 	/// CPI account `associatedTokenProgram`.
 	/// Required privileges: read-only.
 	pub associated_token_program: &'account AccountView,
@@ -89,12 +93,13 @@ impl<'account> Claim<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 8] = [
+		let accounts: [CpiHandle<'_>; 9] = [
 			CpiHandle::writable_signer(self.user)?,
 			CpiHandle::readonly(self.reward_mint),
 			CpiHandle::readonly(self.pool_state),
 			CpiHandle::writable(self.position_state)?,
 			CpiHandle::writable(self.user_reward_ata)?,
+			CpiHandle::readonly(self.reward_vault),
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.system_program),

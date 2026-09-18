@@ -6,4 +6,6 @@ export 'claim.dart';
 export 'deposit.dart';
 export 'initialize_pool.dart';
 export 'open_position.dart';
+export 'set_reward_index.dart';
 export 'withdraw.dart';
+

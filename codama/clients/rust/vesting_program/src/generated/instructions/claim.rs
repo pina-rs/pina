@@ -22,6 +22,7 @@ pub struct Claim {
 	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
+	pub clock: solana_pubkey::Pubkey,
 }
 
 impl Claim {
@@ -32,6 +33,7 @@ impl Claim {
 		beneficiary_ata: solana_pubkey::Pubkey,
 		vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
+		clock: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			beneficiary,
@@ -44,6 +46,7 @@ impl Claim {
 			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
+			clock,
 		}
 	}
 
@@ -57,7 +60,7 @@ impl Claim {
 		data: ClaimInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.beneficiary, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint, false,
@@ -82,6 +85,9 @@ impl Claim {
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.token_program,
 			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.clock, false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {

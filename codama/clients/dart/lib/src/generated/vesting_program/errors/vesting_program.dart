@@ -15,13 +15,21 @@ const int vestingProgramErrorClaimTooLarge = 0x1; // 1
 /// Message: "The vesting account was already cancelled and holds nothing to claim."
 const int vestingProgramErrorAlreadyCancelled = 0x2; // 2
 
+/// The schedule has not reached its cliff, so nothing has vested yet.
+/// Message: "The schedule has not reached its cliff, so nothing has vested yet."
+const int vestingProgramErrorCliffNotReached = 0x3; // 3
+
+/// The vault holds fewer tokens than the claim must release.
+/// Message: "The vault holds fewer tokens than the claim must release."
+const int vestingProgramErrorInsufficientVaultBalance = 0x4; // 4
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _vestingProgramErrorMessages = {
-  vestingProgramErrorInvalidSchedule:
-      'The schedule is malformed: its window is empty, unordered, or fully elapsed.',
-  vestingProgramErrorClaimTooLarge: 'The claim exceeds what has vested so far.',
-  vestingProgramErrorAlreadyCancelled:
-      'The vesting account was already cancelled and holds nothing to claim.',
+    vestingProgramErrorInvalidSchedule: 'The schedule is malformed: its window is empty, unordered, or fully elapsed.',
+    vestingProgramErrorClaimTooLarge: 'The claim exceeds what has vested so far.',
+    vestingProgramErrorAlreadyCancelled: 'The vesting account was already cancelled and holds nothing to claim.',
+    vestingProgramErrorCliffNotReached: 'The schedule has not reached its cliff, so nothing has vested yet.',
+    vestingProgramErrorInsufficientVaultBalance: 'The vault holds fewer tokens than the claim must release.',
 };
 
 /// Get the error message for a VestingProgram program error code.

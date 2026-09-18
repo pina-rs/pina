@@ -69,6 +69,8 @@ enum Command {
 	Withdraw(commands::WithdrawArgs),
 
 	Claim(commands::ClaimArgs),
+
+	SetRewardIndex(commands::SetRewardIndexArgs),
 	/// Fetch and decode a program account.
 	#[command(subcommand)]
 	Fetch(fetch::Command),
@@ -101,6 +103,7 @@ fn run(cli: Cli) -> Result<(), context::CliError> {
 		Command::Deposit(args) => commands::deposit::run(&context, args),
 		Command::Withdraw(args) => commands::withdraw::run(&context, args),
 		Command::Claim(args) => commands::claim::run(&context, args),
+		Command::SetRewardIndex(args) => commands::set_reward_index::run(&context, args),
 		Command::Fetch(command) => fetch::run(&context, command),
 	}
 }

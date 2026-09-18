@@ -38,6 +38,9 @@ pub struct ClaimArgs {
 	/// The `token_program` account
 	#[arg(long)]
 	token_program: String,
+	/// The `clock` account
+	#[arg(long)]
+	clock: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError> {
@@ -50,6 +53,7 @@ pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError>
 	let beneficiary_ata = CliContext::pubkey("--beneficiary_ata", &args.beneficiary_ata)?;
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
+	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ClaimInstructionData::new(|data| {
 		data.amount.set(args.amount);
 	})
@@ -70,6 +74,7 @@ pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError>
 		),
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 		token_program,
+		clock,
 	};
 
 	context.send(accounts.instruction(data))

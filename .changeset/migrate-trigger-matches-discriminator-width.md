@@ -1,9 +1,9 @@
 ---
-pina: minor
-pina_macros: minor
+pina: feat
+pina_macros: feat
 ---
 
-# Match the reserved `Migrate` trigger to the instruction discriminator width
+# Match the Migrate trigger to the discriminator width
 
 `#[discriminator]` reserves the all-ones value of the enum's own primitive, so a `u16` program reserves `0xffff` and a `u32` program reserves `0xffff_ffff`. The generated entrypoint guarded the reserved path with `is_migrate_instruction`, which only tests one byte, so for any program whose instruction enum used `primitive = u16`, `u32`, or `u64` the reserved discriminator never matched and `process_migrate` was unreachable.
 

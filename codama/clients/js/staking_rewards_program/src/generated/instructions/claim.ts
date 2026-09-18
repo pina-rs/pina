@@ -59,6 +59,7 @@ export type ClaimInstruction<
 	TAccountPoolState extends string | AccountMeta<string> = string,
 	TAccountPositionState extends string | AccountMeta<string> = string,
 	TAccountUserRewardAta extends string | AccountMeta<string> = string,
+	TAccountRewardVault extends string | AccountMeta<string> = string,
 	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
 		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -83,6 +84,8 @@ export type ClaimInstruction<
 			TAccountUserRewardAta extends string
 				? WritableAccount<TAccountUserRewardAta>
 				: TAccountUserRewardAta,
+			TAccountRewardVault extends string ? ReadonlyAccount<TAccountRewardVault>
+				: TAccountRewardVault,
 			TAccountAssociatedTokenProgram extends string
 				? ReadonlyAccount<TAccountAssociatedTokenProgram>
 				: TAccountAssociatedTokenProgram,
@@ -143,6 +146,7 @@ export type ClaimInput<
 	TAccountPoolState extends string = string,
 	TAccountPositionState extends string = string,
 	TAccountUserRewardAta extends string = string,
+	TAccountRewardVault extends string = string,
 	TAccountAssociatedTokenProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
@@ -152,6 +156,7 @@ export type ClaimInput<
 	poolState: Address<TAccountPoolState>;
 	positionState: Address<TAccountPositionState>;
 	userRewardAta: Address<TAccountUserRewardAta>;
+	rewardVault: Address<TAccountRewardVault>;
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
@@ -163,6 +168,7 @@ export function getClaimInstruction<
 	TAccountPoolState extends string,
 	TAccountPositionState extends string,
 	TAccountUserRewardAta extends string,
+	TAccountRewardVault extends string,
 	TAccountAssociatedTokenProgram extends string,
 	TAccountTokenProgram extends string,
 	TAccountSystemProgram extends string,
@@ -175,6 +181,7 @@ export function getClaimInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserRewardAta,
+		TAccountRewardVault,
 		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
@@ -187,6 +194,7 @@ export function getClaimInstruction<
 	TAccountPoolState,
 	TAccountPositionState,
 	TAccountUserRewardAta,
+	TAccountRewardVault,
 	TAccountAssociatedTokenProgram,
 	TAccountTokenProgram,
 	TAccountSystemProgram
@@ -202,6 +210,7 @@ export function getClaimInstruction<
 		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
+		rewardVault: { value: input.rewardVault ?? null, isWritable: false },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isWritable: false,
@@ -236,6 +245,7 @@ export function getClaimInstruction<
 			getAccountMeta("poolState", accounts.poolState),
 			getAccountMeta("positionState", accounts.positionState),
 			getAccountMeta("userRewardAta", accounts.userRewardAta),
+			getAccountMeta("rewardVault", accounts.rewardVault),
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
@@ -249,6 +259,7 @@ export function getClaimInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserRewardAta,
+		TAccountRewardVault,
 		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
@@ -266,9 +277,10 @@ export type ParsedClaimInstruction<
 		poolState: TAccountMetas[2];
 		positionState: TAccountMetas[3];
 		userRewardAta: TAccountMetas[4];
-		associatedTokenProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
-		systemProgram: TAccountMetas[7];
+		rewardVault: TAccountMetas[5];
+		associatedTokenProgram: TAccountMetas[6];
+		tokenProgram: TAccountMetas[7];
+		systemProgram: TAccountMetas[8];
 	};
 	data: ClaimInstructionData;
 };
@@ -282,12 +294,12 @@ export function parseClaimInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -305,6 +317,7 @@ export function parseClaimInstruction<
 			poolState: getNextAccount(),
 			positionState: getNextAccount(),
 			userRewardAta: getNextAccount(),
+			rewardVault: getNextAccount(),
 			associatedTokenProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),

@@ -1,6 +1,6 @@
 ---
-pina: minor
-pina_macros: minor
+pina: feat
+pina_macros: feat
 ---
 
 # Reject event schemas that cannot fit the SBF stack

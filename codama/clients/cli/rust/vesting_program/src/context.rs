@@ -387,6 +387,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		0 => Some("InvalidSchedule"),
 		1 => Some("ClaimTooLarge"),
 		2 => Some("AlreadyCancelled"),
+		3 => Some("CliffNotReached"),
+		4 => Some("InsufficientVaultBalance"),
 		_ => None,
 	}
 }

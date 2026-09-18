@@ -17,7 +17,10 @@ pub struct Cancel {
 	pub admin: solana_pubkey::Pubkey,
 	pub mint: solana_pubkey::Pubkey,
 	pub vesting_state: solana_pubkey::Pubkey,
+	pub admin_ata: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
+	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 }
 
@@ -26,6 +29,7 @@ impl Cancel {
 		admin: solana_pubkey::Pubkey,
 		mint: solana_pubkey::Pubkey,
 		vesting_state: solana_pubkey::Pubkey,
+		admin_ata: solana_pubkey::Pubkey,
 		vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
 	) -> Self {
@@ -33,7 +37,12 @@ impl Cancel {
 			admin,
 			mint,
 			vesting_state,
+			admin_ata,
 			vault,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
+			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
 	}
@@ -48,10 +57,8 @@ impl Cancel {
 		data: CancelInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.admin, true,
-		));
+		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.admin, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint, false,
 		));
@@ -59,7 +66,16 @@ impl Cancel {
 			self.vesting_state,
 			false,
 		));
+		accounts.push(solana_instruction::AccountMeta::new(self.admin_ata, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.token_program,
 			false,

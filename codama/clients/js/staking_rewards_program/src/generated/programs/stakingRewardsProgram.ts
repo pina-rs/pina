@@ -47,6 +47,7 @@ import {
 	getDepositInstruction,
 	getInitializePoolInstructionAsync,
 	getOpenPositionInstruction,
+	getSetRewardIndexInstruction,
 	getWithdrawInstruction,
 	type InitializePoolAsyncInput,
 	type OpenPositionInput,
@@ -56,10 +57,13 @@ import {
 	parseDepositInstruction,
 	type ParsedInitializePoolInstruction,
 	type ParsedOpenPositionInstruction,
+	type ParsedSetRewardIndexInstruction,
 	type ParsedWithdrawInstruction,
 	parseInitializePoolInstruction,
 	parseOpenPositionInstruction,
+	parseSetRewardIndexInstruction,
 	parseWithdrawInstruction,
+	type SetRewardIndexInput,
 	type WithdrawInput,
 } from "../instructions";
 import { getMigrateInstruction, type MigrateInput } from "../instructions";
@@ -100,6 +104,7 @@ export enum StakingRewardsProgramInstruction {
 	Deposit,
 	Withdraw,
 	Claim,
+	SetRewardIndex,
 }
 
 export function identifyStakingRewardsProgramInstruction(
@@ -126,6 +131,10 @@ export function identifyStakingRewardsProgramInstruction(
 		containsBytes(data, getU8Encoder().encode(4), 0) &&
 		containsBytes(data, getU8Encoder().encode(0), 1)
 	) return StakingRewardsProgramInstruction.Claim;
+	if (
+		containsBytes(data, getU8Encoder().encode(5), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return StakingRewardsProgramInstruction.SetRewardIndex;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "stakingRewardsProgram" },
@@ -144,7 +153,9 @@ export type ParsedStakingRewardsProgramInstruction<
 	| { instructionType: StakingRewardsProgramInstruction.Withdraw }
 		& ParsedWithdrawInstruction<TProgram>
 	| { instructionType: StakingRewardsProgramInstruction.Claim }
-		& ParsedClaimInstruction<TProgram>;
+		& ParsedClaimInstruction<TProgram>
+	| { instructionType: StakingRewardsProgramInstruction.SetRewardIndex }
+		& ParsedSetRewardIndexInstruction<TProgram>;
 
 export function parseStakingRewardsProgramInstruction<TProgram extends string>(
 	instruction:
@@ -186,6 +197,13 @@ export function parseStakingRewardsProgramInstruction<TProgram extends string>(
 			return {
 				instructionType: StakingRewardsProgramInstruction.Claim,
 				...parseClaimInstruction(instruction),
+			};
+		}
+		case StakingRewardsProgramInstruction.SetRewardIndex: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.SetRewardIndex,
+				...parseSetRewardIndexInstruction(instruction),
 			};
 		}
 		default:
@@ -235,6 +253,11 @@ export type StakingRewardsProgramPluginInstructions = {
 	claim: (
 		input: ClaimInput,
 	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
+	setRewardIndex: (
+		input: SetRewardIndexInput,
+	) =>
+		& ReturnType<typeof getSetRewardIndexInstruction>
+		& SelfPlanAndSendFunctions;
 };
 
 export type StakingRewardsProgramPluginPdas = {
@@ -279,6 +302,11 @@ export function stakingRewardsProgramProgram() {
 						addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
 					claim: (input) =>
 						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
+					setRewardIndex: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getSetRewardIndexInstruction(input),
+						),
 				},
 				pdas: { pool: findPoolPda, position: findPositionPda },
 				identifyAccount: identifyStakingRewardsProgramAccount,
