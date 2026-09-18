@@ -1,0 +1,18 @@
+error[E0308]: mismatched types
+  --> tests/ui/fail/pda_shadowed_address.rs:19:1
+   |
+19 | #[pda(seeds = [b"vault", authority: Address])]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `pina::Address`, found `Address`
+   |
+   = note: `Address` and `pina::Address` have similar names, but are actually distinct types
+note: `Address` is defined in the current crate
+  --> tests/ui/fail/pda_shadowed_address.rs:8:1
+   |
+ 8 | pub struct Address([u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^
+note: `pina::Address` is defined in crate `solana_address`
+  --> $CARGO/solana-address-$VERSION/src/lib.rs
+   |
+   | pub struct Address(pub(crate) [u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `pda` (in Nightly builds, run with -Z macro-backtrace for more info)
