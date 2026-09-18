@@ -873,11 +873,20 @@ fn cpi_render_error(path: &Path, source: pina_cpi_renderer::RenderError) -> Coda
 
 pub(crate) fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
 	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
+	let has_link = crate::path_security::has_user_controlled_link_like_component(&absolute)
+		.map_err(|source| create_dir_error(path, source))?;
 
 	if absolute.parent().is_none() {
 		return Err(CodamaError::UnsafeOutput {
 			path: absolute,
 			reason: "filesystem roots cannot be generation targets".to_owned(),
+		});
+	}
+
+	if has_link {
+		return Err(CodamaError::UnsafeOutput {
+			path: absolute,
+			reason: "generation output paths cannot traverse symbolic links".to_owned(),
 		});
 	}
 
@@ -1969,21 +1978,24 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
-	fn render_target_allows_a_symlinked_prefix_but_rejects_the_target() {
+	fn render_target_rejects_a_symlinked_prefix_and_target() {
 		use std::os::unix::fs::symlink;
 
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		let real = temp.path().join("real");
-		let link = temp.path().join("link");
+		let temp_root =
+			std::fs::canonicalize(temp.path()).expect("temporary directory should resolve");
+		let real = temp_root.join("real");
+		let link = temp_root.join("link");
 		std::fs::create_dir_all(&real)
 			.unwrap_or_else(|error| panic!("failed to create real dir: {error}"));
 		symlink(&real, &link).unwrap_or_else(|error| panic!("failed to create symlink: {error}"));
 
-		validate_render_target(&link.join("generated"))
-			.unwrap_or_else(|error| panic!("symlinked prefix should be allowed: {error}"));
+		let prefix_error = validate_render_target(&link.join("generated"))
+			.expect_err("symlinked prefixes should be rejected");
 		let error = validate_render_target(&link).expect_err("symlink target should be rejected");
 
+		assert!(prefix_error.to_string().contains("symbolic link"));
 		assert!(error.to_string().contains("symbolic link"));
 	}
 
@@ -1994,8 +2006,10 @@ mod tests {
 
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		let output = temp.path().join("clients");
-		let external = temp.path().join("external");
+		let temp_root =
+			std::fs::canonicalize(temp.path()).expect("temporary directory should resolve");
+		let output = temp_root.join("clients");
+		let external = temp_root.join("external");
 		std::fs::create_dir_all(&output)
 			.unwrap_or_else(|error| panic!("failed to create output dir: {error}"));
 		std::fs::create_dir_all(&external)
