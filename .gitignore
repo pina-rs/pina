@@ -10,6 +10,11 @@
 /.direnv
 **/rustc-ice-*.txt
 
+# LLVM profile data written by `coverage:all`. Each test binary drops one in
+# its crate directory, so a full coverage run would otherwise litter the
+# worktree.
+*.profraw
+
 # Devenv
 .devenv*
 devenv.local.nix

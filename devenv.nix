@@ -108,9 +108,22 @@ in
   # HOST_* is required because the nix stdenv setup hooks re-export
   # CC=clang/CXX=clang++ after `env`, silently overriding shell-level CC/CXX
   # values; cc-rs prefers HOST_* over CC/CXX, and nothing overwrites those.
+  #
+  # Rust links host test binaries through the same nix cc-wrapper, which ends at
+  # `cctools-binutils-darwin`'s `ld64` instead of Apple's linker. Binaries it
+  # produces cannot initialise their unwinder, so every `panic!` aborts the
+  # whole test binary with `fatal runtime error: failed to initiate panic,
+  # error 5` — a failed assertion becomes indistinguishable from a crash, and
+  # the `lint:push` hook (which re-enters devenv) can never pass.
+  #
+  # `CARGO_TARGET_<TARGET>_LINKER` redirects the host target only, leaving the
+  # `bpfel-unknown-none` cross builds and Kani untouched. `/usr/bin/cc` is
+  # Apple's driver, so it resolves the global SDK the same way `HOST_*` does.
   // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
     HOST_CC = "/usr/bin/clang";
     HOST_CXX = "/usr/bin/clang++";
+    CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "/usr/bin/cc";
+    CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER = "/usr/bin/cc";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
