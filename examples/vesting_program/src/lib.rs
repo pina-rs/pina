@@ -201,7 +201,7 @@ fn vested_amount(
 		.ok_or(ProgramError::ArithmeticOverflow)?
 		/ u128::from(window);
 
-	u64::try_from(vested).map_err(|_| ProgramError::ArithmeticOverflow.into())
+	u64::try_from(vested).map_err(|_| ProgramError::ArithmeticOverflow)
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {

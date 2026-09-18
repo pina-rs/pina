@@ -583,9 +583,7 @@ fn fetch_verified(url: &str, identity: &ToolchainIdentity) -> Result<VerifiedDri
 
 /// Return the lowercase hex sha256 of `bytes`.
 fn sha256_hex(bytes: &[u8]) -> String {
-	use sha2::Digest;
-
-	let digest = sha2::Sha256::digest(bytes);
+	let digest = Sha256::digest(bytes);
 	let mut hex = String::with_capacity(digest.len() * 2);
 	for byte in digest {
 		use core::fmt::Write;
@@ -666,7 +664,7 @@ fn fetch(url: &str, identity: &ToolchainIdentity) -> Result<Vec<u8>, DriverError
 
 	let mut limited = response.body_mut().as_reader().take(MAX_DOWNLOAD_BYTES + 1);
 	let mut bytes = Vec::new();
-	std::io::Read::read_to_end(&mut limited, &mut bytes).map_err(|error| {
+	Read::read_to_end(&mut limited, &mut bytes).map_err(|error| {
 		DriverError::Download {
 			url: url.to_owned(),
 			toolchain: identity.to_string(),

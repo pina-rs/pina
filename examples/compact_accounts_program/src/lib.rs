@@ -256,7 +256,7 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 		self.journal.assert_writable()?;
 
 		let (mut entries, current_count, revision) =
-			Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
+			Journal::with_stored_bump_pda(self.journal, &authority_key, &ID, |journal| {
 				assert_journal_authority(journal.authority, &authority_key)?;
 				let current = journal.entries();
 				let mut entries = [PodU64::ZERO; Journal::ENTRIES_CAPACITY];
@@ -300,7 +300,7 @@ impl<'a> ProcessAccountInfos<'a> for WriteAccounts<'a> {
 		self.journal.assert_writable()?;
 
 		let (mut entries, entry_count, revision) =
-			Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
+			Journal::with_stored_bump_pda(self.journal, &authority_key, &ID, |journal| {
 				assert_journal_authority(journal.authority, &authority_key)?;
 				let current = journal.entries();
 				if index >= current.len() {
@@ -337,11 +337,12 @@ impl<'a> ProcessAccountInfos<'a> for RenameAccounts<'a> {
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.journal.assert_writable()?;
-		let revision = Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
-			assert_journal_authority(journal.authority, &authority_key)?;
+		let revision =
+			Journal::with_stored_bump_pda(self.journal, &authority_key, &ID, |journal| {
+				assert_journal_authority(journal.authority, &authority_key)?;
 
-			Ok(journal.revision.get())
-		})?;
+				Ok(journal.revision.get())
+			})?;
 
 		UpdateResizableAccount {
 			account: self.journal,
