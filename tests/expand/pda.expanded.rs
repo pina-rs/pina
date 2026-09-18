@@ -152,6 +152,12 @@ impl ::pina::IntoDiscriminator for PdaDisc {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u8).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u8).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u8).matches_discriminator(bytes)
     }

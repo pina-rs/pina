@@ -138,6 +138,12 @@ impl ::pina::IntoDiscriminator for MyDiscriminator {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u8).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u8).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u8).matches_discriminator(bytes)
     }
@@ -265,6 +271,12 @@ impl ::pina::IntoDiscriminator for U16Discriminator {
     }
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u16).write_discriminator(bytes);
+    }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u16).try_write_discriminator(bytes)
     }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u16).matches_discriminator(bytes)
@@ -394,6 +406,12 @@ impl ::pina::IntoDiscriminator for U32Discriminator {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u32).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u32).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u32).matches_discriminator(bytes)
     }
@@ -522,6 +540,12 @@ impl ::pina::IntoDiscriminator for U64Discriminator {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u64).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u64).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u64).matches_discriminator(bytes)
     }
@@ -626,6 +650,12 @@ impl ::pina::IntoDiscriminator for FinalDiscriminator {
     }
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u8).write_discriminator(bytes);
+    }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u8).try_write_discriminator(bytes)
     }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u8).matches_discriminator(bytes)

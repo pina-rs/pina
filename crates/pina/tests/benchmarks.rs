@@ -139,6 +139,17 @@ fn benchmark_discriminator_write() {
 	});
 }
 
+/// The checked write adds one length comparison, which is the entire cost of
+/// switching a manual implementation from the unchecked form.
+#[test]
+fn benchmark_try_discriminator_write() {
+	let mut bytes = [0u8; 4];
+	bench("discriminator u32 try_write", || {
+		let val: u32 = black_box(0xDEAD_BEEF);
+		let _ = black_box(val.try_write_discriminator(black_box(&mut bytes)));
+	});
+}
+
 #[test]
 fn benchmark_has_discriminator_matches() {
 	bench("HasDiscriminator matches (TestState)", || {
