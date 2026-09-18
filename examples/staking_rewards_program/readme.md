@@ -2,9 +2,9 @@
 
 <br>
 
-Staking account and rewards-bookkeeping scaffold.
+Staking pools with check-pointed reward accrual and reward release.
 
-> **Not production-ready:** Deposit, withdraw, and claim update program-owned bookkeeping but do not transfer stake or reward tokens. Do not deploy or fork this example as a staking product without completing the custody and reward model described below.
+> **Review before deploying:** rewards accrue and release correctly, but the example still omits the emission policy a specific product needs (funding schedules, solvency guarantees, and shutdown rules). See the production-readiness checklist below.
 
 ## What it covers
 
@@ -13,15 +13,15 @@ Staking account and rewards-bookkeeping scaffold.
 - Pool initialization with stake and reward vault ATAs.
 - Per-user position PDAs keyed by pool + owner.
 - Deposit, withdraw, and claim validation and bookkeeping flows.
-- Token-program validation and ATA creation (eager for pool vaults, idempotent for deposits).
+- Reward accrual through a monotone pool `reward_index` (rewards per staked token, scaled by `REWARD_INDEX_SCALE`) with a per-position `reward_debt` checkpoint. `SetRewardIndex` is the authority's drip and may only raise the index; deposit and withdraw bank the position's accrued rewards before the stake changes, so a new deposit cannot claim rewards earned before it arrived.
+- Reward release: `Claim` transfers the accrued amount out of the pool's reward vault, signed by the pool PDA.
 
-The `tests/e2e.rs` file exercises the bookkeeping lifecycle through Mollusk. It does not assert token custody or reward payments. The tests report a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
+The `tests/surfpool` suite funds both vaults through real mints and asserts the balances around every step, including that a second claim without a new drip is refused and that a regressed reward index is rejected. It reports a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
 
 ## Deliberately out of scope
 
+- Reward funding schedules, emissions curves, and solvency guarantees: the authority decides when and by how much the index moves, and a claim fails if the reward vault cannot cover it.
 - Transfers into and out of the PDA-controlled stake vault.
-- Transfers from the reward vault to a claimant.
-- Reward funding, solvency, emissions, time, precision, and settlement rules.
 - Pause administration, position closure, pool shutdown, and recovery policy.
 
 See the book's [Production Readiness](../../docs/src/production-readiness.md) checklist for the invariants and adversarial tests a real staking program needs.
