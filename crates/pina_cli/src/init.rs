@@ -218,7 +218,10 @@ verbose-logs = ["pina/verbose-logs"]
 bpf-entrypoint = []
 
 [dependencies]
-pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
+# `account-resize` backs the reserved `Migrate` route that
+# `#[discriminator(entrypoint)]` generates, which is how a scaffolded program
+# serves migrations.
+pina = {{ version = "{pina_version}", features = ["account-resize", "logs", "derive"] }}
 
 # Production profile for the deployed program. Every setting here either
 # shrinks the deployed binary or keeps the build honest about it.
@@ -587,6 +590,9 @@ mod tests {
 		assert!(cargo.contains("default = []"));
 		assert!(cargo.contains("bpf-entrypoint = []"));
 		assert!(!cargo.contains("cpi = []"));
+		// The scaffolded program serves migrations, and the reserved `Migrate`
+		// route that `#[discriminator(entrypoint)]` generates resizes accounts.
+		assert!(cargo.contains("features = [\"account-resize\", \"logs\", \"derive\"]"));
 		assert!(cargo.contains("[workspace.metadata.cli]"));
 		assert!(cargo.contains("solana = \"3.0.0\""));
 		assert!(!cargo.contains("[workspace.metadata.bin]"));

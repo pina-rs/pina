@@ -638,7 +638,13 @@ mod executor {
 		payer: Option<&'payer AccountView>,
 		signers: &'signers [Signer<'signers, 'signers>],
 		rent: Option<Rent>,
-		max_lamports: u64,
+		/// Caller-declared ceiling on the lamports this migration may transfer.
+		///
+		/// `None` means no declared ceiling: the transfer stays bounded by the
+		/// rent deficit of a size change the runtime already caps at
+		/// [`MAX_PERMITTED_DATA_INCREASE`], so an absent ceiling routes the
+		/// limit rather than removing it.
+		max_lamports: Option<u64>,
 		original_size: usize,
 		stored: u32,
 		transferred: u64,
@@ -706,7 +712,12 @@ mod executor {
 			0
 		};
 		let next_transferred = ctx.transferred.checked_add(funding);
-		if next_transferred.is_none_or(|total| total > ctx.max_lamports) {
+		// An absent ceiling enforces nothing: `funding` is already bounded by
+		// the rent deficit of a growth the runtime caps, so there is no
+		// unbounded spend to guard against.
+		if let Some(max_lamports) = ctx.max_lamports
+			&& next_transferred.is_none_or(|total| total > max_lamports)
+		{
 			return Err(PinaProgramError::MigrationLamportBudgetExceeded.into());
 		}
 		// Account for the planned funding up front so the post-mutation tail
@@ -896,8 +907,12 @@ mod executor {
 		/// Executing program ID used to validate account ownership.
 		pub program_id: &'address Address,
 
-		/// Maximum lamports this invocation may transfer from `payer`.
-		pub max_lamports: u64,
+		/// Ceiling on the lamports this invocation may transfer from `payer`.
+		///
+		/// `None` declares no ceiling: growth stays bounded by the rent deficit
+		/// of a size change the runtime already limits, so the transfer cannot
+		/// grow without bound.
+		pub max_lamports: Option<u64>,
 	}
 
 	impl MigrateAccount<'_, '_, '_> {
@@ -1025,11 +1040,12 @@ mod executor {
 	/// `max_lamports` caps the rent transfers of the whole reserved
 	/// instruction: every slot this context migrates draws from the same
 	/// budget, so the payer can never be charged the cap once per account.
+	/// `None` declares no ceiling.
 	#[must_use]
 	pub struct MigrateContext<'account> {
 		program_id: &'account Address,
 		accounts: &'account mut [AccountView],
-		max_lamports: u64,
+		max_lamports: Option<u64>,
 		migrated: u64,
 		spent_lamports: u64,
 		rent: Option<Rent>,
@@ -1048,7 +1064,7 @@ mod executor {
 		pub fn new(
 			program_id: &'account Address,
 			accounts: &'account mut [AccountView],
-			max_lamports: u64,
+			max_lamports: Option<u64>,
 		) -> Result<Self, ProgramError> {
 			let Some((payer, rest)) = accounts.split_first_mut() else {
 				return Err(ProgramError::NotEnoughAccountKeys);
@@ -1096,7 +1112,7 @@ mod executor {
 		pub(super) fn with_rent(
 			program_id: &'account Address,
 			accounts: &'account mut [AccountView],
-			max_lamports: u64,
+			max_lamports: Option<u64>,
 			rent: Rent,
 		) -> Result<Self, ProgramError> {
 			let mut context = Self::new(program_id, accounts, max_lamports)?;
@@ -1164,7 +1180,9 @@ mod executor {
 				// Spend from the instruction-wide budget, not a per-account
 				// copy of the cap: the payer may fund several slots in one
 				// reserved invocation.
-				max_lamports: self.max_lamports.saturating_sub(self.spent_lamports),
+				max_lamports: self
+					.max_lamports
+					.map(|cap| cap.saturating_sub(self.spent_lamports)),
 			};
 			let outcome = executor.invoke_signed_inner::<T>(&[], self.rent)?;
 			self.migrated |= bit;
@@ -1214,6 +1232,17 @@ mod executor {
 pub use executor::MigrateAccount;
 #[cfg(feature = "account-resize")]
 pub use executor::MigrateContext;
+
+/// Capability marker for the reserved `Migrate` route.
+///
+/// Deliberately named after the remedy: `#[discriminator(entrypoint)]` emits a
+/// reference to it, so a program that enables the route without the
+/// `account-resize` feature fails to resolve a symbol that spells out the
+/// feature to enable. Enabling the route without the executor it calls cannot
+/// work, and the feature is the only switch for it, so this constant is the
+/// macro's compile-time dependency declaration.
+#[cfg(feature = "account-resize")]
+pub const ACCOUNT_RESIZE_FEATURE_REQUIRED_FOR_MIGRATE_ROUTE: () = ();
 
 #[cfg(test)]
 #[allow(unsafe_code)]
@@ -1902,7 +1931,7 @@ mod tests {
 		let program_id = Address::new_from_array([9; 32]);
 
 		assert_eq!(
-			MigrateContext::new(&program_id, &mut [], 0).err(),
+			MigrateContext::new(&program_id, &mut [], Some(0)).err(),
 			Some(ProgramError::NotEnoughAccountKeys)
 		);
 
@@ -1913,7 +1942,7 @@ mod tests {
 					.view(),
 			];
 		assert_eq!(
-			MigrateContext::new(&program_id, &mut payer_only, 0).err(),
+			MigrateContext::new(&program_id, &mut payer_only, Some(0)).err(),
 			Some(ProgramError::NotEnoughAccountKeys)
 		);
 
@@ -1930,7 +1959,7 @@ mod tests {
 		);
 		let mut views = [stored_payer.view(), system.view(), stored_target.view()];
 		assert!(matches!(
-			MigrateContext::new(&program_id, &mut views, 0),
+			MigrateContext::new(&program_id, &mut views, Some(0)),
 			Err(ProgramError::InvalidAccountData)
 		));
 
@@ -1950,7 +1979,7 @@ mod tests {
 			wrong_system.view(),
 			stored_target.view(),
 		];
-		assert!(MigrateContext::new(&program_id, &mut views, 0).is_err());
+		assert!(MigrateContext::new(&program_id, &mut views, Some(0)).is_err());
 
 		// Every migratable slot must be owned by the executing program.
 		let mut stored_payer =
@@ -1964,7 +1993,7 @@ mod tests {
 		);
 		let mut views = [stored_payer.view(), system.view(), foreign.view()];
 		assert_eq!(
-			MigrateContext::new(&program_id, &mut views, 0).err(),
+			MigrateContext::new(&program_id, &mut views, Some(0)).err(),
 			Some(ProgramError::InvalidAccountOwner)
 		);
 
@@ -1978,7 +2007,7 @@ mod tests {
 			&[7, 0, 42],
 		);
 		let mut views = [placeholder.view(), system.view(), stored_target.view()];
-		let context = MigrateContext::new(&program_id, &mut views, 0)
+		let context = MigrateContext::new(&program_id, &mut views, Some(0))
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 		assert!(!context.migrated_any());
 	}
@@ -1996,7 +2025,7 @@ mod tests {
 			&[7, 0, 42],
 		);
 		let mut views = [placeholder.view(), system.view(), stored.view()];
-		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, Some(0), test_rent())
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 
 		assert_eq!(
@@ -2051,7 +2080,7 @@ mod tests {
 		let duplicate = stored.view();
 		let mut views = [placeholder.view(), system.view(), stored.view(), duplicate];
 		assert_eq!(
-			MigrateContext::new(&program_id, &mut views, 0).err(),
+			MigrateContext::new(&program_id, &mut views, Some(0)).err(),
 			Some(PinaProgramError::DuplicateMutableAccount.into())
 		);
 	}
@@ -2069,7 +2098,7 @@ mod tests {
 			&[8, 0, 11, 42],
 		);
 		let mut views = [placeholder.view(), system.view(), stored.view()];
-		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, Some(0), test_rent())
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 
 		assert_eq!(
@@ -2097,7 +2126,7 @@ mod tests {
 			absent.view(),
 			stored.view(),
 		];
-		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, Some(0), test_rent())
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 
 		assert_eq!(context.run_optional::<GrowingAccount>(2).ok(), Some(None));
@@ -2117,7 +2146,7 @@ mod tests {
 		let mut poor =
 			TestAccount::<8>::new(Address::new_from_array([3; 32]), program_id, 0, &[7, 0, 42]);
 		let mut views = [payer.view(), system.view(), poor.view()];
-		let mut context = MigrateContext::with_rent(&program_id, &mut views, 0, test_rent())
+		let mut context = MigrateContext::with_rent(&program_id, &mut views, Some(0), test_rent())
 			.unwrap_or_else(|error| panic!("valid layout: {error:?}"));
 		assert_eq!(
 			context.run::<GrowingAccount>(2).err(),
@@ -2170,7 +2199,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<GrowingAccount>(test_rent())
 		.unwrap_or_else(|error| panic!("migrate account: {error:?}"));
@@ -2204,7 +2233,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<TwoStepAccount>(test_rent())
 		.unwrap_or_else(|error| panic!("migrate two-step account: {error:?}"));
@@ -2237,7 +2266,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<ShrinkingAccount>(test_rent())
 		.unwrap_or_else(|error| panic!("migrate account: {error:?}"));
@@ -2273,7 +2302,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<GrowingAccount>(test_rent());
 
@@ -2305,7 +2334,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		};
 		assert_eq!(
 			migration.invoke::<GrowingAccount>(),
@@ -2333,7 +2362,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: u64::MAX,
+			max_lamports: Some(u64::MAX),
 		}
 		.invoke::<GrowingAccount>();
 
@@ -2355,7 +2384,7 @@ mod tests {
 			account: &mut account,
 			payer: Some(&payer),
 			program_id: &owner,
-			max_lamports: u64::MAX,
+			max_lamports: Some(u64::MAX),
 		}
 		.invoke_with_rent::<GrowingAccount>(test_rent())
 		.unwrap_or_else(|error| panic!("funded migration: {error:?}"));
@@ -2388,7 +2417,7 @@ mod tests {
 				account: &mut account,
 				payer: Some(&readonly_payer),
 				program_id: &owner,
-				max_lamports: u64::MAX,
+				max_lamports: Some(u64::MAX),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(ProgramError::InvalidAccountData)
@@ -2409,7 +2438,7 @@ mod tests {
 				account: &mut account,
 				payer: Some(&borrowed_payer),
 				program_id: &owner,
-				max_lamports: u64::MAX,
+				max_lamports: Some(u64::MAX),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(ProgramError::AccountBorrowFailed)
@@ -2432,7 +2461,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: u64::MAX,
+			max_lamports: Some(u64::MAX),
 		}
 		.invoke_with_rent::<GrowingAccount>(rent);
 
@@ -2457,7 +2486,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &program_id,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(ProgramError::InvalidAccountOwner)
@@ -2477,7 +2506,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &program_id,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(ProgramError::InvalidAccountData)
@@ -2497,7 +2526,7 @@ mod tests {
 					account: &mut account,
 					payer: None,
 					program_id: &program_id,
-					max_lamports: 0,
+					max_lamports: Some(0),
 				}
 				.invoke_with_rent::<GrowingAccount>(test_rent())
 				.is_err()
@@ -2522,7 +2551,7 @@ mod tests {
 					account: &mut account,
 					payer: None,
 					program_id: &owner,
-					max_lamports: u64::MAX,
+					max_lamports: Some(u64::MAX),
 				}
 				.invoke_with_rent::<AdversarialPlanAccount>(test_rent()),
 				Err(PinaProgramError::MigrationUnavailable.into())
@@ -2541,7 +2570,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: u64::MAX,
+				max_lamports: Some(u64::MAX),
 			}
 			.invoke_with_rent::<AdversarialPlanAccount>(test_rent()),
 			Err(PinaProgramError::MigrationAccountGrowthExceeded.into())
@@ -2556,7 +2585,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: u64::MAX,
+				max_lamports: Some(u64::MAX),
 			}
 			.invoke_with_rent::<StepBudgetAccount>(test_rent()),
 			Err(PinaProgramError::MigrationUnavailable.into())
@@ -2590,7 +2619,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: u64::MAX,
+			max_lamports: Some(u64::MAX),
 		}
 		.invoke_with_rent::<AdversarialPlanAccount>(test_rent())
 		.expect_err("growth beyond MAX_PERMITTED_DATA_INCREASE must fail");
@@ -2607,7 +2636,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<GrowingAccount>(test_rent())
 		.expect_err("a rent deficit beyond max_lamports must fail");
@@ -2621,6 +2650,49 @@ mod tests {
 		assert_ne!(workspace, growth);
 		assert_ne!(workspace, lamports);
 		assert_ne!(growth, lamports);
+	}
+
+	/// An absent ceiling enforces nothing: the same step that fails under
+	/// `Some(0)` completes when no budget is declared, because the transfer is
+	/// already bounded by the rent deficit of a runtime-capped growth.
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn an_absent_lamport_ceiling_permits_funded_growth() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut payer =
+			TestAccount::<32>::new(Address::new_from_array([8; 32]), owner, 1_000_000, &[]);
+
+		let mut unbounded_stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+		let mut unbounded_account = unbounded_stored.view();
+		let mut unbounded_payer = payer.view();
+		MigrateAccount {
+			account: &mut unbounded_account,
+			payer: Some(&mut unbounded_payer),
+			program_id: &owner,
+			max_lamports: None,
+		}
+		.invoke_with_rent::<GrowingAccount>(test_rent())
+		.expect("a migration with no declared ceiling funds its rent deficit");
+
+		// The identical starting bytes fail once a ceiling of zero is declared,
+		// which is what proves the ceiling is what rejected them above.
+		let mut bounded_stored =
+			TestAccount::<8>::new(Address::new_from_array([2; 32]), owner, 0, &[7, 0, 42]);
+		let mut bounded_account = bounded_stored.view();
+		let mut bounded_payer = payer.view();
+		let rejected = MigrateAccount {
+			account: &mut bounded_account,
+			payer: Some(&mut bounded_payer),
+			program_id: &owner,
+			max_lamports: Some(0),
+		}
+		.invoke_with_rent::<GrowingAccount>(test_rent())
+		.expect_err("a declared ceiling of zero still rejects the same growth");
+		assert_eq!(
+			rejected,
+			PinaProgramError::MigrationLamportBudgetExceeded.into()
+		);
 	}
 
 	/// A stale account beyond the generated `MAX_INLINE_STEPS` reports
@@ -2647,7 +2719,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<StepBudgetAccount>(test_rent()),
 			Err(PinaProgramError::MigrationUnavailable.into())
@@ -2664,7 +2736,7 @@ mod tests {
 			account: &mut account,
 			payer: None,
 			program_id: &owner,
-			max_lamports: 0,
+			max_lamports: Some(0),
 		}
 		.invoke_with_rent::<TwoStepAccount>(test_rent())
 		.unwrap_or_else(|error| panic!("rebalanced ladder: {error:?}"));
@@ -2807,7 +2879,7 @@ mod tests {
 			account: &mut account,
 			payer: Some(&payer),
 			program_id: &owner,
-			max_lamports: u64::MAX,
+			max_lamports: Some(u64::MAX),
 		}
 		.invoke_with_rent::<FundedLadderAccount>(rent);
 
@@ -2836,7 +2908,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<InvalidDestinationAccount>(test_rent());
 		} else {
@@ -2847,7 +2919,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<PlannerFailureAfterMutation>(test_rent());
 		}
@@ -2867,7 +2939,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: 0,
+				max_lamports: Some(0),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(PinaProgramError::MigrationLamportBudgetExceeded.into())
@@ -2882,7 +2954,7 @@ mod tests {
 				account: &mut account,
 				payer: None,
 				program_id: &owner,
-				max_lamports: u64::MAX,
+				max_lamports: Some(u64::MAX),
 			}
 			.invoke_with_rent::<GrowingAccount>(test_rent()),
 			Err(PinaProgramError::MigrationRequired.into())

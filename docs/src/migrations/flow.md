@@ -232,13 +232,15 @@ if is_migrate_instruction(data) {
 
 Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account.
 
-**The ladder is derived, not declared.** A program wires the route by adding `migrations_max_lamports = EXPR` to its `#[discriminator(entrypoint)]` attribute; the slots are then read from `migrations/manifest.json`, one per enveloped account contract, in the manifest's identity-sorted order — exactly the order generated clients compose. Declaring a contract list is optional and only needed to batch several accounts of the _same_ contract in one sweep, because the manifest records contracts rather than account instances:
+**The ladder is derived, not declared.** `#[discriminator(entrypoint)]` wires the route on its own: the slots are read from `migrations/manifest.json`, one per enveloped account contract, in the manifest's identity-sorted order — exactly the order generated clients compose. Declaring a contract list is optional and only needed to batch several accounts of the _same_ contract in one sweep, because the manifest records contracts rather than account instances:
+
+The route calls the resize executor, so a program that serves migrations needs `pina`'s `account-resize` feature. `pina init` scaffolds it; the generated code names it when it is missing.
 
 ```rust,ignore
-#[discriminator(entrypoint, migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS)]
+#[discriminator(entrypoint)]
 pub enum Instruction { /* … */ }
 
-// Optional override: two `State` accounts share one sweep and one budget.
+// Optional ceiling, and optional slot override for same-contract batching.
 #[discriminator(
 	entrypoint,
 	migrations(State, State),
@@ -246,7 +248,7 @@ pub enum Instruction { /* … */ }
 )]
 ```
 
-The budget stays explicit: an unset `migrations_max_lamports` generates no reserved route, and the macro never invents a cap, because the ceiling is program policy and a silent default would misprice rent transfers. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
+`migrations_max_lamports` is optional and off by default. Declaring one caps the total lamports the reserved instruction may transfer; leaving it out enforces no ceiling, which is safe because a transfer is never more than the rent deficit of a growth the runtime already caps at `MAX_PERMITTED_DATA_INCREASE`. Declare one to refuse an expensive migration rather than to permit it. A slot holding the program address (the placeholder generated clients write for an omitted optional account) or an index past the end of the list is skipped, so a client sends only the accounts it needs. `MigrateContext` validates ownership, rejects duplicated account slots, migrates each slot at most once, and runs each slot through the same `MigrateAccount` executor — the same step, growth, and lamport caps as the inline path.
 
 That makes the client flow explicit: when an account is stale and the business instruction cannot carry a payer, prepend `[Migrate { payer }, …real instructions]` in the same transaction — the payer authorizes exactly the migration cost, and the real instruction observes current data or the whole transaction fails.
 

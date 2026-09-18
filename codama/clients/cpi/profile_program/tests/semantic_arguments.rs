@@ -11,6 +11,7 @@ fn semantic_strings_encode_the_exact_pinapod_wire() {
 	.to_bytes()
 	.unwrap_or_else(|error| panic!("semantic strings should encode: {error:?}"));
 
+	// Envelope: discriminator, migration version, bump, then the payload.
 	assert_eq!(bytes.len(), 165);
 	assert_eq!(&bytes[..4], &[0, 0, 7, 4]);
 	assert_eq!(&bytes[4..8], b"Pina");

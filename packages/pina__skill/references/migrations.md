@@ -29,16 +29,21 @@ Per contract, add the `migrations` token to the schema attribute:
 
 `migrations = true` is equivalent. `migrations = false` opts one contract out.
 
-Wire the reserved `Migrate` route by adding the lamport budget to the entrypoint enum. The slot ladder is derived from `migrations/manifest.json` (one slot per enveloped account contract, in identity-sorted order, matching generated clients); an explicit `migrations(A, B)` list is an optional override for batching several accounts of one contract in a single sweep:
+`#[discriminator(entrypoint)]` wires the reserved `Migrate` route on its own. The slot ladder is derived from `migrations/manifest.json` (one slot per enveloped account contract, in identity-sorted order, matching generated clients); an explicit `migrations(A, B)` list is an optional override for batching several accounts of one contract in a single sweep:
 
 ```rust
-#[discriminator(entrypoint, migrations_max_lamports = MAX_INLINE_MIGRATION_LAMPORTS)]
+#[discriminator(entrypoint)]
 pub enum ProgramInstruction {
 	// …
 }
+
+// Optional ceiling, plus the same-contract batching override.
+#[discriminator(entrypoint, migrations(State, State), migrations_max_lamports = 20_000)]
 ```
 
-Exactly one discriminator enum per program may carry `entrypoint`; `pina build` fails closed when two declare it. An unset `migrations_max_lamports` generates no reserved route, because the cap is program policy.
+The route calls the resize executor, so the program needs `pina`'s `account-resize` feature; `pina init` scaffolds it, and the generated code names it when missing. `migrations_max_lamports` is optional: declaring one caps the reserved instruction's total rent transfers, while omitting it enforces no ceiling — safe because a transfer never exceeds the rent deficit of a growth the runtime caps at `MAX_PERMITTED_DATA_INCREASE`.
+
+Exactly one discriminator enum per program may carry `entrypoint`; `pina build` fails closed when two declare it.
 
 Whole kinds, through `pina.toml`:
 

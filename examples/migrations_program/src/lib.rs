@@ -140,7 +140,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 				account: state,
 				payer,
 				program_id: &ID,
-				max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 			}
 			.invoke::<State>()?;
 
@@ -151,7 +151,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 					account: manual_state,
 					payer,
 					program_id: &ID,
-					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 				}
 				.invoke::<ManualState>()?;
 				manual_state.with_compact_account::<ManualState, _>(&ID, |manual| {
@@ -166,7 +166,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 					account: compact_state,
 					payer,
 					program_id: &ID,
-					max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 				}
 				.invoke::<CompactState>()?;
 			}
