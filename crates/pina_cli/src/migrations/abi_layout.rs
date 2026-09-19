@@ -40,7 +40,7 @@ pub fn generate(manifest: &MigrationManifest) -> String {
 	output.push_str("// program-id: ");
 	output.push_str(&manifest.program_id);
 	output.push('\n');
-	output.push_str("// version-type: ");
+	output.push_str("// version_type: ");
 	output.push_str(manifest.version_type.as_str());
 	output.push('\n');
 
@@ -317,7 +317,7 @@ mod tests {
 		let rendered = generate(&manifest);
 
 		assert!(rendered.contains("program-id: 11111111111111111111111111111111"));
-		assert!(rendered.contains("version-type: u8"));
+		assert!(rendered.contains("version_type: u8"));
 	}
 }
 
