@@ -1042,6 +1042,7 @@ fn spending_limit_use_resets_the_period_and_moves_sol() {
 			.multisig(pina_address(&multisig_key))
 			.create_key(pina_address(&limit_create_key))
 			.vault_index(0)
+			.vault_bump(vault_pda(&multisig_key, 0).1)
 			.mint(Address::default())
 			.amount(100)
 			.remaining_amount(0)

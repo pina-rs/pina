@@ -17,7 +17,9 @@ class ProposalCreateInstructionData {
     required this.bump,
     required this.kind,
     required this.vaultIndex,
+    required this.vaultBump,
     required this.ephemeralSigners,
+    required this.ephemeralBumps,
     required this.messageLen,
     required this.message,
     required this.actionsLen,
@@ -30,7 +32,9 @@ class ProposalCreateInstructionData {
   final int bump;
   final int kind;
   final int vaultIndex;
+  final int vaultBump;
   final int ephemeralSigners;
+  final Uint8List ephemeralBumps;
   final int messageLen;
   final Uint8List message;
   final int actionsLen;
@@ -45,7 +49,12 @@ getProposalCreateInstructionDataEncoder() {
     ('bump', getU8Encoder()),
     ('kind', getU8Encoder()),
     ('vaultIndex', getU8Encoder()),
+    ('vaultBump', getU8Encoder()),
     ('ephemeralSigners', getU8Encoder()),
+    (
+      'ephemeralBumps',
+      fixEncoderSize(getBytesEncoder(), 4, allowTruncation: false),
+    ),
     ('messageLen', getU16Encoder()),
     ('message', fixEncoderSize(getBytesEncoder(), 640, allowTruncation: false)),
     ('actionsLen', getU16Encoder()),
@@ -60,7 +69,9 @@ getProposalCreateInstructionDataEncoder() {
       'bump': value.bump,
       'kind': value.kind,
       'vaultIndex': value.vaultIndex,
+      'vaultBump': value.vaultBump,
       'ephemeralSigners': value.ephemeralSigners,
+      'ephemeralBumps': value.ephemeralBumps,
       'messageLen': value.messageLen,
       'message': value.message,
       'actionsLen': value.actionsLen,
@@ -77,7 +88,9 @@ getProposalCreateInstructionDataDecoder() {
     ('bump', getU8Decoder()),
     ('kind', getU8Decoder()),
     ('vaultIndex', getU8Decoder()),
+    ('vaultBump', getU8Decoder()),
     ('ephemeralSigners', getU8Decoder()),
+    ('ephemeralBumps', fixDecoderSize(getBytesDecoder(), 4)),
     ('messageLen', getU16Decoder()),
     ('message', fixDecoderSize(getBytesDecoder(), 640)),
     ('actionsLen', getU16Decoder()),
@@ -108,7 +121,9 @@ getProposalCreateInstructionDataDecoder() {
         bump: map['bump']! as int,
         kind: map['kind']! as int,
         vaultIndex: map['vaultIndex']! as int,
+        vaultBump: map['vaultBump']! as int,
         ephemeralSigners: map['ephemeralSigners']! as int,
+        ephemeralBumps: map['ephemeralBumps']! as Uint8List,
         messageLen: map['messageLen']! as int,
         message: map['message']! as Uint8List,
         actionsLen: map['actionsLen']! as int,
@@ -158,7 +173,9 @@ Instruction getProposalCreateInstruction({
   required int bump,
   required int kind,
   required int vaultIndex,
+  required int vaultBump,
   required int ephemeralSigners,
+  required Uint8List ephemeralBumps,
   required int messageLen,
   required Uint8List message,
   required int actionsLen,
@@ -168,7 +185,9 @@ Instruction getProposalCreateInstruction({
     bump: bump,
     kind: kind,
     vaultIndex: vaultIndex,
+    vaultBump: vaultBump,
     ephemeralSigners: ephemeralSigners,
+    ephemeralBumps: ephemeralBumps,
     messageLen: messageLen,
     message: message,
     actionsLen: actionsLen,

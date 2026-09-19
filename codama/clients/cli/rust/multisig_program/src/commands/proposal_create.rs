@@ -25,7 +25,11 @@ pub struct ProposalCreateArgs {
 	#[arg(long)]
 	vault_index: u8,
 	#[arg(long)]
+	vault_bump: u8,
+	#[arg(long)]
 	ephemeral_signers: u8,
+	#[arg(long)]
+	ephemeral_bumps: String,
 	#[arg(long)]
 	message_len: u16,
 	#[arg(long)]
@@ -52,6 +56,7 @@ pub struct ProposalCreateArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: ProposalCreateArgs) -> Result<(), CliError> {
+	let ephemeral_bumps = CliContext::bytes::<4>("--ephemeral_bumps", &args.ephemeral_bumps)?;
 	let message = CliContext::bytes::<640>("--message", &args.message)?;
 	let actions = CliContext::bytes::<128>("--actions", &args.actions)?;
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
@@ -69,7 +74,9 @@ pub(crate) fn run(context: &CliContext, args: ProposalCreateArgs) -> Result<(), 
 		data.bump = args.bump;
 		data.kind = args.kind;
 		data.vault_index = args.vault_index;
+		data.vault_bump = args.vault_bump;
 		data.ephemeral_signers = args.ephemeral_signers;
+		data.ephemeral_bumps = ephemeral_bumps;
 		data.message_len.set(args.message_len);
 		data.message = message;
 		data.actions_len.set(args.actions_len);

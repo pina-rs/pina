@@ -418,7 +418,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "84cfc5571c342ce8c1ba7a9c87dfd19d7834a5cee15314a2a78fac05a87f45dd",
+					"schemaSha256": "45e34c33437452ce71a9f2b5e62ffb010e5d13e8189b0eff458fd8291bbb4a7d",
 					"schema": {
 						"layout": "compact",
 						"fields": [
@@ -436,6 +436,10 @@
 							},
 							{
 								"name": "vault_index",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_bump",
 								"rustType": "u8"
 							},
 							{
@@ -470,8 +474,8 @@
 						"codec": "pinaPodV2",
 						"physical": {
 							"kind": "compact",
-							"headerSize": 127,
-							"maximumSize": 895,
+							"headerSize": 128,
+							"maximumSize": 896,
 							"tailAlignment": 1,
 							"fields": [
 								{
@@ -495,33 +499,38 @@
 									"headerSize": 1
 								},
 								{
-									"name": "mint",
+									"name": "vault_bump",
 									"headerOffset": 66,
+									"headerSize": 1
+								},
+								{
+									"name": "mint",
+									"headerOffset": 67,
 									"headerSize": 32
 								},
 								{
 									"name": "amount",
-									"headerOffset": 98,
+									"headerOffset": 99,
 									"headerSize": 8
 								},
 								{
 									"name": "remaining_amount",
-									"headerOffset": 106,
+									"headerOffset": 107,
 									"headerSize": 8
 								},
 								{
 									"name": "last_reset",
-									"headerOffset": 114,
+									"headerOffset": 115,
 									"headerSize": 8
 								},
 								{
 									"name": "period",
-									"headerOffset": 122,
+									"headerOffset": 123,
 									"headerSize": 1
 								},
 								{
 									"name": "members",
-									"headerOffset": 123,
+									"headerOffset": 124,
 									"headerSize": 2,
 									"tail": {
 										"index": 0,
@@ -535,7 +544,7 @@
 								},
 								{
 									"name": "destinations",
-									"headerOffset": 125,
+									"headerOffset": 126,
 									"headerSize": 2,
 									"tail": {
 										"index": 1,
@@ -1099,7 +1108,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "0e0574914fe4c632ba9066a4d243bf9d7c1d5a40c826dfad5a1afb3b4d83c028",
+					"schemaSha256": "2fccc474a1b1517ecc4935cecc25fb7d8869bab07782d246ec84f3a32e6fc321",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -1116,8 +1125,16 @@
 								"rustType": "u8"
 							},
 							{
+								"name": "vault_bump",
+								"rustType": "u8"
+							},
+							{
 								"name": "ephemeral_signers",
 								"rustType": "u8"
+							},
+							{
+								"name": "ephemeral_bumps",
+								"rustType": "[u8; 4]"
 							},
 							{
 								"name": "message_len",
@@ -1139,7 +1156,7 @@
 						"codec": "pinaPodV2",
 						"physical": {
 							"kind": "fixed",
-							"size": 776,
+							"size": 781,
 							"fields": [
 								{
 									"name": "bump",
@@ -1157,28 +1174,38 @@
 									"size": 1
 								},
 								{
-									"name": "ephemeral_signers",
+									"name": "vault_bump",
 									"offset": 3,
 									"size": 1
 								},
 								{
-									"name": "message_len",
+									"name": "ephemeral_signers",
 									"offset": 4,
+									"size": 1
+								},
+								{
+									"name": "ephemeral_bumps",
+									"offset": 5,
+									"size": 4
+								},
+								{
+									"name": "message_len",
+									"offset": 9,
 									"size": 2
 								},
 								{
 									"name": "message",
-									"offset": 6,
+									"offset": 11,
 									"size": 640
 								},
 								{
 									"name": "actions_len",
-									"offset": 646,
+									"offset": 651,
 									"size": 2
 								},
 								{
 									"name": "actions",
-									"offset": 648,
+									"offset": 653,
 									"size": 128
 								}
 							]

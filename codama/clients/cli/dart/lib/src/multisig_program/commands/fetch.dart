@@ -218,6 +218,7 @@ final class FetchSpendingLimitCommand extends Command<void> {
       'multisig': account.data.multisig,
       'create_key': account.data.createKey,
       'vault_index': account.data.vaultIndex,
+      'vault_bump': account.data.vaultBump,
       'mint': account.data.mint,
       'amount': account.data.amount,
       'remaining_amount': account.data.remainingAmount,

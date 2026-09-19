@@ -168,12 +168,22 @@ fn create_multisig_ix(bump: u8, member_count: usize, threshold: u16) -> Vec<u8> 
 	data
 }
 
-fn proposal_create_ix(bump: u8, kind: u8, message: &[u8], actions: &[u8]) -> Vec<u8> {
+fn proposal_create_ix(
+	multisig: &Pubkey,
+	bump: u8,
+	kind: u8,
+	message: &[u8],
+	actions: &[u8],
+) -> Vec<u8> {
+	// The vault bump is a client-supplied argument now; pass the canonical
+	// one so execution signs the conventionally-derived vault.
+	let (_, vault_bump) = vault_pda(multisig, 0);
 	let mut data = vec![0_u8; ProposalCreateIx::SIZE];
 	ProposalCreateIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.kind = kind;
 		ix.vault_index = 0;
+		ix.vault_bump = vault_bump;
 		ix.ephemeral_signers = 0;
 		ix.message_len.set(message.len() as u16);
 		ix.message[..message.len()].copy_from_slice(message);
@@ -181,7 +191,7 @@ fn proposal_create_ix(bump: u8, kind: u8, message: &[u8], actions: &[u8]) -> Vec
 		ix.actions[..actions.len()].copy_from_slice(actions);
 		Ok(())
 	})
-	.expect("encode proposal create");
+	.unwrap_or_else(|error| panic!("encode proposal create: {error:?}"));
 	data
 }
 
@@ -330,7 +340,7 @@ fn end_to_end_governed_sol_transfer() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(proposal_bump, KIND_VAULT, &message, &[]),
+					&proposal_create_ix(&multisig_key, proposal_bump, KIND_VAULT, &message, &[]),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(proposal_key, false),
@@ -455,7 +465,13 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(stale_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 0], &[]),
+					&proposal_create_ix(
+						&multisig_key,
+						stale_bump,
+						KIND_VAULT,
+						&[0, 0, 0, 0, 0, 0],
+						&[],
+					),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(stale_proposal_key, false),
@@ -482,7 +498,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(proposal_bump, KIND_CONFIG, &[], &actions),
+					&proposal_create_ix(&multisig_key, proposal_bump, KIND_CONFIG, &[], &actions),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(proposal_key, false),
@@ -611,7 +627,13 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(proposal_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 0], &[]),
+					&proposal_create_ix(
+						&multisig_key,
+						proposal_bump,
+						KIND_VAULT,
+						&[0, 0, 0, 0, 0, 0],
+						&[],
+					),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(proposal_key, false),
@@ -824,6 +846,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 				.multisig(pina_address(&multisig_key))
 				.create_key(pina_address(&limit_create_key))
 				.vault_index(0)
+				.vault_bump(vault_pda(&multisig_key, 0).1)
 				.mint(Address::default())
 				.amount(1000)
 				.remaining_amount(1000)

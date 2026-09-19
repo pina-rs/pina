@@ -102,7 +102,9 @@ export type ProposalCreateInstructionData = {
 	bump: number;
 	kind: number;
 	vaultIndex: number;
+	vaultBump: number;
 	ephemeralSigners: number;
+	ephemeralBumps: ReadonlyUint8Array;
 	messageLen: number;
 	message: ReadonlyUint8Array;
 	actionsLen: number;
@@ -113,7 +115,9 @@ export type ProposalCreateInstructionDataArgs = {
 	bump: number;
 	kind: number;
 	vaultIndex: number;
+	vaultBump: number;
 	ephemeralSigners: number;
+	ephemeralBumps: ReadonlyUint8Array;
 	messageLen: number;
 	message: ReadonlyUint8Array;
 	actionsLen: number;
@@ -130,7 +134,9 @@ export function getProposalCreateInstructionDataEncoder(): FixedSizeEncoder<
 			["bump", getU8Encoder()],
 			["kind", getU8Encoder()],
 			["vaultIndex", getU8Encoder()],
+			["vaultBump", getU8Encoder()],
 			["ephemeralSigners", getU8Encoder()],
+			["ephemeralBumps", fixPinaPodEncoderSize(getBytesEncoder(), 4)],
 			["messageLen", getU16Encoder()],
 			["message", fixPinaPodEncoderSize(getBytesEncoder(), 640)],
 			["actionsLen", getU16Encoder()],
@@ -155,7 +161,9 @@ export function getProposalCreateInstructionDataDecoder(): FixedSizeDecoder<
 		["bump", getU8Decoder()],
 		["kind", getU8Decoder()],
 		["vaultIndex", getU8Decoder()],
+		["vaultBump", getU8Decoder()],
 		["ephemeralSigners", getU8Decoder()],
+		["ephemeralBumps", fixDecoderSize(getBytesDecoder(), 4)],
 		["messageLen", getU16Decoder()],
 		["message", fixDecoderSize(getBytesDecoder(), 640)],
 		["actionsLen", getU16Decoder()],
@@ -190,7 +198,9 @@ export type ProposalCreateInput<
 	bump: ProposalCreateInstructionDataArgs["bump"];
 	kind: ProposalCreateInstructionDataArgs["kind"];
 	vaultIndex: ProposalCreateInstructionDataArgs["vaultIndex"];
+	vaultBump: ProposalCreateInstructionDataArgs["vaultBump"];
 	ephemeralSigners: ProposalCreateInstructionDataArgs["ephemeralSigners"];
+	ephemeralBumps: ProposalCreateInstructionDataArgs["ephemeralBumps"];
 	messageLen: ProposalCreateInstructionDataArgs["messageLen"];
 	message: ProposalCreateInstructionDataArgs["message"];
 	actionsLen: ProposalCreateInstructionDataArgs["actionsLen"];

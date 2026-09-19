@@ -21,6 +21,10 @@ pub struct SpendingLimit {
 	pub create_key: solana_pubkey::Pubkey,
 	/// Vault the allowance draws from.
 	pub vault_index: u8,
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,
+	/// recorded at creation so draws derive it with one address computation
+	/// instead of an on-chain search.
+	pub vault_bump: u8,
 	/// The default address means SOL; anything else is an SPL mint.
 	pub mint: solana_pubkey::Pubkey,
 	/// Allowance per period, in native mint decimals.

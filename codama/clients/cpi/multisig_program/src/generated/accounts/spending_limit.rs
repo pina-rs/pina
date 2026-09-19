@@ -20,6 +20,7 @@ pub struct SpendingLimit<'data> {
 	pub multisig: Address,
 	pub create_key: Address,
 	pub vault_index: u8,
+	pub vault_bump: u8,
 	pub mint: Address,
 	pub amount: u64,
 	pub remaining_amount: u64,
@@ -34,7 +35,7 @@ pub const SPENDING_LIMIT_DISCRIMINATOR: [u8; 2] = [4, 0];
 
 impl<'data> SpendingLimit<'data> {
 	/// Largest encoded size of this account's data.
-	pub const MAX_LEN: usize = 131199;
+	pub const MAX_LEN: usize = 131200;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str =
 		"unsupported type `accountNode` at `account `SpendingLimit` field `members``: this \

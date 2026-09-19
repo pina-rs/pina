@@ -375,6 +375,10 @@ pub struct SpendingLimit {
 	pub create_key: Address,
 	/// Vault the allowance draws from.
 	pub vault_index: u8,
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,
+	/// recorded at creation so draws derive it with one address computation
+	/// instead of an on-chain search.
+	pub vault_bump: u8,
 	/// The default address means SOL; anything else is an SPL mint.
 	pub mint: Address,
 	/// Allowance per period, in native mint decimals.
@@ -449,8 +453,15 @@ pub struct ProposalCreateIx {
 	/// [`KIND_VAULT`] or [`KIND_CONFIG`].
 	pub kind: u8,
 	pub vault_index: u8,
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	/// verified with one derivation instead of an on-chain search.
+	pub vault_bump: u8,
 	/// Ephemeral signing PDAs the vault message requires.
 	pub ephemeral_signers: u8,
+	/// One bump per ephemeral signer, for
+	/// `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	/// single derivation.
+	pub ephemeral_bumps: [u8; 4],
 	/// Active length of `message`.
 	pub message_len: u16,
 	pub message: [u8; 640],
@@ -692,10 +703,13 @@ pub struct MultisigSnapshot {
 }
 
 impl MultisigSnapshot {
-	/// Load a multisig, asserting it is the stored-bump PDA for `create_key`.
-	pub fn load(account: &AccountView, create_key: &Address) -> Result<Self, ProgramError> {
+	/// Load a multisig in one parse, asserting it is the PDA its stored
+	/// `create_key` and `bump` derive. Every field the instruction needs is
+	/// read in the same pass; the seed check derives once from the captured
+	/// values instead of re-parsing the header for the bump.
+	pub fn load(account: &AccountView) -> Result<Self, ProgramError> {
 		let mut snapshot = MultisigSnapshot {
-			create_key: *create_key,
+			create_key: Address::default(),
 			config_authority: Address::default(),
 			rent_collector: Address::default(),
 			threshold: 0,
@@ -710,6 +724,7 @@ impl MultisigSnapshot {
 		};
 
 		account.with_compact_account::<Multisig, _>(&ID, |state| {
+			snapshot.create_key = state.create_key;
 			snapshot.config_authority = state.config_authority;
 			snapshot.rent_collector = state.rent_collector;
 			snapshot.threshold = state.threshold.get();
@@ -725,7 +740,11 @@ impl MultisigSnapshot {
 			Ok(())
 		})?;
 
-		Multisig::assert_seeds(account, create_key, &ID)?;
+		let seeds = Multisig::seeds(&snapshot.create_key).with_bump(snapshot.bump);
+		let derived = create_program_address(&seeds.as_slices(), &ID)?;
+		if &derived != account.address() {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		Ok(snapshot)
 	}
 
@@ -776,17 +795,13 @@ pub struct ProposalSnapshot {
 }
 
 impl ProposalSnapshot {
-	/// Load a proposal, asserting it is the stored-bump PDA owned by the
-	/// multisig at `multisig` for proposal `index`.
-	pub fn load(
-		account: &AccountView,
-		multisig: &Address,
-		index: u64,
-	) -> Result<Self, ProgramError> {
+	/// Load a proposal in one parse, asserting it is the stored-bump PDA the
+	/// multisig at `multisig` owns for the proposal index it records.
+	pub fn load(account: &AccountView, multisig: &Address) -> Result<Self, ProgramError> {
 		let mut snapshot = ProposalSnapshot {
 			multisig: *multisig,
 			creator: Address::default(),
-			index,
+			index: 0,
 			kind: KIND_VAULT,
 			vault_index: 0,
 			vault_bump: 0,
@@ -799,10 +814,11 @@ impl ProposalSnapshot {
 		};
 
 		account.with_compact_account::<Proposal, _>(&ID, |state| {
-			if state.multisig != *multisig || state.index.get() != index {
+			if state.multisig != *multisig {
 				return Err(ProgramError::InvalidSeeds);
 			}
 			snapshot.creator = state.creator;
+			snapshot.index = state.index.get();
 			snapshot.kind = state.kind;
 			snapshot.vault_index = state.vault_index;
 			snapshot.vault_bump = state.vault_bump;
@@ -815,32 +831,13 @@ impl ProposalSnapshot {
 			Ok(())
 		})?;
 
-		Proposal::assert_seeds(account, multisig, index, &ID)?;
+		let seeds = Proposal::seeds(multisig, snapshot.index).with_bump(snapshot.bump);
+		let derived = create_program_address(&seeds.as_slices(), &ID)?;
+		if &derived != account.address() {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		Ok(snapshot)
 	}
-}
-
-/// Read a multisig's `create_key` straight from its header. Proposal loaders
-/// need it to seed the multisig PDA check, and the caller only knows the
-/// multisig address at that point.
-fn stored_create_key(account: &AccountView) -> Result<Address, ProgramError> {
-	let mut create_key = Address::default();
-	account.with_compact_account::<Multisig, _>(&ID, |state| {
-		create_key = state.create_key;
-		Ok(())
-	})?;
-	Ok(create_key)
-}
-
-/// Read a proposal's `index` straight from its header so the caller can seed
-/// the proposal PDA check.
-fn stored_proposal_index(account: &AccountView) -> Result<u64, ProgramError> {
-	let mut index = 0;
-	account.with_compact_account::<Proposal, _>(&ID, |state| {
-		index = state.index.get();
-		Ok(())
-	})?;
-	Ok(index)
 }
 
 // ---------------------------------------------------------------------------
@@ -976,8 +973,9 @@ impl<'a> MessageView<'a> {
 		self.num_instructions
 	}
 
-	/// The account key at `index`.
-	pub fn account_key(&self, index: usize) -> Result<Address, ProgramError> {
+	/// The account key at `index` as its raw 32 bytes. Hot paths compare
+	/// these directly instead of copying an owned [`Address`] per account.
+	pub fn account_key_bytes(&self, index: usize) -> Result<&'a [u8], ProgramError> {
 		let start = self
 			.accounts_offset
 			.checked_add(
@@ -989,10 +987,14 @@ impl<'a> MessageView<'a> {
 		let end = start
 			.checked_add(32)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-		let bytes = self
-			.bytes
+		self.bytes
 			.get(start..end)
-			.ok_or(ProgramError::Custom(MultisigError::InvalidMessage as u32))?;
+			.ok_or(ProgramError::Custom(MultisigError::InvalidMessage as u32))
+	}
+
+	/// The account key at `index` as an owned address.
+	pub fn account_key(&self, index: usize) -> Result<Address, ProgramError> {
+		let bytes = self.account_key_bytes(index)?;
 		Address::try_from(bytes)
 			.map_err(|_| ProgramError::Custom(MultisigError::InvalidMessage as u32))
 	}
@@ -1130,6 +1132,7 @@ pub const ACTION_SET_PROPOSAL_TTL: u8 = 8;
 #[derive(Debug, Clone, Copy)]
 #[expect(
 	variant_size_differences,
+	clippy::large_enum_variant,
 	reason = "the spending-limit variant carries its fixed rosters by design"
 )]
 pub enum ConfigActionView {
@@ -1744,6 +1747,19 @@ fn apply_config_actions(
 						.multisig(*multisig_key)
 						.create_key(create_key)
 						.vault_index(vault_index)
+						// Record the canonical vault bump once here so every
+						// draw derives the signing address with a single
+						// address computation.
+						.vault_bump({
+							let vault_index_bytes = [vault_index];
+							let Some((_, vault_bump)) = try_find_program_address(
+								&[SEED_VAULT, multisig_key.as_ref(), &vault_index_bytes],
+								&ID,
+							) else {
+								return Err(ProgramError::InvalidSeeds);
+							};
+							vault_bump
+						})
 						.mint(mint)
 						.amount(amount)
 						.remaining_amount(amount)
@@ -2082,8 +2098,7 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCreateAccounts<'a> {
 		self.rent_payer.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		let create_key = stored_create_key(self.multisig)?;
-		let snapshot = MultisigSnapshot::load(self.multisig, &create_key)?;
+		let snapshot = MultisigSnapshot::load(self.multisig)?;
 		let creator_index = snapshot
 			.member_index_of(self.creator.address())
 			.ok_or(MultisigError::NotAMember)?;
@@ -2105,40 +2120,52 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCreateAccounts<'a> {
 				.ok_or(ProgramError::ArithmeticOverflow)?
 		};
 
-		// Derive the proposal address once so ephemeral signers and the vault
-		// bump seed from the exact address the account will land at.
+		// Derive the proposal address once so the ephemeral signer seeds
+		// reference the exact address the account will land at.
 		let seeds = Proposal::seeds(&multisig_key, transaction_index);
 		let proposal_seeds = seeds.with_bump(args.bump);
 		let proposal_key = create_program_address(&proposal_seeds.as_slices(), &ID)?;
 
+		// The client supplies the ephemeral bumps; one derivation each
+		// verifies the seeds produce a valid PDA without an on-chain search.
+		// A failed derivation at create fails fast here instead of at
+		// execute, and any address these seeds derive is program-controlled
+		// either way.
 		let mut ephemeral_bumps = [0_u8; MAX_EPHEMERAL_SIGNERS];
-		for (position, slot) in ephemeral_bumps.iter_mut().enumerate().take(ephemeral_count) {
+		ephemeral_bumps[..MAX_EPHEMERAL_SIGNERS]
+			.copy_from_slice(&args.ephemeral_bumps[..MAX_EPHEMERAL_SIGNERS]);
+		for (position, bump) in ephemeral_bumps.iter().enumerate().take(ephemeral_count) {
 			let position_bytes = [position as u8];
-			let Some((_, bump)) = try_find_program_address(
+			let bump_bytes = [*bump];
+			create_program_address(
 				&[
 					SEED_EPHEMERAL_SIGNER,
 					proposal_key.as_ref(),
 					&position_bytes,
+					&bump_bytes,
 				],
 				&ID,
-			) else {
-				return Err(ProgramError::InvalidSeeds);
-			};
-			*slot = bump;
+			)?;
 		}
 
-		let vault_bump = if kind == KIND_VAULT {
+		// Same for the vault bump: verify the client's value derives a valid
+		// PDA once. The vault itself is not created here, so canonicality is
+		// the client's convention, not a program invariant; execution signs
+		// with exactly the address these seeds derive.
+		let vault_bump = args.vault_bump;
+		if kind == KIND_VAULT {
 			let vault_index_bytes = [args.vault_index];
-			let Some((_, vault_bump)) = try_find_program_address(
-				&[SEED_VAULT, multisig_key.as_ref(), &vault_index_bytes],
+			let bump_bytes = [vault_bump];
+			create_program_address(
+				&[
+					SEED_VAULT,
+					multisig_key.as_ref(),
+					&vault_index_bytes,
+					&bump_bytes,
+				],
 				&ID,
-			) else {
-				return Err(ProgramError::InvalidSeeds);
-			};
-			vault_bump
-		} else {
-			0
-		};
+			)?;
+		}
 
 		let space = Proposal::projected_bytes(
 			if kind == KIND_VAULT {
@@ -2211,6 +2238,8 @@ pub struct MemberContext {
 	pub threshold: u16,
 	pub timelock: u32,
 	pub stale_transaction_index: u64,
+	/// Rejections needed to settle a proposal, from the same roster read.
+	pub cutoff: usize,
 	/// The member's position in the sorted roster; also its vote-mask bit.
 	pub member_index: usize,
 }
@@ -2225,32 +2254,43 @@ fn load_member_proposal(
 	member: &Address,
 	permission: u8,
 ) -> Result<(MemberContext, ProposalSnapshot), ProgramError> {
-	let create_key = stored_create_key(multisig)?;
-
+	// One multisig parse captures every consensus fact the vote path needs —
+	// membership, permissions, threshold, cutoff — plus the stored seeds for
+	// a single address derivation afterwards.
 	let mut context = MemberContext {
 		multisig_key: *multisig.address(),
 		threshold: 0,
 		timelock: 0,
 		stale_transaction_index: 0,
+		cutoff: 0,
 		member_index: 0,
 	};
+	let mut create_key = Address::default();
+	let mut multisig_bump = 0_u8;
 	multisig.with_compact_account::<Multisig, _>(&ID, |state| {
 		let mut roster = [Address::default(); MAX_MEMBERS];
 		let count = decode_roster(state.member_roster(), &mut roster)?;
 		let position = member_index(&roster[..count], member).ok_or(MultisigError::NotAMember)?;
-		if state.member_permissions()[position] & permission == 0 {
+		let permissions = state.member_permissions();
+		if permissions[position] & permission == 0 {
 			return Err(MultisigError::Unauthorized.into());
 		}
 		context.threshold = state.threshold.get();
 		context.timelock = state.timelock.get();
 		context.stale_transaction_index = state.stale_transaction_index.get();
+		context.cutoff = rejection_cutoff(permissions, context.threshold)?;
 		context.member_index = position;
+		create_key = state.create_key;
+		multisig_bump = state.bump;
 		Ok(())
 	})?;
-	Multisig::assert_seeds(multisig, &create_key, &ID)?;
+	let seeds = Multisig::seeds(&create_key).with_bump(multisig_bump);
+	let derived = create_program_address(&seeds.as_slices(), &ID)?;
+	if &derived != multisig.address() {
+		return Err(ProgramError::InvalidSeeds);
+	}
 
-	let index = stored_proposal_index(proposal)?;
-	let proposal_snapshot = ProposalSnapshot::load(proposal, multisig.address(), index)?;
+	let proposal_snapshot = ProposalSnapshot::load(proposal, multisig.address())?;
 	Ok((context, proposal_snapshot))
 }
 
@@ -2378,20 +2418,11 @@ impl<'a> ProcessAccountInfos<'a> for ProposalRejectAccounts<'a> {
 			return Err(MultisigError::AlreadyVoted.into());
 		}
 
-		// The cutoff counts voters on the current roster: once this many
-		// reject, approval is arithmetically impossible.
-		let cutoff = {
-			let mut cutoff = 0;
-			self.multisig
-				.with_compact_account::<Multisig, _>(&ID, |state| {
-					cutoff = rejection_cutoff(state.member_permissions(), state.threshold.get())?;
-					Ok(())
-				})?;
-			cutoff
-		};
+		// The cutoff was captured with the roster in the same parse above:
+		// once that many members reject, approval is arithmetically impossible.
 		let rejected_mask = proposal.rejected_mask | bit;
 		let approved_mask = proposal.approved_mask & !bit;
-		let status = if mask_count(rejected_mask) >= cutoff {
+		let status = if mask_count(rejected_mask) >= multisig.cutoff {
 			STATUS_REJECTED
 		} else {
 			STATUS_ACTIVE
@@ -2608,12 +2639,12 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 			return Err(MultisigError::InvalidNumberOfAccounts.into());
 		}
 		for account_index in 0..message.num_accounts() {
-			let expected = message.account_key(account_index)?;
+			let expected = message.account_key_bytes(account_index)?;
 			let view = self
 				.message_accounts
 				.get(account_index)
 				.ok_or(MultisigError::InvalidNumberOfAccounts)?;
-			if view.address() != &expected {
+			if view.address().as_ref() != expected {
 				return Err(MultisigError::InvalidAccount.into());
 			}
 			if message.is_writable_index(account_index) {
@@ -2777,8 +2808,7 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 		self.member.assert_signer()?;
 		self.rent_payer.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
-		let create_key = stored_create_key(self.multisig)?;
-		let multisig = MultisigSnapshot::load(self.multisig, &create_key)?;
+		let multisig = MultisigSnapshot::load(self.multisig)?;
 		if is_controlled(&multisig.config_authority) {
 			return Err(MultisigError::NotSupportedForControlled.into());
 		}
@@ -2789,8 +2819,7 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 			return Err(MultisigError::Unauthorized.into());
 		}
 
-		let index = stored_proposal_index(self.proposal)?;
-		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address(), index)?;
+		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address())?;
 		if proposal.kind != KIND_CONFIG {
 			return Err(MultisigError::InvalidProposalKind.into());
 		}
@@ -2858,8 +2887,7 @@ impl<'a> ProcessAccountInfos<'a> for ConfigAuthorityExecuteAccounts<'a> {
 		self.authority.assert_signer()?;
 		self.rent_payer.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
-		let create_key = stored_create_key(self.multisig)?;
-		let multisig = MultisigSnapshot::load(self.multisig, &create_key)?;
+		let multisig = MultisigSnapshot::load(self.multisig)?;
 		if !is_controlled(&multisig.config_authority) {
 			return Err(MultisigError::NotSupportedForAutonomous.into());
 		}
@@ -2903,12 +2931,12 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 
 		// Validate the multisig account is the real stored-bump PDA before
 		// trusting anything the spending limit says about it.
-		let create_key = stored_create_key(self.multisig)?;
-		MultisigSnapshot::load(self.multisig, &create_key)?;
+		MultisigSnapshot::load(self.multisig)?;
 
 		let mut limit_create_key = Address::default();
 		let mut mint = Address::default();
 		let mut vault_index = 0_u8;
+		let mut vault_bump = 0_u8;
 		let mut period = PERIOD_ONE_TIME;
 		let mut allowance = 0_u64;
 		let mut remaining_amount = 0_u64;
@@ -2928,6 +2956,7 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 				limit_create_key = limit.create_key;
 				mint = limit.mint;
 				vault_index = limit.vault_index;
+				vault_bump = limit.vault_bump;
 				period = limit.period;
 				allowance = limit.amount.get();
 				remaining_amount = limit.remaining_amount.get();
@@ -2958,14 +2987,21 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 			.checked_sub(amount)
 			.ok_or(MultisigError::SpendingLimitExceeded)?;
 
-		// The vault PDA signs either flavor of transfer.
+		// The vault PDA signs either flavor of transfer. The header recorded
+		// the bump at creation, so one derivation yields the address with no
+		// on-chain search.
 		let vault_index_bytes = [vault_index];
-		let vault_seeds = [SEED_VAULT, multisig_key.as_ref(), &vault_index_bytes[..]];
-		let Some((vault_key, vault_bump)) = try_find_program_address(&vault_seeds, &ID) else {
-			return Err(ProgramError::InvalidSeeds);
-		};
-		self.vault.assert_address(&vault_key)?;
 		let vault_bump_bytes = [vault_bump];
+		let vault_key = create_program_address(
+			&[
+				SEED_VAULT,
+				multisig_key.as_ref(),
+				&vault_index_bytes[..],
+				&vault_bump_bytes[..],
+			],
+			&ID,
+		)?;
+		self.vault.assert_address(&vault_key)?;
 		let vault_signer_storage = PdaSigner::from_slices([
 			SEED_VAULT,
 			multisig_key.as_ref(),
@@ -3033,16 +3069,14 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCloseAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = ProposalCloseIx::try_from_bytes(data)?;
 
-		let create_key = stored_create_key(self.multisig)?;
-		let multisig = MultisigSnapshot::load(self.multisig, &create_key)?;
+		let multisig = MultisigSnapshot::load(self.multisig)?;
 		if multisig.rent_collector == Address::default() {
 			return Err(MultisigError::InvalidConfiguration.into());
 		}
 		self.rent_collector
 			.assert_address(&multisig.rent_collector)?;
 
-		let index = stored_proposal_index(self.proposal)?;
-		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address(), index)?;
+		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address())?;
 		if !matches!(
 			proposal.status,
 			STATUS_EXECUTED | STATUS_REJECTED | STATUS_CANCELLED
@@ -3593,7 +3627,9 @@ mod tests {
 			ix.bump = 253;
 			ix.kind = KIND_VAULT;
 			ix.vault_index = 4;
+			ix.vault_bump = 251;
 			ix.ephemeral_signers = 2;
+			ix.ephemeral_bumps = [250, 249, 0, 0];
 			ix.message_len.set(3);
 			ix.message = [7; 640];
 			ix.actions_len.set(0);
@@ -3603,6 +3639,8 @@ mod tests {
 		let decoded = ProposalCreateIx::try_from_bytes(&proposal_bytes)
 			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(decoded.kind, KIND_VAULT);
+		assert_eq!(decoded.vault_bump, 251);
+		assert_eq!(decoded.ephemeral_bumps[0], 250);
 		assert_eq!(decoded.message_len.get(), 3);
 		assert_eq!(&decoded.message[..3], &[7, 7, 7]);
 

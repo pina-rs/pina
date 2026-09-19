@@ -15,11 +15,13 @@ final class ProposalCreateCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('kind', mandatory: true, help: "kind")
       ..addOption('vault_index', mandatory: true, help: "vaultIndex")
+      ..addOption('vault_bump', mandatory: true, help: "vaultBump")
       ..addOption(
         'ephemeral_signers',
         mandatory: true,
         help: "ephemeralSigners",
       )
+      ..addOption('ephemeral_bumps', mandatory: true, help: "ephemeralBumps")
       ..addOption('message_len', mandatory: true, help: "messageLen")
       ..addOption('message', mandatory: true, help: "message")
       ..addOption('actions_len', mandatory: true, help: "actionsLen")
@@ -64,9 +66,17 @@ final class ProposalCreateCommand extends Command<void> {
       '--vault-index',
       results['vault_index']! as String,
     );
+    final vaultBumpValue = integer(
+      '--vault-bump',
+      results['vault_bump']! as String,
+    );
     final ephemeralSignersValue = integer(
       '--ephemeral-signers',
       results['ephemeral_signers']! as String,
+    );
+    final ephemeralBumpsValue = base58Bytes(
+      '--ephemeral-bumps',
+      results['ephemeral_bumps']! as String,
     );
     final messageLenValue = integer(
       '--message-len',
@@ -95,7 +105,9 @@ final class ProposalCreateCommand extends Command<void> {
       bump: bumpValue,
       kind: kindValue,
       vaultIndex: vaultIndexValue,
+      vaultBump: vaultBumpValue,
       ephemeralSigners: ephemeralSignersValue,
+      ephemeralBumps: ephemeralBumpsValue,
       messageLen: messageLenValue,
       message: messageValue,
       actionsLen: actionsLenValue,

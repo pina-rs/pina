@@ -769,6 +769,20 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
+							"name": "vaultBump",
+							"docs": [
+								"Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,",
+								"recorded at creation so draws derive it with one address computation",
+								"instead of an on-chain search."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "mint",
 							"docs": [
 								"The default address means SOL; anything else is an SPL mint."
@@ -850,7 +864,7 @@
 											"strategy": "preOffset",
 											"type": {
 												"kind": "preOffsetTypeNode",
-												"offset": 125,
+												"offset": 126,
 												"strategy": "absolute",
 												"type": {
 													"kind": "numberTypeNode",
@@ -885,7 +899,7 @@
 										"strategy": "preOffset",
 										"type": {
 											"kind": "preOffsetTypeNode",
-											"offset": 127,
+											"offset": 128,
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
@@ -1726,11 +1740,31 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
+						"name": "vaultBump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "ephemeralSigners",
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
 							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "ephemeralBumps",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 4,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
 						}
 					},
 					{

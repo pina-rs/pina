@@ -281,6 +281,7 @@ fn spending_limit_json(account: &multisig_program_client::accounts::SpendingLimi
 		"multisig": account.multisig.to_string(),
 		"create_key": account.create_key.to_string(),
 		"vault_index": account.vault_index,
+		"vault_bump": account.vault_bump,
 		"mint": account.mint.to_string(),
 		"amount": account.amount.get(),
 		"remaining_amount": account.remaining_amount.get(),

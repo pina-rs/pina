@@ -72,6 +72,12 @@ export type SpendingLimit = {
 	createKey: Address;
 	/** Vault the allowance draws from. */
 	vaultIndex: number;
+	/**
+	 * Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,
+	 * recorded at creation so draws derive it with one address computation
+	 * instead of an on-chain search.
+	 */
+	vaultBump: number;
 	/** The default address means SOL; anything else is an SPL mint. */
 	mint: Address;
 	/** Allowance per period, in native mint decimals. */
@@ -97,6 +103,12 @@ export type SpendingLimitArgs = {
 	createKey: Address;
 	/** Vault the allowance draws from. */
 	vaultIndex: number;
+	/**
+	 * Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,
+	 * recorded at creation so draws derive it with one address computation
+	 * instead of an on-chain search.
+	 */
+	vaultBump: number;
 	/** The default address means SOL; anything else is an SPL mint. */
 	mint: Address;
 	/** Allowance per period, in native mint decimals. */
@@ -126,6 +138,7 @@ export function getSpendingLimitEncoder(): Encoder<SpendingLimitArgs> {
 			["multisig", getAddressEncoder()],
 			["createKey", getAddressEncoder()],
 			["vaultIndex", getU8Encoder()],
+			["vaultBump", getU8Encoder()],
 			["mint", getAddressEncoder()],
 			["amount", getU64Encoder()],
 			["remainingAmount", getU64Encoder()],
@@ -137,7 +150,7 @@ export function getSpendingLimitEncoder(): Encoder<SpendingLimitArgs> {
 					getPinaPodBoundedArrayEncoder(
 						getArrayEncoder(getU8Encoder(), {
 							size: offsetEncoder(
-								offsetEncoder(getU16Encoder(), { preOffset: () => 125 }),
+								offsetEncoder(getU16Encoder(), { preOffset: () => 126 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
 						}),
@@ -151,7 +164,7 @@ export function getSpendingLimitEncoder(): Encoder<SpendingLimitArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU8Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU16Encoder(), { preOffset: () => 127 }),
+							offsetEncoder(getU16Encoder(), { preOffset: () => 128 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -178,6 +191,7 @@ export function getSpendingLimitDecoder(): Decoder<SpendingLimit> {
 		["multisig", getAddressDecoder()],
 		["createKey", getAddressDecoder()],
 		["vaultIndex", getU8Decoder()],
+		["vaultBump", getU8Decoder()],
 		["mint", getAddressDecoder()],
 		["amount", getU64Decoder()],
 		["remainingAmount", getU64Decoder()],
@@ -189,13 +203,13 @@ export function getSpendingLimitDecoder(): Decoder<SpendingLimit> {
 				getPinaPodBoundedArrayDecoder(
 					getArrayDecoder(getU8Decoder(), {
 						size: offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 125 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 126 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
 					getPinaPodBoundedCountDecoder(
 						offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 125 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 126 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 						512,
@@ -210,13 +224,13 @@ export function getSpendingLimitDecoder(): Decoder<SpendingLimit> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU8Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 127 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 128 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 127 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 128 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					256,

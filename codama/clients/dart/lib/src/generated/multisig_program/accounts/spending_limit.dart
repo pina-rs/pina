@@ -19,6 +19,7 @@ class SpendingLimit {
     required this.multisig,
     required this.createKey,
     required this.vaultIndex,
+    required this.vaultBump,
     required this.mint,
     required this.amount,
     required this.remainingAmount,
@@ -35,6 +36,7 @@ class SpendingLimit {
   final Address multisig;
   final Address createKey;
   final int vaultIndex;
+  final int vaultBump;
   final Address mint;
   final BigInt amount;
   final BigInt remainingAmount;
@@ -54,6 +56,7 @@ class SpendingLimit {
           multisig == other.multisig &&
           createKey == other.createKey &&
           vaultIndex == other.vaultIndex &&
+          vaultBump == other.vaultBump &&
           mint == other.mint &&
           amount == other.amount &&
           remainingAmount == other.remainingAmount &&
@@ -70,6 +73,7 @@ class SpendingLimit {
     multisig,
     createKey,
     vaultIndex,
+    vaultBump,
     mint,
     amount,
     remainingAmount,
@@ -81,7 +85,7 @@ class SpendingLimit {
 
   @override
   String toString() =>
-      'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, members: $members, destinations: $destinations)';
+      'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, vaultBump: $vaultBump, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, members: $members, destinations: $destinations)';
 }
 
 Encoder<SpendingLimit> getSpendingLimitEncoder() {
@@ -92,6 +96,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
     ('multisig', getAddressEncoder()),
     ('createKey', getAddressEncoder()),
     ('vaultIndex', getU8Encoder()),
+    ('vaultBump', getU8Encoder()),
     ('mint', getAddressEncoder()),
     ('amount', getU64Encoder()),
     ('remainingAmount', getU64Encoder()),
@@ -107,7 +112,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
               offsetEncoder(
                 offsetEncoder(
                   getU16Encoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
+                  OffsetConfig(preOffset: (scope) => 126),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -127,7 +132,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 127),
+                OffsetConfig(preOffset: (scope) => 128),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -147,6 +152,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
       'multisig': value.multisig,
       'createKey': value.createKey,
       'vaultIndex': value.vaultIndex,
+      'vaultBump': value.vaultBump,
       'mint': value.mint,
       'amount': value.amount,
       'remainingAmount': value.remainingAmount,
@@ -166,6 +172,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
     ('multisig', getAddressDecoder()),
     ('createKey', getAddressDecoder()),
     ('vaultIndex', getU8Decoder()),
+    ('vaultBump', getU8Decoder()),
     ('mint', getAddressDecoder()),
     ('amount', getU64Decoder()),
     ('remainingAmount', getU64Decoder()),
@@ -181,7 +188,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
               offsetDecoder(
                 offsetDecoder(
                   getU16Decoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
+                  OffsetConfig(preOffset: (scope) => 126),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -191,7 +198,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 125),
+                OffsetConfig(preOffset: (scope) => 126),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -211,7 +218,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 127),
+                OffsetConfig(preOffset: (scope) => 128),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -221,7 +228,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 127),
+              OffsetConfig(preOffset: (scope) => 128),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -258,6 +265,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
         multisig: map['multisig']! as Address,
         createKey: map['createKey']! as Address,
         vaultIndex: map['vaultIndex']! as int,
+        vaultBump: map['vaultBump']! as int,
         mint: map['mint']! as Address,
         amount: map['amount']! as BigInt,
         remainingAmount: map['remainingAmount']! as BigInt,

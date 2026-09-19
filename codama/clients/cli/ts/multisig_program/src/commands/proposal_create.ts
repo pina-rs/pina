@@ -21,7 +21,9 @@ export const proposalCreateCommand = registerGlobals(
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--kind <kind>", "kind")
 	.requiredOption("--vault-index <vaultIndex>", "vaultIndex")
+	.requiredOption("--vault-bump <vaultBump>", "vaultBump")
 	.requiredOption("--ephemeral-signers <ephemeralSigners>", "ephemeralSigners")
+	.requiredOption("--ephemeral-bumps <ephemeralBumps>", "ephemeralBumps")
 	.requiredOption("--message-len <messageLen>", "messageLen")
 	.requiredOption("--message <message>", "message")
 	.requiredOption("--actions-len <actionsLen>", "actionsLen")
@@ -40,10 +42,12 @@ export const proposalCreateCommand = registerGlobals(
 			bump: smallInteger("--bump", options.bump),
 			kind: smallInteger("--kind", options.kind),
 			vaultIndex: smallInteger("--vault-index", options.vaultIndex),
+			vaultBump: smallInteger("--vault-bump", options.vaultBump),
 			ephemeralSigners: smallInteger(
 				"--ephemeral-signers",
 				options.ephemeralSigners,
 			),
+			ephemeralBumps: base58("--ephemeral-bumps", options.ephemeralBumps),
 			messageLen: smallInteger("--message-len", options.messageLen),
 			message: base58("--message", options.message),
 			actionsLen: smallInteger("--actions-len", options.actionsLen),

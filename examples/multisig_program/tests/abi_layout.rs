@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 340c3f822ff5f33ff80d2368b75d2f69c0fbb4ab022598319431ed30dd23f512
+// manifest-sha256: a94d2e255abfb88144bd7cb8ec77c3459c72653722fc2f061e0dbbce29216b74
 // program-id: 5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc
 // version_type: u8
 
@@ -114,7 +114,7 @@ pub mod account_1_04 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "84cfc5571c342ce8c1ba7a9c87dfd19d7834a5cee15314a2a78fac05a87f45dd";
+	pub const SCHEMA_SHA256: &str = "45e34c33437452ce71a9f2b5e62ffb010e5d13e8189b0eff458fd8291bbb4a7d";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -124,9 +124,9 @@ pub mod account_1_04 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Compact header size in bytes.
-	pub const HEADER_SIZE: usize = 127;
+	pub const HEADER_SIZE: usize = 128;
 	/// Maximum encoded size in bytes.
-	pub const MAX_SIZE: usize = 895;
+	pub const MAX_SIZE: usize = 896;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
@@ -312,7 +312,7 @@ pub mod instruction_1_04 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "0e0574914fe4c632ba9066a4d243bf9d7c1d5a40c826dfad5a1afb3b4d83c028";
+	pub const SCHEMA_SHA256: &str = "2fccc474a1b1517ecc4935cecc25fb7d8869bab07782d246ec84f3a32e6fc321";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -322,21 +322,23 @@ pub mod instruction_1_04 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Payload size in bytes, excluding the envelope header.
-	pub const PAYLOAD_SIZE: usize = 776;
+	pub const PAYLOAD_SIZE: usize = 781;
 	/// Total encoded size in bytes, including the envelope header.
 	pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;
 	/// Manifest payload size; must agree with `PAYLOAD_SIZE`.
-	pub const MANIFEST_PAYLOAD_SIZE: usize = 776;
+	pub const MANIFEST_PAYLOAD_SIZE: usize = 781;
 	/// `(name, absolute_offset, size)` in encoded bytes.
 	pub const FIELDS: &[(&str, usize, usize)] = &[
 		("bump", MIGRATION_HEADER_SIZE + 0, 1),
 		("kind", MIGRATION_HEADER_SIZE + 1, 1),
 		("vault_index", MIGRATION_HEADER_SIZE + 2, 1),
-		("ephemeral_signers", MIGRATION_HEADER_SIZE + 3, 1),
-		("message_len", MIGRATION_HEADER_SIZE + 4, 2),
-		("message", MIGRATION_HEADER_SIZE + 6, 640),
-		("actions_len", MIGRATION_HEADER_SIZE + 646, 2),
-		("actions", MIGRATION_HEADER_SIZE + 648, 128),
+		("vault_bump", MIGRATION_HEADER_SIZE + 3, 1),
+		("ephemeral_signers", MIGRATION_HEADER_SIZE + 4, 1),
+		("ephemeral_bumps", MIGRATION_HEADER_SIZE + 5, 4),
+		("message_len", MIGRATION_HEADER_SIZE + 9, 2),
+		("message", MIGRATION_HEADER_SIZE + 11, 640),
+		("actions_len", MIGRATION_HEADER_SIZE + 651, 2),
+		("actions", MIGRATION_HEADER_SIZE + 653, 128),
 	];
 }
 
