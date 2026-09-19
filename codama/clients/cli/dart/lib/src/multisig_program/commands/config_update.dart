@@ -10,9 +10,9 @@ import 'package:pina_codama_clients/multisig_program.dart';
 final class ConfigUpdateCommand extends Command<void> {
   ConfigUpdateCommand() {
     argParser
-      ..addOption('set_treasury', mandatory: true, help: "setTreasury")
+      ..addFlag('set_treasury', help: "setTreasury")
       ..addOption('treasury', mandatory: true, help: "treasury")
-      ..addOption('set_creation_fee', mandatory: true, help: "setCreationFee")
+      ..addFlag('set_creation_fee', help: "setCreationFee")
       ..addOption('creation_fee', mandatory: true, help: "creationFee")
       ..addOption(
         'authority',
@@ -44,9 +44,9 @@ final class ConfigUpdateCommand extends Command<void> {
         : (await findProgramConfigPda(
             programAddress: context.programAddress,
           )).$1;
-    final setTreasuryValue = results['set_treasury']! as String;
+    final setTreasuryValue = results['set_treasury'] as bool? ?? false;
     final treasuryValue = pubkey('--treasury', results['treasury']! as String);
-    final setCreationFeeValue = results['set_creation_fee']! as String;
+    final setCreationFeeValue = results['set_creation_fee'] as bool? ?? false;
     final creationFeeValue = bigInteger(
       '--creation-fee',
       results['creation_fee']! as String,

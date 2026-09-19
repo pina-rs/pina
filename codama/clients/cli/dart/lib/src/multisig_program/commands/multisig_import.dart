@@ -19,17 +19,9 @@ final class MultisigImportCommand extends Command<void> {
         mandatory: true,
         help: "legacyDiscriminator",
       )
-      ..addOption(
-        'set_config_authority',
-        mandatory: true,
-        help: "setConfigAuthority",
-      )
+      ..addFlag('set_config_authority', help: "setConfigAuthority")
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
-      ..addOption(
-        'set_rent_collector',
-        mandatory: true,
-        help: "setRentCollector",
-      )
+      ..addFlag('set_rent_collector', help: "setRentCollector")
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
       ..addOption(
         'legacy_multisig',
@@ -104,12 +96,14 @@ final class MultisigImportCommand extends Command<void> {
       '--legacy-discriminator',
       results['legacy_discriminator']! as String,
     );
-    final setConfigAuthorityValue = results['set_config_authority']! as String;
+    final setConfigAuthorityValue =
+        results['set_config_authority'] as bool? ?? false;
     final configAuthorityValue = pubkey(
       '--config-authority',
       results['config_authority']! as String,
     );
-    final setRentCollectorValue = results['set_rent_collector']! as String;
+    final setRentCollectorValue =
+        results['set_rent_collector'] as bool? ?? false;
     final rentCollectorValue = pubkey(
       '--rent-collector',
       results['rent_collector']! as String,

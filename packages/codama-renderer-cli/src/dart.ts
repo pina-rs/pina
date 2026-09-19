@@ -382,6 +382,8 @@ function argExpression(arg: { snake: string; type: ArgKind }): string {
 			return `base58Bytes('--${
 				kebab(arg.snake)
 			}', results['${arg.snake}']! as String)`;
+		case "bool":
+			return `results['${arg.snake}'] as bool? ?? false`;
 		default:
 			return `results['${arg.snake}']! as String`;
 	}
@@ -467,6 +469,14 @@ function usesResults(instruction: InstructionModel): boolean {
 function optionAdders(instruction: InstructionModel): string {
 	const adders: string[] = [];
 	for (const arg of instruction.args) {
+		if (arg.type.kind === "bool") {
+			adders.push(
+				`      ..addFlag('${arg.snake}', help: ${
+					JSON.stringify(arg.docs[0]?.split("\n")[0] ?? arg.camel)
+				})`,
+			);
+			continue;
+		}
 		adders.push(
 			`      ..addOption('${arg.snake}', mandatory: true, help: ${
 				JSON.stringify(arg.docs[0]?.split("\n")[0] ?? arg.camel)
