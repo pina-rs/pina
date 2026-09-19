@@ -1,0 +1,2029 @@
+{
+	"formatVersion": 4,
+	"programId": "5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "ProgramConfig",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "e4f3df781d0ec9d8120ca4fc5199d89a391c41b08e179b46f570f307ec64c02e",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "treasury",
+								"rustType": "Address"
+							},
+							{
+								"name": "creation_fee",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 73,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "authority",
+									"offset": 1,
+									"size": 32
+								},
+								{
+									"name": "treasury",
+									"offset": 33,
+									"size": 32
+								},
+								{
+									"name": "creation_fee",
+									"offset": 65,
+									"size": 8
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:02": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "Multisig",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "1894f1fe6a2f09904a791d2b0bf6cad9e14d4c8be0ff24f031834fd70ad132b0",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "create_key",
+								"rustType": "Address"
+							},
+							{
+								"name": "config_authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "rent_collector",
+								"rustType": "Address"
+							},
+							{
+								"name": "threshold",
+								"rustType": "u16"
+							},
+							{
+								"name": "timelock",
+								"rustType": "u32"
+							},
+							{
+								"name": "ttl",
+								"rustType": "u32"
+							},
+							{
+								"name": "transaction_index",
+								"rustType": "u64"
+							},
+							{
+								"name": "stale_transaction_index",
+								"rustType": "u64"
+							},
+							{
+								"name": "member_roster",
+								"rustType": "PodVec<u8, 512, 2>"
+							},
+							{
+								"name": "member_permissions",
+								"rustType": "PodVec<u8, 16, 1>"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "compact",
+							"headerSize": 126,
+							"maximumSize": 654,
+							"tailAlignment": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"headerOffset": 0,
+									"headerSize": 1
+								},
+								{
+									"name": "create_key",
+									"headerOffset": 1,
+									"headerSize": 32
+								},
+								{
+									"name": "config_authority",
+									"headerOffset": 33,
+									"headerSize": 32
+								},
+								{
+									"name": "rent_collector",
+									"headerOffset": 65,
+									"headerSize": 32
+								},
+								{
+									"name": "threshold",
+									"headerOffset": 97,
+									"headerSize": 2
+								},
+								{
+									"name": "timelock",
+									"headerOffset": 99,
+									"headerSize": 4
+								},
+								{
+									"name": "ttl",
+									"headerOffset": 103,
+									"headerSize": 4
+								},
+								{
+									"name": "transaction_index",
+									"headerOffset": 107,
+									"headerSize": 8
+								},
+								{
+									"name": "stale_transaction_index",
+									"headerOffset": 115,
+									"headerSize": 8
+								},
+								{
+									"name": "member_roster",
+									"headerOffset": 123,
+									"headerSize": 2,
+									"tail": {
+										"index": 0,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 2,
+										"capacity": 512,
+										"elementSize": 1,
+										"maximumBytes": 512
+									}
+								},
+								{
+									"name": "member_permissions",
+									"headerOffset": 125,
+									"headerSize": 1,
+									"tail": {
+										"index": 1,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 1,
+										"capacity": 16,
+										"elementSize": 1,
+										"maximumBytes": 16
+									}
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:03": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "Proposal",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0a7e458a083760473b61338b90d7e70eda5ac8d68ae35e9be4459f3dc313260d",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "multisig",
+								"rustType": "Address"
+							},
+							{
+								"name": "creator",
+								"rustType": "Address"
+							},
+							{
+								"name": "index",
+								"rustType": "u64"
+							},
+							{
+								"name": "kind",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_index",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "status",
+								"rustType": "u8"
+							},
+							{
+								"name": "status_at",
+								"rustType": "i64"
+							},
+							{
+								"name": "expires_at",
+								"rustType": "i64"
+							},
+							{
+								"name": "approved_mask",
+								"rustType": "u32"
+							},
+							{
+								"name": "rejected_mask",
+								"rustType": "u32"
+							},
+							{
+								"name": "ephemeral_bumps",
+								"rustType": "PodVec<u8, 4, 1>"
+							},
+							{
+								"name": "message",
+								"rustType": "PodVec<u8, 640, 2>"
+							},
+							{
+								"name": "actions",
+								"rustType": "PodVec<u8, 128, 2>"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "compact",
+							"headerSize": 106,
+							"maximumSize": 878,
+							"tailAlignment": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"headerOffset": 0,
+									"headerSize": 1
+								},
+								{
+									"name": "multisig",
+									"headerOffset": 1,
+									"headerSize": 32
+								},
+								{
+									"name": "creator",
+									"headerOffset": 33,
+									"headerSize": 32
+								},
+								{
+									"name": "index",
+									"headerOffset": 65,
+									"headerSize": 8
+								},
+								{
+									"name": "kind",
+									"headerOffset": 73,
+									"headerSize": 1
+								},
+								{
+									"name": "vault_index",
+									"headerOffset": 74,
+									"headerSize": 1
+								},
+								{
+									"name": "vault_bump",
+									"headerOffset": 75,
+									"headerSize": 1
+								},
+								{
+									"name": "status",
+									"headerOffset": 76,
+									"headerSize": 1
+								},
+								{
+									"name": "status_at",
+									"headerOffset": 77,
+									"headerSize": 8
+								},
+								{
+									"name": "expires_at",
+									"headerOffset": 85,
+									"headerSize": 8
+								},
+								{
+									"name": "approved_mask",
+									"headerOffset": 93,
+									"headerSize": 4
+								},
+								{
+									"name": "rejected_mask",
+									"headerOffset": 97,
+									"headerSize": 4
+								},
+								{
+									"name": "ephemeral_bumps",
+									"headerOffset": 101,
+									"headerSize": 1,
+									"tail": {
+										"index": 0,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 1,
+										"capacity": 4,
+										"elementSize": 1,
+										"maximumBytes": 4
+									}
+								},
+								{
+									"name": "message",
+									"headerOffset": 102,
+									"headerSize": 2,
+									"tail": {
+										"index": 1,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 2,
+										"capacity": 640,
+										"elementSize": 1,
+										"maximumBytes": 640
+									}
+								},
+								{
+									"name": "actions",
+									"headerOffset": 104,
+									"headerSize": 2,
+									"tail": {
+										"index": 2,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 2,
+										"capacity": 128,
+										"elementSize": 1,
+										"maximumBytes": 128
+									}
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:04": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "04"
+			},
+			"rustName": "SpendingLimit",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "45e34c33437452ce71a9f2b5e62ffb010e5d13e8189b0eff458fd8291bbb4a7d",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "multisig",
+								"rustType": "Address"
+							},
+							{
+								"name": "create_key",
+								"rustType": "Address"
+							},
+							{
+								"name": "vault_index",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "mint",
+								"rustType": "Address"
+							},
+							{
+								"name": "amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "remaining_amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "last_reset",
+								"rustType": "i64"
+							},
+							{
+								"name": "period",
+								"rustType": "u8"
+							},
+							{
+								"name": "members",
+								"rustType": "PodVec<u8, 512, 2>"
+							},
+							{
+								"name": "destinations",
+								"rustType": "PodVec<u8, 256, 2>"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "compact",
+							"headerSize": 128,
+							"maximumSize": 896,
+							"tailAlignment": 1,
+							"fields": [
+								{
+									"name": "bump",
+									"headerOffset": 0,
+									"headerSize": 1
+								},
+								{
+									"name": "multisig",
+									"headerOffset": 1,
+									"headerSize": 32
+								},
+								{
+									"name": "create_key",
+									"headerOffset": 33,
+									"headerSize": 32
+								},
+								{
+									"name": "vault_index",
+									"headerOffset": 65,
+									"headerSize": 1
+								},
+								{
+									"name": "vault_bump",
+									"headerOffset": 66,
+									"headerSize": 1
+								},
+								{
+									"name": "mint",
+									"headerOffset": 67,
+									"headerSize": 32
+								},
+								{
+									"name": "amount",
+									"headerOffset": 99,
+									"headerSize": 8
+								},
+								{
+									"name": "remaining_amount",
+									"headerOffset": 107,
+									"headerSize": 8
+								},
+								{
+									"name": "last_reset",
+									"headerOffset": 115,
+									"headerSize": 8
+								},
+								{
+									"name": "period",
+									"headerOffset": 123,
+									"headerSize": 1
+								},
+								{
+									"name": "members",
+									"headerOffset": 124,
+									"headerSize": 2,
+									"tail": {
+										"index": 0,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 2,
+										"capacity": 512,
+										"elementSize": 1,
+										"maximumBytes": 512
+									}
+								},
+								{
+									"name": "destinations",
+									"headerOffset": 126,
+									"headerSize": 2,
+									"tail": {
+										"index": 1,
+										"kind": "vector",
+										"optional": false,
+										"prefixBytes": 2,
+										"capacity": 256,
+										"elementSize": 1,
+										"maximumBytes": 256
+									}
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"event:1:01": {
+			"identity": {
+				"kind": "event",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "ProposalStatusEvent",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "c65d08fef869b8fed1dc796cb42025238719ee702b26eaab52ce7a4b242a8109",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "multisig",
+								"rustType": "Address"
+							},
+							{
+								"name": "index",
+								"rustType": "u64"
+							},
+							{
+								"name": "status",
+								"rustType": "u8"
+							},
+							{
+								"name": "timestamp",
+								"rustType": "i64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 49,
+							"fields": [
+								{
+									"name": "multisig",
+									"offset": 0,
+									"size": 32
+								},
+								{
+									"name": "index",
+									"offset": 32,
+									"size": 8
+								},
+								{
+									"name": "status",
+									"offset": 40,
+									"size": 1
+								},
+								{
+									"name": "timestamp",
+									"offset": 41,
+									"size": 8
+								}
+							]
+						}
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "ConfigInitializeIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "b18b9186542568ae91c11757f0805c374576e8469e51a957f6f5132b32e2e33c",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "treasury",
+								"rustType": "Address"
+							},
+							{
+								"name": "creation_fee",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 41,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "treasury",
+									"offset": 1,
+									"size": 32
+								},
+								{
+									"name": "creation_fee",
+									"offset": 33,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "program_config",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "program_config"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "32685999697f32337f13e9b4130f1b3283fc3463e89d1f33d4d4d861b6e45873",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "ConfigUpdateIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "118b92368db650b4c9f4d6f1444abf9c2e015a95d96cd2e50e81de3ed27dd421",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "set_treasury",
+								"rustType": "bool"
+							},
+							{
+								"name": "treasury",
+								"rustType": "Address"
+							},
+							{
+								"name": "set_creation_fee",
+								"rustType": "bool"
+							},
+							{
+								"name": "creation_fee",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 42,
+							"fields": [
+								{
+									"name": "set_treasury",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "treasury",
+									"offset": 1,
+									"size": 32
+								},
+								{
+									"name": "set_creation_fee",
+									"offset": 33,
+									"size": 1
+								},
+								{
+									"name": "creation_fee",
+									"offset": 34,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "program_config",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "program_config"
+							}
+						]
+					},
+					"processSha256": "6de7459a475213b2777e85dc42c1ed2f2b2ab9a255f26976e7838e02dba66916",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "MultisigCreateIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "ada1f7be43be5354422b8b8f7cfc75beae622807031e02c9d2026d0c353cd209",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "threshold",
+								"rustType": "u16"
+							},
+							{
+								"name": "timelock",
+								"rustType": "u32"
+							},
+							{
+								"name": "ttl",
+								"rustType": "u32"
+							},
+							{
+								"name": "member_permissions",
+								"rustType": "[u8; 16]"
+							},
+							{
+								"name": "config_authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "rent_collector",
+								"rustType": "Address"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 91,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "threshold",
+									"offset": 1,
+									"size": 2
+								},
+								{
+									"name": "timelock",
+									"offset": 3,
+									"size": 4
+								},
+								{
+									"name": "ttl",
+									"offset": 7,
+									"size": 4
+								},
+								{
+									"name": "member_permissions",
+									"offset": 11,
+									"size": 16
+								},
+								{
+									"name": "config_authority",
+									"offset": 27,
+									"size": 32
+								},
+								{
+									"name": "rent_collector",
+									"offset": 59,
+									"size": 32
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "program_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "create_key",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "multisig"
+							},
+							{
+								"name": "rent_payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							},
+							{
+								"name": "treasury",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member_accounts",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"remaining"
+								]
+							}
+						]
+					},
+					"processSha256": "e307f196ef7875d0b8fd2f09dbbf811309062e338fb85377d276cb0abef69df8",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:03": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "MultisigImportIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "1698c8736c1b85c9e9ae8ab6ed8db19425affb402056b1753ca31c8b6a4f0afc",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "legacy_program",
+								"rustType": "Address"
+							},
+							{
+								"name": "legacy_discriminator",
+								"rustType": "[u8; 8]"
+							},
+							{
+								"name": "set_config_authority",
+								"rustType": "bool"
+							},
+							{
+								"name": "config_authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "set_rent_collector",
+								"rustType": "bool"
+							},
+							{
+								"name": "rent_collector",
+								"rustType": "Address"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 107,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "legacy_program",
+									"offset": 1,
+									"size": 32
+								},
+								{
+									"name": "legacy_discriminator",
+									"offset": 33,
+									"size": 8
+								},
+								{
+									"name": "set_config_authority",
+									"offset": 41,
+									"size": 1
+								},
+								{
+									"name": "config_authority",
+									"offset": 42,
+									"size": 32
+								},
+								{
+									"name": "set_rent_collector",
+									"offset": 74,
+									"size": 1
+								},
+								{
+									"name": "rent_collector",
+									"offset": 75,
+									"size": 32
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "legacy_multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "program_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "create_key",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "multisig"
+							},
+							{
+								"name": "rent_payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							},
+							{
+								"name": "treasury",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "d91c2795de0d13429d634d9bd97e1a59b73368dd297ebde726a2b29ea2e0ee30",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:04": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "04"
+			},
+			"rustName": "ProposalCreateIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "2fccc474a1b1517ecc4935cecc25fb7d8869bab07782d246ec84f3a32e6fc321",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "kind",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_index",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "ephemeral_signers",
+								"rustType": "u8"
+							},
+							{
+								"name": "ephemeral_bumps",
+								"rustType": "[u8; 4]"
+							},
+							{
+								"name": "message_len",
+								"rustType": "u16"
+							},
+							{
+								"name": "message",
+								"rustType": "[u8; 640]"
+							},
+							{
+								"name": "actions_len",
+								"rustType": "u16"
+							},
+							{
+								"name": "actions",
+								"rustType": "[u8; 128]"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 781,
+							"fields": [
+								{
+									"name": "bump",
+									"offset": 0,
+									"size": 1
+								},
+								{
+									"name": "kind",
+									"offset": 1,
+									"size": 1
+								},
+								{
+									"name": "vault_index",
+									"offset": 2,
+									"size": 1
+								},
+								{
+									"name": "vault_bump",
+									"offset": 3,
+									"size": 1
+								},
+								{
+									"name": "ephemeral_signers",
+									"offset": 4,
+									"size": 1
+								},
+								{
+									"name": "ephemeral_bumps",
+									"offset": 5,
+									"size": 4
+								},
+								{
+									"name": "message_len",
+									"offset": 9,
+									"size": 2
+								},
+								{
+									"name": "message",
+									"offset": 11,
+									"size": 640
+								},
+								{
+									"name": "actions_len",
+									"offset": 651,
+									"size": 2
+								},
+								{
+									"name": "actions",
+									"offset": 653,
+									"size": 128
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "proposal"
+							},
+							{
+								"name": "creator",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "rent_payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "d580ec496d911a0177420207cb278150e4c0eae109023b20899ce788f34b74fb",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:05": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "05"
+			},
+			"rustName": "ProposalActivateIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6619c92987d292d2ffb956b982a13a30cd02367933cb4f879424ecd469b329cf",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:06": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "06"
+			},
+			"rustName": "ProposalApproveIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6619c92987d292d2ffb956b982a13a30cd02367933cb4f879424ecd469b329cf",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:07": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "07"
+			},
+			"rustName": "ProposalRejectIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6619c92987d292d2ffb956b982a13a30cd02367933cb4f879424ecd469b329cf",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:08": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "08"
+			},
+			"rustName": "ProposalRevokeIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6619c92987d292d2ffb956b982a13a30cd02367933cb4f879424ecd469b329cf",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:09": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "09"
+			},
+			"rustName": "ProposalCancelIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "6619c92987d292d2ffb956b982a13a30cd02367933cb4f879424ecd469b329cf",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0a": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0a"
+			},
+			"rustName": "VaultExecuteIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "message_accounts",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"remaining"
+								]
+							}
+						]
+					},
+					"processSha256": "f015a8fe7b040306db1d56a064fb7c1cbb96f20a8c0566392f47ef2fcac581c5",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0b": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0b"
+			},
+			"rustName": "ConfigExecuteIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "rent_payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "spending_limit_accounts",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"remaining"
+								]
+							}
+						]
+					},
+					"processSha256": "413f4c3494e1e240be99d177783663e86ee1ee35ca0fc0ca0418eeed4c5d0d6b",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0c": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0c"
+			},
+			"rustName": "ConfigAuthorityExecuteIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "9f92876707a535221ad0a8fc0ee3bab601e1879110c13c26596e58e495c47bed",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "actions_len",
+								"rustType": "u16"
+							},
+							{
+								"name": "actions",
+								"rustType": "[u8; 128]"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 130,
+							"fields": [
+								{
+									"name": "actions_len",
+									"offset": 0,
+									"size": 2
+								},
+								{
+									"name": "actions",
+									"offset": 2,
+									"size": 128
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "rent_payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "spending_limit_accounts",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"remaining"
+								]
+							}
+						]
+					},
+					"processSha256": "bb1c7496c46cba2bc21d71f1ddcb9db8f7dce43b571d9dc902e8f5ae438eb560",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0d": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0d"
+			},
+			"rustName": "SpendingLimitUseIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "38351bddd2d06d1c3a21c3ac118feca4262b6baf9580dd65a55681bc34b50b6d",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "decimals",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 9,
+							"fields": [
+								{
+									"name": "amount",
+									"offset": 0,
+									"size": 8
+								},
+								{
+									"name": "decimals",
+									"offset": 8,
+									"size": 1
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "spending_limit",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "spending_limit"
+							},
+							{
+								"name": "member",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "destination",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "vault_token_account",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "mint",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "token_program",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": "publicKey:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "e854de8209f579e0790e07ca833e7f43061480db69c3187f46b107cc7fcd3cfe",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0e": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0e"
+			},
+			"rustName": "ProposalCloseIx",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 0,
+							"fields": []
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "multisig",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "proposal",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "rent_collector",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "5868528fe282119cf835f90fbf5e79fb567d4d926c05700369c2964ecb3724e8",
+					"transition": null
+				}
+			]
+		}
+	}
+}

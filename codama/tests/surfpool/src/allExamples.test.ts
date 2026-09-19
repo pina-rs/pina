@@ -45,6 +45,7 @@ const EXAMPLE_PROGRAMS = [
 	"float_accounts_program",
 	"hello_solana_program",
 	"migrations_program",
+	"multisig_program",
 	"optional_accounts_program",
 	"pina_bpf_program",
 	"profile_program",
@@ -500,6 +501,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
+	multisig_program: {
+		instruction: "configInitialize",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	optional_accounts_program: {
 		instruction: "init",
 		accounts: "none",
@@ -560,6 +566,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	escrow_program: "InvalidAccountData",
 	hello_solana_program: "MissingRequiredSignature",
 	migrations_program: "InvalidAccountData",
+	multisig_program: "InvalidAccountData",
 	optional_accounts_program: "MissingRequiredSignature",
 	profile_program: "InvalidAccountData",
 	prop_amm_program: "InvalidAccountData",

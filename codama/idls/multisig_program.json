@@ -1,0 +1,3568 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "multisigProgram",
+		"publicKey": "5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "programConfig",
+				"docs": [
+					"Global program configuration: the authority that may update it, the",
+					"treasury that collects multisig creation fees, and the fee itself."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "treasury",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "creationFee",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "programConfig"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "accountNode",
+				"name": "multisig",
+				"docs": [
+					"A multisig: consensus parameters plus the sorted member roster.",
+					"",
+					"Members live in two parallel compact tails (`member_keys` sorted ascending,",
+					"`member_permissions` aligned by index) so the account only pays rent for",
+					"active members. A member's bit index in a proposal's vote masks is its",
+					"position in `member_keys`."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "createKey",
+							"docs": [
+								"Key that seeds the multisig PDA and namespaces proposals."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "configAuthority",
+							"docs": [
+								"An autonomous multisig (default key) changes config through proposals;",
+								"a controlled multisig defers to this key via",
+								"[`MultisigInstruction::ConfigAuthorityExecute`]."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "rentCollector",
+							"docs": [
+								"Where terminal proposal rent is reclaimed; the default address",
+								"disables collection."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "threshold",
+							"docs": [
+								"Signatures required to approve a proposal."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u16",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "timelock",
+							"docs": [
+								"Seconds between approval and permissible execution."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "ttl",
+							"docs": [
+								"Lifetime stamped onto new proposals; zero disables expiry."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "transactionIndex",
+							"docs": [
+								"Last allocated proposal index; counts both kinds."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "staleTransactionIndex",
+							"docs": [
+								"Proposals at or below this index predate the latest consensus change."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "memberRoster",
+							"docs": [
+								"Sorted member roster as concatenated 32-byte addresses, parallel to",
+								"`member_permissions`. Raw bytes keep the generated CLI clients",
+								"renderable while the compact tail still charges rent per member."
+							],
+							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 3,
+								"strategy": "relative",
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "postOffsetTypeNode",
+											"offset": 0,
+											"strategy": "preOffset",
+											"type": {
+												"kind": "preOffsetTypeNode",
+												"offset": 125,
+												"strategy": "absolute",
+												"type": {
+													"kind": "numberTypeNode",
+													"format": "u16",
+													"endian": "le"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "memberPermissions",
+							"docs": [
+								"Permission masks, parallel to the roster."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 127,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u8",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "multisig"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "accountNode",
+				"name": "proposal",
+				"docs": [
+					"A proposal: vote state and payload in one account.",
+					"",
+					"The payload is stored exactly as the wire format the program re-parses at",
+					"execution, validated once at creation, so there is a single encoding of a",
+					"vault message or config action stream between creation and execution."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "multisig",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "creator",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "index",
+							"docs": [
+								"The index this proposal occupies in the multisig's namespace."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "kind",
+							"docs": [
+								"[`KIND_VAULT`] or [`KIND_CONFIG`]."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "vaultIndex",
+							"docs": [
+								"Vault index for vault proposals; ignored for config proposals."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "vaultBump",
+							"docs": [
+								"Canonical bump of the vault PDA for vault proposals."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "status",
+							"docs": [
+								"Lifecycle status; see the `STATUS_*` constants."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "statusAt",
+							"docs": [
+								"When the current status was set. For approved proposals this anchors",
+								"the timelock."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "i64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "expiresAt",
+							"docs": [
+								"When the proposal dies; zero means it never expires."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "i64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "approvedMask",
+							"docs": [
+								"Approval bitmask over the multisig's sorted member list."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "rejectedMask",
+							"docs": [
+								"Rejection bitmask over the multisig's sorted member list."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "ephemeralBumps",
+							"docs": [
+								"Ephemeral signer bumps, one per ephemeral PDA, for vault proposals."
+							],
+							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 5,
+								"strategy": "relative",
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "postOffsetTypeNode",
+											"offset": 0,
+											"strategy": "preOffset",
+											"type": {
+												"kind": "preOffsetTypeNode",
+												"offset": 103,
+												"strategy": "absolute",
+												"type": {
+													"kind": "numberTypeNode",
+													"format": "u8",
+													"endian": "le"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "message",
+							"docs": [
+								"Encoded vault message ([`MAX_MESSAGE_BYTES`] cap)."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 104,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u16",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "actions",
+							"docs": [
+								"Encoded config action stream ([`MAX_ACTIONS_BYTES`] cap)."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 106,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u16",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "proposal"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "accountNode",
+				"name": "spendingLimit",
+				"docs": [
+					"A member-scoped allowance to spend from a vault without a vote."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 4
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "multisig",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "createKey",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "vaultIndex",
+							"docs": [
+								"Vault the allowance draws from."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "vaultBump",
+							"docs": [
+								"Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`,",
+								"recorded at creation so draws derive it with one address computation",
+								"instead of an on-chain search."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "mint",
+							"docs": [
+								"The default address means SOL; anything else is an SPL mint."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "amount",
+							"docs": [
+								"Allowance per period, in native mint decimals."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "remainingAmount",
+							"docs": [
+								"Remaining allowance in the current period."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "lastReset",
+							"docs": [
+								"When the current period started."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "i64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "period",
+							"docs": [
+								"Reset period; see the `PERIOD_*` constants."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "members",
+							"docs": [
+								"Members allowed to draw on this limit, as concatenated addresses."
+							],
+							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 4,
+								"strategy": "relative",
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "postOffsetTypeNode",
+											"offset": 0,
+											"strategy": "preOffset",
+											"type": {
+												"kind": "preOffsetTypeNode",
+												"offset": 126,
+												"strategy": "absolute",
+												"type": {
+													"kind": "numberTypeNode",
+													"format": "u16",
+													"endian": "le"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "destinations",
+							"docs": [
+								"Allowed destinations as concatenated addresses; empty means",
+								"unrestricted."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 128,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u16",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "spendingLimit"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 4
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "configInitialize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "programConfig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "programConfig"
+							}
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "treasury",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "creationFee",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "configUpdate",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "programConfig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "programConfig"
+							}
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "setTreasury",
+						"type": {
+							"kind": "booleanTypeNode",
+							"size": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "treasury",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "setCreationFee",
+						"type": {
+							"kind": "booleanTypeNode",
+							"size": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "creationFee",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "multisigCreate",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "programConfig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "createKey",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "multisig"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "createKey",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "createKey"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentPayer",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "treasury",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"Treasury that collects the creation fee; pass the program's own",
+							"address as a filler when the fee is zero."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "memberAccounts",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The founding members, sorted by address; `member_permissions` indexes",
+							"into this list positionally."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "threshold",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "timelock",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u32",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "ttl",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u32",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "memberPermissions",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 16,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "configAuthority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "rentCollector",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "multisigImport",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "legacyMultisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "programConfig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "createKey",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "multisig"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "createKey",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "createKey"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentPayer",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "treasury",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"Treasury that collects the creation fee; absent when the fee is zero."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "legacyProgram",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "legacyDiscriminator",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 8,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "setConfigAuthority",
+						"type": {
+							"kind": "booleanTypeNode",
+							"size": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "configAuthority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "setRentCollector",
+						"type": {
+							"kind": "booleanTypeNode",
+							"size": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "rentCollector",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalCreate",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "creator",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentPayer",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 4
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "kind",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "vaultIndex",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "vaultBump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "ephemeralSigners",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "ephemeralBumps",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 4,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "messageLen",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "message",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 640,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "actionsLen",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "actions",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 128,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 4
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalActivate",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 5
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 5
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalApprove",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 6
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 6
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalReject",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 7
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 7
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalRevoke",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 8
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 8
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalCancel",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 9
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 9
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "vaultExecute",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "messageAccounts",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The message's account keys, in message order. Accounts the message",
+							"marks writable must also be writable in this instruction."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 10
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 10
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "configExecute",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentPayer",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "spendingLimitAccounts",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Spending limit accounts referenced by add/remove spending-limit",
+							"actions, in any order."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 11
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 11
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "configAuthorityExecute",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentPayer",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "spendingLimitAccounts",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Spending limit accounts referenced by add/remove spending-limit",
+							"actions, in any order."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 12
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "actionsLen",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "actions",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 128,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 12
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "spendingLimitUse",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "spendingLimit",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "member",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "vault",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The vault PDA: SOL source or SPL transfer authority."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "destination",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"SOL destination, or the destination token account for SPL."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "vaultTokenAccount",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"SPL source token account; absent for SOL."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "mint",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"SPL mint; absent for SOL."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "tokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"SPL token program; absent for SOL."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"System program; absent for SPL."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 13
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "amount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "decimals",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 13
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "proposalClose",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "multisig",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "proposal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rentCollector",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 14
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "migrationVersion",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 14
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			}
+		],
+		"definedTypes": [
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8MultisigF12MemberRoster",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 512,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8MultisigF17MemberPermissions",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 16,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8ProposalF14EphemeralBumps",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 4,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8ProposalF7Message",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 640,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8ProposalF7Actions",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 128,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA13SpendingLimitF7Members",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 512,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA13SpendingLimitF12Destinations",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 256,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "programConfig",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "multisig-program-config"
+						}
+					}
+				]
+			},
+			{
+				"kind": "pdaNode",
+				"name": "multisig",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "multisig"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "createKey",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			},
+			{
+				"kind": "pdaNode",
+				"name": "proposal",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "proposal"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "multisig",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "index",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				]
+			},
+			{
+				"kind": "pdaNode",
+				"name": "spendingLimit",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "spending-limit"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "multisig",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "createKey",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"kind": "eventNode",
+				"name": "proposalStatusEvent",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "migrationVersion",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "multisig",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "index",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "status",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "timestamp",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "i64",
+								"endian": "le"
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					},
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 1,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			}
+		],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "notAmember",
+				"code": 0,
+				"message": "The signer is not a member of the multisig.",
+				"docs": [
+					"The signer is not a member of the multisig."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "unauthorized",
+				"code": 1,
+				"message": "The member lacks the permission the instruction requires.",
+				"docs": [
+					"The member lacks the permission the instruction requires."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidThreshold",
+				"code": 2,
+				"message": "The threshold is zero or exceeds the number of voting members.",
+				"docs": [
+					"The threshold is zero or exceeds the number of voting members."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "tooManyMembers",
+				"code": 3,
+				"message": "The member list exceeds [`MAX_MEMBERS`].",
+				"docs": [
+					"The member list exceeds [`MAX_MEMBERS`]."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "duplicateMember",
+				"code": 4,
+				"message": "The member list contains a duplicate or unsorted key.",
+				"docs": [
+					"The member list contains a duplicate or unsorted key."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "unknownPermission",
+				"code": 5,
+				"message": "A member carries a permission bit outside the defined set.",
+				"docs": [
+					"A member carries a permission bit outside the defined set."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidConfiguration",
+				"code": 6,
+				"message": "The multisig needs at least one member with each core permission.",
+				"docs": [
+					"The multisig needs at least one member with each core permission."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "timeLockExceedsMaxAllowed",
+				"code": 7,
+				"message": "The timelock exceeds [`MAX_TIME_LOCK`].",
+				"docs": [
+					"The timelock exceeds [`MAX_TIME_LOCK`]."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidProposalStatus",
+				"code": 8,
+				"message": "The proposal is not in the status this instruction requires.",
+				"docs": [
+					"The proposal is not in the status this instruction requires."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "staleProposal",
+				"code": 9,
+				"message": "The proposal predates the last consensus change and is stale.",
+				"docs": [
+					"The proposal predates the last consensus change and is stale."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "alreadyVoted",
+				"code": 10,
+				"message": "The member has already cast this vote.",
+				"docs": [
+					"The member has already cast this vote."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "hasNotApproved",
+				"code": 11,
+				"message": "The member has no approval to revoke.",
+				"docs": [
+					"The member has no approval to revoke."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "timeLockNotReleased",
+				"code": 12,
+				"message": "The timelock has not elapsed since approval.",
+				"docs": [
+					"The timelock has not elapsed since approval."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidMessage",
+				"code": 13,
+				"message": "The encoded vault message is malformed or exceeds a capacity.",
+				"docs": [
+					"The encoded vault message is malformed or exceeds a capacity."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidNumberOfAccounts",
+				"code": 14,
+				"message": "The remaining accounts do not match the message account keys.",
+				"docs": [
+					"The remaining accounts do not match the message account keys."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidAccount",
+				"code": 15,
+				"message": "An account does not match the key, signer, or writability the message",
+				"docs": [
+					"An account does not match the key, signer, or writability the message",
+					"declares."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "protectedAccount",
+				"code": 16,
+				"message": "A message instruction wants to write a program-owned account the",
+				"docs": [
+					"A message instruction wants to write a program-owned account the",
+					"multisig must protect."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidActions",
+				"code": 17,
+				"message": "The encoded config action stream is malformed or exceeds a capacity.",
+				"docs": [
+					"The encoded config action stream is malformed or exceeds a capacity."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "missingAccount",
+				"code": 18,
+				"message": "A config action references a spending limit account that is missing.",
+				"docs": [
+					"A config action references a spending limit account that is missing."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "notSupportedForControlled",
+				"code": 19,
+				"message": "Governed config transactions require an autonomous multisig.",
+				"docs": [
+					"Governed config transactions require an autonomous multisig."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "notSupportedForAutonomous",
+				"code": 20,
+				"message": "The config-authority path requires a controlled multisig.",
+				"docs": [
+					"The config-authority path requires a controlled multisig."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "missingTreasury",
+				"code": 21,
+				"message": "The configured creation fee is positive but the treasury account is",
+				"docs": [
+					"The configured creation fee is positive but the treasury account is",
+					"missing."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "spendingLimitExceeded",
+				"code": 22,
+				"message": "The spending limit is exhausted for this period.",
+				"docs": [
+					"The spending limit is exhausted for this period."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidDestination",
+				"code": 23,
+				"message": "The destination is not on the spending limit's allow-list.",
+				"docs": [
+					"The destination is not on the spending limit's allow-list."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidMint",
+				"code": 24,
+				"message": "The mint does not match the spending limit.",
+				"docs": [
+					"The mint does not match the spending limit."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "decimalsMismatch",
+				"code": 25,
+				"message": "The decimals do not match the mint (SOL always has nine).",
+				"docs": [
+					"The decimals do not match the mint (SOL always has nine)."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidPeriod",
+				"code": 26,
+				"message": "The reset period is not one of the defined variants.",
+				"docs": [
+					"The reset period is not one of the defined variants."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidLegacyMultisig",
+				"code": 27,
+				"message": "The legacy account is not a multisig this program can import.",
+				"docs": [
+					"The legacy account is not a multisig this program can import."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidConfigAuthority",
+				"code": 28,
+				"message": "The program config authority does not match the signer.",
+				"docs": [
+					"The program config authority does not match the signer."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidProposalKind",
+				"code": 29,
+				"message": "The proposal kind does not match the instruction.",
+				"docs": [
+					"The proposal kind does not match the instruction."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "missingRentPayer",
+				"code": 30,
+				"message": "A spending limit action needs its rent payer and system program.",
+				"docs": [
+					"A spending limit action needs its rent payer and system program."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "proposalExpired",
+				"code": 31,
+				"message": "The proposal's recorded lifetime has elapsed.",
+				"docs": [
+					"The proposal's recorded lifetime has elapsed."
+				]
+			}
+		]
+	}
+}
