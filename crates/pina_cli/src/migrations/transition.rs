@@ -33,9 +33,14 @@ pub(super) struct TransitionRequest<'a> {
 	pub(super) identity: &'a ContractIdentity,
 	pub(super) rust_name: &'a str,
 	pub(super) source: &'a SchemaVersion,
+	/// Version number of `source`: the index of the version this transition
+	/// leaves.
+	pub(super) source_version: u32,
 	/// Every version a stale account may still hold while migrating inline to
 	/// this destination, oldest first; the adjacent source is the last entry.
-	pub(super) stale_ladder: &'a [&'a SchemaVersion],
+	/// Each entry carries its own version number, which the version index no
+	/// longer stores.
+	pub(super) stale_ladder: &'a [(u32, &'a SchemaVersion)],
 	pub(super) renames: Vec<pina_abi::RenameMapping>,
 	pub(super) destination_version: u32,
 	pub(super) destination: &'a DataSchema,
@@ -52,6 +57,7 @@ pub(super) fn create_transition(
 		identity,
 		rust_name,
 		source,
+		source_version,
 		stale_ladder,
 		renames,
 		destination_version,
@@ -59,20 +65,23 @@ pub(super) fn create_transition(
 		destination_process,
 		preserve_manual,
 	} = request;
-	let process = process_transition(
+	// The account-list proof is derived from the neighbouring versions on load
+	// rather than stored, so this call only has to fail closed here.
+	process_transition(
 		identity,
 		rust_name,
 		source.process.as_ref(),
 		destination_process,
 	)?;
 	let mode = transition_mode(&source.schema, destination);
-	let path = transition_path(project, identity, source.version, destination_version);
+	let path = transition_path(project, identity, source_version, destination_version);
 	let generated = match mode {
 		TransitionMode::Automatic => {
 			automatic_transition_source(
 				identity,
 				project.migration_version_type,
 				source,
+				source_version,
 				destination_version,
 				destination,
 			)
@@ -82,6 +91,7 @@ pub(super) fn create_transition(
 				identity,
 				project.migration_version_type,
 				source,
+				source_version,
 				destination_version,
 				destination,
 			)?
@@ -106,6 +116,7 @@ pub(super) fn create_transition(
 		identity,
 		rust_name,
 		source,
+		source_version,
 		stale_ladder,
 		destination,
 		project.migration_version_type.bytes(),
@@ -113,15 +124,8 @@ pub(super) fn create_transition(
 	);
 	let implementation_sha256 = Some(hash_transition_file(&path)?);
 	Ok(Transition {
-		from: source.version,
-		to: destination_version,
 		mode,
 		renames,
-		source_schema_sha256: source.schema_sha256.clone(),
-		destination_schema_sha256: destination.sha256(),
-		source_process_sha256: source.process_sha256.clone(),
-		destination_process_sha256: destination_process.map(ProcessContract::sha256),
-		process,
 		implementation_sha256,
 	})
 }
@@ -155,18 +159,22 @@ pub(crate) const MAX_INLINE_STEPS: u32 = 8;
 /// The generated `MAX_INLINE_STEPS` bounds the ladder at
 /// `destination_version.min(8)` adjacent steps, and the executor captures the
 /// account size before the first step, so each of these versions is a distinct
-/// starting point for the runtime growth check. Versions missing from the
-/// history are skipped so a malformed manifest produces fewer warnings
-/// instead of a panic.
+/// starting point for the runtime growth check. Each entry carries its own
+/// version number because a history stores positions, not numbers; versions
+/// missing from the history are skipped so a malformed manifest produces fewer
+/// warnings instead of a panic.
 pub(super) fn supported_stale_ladder(
 	history: &ContractHistory,
 	destination_version: u32,
-) -> Vec<&SchemaVersion> {
+) -> Vec<(u32, &SchemaVersion)> {
 	let steps = destination_version.min(MAX_INLINE_STEPS);
 	let first = destination_version.saturating_sub(steps);
 
 	(first..destination_version)
-		.filter_map(|version| history.versions.get(version as usize))
+		.filter_map(|version| {
+			let entry = history.versions.get(version as usize)?;
+			Some((version, entry))
+		})
 		.collect()
 }
 
@@ -192,13 +200,15 @@ struct WorstLadderGrowth {
 /// `MigrationAccountGrowthExceeded` however large the lamport budget is.
 /// Fixed layouts quote exact byte growth; compact layouts quote the exact
 /// worst-case growth the declared capacities imply. `adjacent` is the source
-/// of the new transition; `stale_ladder` lists the supported stale versions it
-/// walks from, oldest first.
+/// of the new transition and `adjacent_version` its version number;
+/// `stale_ladder` lists the supported stale versions it walks from, oldest
+/// first.
 pub(super) fn warn_about_account_growth(
 	identity: &ContractIdentity,
 	rust_name: &str,
 	adjacent: &SchemaVersion,
-	stale_ladder: &[&SchemaVersion],
+	adjacent_version: u32,
+	stale_ladder: &[(u32, &SchemaVersion)],
 	destination: &DataSchema,
 	version_bytes: usize,
 	output: &mut MakeMigrationsOutput,
@@ -211,7 +221,7 @@ pub(super) fn warn_about_account_growth(
 	let adjacent_size = header.saturating_add(payload_size(&adjacent.schema));
 	let compact = stale_ladder
 		.iter()
-		.any(|source| source.schema.layout == LayoutKind::Compact)
+		.any(|(_, source)| source.schema.layout == LayoutKind::Compact)
 		|| destination.layout == LayoutKind::Compact;
 
 	if destination_size > adjacent_size {
@@ -223,9 +233,8 @@ pub(super) fn warn_about_account_growth(
 			adjacent_size,
 			destination_size,
 			&format!(
-				"in transition v{} to v{}",
-				adjacent.version,
-				adjacent.version + 1
+				"in transition v{adjacent_version} to v{}",
+				adjacent_version + 1
 			),
 		);
 		output.data_warnings.push(format!(
@@ -236,24 +245,29 @@ pub(super) fn warn_about_account_growth(
 		));
 	}
 
-	let worst = worst_ladder_growth(header, adjacent, stale_ladder, destination);
+	let worst = worst_ladder_growth(
+		header,
+		adjacent,
+		adjacent_version,
+		stale_ladder,
+		destination,
+	);
 	if worst.peak.saturating_sub(worst.from_size) > MAX_PERMITTED_DATA_INCREASE {
 		// A worst case starting at the adjacent version is the single
 		// transition itself; anything older only exceeds the cap cumulatively,
 		// and intermediates reset it only across separate transactions.
-		let sizes = if worst.from_version == adjacent.version {
+		let sizes = if worst.from_version == adjacent_version {
 			growth_descriptor(
 				compact,
 				worst.from_size,
 				worst.peak,
 				&format!(
-					"in transition v{} to v{}",
-					adjacent.version,
-					adjacent.version + 1
+					"in transition v{adjacent_version} to v{}",
+					adjacent_version + 1
 				),
 			)
 		} else {
-			let steps = adjacent.version + 1 - worst.from_version;
+			let steps = adjacent_version + 1 - worst.from_version;
 			growth_descriptor(
 				compact,
 				worst.from_size,
@@ -262,7 +276,7 @@ pub(super) fn warn_about_account_growth(
 					"across the {steps}-step inline ladder v{} to v{} (an intermediate version \
 					 only resets the runtime cap when it migrates in a separate transaction)",
 					worst.from_version,
-					adjacent.version + 1,
+					adjacent_version + 1,
 				),
 			)
 		};
@@ -292,27 +306,28 @@ fn payload_size(schema: &DataSchema) -> usize {
 fn worst_ladder_growth(
 	header: usize,
 	adjacent: &SchemaVersion,
-	stale_ladder: &[&SchemaVersion],
+	adjacent_version: u32,
+	stale_ladder: &[(u32, &SchemaVersion)],
 	destination: &DataSchema,
 ) -> WorstLadderGrowth {
 	let destination_size = header.saturating_add(payload_size(destination));
 	let adjacent_size = header.saturating_add(payload_size(&adjacent.schema));
 	let mut worst = WorstLadderGrowth {
-		from_version: adjacent.version,
+		from_version: adjacent_version,
 		from_size: adjacent_size,
 		peak: adjacent_size.max(destination_size),
 	};
-	for (index, source) in stale_ladder.iter().enumerate() {
+	for (index, (from_version, source)) in stale_ladder.iter().enumerate() {
 		let from_size = header.saturating_add(payload_size(&source.schema));
 		let mut peak = from_size;
-		for later in &stale_ladder[index + 1..] {
+		for (_, later) in &stale_ladder[index + 1..] {
 			peak = peak.max(header.saturating_add(payload_size(&later.schema)));
 		}
 		peak = peak.max(destination_size);
 		let growth = peak.saturating_sub(from_size);
 		if growth > worst.peak.saturating_sub(worst.from_size) {
 			worst = WorstLadderGrowth {
-				from_version: source.version,
+				from_version: *from_version,
 				from_size,
 				peak,
 			};
@@ -369,6 +384,7 @@ pub(super) fn automatic_transition_source(
 	identity: &ContractIdentity,
 	version_type: MigrationVersionType,
 	source: &SchemaVersion,
+	source_version: u32,
 	destination_version: u32,
 	destination: &DataSchema,
 ) -> String {
@@ -430,13 +446,12 @@ pub(super) fn automatic_transition_source(
 	}
 	format!(
 		"// @generated by `pina migrations make`; do not edit an automatic \
-		 transition.\npub(crate) const FROM_VERSION: u32 = {};\npub(crate) const TO_VERSION: u32 \
-		 = {destination_version};\npub(crate) const SOURCE_SIZE: usize = \
+		 transition.\npub(crate) const FROM_VERSION: u32 = {source_version};\npub(crate) const \
+		 TO_VERSION: u32 = {destination_version};\npub(crate) const SOURCE_SIZE: usize = \
 		 {source_size};\npub(crate) const DESTINATION_SIZE: usize = \
 		 {destination_size};\n\npub(crate) const WORKING_SIZE: usize = \
 		 {working_size};\n\npub(crate) fn migrate(data: &mut [u8]) {{\n\tif data.len() < \
 		 WORKING_SIZE {{\n\t\treturn;\n\t}}\n{moves}{zeroes}}}\n",
-		source.version,
 	)
 }
 
@@ -444,6 +459,7 @@ pub(super) fn manual_transition_source(
 	identity: &ContractIdentity,
 	version_type: MigrationVersionType,
 	source: &SchemaVersion,
+	source_version: u32,
 	destination_version: u32,
 	destination: &DataSchema,
 ) -> Result<String, MigrationError> {
@@ -529,10 +545,9 @@ pub(super) fn manual_transition_source(
 	};
 	Ok(format!(
 		"// Manual adjacent ABI migration generated by `pina migrations make`.\n// Source \
-		 version: {} ({source_description} bytes)\n// Destination version: {destination_version} \
-		 ({destination_description} bytes)\n// TODO(pina-manual-migration): \
+		 version: {source_version} ({source_description} bytes)\n// Destination version: \
+		 {destination_version} ({destination_description} bytes)\n// TODO(pina-manual-migration): \
 		 {requirement}.\n{sizing}\n{migrate}",
-		source.version,
 	))
 }
 
@@ -566,14 +581,20 @@ pub(super) fn verify_transition_files(
 	key: &str,
 	history: &ContractHistory,
 ) -> Result<(), MigrationError> {
-	for version in history.versions.iter().skip(1) {
-		let transition = version.transition.as_ref().ok_or_else(|| {
+	// A transition sits on the version it converts into, so the entering
+	// transition of version `number` is the step from `number - 1`.
+	for (number, version) in history.versions.iter().enumerate().skip(1) {
+		let number = u32::try_from(number).map_err(|_| {
 			MigrationError::InvalidHistory(format!(
-				"contract `{key}` version {} has no transition",
-				version.version
+				"contract `{key}` has more versions than u32 can index"
 			))
 		})?;
-		let path = transition_path(project, &history.identity, transition.from, transition.to);
+		let transition = version.transition.as_ref().ok_or_else(|| {
+			MigrationError::InvalidHistory(format!(
+				"contract `{key}` version {number} has no transition"
+			))
+		})?;
+		let path = transition_path(project, &history.identity, number - 1, number);
 		if !path.is_file() {
 			return Err(MigrationError::MissingTransition { path });
 		}
@@ -590,13 +611,13 @@ pub(super) fn verify_transition_files(
 		}
 		let current_hash = hash_transition_file(&path)?;
 		if transition.implementation_sha256.as_deref() != Some(current_hash.as_str()) {
-			if ledger.version_is_frozen(key, version.version) {
+			if ledger.version_is_frozen(key, number) {
 				return Err(MigrationError::FrozenImplementationChanged { path });
 			}
 			return Err(MigrationError::TransitionDrift {
 				kind: history.identity.kind.to_string(),
 				name: history.rust_name.clone(),
-				version: version.version,
+				version: number,
 				path,
 			});
 		}
@@ -611,6 +632,9 @@ pub(super) fn refresh_draft_transition_hash(
 	history: &mut ContractHistory,
 	output: &mut MakeMigrationsOutput,
 ) -> Result<(), MigrationError> {
+	let latest_version = history
+		.current_version()
+		.unwrap_or_else(|| panic!("decoded migration histories always contain a current version"));
 	let latest = history
 		.versions
 		.last_mut()
@@ -618,7 +642,12 @@ pub(super) fn refresh_draft_transition_hash(
 	let Some(transition) = latest.transition.as_mut() else {
 		return Ok(());
 	};
-	let path = transition_path(project, &history.identity, transition.from, transition.to);
+	let path = transition_path(
+		project,
+		&history.identity,
+		latest_version - 1,
+		latest_version,
+	);
 	if !path.is_file() {
 		return Err(MigrationError::MissingTransition { path });
 	}
@@ -626,12 +655,12 @@ pub(super) fn refresh_draft_transition_hash(
 	if transition.implementation_sha256.as_deref() == Some(hash.as_str()) {
 		return Ok(());
 	}
-	if ledger.version_is_frozen(key, latest.version) {
+	if ledger.version_is_frozen(key, latest_version) {
 		return Err(MigrationError::FrozenImplementationChanged { path });
 	}
 	transition.implementation_sha256 = Some(hash);
 	output
 		.updated_drafts
-		.push(format!("{key}@{}", latest.version));
+		.push(format!("{key}@{latest_version}"));
 	Ok(())
 }

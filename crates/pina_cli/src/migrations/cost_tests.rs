@@ -45,13 +45,12 @@ fn fixed_schema(payload_bytes: usize) -> DataSchema {
 	)
 }
 
-fn version(number: u32, schema: DataSchema) -> SchemaVersion {
+/// One version entry. The version number is its position in the history, so it
+/// is not stored on the entry.
+fn version(schema: DataSchema) -> SchemaVersion {
 	SchemaVersion {
-		version: number,
-		schema_sha256: schema.sha256(),
 		schema,
 		process: None,
-		process_sha256: None,
 		transition: None,
 	}
 }
@@ -65,11 +64,7 @@ fn account_history(
 		identity: ContractIdentity::try_new(ContractKind::Account, 1, discriminator)
 			.unwrap_or_else(|error| panic!("valid account identity: {error}")),
 		rust_name: rust_name.to_owned(),
-		versions: schemas
-			.into_iter()
-			.enumerate()
-			.map(|(index, schema)| version(index as u32, schema))
-			.collect(),
+		versions: schemas.into_iter().map(version).collect(),
 	}
 }
 
@@ -111,14 +106,15 @@ fn instruction_history_with_slots(
 					optional: true,
 					default_value: None,
 					pda: None,
-					constraints: Vec::new(),
 				}
 			})
 			.collect(),
 	};
-	let mut current = version(0, schema);
-	current.process_sha256 = Some(process.sha256());
-	current.process = Some(process);
+	let current = SchemaVersion {
+		schema,
+		process: Some(process),
+		transition: None,
+	};
 
 	ContractHistory {
 		identity: ContractIdentity::try_new(ContractKind::Instruction, 1, discriminator)
@@ -139,7 +135,7 @@ fn instruction_without_process(
 		identity: ContractIdentity::try_new(ContractKind::Instruction, 1, discriminator)
 			.unwrap_or_else(|error| panic!("valid instruction identity: {error}")),
 		rust_name: rust_name.to_owned(),
-		versions: vec![version(0, fixed_schema(payload_bytes))],
+		versions: vec![version(fixed_schema(payload_bytes))],
 	}
 }
 

@@ -55,6 +55,9 @@ pub fn generate(manifest: &MigrationManifest) -> String {
 		let current = history
 			.current()
 			.expect("validated migration histories always contain a current version");
+		let current_version = history
+			.current_version()
+			.unwrap_or_else(|| panic!("validated migration histories carry a current version"));
 		render_contract(
 			&mut output,
 			key,
@@ -65,6 +68,7 @@ pub fn generate(manifest: &MigrationManifest) -> String {
 				version_bytes: manifest.version_type.bytes() as u8,
 			},
 			current,
+			current_version,
 		);
 	}
 
@@ -107,6 +111,7 @@ fn render_contract(
 	rust_name: &str,
 	geometry: &ContractGeometry<'_>,
 	current: &SchemaVersion,
+	current_version: u32,
 ) {
 	let kind_label = match geometry.kind {
 		ContractKind::Account => "account",
@@ -123,12 +128,12 @@ fn render_contract(
 	let _ = writeln!(output, "\t/// Rust type name as declared in the program.");
 	let _ = writeln!(output, "\tpub const RUST_NAME: &str = {rust_name:?};");
 	let _ = writeln!(output, "\t/// Current schema version.");
-	let _ = writeln!(output, "\tpub const VERSION: u32 = {};", current.version);
+	let _ = writeln!(output, "\tpub const VERSION: u32 = {current_version};");
 	let _ = writeln!(output, "\t/// Schema hash recorded for this version.");
 	let _ = writeln!(
 		output,
 		"\tpub const SCHEMA_SHA256: &str = {:?};",
-		current.schema_sha256
+		current.schema_sha256()
 	);
 	// The envelope geometry is the part consumers get wrong by hand: enabling
 	// migrations inserts a version byte after the discriminator, so every byte
@@ -164,7 +169,10 @@ fn render_contract(
 		"\tpub const MIGRATION_HEADER_SIZE: usize = {envelope};"
 	);
 
-	match &current.schema.physical {
+	let physical = current.schema.physical().unwrap_or_else(|error| {
+		panic!("validated manifest schema has a physical layout: {error}")
+	});
+	match &physical {
 		PhysicalLayout::Fixed { size, fields } => {
 			let payload = current.schema.fixed_payload_size().unwrap_or(0);
 			let _ = writeln!(
