@@ -1399,6 +1399,40 @@ mod tests {
 
 	use super::*;
 
+	#[test]
+	fn relative_dependency_path_walks_out_of_the_cli_tree() {
+		// The CLI crate sits three levels below the clients root; the
+		// dependency on the sibling rust client must climb exactly that far.
+		let path = relative_dependency_path(
+			&Path::new("codama/clients/cli/rust/example"),
+			&Path::new("codama/clients/rust/example"),
+		);
+		assert_eq!(path, "../../../rust/example");
+	}
+
+	#[test]
+	fn relative_dependency_path_siblings_and_identity() {
+		// Only "out" is shared, so all three remaining components climb.
+		let path = relative_dependency_path(
+			&Path::new("out/cli/rust/example"),
+			&Path::new("out/rust/example"),
+		);
+		assert_eq!(path, "../../../rust/example");
+
+		// A from-dir that already prefixes the target only descends.
+		let nested = relative_dependency_path(
+			&Path::new("codama/clients"),
+			&Path::new("codama/clients/rust/example"),
+		);
+		assert_eq!(nested, "rust/example");
+
+		// Shared roots with no remainder fall back to an explicit ".".
+		assert_eq!(
+			relative_dependency_path(&Path::new("a/b"), &Path::new("a/b")),
+			"."
+		);
+	}
+
 	fn output(status: ExitStatus, stdout: &[u8], stderr: &[u8]) -> BoundedOutput {
 		BoundedOutput {
 			status,
