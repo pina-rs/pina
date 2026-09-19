@@ -30,23 +30,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bytemuck"
-version = "1.25.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.5",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,7 +277,7 @@ checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
 
 [[package]]
 name = "pina"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "pastey",
  "pina_macros",
@@ -307,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "pina_abi"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "quote",
  "serde",
@@ -318,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "darling",
  "heck",
@@ -538,8 +521,6 @@ version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39c93e262f671bf402e1040e4a7e40b05d81da5956c7681948c975a0997517bb"
 dependencies = [
- "bytemuck",
- "bytemuck_derive",
  "curve25519-dalek",
  "five8",
  "five8_const",
