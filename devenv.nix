@@ -1279,6 +1279,13 @@ in
         # where every advisory deny.toml suppresses actually lives. Without
         # --workspace the advisories check cannot see them at all, so an
         # unreviewed advisory in that stack would pass unnoticed.
+        # A cached target/ can carry an advisory database that a previously
+        # failed fetch left empty; cargo-deny sees the directory, skips the
+        # fetch, and then fails to load any advisory from it. Discard a
+        # database that has no advisory crates in it so the fetch re-runs.
+        if [ -d target/advisory-db ] && [ ! -d target/advisory-db/crates ]; then
+          rm -rf target/advisory-db
+        fi
         cargo-deny --workspace check advisories
         # bans/licenses/sources keep the default scope: rooting them at every
         # workspace member reports the dev/test stack's duplicate versions and
