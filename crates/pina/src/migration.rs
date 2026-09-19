@@ -320,7 +320,8 @@ impl CurrentInstructionData<'_, '_> {
 
 /// Generated conversion contract for one migratable instruction payload.
 ///
-/// The caller owns the workspace so the runtime remains allocator-free.
+/// The caller owns the workspace, so the conversion needs no allocation and
+/// the runtime stays allocator-free by default.
 /// Generated implementations validate one exact historical representation,
 /// clear the workspace, run adjacent transitions, validate the destination,
 /// and commit the current version marker last.

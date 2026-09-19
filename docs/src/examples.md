@@ -24,6 +24,7 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `account_realloc_program`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
 - `compact_accounts_program`: generated compact patches across create, grow, same-size update, shrink, clear, rent adjustment, and rejected boundary cases.
 - `optional_accounts_program`: optional-account slots with explicit presence handling and count tracking.
+- `heap_alloc_program`: opt-in heap allocation through `nostd_entrypoint_alloc!`, with the bump allocator, heap-frame sizing, and allocation-failure behavior.
 - `validation_program`: end-to-end declarative validation for instructions, instruction accounts, stored account state, and events.
 - `multisig_program`: production-shaped multisig consensus — bitmask voting, timelocked vault execution of compiled messages, governed config action streams, spending limits, legacy-account import, and the migration envelope.
 
