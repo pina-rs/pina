@@ -1,0 +1,5 @@
+error: string capacity must be a length this crate can evaluate, but `MISSING_CAPACITY` is not a `const` item; write an integer literal, or declare `const MISSING_CAPACITY: usize = ...;` at the crate root or in a module (a value on a type is not resolved)
+  --> tests/ui/fail/account_compact_unresolved_string_capacity.rs:11:20
+   |
+11 |     pub title: String<MISSING_CAPACITY>,
+   |                       ^^^^^^^^^^^^^^^^

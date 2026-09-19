@@ -6,4 +6,5 @@ pub mod discriminator;
 pub mod error;
 pub mod event;
 pub mod instruction;
+pub mod named_capacities;
 pub mod pda;

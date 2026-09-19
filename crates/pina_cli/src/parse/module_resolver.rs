@@ -69,6 +69,20 @@ pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile
 		pending = next_pending;
 	}
 
+	// A schema capacity may be a named `const` rather than a literal. The CLI
+	// reads the same source the macros expand, so the constants are resolved
+	// here, once, and every extractor downstream sees the numbers it already
+	// understands.
+	let consts = pina_abi::SchemaConsts::from_files(
+		&files
+			.iter()
+			.map(|resolved| &resolved.file)
+			.collect::<Vec<_>>(),
+	);
+	for resolved in &mut files {
+		consts.normalize_file(&mut resolved.file);
+	}
+
 	Ok(files)
 }
 
@@ -371,5 +385,73 @@ mod tests {
 		let files =
 			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
 		assert_eq!(files.len(), 1); // Only lib.rs, inline module is part of it.
+	}
+
+	/// Render the first resolved struct's fields, for capacity assertions.
+	fn fields_of(files: &[ResolvedFile]) -> String {
+		files[0]
+			.file
+			.items
+			.iter()
+			.find_map(|item| {
+				match item {
+					syn::Item::Struct(item) => {
+						Some(quote::ToTokens::to_token_stream(&item.fields).to_string())
+					}
+					_ => None,
+				}
+			})
+			.expect("the test source declares a struct")
+	}
+
+	#[test]
+	fn resolves_named_capacities_to_their_values() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(
+			src.join("lib.rs"),
+			"const MAX_MEMBERS: usize = 24;\n\npub struct Roster {\n\tpub bump: u8,\n\tpub \
+			 members: Vec<Address, MAX_MEMBERS>,\n\tpub width: [u8; MAX_MEMBERS],\n}",
+		)
+		.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let files =
+			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
+		let fields = fields_of(&files);
+
+		assert!(
+			!fields.contains("MAX_MEMBERS"),
+			"every capacity should resolve to its value: {fields}"
+		);
+		assert!(
+			fields.contains("24"),
+			"the resolved capacity should appear: {fields}"
+		);
+		assert!(
+			fields.contains("Address"),
+			"the element type must survive: {fields}"
+		);
+	}
+
+	#[test]
+	fn leaves_an_unknown_capacity_for_the_grammar_to_reject() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(
+			src.join("lib.rs"),
+			"pub struct Roster {\n\tpub bump: u8,\n\tpub members: Vec<Address, MISSING>,\n}",
+		)
+		.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let files =
+			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
+		let fields = fields_of(&files);
+
+		assert!(
+			fields.contains("MISSING"),
+			"an unresolvable capacity must stay for the grammar to name: {fields}"
+		);
 	}
 }

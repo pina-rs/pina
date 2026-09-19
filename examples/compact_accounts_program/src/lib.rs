@@ -23,6 +23,14 @@ use pina::*;
 declare_id!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
 
 const SEED_JOURNAL: &[u8] = b"compact-journal";
+/// Maximum UTF-8 byte length of the journal title.
+const MAX_TITLE: usize = 24;
+/// Maximum number of journal entries retained.
+const MAX_ENTRIES: usize = 8;
+/// Maximum number of independently sized markers.
+const MAX_MARKERS: usize = 8;
+/// Maximum UTF-8 byte length of the optional note.
+const MAX_NOTE: usize = 64;
 pub const DEFAULT_TITLE: &str = "journal";
 
 #[error]
@@ -66,14 +74,14 @@ pub struct Journal {
 	/// Most recently written entry value, stored as `PodOption<PodU64>`.
 	pub featured_entry: Option<u64>,
 	/// Human-readable title stored as active UTF-8 bytes.
-	pub title: String<24>,
+	pub title: String<MAX_TITLE>,
 	/// Active entries. Unused capacity consumes no account bytes.
-	pub entries: Vec<u64, 8>,
+	pub entries: Vec<u64, MAX_ENTRIES>,
 	/// Independently sized markers stored as a second compact tail.
-	pub markers: PodVec<u8, 8, 8>,
+	pub markers: PodVec<u8, MAX_MARKERS, 8>,
 	/// Optional human-readable status attached to the latest resize.
 	#[allow(unused_qualifications)]
-	pub note: Option<pina::String<64>>,
+	pub note: Option<pina::String<MAX_NOTE>>,
 }
 
 #[instruction(discriminator = CompactInstruction::Initialize)]
@@ -104,7 +112,7 @@ pub struct RenameIx {
 	/// Active byte length within `title`.
 	pub title_len: u8,
 	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
-	pub title: [u8; 24],
+	pub title: [u8; MAX_TITLE],
 }
 
 #[derive(Accounts, Debug)]
@@ -169,7 +177,7 @@ fn initialized_markers(marker_count: usize) -> [u8; Journal::MARKERS_CAPACITY] {
 	markers
 }
 
-fn title_from_bytes(bytes: &[u8; 24], title_len: usize) -> Result<&str, ProgramError> {
+fn title_from_bytes(bytes: &[u8; MAX_TITLE], title_len: usize) -> Result<&str, ProgramError> {
 	let title = bytes
 		.get(..title_len)
 		.ok_or(ProgramError::InvalidInstructionData)?;

@@ -18,6 +18,10 @@ use serde::ser::SerializeSeq as _;
 use sha2::Digest as _;
 use sha2::Sha256;
 
+mod consts;
+
+pub use consts::SchemaConsts;
+
 /// Relative path of the checked-in migration database.
 pub const MANIFEST_PATH: &str = "migrations/manifest.json";
 
@@ -2684,6 +2688,10 @@ const fn greatest_common_divisor(mut left: usize, mut right: usize) -> usize {
 }
 
 /// Build the data-only schema seen by an attribute macro before envelope fields are injected.
+///
+/// Field types must already be normalized: a capacity is recorded as the number
+/// it evaluates to, so callers resolve named constants through
+/// [`SchemaConsts::normalize_item`] first.
 pub fn data_schema(item: &syn::ItemStruct, layout: LayoutKind) -> Result<DataSchema, String> {
 	let syn::Fields::Named(fields) = &item.fields else {
 		return Err(format!("{} must have named fields", item.ident));

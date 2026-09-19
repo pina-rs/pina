@@ -102,6 +102,21 @@ The compact grammar accepts these tail forms:
 
 `Option<T>` for fixed `T` stays in the header. The other forms use tail storage. A compact schema can contain several tails, but it cannot place a fixed field after the first tail. The macro rejects unsupported nesting and prints the accepted forms in its error.
 
+`N` and `M` accept an integer literal or a `const` item, so a bound declared once is reused everywhere it appears. Fixed `[T; N]` fields and instruction arguments accept the same forms. A constant may be written in terms of other constants and may live in any module of the crate. Pina resolves it during expansion and records the number, so the generated constants, the ABI manifest, and the Codama IDL are identical to the literal spelling:
+
+```rust
+const MAX_MEMBERS: usize = 24;
+
+#[account(discriminator = AccountType, compact)]
+pub struct Roster {
+	pub bump: u8,
+	pub members: Vec<Address, MAX_MEMBERS>,
+	pub slots: [u8; MAX_MEMBERS],
+}
+```
+
+A capacity Pina cannot evaluate fails the build with a diagnostic naming the expression, rather than reaching the ABI layer as a name it cannot size. An associated constant such as `Bounds::MAX_MEMBERS` is not resolved: declare the bound as a `const` item at the crate root or in a module.
+
 The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also generates `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, checked reads, initialization, projected-size calculation, and atomic updates. `MIN_SIZE` equals `HEADER_SIZE`. Tail prefixes live in the header except for a present `Option<String<N>>` or `Option<Vec<T, N>>`, whose payload retains its own prefix. Each active element of `Vec<String<M>, N>` occupies the fixed `String<M>` footprint, although each string keeps its own logical length.
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
