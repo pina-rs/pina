@@ -53,6 +53,9 @@
 
 #![allow(missing_docs)]
 #![allow(clippy::inline_always)]
+// `AccountView` is small and `Copy`, but every pina accessor and example
+// passes it by reference; match the shared signature style.
+#![expect(clippy::trivially_copy_pass_by_ref)]
 #![no_std]
 
 #[cfg(all(
@@ -621,7 +624,7 @@ fn flatten_roster<const N: usize>(keys: &[Address]) -> [u8; N] {
 
 /// Decode a roster's active length; the tail must hold whole addresses.
 fn roster_count(bytes: &[u8]) -> Result<usize, ProgramError> {
-	if bytes.len() % 32 != 0 {
+	if !bytes.len().is_multiple_of(32) {
 		return Err(MultisigError::InvalidConfiguration.into());
 	}
 	Ok(bytes.len() / 32)
@@ -742,8 +745,7 @@ impl MultisigSnapshot {
 	/// The member's permission mask, or zero for non-members.
 	pub fn permissions_of(&self, key: &Address) -> u8 {
 		self.member_index_of(key)
-			.map(|index| self.member_permissions()[index])
-			.unwrap_or(0)
+			.map_or(0, |index| self.member_permissions()[index])
 	}
 
 	pub fn is_member(&self, key: &Address) -> bool {
@@ -1126,7 +1128,10 @@ pub const ACTION_SET_PROPOSAL_TTL: u8 = 8;
 /// `AddSpendingLimit` carries its member and destination rosters in fixed
 /// buffers so the view stays allocation-free; that width is intentional.
 #[derive(Debug, Clone, Copy)]
-#[allow(variant_size_differences)]
+#[expect(
+	variant_size_differences,
+	reason = "the spending-limit variant carries its fixed rosters by design"
+)]
 pub enum ConfigActionView {
 	AddMember {
 		key: Address,
@@ -1299,10 +1304,10 @@ pub fn validate_actions(bytes: &[u8]) -> Result<(), ProgramError> {
 					return Err(MultisigError::ProposalExpired.into());
 				}
 			}
-			ConfigActionView::AddSpendingLimit { period, .. } => {
-				if period != PERIOD_ONE_TIME && period_seconds(period).is_none() {
-					return Err(MultisigError::InvalidPeriod.into());
-				}
+			ConfigActionView::AddSpendingLimit { period, .. }
+				if period != PERIOD_ONE_TIME && period_seconds(period).is_none() =>
+			{
+				return Err(MultisigError::InvalidPeriod.into());
 			}
 			_ => {}
 		}
@@ -1361,14 +1366,14 @@ fn read_option_address(bytes: &[u8], offset: usize) -> Result<Option<Address>, P
 ///
 /// Layout (Anchor/Borsh, little-endian) shared by the deployed multisig
 /// programs that store their roster inline:
-/// 8..40    create_key
-/// 40..72   config_authority
+/// 8..40    `create_key`
+/// 40..72   `config_authority`
 /// 72..74   threshold u16
-/// 74..78   time_lock u32
-/// 78..86   transaction_index u64
-/// 86..94   stale_transaction_index u64
-/// 94..95   rent_collector Option tag
-/// 95..127  rent_collector key (present even when None)
+/// 74..78   `time_lock` u32
+/// 78..86   `transaction_index` u64
+/// 86..94   `stale_transaction_index` u64
+/// 94..95   `rent_collector` Option tag
+/// 95..127  `rent_collector` key (present even when None)
 /// 127..128 bump u8
 /// 128..132 members length u32
 /// 132..    members: 33 bytes each (key + permission mask)
@@ -1419,9 +1424,8 @@ impl LegacyMultisig {
 			*slot = read_legacy_address(bytes, 132 + position * 33)?;
 		}
 		let mut member_permissions = [0_u8; MAX_MEMBERS];
-		for position in 0..member_count {
-			member_permissions[position] =
-				*bytes.get(132 + position * 33 + 32).ok_or_else(invalid)?;
+		for (position, slot) in member_permissions.iter_mut().enumerate().take(member_count) {
+			*slot = *bytes.get(132 + position * 33 + 32).ok_or_else(invalid)?;
 		}
 
 		let rent_collector_tag = bytes[94];
@@ -1882,10 +1886,10 @@ impl<'a> ProcessAccountInfos<'a> for ConfigUpdateAccounts<'a> {
 		if config.authority != *self.authority.address() {
 			return Err(MultisigError::InvalidConfigAuthority.into());
 		}
-		if args.set_treasury.get().into() {
+		if args.set_treasury.get() {
 			config.treasury = args.treasury;
 		}
-		if args.set_creation_fee.get().into() {
+		if args.set_creation_fee.get() {
 			config.creation_fee.set(args.creation_fee.get());
 		}
 
@@ -2011,12 +2015,12 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 			patch: MultisigPatch::new()
 				.bump(args.bump)
 				.create_key(create_key)
-				.config_authority(if args.set_config_authority.get().into() {
+				.config_authority(if args.set_config_authority.get() {
 					args.config_authority
 				} else {
 					legacy.config_authority
 				})
-				.rent_collector(if args.set_rent_collector.get().into() {
+				.rent_collector(if args.set_rent_collector.get() {
 					args.rent_collector
 				} else {
 					legacy.rent_collector.unwrap_or_default()
@@ -2108,7 +2112,7 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCreateAccounts<'a> {
 		let proposal_key = create_program_address(&proposal_seeds.as_slices(), &ID)?;
 
 		let mut ephemeral_bumps = [0_u8; MAX_EPHEMERAL_SIGNERS];
-		for position in 0..ephemeral_count {
+		for (position, slot) in ephemeral_bumps.iter_mut().enumerate().take(ephemeral_count) {
 			let position_bytes = [position as u8];
 			let Some((_, bump)) = try_find_program_address(
 				&[
@@ -2120,7 +2124,7 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCreateAccounts<'a> {
 			) else {
 				return Err(ProgramError::InvalidSeeds);
 			};
-			ephemeral_bumps[position] = bump;
+			*slot = bump;
 		}
 
 		let vault_bump = if kind == KIND_VAULT {
@@ -2257,7 +2261,7 @@ fn update_proposal_header(
 	patch: &ProposalPatch<'_>,
 ) -> Result<(), ProgramError> {
 	let mut data = proposal.try_borrow_mut()?;
-	Proposal::update(&mut *data, patch)?;
+	Proposal::update(&mut data, patch)?;
 	drop(data);
 	Ok(())
 }
@@ -2570,8 +2574,8 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 				&[
 					SEED_EPHEMERAL_SIGNER,
 					proposal_key.as_ref(),
-					&position_bytes[position..position + 1],
-					&bumps[position..position + 1],
+					&position_bytes[position..=position],
+					&bumps[position..=position],
 				],
 				&ID,
 			)?;
@@ -2650,8 +2654,8 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 			ephemeral_signer_storage[position] = PdaSigner::from_slices([
 				SEED_EPHEMERAL_SIGNER,
 				proposal_key.as_ref(),
-				&position_bytes[position..position + 1],
-				&bumps[position..position + 1],
+				&position_bytes[position..=position],
+				&bumps[position..=position],
 			]);
 		}
 		let mut signers: [Signer<'_, '_>; MAX_EPHEMERAL_SIGNERS + 1] =
@@ -2659,7 +2663,7 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 		for position in 0..ephemeral_count {
 			signers[position + 1] = ephemeral_signer_storage[position].as_signer();
 		}
-		let signers = &signers[..1 + ephemeral_count];
+		let signers = &signers[..=ephemeral_count];
 
 		for instruction_index in 0..message.num_instructions() {
 			let instruction = message.instruction(instruction_index)?;
@@ -3010,7 +3014,7 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 		{
 			let mut limit_data = self.spending_limit.try_borrow_mut()?;
 			SpendingLimit::update(
-				&mut *limit_data,
+				&mut limit_data,
 				&SpendingLimitPatch::new()
 					.remaining_amount(remaining_amount)
 					.last_reset(last_reset),
@@ -3208,9 +3212,10 @@ mod tests {
 			&[(3, &[0, 2], &[9, 9]), (3, &[], &[])],
 			&mut buffer,
 		)
-		.expect("encode message");
+		.unwrap_or_else(|error| panic!("encode message: {error:?}"));
 
-		let message = MessageView::parse(&buffer[..length]).expect("parse message");
+		let message = MessageView::parse(&buffer[..length])
+			.unwrap_or_else(|error| panic!("parse message: {error:?}"));
 		assert_eq!(message.num_accounts(), 4);
 		assert_eq!(message.num_instructions(), 2);
 		assert_eq!(message.account_key(2), Ok(key(3)));
@@ -3221,11 +3226,15 @@ mod tests {
 		assert!(message.is_writable_index(1));
 		assert!(!message.is_writable_index(2));
 
-		let first = message.instruction(0).expect("first instruction");
+		let first = message
+			.instruction(0)
+			.unwrap_or_else(|error| panic!("first instruction: {error:?}"));
 		assert_eq!(first.program_id_index, 3);
 		assert_eq!(first.account_indexes, &[0, 2]);
 		assert_eq!(first.data, &[9, 9]);
-		let second = message.instruction(1).expect("second instruction");
+		let second = message
+			.instruction(1)
+			.unwrap_or_else(|error| panic!("second instruction: {error:?}"));
 		assert_eq!(second.account_indexes, &[] as &[u8]);
 		assert_eq!(second.data, &[] as &[u8]);
 		assert!(message.instruction(2).is_err());
@@ -3243,7 +3252,7 @@ mod tests {
 			&[(1, &[0], &[1, 2, 3])],
 			&mut buffer,
 		)
-		.expect("encode message");
+		.unwrap_or_else(|error| panic!("encode message: {error:?}"));
 
 		for truncated in 0..length {
 			assert!(
@@ -3251,7 +3260,7 @@ mod tests {
 				"a message truncated to {truncated} bytes must not parse"
 			);
 		}
-		assert!(MessageView::parse(&buffer[..length + 1]).is_err());
+		assert!(MessageView::parse(&buffer[..=length]).is_err());
 
 		// Writable signers may not exceed signers.
 		let mut writable_overflow = buffer[..length].to_vec();
@@ -3406,7 +3415,7 @@ mod tests {
 			}
 			Ok(())
 		})
-		.expect("walk actions");
+		.unwrap_or_else(|error| panic!("walk actions: {error:?}"));
 
 		assert_eq!(
 			seen,
@@ -3493,13 +3502,13 @@ mod tests {
 		let mut bytes = Vec::new();
 		bytes.extend_from_slice(&LEGACY_DISCRIMINATOR);
 		bytes.extend_from_slice(key(50).as_ref()); // create_key
-		bytes.extend_from_slice(&Address::default().as_ref()); // autonomous
+		bytes.extend_from_slice(Address::default().as_ref()); // autonomous
 		bytes.extend_from_slice(&2_u16.to_le_bytes()); // threshold
 		bytes.extend_from_slice(&4_320_u32.to_le_bytes()); // timelock
 		bytes.extend_from_slice(&9_u64.to_le_bytes()); // transaction_index
 		bytes.extend_from_slice(&9_u64.to_le_bytes()); // stale_transaction_index
 		bytes.push(0); // rent_collector: None
-		bytes.extend_from_slice(&Address::default().as_ref()); // padded key
+		bytes.extend_from_slice(Address::default().as_ref()); // padded key
 		bytes.push(254); // bump
 		bytes.extend_from_slice(&3_u32.to_le_bytes()); // members len
 		for position in 0..3 {
@@ -3512,8 +3521,8 @@ mod tests {
 	#[test]
 	fn legacy_parser_reads_a_classic_anchor_layout() {
 		let bytes = legacy_multisig_bytes();
-		let legacy =
-			LegacyMultisig::parse(&bytes, &LEGACY_DISCRIMINATOR).expect("parse legacy multisig");
+		let legacy = LegacyMultisig::parse(&bytes, &LEGACY_DISCRIMINATOR)
+			.unwrap_or_else(|error| panic!("parse legacy multisig: {error:?}"));
 
 		assert_eq!(legacy.create_key, key(50));
 		assert_eq!(legacy.config_authority, Address::default());
@@ -3528,8 +3537,8 @@ mod tests {
 		let mut with_collector = bytes.clone();
 		with_collector[94] = 1;
 		with_collector[95..127].copy_from_slice(key(77).as_ref());
-		let legacy =
-			LegacyMultisig::parse(&with_collector, &LEGACY_DISCRIMINATOR).expect("parse collector");
+		let legacy = LegacyMultisig::parse(&with_collector, &LEGACY_DISCRIMINATOR)
+			.unwrap_or_else(|error| panic!("parse collector: {error:?}"));
 		assert_eq!(legacy.rent_collector, Some(key(77)));
 	}
 
@@ -3560,7 +3569,7 @@ mod tests {
 
 	#[test]
 	fn instruction_codecs_roundtrip_their_arguments() {
-		let (keys, permissions) = sorted_members(2);
+		let (_keys, permissions) = sorted_members(2);
 		let mut create_bytes = [0_u8; MultisigCreateIx::SIZE];
 		MultisigCreateIx::initialize(&mut create_bytes, |ix| {
 			ix.bump = 254;
@@ -3572,8 +3581,9 @@ mod tests {
 			ix.rent_collector = Address::default();
 			Ok(())
 		})
-		.expect("initialize create ix");
-		let decoded = MultisigCreateIx::try_from_bytes(&create_bytes).expect("decode");
+		.unwrap_or_else(|error| panic!("initialize create ix: {error:?}"));
+		let decoded = MultisigCreateIx::try_from_bytes(&create_bytes)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(decoded.threshold.get(), 2);
 		assert_eq!(decoded.member_permissions[0], permissions[0]);
 		assert_eq!(decoded.config_authority, key(3));
@@ -3589,8 +3599,9 @@ mod tests {
 			ix.actions_len.set(0);
 			Ok(())
 		})
-		.expect("initialize proposal ix");
-		let decoded = ProposalCreateIx::try_from_bytes(&proposal_bytes).expect("decode");
+		.unwrap_or_else(|error| panic!("initialize proposal ix: {error:?}"));
+		let decoded = ProposalCreateIx::try_from_bytes(&proposal_bytes)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(decoded.kind, KIND_VAULT);
 		assert_eq!(decoded.message_len.get(), 3);
 		assert_eq!(&decoded.message[..3], &[7, 7, 7]);
@@ -3601,8 +3612,9 @@ mod tests {
 			ix.decimals = 9;
 			Ok(())
 		})
-		.expect("initialize spend ix");
-		let decoded = SpendingLimitUseIx::try_from_bytes(&spend_bytes).expect("decode");
+		.unwrap_or_else(|error| panic!("initialize spend ix: {error:?}"));
+		let decoded = SpendingLimitUseIx::try_from_bytes(&spend_bytes)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(decoded.amount.get(), 123);
 		assert_eq!(decoded.decimals, 9);
 	}
@@ -3610,19 +3622,22 @@ mod tests {
 	#[test]
 	fn compact_size_projections_scale_with_active_tails() {
 		assert_eq!(Multisig::projected_bytes(0, 0), Ok(Multisig::HEADER_SIZE));
-		let three = Multisig::projected_bytes(3 * 32, 3).expect("three members");
+		let three = Multisig::projected_bytes(3 * 32, 3)
+			.unwrap_or_else(|error| panic!("three members: {error:?}"));
 		assert_eq!(three, Multisig::HEADER_SIZE + 3 * 32 + 3);
 		// Seventeen members exceed the sixteen-slot roster capacity.
 		assert!(Multisig::projected_bytes(17 * 32, 17).is_err());
 
-		let vault = Proposal::projected_bytes(2, 100, 0).expect("vault proposal");
+		let vault = Proposal::projected_bytes(2, 100, 0)
+			.unwrap_or_else(|error| panic!("vault proposal: {error:?}"));
 		assert_eq!(vault, Proposal::HEADER_SIZE + 2 + 100);
-		let config = Proposal::projected_bytes(0, 0, 64).expect("config proposal");
+		let config = Proposal::projected_bytes(0, 0, 64)
+			.unwrap_or_else(|error| panic!("config proposal: {error:?}"));
 		assert_eq!(config, Proposal::HEADER_SIZE + 64);
 		assert!(Proposal::projected_bytes(0, 641, 0).is_err());
 		assert!(Proposal::projected_bytes(9, 0, 0).is_err());
 
-		assert!(SpendingLimit::projected_bytes(2 * 32, 1 * 32).is_ok());
+		assert!(SpendingLimit::projected_bytes(2 * 32, 32).is_ok());
 		// Rosters must hold whole addresses within their capacities.
 		assert!(SpendingLimit::projected_bytes(16 * 32 + 1, 0).is_err());
 		assert!(SpendingLimit::projected_bytes(0, 8 * 32 + 1).is_err());
@@ -3705,8 +3720,9 @@ mod tests {
 			event.timestamp.set(1_700_000_000);
 			Ok(())
 		})
-		.expect("initialize event record");
-		let decoded = ProposalStatusEvent::try_from_bytes(&bytes).expect("decode event record");
+		.unwrap_or_else(|error| panic!("initialize event record: {error:?}"));
+		let decoded = ProposalStatusEvent::try_from_bytes(&bytes)
+			.unwrap_or_else(|error| panic!("decode event record: {error:?}"));
 		assert_eq!(decoded.multisig, [9; 32].into());
 		assert_eq!(decoded.index.get(), 4);
 		assert_eq!(decoded.status, STATUS_APPROVED);

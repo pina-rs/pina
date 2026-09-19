@@ -37,7 +37,6 @@ use multisig_program::SpendingLimit;
 use multisig_program::SpendingLimitPatch;
 use multisig_program::SpendingLimitUseIx;
 use pina::Address;
-use pina::PinaPodCompact;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -291,7 +290,7 @@ fn proposal_data(
 }
 
 /// Flatten addresses into the roster wire form.
-fn flatten_fixture_roster(keys: &[pina::Address]) -> [u8; 512] {
+fn flatten_fixture_roster(keys: &[Address]) -> [u8; 512] {
 	let mut bytes = [0_u8; 512];
 	for (position, key) in keys.iter().enumerate() {
 		bytes[position * 32..position * 32 + 32].copy_from_slice(key.as_ref());
@@ -300,11 +299,11 @@ fn flatten_fixture_roster(keys: &[pina::Address]) -> [u8; 512] {
 }
 
 /// Decode a roster into owned addresses plus its length.
-fn decode_fixture_roster(bytes: &[u8]) -> ([pina::Address; 16], usize) {
+fn decode_fixture_roster(bytes: &[u8]) -> ([Address; 16], usize) {
 	let count = bytes.len() / 32;
-	let mut keys = [pina::Address::default(); 16];
+	let mut keys = [Address::default(); 16];
 	for (position, slot) in keys.iter_mut().take(count).enumerate() {
-		*slot = pina::Address::try_from(&bytes[position * 32..position * 32 + 32]).unwrap();
+		*slot = Address::try_from(&bytes[position * 32..position * 32 + 32]).unwrap();
 	}
 	(keys, count)
 }
@@ -418,7 +417,7 @@ fn multisig_create_initializes_the_compact_roster() {
 		ix.threshold.set(2);
 		ix.timelock.set(0);
 		ix.ttl.set(0);
-		for (position, member) in members.iter().enumerate() {
+		for (position, _member) in members.iter().enumerate() {
 			ix.member_permissions[position] = PERMISSIONS_ALL;
 		}
 		ix.config_authority = Address::default();
@@ -635,7 +634,7 @@ fn lifecycle_world(
 	let members = sorted_member_keys();
 	let (multisig_key, multisig_bump) = multisig_pda(&create_key);
 	let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, 1);
-	let (_, vault_bump) = vault_pda(&multisig_key, 0);
+	let (_, _vault_bump) = vault_pda(&multisig_key, 0);
 
 	let mut world = World::new();
 	world.add(
