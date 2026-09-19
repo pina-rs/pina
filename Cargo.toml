@@ -109,6 +109,8 @@ members = [
 	"examples/hello_solana_program/tests/surfpool",
 	"examples/migrations_program",
 	"examples/migrations_program/tests/surfpool",
+	"examples/multisig_program",
+	"examples/multisig_program/tests/surfpool",
 	"examples/optional_accounts_program",
 	"examples/optional_accounts_program/tests/surfpool",
 	"examples/pina_bpf_program",
