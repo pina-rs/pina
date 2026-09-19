@@ -97,7 +97,7 @@ pub fn begin_publication(
 				.iter()
 				.map(|version| {
 					PublishedSchema {
-						schema_sha256: version.schema_sha256.clone(),
+						schema_sha256: version.schema_sha256(),
 						transition_sha256: version
 							.transition
 							.as_ref()
@@ -179,7 +179,6 @@ pub fn record_publication(
 		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
 	let receipt = PublicationReceipt {
 		sequence,
-		cluster: pending.cluster,
 		rpc_url: pending.rpc_url,
 		program_id: pending.program_id,
 		executable_sha256: pending.executable_sha256,
@@ -261,7 +260,6 @@ pub fn reconcile_publication(
 		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
 	let receipt = PublicationReceipt {
 		sequence,
-		cluster: pending.cluster,
 		rpc_url: pending.rpc_url,
 		program_id: pending.program_id,
 		executable_sha256: pending.executable_sha256,
@@ -334,10 +332,10 @@ pub(super) fn validate_published_contract(
 	let history = manifest.contracts.get(key).ok_or_else(|| {
 		MigrationError::InvalidHistory(format!("{source} names unknown contract `{key}`"))
 	})?;
-	let current = history.current().ok_or_else(|| {
+	let current_version = history.current_version().ok_or_else(|| {
 		MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
 	})?;
-	if published.version > current.version {
+	if published.version > current_version {
 		return Err(MigrationError::InvalidHistory(format!(
 			"{source} claims future version {} for `{key}`",
 			published.version
@@ -347,12 +345,18 @@ pub(super) fn validate_published_contract(
 		return Ok(());
 	}
 	for (index, pin) in published.history.iter().enumerate() {
-		let version = &history.versions[index];
-		if pin.schema_sha256 != version.schema_sha256 {
+		// A pinned history is positional: entry `index` pins version `index`.
+		let version = history.version(index as u32).ok_or_else(|| {
+			MigrationError::InvalidHistory(format!(
+				"{source} pins version {index} for `{key}`, which the manifest does not record"
+			))
+		})?;
+		if pin.schema_sha256 != version.schema_sha256() {
 			return Err(MigrationError::InvalidHistory(format!(
 				"{source} pinned schema {} for `{key}` version {index}, but the manifest now 				 \
 				 records {}",
-				pin.schema_sha256, version.schema_sha256
+				pin.schema_sha256,
+				version.schema_sha256()
 			)));
 		}
 		let implementation = version

@@ -378,7 +378,7 @@ fn account_cost_preview(
 	source: &ProfileSource,
 ) -> AccountCostPreview {
 	let header = usize::from(history.identity.discriminator_bytes) + version_type.bytes();
-	let current_version = history.current().map_or(0, |current| current.version);
+	let current_version = history.current_version().unwrap_or(0);
 	let transition_count =
 		u32::try_from(history.versions.len().saturating_sub(1)).unwrap_or(u32::MAX);
 	let payload_size = |version: Option<&pina_abi::SchemaVersion>| {
@@ -467,7 +467,7 @@ fn instruction_cost_preview(
 	InstructionCostPreview {
 		identity: history.identity.key(),
 		rust_name: history.rust_name.clone(),
-		current_version: history.current().map_or(0, |current| current.version),
+		current_version: history.current_version().unwrap_or(0),
 		static_cu: total_static_cu(&ladders),
 		ladders,
 		total_steps,
@@ -582,7 +582,7 @@ fn estimate_ladder_cu(
 			reason: source.reason.clone(),
 		};
 	};
-	let current_version = history.current().map_or(0, |current| current.version);
+	let current_version = history.current_version().unwrap_or(0);
 	let module = format!(
 		"__pina_{}_{}_migrations",
 		history.rust_name.to_snake_case(),

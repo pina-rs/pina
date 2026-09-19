@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "Journal",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "4a5fbcb3bfa948a756a7f52ad484eed020d5169a564233cd4961c1e663ee985b",
 					"schema": {
 						"layout": "compact",
 						"fields": [
@@ -55,91 +53,7 @@
 								"rustType": "Option<String<64>>"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "compact",
-							"headerSize": 58,
-							"maximumSize": 219,
-							"tailAlignment": 1,
-							"fields": [
-								{
-									"name": "bump",
-									"headerOffset": 0,
-									"headerSize": 1
-								},
-								{
-									"name": "authority",
-									"headerOffset": 1,
-									"headerSize": 32
-								},
-								{
-									"name": "revision",
-									"headerOffset": 33,
-									"headerSize": 4
-								},
-								{
-									"name": "featured_entry",
-									"headerOffset": 37,
-									"headerSize": 9
-								},
-								{
-									"name": "title",
-									"headerOffset": 46,
-									"headerSize": 1,
-									"tail": {
-										"index": 0,
-										"kind": "string",
-										"optional": false,
-										"prefixBytes": 1,
-										"capacity": 24,
-										"elementSize": 1,
-										"maximumBytes": 24
-									}
-								},
-								{
-									"name": "entries",
-									"headerOffset": 47,
-									"headerSize": 2,
-									"tail": {
-										"index": 1,
-										"kind": "vector",
-										"optional": false,
-										"prefixBytes": 2,
-										"capacity": 8,
-										"elementSize": 8,
-										"maximumBytes": 64
-									}
-								},
-								{
-									"name": "markers",
-									"headerOffset": 49,
-									"headerSize": 8,
-									"tail": {
-										"index": 2,
-										"kind": "vector",
-										"optional": false,
-										"prefixBytes": 8,
-										"capacity": 8,
-										"elementSize": 1,
-										"maximumBytes": 8
-									}
-								},
-								{
-									"name": "note",
-									"headerOffset": 57,
-									"headerSize": 1,
-									"tail": {
-										"index": 3,
-										"kind": "string",
-										"optional": true,
-										"prefixBytes": 1,
-										"capacity": 64,
-										"elementSize": 1,
-										"maximumBytes": 65
-									}
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -154,8 +68,6 @@
 			"rustName": "InitializeIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "a598f7ddf0c78595660c0b59e5670c72952c3c62a3616c60bd2c9c88fcf93e6a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -172,28 +84,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 3,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "entry_count",
-									"offset": 1,
-									"size": 1
-								},
-								{
-									"name": "marker_count",
-									"offset": 2,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -223,7 +114,6 @@
 							}
 						]
 					},
-					"processSha256": "3d5259e6e1a25a220f12df92fa9ea43a59f767e3344cadd020157b0d02ff9759",
 					"transition": null
 				}
 			]
@@ -237,8 +127,6 @@
 			"rustName": "ResizeIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "d666711afa1b6df8daf335c11f2a6faa0f4c1185d7dca279a58bd3488adaa7d3",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -251,23 +139,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 2,
-							"fields": [
-								{
-									"name": "entry_count",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "marker_count",
-									"offset": 1,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -297,7 +169,6 @@
 							}
 						]
 					},
-					"processSha256": "3d5259e6e1a25a220f12df92fa9ea43a59f767e3344cadd020157b0d02ff9759",
 					"transition": null
 				}
 			]
@@ -311,8 +182,6 @@
 			"rustName": "WriteIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "07a1802fd6e4fd1db01ec378a406010ce9d226645aa5964d32adae531eb480c6",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -325,23 +194,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 9,
-							"fields": [
-								{
-									"name": "index",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "value",
-									"offset": 1,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -363,7 +216,6 @@
 							}
 						]
 					},
-					"processSha256": "8d80129fb1c2bca51b1e8fc416d5e6cb280cb3cae37a546580734704e5cce3b7",
 					"transition": null
 				}
 			]
@@ -377,8 +229,6 @@
 			"rustName": "RenameIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "abee344e7bf2c44428ff02774e45d05ba63fee353bed6a91ddc6f052174359ed",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -391,23 +241,7 @@
 								"rustType": "[u8; 24]"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 25,
-							"fields": [
-								{
-									"name": "title_len",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "title",
-									"offset": 1,
-									"size": 24
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -437,7 +271,6 @@
 							}
 						]
 					},
-					"processSha256": "3d5259e6e1a25a220f12df92fa9ea43a59f767e3344cadd020157b0d02ff9759",
 					"transition": null
 				}
 			]

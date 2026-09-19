@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+mod abi_command;
 mod cli;
 mod commands;
 mod idl_command;

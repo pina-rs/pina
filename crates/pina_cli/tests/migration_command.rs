@@ -660,9 +660,10 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	);
 	assert!(made.contains("Created"), "stdout: {made}");
 
-	// The policy is recorded in the manifest, not just in pina.toml.
+	// The policy is recorded in the manifest, not just in pina.toml. The
+	// document records the Pina ABI version rather than a format counter.
 	let manifest = fixture.manifest();
-	assert_eq!(manifest["formatVersion"], 4);
+	assert_eq!(manifest["abiVersion"], pina_abi::ABI_VERSION);
 	assert_eq!(manifest["auto"], serde_json::json!(["accounts", "events"]));
 	assert!(manifest["contracts"].get("instruction:1:02").is_none());
 

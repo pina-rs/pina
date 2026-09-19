@@ -60,7 +60,8 @@
 		".local-cache/",
 		"**/dist/**",
 		"**/pkg/",
-		"**/abi_layout.rs"
+		"**/abi_layout.rs",
+		"**/*.schema.json"
 	],
 	"plugins": [
 		"https://plugins.dprint.dev/typescript-0.95.13.wasm",

@@ -109,18 +109,21 @@ fn manual_account_transition_is_total_after_schema_preflight() {
 	let instruction = ContractIdentity::try_new(ContractKind::Instruction, 1, 2).unwrap();
 	let source_schema = schema(LayoutKind::Fixed, &[("amount", "u8")]);
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: source_schema.sha256(),
 		schema: source_schema,
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let destination = schema(LayoutKind::Fixed, &[("amount", "u16")]);
 
-	let account_source =
-		manual_transition_source(&account, MigrationVersionType::U8, &source, 1, &destination)
-			.unwrap_or_else(|error| panic!("manual account transition: {error:?}"));
+	let account_source = manual_transition_source(
+		&account,
+		MigrationVersionType::U8,
+		&source,
+		0,
+		1,
+		&destination,
+	)
+	.unwrap_or_else(|error| panic!("manual account transition: {error:?}"));
 	assert!(account_source.contains("fn migrate(data: &mut [u8]) {"));
 	assert!(!account_source.contains("fn migrate(data: &mut [u8]) -> bool"));
 	assert!(account_source.contains("conversion must be total"));
@@ -129,6 +132,7 @@ fn manual_account_transition_is_total_after_schema_preflight() {
 		&instruction,
 		MigrationVersionType::U8,
 		&source,
+		0,
 		1,
 		&destination,
 	)
@@ -142,11 +146,8 @@ fn compact_account_transition_uses_checked_runtime_sizing() {
 	let account = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
 	let source_schema = schema(LayoutKind::Compact, &[("name", "String<4>")]);
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: source_schema.sha256(),
 		schema: source_schema,
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let destination = schema(
@@ -154,9 +155,15 @@ fn compact_account_transition_uses_checked_runtime_sizing() {
 		&[("name", "String<4>"), ("tags", "Vec<u16, 2>")],
 	);
 
-	let generated =
-		manual_transition_source(&account, MigrationVersionType::U8, &source, 1, &destination)
-			.unwrap_or_else(|error| panic!("manual transition: {error:?}"));
+	let generated = manual_transition_source(
+		&account,
+		MigrationVersionType::U8,
+		&source,
+		0,
+		1,
+		&destination,
+	)
+	.unwrap_or_else(|error| panic!("manual transition: {error:?}"));
 
 	assert!(generated.contains("Source version: 0 (variable bytes)"));
 	assert!(generated.contains("fn target_size(data: &[u8]) -> Option<usize>"));
@@ -174,7 +181,6 @@ fn process_transition_accepts_optional_suffix_and_rejects_privilege_changes() {
 		optional: false,
 		default_value: None,
 		pda: None,
-		constraints: vec![],
 	};
 	let source = ProcessContract {
 		accounts: vec![authority.clone()],
@@ -189,7 +195,6 @@ fn process_transition_accepts_optional_suffix_and_rejects_privilege_changes() {
 				optional: true,
 				default_value: None,
 				pda: None,
-				constraints: vec![],
 			},
 		],
 	};
@@ -229,14 +234,10 @@ fn transition_creation_propagates_process_and_directory_failures() {
 			optional: false,
 			default_value: None,
 			pda: None,
-			constraints: vec![],
 		}],
 	};
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: source_schema.sha256(),
 		schema: source_schema.clone(),
-		process_sha256: Some(source_process.sha256()),
 		process: Some(source_process.clone()),
 		transition: None,
 	};
@@ -249,7 +250,8 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				identity: &identity,
 				rust_name: "Update",
 				source: &source,
-				stale_ladder: &[&source],
+				source_version: 0,
+				stale_ladder: &[(0, &source)],
 				renames: Vec::new(),
 				destination_version: 1,
 				destination: &source_schema,
@@ -268,10 +270,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 		.unwrap_or_else(|error| panic!("discover blocked fixture: {error}"));
 	let account = ContractIdentity::try_new(ContractKind::Account, 1, 1).expect("valid identity");
 	let account_source = SchemaVersion {
-		version: 0,
-		schema_sha256: source_schema.sha256(),
 		schema: source_schema,
-		process_sha256: None,
 		process: None,
 		transition: None,
 	};
@@ -283,7 +282,8 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				identity: &account,
 				rust_name: "State",
 				source: &account_source,
-				stale_ladder: &[&account_source],
+				source_version: 0,
+				stale_ladder: &[(0, &account_source)],
 				renames: Vec::new(),
 				destination_version: 1,
 				destination: &destination,
@@ -344,11 +344,8 @@ fn direction_and_manual_sizing_cover_every_layout_shape() {
 		Some(MoveDirection::Backward)
 	));
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: source_schema.sha256(),
 		schema: source_schema,
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
@@ -356,6 +353,7 @@ fn direction_and_manual_sizing_cover_every_layout_shape() {
 		&identity,
 		MigrationVersionType::U8,
 		&source,
+		0,
 		1,
 		&destination,
 	);
@@ -363,17 +361,15 @@ fn direction_and_manual_sizing_cover_every_layout_shape() {
 
 	let compact = schema(LayoutKind::Compact, &[("name", "String<4>")]);
 	let compact_source = SchemaVersion {
-		version: 0,
-		schema_sha256: compact.sha256(),
 		schema: compact,
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let generated = manual_transition_source(
 		&identity,
 		MigrationVersionType::U8,
 		&compact_source,
+		0,
 		1,
 		&destination,
 	)
@@ -812,8 +808,8 @@ fn internal_contract_helpers_fail_closed_on_collisions_and_missing_values() {
 				default_value: Some(DefaultValueIr::ProgramId("program".to_owned())),
 				is_pda: false,
 				pda_name: None,
-				constraints: vec![],
 				docs: vec![],
+				constraints: vec![],
 			},
 			crate::ir::InstructionAccountIr {
 				name: "authority".to_owned(),
@@ -823,8 +819,8 @@ fn internal_contract_helpers_fail_closed_on_collisions_and_missing_values() {
 				default_value: Some(DefaultValueIr::PublicKey("address".to_owned())),
 				is_pda: false,
 				pda_name: None,
-				constraints: vec![],
 				docs: vec![],
+				constraints: vec![],
 			},
 		],
 		arguments: vec![],
@@ -1107,15 +1103,8 @@ fn missing_ledger_with_advanced_versions_fails_closed() {
 		MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
 	let base = schema(LayoutKind::Fixed, &[("value", "u64")]);
 	let transition = Transition {
-		from: 0,
-		to: 1,
 		mode: TransitionMode::Automatic,
 		renames: Vec::new(),
-		source_schema_sha256: base.sha256(),
-		destination_schema_sha256: advanced_schema.sha256(),
-		source_process_sha256: None,
-		destination_process_sha256: None,
-		process: None,
 		implementation_sha256: Some("e".repeat(64)),
 	};
 	advanced.contracts.insert(
@@ -1125,19 +1114,13 @@ fn missing_ledger_with_advanced_versions_fails_closed() {
 			rust_name: "State".to_owned(),
 			versions: vec![
 				SchemaVersion {
-					version: 0,
-					schema_sha256: base.sha256(),
 					schema: base,
 					process: None,
-					process_sha256: None,
 					transition: None,
 				},
 				SchemaVersion {
-					version: 1,
-					schema_sha256: advanced_schema.sha256(),
 					schema: advanced_schema,
 					process: None,
-					process_sha256: None,
 					transition: Some(transition),
 				},
 			],
@@ -1255,11 +1238,8 @@ fn receipts_pin_published_schema_hashes() {
 			identity,
 			rust_name: "State".to_owned(),
 			versions: vec![SchemaVersion {
-				version: 0,
-				schema_sha256: tampered_schema.sha256(),
 				schema: tampered_schema,
 				process: None,
-				process_sha256: None,
 				transition: None,
 			}],
 		},
@@ -1415,11 +1395,13 @@ fn transition_files_fail_closed_before_and_after_publication() {
 		.transition
 		.as_ref()
 		.expect("generated transition");
+	assert_eq!(transition.mode, TransitionMode::Automatic);
+	// The transition sits on `versions[1]`, so it converts v0 into v1.
 	let path = transition_path(
 		&Project::discover(&missing.root).expect("discover fixture"),
 		&manifest.contracts["account:1:01"].identity,
-		transition.from,
-		transition.to,
+		0,
+		1,
 	);
 	std::fs::write(&path, [0xff])
 		.unwrap_or_else(|error| panic!("write invalid transition text: {error}"));
@@ -1519,11 +1501,8 @@ fn published_fixture_with(fields: &[(&str, &str)]) -> PublicationFixture {
 			identity,
 			rust_name: "State".to_owned(),
 			versions: vec![SchemaVersion {
-				version: 0,
-				schema_sha256: schema.sha256(),
 				schema,
 				process: None,
-				process_sha256: None,
 				transition: None,
 			}],
 		},
@@ -1808,11 +1787,8 @@ fn growing_transitions_warn_about_rent_funding() {
 fn oversized_growth_warns_about_the_runtime_realloc_cap() {
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	// 2,000 u64 fields grow one transition by more than the runtime's 10 KiB
@@ -1830,7 +1806,8 @@ fn oversized_growth_warns_about_the_runtime_realloc_cap() {
 		&identity,
 		"State",
 		&source,
-		&[&source],
+		0,
+		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -1902,18 +1879,15 @@ fn growing_fields(count: usize) -> String {
 #[test]
 fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
-	let version = |version: u32, fields: usize| {
+	let version = |fields: usize| {
 		SchemaVersion {
-			version,
-			schema_sha256: "irrelevant".to_owned(),
 			schema: growing_schema(fields),
 			process: None,
-			process_sha256: None,
 			transition: None,
 		}
 	};
-	let oldest = version(0, 0);
-	let adjacent = version(1, 750);
+	let oldest = version(0);
+	let adjacent = version(750);
 	let destination = growing_schema(1_500);
 
 	// The adjacent hop alone stays under the runtime cap.
@@ -1922,7 +1896,8 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 		&identity,
 		"State",
 		&adjacent,
-		&[&adjacent],
+		1,
+		&[(1, &adjacent)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut adjacent_only,
@@ -1942,7 +1917,8 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 		&identity,
 		"State",
 		&adjacent,
-		&[&oldest, &adjacent],
+		1,
+		&[(0, &oldest), (1, &adjacent)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -2445,11 +2421,8 @@ fn dropped_fields_without_candidates_warn_without_questions() {
 #[test]
 fn effective_schema_rebuilds_reject_corrupted_manifest_schemas() {
 	let mut version = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	// A hand-edited manifest can carry a field type the closed grammar
@@ -2622,11 +2595,8 @@ fn unclaimed_candidates_pair_once_across_several_removals() {
 fn growth_warnings_only_apply_to_account_contracts() {
 	let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 0).unwrap();
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let destination = schema(
@@ -2638,7 +2608,8 @@ fn growth_warnings_only_apply_to_account_contracts() {
 		&identity,
 		"Update",
 		&source,
-		&[&source],
+		0,
+		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -2653,11 +2624,8 @@ fn growth_warnings_only_apply_to_account_contracts() {
 fn compact_growth_warnings_estimate_rent_from_capacity() {
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let destination = schema(
@@ -2669,7 +2637,8 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 		&identity,
 		"State",
 		&source,
-		&[&source],
+		0,
+		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
 		&mut output,
@@ -2698,11 +2667,8 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 fn manual_instruction_transitions_require_fixed_layouts() {
 	let instruction = ContractIdentity::try_new(ContractKind::Instruction, 1, 0).unwrap();
 	let fixed_source = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let compact_destination = schema(LayoutKind::Compact, &[("label", "String<8>")]);
@@ -2710,6 +2676,7 @@ fn manual_instruction_transitions_require_fixed_layouts() {
 		&instruction,
 		MigrationVersionType::U8,
 		&fixed_source,
+		0,
 		1,
 		&compact_destination,
 	)
@@ -2720,11 +2687,8 @@ fn manual_instruction_transitions_require_fixed_layouts() {
 	);
 
 	let compact_source = SchemaVersion {
-		version: 0,
-		schema_sha256: "irrelevant".to_owned(),
 		schema: schema(LayoutKind::Compact, &[("label", "String<8>")]),
 		process: None,
-		process_sha256: None,
 		transition: None,
 	};
 	let fixed_destination = schema(LayoutKind::Fixed, &[("value", "u64")]);
@@ -2732,6 +2696,7 @@ fn manual_instruction_transitions_require_fixed_layouts() {
 		&instruction,
 		MigrationVersionType::U8,
 		&compact_source,
+		0,
 		1,
 		&fixed_destination,
 	)
@@ -2808,15 +2773,11 @@ fn create_transition_propagates_manual_layout_errors() {
 			optional: false,
 			default_value: None,
 			pda: None,
-			constraints: vec![],
 		}],
 	};
 	let source = SchemaVersion {
-		version: 0,
-		schema_sha256: "source".to_owned(),
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: Some(process.clone()),
-		process_sha256: None,
 		transition: None,
 	};
 	let destination = schema(LayoutKind::Compact, &[("label", "String<8>")]);
@@ -2828,7 +2789,8 @@ fn create_transition_propagates_manual_layout_errors() {
 			identity: &identity,
 			rust_name: "Update",
 			source: &source,
-			stale_ladder: &[&source],
+			source_version: 0,
+			stale_ladder: &[(0, &source)],
 			renames: vec![],
 			destination_version: 1,
 			destination: &destination,
@@ -2909,21 +2871,11 @@ fn published_contracts_must_carry_versions_and_matching_pins() {
 			identity: identity.clone(),
 			rust_name: "State".to_owned(),
 			versions: vec![SchemaVersion {
-				version: 0,
-				schema_sha256: pinned_schema.sha256(),
 				schema: pinned_schema,
 				process: None,
-				process_sha256: None,
 				transition: Some(Transition {
-					from: 0,
-					to: 0,
 					mode: TransitionMode::Automatic,
 					renames: vec![],
-					source_schema_sha256: "source".to_owned(),
-					destination_schema_sha256: "destination".to_owned(),
-					source_process_sha256: None,
-					destination_process_sha256: None,
-					process: None,
 					implementation_sha256: Some("manifest-implementation".to_owned()),
 				}),
 			}],
