@@ -1,0 +1,12 @@
+error: PDA seed list has 16 seeds; the maximum is 15 before the bump seed, because every generated derivation appends one for a total of 16
+  --> tests/ui/fail/pda_seed_count_over_limit.rs:5:10
+   |
+ 5 |       seeds = [
+   |  _____________^
+ 6 | |         b"a",
+ 7 | |         b"b",
+ 8 | |         b"c",
+...  |
+21 | |         b"p",
+22 | |     ],
+   | |_____^

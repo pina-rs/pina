@@ -2,6 +2,7 @@
 	"name": "@pina-rs/workspace",
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@11.25.0",
 	"scripts": {
 		"generate": "pnpm run build:codama-renderer-cpi >/dev/null 2>&1 || true; pnpm run build:codama-renderer-cli && cargo run -p pina_cli -- codama generate --npx node",
 		"check:js": "tsc --noEmit -p codama/tsconfig.json && tsc --noEmit -p codama/tsconfig.cli.json",

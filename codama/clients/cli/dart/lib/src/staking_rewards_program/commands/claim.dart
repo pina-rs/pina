@@ -34,6 +34,11 @@ final class ClaimCommand extends Command<void> {
         help: "The user_reward_ata account",
       )
       ..addOption(
+        'reward_vault',
+        mandatory: true,
+        help: "The reward_vault account",
+      )
+      ..addOption(
         'token_program',
         mandatory: true,
         help: "The token_program account",
@@ -66,6 +71,10 @@ final class ClaimCommand extends Command<void> {
       '--user-reward-ata',
       results['user_reward_ata']! as String,
     );
+    final rewardVault = pubkey(
+      '--reward-vault',
+      results['reward_vault']! as String,
+    );
     final tokenProgram = pubkey(
       '--token-program',
       results['token_program']! as String,
@@ -78,6 +87,7 @@ final class ClaimCommand extends Command<void> {
       poolState: poolState,
       positionState: positionState,
       userRewardAta: userRewardAta,
+      rewardVault: rewardVault,
       associatedTokenProgram: Address(
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
       ),

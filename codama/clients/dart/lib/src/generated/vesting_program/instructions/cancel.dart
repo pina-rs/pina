@@ -93,7 +93,10 @@ Instruction getCancelInstruction({
   required Address admin,
   required Address mint,
   required Address vestingState,
+  required Address adminAta,
   required Address vault,
+  required Address associatedTokenProgram,
+  required Address systemProgram,
   required Address tokenProgram,
 }) {
   final instructionData = CancelInstructionData();
@@ -101,10 +104,13 @@ Instruction getCancelInstruction({
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: admin, role: AccountRole.readonlySigner),
+      AccountMeta(address: admin, role: AccountRole.writableSigner),
       AccountMeta(address: mint, role: AccountRole.readonly),
       AccountMeta(address: vestingState, role: AccountRole.writable),
+      AccountMeta(address: adminAta, role: AccountRole.writable),
       AccountMeta(address: vault, role: AccountRole.writable),
+      AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
       AccountMeta(address: tokenProgram, role: AccountRole.readonly),
     ],
     data: getCancelInstructionDataEncoder().encode(instructionData),

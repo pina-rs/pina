@@ -4,6 +4,8 @@
 
 import 'package:args/command_runner.dart';
 
+import 'package:solana_kit_address/solana_kit_address.dart';
+
 import '../context.dart';
 import 'package:pina_codama_clients/vesting_program.dart';
 
@@ -21,6 +23,7 @@ final class CancelCommand extends Command<void> {
         mandatory: true,
         help: "The vesting_state account",
       )
+      ..addOption('admin_ata', mandatory: true, help: "The admin_ata account")
       ..addOption('vault', mandatory: true, help: "The vault account")
       ..addOption(
         'token_program',
@@ -47,6 +50,7 @@ final class CancelCommand extends Command<void> {
       '--vesting-state',
       results['vesting_state']! as String,
     );
+    final adminAta = pubkey('--admin-ata', results['admin_ata']! as String);
     final vault = pubkey('--vault', results['vault']! as String);
     final tokenProgram = pubkey(
       '--token-program',
@@ -58,7 +62,12 @@ final class CancelCommand extends Command<void> {
       admin: admin,
       mint: mint,
       vestingState: vestingState,
+      adminAta: adminAta,
       vault: vault,
+      associatedTokenProgram: Address(
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+      ),
+      systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
     );
     await context.send([instruction]);

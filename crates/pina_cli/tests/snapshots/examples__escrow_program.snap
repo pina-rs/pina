@@ -545,6 +545,15 @@ expression: idl
         "docs": [
           "A supplied token account is not the one the offer references."
         ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "emptyOffer",
+        "code": 2,
+        "message": "One side of the offer is zero, so the exchange gives value away.",
+        "docs": [
+          "One side of the offer is zero, so the exchange gives value away."
+        ]
       }
     ]
   }

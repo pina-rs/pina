@@ -16,4 +16,4 @@ pub use instructions::*;
 pub use programs::*;
 
 /// Number of instructions rendered for the `stakingRewardsProgram` program.
-pub const INSTRUCTION_COUNT: usize = 5;
+pub const INSTRUCTION_COUNT: usize = 6;

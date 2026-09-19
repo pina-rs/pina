@@ -7,4 +7,5 @@ export 'open_position.dart';
 export 'deposit.dart';
 export 'withdraw.dart';
 export 'claim.dart';
+export 'set_reward_index.dart';
 export 'fetch.dart';

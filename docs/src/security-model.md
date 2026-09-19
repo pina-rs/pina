@@ -84,8 +84,8 @@ Closing guidance under Pinocchio 0.11:
 - **Create accounts through the typed creation builders**, which reject targets whose storage is not zeroed with `AccountAlreadyInitialized`
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
-- **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view and the address is already established, so the layout and stored-bump PDA address are validated during the same borrow
-- **Use generated `with_checked_pda` instead of `with_pda`** when an untrusted caller chooses which account the handler loads; it searches for the canonical bump and so rejects a shadow account created at a noncanonical bump, which a stored-bump check alone cannot detect
+- **Use generated `with_stored_bump_pda`** (the pre-split name `with_pda` still works but is deprecated) when a compact stored-bump PDA handler needs a compact view and the address is already established, so the layout and stored-bump PDA address are validated during the same borrow
+- **Use generated `with_checked_pda` instead of `with_stored_bump_pda`** when an untrusted caller chooses which account the handler loads; it searches for the canonical bump and so rejects a shadow account created at a noncanonical bump, which a stored-bump check alone cannot detect
 - **Validate dynamic program accounts** with Pina's `assert_program()` before explicitly unverified CPI invocations; static and self-verifying CPI APIs need no redundant assertion
 - **Use `as_account::<T>()` or `as_account_mut::<T>()`** when a handler needs fixed-account fields; these guard-backed loaders check the owner, discriminator, exact size, and nested values
 - **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast

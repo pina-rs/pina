@@ -374,6 +374,13 @@ pub enum ProjectError {
 	#[error("Cargo package {package} does not define a Rust library target")]
 	MissingLibraryTarget { package: String },
 
+	#[error(
+		"Cargo library name `{name}` cannot be used as a path component. Library names must \
+		 contain only ASCII letters, digits, underscores, and hyphens because pina derives file \
+		 and directory names from them."
+	)]
+	InvalidLibraryName { name: String },
+
 	#[error("Unknown pina lint `{name}` in [lints]; known lints: {known}")]
 	UnknownLint { name: String, known: String },
 
@@ -1184,11 +1191,36 @@ fn library_details(package: &Package) -> Result<(String, PathBuf, Vec<String>), 
 			}
 		})?;
 
+	validate_library_name(&target.name)?;
+
 	Ok((
 		target.name.clone(),
 		target.src_path.as_std_path().to_path_buf(),
 		target.crate_types.iter().map(ToString::to_string).collect(),
 	))
+}
+
+/// Reject a Cargo library name that cannot be a path component.
+///
+/// Cargo accepts any string as a `[lib] name` and reports it verbatim through
+/// `cargo metadata`, so a manifest controls this value. Pina joins it into
+/// output paths (`target/deploy`, generated IDL files, client crate
+/// directories), where a name containing a separator or `..` would escape the
+/// project directory. Validating at the single point where the name enters the
+/// project model keeps every current and future path join safe.
+fn validate_library_name(name: &str) -> Result<(), ProjectError> {
+	let valid = !name.is_empty()
+		&& name.chars().all(|character| {
+			character.is_ascii_alphanumeric() || character == '_' || character == '-'
+		});
+
+	if valid {
+		return Ok(());
+	}
+
+	Err(ProjectError::InvalidLibraryName {
+		name: name.to_string(),
+	})
 }
 
 fn cargo_metadata(start: &Path, manifest_path: Option<&Path>) -> Result<Metadata, ProjectError> {
@@ -1332,6 +1364,52 @@ crate-type = ["cdylib", "lib"]
 
 		assert_eq!(project.package_name, "hyphen-package");
 		assert_eq!(project.library_name, "custom_program");
+	}
+
+	#[test]
+	fn discovery_rejects_traversing_library_names() {
+		// Cargo accepts all of these as `[lib] name` values and reports them
+		// through `cargo metadata` verbatim. The empty name is absent because
+		// cargo rejects it before metadata reaches pina.
+		for library_name in ["../../pwned", "a/b", "a\\b", "..", "a b", "a.b"] {
+			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+			write_program_with_lib(temp.path(), "counter-program", Some(library_name));
+			fs::write(temp.path().join(CONFIG_FILE_NAME), "")
+				.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+
+			let error = Project::discover(temp.path())
+				.expect_err("a traversal-capable library name must be rejected");
+
+			assert!(
+				matches!(error, ProjectError::InvalidLibraryName { .. }),
+				"expected InvalidLibraryName for {library_name:?}, got {error}"
+			);
+		}
+	}
+
+	#[test]
+	fn library_name_validation_accepts_cargo_shaped_names() {
+		for name in ["counter_program", "counter-program", "program2", "a"] {
+			assert!(
+				validate_library_name(name).is_ok(),
+				"expected {name:?} to be accepted"
+			);
+		}
+		for name in [
+			"../../pwned",
+			"a/b",
+			"a\\b",
+			"..",
+			"",
+			".hidden",
+			"a b",
+			"a.b",
+		] {
+			assert!(
+				validate_library_name(name).is_err(),
+				"expected {name:?} to be rejected"
+			);
+		}
 	}
 
 	#[test]

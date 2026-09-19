@@ -12,10 +12,12 @@ pub mod claim;
 pub mod deposit;
 pub mod initialize_pool;
 pub mod open_position;
+pub mod set_reward_index;
 pub mod withdraw;
 
 pub use claim::ClaimArgs;
 pub use deposit::DepositArgs;
 pub use initialize_pool::InitializePoolArgs;
 pub use open_position::OpenPositionArgs;
+pub use set_reward_index::SetRewardIndexArgs;
 pub use withdraw::WithdrawArgs;

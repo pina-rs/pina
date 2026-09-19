@@ -151,6 +151,12 @@ impl ::pina::IntoDiscriminator for EventDisc {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u8).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u8).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u8).matches_discriminator(bytes)
     }
@@ -363,6 +369,15 @@ const _: () = {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::size_of::<TransferEventZc>() ==\n    EventDisc::BYTES + 0usize +\n                ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n            ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n        ::core::mem::size_of::<pina::PodU64>()",
         )
+    }
+};
+const _: () = if !(TransferEvent::SIZE <= pina::MAX_EVENT_RECORD_BYTES) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "event record for TransferEvent exceeds the SBF stack budget; reduce the payload or field count",
+            ),
+        );
     }
 };
 impl TransferEvent {
@@ -587,6 +602,15 @@ const _: () = {
         )
     }
 };
+const _: () = if !(InitEvent::SIZE <= pina::MAX_EVENT_RECORD_BYTES) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "event record for InitEvent exceeds the SBF stack budget; reduce the payload or field count",
+            ),
+        );
+    }
+};
 impl InitEvent {
     /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
@@ -764,6 +788,15 @@ const _: () = {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::size_of::<EmptyEventZc>() == EventDisc::BYTES + 0usize",
         )
+    }
+};
+const _: () = if !(EmptyEvent::SIZE <= pina::MAX_EVENT_RECORD_BYTES) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "event record for EmptyEvent exceeds the SBF stack budget; reduce the payload or field count",
+            ),
+        );
     }
 };
 impl EmptyEvent {
@@ -1042,6 +1075,15 @@ const _: () = {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::size_of::<AuditEventZc>() ==\n    EventDisc::BYTES + 0usize +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<pina::PodU64>()",
         )
+    }
+};
+const _: () = if !(AuditEvent::SIZE <= pina::MAX_EVENT_RECORD_BYTES) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "event record for AuditEvent exceeds the SBF stack budget; reduce the payload or field count",
+            ),
+        );
     }
 };
 impl AuditEvent {

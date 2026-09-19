@@ -35,6 +35,7 @@ export const claimCommand = registerGlobals(new Command("claim"))
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
 	)
+	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
@@ -45,6 +46,7 @@ export const claimCommand = registerGlobals(new Command("claim"))
 			beneficiaryAta: pubkey("--beneficiary-ata", options.beneficiaryAta),
 			vault: pubkey("--vault", options.vault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
+			clock: pubkey("--clock", options.clock),
 		};
 		const instruction = getClaimInstruction(
 			...[input],

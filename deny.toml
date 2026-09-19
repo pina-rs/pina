@@ -4,20 +4,103 @@ all-features = true
 [advisories]
 db-path = "target/advisory-db"
 db-urls = ["https://github.com/RustSec/advisory-db.git"]
+# The libgit2 fetch cargo-deny uses by default fails silently on the CI
+# runners (the database clones but loads empty), so fetch through the git
+# CLI instead. The advisory check itself is unchanged.
+git-fetch-with-cli = true
+# This list is the repository's single advisory policy: `security:deny` runs
+# the advisories check, and `security:audit` passes no ignore list of its own.
+#
+# Every entry below is reachable only from the host-side dev/test stack
+# (surfpool, litesvm, mollusk, solana-runtime, and the Agave precompile host
+# crates) pulled in through `pina_test` and the `*/tests/surfpool` harnesses.
+# None of them appears in the dependency graph of a shipped crate
+# (`pina`, `pina_abi`, `pina_macros`, `pina_cli`, `pina_profile`), and none is
+# compiled into an on-chain program. Verify with, for example:
+#
+#   cargo tree -i h2@0.3.27 -p pina -p pina_abi -p pina_macros -p pina_cli
+#
+# `cargo-deny` cannot see these crates under its default roots (a virtual
+# manifest roots the graph at the workspace members' normal dependencies, so
+# the dev/test stack is absent and these advisories never fire). The reachability
+# claims above were verified against `cargo tree -i <spec> --workspace
+# --all-features --target all`, which does include dev edges.
+#
+# Review date: 2026-09-18. Re-check on each dependency-train bump; each
+# suppression below should become an upstream upgrade rather than accumulate.
+# Each entry also needs a tracking issue filed on the repository (see the
+# accompanying changeset); this file cannot open one itself.
 ignore = [
-	# RUSTSEC-2025-0141: bincode is unmaintained. Transitive dev-dependency
-	# (mollusk-svm, solana-account) — not shipped in any on-chain program.
+	# RUSTSEC-2021-0139: ansi_term is unmaintained. Reached via
+	# surfpool-core → hiro-system-kit → ansi_term. Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2021-0139",
+	# RUSTSEC-2024-0375: atty is unmaintained. Reached via
+	# surfpool-core → hiro-system-kit → atty. Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2024-0375",
+	# RUSTSEC-2025-0141: bincode is unmaintained. Reached via
+	# litesvm/solana-runtime → agave-precompiles → bincode. Host/test stack
+	# only (via surfpool/litesvm, not in any shipped crate graph).
 	"RUSTSEC-2025-0141",
-	# RUSTSEC-2024-0388: derivative is unmaintained. Transitive dev-dependency
-	# (mollusk-svm → solana-syscalls → solana-poseidon → ark-bn254) — not
-	# shipped in any on-chain program.
+	# RUSTSEC-2024-0388: derivative is unmaintained. Reached via
+	# solana-poseidon → ark-bn254 → ark-ec → derivative. Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
 	"RUSTSEC-2024-0388",
-	# RUSTSEC-2025-0161: libsecp256k1 is unmaintained. Transitive dev-dependency
-	# (mollusk-svm) — not shipped in any on-chain program.
+	# RUSTSEC-2025-0161: libsecp256k1 is unmaintained. Reached via
+	# litesvm → agave-precompiles → libsecp256k1 and solana-program →
+	# solana-secp256k1-recover. Host/test stack only (via surfpool/litesvm,
+	# not in any shipped crate graph).
 	"RUSTSEC-2025-0161",
-	# RUSTSEC-2024-0436: paste is no longer maintained. Transitive dev-dependency
-	# (mollusk-svm) — not shipped in any on-chain program.
+	# RUSTSEC-2024-0436: paste is no longer maintained. Reached via
+	# solana-poseidon → ark-bn254 → ark-ff → paste. Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
 	"RUSTSEC-2024-0436",
+	# RUSTSEC-2024-0384: instant is unmaintained. Reached via
+	# surfpool-core → jsonrpc-http-server → parking_lot 0.11 → instant.
+	# Host/test stack only (via surfpool/litesvm, not in any shipped crate
+	# graph).
+	"RUSTSEC-2024-0384",
+	# RUSTSEC-2020-0016: net2 is deprecated. Reached via
+	# surfpool-core → jsonrpc-http-server → net2. Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2020-0016",
+	# RUSTSEC-2025-0134: rustls-pemfile is unmaintained. Reached via
+	# surfpool-core → txtx-addon-kit → reqwest 0.11 → rustls-pemfile.
+	# Host/test stack only (via surfpool/litesvm, not in any shipped crate
+	# graph).
+	"RUSTSEC-2025-0134",
+	# RUSTSEC-2026-0173: proc-macro-error2 is unmaintained. Reached via
+	# pina_test → solana-runtime → aquamarine → proc-macro-error2. Host/test
+	# stack only (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2026-0173",
+	# RUSTSEC-2022-0093: ed25519-dalek double-public-key signing oracle.
+	# Reached via litesvm → agave-precompiles → ed25519-dalek 1.0.1.
+	# Host/test stack only (via surfpool/litesvm, not in any shipped crate
+	# graph). The workspace's own ed25519-dalek is 3.0.0.
+	"RUSTSEC-2022-0093",
+	# RUSTSEC-2024-0344: curve25519-dalek Scalar sub timing variability.
+	# Reached via ed25519-dalek 1.0.1 → curve25519-dalek 3.2.0 in the
+	# host/test stack only. The workspace's own curve25519-dalek is 4.1.3.
+	"RUSTSEC-2024-0344",
+	# RUSTSEC-2024-0421: idna accepts non-decoding Punycode labels. Reached
+	# via surfpool-core → jsonrpc-client-transports → url 1.7.2 → idna 0.1.5.
+	# Host/test stack only (via surfpool/litesvm, not in any shipped crate
+	# graph).
+	"RUSTSEC-2024-0421",
+	# RUSTSEC-2026-0098, RUSTSEC-2026-0099, RUSTSEC-2026-0104:
+	# rustls-webpki 0.101 certificate-validation flaws. All three are reached
+	# only through surfpool-core → txtx-addon-kit → reqwest 0.11 →
+	# rustls 0.21 → rustls-webpki 0.101.7. Host/test stack only (via
+	# surfpool/litesvm, not in any shipped crate graph). The workspace's own
+	# rustls-webpki is 0.103.15.
+	"RUSTSEC-2026-0098",
+	"RUSTSEC-2026-0099",
+	"RUSTSEC-2026-0104",
+	# RUSTSEC-2026-0258: h2 unbounded empty DATA frames. Reached via
+	# surfpool-core → jsonrpc-http-server → hyper 0.14 → h2 0.3.27. Host/test
+	# stack only (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2026-0258",
 ]
 
 [licenses]

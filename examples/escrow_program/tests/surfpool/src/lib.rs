@@ -12,6 +12,7 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use pina_test::TestError;
+use program_under_test::EscrowError;
 use program_under_test::EscrowInstruction;
 use program_under_test::ID;
 
@@ -181,12 +182,14 @@ fn make_instruction(
 	vault: &Pubkey,
 	seed: u64,
 	bump: u8,
+	amount_a: u64,
+	amount_b: u64,
 ) -> pina_test::Instruction {
 	// discriminator + migration version, then seed, amounts, and bump.
 	let mut data = vec![EscrowInstruction::Make as u8, 0u8];
 	data.extend_from_slice(&seed.to_le_bytes());
-	data.extend_from_slice(&OFFER_A.to_le_bytes());
-	data.extend_from_slice(&OFFER_B.to_le_bytes());
+	data.extend_from_slice(&amount_a.to_le_bytes());
+	data.extend_from_slice(&amount_b.to_le_bytes());
 	data.push(bump);
 
 	program.instruction(
@@ -216,7 +219,14 @@ fn take_instruction(
 	maker_ata_b: &Pubkey,
 	escrow: &Pubkey,
 	vault: &Pubkey,
+	maker_writable: bool,
 ) -> pina_test::Instruction {
+	let maker_meta = if maker_writable {
+		AccountMeta::new(*maker, false)
+	} else {
+		AccountMeta::new_readonly(*maker, false)
+	};
+
 	program.instruction(
 		&[EscrowInstruction::Take as u8, 0u8],
 		vec![
@@ -225,7 +235,7 @@ fn take_instruction(
 			AccountMeta::new_readonly(*mint_b, false),
 			AccountMeta::new(*taker_ata_a, false),
 			AccountMeta::new(*taker_ata_b, false),
-			AccountMeta::new(*maker, false),
+			maker_meta,
 			AccountMeta::new(*maker_ata_b, false),
 			AccountMeta::new(*escrow, false),
 			AccountMeta::new(*vault, false),
@@ -331,6 +341,8 @@ fn full_escrow_round_trip() {
 				&vault,
 				seed,
 				bump,
+				OFFER_A,
+				OFFER_B,
 			))
 			.expect("execute Make");
 
@@ -364,6 +376,7 @@ fn full_escrow_round_trip() {
 					&maker_ata_b,
 					&escrow,
 					&vault,
+					true,
 				),
 				&[&taker],
 			)
@@ -389,6 +402,275 @@ fn full_escrow_round_trip() {
 			"escrow closed after Take"
 		);
 		assert!(program.account(&vault).is_err(), "vault closed after Take");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A zero side of the offer is rejected before any account is created or any
+/// token moves, so a fat-fingered `Make` cannot give token A away for nothing.
+#[test]
+#[ignore = "run with pina test"]
+fn make_rejects_a_zero_amount() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([12; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let maker = program.payer();
+		let mint_a_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 6).expect("provision mint A");
+		let mint_b_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 7).expect("provision mint B");
+
+		let maker_ata_a = ata_of(&maker, &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&maker,
+			&maker,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+
+		let seed = 21u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+		let maker_balance_before = program
+			.account(&maker)
+			.expect("maker account before Make")
+			.lamports;
+
+		// `amount_b == 0` asks for nothing in return for the escrowed token A.
+		let error = program
+			.send_instruction(make_instruction(
+				&program,
+				&maker,
+				&mint_a_pubkey,
+				&mint_b_pubkey,
+				&maker_ata_a,
+				&escrow,
+				&vault,
+				seed,
+				bump,
+				OFFER_A,
+				0,
+			))
+			.expect_err("a zero token B amount is not an offer");
+		// The exact variant matters: printing the error passes when the program
+		// fails for an unrelated reason.
+		pina_test::assert_custom_error(&error, EscrowError::EmptyOffer as u32);
+
+		// Nothing moved and nothing was created: no token A left the maker, the
+		// maker paid no rent, the escrow PDA does not exist, and the vault was
+		// never initialized.
+		assert_eq!(
+			token_amount(&program.account(&maker_ata_a).expect("maker token A ATA")),
+			MINTED_A,
+			"a rejected Make must not move token A"
+		);
+		assert_eq!(
+			program
+				.account(&maker)
+				.expect("maker account after Make")
+				.lamports,
+			maker_balance_before,
+			"a rejected Make must not charge rent"
+		);
+		assert!(
+			program.account(&escrow).is_err(),
+			"a rejected Make must not create the escrow"
+		);
+		assert!(
+			program.account(&vault).is_err(),
+			"a rejected Make must not create the vault"
+		);
+
+		// `amount_a == 0` has the same one-sided shape and is rejected too.
+		let error = program
+			.send_instruction(make_instruction(
+				&program,
+				&maker,
+				&mint_a_pubkey,
+				&mint_b_pubkey,
+				&maker_ata_a,
+				&escrow,
+				&vault,
+				seed,
+				bump,
+				0,
+				OFFER_B,
+			))
+			.expect_err("a zero token A amount is not an offer");
+		pina_test::assert_custom_error(&error, EscrowError::EmptyOffer as u32);
+		assert!(
+			program.account(&escrow).is_err(),
+			"a rejected Make with zero token A must not create the escrow"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The maker receives both the vault rent and the escrow rent during `Take`,
+/// so a read-only maker must be refused instead of reaching the close CPIs.
+#[test]
+#[ignore = "run with pina test"]
+fn take_requires_a_writable_maker() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([13; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		// The maker is deliberately not the transaction payer: a payer is always
+		// writable, and the case under test needs a maker the caller can mark
+		// read-only.
+		let maker = Keypair::new_from_array([15; 32]);
+		program.fund(&maker.pubkey(), FUND).expect("fund maker");
+		let maker_pubkey = maker.pubkey();
+		let mint_a_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 8)
+			.expect("provision mint A");
+		let mint_b_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 9)
+			.expect("provision mint B");
+
+		let taker = Keypair::new_from_array([14; 32]);
+		program.fund(&taker.pubkey(), FUND).expect("fund taker");
+
+		let maker_ata_a = ata_of(&maker_pubkey, &mint_a_pubkey);
+		let maker_ata_b = ata_of(&maker_pubkey, &mint_b_pubkey);
+		let taker_ata_a = ata_of(&taker.pubkey(), &mint_a_pubkey);
+		let taker_ata_b = ata_of(&taker.pubkey(), &mint_b_pubkey);
+
+		provision_ata(
+			&program,
+			&program.payer(),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+		provision_ata(
+			&program,
+			&program.payer(),
+			&maker_pubkey,
+			&mint_b_pubkey,
+			None,
+			0,
+		)
+		.expect("maker token B ATA");
+		provision_ata(
+			&program,
+			&program.payer(),
+			&taker.pubkey(),
+			&mint_a_pubkey,
+			None,
+			0,
+		)
+		.expect("taker token A ATA");
+		provision_ata(
+			&program,
+			&program.payer(),
+			&taker.pubkey(),
+			&mint_b_pubkey,
+			Some(&mint_authority),
+			TAKER_OFFER,
+		)
+		.expect("taker token B ATA");
+
+		let seed = 22u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker_pubkey, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		program
+			.send_with_signers(
+				make_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					seed,
+					bump,
+					OFFER_A,
+					OFFER_B,
+				),
+				&[&maker],
+			)
+			.expect("execute Make");
+
+		// Presenting the maker as read-only must fail. `validate_writable`
+		// returns `InvalidAccountData` for a non-writable account.
+		let error = program
+			.send_with_signers(
+				take_instruction(
+					&program,
+					&taker.pubkey(),
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&taker_ata_a,
+					&taker_ata_b,
+					&maker_pubkey,
+					&maker_ata_b,
+					&escrow,
+					&vault,
+					false,
+				),
+				&[&taker],
+			)
+			.expect_err("a read-only maker cannot receive the closed rent");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::InvalidAccountData
+			)),
+			"a read-only maker is refused before any token moves"
+		);
+
+		// The failed Take left the escrow and vault intact and the taker paid
+		// nothing.
+		assert_escrow(
+			&program
+				.account(&escrow)
+				.expect("escrow survives a rejected Take"),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			&mint_b_pubkey,
+			OFFER_A,
+			OFFER_B,
+			seed,
+			bump,
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&vault)
+					.expect("vault survives a rejected Take")
+			),
+			OFFER_A,
+			"the vault still holds the escrowed token A"
+		);
+		assert_eq!(
+			token_amount(&program.account(&taker_ata_b).expect("taker token B ATA")),
+			TAKER_OFFER,
+			"the taker paid nothing"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});

@@ -1410,6 +1410,15 @@ fn run_docs(topic: Option<&str>) {
 		return;
 	};
 
+	let Some(topic) = doc_topic_basename(topic) else {
+		eprintln!(
+			"{} Topic `{}` is not a valid file name.",
+			"Error".red().bold(),
+			topic
+		);
+		std::process::exit(1);
+	};
+
 	let mut attempted_paths = Vec::new();
 
 	if let Ok(template_dir) = std::env::var("PINA_TEMPLATES_DIR") {
@@ -1478,6 +1487,17 @@ fn bundled_docs(topic: &str) -> Option<&'static str> {
 		"pina-validation" => Some(include_str!("../templates/pina-validation.md")),
 		_ => None,
 	}
+}
+
+/// Reduces a user-supplied topic to its final file-name component.
+///
+/// `PINA_TEMPLATES_DIR` topics are joined into `<dir>/<topic>.t.md`, so a topic
+/// such as `../../etc/passwd` would otherwise read outside the template
+/// directory. Keeping only the file-name component pins the join to a direct
+/// child of the template directory. Returns `None` when the topic has no
+/// file-name component (`""`, `/`, `..`, `a/..`).
+fn doc_topic_basename(topic: &str) -> Option<&str> {
+	Path::new(topic).file_name()?.to_str()
 }
 
 fn render_docs(content: &str) {
@@ -1769,6 +1789,7 @@ mod tests {
 	use super::SnapshotViewArg;
 	use super::capture_cli_snapshot;
 	use super::display_features;
+	use super::doc_topic_basename;
 	use super::escaped_path;
 	use super::escaped_text;
 	use super::prepare_and_confirm_record;
@@ -1777,6 +1798,18 @@ mod tests {
 	use super::render_cli_snapshot;
 	use super::render_static_cu;
 	use super::report_snapshot;
+
+	#[test]
+	fn docs_topic_is_reduced_to_its_file_name() {
+		assert_eq!(doc_topic_basename("pina-idl"), Some("pina-idl"));
+		assert_eq!(doc_topic_basename("nested/pina-idl"), Some("pina-idl"));
+		assert_eq!(doc_topic_basename("../../etc/passwd"), Some("passwd"));
+		assert_eq!(doc_topic_basename("/etc/passwd"), Some("passwd"));
+		assert_eq!(doc_topic_basename(".."), None);
+		assert_eq!(doc_topic_basename("a/.."), None);
+		assert_eq!(doc_topic_basename(""), None);
+		assert_eq!(doc_topic_basename("/"), None);
+	}
 
 	#[test]
 	fn cost_preview_renderer_covers_every_state() {

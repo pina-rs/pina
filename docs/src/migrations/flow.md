@@ -230,6 +230,8 @@ if is_migrate_instruction(data) {
 }
 ```
 
+The trigger must match the program's own discriminator width. `is_migrate_instruction` tests one byte, so a program whose instruction enum uses `primitive = u16` (or `u32`, or `u64`) matches with `is_migrate_instruction_u16` (or `_u32`, `_u64`) instead — the one-byte helper never matches a two-byte `0xffff`, which would leave the reserved path unreachable. Generated entrypoints select the matching helper from the enum's `primitive`, so `#[discriminator(entrypoint)]` needs no hand-written guard at all.
+
 Its account layout is `[payer, systemProgram, accountA, accountB, …]`. Slot 0 is a writable payer funding every rent deficit (or the program address when the invocation needs no funding), slot 1 is the system program the rent transfers invoke, and each later slot is a program-owned, self-describing migratable account.
 
 **The ladder is derived, not declared.** `#[discriminator(entrypoint)]` wires the route on its own: the slots are read from `migrations/manifest.json`, one per enveloped account contract, in the manifest's identity-sorted order — exactly the order generated clients compose. Declaring a contract list is optional and only needed to batch several accounts of the _same_ contract in one sweep, because the manifest records contracts rather than account instances:

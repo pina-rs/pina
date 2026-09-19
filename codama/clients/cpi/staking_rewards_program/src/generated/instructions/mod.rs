@@ -11,10 +11,12 @@ pub(crate) mod r#claim;
 pub(crate) mod r#deposit;
 pub(crate) mod r#initialize_pool;
 pub(crate) mod r#open_position;
+pub(crate) mod r#set_reward_index;
 pub(crate) mod r#withdraw;
 
 pub use self::r#claim::*;
 pub use self::r#deposit::*;
 pub use self::r#initialize_pool::*;
 pub use self::r#open_position::*;
+pub use self::r#set_reward_index::*;
 pub use self::r#withdraw::*;

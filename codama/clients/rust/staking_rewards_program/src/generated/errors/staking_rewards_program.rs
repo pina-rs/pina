@@ -33,6 +33,14 @@ pub enum StakingRewardsProgramError {
 	/// 4 - The supplied account is not the pool this position belongs to.
 	#[error("The supplied account is not the pool this position belongs to.")]
 	InvalidPool = 0x4,
+	/// The supplied reward index would move rewards backwards.
+	/// 5 - The supplied reward index would move rewards backwards.
+	#[error("The supplied reward index would move rewards backwards.")]
+	RewardIndexRegressed = 0x5,
+	/// The position has accrued nothing to release.
+	/// 6 - The position has accrued nothing to release.
+	#[error("The position has accrued nothing to release.")]
+	NothingToClaim = 0x6,
 }
 
 impl From<StakingRewardsProgramError> for solana_program_error::ProgramError {

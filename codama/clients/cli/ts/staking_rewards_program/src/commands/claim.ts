@@ -27,6 +27,7 @@ export const claimCommand = registerGlobals(new Command("claim"))
 		"--user-reward-ata <userRewardAta>",
 		"The `user_reward_ata` account",
 	)
+	.requiredOption("--reward-vault <rewardVault>", "The `reward_vault` account")
 	.requiredOption(
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
@@ -39,6 +40,7 @@ export const claimCommand = registerGlobals(new Command("claim"))
 			poolState: pubkey("--pool-state", options.poolState),
 			positionState: pubkey("--position-state", options.positionState),
 			userRewardAta: pubkey("--user-reward-ata", options.userRewardAta),
+			rewardVault: pubkey("--reward-vault", options.rewardVault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
 		const instruction = getClaimInstruction(

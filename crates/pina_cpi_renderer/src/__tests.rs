@@ -1171,6 +1171,107 @@ fn scaffold_and_generated_writes_refuse_symlink_targets() {
 	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans symlink test: {error}"));
 }
 
+/// A name read from an IDL JSON must stay inside the generated doc comment.
+///
+/// `CamelCaseString` derives `Deserialize` on its inner `String`, so the
+/// normalization its constructor applies does not run for JSON input: a name
+/// containing a newline reaches the renderer verbatim. Before the fix the raw
+/// interpolation emitted everything after the newline as uncommented Rust.
+#[test]
+fn untrusted_idl_names_cannot_escape_generated_doc_comments() {
+	let temp = unique_temp_dir("pina-cpi-doc-injection");
+	fs::create_dir_all(&temp).unwrap_or_else(|error| panic!("creates temp dir: {error}"));
+	let idl_path = temp.join("evil.json");
+	fs::write(&idl_path, EVIL_IDL_JSON).unwrap_or_else(|error| panic!("writes evil idl: {error}"));
+
+	let root = read_root_node(&idl_path).unwrap_or_else(|error| panic!("parses evil idl: {error}"));
+	// The payload must survive deserialization verbatim, otherwise this test
+	// would silently stop exercising the injection path.
+	let account_name = root.program.instructions[0].accounts[0].name.as_ref();
+	assert!(
+		account_name.contains('\n'),
+		"expected the newline to survive IDL parsing, got {account_name:?}"
+	);
+
+	let files = render_program_to_files(&root, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("renders injected idl: {error}"));
+	let page = files
+		.get(Path::new("instructions/transfer.rs"))
+		.unwrap_or_else(|| panic!("instruction page is generated"));
+
+	// The canary may only appear inside a comment line.
+	for line in page.lines() {
+		if line.contains("loop {}") {
+			assert!(
+				line.trim_start().starts_with("///"),
+				"payload escaped the doc comment: {line:?}"
+			);
+		}
+	}
+	assert!(
+		!page
+			.lines()
+			.any(|line| line.trim_start().starts_with("const _: ()")),
+		"injected item must not be emitted as source"
+	);
+
+	fs::remove_dir_all(&temp).unwrap_or_else(|error| panic!("cleans temp dir: {error}"));
+}
+
+/// Minimal Codama IDL whose account and argument names carry a code-injection payload.
+const EVIL_IDL_JSON: &str = r#"{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "sneaky",
+    "publicKey": "11111111111111111111111111111111",
+    "version": "0.0.0",
+    "docs": [],
+    "accounts": [],
+    "pdas": [],
+    "definedTypes": [],
+    "events": [],
+    "errors": [],
+    "constants": [],
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "transfer",
+        "docs": [],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "acct\n}\nconst _: () = loop {};\npub struct Injected {",
+            "isWritable": false,
+            "isSigner": false
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "acct\n}\nconst _: () = loop {};\npub struct Injected {",
+            "type": { "kind": "publicKeyTypeNode" },
+            "defaultValueStrategy": "omitted"
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": { "kind": "numberTypeNode", "format": "u8", "endian": "le" },
+              "value": { "kind": "numberValueNode", "number": 7 }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "additionalPrograms": []
+}"#;
 /// Loads a checked-in foreign IDL fixture.
 fn foreign_fixture_root(name: &str) -> RootNode {
 	let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -451,6 +451,13 @@
 						"isWritable": false,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
 				"arguments": [
@@ -534,7 +541,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -554,10 +561,39 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "adminAta",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "vault",
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "associatedTokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -699,6 +735,24 @@
 				"message": "The vesting account was already cancelled and holds nothing to claim.",
 				"docs": [
 					"The vesting account was already cancelled and holds nothing to claim."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "cliffNotReached",
+				"code": 3,
+				"message": "The schedule has not reached its cliff, so nothing has vested yet.",
+				"docs": [
+					"The schedule has not reached its cliff, so nothing has vested yet."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "insufficientVaultBalance",
+				"code": 4,
+				"message": "The vault holds fewer tokens than the claim must release.",
+				"docs": [
+					"The vault holds fewer tokens than the claim must release."
 				]
 			}
 		]

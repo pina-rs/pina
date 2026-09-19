@@ -119,9 +119,9 @@ pub(crate) fn expand(
 			}
 			PdaSeedArg::Variable { name, ty } => {
 				has_borrowed_seed |= ty.borrows();
-				let field_type = ty.field_type();
-				let param_type = ty.param_type();
-				let param_type_lt = ty.param_type_lt();
+				let field_type = ty.field_type(crate_path);
+				let param_type = ty.param_type(crate_path);
+				let param_type_lt = ty.param_type_lt(crate_path);
 				let stored_field = ty.stored_field(name);
 				let slice_expr = ty.slice_expr(name);
 				let slice_expr_with_bump = ty.slice_expr_inner(name);
@@ -149,11 +149,32 @@ pub(crate) fn expand(
 	let seeds_with_bump_doc =
 		format!("The PDA seeds for `{struct_name}`, including the bump seed.");
 
+	// Every generated `Address` is qualified with `#crate_path`, so the
+	// declaration's own `Address` spelling is otherwise unused. This proof binds
+	// it: the bare `Address` resolves to whatever the caller's scope imports, and
+	// it must be the crate's `Address` for the proof to type-check. A user type
+	// named `Address` in scope therefore fails here, naming the shadowing type,
+	// instead of silently changing a generated signature.
+	//
+	// The seed grammar accepts only the bare ident `Address` (see
+	// `parse_seed_type`), so the spelling is known without storing it.
+	//
+	// Emitted only when a seed is an `Address`: a declaration without one never
+	// names the type, so it must not require it in scope.
+	let address_identity_proof = has_borrowed_seed.then(|| {
+		quote! {
+			const _: fn(Address) -> #crate_path::Address = |value| value;
+		}
+	});
+
 	// The `seeds()` constructor params (with a shared lifetime) and the
-	// `try_find_pda`/`find_pda`/`assert_seeds` params
+	// `try_find_pda`/`find_pda`/`assert_seeds` params.
+	//
+	// `program_id` is qualified like every other generated `Address`: a bare
+	// `Address` would resolve to whatever the user's own scope imports.
 	let find_params = {
 		let mut params = find_seed_params.clone();
-		params.push(quote!(program_id: &Address));
+		params.push(quote!(program_id: &#crate_path::Address));
 		params
 	};
 
@@ -287,7 +308,7 @@ pub(crate) fn expand(
 			quote! {
 				#(#with_doc_attributes)*
 				#[inline(always)]
-				pub fn with_pda<R>(
+				pub fn with_stored_bump_pda<R>(
 					account: &#crate_path::AccountView,
 					#(#find_seed_params,)*
 					program_id: &#crate_path::Address,
@@ -313,6 +334,27 @@ pub(crate) fn expand(
 							use_account(state)
 						},
 					)
+				}
+
+				/// Deprecated alias for the stored-bump loader.
+				///
+				/// This name predates the split that gave the two compact PDA loaders
+				/// distinct names. It verifies only the address the stored bump derives,
+				/// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
+				/// an untrusted caller chooses which account the handler loads.
+				#[deprecated(
+					note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
+				)]
+				#[inline(always)]
+				pub fn with_pda<R>(
+					account: &#crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+					use_account: impl FnOnce(
+						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
+					) -> ::core::result::Result<R, #crate_path::ProgramError>,
+				) -> ::core::result::Result<R, #crate_path::ProgramError> {
+					Self::with_stored_bump_pda(account, #(#seed_param_names,)* program_id, use_account)
 				}
 
 				#(#checked_doc_attributes)*
@@ -431,6 +473,7 @@ pub(crate) fn expand(
 
 	quote! {
 		#item_struct
+		#address_identity_proof
 		#generated
 	}
 }

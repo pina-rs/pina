@@ -66,6 +66,7 @@ export type ClaimInstruction<
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
+	TAccountClock extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -95,6 +96,8 @@ export type ClaimInstruction<
 			TAccountTokenProgram extends string
 				? ReadonlyAccount<TAccountTokenProgram>
 				: TAccountTokenProgram,
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
 			...TRemainingAccounts,
 		]
 	>;
@@ -151,6 +154,7 @@ export type ClaimInput<
 	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
+	TAccountClock extends string = string,
 > = {
 	beneficiary: TransactionSigner<TAccountBeneficiary>;
 	mint: Address<TAccountMint>;
@@ -160,6 +164,7 @@ export type ClaimInput<
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
+	clock: Address<TAccountClock>;
 	amount: ClaimInstructionDataArgs["amount"];
 };
 
@@ -172,6 +177,7 @@ export function getClaimInstruction<
 	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
+	TAccountClock extends string,
 	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ClaimInput<
@@ -182,7 +188,8 @@ export function getClaimInstruction<
 		TAccountVault,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
-		TAccountTokenProgram
+		TAccountTokenProgram,
+		TAccountClock
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): ClaimInstruction<
@@ -194,7 +201,8 @@ export function getClaimInstruction<
 	TAccountVault,
 	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
-	TAccountTokenProgram
+	TAccountTokenProgram,
+	TAccountClock
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
@@ -213,6 +221,7 @@ export function getClaimInstruction<
 		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		clock: { value: input.clock ?? null, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -247,6 +256,7 @@ export function getClaimInstruction<
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
+			getAccountMeta("clock", accounts.clock),
 		],
 		data: getClaimInstructionDataEncoder().encode(
 			args as ClaimInstructionDataArgs,
@@ -261,7 +271,8 @@ export function getClaimInstruction<
 		TAccountVault,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
-		TAccountTokenProgram
+		TAccountTokenProgram,
+		TAccountClock
 	>);
 }
 
@@ -279,6 +290,7 @@ export type ParsedClaimInstruction<
 		associatedTokenProgram: TAccountMetas[5];
 		systemProgram: TAccountMetas[6];
 		tokenProgram: TAccountMetas[7];
+		clock: TAccountMetas[8];
 	};
 	data: ClaimInstructionData;
 };
@@ -292,12 +304,12 @@ export function parseClaimInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -318,6 +330,7 @@ export function parseClaimInstruction<
 			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
+			clock: getNextAccount(),
 		},
 		data: getClaimInstructionDataDecoder().decode(instruction.data),
 	};

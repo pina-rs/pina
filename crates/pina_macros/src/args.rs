@@ -130,6 +130,11 @@ pub(crate) struct ErrorArgs {
 }
 
 /// Arguments for the `#[pda(...)]` attribute macro.
+///
+/// The seed list is capped at [`SeedType::MAX_SEEDS_BEFORE_BUMP`] entries. The
+/// cap holds whether or not `bump` is declared: a declaration without a stored
+/// bump still derives through `try_find_pda`/`find_pda`, which append the
+/// canonical bump before calling the runtime.
 #[derive(Debug)]
 pub(crate) struct PdaArgs {
 	/// Set the path to the crate
@@ -163,8 +168,22 @@ pub(crate) enum SeedType {
 }
 
 impl SeedType {
-	/// The maximum number of seeds before the bump seed.
+	/// The maximum number of seeds in one derivation, including the bump.
+	///
+	/// This mirrors `pinocchio::address::MAX_SEEDS`, the runtime's own cap: a
+	/// derivation that presents more seeds than this is rejected.
 	pub(crate) const MAX_SEEDS: usize = 16;
+	/// The maximum number of declared seeds before the bump is appended.
+	///
+	/// Every generated derivation path appends a bump seed: `try_find_pda` and
+	/// `find_pda` search for the canonical one, `with_bump` supplies the stored
+	/// or explicit one, and the account loaders derive from a stored bump. A
+	/// declaration of [`Self::MAX_SEEDS`] seeds therefore produces a derivation
+	/// one seed over the runtime limit, which can never succeed; pina's
+	/// `combine_seeds_with_bump` rejects it before any syscall is made.
+	/// Reserving the bump here turns that unreachable runtime state into a
+	/// compile error.
+	pub(crate) const MAX_SEEDS_BEFORE_BUMP: usize = Self::MAX_SEEDS - 1;
 	/// The maximum byte length of a single seed.
 	pub(crate) const MAX_SEED_LEN: usize = 32;
 
@@ -174,9 +193,14 @@ impl SeedType {
 	}
 
 	/// The Rust type used for the constructor parameter.
-	pub(crate) fn param_type(self) -> Type {
+	///
+	/// `crate_path` qualifies the `Address` spelling. A bare `Address` would
+	/// resolve to whatever the user's own scope happens to import, so a struct
+	/// or type named `Address` in the program crate would silently change the
+	/// generated signature.
+	pub(crate) fn param_type(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&Address),
+			SeedType::Address => syn::parse_quote!(&#crate_path::Address),
 			SeedType::U8 => syn::parse_quote!(u8),
 			SeedType::U16 => syn::parse_quote!(u16),
 			SeedType::U32 => syn::parse_quote!(u32),
@@ -186,19 +210,19 @@ impl SeedType {
 	}
 
 	/// The constructor parameter type with an explicit lifetime, used by the
-	/// `seeds()` method so multiple `&Address` parameters can share one
-	/// lifetime.
-	pub(crate) fn param_type_lt(self) -> Type {
+	/// `seeds()` method so multiple `&#crate_path::Address` parameters can
+	/// share one lifetime.
+	pub(crate) fn param_type_lt(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&'a Address),
-			_ => self.param_type(),
+			SeedType::Address => syn::parse_quote!(&'a #crate_path::Address),
+			_ => self.param_type(crate_path),
 		}
 	}
 
 	/// The field type stored in the generated seeds struct.
-	pub(crate) fn field_type(self) -> Type {
+	pub(crate) fn field_type(self, crate_path: &Path) -> Type {
 		match self {
-			SeedType::Address => syn::parse_quote!(&'a Address),
+			SeedType::Address => syn::parse_quote!(&'a #crate_path::Address),
 			SeedType::U8 => syn::parse_quote!([u8; 1]),
 			SeedType::U16 => syn::parse_quote!([u8; 2]),
 			SeedType::U32 => syn::parse_quote!([u8; 4]),
@@ -302,7 +326,7 @@ impl syn::parse::Parse for PdaArgs {
 /// are not valid Rust expressions.
 fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg>> {
 	let content;
-	syn::bracketed!(content in input);
+	let bracket = syn::bracketed!(content in input);
 
 	let mut seeds = Vec::new();
 	while !content.is_empty() {
@@ -338,12 +362,14 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 		content.parse::<syn::Token![,]>()?;
 	}
 
-	if seeds.len() > SeedType::MAX_SEEDS {
+	if seeds.len() > SeedType::MAX_SEEDS_BEFORE_BUMP {
 		return Err(syn::Error::new(
-			input.span(),
+			bracket.span.join(),
 			format!(
-				"PDA seed list has {} seeds before the bump; the maximum is {}",
+				"PDA seed list has {} seeds; the maximum is {} before the bump seed, because \
+				 every generated derivation appends one for a total of {}",
 				seeds.len(),
+				SeedType::MAX_SEEDS_BEFORE_BUMP,
 				SeedType::MAX_SEEDS
 			),
 		));
@@ -741,5 +767,54 @@ mod tests {
 			error.to_string().contains("migrations"),
 			"unexpected message: {error}"
 		);
+	}
+
+	fn pda_args(source: &str) -> syn::Result<PdaArgs> {
+		syn::parse_str::<PdaArgs>(source)
+	}
+
+	/// One declaration with `count` byte-string seeds and an optional bump.
+	fn pda_source(count: usize, bump: bool) -> String {
+		let seeds = (0..count)
+			.map(|i| format!(r#"b"seed{i}""#))
+			.collect::<Vec<_>>()
+			.join(", ");
+		if bump {
+			format!("seeds = [{seeds}], bump = bump")
+		} else {
+			format!("seeds = [{seeds}]")
+		}
+	}
+
+	#[test]
+	fn pda_accepts_the_maximum_seed_count_before_the_bump() {
+		let args = pda_args(&pda_source(15, true))
+			.unwrap_or_else(|error| panic!("15 seeds with a bump must parse: {error}"));
+		assert_eq!(args.seeds.len(), 15);
+
+		// The cap is width-independent: a bump-free declaration still appends a
+		// bump through `try_find_pda`, so it is capped identically.
+		let args = pda_args(&pda_source(15, false))
+			.unwrap_or_else(|error| panic!("15 seeds without a bump must parse: {error}"));
+		assert_eq!(args.seeds.len(), 15);
+	}
+
+	#[test]
+	fn pda_rejects_seeds_that_leave_no_room_for_the_bump() {
+		// The runtime accepts at most `MAX_SEEDS` (16) seeds in one derivation
+		// (`create_program_address` rejects `seeds.len() > MAX_SEEDS`), and pina's
+		// signing helper rejects 16 seeds before the bump is appended. Sixteen
+		// declared seeds become seventeen once the bump is added, so the derived
+		// address can never be produced or validated. Compiling the declaration
+		// would ship a PDA that no instruction can load.
+		for bump in [true, false] {
+			let error =
+				pda_args(&pda_source(16, bump)).expect_err("16 seeds must not parse, bump or not");
+			let message = error.to_string();
+			assert!(
+				message.contains("16 seeds") && message.contains("15") && message.contains("16"),
+				"error must name the count and both limits: {message}"
+			);
+		}
 	}
 }

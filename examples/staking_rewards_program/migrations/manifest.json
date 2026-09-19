@@ -631,6 +631,14 @@
 								"pda": null
 							},
 							{
+								"name": "reward_vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "associated_token_program",
 								"writable": false,
 								"signer": false,
@@ -656,7 +664,64 @@
 							}
 						]
 					},
-					"processSha256": "5c3d4f1e04f427173ca6d6772905cf0ae203452f0b408b8e92f320e0127d884c",
+					"processSha256": "b986859ccb024db7e5138178b829c208125643f41829916850c5cfc1c0f6dfe3",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:05": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "05"
+			},
+			"rustName": "SetRewardIndexInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "708c828aad85b91616c1d1f3912ff7e7944521e1aa3b607a99175d3514259d47",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "new_index",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 8,
+							"fields": [
+								{
+									"name": "new_index",
+									"offset": 0,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "admin",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_state",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "9c38423f6fef819ace6ac5c68c39e9c4301f96492dc768b68d7e9dc97039109f",
 					"transition": null
 				}
 			]

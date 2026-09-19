@@ -42,5 +42,6 @@ CommandRunner<void> buildRunner() {
     ..addCommand(DepositCommand())
     ..addCommand(WithdrawCommand())
     ..addCommand(ClaimCommand())
+    ..addCommand(SetRewardIndexCommand())
     ..addCommand(FetchCommand());
 }

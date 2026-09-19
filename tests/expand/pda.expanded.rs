@@ -152,6 +152,12 @@ impl ::pina::IntoDiscriminator for PdaDisc {
     fn write_discriminator(&self, bytes: &mut [u8]) {
         (*self as u8).write_discriminator(bytes);
     }
+    fn try_write_discriminator(
+        &self,
+        bytes: &mut [u8],
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        (*self as u8).try_write_discriminator(bytes)
+    }
     fn matches_discriminator(&self, bytes: &[u8]) -> bool {
         (*self as u8).matches_discriminator(bytes)
     }
@@ -278,10 +284,11 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
+const _: fn(Address) -> pina::Address = |value| value;
 ///The PDA seeds for `CounterState`.
 pub struct CounterStateSeeds<'a> {
     ///The `authority` seed.
-    pub authority: &'a Address,
+    pub authority: &'a pina::Address,
 }
 #[automatically_derived]
 #[doc(hidden)]
@@ -290,7 +297,7 @@ unsafe impl<'a> ::core::clone::TrivialClone for CounterStateSeeds<'a> {}
 impl<'a> ::core::clone::Clone for CounterStateSeeds<'a> {
     #[inline]
     fn clone(&self) -> CounterStateSeeds<'a> {
-        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        let _: ::core::clone::AssertParamIsClone<&'a pina::Address>;
         *self
     }
 }
@@ -303,13 +310,13 @@ pub struct CounterStateSeedsWithBump<'a> {
 }
 impl CounterState {
     /// Build the PDA seeds for this account.
-    pub fn seeds<'a>(authority: &'a Address) -> CounterStateSeeds<'a> {
+    pub fn seeds<'a>(authority: &'a pina::Address) -> CounterStateSeeds<'a> {
         CounterStateSeeds { authority }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        authority: &Address,
-        program_id: &Address,
+        authority: &pina::Address,
+        program_id: &pina::Address,
     ) -> ::core::option::Option<(pina::Address, u8)> {
         let seeds = Self::seeds(authority);
         pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -319,7 +326,10 @@ impl CounterState {
     /// # Panics
     ///
     /// Panics if no valid PDA exists for the given seeds.
-    pub fn find_pda(authority: &Address, program_id: &Address) -> (pina::Address, u8) {
+    pub fn find_pda(
+        authority: &pina::Address,
+        program_id: &pina::Address,
+    ) -> (pina::Address, u8) {
         Self::try_find_pda(authority, program_id)
             .unwrap_or_else(|| {
                 ::core::panicking::panic_fmt(
@@ -330,7 +340,7 @@ impl CounterState {
     ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
     pub fn assert_seeds(
         account: &pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
         let bump = pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
@@ -346,7 +356,7 @@ impl CounterState {
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<
         pina::Ref<'account, <Self as pina::PinaPodFixed>::Zc>,
@@ -368,7 +378,7 @@ impl CounterState {
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<
         pina::RefMut<'account, <Self as pina::PinaPodFixed>::Zc>,
@@ -832,6 +842,7 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
+const _: fn(Address) -> ::pina::Address = |value| value;
 ///The PDA seeds for `AllSeedState`.
 pub struct AllSeedStateSeeds<'a> {
     ///The `authority` seed.
@@ -840,7 +851,7 @@ pub struct AllSeedStateSeeds<'a> {
     ///The `tag` seed.
     ///The `width` seed.
     ///The `height` seed.
-    pub authority: &'a Address,
+    pub authority: &'a ::pina::Address,
     pub amount: [u8; 8],
     pub side: [u8; 1],
     pub tag: [u8; 8usize],
@@ -854,7 +865,7 @@ unsafe impl<'a> ::core::clone::TrivialClone for AllSeedStateSeeds<'a> {}
 impl<'a> ::core::clone::Clone for AllSeedStateSeeds<'a> {
     #[inline]
     fn clone(&self) -> AllSeedStateSeeds<'a> {
-        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        let _: ::core::clone::AssertParamIsClone<&'a ::pina::Address>;
         let _: ::core::clone::AssertParamIsClone<[u8; 8]>;
         let _: ::core::clone::AssertParamIsClone<[u8; 1]>;
         let _: ::core::clone::AssertParamIsClone<[u8; 8usize]>;
@@ -873,7 +884,7 @@ pub struct AllSeedStateSeedsWithBump<'a> {
 impl AllSeedState {
     /// Build the PDA seeds for this account.
     pub fn seeds<'a>(
-        authority: &'a Address,
+        authority: &'a ::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
@@ -891,13 +902,13 @@ impl AllSeedState {
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        authority: &Address,
+        authority: &::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
         width: u16,
         height: u32,
-        program_id: &Address,
+        program_id: &::pina::Address,
     ) -> ::core::option::Option<(::pina::Address, u8)> {
         let seeds = Self::seeds(authority, amount, side, tag, width, height);
         ::pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -908,13 +919,13 @@ impl AllSeedState {
     ///
     /// Panics if no valid PDA exists for the given seeds.
     pub fn find_pda(
-        authority: &Address,
+        authority: &::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
         width: u16,
         height: u32,
-        program_id: &Address,
+        program_id: &::pina::Address,
     ) -> (::pina::Address, u8) {
         Self::try_find_pda(authority, amount, side, tag, width, height, program_id)
             .unwrap_or_else(|| {
@@ -926,7 +937,7 @@ impl AllSeedState {
     ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
     pub fn assert_seeds(
         account: &::pina::AccountView,
-        authority: &Address,
+        authority: &::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
@@ -948,7 +959,7 @@ impl AllSeedState {
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account ::pina::AccountView,
-        authority: &Address,
+        authority: &::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
@@ -976,7 +987,7 @@ impl AllSeedState {
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut ::pina::AccountView,
-        authority: &Address,
+        authority: &::pina::Address,
         amount: u64,
         side: u8,
         tag: [u8; 8usize],
@@ -1294,10 +1305,11 @@ impl pina::PinaAccount for AllSeedState {
 pub struct VaultState {
     pub user: Address,
 }
+const _: fn(Address) -> pina::Address = |value| value;
 ///The PDA seeds for `VaultState`.
 pub struct VaultStateSeeds<'a> {
     ///The `user` seed.
-    pub user: &'a Address,
+    pub user: &'a pina::Address,
 }
 #[automatically_derived]
 #[doc(hidden)]
@@ -1306,7 +1318,7 @@ unsafe impl<'a> ::core::clone::TrivialClone for VaultStateSeeds<'a> {}
 impl<'a> ::core::clone::Clone for VaultStateSeeds<'a> {
     #[inline]
     fn clone(&self) -> VaultStateSeeds<'a> {
-        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        let _: ::core::clone::AssertParamIsClone<&'a pina::Address>;
         *self
     }
 }
@@ -1319,13 +1331,13 @@ pub struct VaultStateSeedsWithBump<'a> {
 }
 impl VaultState {
     /// Build the PDA seeds for this account.
-    pub fn seeds<'a>(user: &'a Address) -> VaultStateSeeds<'a> {
+    pub fn seeds<'a>(user: &'a pina::Address) -> VaultStateSeeds<'a> {
         VaultStateSeeds { user }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        user: &Address,
-        program_id: &Address,
+        user: &pina::Address,
+        program_id: &pina::Address,
     ) -> ::core::option::Option<(pina::Address, u8)> {
         let seeds = Self::seeds(user);
         pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -1335,7 +1347,10 @@ impl VaultState {
     /// # Panics
     ///
     /// Panics if no valid PDA exists for the given seeds.
-    pub fn find_pda(user: &Address, program_id: &Address) -> (pina::Address, u8) {
+    pub fn find_pda(
+        user: &pina::Address,
+        program_id: &pina::Address,
+    ) -> (pina::Address, u8) {
         Self::try_find_pda(user, program_id)
             .unwrap_or_else(|| {
                 ::core::panicking::panic_fmt(
@@ -1493,10 +1508,11 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
+const _: fn(Address) -> ::pina::Address = |value| value;
 ///The PDA seeds for `TodoState`.
 pub struct TodoStateSeeds<'a> {
     ///The `owner` seed.
-    pub owner: &'a Address,
+    pub owner: &'a ::pina::Address,
 }
 #[automatically_derived]
 #[doc(hidden)]
@@ -1505,7 +1521,7 @@ unsafe impl<'a> ::core::clone::TrivialClone for TodoStateSeeds<'a> {}
 impl<'a> ::core::clone::Clone for TodoStateSeeds<'a> {
     #[inline]
     fn clone(&self) -> TodoStateSeeds<'a> {
-        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        let _: ::core::clone::AssertParamIsClone<&'a ::pina::Address>;
         *self
     }
 }
@@ -1518,13 +1534,13 @@ pub struct TodoStateSeedsWithBump<'a> {
 }
 impl TodoState {
     /// Build the PDA seeds for this account.
-    pub fn seeds<'a>(owner: &'a Address) -> TodoStateSeeds<'a> {
+    pub fn seeds<'a>(owner: &'a ::pina::Address) -> TodoStateSeeds<'a> {
         TodoStateSeeds { owner }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        owner: &Address,
-        program_id: &Address,
+        owner: &::pina::Address,
+        program_id: &::pina::Address,
     ) -> ::core::option::Option<(::pina::Address, u8)> {
         let seeds = Self::seeds(owner);
         ::pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -1534,7 +1550,10 @@ impl TodoState {
     /// # Panics
     ///
     /// Panics if no valid PDA exists for the given seeds.
-    pub fn find_pda(owner: &Address, program_id: &Address) -> (::pina::Address, u8) {
+    pub fn find_pda(
+        owner: &::pina::Address,
+        program_id: &::pina::Address,
+    ) -> (::pina::Address, u8) {
         Self::try_find_pda(owner, program_id)
             .unwrap_or_else(|| {
                 ::core::panicking::panic_fmt(
@@ -1545,7 +1564,7 @@ impl TodoState {
     ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
     pub fn assert_seeds(
         account: &::pina::AccountView,
-        owner: &Address,
+        owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
         let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
@@ -1561,7 +1580,7 @@ impl TodoState {
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account ::pina::AccountView,
-        owner: &Address,
+        owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<
         ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
@@ -1583,7 +1602,7 @@ impl TodoState {
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut ::pina::AccountView,
-        owner: &Address,
+        owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<
         ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
@@ -2598,10 +2617,11 @@ mod __pinapod_compact_CompactState {
 pub use __pinapod_compact_CompactState::{
     CompactStateHeader, CompactStatePatch, CompactStateRef,
 };
+const _: fn(Address) -> pina::Address = |value| value;
 ///The PDA seeds for `CompactState`.
 pub struct CompactStateSeeds<'a> {
     ///The `authority` seed.
-    pub authority: &'a Address,
+    pub authority: &'a pina::Address,
 }
 #[automatically_derived]
 #[doc(hidden)]
@@ -2610,7 +2630,7 @@ unsafe impl<'a> ::core::clone::TrivialClone for CompactStateSeeds<'a> {}
 impl<'a> ::core::clone::Clone for CompactStateSeeds<'a> {
     #[inline]
     fn clone(&self) -> CompactStateSeeds<'a> {
-        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        let _: ::core::clone::AssertParamIsClone<&'a pina::Address>;
         *self
     }
 }
@@ -2623,13 +2643,13 @@ pub struct CompactStateSeedsWithBump<'a> {
 }
 impl CompactState {
     /// Build the PDA seeds for this account.
-    pub fn seeds<'a>(authority: &'a Address) -> CompactStateSeeds<'a> {
+    pub fn seeds<'a>(authority: &'a pina::Address) -> CompactStateSeeds<'a> {
         CompactStateSeeds { authority }
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        authority: &Address,
-        program_id: &Address,
+        authority: &pina::Address,
+        program_id: &pina::Address,
     ) -> ::core::option::Option<(pina::Address, u8)> {
         let seeds = Self::seeds(authority);
         pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -2639,7 +2659,10 @@ impl CompactState {
     /// # Panics
     ///
     /// Panics if no valid PDA exists for the given seeds.
-    pub fn find_pda(authority: &Address, program_id: &Address) -> (pina::Address, u8) {
+    pub fn find_pda(
+        authority: &pina::Address,
+        program_id: &pina::Address,
+    ) -> (pina::Address, u8) {
         Self::try_find_pda(authority, program_id)
             .unwrap_or_else(|| {
                 ::core::panicking::panic_fmt(
@@ -2650,7 +2673,7 @@ impl CompactState {
     ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
     pub fn assert_seeds(
         account: &pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
         let bump = pina::AsCompactAccount::with_compact_account::<
@@ -2673,9 +2696,9 @@ impl CompactState {
     ///
     /// Prefer `with_checked_pda` when an untrusted caller chooses which account the handler loads. This method accepts any address the stored bump derives, including a shadow account created at a noncanonical bump, so it cannot on its own prove the namespace is unique.
     #[inline(always)]
-    pub fn with_pda<R>(
+    pub fn with_stored_bump_pda<R>(
         account: &pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
         use_account: impl FnOnce(
             <Self as pina::PinaCompactAccount>::Ref<'_>,
@@ -2701,6 +2724,26 @@ impl CompactState {
             },
         )
     }
+    /// Deprecated alias for the stored-bump loader.
+    ///
+    /// This name predates the split that gave the two compact PDA loaders
+    /// distinct names. It verifies only the address the stored bump derives,
+    /// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
+    /// an untrusted caller chooses which account the handler loads.
+    #[deprecated(
+        note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
+    )]
+    #[inline(always)]
+    pub fn with_pda<R>(
+        account: &pina::AccountView,
+        authority: &pina::Address,
+        program_id: &pina::Address,
+        use_account: impl FnOnce(
+            <Self as pina::PinaCompactAccount>::Ref<'_>,
+        ) -> ::core::result::Result<R, pina::ProgramError>,
+    ) -> ::core::result::Result<R, pina::ProgramError> {
+        Self::with_stored_bump_pda(account, authority, program_id, use_account)
+    }
     /// Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
     ///
     /// Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the only compact loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `with_pda` performs.
@@ -2709,7 +2752,7 @@ impl CompactState {
     #[inline(always)]
     pub fn with_checked_pda<R>(
         account: &pina::AccountView,
-        authority: &Address,
+        authority: &pina::Address,
         program_id: &pina::Address,
         use_account: impl FnOnce(
             <Self as pina::PinaCompactAccount>::Ref<'_>,
@@ -3109,7 +3152,7 @@ impl AuthorityState {
     }
     /// Find the canonical PDA for this account and its bump seed.
     pub fn try_find_pda(
-        program_id: &Address,
+        program_id: &pina::Address,
     ) -> ::core::option::Option<(pina::Address, u8)> {
         let seeds = Self::seeds();
         pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -3119,7 +3162,7 @@ impl AuthorityState {
     /// # Panics
     ///
     /// Panics if no valid PDA exists for the given seeds.
-    pub fn find_pda(program_id: &Address) -> (pina::Address, u8) {
+    pub fn find_pda(program_id: &pina::Address) -> (pina::Address, u8) {
         Self::try_find_pda(program_id)
             .unwrap_or_else(|| {
                 ::core::panicking::panic_fmt(
@@ -3200,7 +3243,7 @@ impl NumericState {
     pub fn try_find_pda(
         nonce: u64,
         tag: [u8; 8usize],
-        program_id: &Address,
+        program_id: &pina::Address,
     ) -> ::core::option::Option<(pina::Address, u8)> {
         let seeds = Self::seeds(nonce, tag);
         pina::try_find_program_address(&seeds.as_slices(), program_id)
@@ -3213,7 +3256,7 @@ impl NumericState {
     pub fn find_pda(
         nonce: u64,
         tag: [u8; 8usize],
-        program_id: &Address,
+        program_id: &pina::Address,
     ) -> (pina::Address, u8) {
         Self::try_find_pda(nonce, tag, program_id)
             .unwrap_or_else(|| {

@@ -505,6 +505,18 @@ macro_rules! primitive_into_discriminator {
 				bytes[..Self::BYTES].copy_from_slice(&self.to_le_bytes());
 			}
 
+			fn try_write_discriminator(
+				&self,
+				bytes: &mut [u8],
+			) -> Result<(), $crate::ProgramError> {
+				let Some(destination) = bytes.get_mut(..Self::BYTES) else {
+					return Err($crate::PinaProgramError::DataTooShort.into());
+				};
+				destination.copy_from_slice(&self.to_le_bytes());
+
+				Ok(())
+			}
+
 			fn matches_discriminator(&self, bytes: &[u8]) -> bool {
 				if bytes.len() < Self::BYTES {
 					return false;
@@ -585,6 +597,13 @@ macro_rules! into_discriminator {
 				(*self as $type).write_discriminator(bytes);
 			}
 
+			fn try_write_discriminator(
+				&self,
+				bytes: &mut [u8],
+			) -> ::core::result::Result<(), $crate::ProgramError> {
+				(*self as $type).try_write_discriminator(bytes)
+			}
+
 			fn matches_discriminator(&self, bytes: &[u8]) -> bool {
 				(*self as $type).matches_discriminator(bytes)
 			}
@@ -622,7 +641,56 @@ pub trait IntoDiscriminator: Sized {
 	fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, ProgramError>;
 
 	/// Write the discriminator to the provided bytes.
+	///
+	/// A slice shorter than [`Self::BYTES`] is left untouched and the write is
+	/// silently dropped. Prefer [`Self::try_write_discriminator`] in new manual
+	/// implementations: it reports the undersized buffer instead of producing an
+	/// account whose discriminator was never written.
 	fn write_discriminator(&self, bytes: &mut [u8]);
+
+	/// Write the discriminator to the provided bytes, reporting a short buffer.
+	///
+	/// Returns [`PinaProgramError::DataTooShort`] when `bytes` is shorter than
+	/// [`Self::BYTES`]. The default implementation keeps the historical
+	/// [`Self::write_discriminator`] behavior and only adds the length check, so
+	/// an implementer that already writes correctly inherits a checked path for
+	/// free.
+	///
+	/// # Errors
+	///
+	/// Returns [`PinaProgramError::DataTooShort`] when `bytes` cannot hold the
+	/// full discriminator. `DataTooShort` is the variant the framework already
+	/// returns from its other short-buffer writes, such as
+	/// [`crate::HasMigrationVersion`]'s `write_le`, so a caller sees one error
+	/// for every "the destination is too small" case.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use pina::IntoDiscriminator;
+	/// use pina::PinaProgramError;
+	/// use pina::ProgramError;
+	///
+	/// let mut buffer = [0u8; 4];
+	/// 0xDEAD_BEEFu32
+	/// 	.try_write_discriminator(&mut buffer)
+	/// 	.unwrap_or_else(|e| panic!("{e:?}"));
+	/// assert_eq!(buffer, [0xEF, 0xBE, 0xAD, 0xDE]);
+	///
+	/// let mut short = [0u8; 2];
+	/// assert_eq!(
+	/// 	u32::try_write_discriminator(&0xDEAD_BEEF, &mut short),
+	/// 	Err::<(), ProgramError>(PinaProgramError::DataTooShort.into()),
+	/// );
+	/// ```
+	fn try_write_discriminator(&self, bytes: &mut [u8]) -> Result<(), ProgramError> {
+		if bytes.len() < Self::BYTES {
+			return Err(PinaProgramError::DataTooShort.into());
+		}
+		self.write_discriminator(bytes);
+
+		Ok(())
+	}
 
 	/// Check if this discriminator matches the first `BYTES` of the provided
 	/// byte array.
@@ -1289,6 +1357,35 @@ mod tests {
 		const VALUE: u8 = 7;
 	}
 
+	/// A manual implementer that overrides only the required methods, so it
+	/// runs the default `try_write_discriminator` body rather than the
+	/// primitive override every generated type uses.
+	///
+	/// The payload is what makes `BYTES` one: a fieldless struct would size to
+	/// zero and never exercise the length check.
+	struct LegacyDiscriminator(u8);
+
+	impl IntoDiscriminator for LegacyDiscriminator {
+		fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, ProgramError> {
+			match bytes.first() {
+				Some(value) => Ok(Self(*value)),
+				None => Err(PinaProgramError::DataTooShort.into()),
+			}
+		}
+
+		fn write_discriminator(&self, bytes: &mut [u8]) {
+			// Deliberately unchecked, matching the pre-existing manual style the
+			// default checked implementation has to be compatible with.
+			if let Some(first) = bytes.first_mut() {
+				*first = self.0;
+			}
+		}
+
+		fn matches_discriminator(&self, bytes: &[u8]) -> bool {
+			bytes.first() == Some(&self.0)
+		}
+	}
+
 	#[test]
 	fn trailing_optional_accounts_may_be_absent() {
 		let program_id = Address::new_from_array([7; 32]);
@@ -1475,6 +1572,137 @@ mod tests {
 		// HasDiscriminator::matches_discriminator delegates to the primitive
 		// and should also handle short data gracefully.
 		assert!(!TestType::matches_discriminator(&[]));
+	}
+
+	/// An undersized buffer must report the failure instead of silently
+	/// dropping the write. `write_discriminator` still returns `()` and leaves
+	/// the buffer alone, which is the compatibility behavior the checked form
+	/// exists to replace.
+	#[test]
+	fn try_write_discriminator_rejects_short_buffers() {
+		let val: u32 = 0xDEAD_BEEF;
+
+		for length in 0..u32::BYTES {
+			let mut bytes = [0xFFu8; 4];
+			let result = val.try_write_discriminator(&mut bytes[..length]);
+			assert_eq!(
+				result,
+				Err(PinaProgramError::DataTooShort.into()),
+				"a {length}-byte buffer must be rejected for u32"
+			);
+			assert_eq!(
+				bytes, [0xFF; 4],
+				"a rejected write must not touch the buffer"
+			);
+		}
+
+		let mut bytes = [0xFFu8; 8];
+		assert_eq!(
+			0xDEAD_BEEFu32.try_write_discriminator(&mut bytes[..3]),
+			Err(PinaProgramError::DataTooShort.into()),
+			"a shorter inner slice is undersized even inside a longer array"
+		);
+	}
+
+	/// Each primitive writes exactly its little-endian bytes into an exact-size
+	/// buffer and leaves the buffer unchanged on failure.
+	#[test]
+	fn try_write_discriminator_writes_exact_and_oversized_buffers() {
+		let mut bytes_u8 = [0u8; u8::BYTES];
+		42u8.try_write_discriminator(&mut bytes_u8)
+			.unwrap_or_else(|error| panic!("u8 exact: {error:?}"));
+		assert_eq!(bytes_u8, [42]);
+
+		let mut bytes_u16 = [0u8; u16::BYTES];
+		0x0102u16
+			.try_write_discriminator(&mut bytes_u16)
+			.unwrap_or_else(|error| panic!("u16 exact: {error:?}"));
+		assert_eq!(bytes_u16, [0x02, 0x01]);
+
+		let mut bytes_u32 = [0u8; u32::BYTES];
+		0xDEAD_BEEFu32
+			.try_write_discriminator(&mut bytes_u32)
+			.unwrap_or_else(|error| panic!("u32 exact: {error:?}"));
+		assert_eq!(bytes_u32, [0xEF, 0xBE, 0xAD, 0xDE]);
+
+		let mut bytes_u64 = [0u8; u64::BYTES];
+		0x0123_4567_89AB_CDEFu64
+			.try_write_discriminator(&mut bytes_u64)
+			.unwrap_or_else(|error| panic!("u64 exact: {error:?}"));
+		assert_eq!(bytes_u64, [0xEF, 0xCD, 0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]);
+
+		// An oversized buffer keeps its trailing bytes and reports success.
+		let mut tail = [0xAAu8; 5];
+		tail[..4].copy_from_slice(&0u32.to_le_bytes());
+		0xDEAD_BEEFu32
+			.try_write_discriminator(&mut tail)
+			.unwrap_or_else(|error| panic!("u32 oversized: {error:?}"));
+		assert_eq!(tail, [0xEF, 0xBE, 0xAD, 0xDE, 0xAA]);
+	}
+
+	/// The checked write agrees with the unchecked one wherever the unchecked
+	/// one writes, so a caller can switch without changing the bytes produced.
+	#[test]
+	fn try_write_discriminator_matches_write_discriminator() {
+		let mut expected = [0u8; 8];
+		let mut checked = [0u8; 8];
+
+		0xDEAD_BEEFu32.write_discriminator(&mut expected);
+		0xDEAD_BEEFu32
+			.try_write_discriminator(&mut checked)
+			.unwrap_or_else(|error| panic!("u32: {error:?}"));
+		assert_eq!(checked, expected);
+
+		let mut expected = [0u8; 8];
+		let mut checked = [0u8; 8];
+		0x0123_4567_89AB_CDEFu64.write_discriminator(&mut expected);
+		0x0123_4567_89AB_CDEFu64
+			.try_write_discriminator(&mut checked)
+			.unwrap_or_else(|error| panic!("u64: {error:?}"));
+		assert_eq!(checked, expected);
+	}
+
+	/// A manual implementer that does not override the method still gets the
+	/// checked behavior from the default body, which is the point of shipping a
+	/// default rather than a required method.
+	#[test]
+	fn try_write_discriminator_default_impl_is_checked() {
+		let mut sized = [0xFFu8; 4];
+		LegacyDiscriminator(9)
+			.try_write_discriminator(&mut sized)
+			.unwrap_or_else(|error| panic!("sized buffer: {error:?}"));
+		assert_eq!(sized, [9, 0xFF, 0xFF, 0xFF]);
+
+		// `LegacyDiscriminator` has `BYTES == 1`, so an empty slice must be
+		// reported by the default body rather than dropped as a no-op.
+		assert_eq!(
+			LegacyDiscriminator(9).try_write_discriminator(&mut []),
+			Err(PinaProgramError::DataTooShort.into()),
+			"the default body rejects a buffer shorter than BYTES"
+		);
+	}
+
+	/// A `#[discriminator]` enum inherits the primitive's checked write, so the
+	/// generated path reports a short buffer too.
+	#[test]
+	fn try_write_discriminator_reaches_generated_enums() {
+		let mut bytes = [0u8; 1];
+		TestType::VALUE
+			.try_write_discriminator(&mut bytes)
+			.unwrap_or_else(|error| panic!("u8 enum value: {error:?}"));
+		assert_eq!(bytes, [7]);
+
+		let mut short = [0xFFu8; 8];
+		assert_eq!(
+			TestType::VALUE.try_write_discriminator(&mut short[..0]),
+			Err(PinaProgramError::DataTooShort.into())
+		);
+		assert_eq!(
+			TestType::VALUE.try_write_discriminator(&mut short[1..]),
+			Ok(()),
+			"an inner slice with room still succeeds"
+		);
+		assert_eq!(short[1], 7);
 	}
 
 	// ---- Additional coverage tests ----

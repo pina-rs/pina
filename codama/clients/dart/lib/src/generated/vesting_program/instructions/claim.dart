@@ -104,6 +104,7 @@ Instruction getClaimInstruction({
   required Address associatedTokenProgram,
   required Address systemProgram,
   required Address tokenProgram,
+  required Address clock,
   required BigInt amount,
 }) {
   final instructionData = ClaimInstructionData(amount: amount);
@@ -119,6 +120,7 @@ Instruction getClaimInstruction({
       AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
       AccountMeta(address: tokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getClaimInstructionDataEncoder().encode(instructionData),
   );

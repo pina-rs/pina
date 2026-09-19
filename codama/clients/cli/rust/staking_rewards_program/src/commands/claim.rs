@@ -33,6 +33,9 @@ pub struct ClaimArgs {
 	/// The `user_reward_ata` account
 	#[arg(long)]
 	user_reward_ata: String,
+	/// The `reward_vault` account
+	#[arg(long)]
+	reward_vault: String,
 	/// The `token_program` account
 	#[arg(long)]
 	token_program: String,
@@ -47,6 +50,7 @@ pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError>
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
 	let position_state = CliContext::pubkey("--position_state", &args.position_state)?;
 	let user_reward_ata = CliContext::pubkey("--user_reward_ata", &args.user_reward_ata)?;
+	let reward_vault = CliContext::pubkey("--reward_vault", &args.reward_vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = ClaimInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
@@ -60,6 +64,7 @@ pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError>
 		pool_state,
 		position_state,
 		user_reward_ata,
+		reward_vault,
 		associated_token_program: Pubkey::from_str_const(
 			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 		),

@@ -363,10 +363,18 @@
 								"optional": false,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
 							}
 						]
 					},
-					"processSha256": "3e069217276552ed0d12e443a4b982cf2676a780b3c2abaeb74b091ba6cc9d58",
+					"processSha256": "8dff471bba0cf9284bc92c6bc4b477ebbc9c3bc415a342e8fee75ba734296ea5",
 					"transition": null
 				}
 			]
@@ -396,7 +404,7 @@
 						"accounts": [
 							{
 								"name": "admin",
-								"writable": false,
+								"writable": true,
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,
@@ -419,11 +427,35 @@
 								"pda": "vesting"
 							},
 							{
+								"name": "admin_ata",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "vault",
 								"writable": true,
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "associated_token_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
 								"pda": null
 							},
 							{
@@ -436,7 +468,7 @@
 							}
 						]
 					},
-					"processSha256": "9752f51618253f6f4263fdf05a6e98ad4e1f061bdbc99cddf6b849e4002a19d1",
+					"processSha256": "6bd6beca94cc63892a9ca12bc4754ff72e86eeeb72a9e837c77e0da658ffd668",
 					"transition": null
 				}
 			]

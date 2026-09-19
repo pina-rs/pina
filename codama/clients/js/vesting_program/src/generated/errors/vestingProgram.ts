@@ -20,10 +20,16 @@ export const VESTING_PROGRAM_ERROR__INVALID_SCHEDULE = 0x0; // 0
 export const VESTING_PROGRAM_ERROR__CLAIM_TOO_LARGE = 0x1; // 1
 /** The vesting account was already cancelled and holds nothing to claim. */
 export const VESTING_PROGRAM_ERROR__ALREADY_CANCELLED = 0x2; // 2
+/** The schedule has not reached its cliff, so nothing has vested yet. */
+export const VESTING_PROGRAM_ERROR__CLIFF_NOT_REACHED = 0x3; // 3
+/** The vault holds fewer tokens than the claim must release. */
+export const VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE = 0x4; // 4
 
 export type VestingProgramError =
 	| typeof VESTING_PROGRAM_ERROR__ALREADY_CANCELLED
 	| typeof VESTING_PROGRAM_ERROR__CLAIM_TOO_LARGE
+	| typeof VESTING_PROGRAM_ERROR__CLIFF_NOT_REACHED
+	| typeof VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE
 	| typeof VESTING_PROGRAM_ERROR__INVALID_SCHEDULE;
 
 let vestingProgramErrorMessages:
@@ -35,6 +41,10 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The vesting account was already cancelled and holds nothing to claim.`,
 		[VESTING_PROGRAM_ERROR__CLAIM_TOO_LARGE]:
 			`The claim exceeds what has vested so far.`,
+		[VESTING_PROGRAM_ERROR__CLIFF_NOT_REACHED]:
+			`The schedule has not reached its cliff, so nothing has vested yet.`,
+		[VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE]:
+			`The vault holds fewer tokens than the claim must release.`,
 		[VESTING_PROGRAM_ERROR__INVALID_SCHEDULE]:
 			`The schedule is malformed: its window is empty, unordered, or fully elapsed.`,
 	};

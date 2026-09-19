@@ -20,6 +20,7 @@ use crate::args::CapacityTestArg;
 use crate::args::DiscriminatorArgs;
 use crate::args::DispatchVariantArgs;
 use crate::args::InlineArg;
+use crate::args::Primitive;
 
 /// Suffix appended to a variant name to find its accounts struct.
 const ACCOUNTS_SUFFIX: &str = "Accounts";
@@ -349,8 +350,8 @@ pub(crate) fn expand(
 /// The ladder is derived from the checked-in manifest: every enveloped account
 /// contract becomes an optional reserved-instruction slot, in the manifest's
 /// identity-sorted order — the same order generated clients compose. Returns
-/// the `process_migrate` helper and the `is_migrate_instruction` guard, or
-/// `None` when the program has no manifest or no migratable accounts.
+/// the `process_migrate` helper and the width-matched `is_migrate_instruction`
+/// guard, or `None` when the program has no manifest or no migratable accounts.
 fn resolve_migrations(
 	args: &DiscriminatorArgs,
 	enum_name: &Ident,
@@ -397,6 +398,7 @@ fn resolve_migrations(
 
 	Ok(Some(migrate_emission(
 		crate_path,
+		args.primitive,
 		&ladder,
 		max_lamports.as_ref(),
 		&args
@@ -416,6 +418,7 @@ fn resolve_migrations(
 /// without a manifest on disk.
 fn migrate_emission(
 	crate_path: &Path,
+	primitive: Primitive,
 	ladder: &[proc_macro2::TokenStream],
 	max_lamports: Option<&Expr>,
 	program_id: &Expr,
@@ -434,6 +437,17 @@ fn migrate_emission(
 			migrate.run_optional::<#account>(#index)?;
 		}
 	});
+
+	// The reserved value is the all-ones value of the instruction
+	// discriminator's own width, so the guard must test the same width. A
+	// one-byte check against a `u16` enum's `0xffff` never matches, which would
+	// make the reserved path unreachable.
+	let is_migrate_instruction = match primitive {
+		Primitive::U8 => quote!(is_migrate_instruction),
+		Primitive::U16 => quote!(is_migrate_instruction_u16),
+		Primitive::U32 => quote!(is_migrate_instruction_u32),
+		Primitive::U64 => quote!(is_migrate_instruction_u64),
+	};
 
 	let helper = quote! {
 		/// Routes the reserved framework `Migrate` instruction.
@@ -473,9 +487,11 @@ fn migrate_emission(
 	};
 
 	// The reserved instruction is detected before `parse_instruction`, which
-	// would reject it: `#[discriminator]` reserves the all-ones value.
+	// would reject it: `#[discriminator]` reserves the all-ones value. The
+	// guard matches the enum's own width, so a wider program's `0xffff` (or
+	// `0xffff_ffff`, and so on) is recognized rather than only `0xff`.
 	let prelude = quote! {
-		if #crate_path::is_migrate_instruction(data) {
+		if #crate_path::#is_migrate_instruction(data) {
 			return Self::process_migrate(program_id, accounts);
 		}
 	};
@@ -710,7 +726,13 @@ mod tests {
 			ladder_of("State"),
 		]
 		.map(|path| ::quote::ToTokens::to_token_stream(&path));
-		let (helper, prelude) = migrate_emission(&crate_path, &ladder, Some(&budget), &program_id);
+		let (helper, prelude) = migrate_emission(
+			&crate_path,
+			Primitive::U8,
+			&ladder,
+			Some(&budget),
+			&program_id,
+		);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());
 
@@ -739,11 +761,46 @@ mod tests {
 	}
 
 	#[test]
+	fn migration_emission_matches_the_guard_to_the_discriminator_width() {
+		// The reserved value is the all-ones value of the enum's own width, so a
+		// one-byte guard on a `u16` program never matches and the reserved path
+		// is unreachable. Each width must select the helper that tests it.
+		let crate_path: Path = syn::parse_quote!(::pina);
+		let budget: Expr = syn::parse_quote!(BUDGET);
+		let program_id: Expr = syn::parse_quote!(ID);
+		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
+
+		for (primitive, expected) in [
+			(Primitive::U8, "::pina::is_migrate_instruction(data)"),
+			(Primitive::U16, "::pina::is_migrate_instruction_u16(data)"),
+			(Primitive::U32, "::pina::is_migrate_instruction_u32(data)"),
+			(Primitive::U64, "::pina::is_migrate_instruction_u64(data)"),
+		] {
+			let (_, prelude) =
+				migrate_emission(&crate_path, primitive, &ladder, Some(&budget), &program_id);
+			let prelude = squeezed(&prelude.to_string());
+
+			assert!(
+				prelude.contains(expected),
+				"`{primitive:?}` must guard with `{expected}`; got: {prelude}"
+			);
+			// Exact spelling only: the wider helper names contain the one-byte
+			// name as a prefix, so a substring check would pass on the wrong one.
+			if !matches!(primitive, Primitive::U8) {
+				assert!(
+					!prelude.contains("is_migrate_instruction("),
+					"`{primitive:?}` must use its own width's helper: {prelude}"
+				);
+			}
+		}
+	}
+
+	#[test]
 	fn migration_emission_without_a_budget_declares_no_ceiling() {
 		let crate_path: Path = syn::parse_quote!(::pina);
 		let program_id: Expr = syn::parse_quote!(ID);
 		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
-		let (helper, _) = migrate_emission(&crate_path, &ladder, None, &program_id);
+		let (helper, _) = migrate_emission(&crate_path, Primitive::U8, &ladder, None, &program_id);
 		let helper = squeezed(&helper.to_string());
 
 		// No ceiling is stated as `None` rather than a sentinel maximum, and the

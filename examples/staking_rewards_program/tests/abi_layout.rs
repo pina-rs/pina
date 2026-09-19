@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 664c6ee32e65fcbbeaf408443005cd894130a4f12b877053080297924f32d6ee
+// manifest-sha256: ad309e7b65342ad36eff8433f11904e09a2c0b97dd8e5a034cdfcd664ea534c4
 // program-id: 9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr
 // version-type: u8
 
@@ -233,6 +233,36 @@ pub mod instruction_1_04 {
 	pub const MANIFEST_PAYLOAD_SIZE: usize = 0;
 	/// `(name, absolute_offset, size)` in encoded bytes.
 	pub const FIELDS: &[(&str, usize, usize)] = &[
+	];
+}
+
+/// ABI layout for the `SetRewardIndexInstruction` instruction.
+pub mod instruction_1_05 {
+	/// Manifest contract key.
+	pub const KEY: &str = "instruction:1:05";
+	/// Rust type name as declared in the program.
+	pub const RUST_NAME: &str = "SetRewardIndexInstruction";
+	/// Current schema version.
+	pub const VERSION: u32 = 0;
+	/// Schema hash recorded for this version.
+	pub const SCHEMA_SHA256: &str = "708c828aad85b91616c1d1f3912ff7e7944521e1aa3b607a99175d3514259d47";
+	/// Width of the discriminator in bytes.
+	pub const DISCRIMINATOR_BYTES: usize = 1;
+	/// Byte offset of the migration version field.
+	pub const VERSION_OFFSET: usize = 1;
+	/// Width of the migration version field in bytes.
+	pub const VERSION_BYTES: usize = 1;
+	/// Bytes occupied by the discriminator and version envelope together.
+	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	/// Payload size in bytes, excluding the envelope header.
+	pub const PAYLOAD_SIZE: usize = 8;
+	/// Total encoded size in bytes, including the envelope header.
+	pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;
+	/// Manifest payload size; must agree with `PAYLOAD_SIZE`.
+	pub const MANIFEST_PAYLOAD_SIZE: usize = 8;
+	/// `(name, absolute_offset, size)` in encoded bytes.
+	pub const FIELDS: &[(&str, usize, usize)] = &[
+		("new_index", MIGRATION_HEADER_SIZE + 0, 8),
 	];
 }
 

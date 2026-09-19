@@ -34,7 +34,8 @@ final class ClaimCommand extends Command<void> {
         'token_program',
         mandatory: true,
         help: "The token_program account",
-      );
+      )
+      ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
   @override
@@ -64,6 +65,7 @@ final class ClaimCommand extends Command<void> {
       '--token-program',
       results['token_program']! as String,
     );
+    final clock = pubkey('--clock', results['clock']! as String);
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final instruction = getClaimInstruction(
       programAddress: context.programAddress,
@@ -77,6 +79,7 @@ final class ClaimCommand extends Command<void> {
       ),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
+      clock: clock,
       amount: amountValue,
     );
     await context.send([instruction]);

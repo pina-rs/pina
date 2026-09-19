@@ -123,9 +123,12 @@ fn compact_every_shorter_prefix_rejects_active_tail_truncation() {
 		PodU16::from(kani::any::<u16>()),
 	];
 	let triple_values: [[u8; 3]; 2] = kani::any();
-	let byte_len: usize = kani::any();
-	let word_len: usize = kani::any();
-	let triple_len: usize = kani::any();
+	// The lengths only ever range over the two-to-three element capacities, so
+	// generating them from `u8` keeps the 64-bit `usize` arithmetic out of the
+	// SAT problem while the casts make the slicing bounds explicit.
+	let byte_len = kani::any::<u8>() as usize;
+	let word_len = kani::any::<u8>() as usize;
+	let triple_len = kani::any::<u8>() as usize;
 	kani::assume(byte_len <= byte_values.len());
 	kani::assume(word_len <= word_values.len());
 	kani::assume(triple_len <= triple_values.len());
@@ -138,7 +141,7 @@ fn compact_every_shorter_prefix_rejects_active_tail_truncation() {
 			.replace_triples(&triple_values[..triple_len]),
 	)
 	.unwrap();
-	let shorter_len: usize = kani::any();
+	let shorter_len = kani::any::<u8>() as usize;
 	kani::assume(shorter_len < committed_size);
 
 	assert!(CompactProofState::validate_account_data(&data[..shorter_len]).is_err());

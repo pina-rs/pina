@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: event record for Oversized exceeds the SBF stack budget; reduce the payload or field count
+  --> tests/ui/fail/event_record_over_stack_budget.rs:12:1
+   |
+12 | #[event(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here

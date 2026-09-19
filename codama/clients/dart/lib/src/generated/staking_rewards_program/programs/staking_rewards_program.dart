@@ -26,6 +26,7 @@ enum StakingRewardsProgramInstruction {
   deposit,
   withdraw,
   claim,
+  setRewardIndex,
 }
 
 /// Identifies the type of a StakingRewardsProgram instruction.
@@ -51,6 +52,10 @@ StakingRewardsProgramInstruction identifyStakingRewardsProgramInstruction(
   if (containsBytes(data, getU8Encoder().encode(4), 0) &&
       containsBytes(data, getU8Encoder().encode(0), 1)) {
     return StakingRewardsProgramInstruction.claim;
+  }
+  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
+    return StakingRewardsProgramInstruction.setRewardIndex;
   }
 
   throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
@@ -107,6 +112,15 @@ final class ParsedClaim extends ParsedStakingRewardsProgramInstruction {
   final ClaimInstructionData data;
 }
 
+/// A parsed SetRewardIndex instruction.
+final class ParsedSetRewardIndex
+    extends ParsedStakingRewardsProgramInstruction {
+  const ParsedSetRewardIndex({required this.data})
+    : super(StakingRewardsProgramInstruction.setRewardIndex);
+
+  final SetRewardIndexInstructionData data;
+}
+
 /// Parses a StakingRewardsProgram instruction.
 ParsedStakingRewardsProgramInstruction parseStakingRewardsProgramInstruction(
   Instruction instruction,
@@ -128,6 +142,9 @@ ParsedStakingRewardsProgramInstruction parseStakingRewardsProgramInstruction(
     ),
     StakingRewardsProgramInstruction.claim => ParsedClaim(
       data: parseClaimInstruction(instruction),
+    ),
+    StakingRewardsProgramInstruction.setRewardIndex => ParsedSetRewardIndex(
+      data: parseSetRewardIndexInstruction(instruction),
     ),
   };
 }

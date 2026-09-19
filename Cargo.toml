@@ -269,7 +269,6 @@ solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
 syn = { default-features = false, version = "^3", features = ["full"] }
-tar = { default-features = false, version = "^0.4" }
 tempfile = { default-features = false, version = "^3" }
 termimad = { default-features = false, version = "^0.35.1" }
 thiserror = { default-features = false, version = "^2" }
