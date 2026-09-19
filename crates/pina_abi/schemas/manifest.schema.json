@@ -1,365 +1,365 @@
 {
-	"$defs": {
-		"ContractHistory": {
-			"additionalProperties": false,
-			"description": "Complete history for one discriminator identity.",
-			"properties": {
-				"identity": {
-					"$ref": "#/$defs/ContractIdentity"
-				},
-				"rustName": {
-					"description": "Current Rust source name. It is not part of stable identity.",
-					"type": "string"
-				},
-				"versions": {
-					"items": {
-						"$ref": "#/$defs/SchemaVersion"
-					},
-					"type": "array"
-				}
-			},
-			"required": [
-				"identity",
-				"rustName",
-				"versions"
-			],
-			"type": "object"
-		},
-		"ContractIdentity": {
-			"additionalProperties": false,
-			"description": "Identity of a wire contract, independent of its Rust name.",
-			"properties": {
-				"discriminatorBytes": {
-					"description": "Width of the existing discriminator.",
-					"format": "uint8",
-					"maximum": 255,
-					"minimum": 0,
-					"type": "integer"
-				},
-				"discriminatorHex": {
-					"description": "Discriminator encoded little-endian using exactly `discriminator_bytes`.",
-					"type": "string"
-				},
-				"kind": {
-					"$ref": "#/$defs/ContractKind",
-					"description": "Contract namespace."
-				}
-			},
-			"required": [
-				"kind",
-				"discriminatorBytes",
-				"discriminatorHex"
-			],
-			"type": "object"
-		},
-		"ContractKind": {
-			"description": "Kind of versioned data contract.",
-			"oneOf": [
-				{
-					"const": "account",
-					"description": "Program-owned persisted account data.",
-					"type": "string"
-				},
-				{
-					"const": "instruction",
-					"description": "Data bytes sent to one stable instruction process.",
-					"type": "string"
-				},
-				{
-					"const": "event",
-					"description": "Immutable data emitted into transaction logs.",
-					"type": "string"
-				}
-			]
-		},
-		"DataCodec": {
-			"description": "Versioned byte codec whose invariants define a schema snapshot.",
-			"oneOf": [
-				{
-					"const": "pinaPodV2",
-					"description": "`PinaPod` 0.2 fixed and compact wire semantics.",
-					"type": "string"
-				}
-			]
-		},
-		"DataSchema": {
-			"additionalProperties": false,
-			"description": "Canonical source schema for one version.\n\nA version stores the facts a reader cannot recompute — the layout family, the\nfields in physical order, and the codec that defines their wire semantics.\nThe byte-level descriptor is derived on load rather than stored, so a\ndocument cannot disagree with its own derivation and a layout change is a\ndeliberate, visible version event instead of a silently reinterpreted cache.",
-			"properties": {
-				"codec": {
-					"$ref": "#/$defs/DataCodec",
-					"description": "Versioned codec used to validate and reconstruct these bytes."
-				},
-				"fields": {
-					"description": "User fields in physical declaration order. Framework envelope fields are omitted.",
-					"items": {
-						"$ref": "#/$defs/FieldSchema"
-					},
-					"type": "array"
-				},
-				"layout": {
-					"$ref": "#/$defs/LayoutKind",
-					"description": "Fixed or compact physical encoding."
-				}
-			},
-			"required": [
-				"layout",
-				"fields",
-				"codec"
-			],
-			"type": "object"
-		},
-		"FieldSchema": {
-			"additionalProperties": false,
-			"description": "One named ABI field.",
-			"properties": {
-				"name": {
-					"description": "Wire-significant field name used by automatic transition matching.",
-					"type": "string"
-				},
-				"rustType": {
-					"description": "Canonical closed-grammar type spelling.",
-					"type": "string"
-				}
-			},
-			"required": [
-				"name",
-				"rustType"
-			],
-			"type": "object"
-		},
-		"LayoutKind": {
-			"description": "Physical layout family used by a contract.",
-			"oneOf": [
-				{
-					"const": "fixed",
-					"description": "Fixed-size `PinaPod` layout.",
-					"type": "string"
-				},
-				{
-					"const": "compact",
-					"description": "Compact `PinaPod` account with a variable-length tail.",
-					"type": "string"
-				}
-			]
-		},
-		"MigrationAuto": {
-			"description": "Contract kinds enveloped without a per-item token, in stable order.",
-			"items": {
-				"type": "string"
-			},
-			"type": "array",
-			"uniqueItems": true
-		},
-		"MigrationVersionType": {
-			"description": "Program-wide integer encoding for every migration version envelope.",
-			"oneOf": [
-				{
-					"const": "u8",
-					"description": "One byte, supporting versions 0 through 255.",
-					"type": "string"
-				},
-				{
-					"const": "u16",
-					"description": "Two bytes, supporting versions 0 through 65,535.",
-					"type": "string"
-				},
-				{
-					"const": "u32",
-					"description": "Four bytes, supporting every `u32` version.",
-					"type": "string"
-				}
-			]
-		},
-		"ProcessAccount": {
-			"additionalProperties": false,
-			"description": "One positional account in an instruction process.\n\nOnly wire facts are recorded: the fields here decide whether old bytes and\nold account lists still parse. Declarative validation rules are program\nsemantics, not wire format, and live in the IDL that clients generate from;\nrecording them here made a validation-only change look like a wire break.",
-			"properties": {
-				"defaultValue": {
-					"description": "Known address emitted by generated clients, when one exists.",
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"name": {
-					"description": "Stable semantic slot name. Renaming a slot is currently breaking.",
-					"type": "string"
-				},
-				"optional": {
-					"description": "Whether an absent value is representable by this process.",
-					"type": "boolean"
-				},
-				"pda": {
-					"description": "Stable Pina PDA identity, when the slot is a generated PDA.",
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"signer": {
-					"description": "Signature expected by the current process.",
-					"type": "boolean"
-				},
-				"writable": {
-					"description": "Privilege expected by the current process.",
-					"type": "boolean"
-				}
-			},
-			"required": [
-				"name",
-				"writable",
-				"signer",
-				"optional"
-			],
-			"type": "object"
-		},
-		"ProcessContract": {
-			"additionalProperties": false,
-			"description": "Stable instruction account and authorization contract.",
-			"properties": {
-				"accounts": {
-					"description": "Positional account slots in transaction order.",
-					"items": {
-						"$ref": "#/$defs/ProcessAccount"
-					},
-					"type": "array"
-				}
-			},
-			"required": [
-				"accounts"
-			],
-			"type": "object"
-		},
-		"RenameMapping": {
-			"additionalProperties": false,
-			"description": "One field rename carried by an adjacent transition.",
-			"properties": {
-				"from": {
-					"description": "Field name in the source schema whose bytes move to `to`.",
-					"type": "string"
-				},
-				"to": {
-					"description": "Field name in the destination schema receiving those bytes.",
-					"type": "string"
-				}
-			},
-			"required": [
-				"from",
-				"to"
-			],
-			"type": "object"
-		},
-		"SchemaVersion": {
-			"additionalProperties": false,
-			"description": "One immutable schema version in a contract history.\n\nThe version number is this entry's position in the history, so it is not\nstored. Schema and process hashes are computed from the decoded content, so\nthey are not stored either; publication receipts compute their pins from the\nsame functions when a deployment is recorded.",
-			"properties": {
-				"process": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/ProcessContract"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"description": "Instruction account ABI for this version. Absent for accounts and events."
-				},
-				"schema": {
-					"$ref": "#/$defs/DataSchema"
-				},
-				"transition": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/Transition"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"description": "Absent only for version zero."
-				}
-			},
-			"required": [
-				"schema"
-			],
-			"type": "object"
-		},
-		"Transition": {
-			"additionalProperties": false,
-			"description": "Description of an adjacent schema conversion.\n\nA transition sits on version `index` and describes the step from `index - 1`.\nAdjacency, the neighbouring schema and process hashes, and the account-list\nproof are all derived on load rather than stored as a second copy of the\nsame invariant.",
-			"properties": {
-				"implementationSha256": {
-					"description": "Hash of generated or manual Rust once the version is published.",
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"mode": {
-					"$ref": "#/$defs/TransitionMode"
-				},
-				"renames": {
-					"description": "Disambiguated field renames answered through `pina migrations make`.\nRenames record source intent so repeated runs stay stable and the\ngenerated transition moves bytes instead of dropping them.",
-					"items": {
-						"$ref": "#/$defs/RenameMapping"
-					},
-					"type": "array"
-				}
-			},
-			"required": [
-				"mode"
-			],
-			"type": "object"
-		},
-		"TransitionMode": {
-			"description": "How a checked-in adjacent transition is implemented.",
-			"oneOf": [
-				{
-					"const": "automatic",
-					"description": "Pina proved and generated the complete conversion.",
-					"type": "string"
-				},
-				{
-					"const": "manual",
-					"description": "The developer owns the generated typed transition function body.",
-					"type": "string"
-				}
-			]
-		}
-	},
-	"$id": "https://pina-rs.github.io/pina/abi/schemas/0.20/manifest.schema.json",
-	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"additionalProperties": false,
-	"description": "Checked-in source of truth for every migration-aware data contract.",
-	"properties": {
-		"abiVersion": {
-			"description": "The ABI document version that wrote this manifest.",
-			"type": "string"
-		},
-		"auto": {
-			"$ref": "#/$defs/MigrationAuto",
-			"description": "Kinds whose declarations are enveloped without a per-item token."
-		},
-		"contracts": {
-			"additionalProperties": {
-				"$ref": "#/$defs/ContractHistory"
-			},
-			"type": "object"
-		},
-		"programId": {
-			"type": "string"
-		},
-		"versionType": {
-			"$ref": "#/$defs/MigrationVersionType"
-		}
-	},
-	"required": [
-		"abiVersion",
-		"programId",
-		"versionType",
-		"contracts"
-	],
-	"title": "MigrationManifest",
-	"type": "object"
+  "$defs": {
+    "ContractHistory": {
+      "additionalProperties": false,
+      "description": "Complete history for one discriminator identity.",
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/ContractIdentity"
+        },
+        "rustName": {
+          "description": "Current Rust source name. It is not part of stable identity.",
+          "type": "string"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/SchemaVersion"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "identity",
+        "rustName",
+        "versions"
+      ],
+      "type": "object"
+    },
+    "ContractIdentity": {
+      "additionalProperties": false,
+      "description": "Identity of a wire contract, independent of its Rust name.",
+      "properties": {
+        "discriminatorBytes": {
+          "description": "Width of the existing discriminator.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "discriminatorHex": {
+          "description": "Discriminator encoded little-endian using exactly `discriminator_bytes`.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ContractKind",
+          "description": "Contract namespace."
+        }
+      },
+      "required": [
+        "kind",
+        "discriminatorBytes",
+        "discriminatorHex"
+      ],
+      "type": "object"
+    },
+    "ContractKind": {
+      "description": "Kind of versioned data contract.",
+      "oneOf": [
+        {
+          "const": "account",
+          "description": "Program-owned persisted account data.",
+          "type": "string"
+        },
+        {
+          "const": "instruction",
+          "description": "Data bytes sent to one stable instruction process.",
+          "type": "string"
+        },
+        {
+          "const": "event",
+          "description": "Immutable data emitted into transaction logs.",
+          "type": "string"
+        }
+      ]
+    },
+    "DataCodec": {
+      "description": "Versioned byte codec whose invariants define a schema snapshot.",
+      "oneOf": [
+        {
+          "const": "pinaPodV2",
+          "description": "`PinaPod` 0.2 fixed and compact wire semantics.",
+          "type": "string"
+        }
+      ]
+    },
+    "DataSchema": {
+      "additionalProperties": false,
+      "description": "Canonical source schema for one version.\n\nA version stores the facts a reader cannot recompute — the layout family, the\nfields in physical order, and the codec that defines their wire semantics.\nThe byte-level descriptor is derived on load rather than stored, so a\ndocument cannot disagree with its own derivation and a layout change is a\ndeliberate, visible version event instead of a silently reinterpreted cache.",
+      "properties": {
+        "codec": {
+          "$ref": "#/$defs/DataCodec",
+          "description": "Versioned codec used to validate and reconstruct these bytes."
+        },
+        "fields": {
+          "description": "User fields in physical declaration order. Framework envelope fields are omitted.",
+          "items": {
+            "$ref": "#/$defs/FieldSchema"
+          },
+          "type": "array"
+        },
+        "layout": {
+          "$ref": "#/$defs/LayoutKind",
+          "description": "Fixed or compact physical encoding."
+        }
+      },
+      "required": [
+        "layout",
+        "fields",
+        "codec"
+      ],
+      "type": "object"
+    },
+    "FieldSchema": {
+      "additionalProperties": false,
+      "description": "One named ABI field.",
+      "properties": {
+        "name": {
+          "description": "Wire-significant field name used by automatic transition matching.",
+          "type": "string"
+        },
+        "rustType": {
+          "description": "Canonical closed-grammar type spelling.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "rustType"
+      ],
+      "type": "object"
+    },
+    "LayoutKind": {
+      "description": "Physical layout family used by a contract.",
+      "oneOf": [
+        {
+          "const": "fixed",
+          "description": "Fixed-size `PinaPod` layout.",
+          "type": "string"
+        },
+        {
+          "const": "compact",
+          "description": "Compact `PinaPod` account with a variable-length tail.",
+          "type": "string"
+        }
+      ]
+    },
+    "MigrationAuto": {
+      "description": "Contract kinds enveloped without a per-item token, in stable order.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "MigrationVersionType": {
+      "description": "Program-wide integer encoding for every migration version envelope.",
+      "oneOf": [
+        {
+          "const": "u8",
+          "description": "One byte, supporting versions 0 through 255.",
+          "type": "string"
+        },
+        {
+          "const": "u16",
+          "description": "Two bytes, supporting versions 0 through 65,535.",
+          "type": "string"
+        },
+        {
+          "const": "u32",
+          "description": "Four bytes, supporting every `u32` version.",
+          "type": "string"
+        }
+      ]
+    },
+    "ProcessAccount": {
+      "additionalProperties": false,
+      "description": "One positional account in an instruction process.\n\nOnly wire facts are recorded: the fields here decide whether old bytes and\nold account lists still parse. Declarative validation rules are program\nsemantics, not wire format, and live in the IDL that clients generate from;\nrecording them here made a validation-only change look like a wire break.",
+      "properties": {
+        "defaultValue": {
+          "description": "Known address emitted by generated clients, when one exists.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Stable semantic slot name. Renaming a slot is currently breaking.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "Whether an absent value is representable by this process.",
+          "type": "boolean"
+        },
+        "pda": {
+          "description": "Stable Pina PDA identity, when the slot is a generated PDA.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "signer": {
+          "description": "Signature expected by the current process.",
+          "type": "boolean"
+        },
+        "writable": {
+          "description": "Privilege expected by the current process.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "writable",
+        "signer",
+        "optional"
+      ],
+      "type": "object"
+    },
+    "ProcessContract": {
+      "additionalProperties": false,
+      "description": "Stable instruction account and authorization contract.",
+      "properties": {
+        "accounts": {
+          "description": "Positional account slots in transaction order.",
+          "items": {
+            "$ref": "#/$defs/ProcessAccount"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "accounts"
+      ],
+      "type": "object"
+    },
+    "RenameMapping": {
+      "additionalProperties": false,
+      "description": "One field rename carried by an adjacent transition.",
+      "properties": {
+        "from": {
+          "description": "Field name in the source schema whose bytes move to `to`.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Field name in the destination schema receiving those bytes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "additionalProperties": false,
+      "description": "One immutable schema version in a contract history.\n\nThe version number is this entry's position in the history, so it is not\nstored. Schema and process hashes are computed from the decoded content, so\nthey are not stored either; publication receipts compute their pins from the\nsame functions when a deployment is recorded.",
+      "properties": {
+        "process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessContract"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Instruction account ABI for this version. Absent for accounts and events."
+        },
+        "schema": {
+          "$ref": "#/$defs/DataSchema"
+        },
+        "transition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Absent only for version zero."
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "type": "object"
+    },
+    "Transition": {
+      "additionalProperties": false,
+      "description": "Description of an adjacent schema conversion.\n\nA transition sits on version `index` and describes the step from `index - 1`.\nAdjacency, the neighbouring schema and process hashes, and the account-list\nproof are all derived on load rather than stored as a second copy of the\nsame invariant.",
+      "properties": {
+        "implementationSha256": {
+          "description": "Hash of generated or manual Rust once the version is published.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/TransitionMode"
+        },
+        "renames": {
+          "description": "Disambiguated field renames answered through `pina migrations make`.\nRenames record source intent so repeated runs stay stable and the\ngenerated transition moves bytes instead of dropping them.",
+          "items": {
+            "$ref": "#/$defs/RenameMapping"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "TransitionMode": {
+      "description": "How a checked-in adjacent transition is implemented.",
+      "oneOf": [
+        {
+          "const": "automatic",
+          "description": "Pina proved and generated the complete conversion.",
+          "type": "string"
+        },
+        {
+          "const": "manual",
+          "description": "The developer owns the generated typed transition function body.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.20/manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Checked-in source of truth for every migration-aware data contract.",
+  "properties": {
+    "abiVersion": {
+      "description": "The ABI document version that wrote this manifest.",
+      "type": "string"
+    },
+    "auto": {
+      "$ref": "#/$defs/MigrationAuto",
+      "description": "Kinds whose declarations are enveloped without a per-item token."
+    },
+    "contracts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ContractHistory"
+      },
+      "type": "object"
+    },
+    "programId": {
+      "type": "string"
+    },
+    "versionType": {
+      "$ref": "#/$defs/MigrationVersionType"
+    }
+  },
+  "required": [
+    "abiVersion",
+    "programId",
+    "versionType",
+    "contracts"
+  ],
+  "title": "MigrationManifest",
+  "type": "object"
 }

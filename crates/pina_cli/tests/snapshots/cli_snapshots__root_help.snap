@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 165
 info:
   program: pina
   args:
@@ -21,6 +22,8 @@ Commands:
           Run Pina's official security lints against the current program
   migrations
           Create and verify checked-in ABI migrations
+  abi
+          Inspect the Pina ABI document contract
   generate
           Generate configured clients for the current Pina program
   cpi

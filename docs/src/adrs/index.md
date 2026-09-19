@@ -21,7 +21,7 @@ This section captures the durable architectural decisions behind Pina's public m
 | [ADR 0006](./0006-verification-layers-in-ci.md)          | Accepted | Treat CI as layered verification, not a single all-purpose test lane.                                                                             |
 | [ADR 0007](./0007-first-class-versioned-abi.md)          | Proposed | Make migrations a generated, on-demand, versioned ABI compatibility boundary.                                                                     |
 | [ADR 0008](./0008-migration-ux-and-legacy-adoption.md)   | Proposed | Reserve a migration instruction, add client migrate-first flow, and support adopting migrations on already-launched programs.                     |
-| [ADR 0009](./0009-abi-document-versioning.md)            | Proposed | Give `pina_abi` its own release line, pin a committed `abiVersion` to it, reset the document to stored facts, and publish generated JSON Schemas. |
+| [ADR 0009](./0009-abi-document-versioning.md)            | Accepted | Give `pina_abi` its own release line, pin a committed `abiVersion` to it, reset the document to stored facts, and publish generated JSON Schemas. |
 
 ## How to use this section
 
