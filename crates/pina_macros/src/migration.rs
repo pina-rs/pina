@@ -54,7 +54,9 @@ impl MigrationExpansion {
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
 		verify_source_schema(item, &source_schema, &current.schema)?;
 		verify_transition_files(item, program_dir, history)?;
-		let current_version = current.version;
+		let current_version = history
+			.current_version()
+			.ok_or_else(|| syn::Error::new_spanned(item, "migration history has no versions"))?;
 		let discriminator_bytes = history.identity.discriminator_bytes;
 		let discriminator_value = history
 			.identity
@@ -217,16 +219,19 @@ impl MigrationExpansion {
 			struct_name.to_string().to_snake_case(),
 			contract_label,
 		);
-		let transition_modules = versions.iter().skip(1).map(|version| {
-			let transition = version
+		let transition_modules = versions.iter().enumerate().skip(1).map(|(to, version)| {
+			version
 				.transition
 				.as_ref()
 				.expect("validated immutable history has adjacent transitions");
-			let name = format_ident!("v{}_to_v{}", transition.from, transition.to);
-			let relative =
-				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
-					.to_string_lossy()
-					.replace('\\', "/");
+			let from = to - 1;
+			let name = format_ident!("v{}_to_v{}", from, to);
+			// `transition_path` keys on the on-chain version numbers, which are
+			// `u32`; the enumeration index is a `usize`.
+			let (from, to) = (from as u32, to as u32);
+			let relative = pina_abi::transition_path(&self.history.identity, from, to)
+				.to_string_lossy()
+				.replace('\\', "/");
 			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
@@ -237,82 +242,84 @@ impl MigrationExpansion {
 		});
 		let historical_structs = versions
 			.iter()
+			.enumerate()
 			.take(versions.len().saturating_sub(1))
-			.map(|version| {
+			.map(|(number, version)| {
 				historical_struct(
 					crate_path,
 					struct_name,
 					version,
+					number as u32,
 					self.discriminator_bytes,
 					self.version_bytes(),
 					&syn::Visibility::Inherited,
 				)
 			})
 			.collect::<syn::Result<Vec<_>>>()?;
-		let migration_arms =
-			versions
-				.iter()
-				.take(versions.len().saturating_sub(1))
-				.map(|version| {
-					let number = version.version;
-					let source_type = historical_struct_name(struct_name, number);
-					if current - number > u32::from(MAX_INLINE_STEPS) {
-						return quote! {
-							#number => Err(#crate_path::PinaProgramError::MigrationRequired.into()),
-						};
-					}
-					let calls = ((number + 1)..=current).map(|to| {
-						let destination_version = &versions[to as usize];
-						let transition = destination_version
-							.transition
-							.as_ref()
-							.expect("validated history has adjacent transition");
-						let transition_name = format_ident!("v{}_to_v{}", to - 1, to);
-						let invoke = match transition.mode {
-							TransitionMode::Automatic => {
-								quote!(#module_name::#transition_name::migrate(workspace);)
-							}
-							TransitionMode::Manual => {
-								quote! {
-									if !#module_name::#transition_name::migrate(workspace) {
-										return Err(#crate_path::ProgramError::InvalidInstructionData);
-									}
+		let migration_arms = versions
+			.iter()
+			.enumerate()
+			.take(versions.len().saturating_sub(1))
+			.map(|(number, _version)| {
+				let number = number as u32;
+				let source_type = historical_struct_name(struct_name, number);
+				if current - number > u32::from(MAX_INLINE_STEPS) {
+					return quote! {
+						#number => Err(#crate_path::PinaProgramError::MigrationRequired.into()),
+					};
+				}
+				let calls = ((number + 1)..=current).map(|to| {
+					let destination_version = &versions[to as usize];
+					let transition = destination_version
+						.transition
+						.as_ref()
+						.expect("validated history has adjacent transition");
+					let transition_name = format_ident!("v{}_to_v{}", to - 1, to);
+					let invoke = match transition.mode {
+						TransitionMode::Automatic => {
+							quote!(#module_name::#transition_name::migrate(workspace);)
+						}
+						TransitionMode::Manual => {
+							quote! {
+								if !#module_name::#transition_name::migrate(workspace) {
+									return Err(#crate_path::ProgramError::InvalidInstructionData);
 								}
 							}
-						};
-						let destination_size = sizes[to as usize];
-						let validate = if to == current {
-							quote! {
-								<#struct_name as #crate_path::PinaPodFixed>::validate_exact(
-									&workspace[..#destination_size],
-								)
-								.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
-							}
-						} else {
-							let destination_type = historical_struct_name(struct_name, to);
-							quote! {
-								<#destination_type as #crate_path::PinaPodFixed>::validate_exact(
-									&workspace[..#destination_size],
-								)
-								.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
-							}
-						};
+						}
+					};
+					let destination_size = sizes[to as usize];
+					let validate = if to == current {
 						quote! {
-							#invoke
-							#validate
+							<#struct_name as #crate_path::PinaPodFixed>::validate_exact(
+								&workspace[..#destination_size],
+							)
+							.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
 						}
-					});
+					} else {
+						let destination_type = historical_struct_name(struct_name, to);
+						quote! {
+							<#destination_type as #crate_path::PinaPodFixed>::validate_exact(
+								&workspace[..#destination_size],
+							)
+							.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
+						}
+					};
 					quote! {
-						#number => {
-							<#source_type as #crate_path::PinaPodFixed>::validate_exact(data)
-								.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
-							workspace[..#working_size].fill(0);
-							workspace[..data.len()].copy_from_slice(data);
-							#(#calls)*
-							Ok(())
-						}
+						#invoke
+						#validate
 					}
 				});
+				quote! {
+					#number => {
+						<#source_type as #crate_path::PinaPodFixed>::validate_exact(data)
+							.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
+						workspace[..#working_size].fill(0);
+						workspace[..data.len()].copy_from_slice(data);
+						#(#calls)*
+						Ok(())
+					}
+				}
+			});
 		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
 		let (trait_name, migrate_method, validate_method, consumer_impl) = match contract {
 			ImmutableContract::Instruction => {
@@ -490,16 +497,19 @@ impl MigrationExpansion {
 			"__pina_{}_account_migrations",
 			struct_name.to_string().to_snake_case(),
 		);
-		let transition_modules = versions.iter().skip(1).map(|version| {
-			let transition = version
+		let transition_modules = versions.iter().enumerate().skip(1).map(|(to, version)| {
+			version
 				.transition
 				.as_ref()
 				.expect("automatic history has every adjacent transition");
-			let name = format_ident!("v{}_to_v{}", transition.from, transition.to);
-			let relative =
-				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
-					.to_string_lossy()
-					.replace('\\', "/");
+			let from = to - 1;
+			let name = format_ident!("v{}_to_v{}", from, to);
+			// `transition_path` keys on the on-chain version numbers, which are
+			// `u32`; the enumeration index is a `usize`.
+			let (from, to) = (from as u32, to as u32);
+			let relative = pina_abi::transition_path(&self.history.identity, from, to)
+				.to_string_lossy()
+				.replace('\\', "/");
 			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
@@ -510,12 +520,14 @@ impl MigrationExpansion {
 		});
 		let historical_structs = versions
 			.iter()
+			.enumerate()
 			.take(versions.len().saturating_sub(1))
-			.map(|version| {
+			.map(|(number, version)| {
 				historical_struct(
 					crate_path,
 					struct_name,
 					version,
+					number as u32,
 					self.discriminator_bytes,
 					self.version_bytes(),
 					visibility,
@@ -524,9 +536,10 @@ impl MigrationExpansion {
 			.collect::<syn::Result<Vec<_>>>()?;
 		let planner_arms = versions
 			.iter()
+			.enumerate()
 			.take(versions.len().saturating_sub(1))
-			.map(|version| {
-				let number = version.version;
+			.map(|(number, _version)| {
+				let number = number as u32;
 				let destination = number + 1;
 				let historical = historical_struct_name(struct_name, number);
 				let destination_size = sizes[destination as usize];
@@ -548,9 +561,10 @@ impl MigrationExpansion {
 			});
 		let apply_arms = versions
 			.iter()
+			.enumerate()
 			.take(versions.len().saturating_sub(1))
-			.map(|version| {
-				let number = version.version;
+			.map(|(number, _version)| {
+				let number = number as u32;
 				let transition_name = format_ident!("v{}_to_v{}", number, number + 1);
 				quote! {
 					#number => #module_name::#transition_name::migrate(destination),
@@ -558,10 +572,11 @@ impl MigrationExpansion {
 			});
 		let historical_validation_arms = versions
 			.iter()
+			.enumerate()
 			.skip(1)
 			.take(versions.len().saturating_sub(2))
-			.map(|version| {
-				let number = version.version;
+			.map(|(number, _version)| {
+				let number = number as u32;
 				let size = sizes[number as usize];
 				let historical = historical_struct_name(struct_name, number);
 				quote! {
@@ -678,8 +693,12 @@ impl MigrationExpansion {
 		let mut arms = Vec::with_capacity(versions.len());
 		let mut version_arms = Vec::with_capacity(versions.len());
 
-		for version in versions.iter().take(versions.len().saturating_sub(1)) {
-			let number = version.version;
+		for (number, version) in versions
+			.iter()
+			.take(versions.len().saturating_sub(1))
+			.enumerate()
+		{
+			let number = number as u32;
 			let variant = versioned_variant_name(number);
 			let historical = historical_struct_name(struct_name, number);
 			let (view, read) = match version.schema.layout {
@@ -816,16 +835,19 @@ impl MigrationExpansion {
 			"__pina_{}_account_migrations",
 			struct_name.to_string().to_snake_case(),
 		);
-		let transition_modules = versions.iter().skip(1).map(|version| {
-			let transition = version
+		let transition_modules = versions.iter().enumerate().skip(1).map(|(to, version)| {
+			version
 				.transition
 				.as_ref()
 				.expect("validated account history has adjacent transitions");
-			let name = format_ident!("v{}_to_v{}", transition.from, transition.to);
-			let relative =
-				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
-					.to_string_lossy()
-					.replace('\\', "/");
+			let from = to - 1;
+			let name = format_ident!("v{}_to_v{}", from, to);
+			// `transition_path` keys on the on-chain version numbers, which are
+			// `u32`; the enumeration index is a `usize`.
+			let (from, to) = (from as u32, to as u32);
+			let relative = pina_abi::transition_path(&self.history.identity, from, to)
+				.to_string_lossy()
+				.replace('\\', "/");
 			let include_path = format!("/{}{}", self.manifest_prefix, relative);
 
 			quote! {
@@ -836,12 +858,14 @@ impl MigrationExpansion {
 		});
 		let historical_structs = versions
 			.iter()
+			.enumerate()
 			.take(versions.len().saturating_sub(1))
-			.map(|version| {
+			.map(|(number, version)| {
 				historical_struct(
 					crate_path,
 					struct_name,
 					version,
+					number as u32,
 					self.discriminator_bytes,
 					self.version_bytes(),
 					visibility,
@@ -857,8 +881,8 @@ impl MigrationExpansion {
 			.enumerate()
 		{
 			let destination = &versions[index + 1];
-			let from = source.version;
-			let to = destination.version;
+			let from = index as u32;
+			let to = from + 1;
 			let source_type = historical_struct_name(struct_name, from);
 			let destination_type = (to != current).then(|| historical_struct_name(struct_name, to));
 			let transition_name = format_ident!("v{from}_to_v{to}");
@@ -947,8 +971,8 @@ impl MigrationExpansion {
 		}
 
 		let mut destination_validation_arms = Vec::with_capacity(versions.len().saturating_sub(1));
-		for version in versions.iter().skip(1) {
-			let number = version.version;
+		for (number, version) in versions.iter().enumerate().skip(1) {
+			let number = number as u32;
 			let validation = if number == current {
 				match version.schema.layout {
 					LayoutKind::Fixed => {
@@ -1397,20 +1421,18 @@ fn verify_transition_files(
 	program_dir: &std::path::Path,
 	history: &ContractHistory,
 ) -> syn::Result<()> {
-	for version in history.versions.iter().skip(1) {
+	for (number, version) in history.versions.iter().enumerate().skip(1) {
+		let number = number as u32;
 		let transition = version.transition.as_ref().ok_or_else(|| {
 			syn::Error::new_spanned(
 				item,
-				format!(
-					"migration version {} has no adjacent transition",
-					version.version
-				),
+				format!("migration version {number} has no adjacent transition"),
 			)
 		})?;
 		let path = program_dir.join(pina_abi::transition_path(
 			&history.identity,
-			transition.from,
-			transition.to,
+			number - 1,
+			number,
 		));
 		let bytes = std::fs::read(&path).map_err(|error| {
 			syn::Error::new_spanned(
@@ -1454,11 +1476,12 @@ fn historical_struct(
 	crate_path: &syn::Path,
 	struct_name: &syn::Ident,
 	version: &pina_abi::SchemaVersion,
+	number: u32,
 	discriminator_bytes: u8,
 	version_bytes: usize,
 	visibility: &syn::Visibility,
 ) -> syn::Result<proc_macro2::TokenStream> {
-	let name = historical_struct_name(struct_name, version.version);
+	let name = historical_struct_name(struct_name, number);
 	let discriminator_bytes = usize::from(discriminator_bytes);
 	// Account histories borrow the account's visibility so the generated
 	// versioned view can read their payload fields without widening the source
@@ -1479,14 +1502,12 @@ fn historical_struct(
 			Ok(quote!(#visibility #name: #ty))
 		})
 		.collect::<syn::Result<Vec<_>>>()?;
-	let (attribute, proof) = match version.schema.layout {
-		LayoutKind::Fixed => {
-			let PhysicalLayout::Fixed { size, .. } = &version.schema.physical else {
-				return Err(syn::Error::new_spanned(
-					struct_name,
-					"historical fixed schema has a non-fixed physical descriptor",
-				));
-			};
+	let physical = version
+		.schema
+		.physical()
+		.map_err(|error| syn::Error::new_spanned(struct_name, error))?;
+	let (attribute, proof) = match (version.schema.layout, &physical) {
+		(LayoutKind::Fixed, PhysicalLayout::Fixed { size, .. }) => {
 			let payload_size = usize::try_from(*size).map_err(|_| {
 				syn::Error::new_spanned(struct_name, "historical fixed schema exceeds usize")
 			})?;
@@ -1505,19 +1526,15 @@ fn historical_struct(
 				},
 			)
 		}
-		LayoutKind::Compact => {
-			let PhysicalLayout::Compact {
+		(
+			LayoutKind::Compact,
+			PhysicalLayout::Compact {
 				header_size,
 				maximum_size,
 				tail_alignment,
 				..
-			} = &version.schema.physical
-			else {
-				return Err(syn::Error::new_spanned(
-					struct_name,
-					"historical compact schema has a non-compact physical descriptor",
-				));
-			};
+			},
+		) => {
 			let envelope_size =
 				discriminator_bytes
 					.checked_add(version_bytes)
@@ -1553,6 +1570,12 @@ fn historical_struct(
 					};
 				},
 			)
+		}
+		_ => {
+			return Err(syn::Error::new_spanned(
+				struct_name,
+				"historical schema physical descriptor does not match its layout family",
+			));
 		}
 	};
 
@@ -1714,11 +1737,8 @@ mod tests {
 			identity,
 			rust_name: item.ident.to_string(),
 			versions: vec![SchemaVersion {
-				version: 0,
-				schema_sha256: schema.sha256(),
 				schema,
 				process: None,
-				process_sha256: None,
 				transition: None,
 			}],
 		};
@@ -1826,7 +1846,7 @@ mod tests {
 	}
 
 	fn encode(manifest: &MigrationManifest) -> Vec<u8> {
-		pina_abi::encode_manifest_for_format(manifest, pina_abi::MANIFEST_FORMAT_VERSION)
+		pina_abi::encode_manifest(manifest)
 			.unwrap_or_else(|error| panic!("encode manifest: {error}"))
 	}
 
@@ -1856,11 +1876,8 @@ mod tests {
 					identity,
 					rust_name: name.to_owned(),
 					versions: vec![SchemaVersion {
-						version: 0,
-						schema_sha256: schema.sha256(),
 						schema,
 						process: None,
-						process_sha256: None,
 						transition: None,
 					}],
 				},
@@ -1923,8 +1940,8 @@ mod tests {
 				.is_none()
 		);
 
-		// A future format is rejected before the typed model is read.
-		write_manifest(temp.path(), br#"{"formatVersion": 99}"#);
+		// A future document version is rejected before the typed model is read.
+		write_manifest(temp.path(), br#"{"abiVersion":"99.0"}"#);
 		let future = read_manifest_at(&item, temp.path()).expect_err("future formats must fail");
 		assert!(
 			future.to_string().contains("invalid migration manifest"),
@@ -2141,10 +2158,10 @@ mod tests {
 	#[test]
 	fn manifest_failing_validation_is_reported() {
 		let dir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		// A wrong format version fails `MigrationManifest::validate`.
+		// A document version this build cannot read fails validation.
 		write_manifest(
 			dir.path(),
-			br#"{"formatVersion":0,"programId":"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS","versionType":"u8","contracts":{}}"#,
+			br#"{"abiVersion":"99.0","programId":"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS","versionType":"u8","contracts":{}}"#,
 		);
 
 		let error = verify_ladder(
