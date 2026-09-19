@@ -1,6 +1,9 @@
 [package]
 name = "pina_abi"
-version = { workspace = true }
+# Deliberately literal rather than `{ workspace = true }`. This crate owns its
+# own release group so the version recorded in `ABI_VERSION` can track it
+# without moving on every `core` release.
+version = "0.20.0"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -13,6 +16,8 @@ description = "Canonical ABI history model shared by Pina migration tooling and 
 [dependencies]
 proc-macro2 = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
+schemars = { workspace = true, default-features = true, features = ["derive"] }
+semver = { workspace = true, default-features = true }
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
 sha2 = { workspace = true, default-features = true }
