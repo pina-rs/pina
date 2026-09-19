@@ -1,0 +1,2785 @@
+{
+	"schema_version": "0.6",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-19T14:05:08Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.20.0",
+		"pina_root": "0.0.10"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.20.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.20.0",
+			"members": [
+				"pina",
+				"pina_abi",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.10",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.10",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_abi",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_abi/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_abi",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.20.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/align-advisory-gates.md",
+		".changeset/checked-discriminator-write.md",
+		".changeset/codama-nodes-contract-test.md",
+		".changeset/const-capacities.md",
+		".changeset/driver-spawn-retries-on-busy.md",
+		".changeset/drop-bytemuck-default-features.md",
+		".changeset/escrow-empty-offer-and-maker-writable.md",
+		".changeset/event-record-stack-budget.md",
+		".changeset/lint-driver-download-integrity.md",
+		".changeset/lockfile-and-tooling-hygiene.md",
+		".changeset/migrate-trigger-matches-discriminator-width.md",
+		".changeset/pda-qualified-address.md",
+		".changeset/pda-seed-count-cap.md",
+		".changeset/rename-stored-bump-pda-loader.md",
+		".changeset/sanitize-idl-names-in-docs.md",
+		".changeset/security-disclosure-channel.md",
+		".changeset/validate-cargo-library-name.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/align-advisory-gates.md",
+			"summary": "Align the advisory gates on deny.toml",
+			"details": "`security:deny` ran `cargo-deny check bans licenses sources`, so the `[advisories]` section of `deny.toml` — and the four suppressions it documented — never executed. The task now runs the advisories check with `--workspace`, because cargo-deny's default graph roots at the workspace members' normal dependencies and therefore omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime) where every suppressed advisory actually lives. Without `--workspace` the check cannot see them at all.\n\n`security:audit` carried a second, different seven-id ignore list. `deny.toml` is now the single source of advisory policy: the task reads the `[advisories] ignore` array out of `deny.toml` and passes each id to `cargo-audit`, so the two gates cannot drift. Every suppression in that array carries a reachability justification and a review date, and each needs a tracking issue filed on the repository — the entries are all dev/test-only today, verified with `cargo tree -i <spec> -p pina -p pina_abi -p pina_macros -p pina_cli` and the `--workspace` cargo-deny run, but a file cannot open issues on its own.\n\nThe `[advisories]` section also needed the `RUSTSEC-2021-0139`, `RUSTSEC-2024-0375`, `RUSTSEC-2024-0384`, `RUSTSEC-2020-0016`, `RUSTSEC-2025-0134`, and `RUSTSEC-2026-0173` entries that only the old cargo-audit list had, so moving advisories into the deny gate does not weaken it.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/checked-discriminator-write.md",
+			"summary": "Add a checked discriminator write",
+			"details": "`IntoDiscriminator::write_discriminator` returns `()` and drops the write when the destination slice is shorter than the discriminator: a `debug_assert!` fires in debug builds, but a release build silently leaves the buffer untouched. Generated code always sizes its buffers from `Self::BYTES`, so this only bit hand-written implementations, where a missing discriminator produces an account that looks initialized but decodes as an unknown type.\n\nThe new `IntoDiscriminator::try_write_discriminator` reports the undersized buffer with `PinaProgramError::DataTooShort` (0xFFFF_FFFA, \"Account or instruction data is shorter than the expected minimum\") instead. That is the variant `HasMigrationVersion::write_le` and the migration decoders already return for a destination that cannot hold the value, so a caller sees one error for every short-buffer case.\n\nThe method has a default implementation that length-checks and then delegates to `write_discriminator`, so a manual implementer inherits the checked path without writing anything; the primitive implementations (`u8`, `u16`, `u32`, `u64`) and `into_discriminator!` override it to write through `get_mut` in one step. `write_discriminator` is unchanged, and its doc comment now points new manual implementers at the checked form.\n\nTests cover short buffers of every length up to `BYTES` (including a short inner slice of a long array), exact and oversized buffers, and that the checked write produces the same bytes as the unchecked one.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/codama-nodes-contract-test.md",
+			"summary": "Pin the client contract test to the released surfaces",
+			"details": "The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note.",
+			"targets": [
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/const-capacities.md",
+			"summary": "Accept const capacities in schemas",
+			"details": "Compact account and instruction schemas now accept a `const` item wherever they previously required an integer literal:\n\n```rust\nconst MAX_MEMBERS: usize = 24;\n\n#[account(discriminator = MultisigAccountType, compact)]\npub struct Multisig {\n\tpub bump: u8,\n\tpub member_keys: Vec<Address, MAX_MEMBERS>,\n}\n```\n\n`Vec<T, N>`, `PodVec<T, N, PFX>`, `String<N>`, `PodString<N, PFX>`, an `Option<...>` around them, and fixed `[T; N]` arrays and instruction arguments all resolve a capacity through a constant. Constants may be arithmetic over other constants and may be declared in any module of the crate, so one bound is declared once and reused in the account, the instruction that writes it, and the helper that sizes it.\n\nPina resolves each capacity during expansion and records the number it evaluates to. The ABI layer still receives concrete values, so replacing a literal with a constant of the same value leaves `migrations/manifest.json`, the generated `tests/abi_layout.rs` assertions, `MAX_SIZE`/`MIN_SIZE`/`HEADER_SIZE`, and `projected_bytes(...)` byte-identical, and `pina migrations check` and the Codama IDL unchanged.\n\nA capacity that cannot be evaluated at expansion time now fails the build with a diagnostic naming the expression and pointing at the workaround, instead of the previous `unsupported compact field` or `arrays require an integer literal length` message. An associated constant such as `Bounds::MAX_MEMBERS` is not resolved; declare the bound as a `const` item.\n\n`pina_abi` gains `SchemaConsts`, the shared evaluator both the macros and the CLI use so the two layers agree on what a constant means. `pina_cli` resolves capacities while it parses a program, so migration and IDL tooling reads the same numbers the compiler does.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_abi",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b1aaa533e5deb9bb512e0394dcf5d39b170d92c4",
+						"short_sha": "b1aaa53",
+						"url": "https://github.com/pina-rs/pina/commit/b1aaa533e5deb9bb512e0394dcf5d39b170d92c4",
+						"authored_at": "2026-09-19T14:55:03+01:00",
+						"committed_at": "2026-09-19T14:55:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#463",
+						"title": "feat(schemas): accept const capacities in account and instruction schemas",
+						"url": "https://github.com/pina-rs/pina/pull/463",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b1aaa533e5deb9bb512e0394dcf5d39b170d92c4",
+						"short_sha": "b1aaa53",
+						"url": "https://github.com/pina-rs/pina/commit/b1aaa533e5deb9bb512e0394dcf5d39b170d92c4",
+						"authored_at": "2026-09-19T14:55:03+01:00",
+						"committed_at": "2026-09-19T14:55:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#463",
+						"title": "feat(schemas): accept const capacities in account and instruction schemas",
+						"url": "https://github.com/pina-rs/pina/pull/463",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#460",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/460",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/driver-spawn-retries-on-busy.md",
+			"summary": "Retry the lint driver probe while the kernel reports it busy",
+			"details": "`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.\n\n`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "97908338f3733197db9b394fce93545a1cf49322",
+						"short_sha": "9790833",
+						"url": "https://github.com/pina-rs/pina/commit/97908338f3733197db9b394fce93545a1cf49322",
+						"authored_at": "2026-09-19T14:52:25+01:00",
+						"committed_at": "2026-09-19T14:52:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#461",
+						"title": "fix: repair the post-merge program e2e suites and the driver spawn race",
+						"url": "https://github.com/pina-rs/pina/pull/461",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "97908338f3733197db9b394fce93545a1cf49322",
+						"short_sha": "9790833",
+						"url": "https://github.com/pina-rs/pina/commit/97908338f3733197db9b394fce93545a1cf49322",
+						"authored_at": "2026-09-19T14:52:25+01:00",
+						"committed_at": "2026-09-19T14:52:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#461",
+						"title": "fix: repair the post-merge program e2e suites and the driver spawn race",
+						"url": "https://github.com/pina-rs/pina/pull/461",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#457",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/457",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/drop-bytemuck-default-features.md",
+			"summary": "Stop enabling `bytemuck` on `solana-address`/`solana-pubkey`",
+			"details": "The workspace requested `solana-address/bytemuck` and `solana-pubkey/bytemuck`. Pina used `bytemuck` for its own pod primitives until the migration to `pinapod`, so nothing in the workspace reads the `Pod` or `Zeroable` derives those features add, and no first-party code calls a `bytemuck` API.\n\nBoth entries now request what Pina actually depends on. `solana-address` asks for `copy`, which derives `Copy` on `Address` — the bound `pinapod`'s `ZcElem` requires and the only part of `bytemuck`'s feature set that was load-bearing. Requesting it directly removes the dependence on `bytemuck`'s implication, and on `pinocchio` and `pinapod` enabling `copy` transitively. `solana-pubkey` no longer requests `bytemuck` at all.\n\nDeployable programs are unchanged: `bytemuck` contributed no symbols to any built program, so all 24 `bpf-entrypoint` examples produce byte-identical sizes and an identical instruction mix with and without it. This is a dependency-graph cleanup, not a size or compute-unit change.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "36c1a113a2baa3f2001bc5721046d3ee9f5c8c73",
+						"short_sha": "36c1a11",
+						"url": "https://github.com/pina-rs/pina/commit/36c1a113a2baa3f2001bc5721046d3ee9f5c8c73",
+						"authored_at": "2026-09-19T13:28:49+01:00",
+						"committed_at": "2026-09-19T13:28:49+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#464",
+						"title": "chore(deps): stop enabling bytemuck on solana-address/solana-pubkey",
+						"url": "https://github.com/pina-rs/pina/pull/464",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "36c1a113a2baa3f2001bc5721046d3ee9f5c8c73",
+						"short_sha": "36c1a11",
+						"url": "https://github.com/pina-rs/pina/commit/36c1a113a2baa3f2001bc5721046d3ee9f5c8c73",
+						"authored_at": "2026-09-19T13:28:49+01:00",
+						"committed_at": "2026-09-19T13:28:49+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#464",
+						"title": "chore(deps): stop enabling bytemuck on solana-address/solana-pubkey",
+						"url": "https://github.com/pina-rs/pina/pull/464",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/escrow-empty-offer-and-maker-writable.md",
+			"summary": "Reject empty escrow offers and prove the maker is writable",
+			"details": "`escrow_program`'s `Make` handler now rejects an offer whose `amount_a` or `amount_b` is zero with a new `EscrowError::EmptyOffer` (code 2), before any account is created or any token moves. A zero `amount_b` let a maker escrow token A for nothing, and a zero `amount_a` let a taker receive the vault for nothing; both are fat-finger shapes rather than real offers. The variant is new rather than a reuse of `OfferKeyMismatch` or `TokenAccountMismatch`, because wire values are part of the program ABI and remapping an existing code would change what deployed clients decode. The doc comment on the variant becomes the message in the regenerated Codama IDL and the Rust, JavaScript, and Dart clients.\n\n`Take` now asserts the maker is writable next to the existing address check, so a read-only maker fails with Pina's own `InvalidAccountData` diagnostic instead of a generic runtime failure from the vault or escrow close CPIs. The `&mut AccountView` field already enforced this at parse time, so the assert is defense in depth: the test passes with it removed. It costs 16 CU on `Take` (32,241 to 32,257), which is the price of keeping the requirement visible in the handler, and the maker is credited twice there (vault rent and escrow rent).\n\nTwo Surfpool cases cover the behavior: one asserts `EmptyOffer` and that no balance moves and no account is created, and one presents a read-only maker through a non-payer keypair and asserts the failure plus unchanged escrow, vault, and taker balances.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/event-record-stack-budget.md",
+			"summary": "Reject event schemas that cannot fit the SBF stack",
+			"details": "The generated `emit` function materializes a whole event record in one stack frame (`let mut record = [0u8; Self::SIZE];`) before calling into the runtime, so a large `#[event]` schema compiled cleanly and then exhausted the 4 KiB SBF stack at runtime — a self-inflicted denial of service with no compile-time signal.\n\n`pina` gains `MAX_EVENT_RECORD_BYTES`, set to `4096 - 512`. The 512-byte reserve is headroom for the callee frame and the caller's own frame, the same reasoning `MAX_MIGRATION_WORKSPACE` already applies to the historical-normalization workspace. Because the constant is public, the bound a caller can read is the bound the macro enforces.\n\n`pina_macros` emits a compile-time assertion in every `#[event]` expansion, so an oversized schema now fails the build with a message naming the struct and the remedy. A record exactly at the bound still compiles; the assertion is inclusive.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/lint-driver-download-integrity.md",
+			"summary": "Verify the lint driver download before installing it",
+			"details": "`pina lint` fetches a prebuilt driver binary, marks it executable, and runs it as its version probe. The download trusted the transport alone: no checksum was verified, the response body was read without a size bound, and the origin could be redirected through `PINA_LINT_DRIVER_*` environment variables.\n\nThe download path now fetches the `sha256` published beside the asset, compares it against the bytes received, and refuses to install on mismatch, a malformed checksum, or a checksum file that is not valid UTF-8. A new `VerifiedDriver` type wraps the bytes so only a checksum-verified download can reach the installer — a future edit cannot silently reintroduce an unverified path, because the compiler rejects it. The body read is capped at 256 MiB, and the release workflow now uploads the standalone driver's `.sha256` beside the binary, which it previously did not (only the archives carried published checksums).\n\nA locally built driver (`pina lint --build-driver`) keeps its existing trust root — a cargo build against the pinned `pina_lints` release — and installs through a separate function, since no published checksum exists for an artifact built on the local machine.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/lockfile-and-tooling-hygiene.md",
+			"summary": "Fix the IDL size message and sanitize doc topics",
+			"details": "`pina idl fetch` rejected raw client output above 8 MiB but reported the limit as \"4 MiB\". The check and the message now share one constant, `MAX_RAW_HEX_BYTES`, so the two cannot drift again, and the message states the true 8 MiB limit.\n\n`pina docs <topic>` joined the caller-supplied topic directly into `<PINA_TEMPLATES_DIR>/<topic>.t.md`, so a topic such as `../../etc/passwd` escaped the template directory. Only the file-name component of the topic is now used, and a topic with no file-name component fails with a clear error.\n\nThe unused `tar` dependency is gone from `pina_cli` and the workspace dependency table; nothing in the crate referenced it, and the only other lockfile consumer is `agave-snapshots`, which declares it directly.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/migrate-trigger-matches-discriminator-width.md",
+			"summary": "Match the Migrate trigger to the discriminator width",
+			"details": "`#[discriminator]` reserves the all-ones value of the enum's own primitive, so a `u16` program reserves `0xffff` and a `u32` program reserves `0xffff_ffff`. The generated entrypoint guarded the reserved path with `is_migrate_instruction`, which only tests one byte, so for any program whose instruction enum used `primitive = u16`, `u32`, or `u64` the reserved discriminator never matched and `process_migrate` was unreachable.\n\n`pina` adds width-specific helpers alongside the existing one: `is_migrate_instruction_u16`, `is_migrate_instruction_u32`, and `is_migrate_instruction_u64`. Each matches only its own width, so a one-byte `0xff` is not a two-byte `0xffff` and neither prefix-matches the other. They compare the decoded little-endian value rather than a slice equality, keeping the inline comparison the one-byte helper already had instead of the `memcmp` call `data == CONSTANT.to_le_bytes()` would emit on SBF.\n\n`pina_macros` selects the helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` on a wider discriminator now reaches the reserved path. The generated guard for a default `u8` program is byte-identical to before, so the common case takes no compute regression. The documentation on the reserved-discriminator constants and in `docs/src/migrations/flow.md` now names the width pairing.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pda-qualified-address.md",
+			"summary": "Qualify every `Address` in generated PDA code",
+			"details": "`#[pda]` emitted its generated `Address` types unqualified: the `program_id` parameter of `try_find_pda`, `find_pda`, and `assert_seeds`, and the seed parameter and stored field types of the generated seeds struct. Those spellings resolve against the user's own scope, so a program with its own type named `Address` could silently change which address type a generated signature takes. Every generated `Address` is now the crate-qualified form, matching what the surrounding generated code and the `#[account]` schema path already emitted.\n\nThe expansion also emits the same identity proof the schema path uses — `const _: fn(Address) -> pina::Address = |value| value;` — but only when a declaration actually has an `Address` seed, so a numeric-only `#[pda]` never requires `Address` in scope. The proof binds the caller's bare `Address` spelling to the crate's type, so a future unqualified spelling is a compile error in the user's crate rather than a silent shadow.",
+			"targets": [
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pda-seed-count-cap.md",
+			"summary": "Reject PDA declarations that cannot derive",
+			"details": "Every generated `#[pda]` derivation appends a bump seed: `try_find_pda` and `find_pda` search for the canonical one, `with_bump` supplies the stored or explicit one, and the generated loaders derive from the stored field. The runtime caps a derivation at 16 seeds total, so a declaration of 16 seeds produced 17 and no instruction could ever load the account.\n\nThe macro now caps the declared list at 15 seeds and names both numbers in the error. The cap applies whether or not the declaration has a `bump =` field, because the bump-free variant derives through `try_find_pda` and appends a bump there. A declaration that previously compiled with 16 seeds was already unreachable at runtime; it now fails the build instead of shipping a PDA that always returns `InvalidSeeds`.",
+			"targets": [
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/rename-stored-bump-pda-loader.md",
+			"summary": "Name the stored-bump compact PDA loader for what it verifies",
+			"details": "The release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.\n\nThe weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.\n\n`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.",
+			"targets": [
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/sanitize-idl-names-in-docs.md",
+			"summary": "Keep untrusted IDL names inside generated doc comments",
+			"details": "`CamelCaseString` derives `Deserialize` on its inner `String`, so the normalization its constructor applies never runs for JSON input: a name read from an IDL reaches the renderer verbatim, newlines included. Two sites interpolated such a name straight into a single-line `///` comment — the CPI account line in `render_account` and the argument line in `render_argument` — so everything after an embedded newline was emitted as uncommented Rust. A crafted IDL handed to `pina cpi --idl` produced a generated crate containing attacker-chosen items, which then compile (and execute under `#[cfg(test)]`) in the victim's workspace.\n\nBoth sites now route through `render_doc`, which splits on newlines and prefixes every line as a comment, so an embedded newline becomes another comment line instead of code. `pina_cpi_renderer` gains a regression test that deserializes a malicious IDL through the same `read_root_node` path `pina cpi` uses, asserts the newline survives parsing (so the test keeps exercising the real path), and fails if any payload line escapes its comment.",
+			"targets": [
+				{
+					"id": "pina_cpi_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/security-disclosure-channel.md",
+			"summary": "Lead with GitHub private vulnerability reporting",
+			"details": "`SECURITY.md` documented a personal Gmail address as the only private channel for reporting a vulnerability. It now leads with GitHub's private advisory form at <https://github.com/pina-rs/pina/security/advisories/new>, which opens a draft advisory visible only to the reporter and the maintainers, keeps the reproduction and the fix attached to the repository, and lets the fix ship before the advisory is published. The email stays as the fallback for reporters who cannot use the form, and the \"do not open a public GitHub issue\" instruction, the acknowledgement and disclosure process, the supported-versions table, and the pre-1.0 and unaudited framing are unchanged.",
+			"targets": [
+				{
+					"id": "pina_root",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/validate-cargo-library-name.md",
+			"summary": "Reject Cargo library names that cannot be path components",
+			"details": "Cargo accepts any string as a `[lib] name` and reports it verbatim through `cargo metadata`, so a checked-in manifest controls the value. Pina joined that name into file and directory paths (`target/deploy`, generated IDL files, client crate directories) without validating it, so `[lib] name = \"../../escaped\"` made `pina generate` write outside the project root — reproduced with an artifact landing next to the project directory while the command reported success.\n\n`Project::discover` now validates the library name once, where it enters the project model, and rejects anything outside `[A-Za-z0-9_-]` with the new `ProjectError::InvalidLibraryName`. Cargo already refuses the empty name before metadata reaches pina. Validating at the ingestion point keeps every current and future path join safe instead of patching individual sinks, and no legitimate library name is affected because Cargo's own naming rules are a subset of the accepted set.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"short_sha": "b90be75",
+						"url": "https://github.com/pina-rs/pina/commit/b90be754a53dae43a9cd00754da9a97f49e85a19",
+						"authored_at": "2026-09-19T04:37:17+01:00",
+						"committed_at": "2026-09-19T04:37:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#457",
+						"title": "fix!: remediate the 2026-09-18 deep-audit findings",
+						"url": "https://github.com/pina-rs/pina/pull/457",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#442",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/442",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#448",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/448",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#456",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/456",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.20.0](https://github.com/pina-rs/pina/releases/tag/v0.20.0) (2026-09-19)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Name the stored-bump compact PDA loader for what it verifies\n\n_Packages:_ _pina_, _pina_macros_\n\nThe release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.\n\nThe weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.\n\n`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add a checked discriminator write\n\n_Packages:_ _pina_\n\n`IntoDiscriminator::write_discriminator` returns `()` and drops the write when the destination slice is shorter than the discriminator: a `debug_assert!` fires in debug builds, but a release build silently leaves the buffer untouched. Generated code always sizes its buffers from `Self::BYTES`, so this only bit hand-written implementations, where a missing discriminator produces an account that looks initialized but decodes as an unknown type.\n\nThe new `IntoDiscriminator::try_write_discriminator` reports the undersized buffer with `PinaProgramError::DataTooShort` (0xFFFF_FFFA, \"Account or instruction data is shorter than the expected minimum\") instead. That is the variant `HasMigrationVersion::write_le` and the migration decoders already return for a destination that cannot hold the value, so a caller sees one error for every short-buffer case.\n\nThe method has a default implementation that length-checks and then delegates to `write_discriminator`, so a manual implementer inherits the checked path without writing anything; the primitive implementations (`u8`, `u16`, `u32`, `u64`) and `into_discriminator!` override it to write through `get_mut` in one step. `write_discriminator` is unchanged, and its doc comment now points new manual implementers at the checked form.\n\nTests cover short buffers of every length up to `BYTES` (including a short inner slice of a long array), exact and oversized buffers, and that the checked write produces the same bytes as the unchecked one.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Accept const capacities in schemas\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nCompact account and instruction schemas now accept a `const` item wherever they previously required an integer literal:\n\n```rust\nconst MAX_MEMBERS: usize = 24;\n\n#[account(discriminator = MultisigAccountType, compact)]\npub struct Multisig {\n\tpub bump: u8,\n\tpub member_keys: Vec<Address, MAX_MEMBERS>,\n}\n```\n\n`Vec<T, N>`, `PodVec<T, N, PFX>`, `String<N>`, `PodString<N, PFX>`, an `Option<...>` around them, and fixed `[T; N]` arrays and instruction arguments all resolve a capacity through a constant. Constants may be arithmetic over other constants and may be declared in any module of the crate, so one bound is declared once and reused in the account, the instruction that writes it, and the helper that sizes it.\n\nPina resolves each capacity during expansion and records the number it evaluates to. The ABI layer still receives concrete values, so replacing a literal with a constant of the same value leaves `migrations/manifest.json`, the generated `tests/abi_layout.rs` assertions, `MAX_SIZE`/`MIN_SIZE`/`HEADER_SIZE`, and `projected_bytes(...)` byte-identical, and `pina migrations check` and the Codama IDL unchanged.\n\nA capacity that cannot be evaluated at expansion time now fails the build with a diagnostic naming the expression and pointing at the workaround, instead of the previous `unsupported compact field` or `arrays require an integer literal length` message. An associated constant such as `Bounds::MAX_MEMBERS` is not resolved; declare the bound as a `const` item.\n\n`pina_abi` gains `SchemaConsts`, the shared evaluator both the macros and the CLI use so the two layers agree on what a constant means. `pina_cli` resolves capacities while it parses a program, so migration and IDL tooling reads the same numbers the compiler does.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #463](https://github.com/pina-rs/pina/pull/463) · _Closed issues:_ [#460](https://github.com/pina-rs/pina/issues/460)",
+							"#### Reject event schemas that cannot fit the SBF stack\n\n_Packages:_ _pina_, _pina_macros_\n\nThe generated `emit` function materializes a whole event record in one stack frame (`let mut record = [0u8; Self::SIZE];`) before calling into the runtime, so a large `#[event]` schema compiled cleanly and then exhausted the 4 KiB SBF stack at runtime — a self-inflicted denial of service with no compile-time signal.\n\n`pina` gains `MAX_EVENT_RECORD_BYTES`, set to `4096 - 512`. The 512-byte reserve is headroom for the callee frame and the caller's own frame, the same reasoning `MAX_MIGRATION_WORKSPACE` already applies to the historical-normalization workspace. Because the constant is public, the bound a caller can read is the bound the macro enforces.\n\n`pina_macros` emits a compile-time assertion in every `#[event]` expansion, so an oversized schema now fails the build with a message naming the struct and the remedy. A record exactly at the bound still compiles; the assertion is inclusive.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Match the Migrate trigger to the discriminator width\n\n_Packages:_ _pina_, _pina_macros_\n\n`#[discriminator]` reserves the all-ones value of the enum's own primitive, so a `u16` program reserves `0xffff` and a `u32` program reserves `0xffff_ffff`. The generated entrypoint guarded the reserved path with `is_migrate_instruction`, which only tests one byte, so for any program whose instruction enum used `primitive = u16`, `u32`, or `u64` the reserved discriminator never matched and `process_migrate` was unreachable.\n\n`pina` adds width-specific helpers alongside the existing one: `is_migrate_instruction_u16`, `is_migrate_instruction_u32`, and `is_migrate_instruction_u64`. Each matches only its own width, so a one-byte `0xff` is not a two-byte `0xffff` and neither prefix-matches the other. They compare the decoded little-endian value rather than a slice equality, keeping the inline comparison the one-byte helper already had instead of the `memcmp` call `data == CONSTANT.to_le_bytes()` would emit on SBF.\n\n`pina_macros` selects the helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` on a wider discriminator now reaches the reserved path. The generated guard for a default `u8` program is byte-identical to before, so the common case takes no compute regression. The documentation on the reserved-discriminator constants and in `docs/src/migrations/flow.md` now names the width pairing.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Name the stored-bump compact PDA loader for what it verifies\n\n_Packages:_ _pina_cli_\n\nThe release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.\n\nThe weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.\n\n`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Stop enabling `bytemuck` on `solana-address`/`solana-pubkey`\n\n_Packages:_ _pina_\n\nThe workspace requested `solana-address/bytemuck` and `solana-pubkey/bytemuck`. Pina used `bytemuck` for its own pod primitives until the migration to `pinapod`, so nothing in the workspace reads the `Pod` or `Zeroable` derives those features add, and no first-party code calls a `bytemuck` API.\n\nBoth entries now request what Pina actually depends on. `solana-address` asks for `copy`, which derives `Copy` on `Address` — the bound `pinapod`'s `ZcElem` requires and the only part of `bytemuck`'s feature set that was load-bearing. Requesting it directly removes the dependence on `bytemuck`'s implication, and on `pinocchio` and `pinapod` enabling `copy` transitively. `solana-pubkey` no longer requests `bytemuck` at all.\n\nDeployable programs are unchanged: `bytemuck` contributed no symbols to any built program, so all 24 `bpf-entrypoint` examples produce byte-identical sizes and an identical instruction mix with and without it. This is a dependency-graph cleanup, not a size or compute-unit change.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #464](https://github.com/pina-rs/pina/pull/464)",
+							"#### Retry the lint driver probe while the kernel reports it busy\n\n_Packages:_ _pina_cli_\n\n`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.\n\n`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)",
+							"#### Verify the lint driver download before installing it\n\n_Packages:_ _pina_cli_\n\n`pina lint` fetches a prebuilt driver binary, marks it executable, and runs it as its version probe. The download trusted the transport alone: no checksum was verified, the response body was read without a size bound, and the origin could be redirected through `PINA_LINT_DRIVER_*` environment variables.\n\nThe download path now fetches the `sha256` published beside the asset, compares it against the bytes received, and refuses to install on mismatch, a malformed checksum, or a checksum file that is not valid UTF-8. A new `VerifiedDriver` type wraps the bytes so only a checksum-verified download can reach the installer — a future edit cannot silently reintroduce an unverified path, because the compiler rejects it. The body read is capped at 256 MiB, and the release workflow now uploads the standalone driver's `.sha256` beside the binary, which it previously did not (only the archives carried published checksums).\n\nA locally built driver (`pina lint --build-driver`) keeps its existing trust root — a cargo build against the pinned `pina_lints` release — and installs through a separate function, since no published checksum exists for an artifact built on the local machine.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Fix the IDL size message and sanitize doc topics\n\n_Packages:_ _pina_cli_\n\n`pina idl fetch` rejected raw client output above 8 MiB but reported the limit as \"4 MiB\". The check and the message now share one constant, `MAX_RAW_HEX_BYTES`, so the two cannot drift again, and the message states the true 8 MiB limit.\n\n`pina docs <topic>` joined the caller-supplied topic directly into `<PINA_TEMPLATES_DIR>/<topic>.t.md`, so a topic such as `../../etc/passwd` escaped the template directory. Only the file-name component of the topic is now used, and a topic with no file-name component fails with a clear error.\n\nThe unused `tar` dependency is gone from `pina_cli` and the workspace dependency table; nothing in the crate referenced it, and the only other lockfile consumer is `agave-snapshots`, which declares it directly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Reject Cargo library names that cannot be path components\n\n_Packages:_ _pina_cli_\n\nCargo accepts any string as a `[lib] name` and reports it verbatim through `cargo metadata`, so a checked-in manifest controls the value. Pina joined that name into file and directory paths (`target/deploy`, generated IDL files, client crate directories) without validating it, so `[lib] name = \"../../escaped\"` made `pina generate` write outside the project root — reproduced with an artifact landing next to the project directory while the command reported success.\n\n`Project::discover` now validates the library name once, where it enters the project model, and rejects anything outside `[A-Za-z0-9_-]` with the new `ProjectError::InvalidLibraryName`. Cargo already refuses the empty name before metadata reaches pina. Validating at the ingestion point keeps every current and future path join safe instead of patching individual sinks, and no legitimate library name is affected because Cargo's own naming rules are a subset of the accepted set.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Qualify every `Address` in generated PDA code\n\n_Packages:_ _pina_macros_\n\n`#[pda]` emitted its generated `Address` types unqualified: the `program_id` parameter of `try_find_pda`, `find_pda`, and `assert_seeds`, and the seed parameter and stored field types of the generated seeds struct. Those spellings resolve against the user's own scope, so a program with its own type named `Address` could silently change which address type a generated signature takes. Every generated `Address` is now the crate-qualified form, matching what the surrounding generated code and the `#[account]` schema path already emitted.\n\nThe expansion also emits the same identity proof the schema path uses — `const _: fn(Address) -> pina::Address = |value| value;` — but only when a declaration actually has an `Address` seed, so a numeric-only `#[pda]` never requires `Address` in scope. The proof binds the caller's bare `Address` spelling to the crate's type, so a future unqualified spelling is a compile error in the user's crate rather than a silent shadow.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Reject PDA declarations that cannot derive\n\n_Packages:_ _pina_macros_\n\nEvery generated `#[pda]` derivation appends a bump seed: `try_find_pda` and `find_pda` search for the canonical one, `with_bump` supplies the stored or explicit one, and the generated loaders derive from the stored field. The runtime caps a derivation at 16 seeds total, so a declaration of 16 seeds produced 17 and no instruction could ever load the account.\n\nThe macro now caps the declared list at 15 seeds and names both numbers in the error. The cap applies whether or not the declaration has a `bump =` field, because the bump-free variant derives through `try_find_pda` and appends a bump there. A declaration that previously compiled with 16 seeds was already unreachable at runtime; it now fails the build instead of shipping a PDA that always returns `InvalidSeeds`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Keep untrusted IDL names inside generated doc comments\n\n_Packages:_ _pina_cpi_renderer_\n\n`CamelCaseString` derives `Deserialize` on its inner `String`, so the normalization its constructor applies never runs for JSON input: a name read from an IDL reaches the renderer verbatim, newlines included. Two sites interpolated such a name straight into a single-line `///` comment — the CPI account line in `render_account` and the argument line in `render_argument` — so everything after an embedded newline was emitted as uncommented Rust. A crafted IDL handed to `pina cpi --idl` produced a generated crate containing attacker-chosen items, which then compile (and execute under `#[cfg(test)]`) in the victim's workspace.\n\nBoth sites now route through `render_doc`, which splits on newlines and prefixes every line as a comment, so an embedded newline becomes another comment line instead of code. `pina_cpi_renderer` gains a regression test that deserializes a malicious IDL through the same `read_root_node` path `pina cpi` uses, asserts the newline survives parsing (so the test keeps exercising the real path), and fails if any payload line escapes its comment.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Retry the lint driver probe while the kernel reports it busy\n\n_Packages:_ _pina_\n\n`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.\n\n`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)",
+							"#### Reject empty escrow offers and prove the maker is writable\n\n_Packages:_ _pina_\n\n`escrow_program`'s `Make` handler now rejects an offer whose `amount_a` or `amount_b` is zero with a new `EscrowError::EmptyOffer` (code 2), before any account is created or any token moves. A zero `amount_b` let a maker escrow token A for nothing, and a zero `amount_a` let a taker receive the vault for nothing; both are fat-finger shapes rather than real offers. The variant is new rather than a reuse of `OfferKeyMismatch` or `TokenAccountMismatch`, because wire values are part of the program ABI and remapping an existing code would change what deployed clients decode. The doc comment on the variant becomes the message in the regenerated Codama IDL and the Rust, JavaScript, and Dart clients.\n\n`Take` now asserts the maker is writable next to the existing address check, so a read-only maker fails with Pina's own `InvalidAccountData` diagnostic instead of a generic runtime failure from the vault or escrow close CPIs. The `&mut AccountView` field already enforced this at parse time, so the assert is defense in depth: the test passes with it removed. It costs 16 CU on `Take` (32,241 to 32,257), which is the price of keeping the requirement visible in the handler, and the maker is credited twice there (vault rent and escrow rent).\n\nTwo Surfpool cases cover the behavior: one asserts `EmptyOffer` and that no balance moves and no account is created, and one presents a read-only maker through a non-payer keypair and asserts the failure plus unchanged escrow, vault, and taker balances.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"#### Align the advisory gates on deny.toml\n\n_Packages:_ _pina_cli_\n\n`security:deny` ran `cargo-deny check bans licenses sources`, so the `[advisories]` section of `deny.toml` — and the four suppressions it documented — never executed. The task now runs the advisories check with `--workspace`, because cargo-deny's default graph roots at the workspace members' normal dependencies and therefore omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime) where every suppressed advisory actually lives. Without `--workspace` the check cannot see them at all.\n\n`security:audit` carried a second, different seven-id ignore list. `deny.toml` is now the single source of advisory policy: the task reads the `[advisories] ignore` array out of `deny.toml` and passes each id to `cargo-audit`, so the two gates cannot drift. Every suppression in that array carries a reachability justification and a review date, and each needs a tracking issue filed on the repository — the entries are all dev/test-only today, verified with `cargo tree -i <spec> -p pina -p pina_abi -p pina_macros -p pina_cli` and the `--workspace` cargo-deny run, but a file cannot open issues on its own.\n\nThe `[advisories]` section also needed the `RUSTSEC-2021-0139`, `RUSTSEC-2024-0375`, `RUSTSEC-2024-0384`, `RUSTSEC-2020-0016`, `RUSTSEC-2025-0134`, and `RUSTSEC-2026-0173` entries that only the old cargo-audit list had, so moving advisories into the deny gate does not weaken it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)",
+							"- **pina_codama_nodes**: **Pin the client contract test to the released surfaces.** The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.20.0](https://github.com/pina-rs/pina/releases/tag/v0.20.0) (2026-09-19)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Name the stored-bump compact PDA loader for what it verifies\n\n_Packages:_ _pina_, _pina_macros_\n\nThe release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.\n\nThe weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.\n\n`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n### Features\n\n#### Add a checked discriminator write\n\n_Packages:_ _pina_\n\n`IntoDiscriminator::write_discriminator` returns `()` and drops the write when the destination slice is shorter than the discriminator: a `debug_assert!` fires in debug builds, but a release build silently leaves the buffer untouched. Generated code always sizes its buffers from `Self::BYTES`, so this only bit hand-written implementations, where a missing discriminator produces an account that looks initialized but decodes as an unknown type.\n\nThe new `IntoDiscriminator::try_write_discriminator` reports the undersized buffer with `PinaProgramError::DataTooShort` (0xFFFF_FFFA, \"Account or instruction data is shorter than the expected minimum\") instead. That is the variant `HasMigrationVersion::write_le` and the migration decoders already return for a destination that cannot hold the value, so a caller sees one error for every short-buffer case.\n\nThe method has a default implementation that length-checks and then delegates to `write_discriminator`, so a manual implementer inherits the checked path without writing anything; the primitive implementations (`u8`, `u16`, `u32`, `u64`) and `into_discriminator!` override it to write through `get_mut` in one step. `write_discriminator` is unchanged, and its doc comment now points new manual implementers at the checked form.\n\nTests cover short buffers of every length up to `BYTES` (including a short inner slice of a long array), exact and oversized buffers, and that the checked write produces the same bytes as the unchecked one.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Accept const capacities in schemas\n\n_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_\n\nCompact account and instruction schemas now accept a `const` item wherever they previously required an integer literal:\n\n```rust\nconst MAX_MEMBERS: usize = 24;\n\n#[account(discriminator = MultisigAccountType, compact)]\npub struct Multisig {\n\tpub bump: u8,\n\tpub member_keys: Vec<Address, MAX_MEMBERS>,\n}\n```\n\n`Vec<T, N>`, `PodVec<T, N, PFX>`, `String<N>`, `PodString<N, PFX>`, an `Option<...>` around them, and fixed `[T; N]` arrays and instruction arguments all resolve a capacity through a constant. Constants may be arithmetic over other constants and may be declared in any module of the crate, so one bound is declared once and reused in the account, the instruction that writes it, and the helper that sizes it.\n\nPina resolves each capacity during expansion and records the number it evaluates to. The ABI layer still receives concrete values, so replacing a literal with a constant of the same value leaves `migrations/manifest.json`, the generated `tests/abi_layout.rs` assertions, `MAX_SIZE`/`MIN_SIZE`/`HEADER_SIZE`, and `projected_bytes(...)` byte-identical, and `pina migrations check` and the Codama IDL unchanged.\n\nA capacity that cannot be evaluated at expansion time now fails the build with a diagnostic naming the expression and pointing at the workaround, instead of the previous `unsupported compact field` or `arrays require an integer literal length` message. An associated constant such as `Bounds::MAX_MEMBERS` is not resolved; declare the bound as a `const` item.\n\n`pina_abi` gains `SchemaConsts`, the shared evaluator both the macros and the CLI use so the two layers agree on what a constant means. `pina_cli` resolves capacities while it parses a program, so migration and IDL tooling reads the same numbers the compiler does.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #463](https://github.com/pina-rs/pina/pull/463) · _Closed issues:_ [#460](https://github.com/pina-rs/pina/issues/460)\n\n#### Reject event schemas that cannot fit the SBF stack\n\n_Packages:_ _pina_, _pina_macros_\n\nThe generated `emit` function materializes a whole event record in one stack frame (`let mut record = [0u8; Self::SIZE];`) before calling into the runtime, so a large `#[event]` schema compiled cleanly and then exhausted the 4 KiB SBF stack at runtime — a self-inflicted denial of service with no compile-time signal.\n\n`pina` gains `MAX_EVENT_RECORD_BYTES`, set to `4096 - 512`. The 512-byte reserve is headroom for the callee frame and the caller's own frame, the same reasoning `MAX_MIGRATION_WORKSPACE` already applies to the historical-normalization workspace. Because the constant is public, the bound a caller can read is the bound the macro enforces.\n\n`pina_macros` emits a compile-time assertion in every `#[event]` expansion, so an oversized schema now fails the build with a message naming the struct and the remedy. A record exactly at the bound still compiles; the assertion is inclusive.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Match the Migrate trigger to the discriminator width\n\n_Packages:_ _pina_, _pina_macros_\n\n`#[discriminator]` reserves the all-ones value of the enum's own primitive, so a `u16` program reserves `0xffff` and a `u32` program reserves `0xffff_ffff`. The generated entrypoint guarded the reserved path with `is_migrate_instruction`, which only tests one byte, so for any program whose instruction enum used `primitive = u16`, `u32`, or `u64` the reserved discriminator never matched and `process_migrate` was unreachable.\n\n`pina` adds width-specific helpers alongside the existing one: `is_migrate_instruction_u16`, `is_migrate_instruction_u32`, and `is_migrate_instruction_u64`. Each matches only its own width, so a one-byte `0xff` is not a two-byte `0xffff` and neither prefix-matches the other. They compare the decoded little-endian value rather than a slice equality, keeping the inline comparison the one-byte helper already had instead of the `memcmp` call `data == CONSTANT.to_le_bytes()` would emit on SBF.\n\n`pina_macros` selects the helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` on a wider discriminator now reaches the reserved path. The generated guard for a default `u8` program is byte-identical to before, so the common case takes no compute regression. The documentation on the reserved-discriminator constants and in `docs/src/migrations/flow.md` now names the width pairing.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Name the stored-bump compact PDA loader for what it verifies\n\n_Packages:_ _pina_cli_\n\nThe release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.\n\nThe weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.\n\n`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n### Fixes\n\n#### Stop enabling `bytemuck` on `solana-address`/`solana-pubkey`\n\n_Packages:_ _pina_\n\nThe workspace requested `solana-address/bytemuck` and `solana-pubkey/bytemuck`. Pina used `bytemuck` for its own pod primitives until the migration to `pinapod`, so nothing in the workspace reads the `Pod` or `Zeroable` derives those features add, and no first-party code calls a `bytemuck` API.\n\nBoth entries now request what Pina actually depends on. `solana-address` asks for `copy`, which derives `Copy` on `Address` — the bound `pinapod`'s `ZcElem` requires and the only part of `bytemuck`'s feature set that was load-bearing. Requesting it directly removes the dependence on `bytemuck`'s implication, and on `pinocchio` and `pinapod` enabling `copy` transitively. `solana-pubkey` no longer requests `bytemuck` at all.\n\nDeployable programs are unchanged: `bytemuck` contributed no symbols to any built program, so all 24 `bpf-entrypoint` examples produce byte-identical sizes and an identical instruction mix with and without it. This is a dependency-graph cleanup, not a size or compute-unit change.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #464](https://github.com/pina-rs/pina/pull/464)\n\n#### Retry the lint driver probe while the kernel reports it busy\n\n_Packages:_ _pina_cli_\n\n`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.\n\n`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)\n\n#### Verify the lint driver download before installing it\n\n_Packages:_ _pina_cli_\n\n`pina lint` fetches a prebuilt driver binary, marks it executable, and runs it as its version probe. The download trusted the transport alone: no checksum was verified, the response body was read without a size bound, and the origin could be redirected through `PINA_LINT_DRIVER_*` environment variables.\n\nThe download path now fetches the `sha256` published beside the asset, compares it against the bytes received, and refuses to install on mismatch, a malformed checksum, or a checksum file that is not valid UTF-8. A new `VerifiedDriver` type wraps the bytes so only a checksum-verified download can reach the installer — a future edit cannot silently reintroduce an unverified path, because the compiler rejects it. The body read is capped at 256 MiB, and the release workflow now uploads the standalone driver's `.sha256` beside the binary, which it previously did not (only the archives carried published checksums).\n\nA locally built driver (`pina lint --build-driver`) keeps its existing trust root — a cargo build against the pinned `pina_lints` release — and installs through a separate function, since no published checksum exists for an artifact built on the local machine.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Fix the IDL size message and sanitize doc topics\n\n_Packages:_ _pina_cli_\n\n`pina idl fetch` rejected raw client output above 8 MiB but reported the limit as \"4 MiB\". The check and the message now share one constant, `MAX_RAW_HEX_BYTES`, so the two cannot drift again, and the message states the true 8 MiB limit.\n\n`pina docs <topic>` joined the caller-supplied topic directly into `<PINA_TEMPLATES_DIR>/<topic>.t.md`, so a topic such as `../../etc/passwd` escaped the template directory. Only the file-name component of the topic is now used, and a topic with no file-name component fails with a clear error.\n\nThe unused `tar` dependency is gone from `pina_cli` and the workspace dependency table; nothing in the crate referenced it, and the only other lockfile consumer is `agave-snapshots`, which declares it directly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Reject Cargo library names that cannot be path components\n\n_Packages:_ _pina_cli_\n\nCargo accepts any string as a `[lib] name` and reports it verbatim through `cargo metadata`, so a checked-in manifest controls the value. Pina joined that name into file and directory paths (`target/deploy`, generated IDL files, client crate directories) without validating it, so `[lib] name = \"../../escaped\"` made `pina generate` write outside the project root — reproduced with an artifact landing next to the project directory while the command reported success.\n\n`Project::discover` now validates the library name once, where it enters the project model, and rejects anything outside `[A-Za-z0-9_-]` with the new `ProjectError::InvalidLibraryName`. Cargo already refuses the empty name before metadata reaches pina. Validating at the ingestion point keeps every current and future path join safe instead of patching individual sinks, and no legitimate library name is affected because Cargo's own naming rules are a subset of the accepted set.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Qualify every `Address` in generated PDA code\n\n_Packages:_ _pina_macros_\n\n`#[pda]` emitted its generated `Address` types unqualified: the `program_id` parameter of `try_find_pda`, `find_pda`, and `assert_seeds`, and the seed parameter and stored field types of the generated seeds struct. Those spellings resolve against the user's own scope, so a program with its own type named `Address` could silently change which address type a generated signature takes. Every generated `Address` is now the crate-qualified form, matching what the surrounding generated code and the `#[account]` schema path already emitted.\n\nThe expansion also emits the same identity proof the schema path uses — `const _: fn(Address) -> pina::Address = |value| value;` — but only when a declaration actually has an `Address` seed, so a numeric-only `#[pda]` never requires `Address` in scope. The proof binds the caller's bare `Address` spelling to the crate's type, so a future unqualified spelling is a compile error in the user's crate rather than a silent shadow.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Reject PDA declarations that cannot derive\n\n_Packages:_ _pina_macros_\n\nEvery generated `#[pda]` derivation appends a bump seed: `try_find_pda` and `find_pda` search for the canonical one, `with_bump` supplies the stored or explicit one, and the generated loaders derive from the stored field. The runtime caps a derivation at 16 seeds total, so a declaration of 16 seeds produced 17 and no instruction could ever load the account.\n\nThe macro now caps the declared list at 15 seeds and names both numbers in the error. The cap applies whether or not the declaration has a `bump =` field, because the bump-free variant derives through `try_find_pda` and appends a bump there. A declaration that previously compiled with 16 seeds was already unreachable at runtime; it now fails the build instead of shipping a PDA that always returns `InvalidSeeds`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Keep untrusted IDL names inside generated doc comments\n\n_Packages:_ _pina_cpi_renderer_\n\n`CamelCaseString` derives `Deserialize` on its inner `String`, so the normalization its constructor applies never runs for JSON input: a name read from an IDL reaches the renderer verbatim, newlines included. Two sites interpolated such a name straight into a single-line `///` comment — the CPI account line in `render_account` and the argument line in `render_argument` — so everything after an embedded newline was emitted as uncommented Rust. A crafted IDL handed to `pina cpi --idl` produced a generated crate containing attacker-chosen items, which then compile (and execute under `#[cfg(test)]`) in the victim's workspace.\n\nBoth sites now route through `render_doc`, which splits on newlines and prefixes every line as a comment, so an embedded newline becomes another comment line instead of code. `pina_cpi_renderer` gains a regression test that deserializes a malicious IDL through the same `read_root_node` path `pina cpi` uses, asserts the newline survives parsing (so the test keeps exercising the real path), and fails if any payload line escapes its comment.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n### Notes\n\n#### Retry the lint driver probe while the kernel reports it busy\n\n_Packages:_ _pina_\n\n`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.\n\n`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)\n\n#### Reject empty escrow offers and prove the maker is writable\n\n_Packages:_ _pina_\n\n`escrow_program`'s `Make` handler now rejects an offer whose `amount_a` or `amount_b` is zero with a new `EscrowError::EmptyOffer` (code 2), before any account is created or any token moves. A zero `amount_b` let a maker escrow token A for nothing, and a zero `amount_a` let a taker receive the vault for nothing; both are fat-finger shapes rather than real offers. The variant is new rather than a reuse of `OfferKeyMismatch` or `TokenAccountMismatch`, because wire values are part of the program ABI and remapping an existing code would change what deployed clients decode. The doc comment on the variant becomes the message in the regenerated Codama IDL and the Rust, JavaScript, and Dart clients.\n\n`Take` now asserts the maker is writable next to the existing address check, so a read-only maker fails with Pina's own `InvalidAccountData` diagnostic instead of a generic runtime failure from the vault or escrow close CPIs. The `&mut AccountView` field already enforced this at parse time, so the assert is defense in depth: the test passes with it removed. It costs 16 CU on `Take` (32,241 to 32,257), which is the price of keeping the requirement visible in the handler, and the maker is credited twice there (vault rent and escrow rent).\n\nTwo Surfpool cases cover the behavior: one asserts `EmptyOffer` and that no balance moves and no account is created, and one presents a read-only maker through a non-payer keypair and asserts the failure plus unchanged escrow, vault, and taker balances.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n#### Align the advisory gates on deny.toml\n\n_Packages:_ _pina_cli_\n\n`security:deny` ran `cargo-deny check bans licenses sources`, so the `[advisories]` section of `deny.toml` — and the four suppressions it documented — never executed. The task now runs the advisories check with `--workspace`, because cargo-deny's default graph roots at the workspace members' normal dependencies and therefore omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime) where every suppressed advisory actually lives. Without `--workspace` the check cannot see them at all.\n\n`security:audit` carried a second, different seven-id ignore list. `deny.toml` is now the single source of advisory policy: the task reads the `[advisories] ignore` array out of `deny.toml` and passes each id to `cargo-audit`, so the two gates cannot drift. Every suppression in that array carries a reachability justification and a review date, and each needs a tracking issue filed on the repository — the entries are all dev/test-only today, verified with `cargo tree -i <spec> -p pina -p pina_abi -p pina_macros -p pina_cli` and the `--workspace` cargo-deny run, but a file cannot open issues on its own.\n\nThe `[advisories]` section also needed the `RUSTSEC-2021-0139`, `RUSTSEC-2024-0375`, `RUSTSEC-2024-0384`, `RUSTSEC-2020-0016`, `RUSTSEC-2025-0134`, and `RUSTSEC-2026-0173` entries that only the old cargo-audit list had, so moving advisories into the deny gate does not weaken it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)\n\n- **pina_codama_nodes**: **Pin the client contract test to the released surfaces.** The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note.\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
