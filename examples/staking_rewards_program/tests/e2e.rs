@@ -27,6 +27,7 @@
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
+use pina::ProgramError;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -38,6 +39,7 @@ use staking_rewards_program::PoolState;
 use staking_rewards_program::PoolStateZc;
 use staking_rewards_program::PositionState;
 use staking_rewards_program::PositionStateZc;
+use staking_rewards_program::REWARD_INDEX_SCALE;
 use staking_rewards_program::StakingError;
 use staking_rewards_program::WithdrawInstruction;
 
@@ -137,6 +139,7 @@ fn pool_state_account(
 	paused: bool,
 	bump: u8,
 	lamports: u64,
+	reward_index: u64,
 ) -> Account {
 	let mut data = vec![0u8; PoolState::SIZE];
 	PoolState::initialize(&mut data, |state| {
@@ -144,7 +147,7 @@ fn pool_state_account(
 		state.stake_mint = pubkey_to_address(stake_mint);
 		state.reward_mint = pubkey_to_address(reward_mint);
 		state.total_staked.set(total_staked);
-		state.reward_index.set(0);
+		state.reward_index.set(reward_index);
 		state.paused.set(paused);
 		state.bump = bump;
 		Ok(())
@@ -330,6 +333,7 @@ fn open_position_creates_position_state() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(position_pda, Account::default()), // empty — will be created by the CPI
@@ -445,6 +449,7 @@ fn withdraw_updates_balances() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -544,6 +549,7 @@ fn withdraw_insufficient_balance_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -615,6 +621,7 @@ fn withdraw_from_paused_pool_fails() {
 				true,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -686,6 +693,7 @@ fn withdraw_zero_amount_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -758,6 +766,7 @@ fn withdraw_wrong_owner_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -830,6 +839,7 @@ fn withdraw_wrong_pool_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -903,7 +913,16 @@ fn deposit_paused_pool_fails() {
 		(
 			pool_state_key,
 			// paused = true — the program returns PoolPaused before calling CPI
-			pool_state_account(&admin, &stake_mint, &reward_mint, 0, true, 0, pool_lamports),
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				0,
+				true,
+				0,
+				pool_lamports,
+				0,
+			),
 		),
 		(
 			position_state_key,
@@ -976,6 +995,7 @@ fn deposit_zero_amount_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -1050,6 +1070,7 @@ fn deposit_wrong_stake_mint_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -1129,6 +1150,7 @@ fn deposit_wrong_owner_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -1177,6 +1199,7 @@ fn claim_wrong_pool_fails() {
 	let admin = Pubkey::new_unique();
 	let stake_mint = Pubkey::new_unique();
 	let user_reward_ata = derive_ata(&user, &reward_mint);
+	let reward_vault = derive_ata(&pool_state_key, &reward_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -1190,6 +1213,7 @@ fn claim_wrong_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new(reward_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1212,6 +1236,7 @@ fn claim_wrong_pool_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -1222,6 +1247,7 @@ fn claim_wrong_pool_fails() {
 			user_reward_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(reward_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -1251,6 +1277,7 @@ fn claim_wrong_reward_mint_fails() {
 	let admin = Pubkey::new_unique();
 	let stake_mint = Pubkey::new_unique();
 	let user_reward_ata = derive_ata(&user, &wrong_reward_mint);
+	let reward_vault = derive_ata(&pool_state_key, &wrong_reward_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -1264,6 +1291,7 @@ fn claim_wrong_reward_mint_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new(reward_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1286,6 +1314,7 @@ fn claim_wrong_reward_mint_fails() {
 				false,
 				0,
 				pool_lamports,
+				0,
 			),
 		),
 		(
@@ -1296,6 +1325,7 @@ fn claim_wrong_reward_mint_fails() {
 			user_reward_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(reward_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -1305,5 +1335,100 @@ fn claim_wrong_reward_mint_fails() {
 		&instruction,
 		&accounts,
 		&[Check::err(StakingError::InvalidPool.into())],
+	);
+}
+
+/// Claiming against a reward vault that is not the pool's derived ATA must be
+/// rejected.
+///
+/// The payout is signed by the pool PDA, so the source account is the one
+/// place a caller could redirect value: without the derived-address check a
+/// substituted vault — another wallet's token account, or the pool's own stake
+/// vault when a pool is misconfigured with `stake_mint == reward_mint` — would
+/// be drained under the pool's signature.
+#[test]
+fn claim_wrong_reward_vault_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let user_reward_ata = derive_ata(&user, &reward_mint);
+	// A vault the attacker controls, rather than the pool's derived ATA.
+	let attacker_vault = Pubkey::new_unique();
+	// A position with accrued rewards, so the payout computation succeeds and
+	// the vault identity check is the assertion under test rather than an
+	// incidental "nothing to claim".
+	let staked = 1_000u64;
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&claim_ix_data(),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(reward_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new(attacker_vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(reward_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				staked,
+				false,
+				0,
+				pool_lamports,
+				// One full index unit: the position accrues `staked` rewards, so
+				// the payout computation succeeds.
+				REWARD_INDEX_SCALE,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, staked, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_reward_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		(
+			attacker_vault,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		associated_token_program_account(),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	// The substituted vault fails the derived-address check before the payout
+	// computation, so the instruction never reaches the transfer.
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidSeeds)],
 	);
 }

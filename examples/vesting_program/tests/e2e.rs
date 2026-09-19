@@ -1,8 +1,13 @@
 //! End-to-end tests for the vesting program.
 //!
-//! These tests exercise the Cancel instruction (which does no CPI beyond
-//! validation), the Claim instruction's state updates, and various error
-//! paths through `mollusk-svm`.
+//! These tests exercise the validation and error paths of Cancel and Claim
+//! through `mollusk-svm`. Both instructions CPI into the token program on their
+//! success paths — Claim releases the vested amount, Cancel refunds the
+//! unclaimed balance and closes the vault — so the two fixtures that assert a
+//! successful release require the real SPL programs, and they are skipped when
+//! the harness has not staged their ELFs beside the program binary. The
+//! end-to-end coverage of those releases lives in the Surfpool suite, which
+//! runs a real runtime and asserts the exact token movements.
 //!
 //! ## Prerequisites
 //!
@@ -91,7 +96,64 @@ fn try_create_mollusk() -> Option<Mollusk> {
 		return None;
 	}
 
-	Some(Mollusk::new(&program_id(), "vesting_program"))
+	let mut mollusk = Mollusk::new(&program_id(), "vesting_program");
+	// A success-path fixture runs the release and refund CPIs against the real
+	// programs; Mollusk resolves an ELF by name from `SBF_OUT_DIR`, so one is
+	// available exactly when the test task staged it next to the program.
+	for (program_id, name) in staged_cpi_programs() {
+		mollusk.add_program(&program_id, name);
+	}
+
+	Some(mollusk)
+}
+
+/// The real CPI programs the success-path fixtures need, when staged.
+fn staged_cpi_programs() -> Vec<(Pubkey, &'static str)> {
+	let dirs: Vec<std::path::PathBuf> = ["SBF_OUT_DIR", "BPF_OUT_DIR"]
+		.into_iter()
+		.filter_map(|key| std::env::var(key).ok())
+		.map(std::path::PathBuf::from)
+		.chain(std::iter::once(std::path::PathBuf::from("tests/fixtures")))
+		.collect();
+
+	[
+		(spl_token_program_id(), "spl_token"),
+		(spl_ata_program_id(), "spl_ata"),
+	]
+	.into_iter()
+	.filter(|(_, name)| {
+		dirs.iter()
+			.any(|dir| dir.join(format!("{name}.so")).is_file())
+	})
+	.collect()
+}
+
+/// Whether the real programs a successful release needs are staged.
+fn release_cpis_available() -> bool {
+	staged_cpi_programs().len() == 2
+}
+
+/// The Clock sysvar account, carrying a timestamp the schedules are compared
+/// against. Its layout is five little-endian fields; `Claim` reads the last.
+fn clock_sysvar_account(mollusk: &Mollusk, unix_timestamp: i64) -> (Pubkey, Account) {
+	let clock = &mollusk.sysvars.clock;
+	let mut data = Vec::with_capacity(40);
+	data.extend_from_slice(&clock.slot.to_le_bytes());
+	data.extend_from_slice(&clock.epoch_start_timestamp.to_le_bytes());
+	data.extend_from_slice(&clock.epoch.to_le_bytes());
+	data.extend_from_slice(&clock.leader_schedule_epoch.to_le_bytes());
+	data.extend_from_slice(&unix_timestamp.to_le_bytes());
+
+	(
+		solana_sdk_ids::sysvar::clock::id(),
+		Account {
+			lamports: mollusk.sysvars.rent.minimum_balance(data.len()),
+			data,
+			owner: solana_sdk_ids::sysvar::id(),
+			executable: false,
+			rent_epoch: 0,
+		},
+	)
 }
 
 /// Derive the vesting PDA for the given admin, beneficiary, and mint.
@@ -175,6 +237,50 @@ fn mock_mint_account(lamports: u64) -> Account {
 	}
 }
 
+/// Build a real SPL mint image for a fixture whose instruction runs a CPI.
+///
+/// The token program validates the mint's own state and decimals on every
+/// `TransferChecked`, so a zeroed buffer is rejected even though the program
+/// only reads the owner and address. Layout: the absent mint authority, supply,
+/// decimals, the initialized flag, then the absent freeze authority.
+fn initialized_mint_account(decimals: u8, supply: u64) -> Account {
+	let mut data = vec![0u8; 82];
+	data[36..44].copy_from_slice(&supply.to_le_bytes());
+	data[44] = decimals;
+	data[45] = 1; // COption::Some — is_initialized
+
+	Account {
+		lamports: 1_000_000_000,
+		data,
+		owner: spl_token_program_id(),
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
+/// Build a real SPL token account image for a fixture whose instruction runs a
+/// CPI.
+///
+/// The release and refund paths execute against the actual SPL Token program,
+/// which deserializes this layout: `mint`, `owner`, the little-endian amount,
+/// the absent-delegate slot, then the account state. A zeroed buffer fails that
+/// parse with "stored owner or mint does not match".
+fn token_account(mint: &Pubkey, owner: &Pubkey, amount: u64) -> Account {
+	let mut data = vec![0u8; 165];
+	data[..32].copy_from_slice(mint.as_ref());
+	data[32..64].copy_from_slice(owner.as_ref());
+	data[64..72].copy_from_slice(&amount.to_le_bytes());
+	data[108] = 1; // AccountState::Initialized
+
+	Account {
+		lamports: 1_000_000_000,
+		data,
+		owner: spl_token_program_id(),
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
 /// Create a minimal mock ATA account (165 bytes, owned by the SPL Token
 /// program).
 fn mock_ata_account(lamports: u64) -> Account {
@@ -185,6 +291,54 @@ fn mock_ata_account(lamports: u64) -> Account {
 		executable: false,
 		rent_epoch: 0,
 	}
+}
+
+/// Account metas for `Claim`, in the program's declared order.
+///
+/// The clock sysvar is last because `Claim` reads it to enforce the cliff and
+/// the linear unlock.
+fn claim_account_metas(
+	beneficiary: &Pubkey,
+	mint: &Pubkey,
+	vesting_pda: &Pubkey,
+	beneficiary_ata: &Pubkey,
+	vault: &Pubkey,
+) -> Vec<AccountMeta> {
+	vec![
+		AccountMeta::new(*beneficiary, true),
+		AccountMeta::new_readonly(*mint, false),
+		AccountMeta::new(*vesting_pda, false),
+		AccountMeta::new(*beneficiary_ata, false),
+		AccountMeta::new(*vault, false),
+		AccountMeta::new_readonly(spl_ata_program_id(), false),
+		AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		AccountMeta::new_readonly(spl_token_program_id(), false),
+		AccountMeta::new_readonly(solana_sdk_ids::sysvar::clock::id(), false),
+	]
+}
+
+/// Account metas for `Cancel`, in the program's declared order.
+///
+/// `Cancel` refunds the unclaimed balance to the admin and closes the vault, so
+/// the admin is writable and the admin ATA and ATA program take part in the
+/// refund.
+fn cancel_account_metas(
+	admin: &Pubkey,
+	mint: &Pubkey,
+	vesting_pda: &Pubkey,
+	admin_ata: &Pubkey,
+	vault: &Pubkey,
+) -> Vec<AccountMeta> {
+	vec![
+		AccountMeta::new(*admin, true),
+		AccountMeta::new_readonly(*mint, false),
+		AccountMeta::new(*vesting_pda, false),
+		AccountMeta::new(*admin_ata, false),
+		AccountMeta::new(*vault, false),
+		AccountMeta::new_readonly(spl_ata_program_id(), false),
+		AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		AccountMeta::new_readonly(spl_token_program_id(), false),
+	]
 }
 
 /// Build instruction data for Cancel (just discriminator byte 2).
@@ -259,6 +413,12 @@ fn associated_token_program_account() -> (Pubkey, Account) {
 const SKIP_MSG: &str =
 	"[SKIP] vesting_program SBF binary not found. Build it with `cargo build-vesting-program`.";
 
+/// Reported when a fixture needs the real CPI programs and the harness has not
+/// staged them. The Surfpool suite covers the same releases on a real runtime.
+const CPI_SKIP_MSG: &str = "[SKIP] the real SPL Token and associated-token programs are not \
+                            staged; place spl_token.so and spl_ata.so in SBF_OUT_DIR to run the \
+                            release-path fixtures";
+
 // ---------------------------------------------------------------------------
 // Cancel Tests
 // ---------------------------------------------------------------------------
@@ -269,25 +429,24 @@ fn cancel_sets_cancelled_flag() {
 		eprintln!("{SKIP_MSG}");
 		return;
 	};
+	if !release_cpis_available() {
+		eprintln!("{CPI_SKIP_MSG}");
+		return;
+	}
 
 	let admin = Pubkey::new_unique();
 	let beneficiary = Pubkey::new_unique();
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		vec![
-			AccountMeta::new_readonly(admin, true), // admin (signer)
-			AccountMeta::new_readonly(mint, false), // mint
-			AccountMeta::new(vesting_pda, false),   // vesting_state (writable)
-			AccountMeta::new(vault, false),         // vault (writable)
-			AccountMeta::new_readonly(spl_token_program_id(), false), // token_program
-		],
+		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
 	);
 
 	let accounts = vec![
@@ -295,7 +454,7 @@ fn cancel_sets_cancelled_flag() {
 			admin,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -312,7 +471,10 @@ fn cancel_sets_cancelled_flag() {
 				lamports,
 			),
 		),
-		(vault, mock_ata_account(1_000_000)),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		(admin_ata, token_account(&mint, &admin, 0)),
+		associated_token_program_account(),
+		mollusk_svm::program::keyed_account_for_system_program(),
 		token_program_account(),
 	];
 
@@ -348,19 +510,14 @@ fn cancel_already_cancelled_fails() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		vec![
-			AccountMeta::new_readonly(admin, true),
-			AccountMeta::new_readonly(mint, false),
-			AccountMeta::new(vesting_pda, false),
-			AccountMeta::new(vault, false),
-			AccountMeta::new_readonly(spl_token_program_id(), false),
-		],
+		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
 	);
 
 	let accounts = vec![
@@ -368,7 +525,7 @@ fn cancel_already_cancelled_fails() {
 			admin,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -385,7 +542,10 @@ fn cancel_already_cancelled_fails() {
 				lamports,
 			),
 		),
-		(vault, mock_ata_account(1_000_000)),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		(admin_ata, token_account(&mint, &admin, 0)),
+		associated_token_program_account(),
+		mollusk_svm::program::keyed_account_for_system_program(),
 		token_program_account(),
 	];
 
@@ -430,7 +590,7 @@ fn cancel_wrong_admin_fails() {
 			wrong_admin,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -447,7 +607,10 @@ fn cancel_wrong_admin_fails() {
 				lamports,
 			),
 		),
-		(vault, mock_ata_account(1_000_000)),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		clock_sysvar_account(&mollusk, 250),
+		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -484,16 +647,7 @@ fn claim_already_cancelled_fails() {
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(100),
-		vec![
-			AccountMeta::new(beneficiary, true), // beneficiary (signer/funder)
-			AccountMeta::new_readonly(mint, false), // mint
-			AccountMeta::new(vesting_pda, false), // vesting_state (writable)
-			AccountMeta::new(beneficiary_ata, false), // beneficiary_ata (writable)
-			AccountMeta::new(vault, false),      // vault (writable)
-			AccountMeta::new_readonly(spl_ata_program_id(), false),
-			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
-			AccountMeta::new_readonly(spl_token_program_id(), false),
-		],
+		claim_account_metas(&beneficiary, &mint, &vesting_pda, &beneficiary_ata, &vault),
 	);
 
 	let accounts = vec![
@@ -501,7 +655,7 @@ fn claim_already_cancelled_fails() {
 			beneficiary,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -518,8 +672,9 @@ fn claim_already_cancelled_fails() {
 				lamports,
 			),
 		),
-		(beneficiary_ata, mock_ata_account(0)),
-		(vault, mock_ata_account(1_000_000)),
+		(beneficiary_ata, token_account(&mint, &beneficiary, 0)),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		clock_sysvar_account(&mollusk, 250),
 		mollusk_svm::program::keyed_account_for_system_program(),
 		associated_token_program_account(),
 		token_program_account(),
@@ -552,16 +707,7 @@ fn claim_too_large_fails() {
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(600),
-		vec![
-			AccountMeta::new(beneficiary, true),
-			AccountMeta::new_readonly(mint, false),
-			AccountMeta::new(vesting_pda, false),
-			AccountMeta::new(beneficiary_ata, false),
-			AccountMeta::new(vault, false),
-			AccountMeta::new_readonly(spl_ata_program_id(), false),
-			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
-			AccountMeta::new_readonly(spl_token_program_id(), false),
-		],
+		claim_account_metas(&beneficiary, &mint, &vesting_pda, &beneficiary_ata, &vault),
 	);
 
 	let accounts = vec![
@@ -569,7 +715,7 @@ fn claim_too_large_fails() {
 			beneficiary,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -586,8 +732,9 @@ fn claim_too_large_fails() {
 				lamports,
 			),
 		),
-		(beneficiary_ata, mock_ata_account(0)),
-		(vault, mock_ata_account(1_000_000)),
+		(beneficiary_ata, token_account(&mint, &beneficiary, 0)),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		clock_sysvar_account(&mollusk, 250),
 		mollusk_svm::program::keyed_account_for_system_program(),
 		associated_token_program_account(),
 		token_program_account(),
@@ -606,6 +753,10 @@ fn claim_wrong_beneficiary_fails() {
 		eprintln!("{SKIP_MSG}");
 		return;
 	};
+	if !release_cpis_available() {
+		eprintln!("{CPI_SKIP_MSG}");
+		return;
+	}
 
 	let admin = Pubkey::new_unique();
 	let beneficiary = Pubkey::new_unique();
@@ -621,16 +772,13 @@ fn claim_wrong_beneficiary_fails() {
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(100),
-		vec![
-			AccountMeta::new(wrong_beneficiary, true),
-			AccountMeta::new_readonly(mint, false),
-			AccountMeta::new(vesting_pda, false),
-			AccountMeta::new(wrong_beneficiary_ata, false),
-			AccountMeta::new(vault, false),
-			AccountMeta::new_readonly(spl_ata_program_id(), false),
-			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
-			AccountMeta::new_readonly(spl_token_program_id(), false),
-		],
+		claim_account_metas(
+			&wrong_beneficiary,
+			&mint,
+			&vesting_pda,
+			&wrong_beneficiary_ata,
+			&vault,
+		),
 	);
 
 	let accounts = vec![
@@ -638,7 +786,7 @@ fn claim_wrong_beneficiary_fails() {
 			wrong_beneficiary,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -655,8 +803,12 @@ fn claim_wrong_beneficiary_fails() {
 				lamports,
 			),
 		),
-		(wrong_beneficiary_ata, mock_ata_account(0)),
-		(vault, mock_ata_account(1_000_000)),
+		(
+			wrong_beneficiary_ata,
+			token_account(&mint, &wrong_beneficiary, 0),
+		),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		clock_sysvar_account(&mollusk, 250),
 		mollusk_svm::program::keyed_account_for_system_program(),
 		associated_token_program_account(),
 		token_program_account(),
@@ -713,7 +865,7 @@ fn initialize_invalid_schedule_start_after_cliff() {
 			beneficiary,
 			Account::new(0, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
 		mollusk_svm::program::keyed_account_for_system_program(),
@@ -766,7 +918,7 @@ fn initialize_invalid_schedule_cliff_after_end() {
 			beneficiary,
 			Account::new(0, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
 		mollusk_svm::program::keyed_account_for_system_program(),
@@ -791,25 +943,24 @@ fn benchmark_cu_cancel() {
 		eprintln!("{SKIP_MSG}");
 		return;
 	};
+	if !release_cpis_available() {
+		eprintln!("{CPI_SKIP_MSG}");
+		return;
+	}
 
 	let admin = Pubkey::new_unique();
 	let beneficiary = Pubkey::new_unique();
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		vec![
-			AccountMeta::new_readonly(admin, true),
-			AccountMeta::new_readonly(mint, false),
-			AccountMeta::new(vesting_pda, false),
-			AccountMeta::new(vault, false),
-			AccountMeta::new_readonly(spl_token_program_id(), false),
-		],
+		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
 	);
 
 	let accounts = vec![
@@ -817,7 +968,7 @@ fn benchmark_cu_cancel() {
 			admin,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(mint, mock_mint_account(1_000_000)),
+		(mint, initialized_mint_account(6, 1_000_000)),
 		(
 			vesting_pda,
 			vesting_state_account(
@@ -834,7 +985,10 @@ fn benchmark_cu_cancel() {
 				lamports,
 			),
 		),
-		(vault, mock_ata_account(750_000)),
+		(vault, token_account(&mint, &vesting_pda, 750_000)),
+		(admin_ata, token_account(&mint, &admin, 0)),
+		associated_token_program_account(),
+		mollusk_svm::program::keyed_account_for_system_program(),
 		token_program_account(),
 	];
 

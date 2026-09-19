@@ -81,6 +81,20 @@ const DEFAULT_DRIVER_REPO: &str = "pina-rs/pina";
 /// How long one driver download may take, end to end.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// How long to keep retrying a spawn the kernel reports as busy.
+const BUSY_RETRY_WINDOW: Duration = Duration::from_millis(250);
+
+/// Pause between busy-spawn attempts.
+const BUSY_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+
+/// `ETXTBSY`: the file is open for writing somewhere, so it cannot be executed.
+#[cfg(unix)]
+const BUSY_ERRNO: i32 = 26;
+
+/// Non-Unix platforms have no equivalent of `ETXTBSY`.
+#[cfg(not(unix))]
+const BUSY_ERRNO: i32 = -1;
+
 /// Upper bound on a downloaded driver artifact.
 ///
 /// A real driver is a few MiB. The cap exists so a hostile or misconfigured
@@ -458,24 +472,47 @@ fn probe_output(bin: &Path, sysroot: &Path) -> Result<std::process::Output, Driv
 	probe_output_with_timeout(bin, sysroot, PROBE_TIMEOUT)
 }
 
+/// Start the driver, retrying briefly while the kernel reports the binary busy.
+///
+/// `exec` returns `ExecutableFileBusy` (`ETXTBSY`) when a write descriptor for
+/// the same file is still open in another process — including a descriptor a
+/// concurrent `fork` inherited. The install path writes and then runs the
+/// driver, so the two can overlap; a short bounded retry covers the window
+/// without hiding a genuinely unrunnable binary.
+fn spawn_driver(bin: &Path, sysroot: &Path) -> Result<std::process::Child, DriverError> {
+	let deadline = Instant::now() + BUSY_RETRY_WINDOW;
+	loop {
+		let attempt = Command::new(bin)
+			.envs(driver_library_environment(sysroot))
+			.stdin(Stdio::null())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.spawn();
+
+		match attempt {
+			Ok(child) => return Ok(child),
+			Err(source)
+				if source.raw_os_error() == Some(BUSY_ERRNO) && Instant::now() < deadline =>
+			{
+				std::thread::sleep(BUSY_RETRY_INTERVAL);
+			}
+			Err(source) => {
+				return Err(DriverError::RunDriver {
+					path: bin.to_path_buf(),
+					source,
+				});
+			}
+		}
+	}
+}
+
 /// Start the driver, capture its output, and give up after `timeout`.
 fn probe_output_with_timeout(
 	bin: &Path,
 	sysroot: &Path,
 	timeout: Duration,
 ) -> Result<std::process::Output, DriverError> {
-	let mut child = Command::new(bin)
-		.envs(driver_library_environment(sysroot))
-		.stdin(Stdio::null())
-		.stdout(Stdio::piped())
-		.stderr(Stdio::piped())
-		.spawn()
-		.map_err(|source| {
-			DriverError::RunDriver {
-				path: bin.to_path_buf(),
-				source,
-			}
-		})?;
+	let mut child = spawn_driver(bin, sysroot)?;
 
 	let deadline = Instant::now() + timeout;
 	loop {
@@ -1314,6 +1351,38 @@ mod tests {
 			!driver_loads(&driver, Path::new("/toolchain/sysroot")).expect("run the stub"),
 			"a driver that exits unsuccessfully must not be selected"
 		);
+	}
+
+	#[test]
+	#[cfg(unix)]
+	fn a_driver_held_open_for_writing_is_retried_then_runs() {
+		// `exec` reports `ETXTBSY` while a write descriptor for the file is open
+		// elsewhere — the race the install-then-run path can hit. Hold one open
+		// across the first attempts and confirm the probe still succeeds once it
+		// closes, rather than failing the driver selection.
+		use std::io::Write as _;
+
+		let directory = tempfile::tempdir().expect("temp directory");
+		let driver = directory.path().join("busy-driver");
+		std::fs::write(&driver, "#!/bin/sh\nexit 0\n").expect("write stub driver");
+		set_executable(&driver).expect("permissions");
+
+		let mut held = std::fs::OpenOptions::new()
+			.write(true)
+			.open(&driver)
+			.expect("hold a write descriptor");
+		held.flush().expect("flush");
+
+		let releaser = std::thread::spawn(move || {
+			std::thread::sleep(BUSY_RETRY_INTERVAL * 3);
+			drop(held);
+		});
+
+		assert!(
+			driver_loads(&driver, Path::new("/toolchain/sysroot")).expect("run the stub"),
+			"a driver that becomes executable within the retry window must be selected"
+		);
+		releaser.join().expect("releaser joins");
 	}
 
 	#[test]
