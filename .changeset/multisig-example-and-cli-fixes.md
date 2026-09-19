@@ -3,7 +3,7 @@ pina_cli: fix
 pina_codama_renderer_cli: fix
 ---
 
-# Add the multisig example and repair the generators it exercised
+# Add the multisig example and fix generators
 
 `examples/multisig_program` is a production-shaped multisig built on pina: bitmask voting over a sorted compact roster, unified proposal accounts carrying compiled vault messages or config action streams, timelocked execution with per-proposal ephemeral signers, vote revocation, proposal expiry, spending limits, rent collection, a generic Anchor-layout legacy import, and the full migration envelope. Building it surfaced two generator defects that this changeset also ships.
 
