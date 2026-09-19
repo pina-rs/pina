@@ -5,11 +5,16 @@ pub enum Kind {
 	Words = 0,
 }
 
-const WIDTH: usize = 4;
+// An associated constant cannot be evaluated during macro expansion.
+struct Bounds;
+
+impl Bounds {
+	pub const WIDTH: usize = 4;
+}
 
 #[account(discriminator = Kind)]
 pub struct Words {
-	pub values: [u64; WIDTH],
+	pub values: [u64; Bounds::WIDTH],
 }
 
 fn main() {}

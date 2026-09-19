@@ -1,5 +1,5 @@
-error: `[T; N]` arrays require an integer literal length
-  --> tests/ui/fail/account_array_const_length.rs:12:14
+error: `[T; N]` arrays require a length this crate can evaluate, but `Bounds::WIDTH` cannot be evaluated at expansion time; write an integer literal, or declare a free `const NAME: usize = ...;` in this crate (Pina resolves named constants, including arithmetic over them)
+  --> tests/ui/fail/account_array_const_length.rs:17:20
    |
-12 |     pub values: [u64; WIDTH],
-   |                 ^^^^^^^^^^^^
+17 |     pub values: [u64; Bounds::WIDTH],
+   |                       ^^^^^^^^^^^^^

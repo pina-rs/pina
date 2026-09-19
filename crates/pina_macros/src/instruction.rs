@@ -41,6 +41,7 @@ pub(crate) fn expand(
 		Ok(value) => value,
 		Err(error) => return error.to_compile_error(),
 	};
+	let capacity_proofs = schema::resolve_capacities(&mut item_struct);
 
 	// Extract configuration
 	let struct_name = item_struct.ident.clone();
@@ -157,6 +158,7 @@ pub(crate) fn expand(
 
 	quote! {
 		#item_struct
+		#capacity_proofs
 		#schema_proofs
 		#implementations
 	}

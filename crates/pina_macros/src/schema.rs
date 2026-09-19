@@ -8,6 +8,7 @@
 //! representations audited below, including the `fixed` crate's `FixedI*`
 //! and `FixedU*` schema types whose every bit pattern is a valid value.
 
+use pina_abi::SchemaConsts;
 use quote::quote;
 use syn::Expr;
 use syn::ExprLit;
@@ -23,6 +24,54 @@ use syn::punctuated::Punctuated;
 
 fn is_pinapod_attribute(attribute: &syn::Attribute) -> bool {
 	attribute.path().is_ident("pinapod")
+}
+
+/// Rewrite named capacities in the schema to the numbers they evaluate to, and
+/// return the proof tokens that keep the referenced constants alive.
+///
+/// A capacity may be a `const` item rather than a literal. Everything
+/// downstream — the generated proofs, the ABI document, `MAX_SIZE`, and
+/// `projected_bytes` — needs a concrete number, so the constants are resolved
+/// here and the declaration is rewritten in place. A literal-only schema is
+/// returned untouched, which keeps the two spellings byte-identical from this
+/// point on.
+///
+/// A macro sees only the item it is expanding, so a constant declared elsewhere
+/// in the crate is read back from source. The table is cached for the whole
+/// crate compilation, so this costs one directory walk no matter how many
+/// schemas the program declares.
+pub(crate) fn resolve_capacities(item: &mut ItemStruct) -> proc_macro2::TokenStream {
+	capacity_consts().normalize_item(item)
+}
+
+/// Build the constant table for the crate being expanded.
+///
+/// Both the expanding crate and the discovered program directory are scanned.
+/// A Surfpool harness source-includes the program (`#[path =
+/// "../../src/lib.rs"]`), so its macros expand with the harness's manifest
+/// directory; scanning only that one would miss every constant the program
+/// declares.
+fn capacity_consts() -> &'static SchemaConsts {
+	use std::sync::OnceLock;
+
+	static CONSTS: OnceLock<SchemaConsts> = OnceLock::new();
+
+	CONSTS.get_or_init(|| {
+		let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") else {
+			return SchemaConsts::empty();
+		};
+		let manifest_dir = std::path::PathBuf::from(manifest_dir);
+
+		let mut table = SchemaConsts::from_source_dir(&manifest_dir.join("src"));
+		if let Some((program_dir, _)) = crate::migration::discover_program_dir() {
+			let program_src = program_dir.join("src");
+			if program_src != manifest_dir.join("src") {
+				table.extend(SchemaConsts::from_source_dir(&program_src));
+			}
+		}
+
+		table
+	})
 }
 
 /// Validate a schema and emit compile-time type and layout proofs.
@@ -456,7 +505,12 @@ fn classify_compact_vec(
 	}
 	let capacity = match arguments.args.iter().nth(1) {
 		Some(GenericArgument::Const(value)) if is_integer_literal(value) => quote!(#value),
-		_ => return Err(compact_supported_error(ty)),
+		// A capacity that survived normalization cannot be evaluated here, so
+		// report it by name instead of the generic supported-forms error.
+		Some(argument) => {
+			return Err(capacity_argument_error(argument, "vector capacity"));
+		}
+		None => return Err(compact_supported_error(ty)),
 	};
 	let prefix_size = if is_alias {
 		2
@@ -578,6 +632,55 @@ fn compact_supported_error(ty: &Type) -> syn::Error {
 	)
 }
 
+/// Report a capacity argument that is neither a literal nor a resolvable name.
+///
+/// A capacity written as a `const` item is resolved before the grammar runs, so
+/// reaching this point means the argument is not one this crate can evaluate.
+fn capacity_argument_error(argument: &GenericArgument, name: &str) -> syn::Error {
+	let requirement = format!("{name} must be a length this crate can evaluate");
+
+	match argument {
+		GenericArgument::Const(value) => unresolved_capacity_error(value, &requirement),
+		GenericArgument::Type(ty) => {
+			let printed = expression_text(&quote!(#ty));
+			syn::Error::new_spanned(
+				ty,
+				format!(
+					"{requirement}, but `{printed}` is not a `const` item; write an integer \
+					 literal, or declare a free `const NAME: usize = ...;` at the crate root or \
+					 in a module (a value on a type is not resolved, and `const {printed}: usize` \
+					 would not compile)"
+				),
+			)
+		}
+		other => syn::Error::new_spanned(other, requirement),
+	}
+}
+
+/// Report a capacity that survived normalization, naming the expression.
+///
+/// A capacity written as a `const` item is resolved before the grammar runs, so
+/// reaching this point means the expression cannot be evaluated at expansion
+/// time — an associated constant, a function call, or a name this crate does not
+/// declare. The message names the expression and the way out rather than
+/// reporting a generic unsupported-field error.
+fn unresolved_capacity_error(expression: &Expr, requirement: &str) -> syn::Error {
+	let printed = expression_text(&quote!(#expression));
+	syn::Error::new_spanned(
+		expression,
+		format!(
+			"{requirement}, but `{printed}` cannot be evaluated at expansion time; write an \
+			 integer literal, or declare a free `const NAME: usize = ...;` in this crate (Pina \
+			 resolves named constants, including arithmetic over them)"
+		),
+	)
+}
+
+/// Render tokens the way the source would spell them.
+fn expression_text(tokens: &proc_macro2::TokenStream) -> String {
+	tokens.to_string().replace(" :: ", "::")
+}
+
 fn compact_prefix_proof(
 	capacity: &proc_macro2::TokenStream,
 	prefix_size: usize,
@@ -642,9 +745,9 @@ fn classify_fixed_array(
 	crate_path: &syn::Path,
 ) -> syn::Result<AuditedField> {
 	if !is_integer_literal(&array.len) {
-		return Err(syn::Error::new_spanned(
-			array,
-			"`[T; N]` arrays require an integer literal length",
+		return Err(unresolved_capacity_error(
+			&array.len,
+			"`[T; N]` arrays require a length this crate can evaluate",
 		));
 	}
 
@@ -988,10 +1091,11 @@ fn literal_const_argument<'a>(
 ) -> syn::Result<&'a Expr> {
 	match argument {
 		Some(GenericArgument::Const(value)) if is_integer_literal(value) => Ok(value),
-		_ => {
+		Some(argument) => Err(capacity_argument_error(argument, name)),
+		None => {
 			Err(syn::Error::new_spanned(
 				ty,
-				format!("{name} must be an integer literal"),
+				format!("{name} must be an integer literal or a `const` item in this crate"),
 			))
 		}
 	}
@@ -1174,9 +1278,16 @@ mod tests {
 	fn rejects_typed_arrays_with_non_literal_lengths() {
 		let error = classify_spelled("[u64; WIDTH]")
 			.expect_err("non-literal array lengths must be rejected");
+		// The message must name the expression and the workaround, not report a
+		// generic unsupported field: the reader needs to know `WIDTH` is what
+		// could not be resolved, and a free `const` is what to write.
 		assert!(
-			error.to_string().contains("integer literal length"),
-			"unexpected error: {error}"
+			error.to_string().contains("WIDTH"),
+			"the diagnostic must name the expression: {error}"
+		);
+		assert!(
+			error.to_string().contains("free `const NAME: usize"),
+			"the diagnostic must point at the workaround: {error}"
 		);
 	}
 

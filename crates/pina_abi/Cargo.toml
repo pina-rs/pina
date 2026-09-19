@@ -11,6 +11,7 @@ repository.workspace = true
 description = "Canonical ABI history model shared by Pina migration tooling and macros"
 
 [dependencies]
+proc-macro2 = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
