@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 6d108d3a470ea81fb917e1f5dd34160e8e610d0c943998553b8549fab160455a
+// manifest-sha256: bbca4727bb6a981011df79eda385b5fbc66a57071296161d5bbe9465dcca90ba
 // program-id: Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS
 // version-type: u8
 
@@ -25,7 +25,7 @@ pub mod account_1_01 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "120eba9c4197a411cb027c3337652d02d9c8ca01fdada5eb77a42c1efde23b9c";
+	pub const SCHEMA_SHA256: &str = "286855c863ba1318e21ef9f7f3cbb5dcc8e6adad2ab521e65d8176bc0bc952e8";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -57,7 +57,7 @@ pub mod instruction_1_00 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f";
+	pub const SCHEMA_SHA256: &str = "d210dfdcc02b818a6d1cacf1ce82323a2fcc57a3adb420db62ac61667044f170";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -88,7 +88,7 @@ pub mod instruction_1_01 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f";
+	pub const SCHEMA_SHA256: &str = "d210dfdcc02b818a6d1cacf1ce82323a2fcc57a3adb420db62ac61667044f170";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
