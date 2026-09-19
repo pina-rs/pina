@@ -1805,8 +1805,7 @@ fn oversized_growth_warns_about_the_runtime_realloc_cap() {
 	warn_about_account_growth(
 		&identity,
 		"State",
-		&source,
-		0,
+		(0, &source),
 		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
@@ -1895,8 +1894,7 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	warn_about_account_growth(
 		&identity,
 		"State",
-		&adjacent,
-		1,
+		(1, &adjacent),
 		&[(1, &adjacent)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
@@ -1916,8 +1914,7 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	warn_about_account_growth(
 		&identity,
 		"State",
-		&adjacent,
-		1,
+		(1, &adjacent),
 		&[(0, &oldest), (1, &adjacent)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
@@ -2607,8 +2604,7 @@ fn growth_warnings_only_apply_to_account_contracts() {
 	warn_about_account_growth(
 		&identity,
 		"Update",
-		&source,
-		0,
+		(0, &source),
 		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),
@@ -2636,8 +2632,7 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 	warn_about_account_growth(
 		&identity,
 		"State",
-		&source,
-		0,
+		(0, &source),
 		&[(0, &source)],
 		&destination,
 		MigrationVersionType::U8.bytes(),

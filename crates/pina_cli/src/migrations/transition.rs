@@ -115,8 +115,7 @@ pub(super) fn create_transition(
 	warn_about_account_growth(
 		identity,
 		rust_name,
-		source,
-		source_version,
+		(source_version, source),
 		stale_ladder,
 		destination,
 		project.migration_version_type.bytes(),
@@ -199,20 +198,19 @@ struct WorstLadderGrowth {
 /// version, not only the adjacent hop. Growth beyond that cap fails with
 /// `MigrationAccountGrowthExceeded` however large the lamport budget is.
 /// Fixed layouts quote exact byte growth; compact layouts quote the exact
-/// worst-case growth the declared capacities imply. `adjacent` is the source
-/// of the new transition and `adjacent_version` its version number;
-/// `stale_ladder` lists the supported stale versions it walks from, oldest
-/// first.
+/// worst-case growth the declared capacities imply. `adjacent` pairs the source
+/// of the new transition with its version number; `stale_ladder` lists the
+/// supported stale versions it walks from, oldest first.
 pub(super) fn warn_about_account_growth(
 	identity: &ContractIdentity,
 	rust_name: &str,
-	adjacent: &SchemaVersion,
-	adjacent_version: u32,
+	adjacent: (u32, &SchemaVersion),
 	stale_ladder: &[(u32, &SchemaVersion)],
 	destination: &DataSchema,
 	version_bytes: usize,
 	output: &mut MakeMigrationsOutput,
 ) {
+	let (adjacent_version, adjacent) = adjacent;
 	if identity.kind != ContractKind::Account {
 		return;
 	}
