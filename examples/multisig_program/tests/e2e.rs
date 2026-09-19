@@ -228,7 +228,7 @@ fn multisig_data(
 		permissions[position] = PERMISSIONS_ALL;
 	}
 	let space =
-		Multisig::projected_bytes(member_keys.len(), member_keys.len()).expect("member space");
+		Multisig::projected_bytes(member_keys.len() * 32, member_keys.len()).expect("member space");
 	let mut data = vec![0_u8; space];
 	Multisig::initialize(
 		&mut data,
@@ -236,13 +236,15 @@ fn multisig_data(
 			.bump(bump)
 			.create_key(pina_address(create_key))
 			.config_authority(Address::default())
-			.rent_collector(None)
+			.rent_collector(Address::default())
 			.threshold(threshold)
 			.timelock(timelock)
 			.ttl(ttl)
 			.transaction_index(transaction_index)
 			.stale_transaction_index(0)
-			.replace_member_keys(&keys[..member_keys.len()])
+			.replace_member_roster(
+				&flatten_fixture_roster(&keys[..member_keys.len()])[..member_keys.len() * 32],
+			)
 			.replace_member_permissions(&permissions[..member_keys.len()]),
 	)
 	.unwrap_or_else(|error| panic!("encode multisig fixture: {error:?}"));
@@ -286,6 +288,25 @@ fn proposal_data(
 	)
 	.unwrap_or_else(|error| panic!("encode proposal fixture: {error:?}"));
 	data
+}
+
+/// Flatten addresses into the roster wire form.
+fn flatten_fixture_roster(keys: &[pina::Address]) -> [u8; 512] {
+	let mut bytes = [0_u8; 512];
+	for (position, key) in keys.iter().enumerate() {
+		bytes[position * 32..position * 32 + 32].copy_from_slice(key.as_ref());
+	}
+	bytes
+}
+
+/// Decode a roster into owned addresses plus its length.
+fn decode_fixture_roster(bytes: &[u8]) -> ([pina::Address; 16], usize) {
+	let count = bytes.len() / 32;
+	let mut keys = [pina::Address::default(); 16];
+	for (position, slot) in keys.iter_mut().take(count).enumerate() {
+		*slot = pina::Address::try_from(&bytes[position * 32..position * 32 + 32]).unwrap();
+	}
+	(keys, count)
 }
 
 fn program_config_data(authority: &Pubkey, treasury: &Pubkey, fee: u64, bump: u8) -> Vec<u8> {
@@ -397,13 +418,11 @@ fn multisig_create_initializes_the_compact_roster() {
 		ix.threshold.set(2);
 		ix.timelock.set(0);
 		ix.ttl.set(0);
-		ix.member_count = 3;
 		for (position, member) in members.iter().enumerate() {
-			ix.member_keys[position] = pina_address(member);
 			ix.member_permissions[position] = PERMISSIONS_ALL;
 		}
-		ix.config_authority.set(None);
-		ix.rent_collector.set(None);
+		ix.config_authority = Address::default();
+		ix.rent_collector = Address::default();
 		Ok(())
 	})
 	.unwrap();
@@ -413,11 +432,14 @@ fn multisig_create_initializes_the_compact_roster() {
 		&data,
 		vec![
 			AccountMeta::new_readonly(config_key, false),
-			AccountMeta::new(multisig_key, false),
 			AccountMeta::new_readonly(create_key, true),
+			AccountMeta::new(multisig_key, false),
 			AccountMeta::new(rent_payer, true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(program_id(), false), // no treasury
+			AccountMeta::new_readonly(members[0], false),
+			AccountMeta::new_readonly(members[1], false),
+			AccountMeta::new_readonly(members[2], false),
 		],
 	);
 	let mut world = World::new();
@@ -428,6 +450,9 @@ fn multisig_create_initializes_the_compact_roster() {
 	world.add(multisig_key, Account::default());
 	world.add(create_key, system_account(RENT_LAMPORTS));
 	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	for member in &members {
+		world.add(*member, system_account(RENT_LAMPORTS));
+	}
 	world.add(
 		solana_sdk_ids::system_program::id(),
 		keyed_account_for_system_program().1,
@@ -439,8 +464,9 @@ fn multisig_create_initializes_the_compact_roster() {
 	let state = Multisig::try_from_bytes(stored.data.as_slice())
 		.unwrap_or_else(|error| panic!("decode created multisig: {error:?}"));
 	assert_eq!(state.threshold.get(), 2);
-	assert_eq!(state.member_keys().len(), 3);
-	assert_eq!(state.member_keys()[0], pina_address(&members[0]));
+	let roster = decode_fixture_roster(state.member_roster());
+	assert_eq!(roster.1, 3);
+	assert_eq!(roster.0[0], pina_address(&members[0]));
 	assert_eq!(state.transaction_index.get(), 0);
 }
 
@@ -453,19 +479,17 @@ fn multisig_create_rejects_duplicate_members() {
 	let (multisig_key, bump) = multisig_pda(&create_key);
 	let (config_key, config_bump) = program_config_pda();
 
+	let duplicate = key(1);
 	let mut data = vec![0_u8; multisig_program::MultisigCreateIx::SIZE];
 	multisig_program::MultisigCreateIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.threshold.set(1);
 		ix.timelock.set(0);
 		ix.ttl.set(0);
-		ix.member_count = 2;
-		ix.member_keys[0] = pina_address(&key(1));
-		ix.member_keys[1] = pina_address(&key(1)); // duplicate
 		ix.member_permissions[0] = PERMISSIONS_ALL;
 		ix.member_permissions[1] = PERMISSIONS_ALL;
-		ix.config_authority.set(None);
-		ix.rent_collector.set(None);
+		ix.config_authority = Address::default();
+		ix.rent_collector = Address::default();
 		Ok(())
 	})
 	.unwrap();
@@ -475,11 +499,13 @@ fn multisig_create_rejects_duplicate_members() {
 		&data,
 		vec![
 			AccountMeta::new_readonly(config_key, false),
-			AccountMeta::new(multisig_key, false),
 			AccountMeta::new_readonly(create_key, true),
+			AccountMeta::new(multisig_key, false),
 			AccountMeta::new(rent_payer, true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(program_id(), false), // no treasury
+			AccountMeta::new_readonly(duplicate, false),
+			AccountMeta::new_readonly(duplicate, false),
 		],
 	);
 	let mut world = World::new();
@@ -490,6 +516,7 @@ fn multisig_create_rejects_duplicate_members() {
 	world.add(multisig_key, Account::default());
 	world.add(create_key, system_account(RENT_LAMPORTS));
 	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	world.add(duplicate, system_account(RENT_LAMPORTS));
 	world.add(
 		solana_sdk_ids::system_program::id(),
 		keyed_account_for_system_program().1,
@@ -536,8 +563,10 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 		ix.bump = bump;
 		ix.legacy_program = pina_address(&legacy_program_id());
 		ix.legacy_discriminator = legacy_discriminator();
-		ix.config_authority.set(None);
-		ix.rent_collector.set(None);
+		ix.set_config_authority = false.into();
+		ix.config_authority = Address::default();
+		ix.set_rent_collector = false.into();
+		ix.rent_collector = Address::default();
 		Ok(())
 	})
 	.unwrap();
@@ -548,8 +577,8 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 		vec![
 			AccountMeta::new_readonly(legacy_key, false),
 			AccountMeta::new_readonly(config_key, false),
-			AccountMeta::new(multisig_key, false),
 			AccountMeta::new_readonly(create_key, true),
+			AccountMeta::new(multisig_key, false),
 			AccountMeta::new(rent_payer, true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(program_id(), false), // no treasury
@@ -573,6 +602,9 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 	world.add(multisig_key, Account::default());
 	world.add(create_key, system_account(RENT_LAMPORTS));
 	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	for member in &members {
+		world.add(*member, system_account(RENT_LAMPORTS));
+	}
 	world.add(
 		solana_sdk_ids::system_program::id(),
 		keyed_account_for_system_program().1,
@@ -584,8 +616,9 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 	let state = Multisig::try_from_bytes(stored.data.as_slice())
 		.unwrap_or_else(|error| panic!("decode imported multisig: {error:?}"));
 	assert_eq!(state.threshold.get(), 2);
-	assert_eq!(state.member_keys().len(), 3);
-	assert_eq!(state.member_keys()[2], pina_address(&members[2]));
+	let roster = decode_fixture_roster(state.member_roster());
+	assert_eq!(roster.1, 3);
+	assert_eq!(roster.0[2], pina_address(&members[2]));
 	assert_eq!(state.create_key, pina_address(&create_key));
 }
 
@@ -969,8 +1002,9 @@ fn config_execute_adds_a_member_and_invalidates_prior_proposals() {
 	let stored = account(&result, &multisig_key);
 	let state = Multisig::try_from_bytes(stored.data.as_slice())
 		.unwrap_or_else(|error| panic!("decode resized multisig: {error:?}"));
-	assert_eq!(state.member_keys().len(), 4);
-	assert!(state.member_keys().contains(&pina_address(&new_member)));
+	let roster = decode_fixture_roster(state.member_roster());
+	assert_eq!(roster.1, 4);
+	assert!(roster.0[..4].contains(&pina_address(&new_member)));
 	// The consensus moved, so every prior proposal is stale.
 	assert_eq!(state.stale_transaction_index.get(), 1);
 
@@ -1000,7 +1034,7 @@ fn spending_limit_use_resets_the_period_and_moves_sol() {
 	for (position, member) in members.iter().enumerate() {
 		member_addresses[position] = pina_address(member);
 	}
-	let space = SpendingLimit::projected_bytes(3, 0).unwrap();
+	let space = SpendingLimit::projected_bytes(3 * 32, 0).unwrap();
 	let mut limit_account = vec![0_u8; space];
 	SpendingLimit::initialize(
 		&mut limit_account,
@@ -1014,7 +1048,7 @@ fn spending_limit_use_resets_the_period_and_moves_sol() {
 			.remaining_amount(0)
 			.last_reset(now - 2 * day)
 			.period(PERIOD_DAY)
-			.replace_members(&member_addresses[..3]),
+			.replace_members(&flatten_fixture_roster(&member_addresses[..3])[..3 * 32]),
 	)
 	.unwrap();
 
@@ -1089,7 +1123,7 @@ fn proposal_close_refunds_the_rent_collector() {
 	let mut multisig = multisig_data(&create_key, 2, 0, 0, &members, multisig_bump, 1);
 	Multisig::update(
 		&mut multisig,
-		&MultisigPatch::new().rent_collector(Some(pina_address(&collector))),
+		&MultisigPatch::new().rent_collector(pina_address(&collector)),
 	)
 	.expect("set rent collector");
 

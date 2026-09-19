@@ -81,7 +81,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "247bbb43ad068310bdedea91516d05c8b7b95b0aaf70922cc3c72455732627d2",
+					"schemaSha256": "1894f1fe6a2f09904a791d2b0bf6cad9e14d4c8be0ff24f031834fd70ad132b0",
 					"schema": {
 						"layout": "compact",
 						"fields": [
@@ -99,7 +99,7 @@
 							},
 							{
 								"name": "rent_collector",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
 							},
 							{
 								"name": "threshold",
@@ -122,8 +122,8 @@
 								"rustType": "u64"
 							},
 							{
-								"name": "member_keys",
-								"rustType": "Vec<Address, 16>"
+								"name": "member_roster",
+								"rustType": "PodVec<u8, 512, 2>"
 							},
 							{
 								"name": "member_permissions",
@@ -133,8 +133,8 @@
 						"codec": "pinaPodV2",
 						"physical": {
 							"kind": "compact",
-							"headerSize": 127,
-							"maximumSize": 655,
+							"headerSize": 126,
+							"maximumSize": 654,
 							"tailAlignment": 1,
 							"fields": [
 								{
@@ -155,50 +155,50 @@
 								{
 									"name": "rent_collector",
 									"headerOffset": 65,
-									"headerSize": 33
+									"headerSize": 32
 								},
 								{
 									"name": "threshold",
-									"headerOffset": 98,
+									"headerOffset": 97,
 									"headerSize": 2
 								},
 								{
 									"name": "timelock",
-									"headerOffset": 100,
+									"headerOffset": 99,
 									"headerSize": 4
 								},
 								{
 									"name": "ttl",
-									"headerOffset": 104,
+									"headerOffset": 103,
 									"headerSize": 4
 								},
 								{
 									"name": "transaction_index",
-									"headerOffset": 108,
+									"headerOffset": 107,
 									"headerSize": 8
 								},
 								{
 									"name": "stale_transaction_index",
-									"headerOffset": 116,
+									"headerOffset": 115,
 									"headerSize": 8
 								},
 								{
-									"name": "member_keys",
-									"headerOffset": 124,
+									"name": "member_roster",
+									"headerOffset": 123,
 									"headerSize": 2,
 									"tail": {
 										"index": 0,
 										"kind": "vector",
 										"optional": false,
 										"prefixBytes": 2,
-										"capacity": 16,
-										"elementSize": 32,
+										"capacity": 512,
+										"elementSize": 1,
 										"maximumBytes": 512
 									}
 								},
 								{
 									"name": "member_permissions",
-									"headerOffset": 126,
+									"headerOffset": 125,
 									"headerSize": 1,
 									"tail": {
 										"index": 1,
@@ -418,7 +418,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "70ee844062f17a535945bab8e95c03b484fcfbbc209e62f5b1bb745eee414475",
+					"schemaSha256": "84cfc5571c342ce8c1ba7a9c87dfd19d7834a5cee15314a2a78fac05a87f45dd",
 					"schema": {
 						"layout": "compact",
 						"fields": [
@@ -460,11 +460,11 @@
 							},
 							{
 								"name": "members",
-								"rustType": "Vec<Address, 16>"
+								"rustType": "PodVec<u8, 512, 2>"
 							},
 							{
 								"name": "destinations",
-								"rustType": "Vec<Address, 8>"
+								"rustType": "PodVec<u8, 256, 2>"
 							}
 						],
 						"codec": "pinaPodV2",
@@ -472,7 +472,7 @@
 							"kind": "compact",
 							"headerSize": 127,
 							"maximumSize": 895,
-							"tailAlignment": 32,
+							"tailAlignment": 1,
 							"fields": [
 								{
 									"name": "bump",
@@ -528,8 +528,8 @@
 										"kind": "vector",
 										"optional": false,
 										"prefixBytes": 2,
-										"capacity": 16,
-										"elementSize": 32,
+										"capacity": 512,
+										"elementSize": 1,
 										"maximumBytes": 512
 									}
 								},
@@ -542,8 +542,8 @@
 										"kind": "vector",
 										"optional": false,
 										"prefixBytes": 2,
-										"capacity": 8,
-										"elementSize": 32,
+										"capacity": 256,
+										"elementSize": 1,
 										"maximumBytes": 256
 									}
 								}
@@ -710,17 +710,25 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "8474854803af4aaffda92865d3a224ea7cc99474d9b74a160eab85752e311779",
+					"schemaSha256": "118b92368db650b4c9f4d6f1444abf9c2e015a95d96cd2e50e81de3ed27dd421",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
 							{
+								"name": "set_treasury",
+								"rustType": "bool"
+							},
+							{
 								"name": "treasury",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
+							},
+							{
+								"name": "set_creation_fee",
+								"rustType": "bool"
 							},
 							{
 								"name": "creation_fee",
-								"rustType": "Option<u64>"
+								"rustType": "u64"
 							}
 						],
 						"codec": "pinaPodV2",
@@ -729,14 +737,24 @@
 							"size": 42,
 							"fields": [
 								{
-									"name": "treasury",
+									"name": "set_treasury",
 									"offset": 0,
-									"size": 33
+									"size": 1
+								},
+								{
+									"name": "treasury",
+									"offset": 1,
+									"size": 32
+								},
+								{
+									"name": "set_creation_fee",
+									"offset": 33,
+									"size": 1
 								},
 								{
 									"name": "creation_fee",
-									"offset": 33,
-									"size": 9
+									"offset": 34,
+									"size": 8
 								}
 							]
 						}
@@ -776,7 +794,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "95739b105bda0f968a3b0eabafa8bf2d293198b6617008179fbaf74684a51b67",
+					"schemaSha256": "ada1f7be43be5354422b8b8f7cfc75beae622807031e02c9d2026d0c353cd209",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -797,30 +815,22 @@
 								"rustType": "u32"
 							},
 							{
-								"name": "member_count",
-								"rustType": "u8"
-							},
-							{
-								"name": "member_keys",
-								"rustType": "[Address; 16]"
-							},
-							{
 								"name": "member_permissions",
 								"rustType": "[u8; 16]"
 							},
 							{
 								"name": "config_authority",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
 							},
 							{
 								"name": "rent_collector",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
 							}
 						],
 						"codec": "pinaPodV2",
 						"physical": {
 							"kind": "fixed",
-							"size": 606,
+							"size": 91,
 							"fields": [
 								{
 									"name": "bump",
@@ -843,29 +853,19 @@
 									"size": 4
 								},
 								{
-									"name": "member_count",
-									"offset": 11,
-									"size": 1
-								},
-								{
-									"name": "member_keys",
-									"offset": 12,
-									"size": 512
-								},
-								{
 									"name": "member_permissions",
-									"offset": 524,
+									"offset": 11,
 									"size": 16
 								},
 								{
 									"name": "config_authority",
-									"offset": 540,
-									"size": 33
+									"offset": 27,
+									"size": 32
 								},
 								{
 									"name": "rent_collector",
-									"offset": 573,
-									"size": 33
+									"offset": 59,
+									"size": 32
 								}
 							]
 						}
@@ -881,20 +881,20 @@
 								"pda": null
 							},
 							{
-								"name": "multisig",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": "multisig"
-							},
-							{
 								"name": "create_key",
 								"writable": false,
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "multisig"
 							},
 							{
 								"name": "rent_payer",
@@ -919,10 +919,21 @@
 								"optional": true,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "member_accounts",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"remaining"
+								]
 							}
 						]
 					},
-					"processSha256": "5fe3a2c1743761695c78d64b2f200047e55549821f290917808b0692d9a71acb",
+					"processSha256": "e307f196ef7875d0b8fd2f09dbbf811309062e338fb85377d276cb0abef69df8",
 					"transition": null
 				}
 			]
@@ -937,7 +948,7 @@
 			"versions": [
 				{
 					"version": 0,
-					"schemaSha256": "b31a9dbf752c626df9ef75f1d64859a4b6b4388f4211bb032bd267c2c9c7fd3c",
+					"schemaSha256": "1698c8736c1b85c9e9ae8ab6ed8db19425affb402056b1753ca31c8b6a4f0afc",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -954,12 +965,20 @@
 								"rustType": "[u8; 8]"
 							},
 							{
+								"name": "set_config_authority",
+								"rustType": "bool"
+							},
+							{
 								"name": "config_authority",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
+							},
+							{
+								"name": "set_rent_collector",
+								"rustType": "bool"
 							},
 							{
 								"name": "rent_collector",
-								"rustType": "Option<Address>"
+								"rustType": "Address"
 							}
 						],
 						"codec": "pinaPodV2",
@@ -983,14 +1002,24 @@
 									"size": 8
 								},
 								{
-									"name": "config_authority",
+									"name": "set_config_authority",
 									"offset": 41,
-									"size": 33
+									"size": 1
+								},
+								{
+									"name": "config_authority",
+									"offset": 42,
+									"size": 32
+								},
+								{
+									"name": "set_rent_collector",
+									"offset": 74,
+									"size": 1
 								},
 								{
 									"name": "rent_collector",
-									"offset": 74,
-									"size": 33
+									"offset": 75,
+									"size": 32
 								}
 							]
 						}
@@ -1014,20 +1043,20 @@
 								"pda": null
 							},
 							{
-								"name": "multisig",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": "multisig"
-							},
-							{
 								"name": "create_key",
 								"writable": false,
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "multisig",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "multisig"
 							},
 							{
 								"name": "rent_payer",
@@ -1055,7 +1084,7 @@
 							}
 						]
 					},
-					"processSha256": "9dcee4eeda3816ade1d5db1bb41e6a14ea6e8c483e4ed47dc1f537a5f82244df",
+					"processSha256": "d91c2795de0d13429d634d9bd97e1a59b73368dd297ebde726a2b29ea2e0ee30",
 					"transition": null
 				}
 			]

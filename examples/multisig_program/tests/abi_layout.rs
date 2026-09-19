@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: fa54ef8160e5f43b7069caf6d930a317c4eaa39ef330789933cddf05159c46c2
+// manifest-sha256: 340c3f822ff5f33ff80d2368b75d2f69c0fbb4ab022598319431ed30dd23f512
 // program-id: 5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc
 // version_type: u8
 
@@ -58,7 +58,7 @@ pub mod account_1_02 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "247bbb43ad068310bdedea91516d05c8b7b95b0aaf70922cc3c72455732627d2";
+	pub const SCHEMA_SHA256: &str = "1894f1fe6a2f09904a791d2b0bf6cad9e14d4c8be0ff24f031834fd70ad132b0";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -68,9 +68,9 @@ pub mod account_1_02 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Compact header size in bytes.
-	pub const HEADER_SIZE: usize = 127;
+	pub const HEADER_SIZE: usize = 126;
 	/// Maximum encoded size in bytes.
-	pub const MAX_SIZE: usize = 655;
+	pub const MAX_SIZE: usize = 654;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
@@ -114,7 +114,7 @@ pub mod account_1_04 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "70ee844062f17a535945bab8e95c03b484fcfbbc209e62f5b1bb745eee414475";
+	pub const SCHEMA_SHA256: &str = "84cfc5571c342ce8c1ba7a9c87dfd19d7834a5cee15314a2a78fac05a87f45dd";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -128,7 +128,7 @@ pub mod account_1_04 {
 	/// Maximum encoded size in bytes.
 	pub const MAX_SIZE: usize = 895;
 	/// Byte granularity of valid allocations.
-	pub const TAIL_ALIGNMENT: usize = 32;
+	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
 	pub const MIN_SIZE: usize = MIGRATION_HEADER_SIZE + HEADER_SIZE;
 }
@@ -207,7 +207,7 @@ pub mod instruction_1_01 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "8474854803af4aaffda92865d3a224ea7cc99474d9b74a160eab85752e311779";
+	pub const SCHEMA_SHA256: &str = "118b92368db650b4c9f4d6f1444abf9c2e015a95d96cd2e50e81de3ed27dd421";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -224,8 +224,10 @@ pub mod instruction_1_01 {
 	pub const MANIFEST_PAYLOAD_SIZE: usize = 42;
 	/// `(name, absolute_offset, size)` in encoded bytes.
 	pub const FIELDS: &[(&str, usize, usize)] = &[
-		("treasury", MIGRATION_HEADER_SIZE + 0, 33),
-		("creation_fee", MIGRATION_HEADER_SIZE + 33, 9),
+		("set_treasury", MIGRATION_HEADER_SIZE + 0, 1),
+		("treasury", MIGRATION_HEADER_SIZE + 1, 32),
+		("set_creation_fee", MIGRATION_HEADER_SIZE + 33, 1),
+		("creation_fee", MIGRATION_HEADER_SIZE + 34, 8),
 	];
 }
 
@@ -238,7 +240,7 @@ pub mod instruction_1_02 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "95739b105bda0f968a3b0eabafa8bf2d293198b6617008179fbaf74684a51b67";
+	pub const SCHEMA_SHA256: &str = "ada1f7be43be5354422b8b8f7cfc75beae622807031e02c9d2026d0c353cd209";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -248,22 +250,20 @@ pub mod instruction_1_02 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Payload size in bytes, excluding the envelope header.
-	pub const PAYLOAD_SIZE: usize = 606;
+	pub const PAYLOAD_SIZE: usize = 91;
 	/// Total encoded size in bytes, including the envelope header.
 	pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;
 	/// Manifest payload size; must agree with `PAYLOAD_SIZE`.
-	pub const MANIFEST_PAYLOAD_SIZE: usize = 606;
+	pub const MANIFEST_PAYLOAD_SIZE: usize = 91;
 	/// `(name, absolute_offset, size)` in encoded bytes.
 	pub const FIELDS: &[(&str, usize, usize)] = &[
 		("bump", MIGRATION_HEADER_SIZE + 0, 1),
 		("threshold", MIGRATION_HEADER_SIZE + 1, 2),
 		("timelock", MIGRATION_HEADER_SIZE + 3, 4),
 		("ttl", MIGRATION_HEADER_SIZE + 7, 4),
-		("member_count", MIGRATION_HEADER_SIZE + 11, 1),
-		("member_keys", MIGRATION_HEADER_SIZE + 12, 512),
-		("member_permissions", MIGRATION_HEADER_SIZE + 524, 16),
-		("config_authority", MIGRATION_HEADER_SIZE + 540, 33),
-		("rent_collector", MIGRATION_HEADER_SIZE + 573, 33),
+		("member_permissions", MIGRATION_HEADER_SIZE + 11, 16),
+		("config_authority", MIGRATION_HEADER_SIZE + 27, 32),
+		("rent_collector", MIGRATION_HEADER_SIZE + 59, 32),
 	];
 }
 
@@ -276,7 +276,7 @@ pub mod instruction_1_03 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "b31a9dbf752c626df9ef75f1d64859a4b6b4388f4211bb032bd267c2c9c7fd3c";
+	pub const SCHEMA_SHA256: &str = "1698c8736c1b85c9e9ae8ab6ed8db19425affb402056b1753ca31c8b6a4f0afc";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -296,8 +296,10 @@ pub mod instruction_1_03 {
 		("bump", MIGRATION_HEADER_SIZE + 0, 1),
 		("legacy_program", MIGRATION_HEADER_SIZE + 1, 32),
 		("legacy_discriminator", MIGRATION_HEADER_SIZE + 33, 8),
-		("config_authority", MIGRATION_HEADER_SIZE + 41, 33),
-		("rent_collector", MIGRATION_HEADER_SIZE + 74, 33),
+		("set_config_authority", MIGRATION_HEADER_SIZE + 41, 1),
+		("config_authority", MIGRATION_HEADER_SIZE + 42, 32),
+		("set_rent_collector", MIGRATION_HEADER_SIZE + 74, 1),
+		("rent_collector", MIGRATION_HEADER_SIZE + 75, 32),
 	];
 }
 

@@ -304,8 +304,9 @@ pub struct Multisig {
 	/// a controlled multisig defers to this key via
 	/// [`MultisigInstruction::ConfigAuthorityExecute`].
 	pub config_authority: Address,
-	/// Where terminal proposal rent is reclaimed; `None` disables collection.
-	pub rent_collector: Option<Address>,
+	/// Where terminal proposal rent is reclaimed; the default address
+	/// disables collection.
+	pub rent_collector: Address,
 	/// Signatures required to approve a proposal.
 	pub threshold: u16,
 	/// Seconds between approval and permissible execution.
@@ -316,9 +317,11 @@ pub struct Multisig {
 	pub transaction_index: u64,
 	/// Proposals at or below this index predate the latest consensus change.
 	pub stale_transaction_index: u64,
-	/// Sorted member keys, parallel to `member_permissions`.
-	pub member_keys: Vec<Address, 16>,
-	/// Permission masks, parallel to `member_keys`.
+	/// Sorted member roster as concatenated 32-byte addresses, parallel to
+	/// `member_permissions`. Raw bytes keep the generated CLI clients
+	/// renderable while the compact tail still charges rent per member.
+	pub member_roster: PodVec<u8, 512, 2>,
+	/// Permission masks, parallel to the roster.
 	pub member_permissions: PodVec<u8, 16, 1>,
 }
 
@@ -379,10 +382,11 @@ pub struct SpendingLimit {
 	pub last_reset: i64,
 	/// Reset period; see the `PERIOD_*` constants.
 	pub period: u8,
-	/// Members allowed to draw on this limit.
-	pub members: Vec<Address, 16>,
-	/// Allowed destinations; empty means unrestricted.
-	pub destinations: Vec<Address, 8>,
+	/// Members allowed to draw on this limit, as concatenated addresses.
+	pub members: PodVec<u8, 512, 2>,
+	/// Allowed destinations as concatenated addresses; empty means
+	/// unrestricted.
+	pub destinations: PodVec<u8, 256, 2>,
 }
 
 // ---------------------------------------------------------------------------
@@ -398,10 +402,12 @@ pub struct ConfigInitializeIx {
 
 #[instruction(discriminator = MultisigInstruction::ConfigUpdate)]
 pub struct ConfigUpdateIx {
-	/// `Some` replaces the treasury; `None` keeps it.
-	pub treasury: Option<Address>,
-	/// `Some` replaces the fee; `None` keeps it.
-	pub creation_fee: Option<u64>,
+	/// When set, `treasury` replaces the configured treasury.
+	pub set_treasury: bool,
+	pub treasury: Address,
+	/// When set, `creation_fee` replaces the configured fee.
+	pub set_creation_fee: bool,
+	pub creation_fee: u64,
 }
 
 #[instruction(discriminator = MultisigInstruction::MultisigCreate)]
@@ -411,13 +417,12 @@ pub struct MultisigCreateIx {
 	pub timelock: u32,
 	/// Lifetime for proposals created by this multisig; zero disables.
 	pub ttl: u32,
-	/// Active prefix length of `member_keys` and `member_permissions`.
-	pub member_count: u8,
-	pub member_keys: [Address; 16],
+	/// Permission masks aligned with the trailing member accounts.
 	pub member_permissions: [u8; 16],
-	/// `None` makes the multisig autonomous.
-	pub config_authority: Option<Address>,
-	pub rent_collector: Option<Address>,
+	/// The default address makes the multisig autonomous.
+	pub config_authority: Address,
+	/// The default address disables rent collection.
+	pub rent_collector: Address,
 }
 
 #[instruction(discriminator = MultisigInstruction::MultisigImport)]
@@ -427,10 +432,12 @@ pub struct MultisigImportIx {
 	pub legacy_program: Address,
 	/// Anchor account discriminator the legacy data must start with.
 	pub legacy_discriminator: [u8; 8],
-	/// `None` carries over the legacy config authority.
-	pub config_authority: Option<Address>,
-	/// `None` carries over the legacy rent collector.
-	pub rent_collector: Option<Address>,
+	/// When set, `config_authority` overrides the legacy value.
+	pub set_config_authority: bool,
+	pub config_authority: Address,
+	/// When set, `rent_collector` overrides the legacy value.
+	pub set_rent_collector: bool,
+	pub rent_collector: Address,
 }
 
 #[instruction(discriminator = MultisigInstruction::ProposalCreate)]
@@ -603,6 +610,33 @@ fn roll_period(now: i64, last_reset: i64, period: u8) -> Result<(i64, bool), Pro
 	Ok((advanced, true))
 }
 
+/// Flatten a roster of addresses into its wire form.
+fn flatten_roster<const N: usize>(keys: &[Address]) -> [u8; N] {
+	let mut bytes = [0_u8; N];
+	for (position, key) in keys.iter().enumerate() {
+		bytes[position * 32..position * 32 + 32].copy_from_slice(key.as_ref());
+	}
+	bytes
+}
+
+/// Decode a roster's active length; the tail must hold whole addresses.
+fn roster_count(bytes: &[u8]) -> Result<usize, ProgramError> {
+	if bytes.len() % 32 != 0 {
+		return Err(MultisigError::InvalidConfiguration.into());
+	}
+	Ok(bytes.len() / 32)
+}
+
+/// Copy a wire roster into owned addresses.
+fn decode_roster(bytes: &[u8], output: &mut [Address]) -> Result<usize, ProgramError> {
+	let count = roster_count(bytes)?;
+	for (position, slot) in output.iter_mut().take(count).enumerate() {
+		*slot = Address::try_from(&bytes[position * 32..position * 32 + 32])
+			.map_err(|_| MultisigError::InvalidConfiguration)?;
+	}
+	Ok(count)
+}
+
 fn read_timestamp(clock: &AccountView) -> Result<i64, ProgramError> {
 	Ok(sysvars::clock::Clock::from_account_view(clock)?.unix_timestamp)
 }
@@ -642,7 +676,7 @@ fn emit_proposal_status(
 pub struct MultisigSnapshot {
 	pub create_key: Address,
 	pub config_authority: Address,
-	pub rent_collector: Option<Address>,
+	pub rent_collector: Address,
 	pub threshold: u16,
 	pub timelock: u32,
 	pub ttl: u32,
@@ -660,7 +694,7 @@ impl MultisigSnapshot {
 		let mut snapshot = MultisigSnapshot {
 			create_key: *create_key,
 			config_authority: Address::default(),
-			rent_collector: None,
+			rent_collector: Address::default(),
 			threshold: 0,
 			timelock: 0,
 			ttl: 0,
@@ -674,15 +708,15 @@ impl MultisigSnapshot {
 
 		account.with_compact_account::<Multisig, _>(&ID, |state| {
 			snapshot.config_authority = state.config_authority;
-			snapshot.rent_collector = state.rent_collector.get();
+			snapshot.rent_collector = state.rent_collector;
 			snapshot.threshold = state.threshold.get();
 			snapshot.timelock = state.timelock.get();
 			snapshot.ttl = state.ttl.get();
 			snapshot.transaction_index = state.transaction_index.get();
 			snapshot.stale_transaction_index = state.stale_transaction_index.get();
 			snapshot.bump = state.bump;
-			snapshot.member_count = state.member_keys().len();
-			snapshot.member_keys[..snapshot.member_count].copy_from_slice(state.member_keys());
+			snapshot.member_count =
+				decode_roster(state.member_roster(), &mut snapshot.member_keys)?;
 			snapshot.member_permissions[..snapshot.member_count]
 				.copy_from_slice(state.member_permissions());
 			Ok(())
@@ -1453,20 +1487,25 @@ pub struct ConfigUpdateAccounts<'a> {
 #[derive(Accounts)]
 pub struct MultisigCreateAccounts<'a> {
 	pub program_config: &'a AccountView,
-	pub multisig: &'a mut AccountView,
 	pub create_key: &'a AccountView,
+	pub multisig: &'a mut AccountView,
 	pub rent_payer: &'a mut AccountView,
 	pub system_program: &'a AccountView,
-	/// Treasury that collects the creation fee; absent when the fee is zero.
+	/// Treasury that collects the creation fee; pass the program's own
+	/// address as a filler when the fee is zero.
 	pub treasury: Option<&'a mut AccountView>,
+	/// The founding members, sorted by address; `member_permissions` indexes
+	/// into this list positionally.
+	#[pina(remaining)]
+	pub member_accounts: &'a [AccountView],
 }
 
 #[derive(Accounts)]
 pub struct MultisigImportAccounts<'a> {
 	pub legacy_multisig: &'a AccountView,
 	pub program_config: &'a AccountView,
-	pub multisig: &'a mut AccountView,
 	pub create_key: &'a AccountView,
+	pub multisig: &'a mut AccountView,
 	pub rent_payer: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 	/// Treasury that collects the creation fee; absent when the fee is zero.
@@ -1658,7 +1697,7 @@ fn apply_config_actions(
 				working.ttl = seconds;
 			}
 			ConfigActionView::SetRentCollector { collector } => {
-				working.rent_collector = collector;
+				working.rent_collector = collector.unwrap_or_default();
 			}
 			ConfigActionView::SetConfigAuthority { authority } => {
 				working.config_authority = authority.unwrap_or_default();
@@ -1688,7 +1727,8 @@ fn apply_config_actions(
 				let mut sorted_members = members;
 				sorted_members[..members_len].sort_unstable();
 
-				let space = SpendingLimit::projected_bytes(members_len, destinations_len)?;
+				let space =
+					SpendingLimit::projected_bytes(members_len * 32, destinations_len * 32)?;
 				CreateCompactProgramAccountWithBump {
 					account,
 					payer: &mut *rent_payer,
@@ -1705,8 +1745,14 @@ fn apply_config_actions(
 						.remaining_amount(amount)
 						.last_reset(now)
 						.period(period)
-						.replace_members(&sorted_members[..members_len])
-						.replace_destinations(&destinations[..destinations_len]),
+						.replace_members(
+							&flatten_roster::<512>(&sorted_members[..members_len])
+								[..members_len * 32],
+						)
+						.replace_destinations(
+							&flatten_roster::<256>(&destinations[..destinations_len])
+								[..destinations_len * 32],
+						),
 					space,
 				}
 				.invoke::<SpendingLimit>()?;
@@ -1751,7 +1797,7 @@ struct MultisigWorkingState {
 	threshold: u16,
 	timelock: u32,
 	ttl: u32,
-	rent_collector: Option<Address>,
+	rent_collector: Address,
 	config_authority: Address,
 	transaction_index: u64,
 	changed: bool,
@@ -1836,11 +1882,11 @@ impl<'a> ProcessAccountInfos<'a> for ConfigUpdateAccounts<'a> {
 		if config.authority != *self.authority.address() {
 			return Err(MultisigError::InvalidConfigAuthority.into());
 		}
-		if let Some(treasury) = args.treasury.get() {
-			config.treasury = treasury;
+		if args.set_treasury.get().into() {
+			config.treasury = args.treasury;
 		}
-		if let Some(fee) = args.creation_fee.get() {
-			config.creation_fee.set(fee.get());
+		if args.set_creation_fee.get().into() {
+			config.creation_fee.set(args.creation_fee.get());
 		}
 
 		Ok(())
@@ -1878,17 +1924,22 @@ fn pay_creation_fee(
 impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = MultisigCreateIx::try_from_bytes(data)?;
-		let member_count = usize::from(args.member_count);
+		let member_count = self.member_accounts.len();
 		if member_count == 0 || member_count > MAX_MEMBERS {
 			return Err(MultisigError::TooManyMembers.into());
 		}
-		let member_keys = &args.member_keys[..member_count];
 		let member_permissions = &args.member_permissions[..member_count];
 		let threshold = args.threshold.get();
 		let timelock = args.timelock.get();
 		let ttl = args.ttl.get();
 
-		validate_members(member_keys, member_permissions, threshold)?;
+		// Trailing accounts carry the roster; collect their addresses for
+		// validation and the compact tail in one stack copy.
+		let mut member_keys = [Address::default(); MAX_MEMBERS];
+		for (position, account) in self.member_accounts.iter().take(member_count).enumerate() {
+			member_keys[position] = *account.address();
+		}
+		validate_members(&member_keys[..member_count], member_permissions, threshold)?;
 		if timelock > MAX_TIME_LOCK {
 			return Err(MultisigError::TimeLockExceedsMaxAllowed.into());
 		}
@@ -1902,7 +1953,7 @@ impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 		pay_creation_fee(self.program_config, self.treasury, self.rent_payer)?;
 
 		let create_key = *self.create_key.address();
-		let space = Multisig::projected_bytes(member_count, member_count)?;
+		let space = Multisig::projected_bytes(member_count * 32, member_count)?;
 		let seeds = Multisig::seeds(&create_key);
 
 		CreateCompactProgramAccountWithBump {
@@ -1914,13 +1965,16 @@ impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 			patch: MultisigPatch::new()
 				.bump(args.bump)
 				.create_key(create_key)
-				.config_authority(args.config_authority.get().unwrap_or_default())
-				.rent_collector(args.rent_collector.get())
+				.config_authority(args.config_authority)
+				.rent_collector(args.rent_collector)
 				.threshold(threshold)
 				.timelock(timelock)
+				.ttl(ttl)
 				.transaction_index(0)
 				.stale_transaction_index(0)
-				.replace_member_keys(member_keys)
+				.replace_member_roster(
+					&flatten_roster::<512>(&member_keys[..member_count])[..member_count * 32],
+				)
 				.replace_member_permissions(member_permissions),
 			space,
 		}
@@ -1945,7 +1999,7 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 
 		let create_key = *self.create_key.address();
 		let member_count = legacy.member_count;
-		let space = Multisig::projected_bytes(member_count, member_count)?;
+		let space = Multisig::projected_bytes(member_count * 32, member_count)?;
 		let seeds = Multisig::seeds(&create_key);
 
 		CreateCompactProgramAccountWithBump {
@@ -1957,17 +2011,24 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 			patch: MultisigPatch::new()
 				.bump(args.bump)
 				.create_key(create_key)
-				.config_authority(
+				.config_authority(if args.set_config_authority.get().into() {
 					args.config_authority
-						.get()
-						.unwrap_or(legacy.config_authority),
-				)
-				.rent_collector(args.rent_collector.get().or(legacy.rent_collector))
+				} else {
+					legacy.config_authority
+				})
+				.rent_collector(if args.set_rent_collector.get().into() {
+					args.rent_collector
+				} else {
+					legacy.rent_collector.unwrap_or_default()
+				})
 				.threshold(legacy.threshold)
 				.timelock(legacy.time_lock)
+				.ttl(0)
 				.transaction_index(0)
 				.stale_transaction_index(0)
-				.replace_member_keys(legacy.members())
+				.replace_member_roster(
+					&flatten_roster::<512>(legacy.members())[..legacy.member_count * 32],
+				)
 				.replace_member_permissions(&legacy.member_permissions[..member_count]),
 			space,
 		}
@@ -2110,7 +2171,9 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCreateAccounts<'a> {
 			account: self.proposal,
 			payer: self.rent_payer,
 			owner: &ID,
-			seeds: &proposal_seeds.as_slices(),
+			// The builder appends the bump itself, so hand it the seeds
+			// without one.
+			seeds: &seeds.as_slices(),
 			bump: args.bump,
 			patch,
 			space,
@@ -2168,8 +2231,9 @@ fn load_member_proposal(
 		member_index: 0,
 	};
 	multisig.with_compact_account::<Multisig, _>(&ID, |state| {
-		let position =
-			member_index(state.member_keys(), member).ok_or(MultisigError::NotAMember)?;
+		let mut roster = [Address::default(); MAX_MEMBERS];
+		let count = decode_roster(state.member_roster(), &mut roster)?;
+		let position = member_index(&roster[..count], member).ok_or(MultisigError::NotAMember)?;
 		if state.member_permissions()[position] & permission == 0 {
 			return Err(MultisigError::Unauthorized.into());
 		}
@@ -2682,7 +2746,10 @@ fn commit_multisig(
 			.rent_collector(working.rent_collector)
 			.config_authority(working.config_authority)
 			.stale_transaction_index(stale_transaction_index)
-			.replace_member_keys(&working.member_keys[..working.member_count])
+			.replace_member_roster(
+				&flatten_roster::<512>(&working.member_keys[..working.member_count])
+					[..working.member_count * 32],
+			)
 			.replace_member_permissions(&working.member_permissions[..working.member_count]),
 	}
 	.invoke::<Multisig>()?;
@@ -2849,7 +2916,9 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 				if limit.multisig != multisig_key {
 					return Err(ProgramError::InvalidSeeds);
 				}
-				if !limit.members().contains(&member_key) {
+				let mut members = [Address::default(); MAX_SPENDING_LIMIT_MEMBERS];
+				let members_count = decode_roster(limit.members(), &mut members)?;
+				if !members[..members_count].contains(&member_key) {
 					return Err(MultisigError::Unauthorized.into());
 				}
 				limit_create_key = limit.create_key;
@@ -2859,8 +2928,7 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 				allowance = limit.amount.get();
 				remaining_amount = limit.remaining_amount.get();
 				last_reset = limit.last_reset.get();
-				destination_count = limit.destinations().len();
-				destinations[..destination_count].copy_from_slice(limit.destinations());
+				destination_count = decode_roster(limit.destinations(), &mut destinations)?;
 				Ok(())
 			})?;
 		SpendingLimit::assert_seeds(self.spending_limit, &multisig_key, &limit_create_key, &ID)?;
@@ -2963,10 +3031,11 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCloseAccounts<'a> {
 
 		let create_key = stored_create_key(self.multisig)?;
 		let multisig = MultisigSnapshot::load(self.multisig, &create_key)?;
-		let Some(collector) = multisig.rent_collector else {
+		if multisig.rent_collector == Address::default() {
 			return Err(MultisigError::InvalidConfiguration.into());
-		};
-		self.rent_collector.assert_address(&collector)?;
+		}
+		self.rent_collector
+			.assert_address(&multisig.rent_collector)?;
 
 		let index = stored_proposal_index(self.proposal)?;
 		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address(), index)?;
@@ -3491,25 +3560,23 @@ mod tests {
 
 	#[test]
 	fn instruction_codecs_roundtrip_their_arguments() {
-		let mut create_bytes = [0_u8; MultisigCreateIx::SIZE];
 		let (keys, permissions) = sorted_members(2);
+		let mut create_bytes = [0_u8; MultisigCreateIx::SIZE];
 		MultisigCreateIx::initialize(&mut create_bytes, |ix| {
 			ix.bump = 254;
 			ix.threshold.set(2);
 			ix.timelock.set(30);
-			ix.member_count = 2;
-			ix.member_keys = keys;
+			ix.ttl.set(0);
 			ix.member_permissions = permissions;
-			ix.config_authority.set(Some(key(3)));
-			ix.rent_collector.set(None);
+			ix.config_authority = key(3);
+			ix.rent_collector = Address::default();
 			Ok(())
 		})
 		.expect("initialize create ix");
 		let decoded = MultisigCreateIx::try_from_bytes(&create_bytes).expect("decode");
 		assert_eq!(decoded.threshold.get(), 2);
-		assert_eq!(decoded.member_count, 2);
-		assert_eq!(decoded.member_keys[0], keys[0]);
-		assert_eq!(decoded.config_authority.get(), Some(key(3)));
+		assert_eq!(decoded.member_permissions[0], permissions[0]);
+		assert_eq!(decoded.config_authority, key(3));
 
 		let mut proposal_bytes = [0_u8; ProposalCreateIx::SIZE];
 		ProposalCreateIx::initialize(&mut proposal_bytes, |ix| {
@@ -3543,9 +3610,10 @@ mod tests {
 	#[test]
 	fn compact_size_projections_scale_with_active_tails() {
 		assert_eq!(Multisig::projected_bytes(0, 0), Ok(Multisig::HEADER_SIZE));
-		let three = Multisig::projected_bytes(3, 3).expect("three members");
+		let three = Multisig::projected_bytes(3 * 32, 3).expect("three members");
 		assert_eq!(three, Multisig::HEADER_SIZE + 3 * 32 + 3);
-		assert!(Multisig::projected_bytes(25, 25).is_err());
+		// Seventeen members exceed the sixteen-slot roster capacity.
+		assert!(Multisig::projected_bytes(17 * 32, 17).is_err());
 
 		let vault = Proposal::projected_bytes(2, 100, 0).expect("vault proposal");
 		assert_eq!(vault, Proposal::HEADER_SIZE + 2 + 100);
@@ -3554,9 +3622,10 @@ mod tests {
 		assert!(Proposal::projected_bytes(0, 641, 0).is_err());
 		assert!(Proposal::projected_bytes(9, 0, 0).is_err());
 
-		assert!(SpendingLimit::projected_bytes(2, 1).is_ok());
-		assert!(SpendingLimit::projected_bytes(25, 0).is_err());
-		assert!(SpendingLimit::projected_bytes(0, 9).is_err());
+		assert!(SpendingLimit::projected_bytes(2 * 32, 1 * 32).is_ok());
+		// Rosters must hold whole addresses within their capacities.
+		assert!(SpendingLimit::projected_bytes(16 * 32 + 1, 0).is_err());
+		assert!(SpendingLimit::projected_bytes(0, 8 * 32 + 1).is_err());
 	}
 
 	#[test]
@@ -3606,6 +3675,42 @@ mod tests {
 		assert!(!is_expired(100, 100));
 		assert!(!is_expired(100, 99));
 		assert!(is_expired(100, 101));
+	}
+
+	#[test]
+	fn generated_pda_matches_the_documented_seed_derivation() {
+		let ms: Address = [7; 32].into();
+		let seeds = Proposal::seeds(&ms, 1);
+		// The generated seeds struct must encode exactly the documented
+		// byte slices: b"proposal", the address, and the u64 little-endian.
+		assert_eq!(
+			seeds.as_slices(),
+			[
+				b"proposal".as_slice(),
+				ms.as_ref(),
+				1_u64.to_le_bytes().as_slice()
+			]
+		);
+		let with_bump = seeds.with_bump(254);
+		assert_eq!(with_bump.as_slices()[3], &[254]);
+	}
+
+	#[test]
+	fn proposal_status_event_codec_roundtrips() {
+		let mut bytes = [0_u8; ProposalStatusEvent::SIZE];
+		ProposalStatusEvent::initialize(&mut bytes, |event| {
+			event.multisig = [9; 32].into();
+			event.index.set(4);
+			event.status = STATUS_APPROVED;
+			event.timestamp.set(1_700_000_000);
+			Ok(())
+		})
+		.expect("initialize event record");
+		let decoded = ProposalStatusEvent::try_from_bytes(&bytes).expect("decode event record");
+		assert_eq!(decoded.multisig, [9; 32].into());
+		assert_eq!(decoded.index.get(), 4);
+		assert_eq!(decoded.status, STATUS_APPROVED);
+		assert_eq!(decoded.timestamp.get(), 1_700_000_000);
 	}
 
 	#[test]

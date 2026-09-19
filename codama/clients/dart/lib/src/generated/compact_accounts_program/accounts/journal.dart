@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -13,6 +14,7 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class Journal {
   const Journal({
@@ -24,8 +26,9 @@ class Journal {
     required this.entries,
     required this.markers,
     required this.note,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -55,23 +58,12 @@ class Journal {
           note == other.note;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    authority,
-    revision,
-    featuredEntry,
-    title,
-    entries,
-    markers,
-    note,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, authority, revision, featuredEntry, title, entries, markers, note);
 
   @override
-  String toString() =>
-      'Journal(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers, note: $note)';
+  String toString() => 'Journal(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers, note: $note)';
 }
+
 
 Encoder<Journal> getJournalEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -80,84 +72,11 @@ Encoder<Journal> getJournalEncoder() {
     ('bump', getU8Encoder()),
     ('authority', getAddressEncoder()),
     ('revision', getU32Encoder()),
-    (
-      'featuredEntry',
-      getNullableEncoder<BigInt>(
-        transformEncoder(getU64Encoder(), (BigInt value) => value),
-        noneValue: const ZeroesNoneValue(),
-      ),
-    ),
-    (
-      'title',
-      offsetEncoder(
-        getPinaPodBoundedStringEncoder(
-          addEncoderSizePrefix(
-            getUtf8Encoder(),
-            offsetEncoder(
-              offsetEncoder(
-                getU8Encoder(),
-                OffsetConfig(preOffset: (scope) => 48),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-          24,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 12),
-      ),
-    ),
-    (
-      'entries',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU64Encoder(), (BigInt value) => value),
-          size: PrefixedArraySize(
-            offsetEncoder(
-              offsetEncoder(
-                getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 49),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        8,
-      ),
-    ),
-    (
-      'markers',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU8Encoder(), (int value) => value),
-          size: PrefixedArraySize(
-            offsetEncoder(
-              offsetEncoder(
-                getU64Encoder(),
-                OffsetConfig(preOffset: (scope) => 51),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        8,
-      ),
-    ),
-    (
-      'note',
-      getNullableEncoder<String>(
-        transformEncoder(
-          getPinaPodBoundedStringEncoder(
-            addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-            64,
-          ),
-          (String value) => value,
-        ),
-        prefix: offsetEncoder(
-          offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 59)),
-          OffsetConfig(postOffset: (scope) => scope.preOffset),
-        ),
-      ),
-    ),
+    ('featuredEntry', getNullableEncoder<BigInt>(transformEncoder(getU64Encoder(), (BigInt value) => value), noneValue: const ZeroesNoneValue())),
+    ('title', offsetEncoder(getPinaPodBoundedStringEncoder(addEncoderSizePrefix(getUtf8Encoder(), offsetEncoder(offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 48)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0))), 24), OffsetConfig(preOffset: (scope) => scope.preOffset + 12))),
+    ('entries', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU64Encoder(), (BigInt value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 49)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 8)),
+    ('markers', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU64Encoder(), OffsetConfig(preOffset: (scope) => 51)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 8)),
+    ('note', getNullableEncoder<String>(transformEncoder(getPinaPodBoundedStringEncoder(addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()), 64), (String value) => value), prefix: offsetEncoder(offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 59)), OffsetConfig(postOffset: (scope) => scope.preOffset)))),
   ]);
 
   return transformEncoder(
@@ -184,119 +103,28 @@ Decoder<Journal> getJournalDecoder() {
     ('bump', getU8Decoder()),
     ('authority', getAddressDecoder()),
     ('revision', getU32Decoder()),
-    (
-      'featuredEntry',
-      getNullableDecoder<BigInt>(
-        getU64Decoder(),
-        noneValue: const ZeroesNoneValue(),
-      ),
-    ),
-    (
-      'title',
-      offsetDecoder(
-        getPinaPodBoundedStringDecoder(
-          addDecoderSizePrefix(
-            getUtf8Decoder(),
-            getPinaPodBoundedCountDecoder(
-              offsetDecoder(
-                offsetDecoder(
-                  getU8Decoder(),
-                  OffsetConfig(preOffset: (scope) => 48),
-                ),
-                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-              ),
-              24,
-            ),
-          ),
-          24,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 12),
-      ),
-    ),
-    (
-      'entries',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU64Decoder(),
-          size: PrefixedArraySize(
-            offsetDecoder(
-              offsetDecoder(
-                getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 49),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        getPinaPodBoundedCountDecoder(
-          offsetDecoder(
-            offsetDecoder(
-              getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 49),
-            ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-          ),
-          8,
-        ),
-        8,
-      ),
-    ),
-    (
-      'markers',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU8Decoder(),
-          size: PrefixedArraySize(
-            offsetDecoder(
-              offsetDecoder(
-                getU64Decoder(),
-                OffsetConfig(preOffset: (scope) => 51),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        getPinaPodBoundedCountDecoder(
-          offsetDecoder(
-            offsetDecoder(
-              getU64Decoder(),
-              OffsetConfig(preOffset: (scope) => 51),
-            ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-          ),
-          8,
-        ),
-        8,
-      ),
-    ),
-    (
-      'note',
-      getNullableDecoder<String>(
-        getPinaPodBoundedStringDecoder(
-          addDecoderSizePrefix(
-            getUtf8Decoder(),
-            getPinaPodBoundedCountDecoder(getU8Decoder(), 64),
-          ),
-          64,
-        ),
-        prefix: offsetDecoder(
-          offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 59)),
-          OffsetConfig(postOffset: (scope) => scope.preOffset),
-        ),
-      ),
-    ),
+    ('featuredEntry', getNullableDecoder<BigInt>(getU64Decoder(), noneValue: const ZeroesNoneValue())),
+    ('title', offsetDecoder(getPinaPodBoundedStringDecoder(addDecoderSizePrefix(getUtf8Decoder(), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 48)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 24)), 24), OffsetConfig(preOffset: (scope) => scope.preOffset + 12))),
+    ('entries', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU64Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 49)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 49)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 8), 8)),
+    ('markers', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU64Decoder(), OffsetConfig(preOffset: (scope) => 51)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU64Decoder(), OffsetConfig(preOffset: (scope) => 51)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 8), 8)),
+    ('note', getNullableDecoder<String>(getPinaPodBoundedStringDecoder(addDecoderSizePrefix(getUtf8Decoder(), getPinaPodBoundedCountDecoder(getU8Decoder(), 64)), 64), prefix: offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 59)), OffsetConfig(postOffset: (scope) => scope.preOffset)))),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'journal account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'journal account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Journal, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -309,34 +137,36 @@ Decoder<Journal> getJournalDecoder() {
 
     return (
       Journal(
-        bump: map['bump']! as int,
-        authority: map['authority']! as Address,
-        revision: map['revision']! as int,
-        featuredEntry: map['featuredEntry'] as BigInt?,
-        title: map['title']! as String,
-        entries: map['entries']! as List<BigInt>,
-        markers: map['markers']! as List<int>,
-        note: map['note'] as String?,
+      bump: map['bump']! as int,
+      authority: map['authority']! as Address,
+      revision: map['revision']! as int,
+      featuredEntry: map['featuredEntry'] as BigInt?,
+      title: map['title']! as String,
+      entries: map['entries']! as List<BigInt>,
+      markers: map['markers']! as List<int>,
+      note: map['note'] as String?,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<Journal>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
-    VariableSizeDecoder<Map<String, Object?>>() => VariableSizeDecoder<Journal>(
-      read: readTopLevel,
-      maxSize: structDecoder.maxSize,
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<Journal>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
+    VariableSizeDecoder<Map<String, Object?>>() =>
+      VariableSizeDecoder<Journal>(
+        read: readTopLevel,
+        maxSize: structDecoder.maxSize,
+      ),
   };
 }
 
@@ -356,11 +186,11 @@ const int journalMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool journalNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 1) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 1) {
+		return false;
+	}
+	return data[1] < 0;
 }

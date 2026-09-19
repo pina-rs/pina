@@ -13,16 +13,8 @@ final class CreatePdaCommand extends Command<void> {
   CreatePdaCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'payer',
-        mandatory: false,
-        help: "The payer account [default: payer]",
-      )
-      ..addOption(
-        'state',
-        mandatory: false,
-        help: "The state account [default: derived]",
-      );
+      ..addOption('payer', mandatory: false, help: "The payer account [default: payer]")
+      ..addOption('state', mandatory: false, help: "The state account [default: derived]");
   }
 
   @override
@@ -40,7 +32,9 @@ final class CreatePdaCommand extends Command<void> {
         : context.payerAddress;
     final state = (results['state'] as String?) != null
         ? pubkey('--state', results['state']! as String)
-        : (await findStatePda(programAddress: context.programAddress)).$1;
+        : (await findStatePda(
+          programAddress: context.programAddress,
+        )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getCreatePdaInstruction(
       programAddress: context.programAddress,

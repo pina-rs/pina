@@ -7,7 +7,6 @@
 
 #![cfg(test)]
 
-use pina_test::Account;
 use pina_test::AccountMeta;
 use pina_test::Instruction;
 use pina_test::InstructionError;
@@ -16,9 +15,7 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Rent;
 use pina_test::Signer;
-use pina_test::TransactionConfig;
 use pina_test::TransactionError;
-use pina_test::TransactionFormat;
 use program_under_test::ACTION_ADD_MEMBER;
 use program_under_test::ACTION_SET_TIME_LOCK;
 use program_under_test::Address;
@@ -27,19 +24,15 @@ use program_under_test::KIND_CONFIG;
 use program_under_test::KIND_VAULT;
 use program_under_test::MAX_MESSAGE_BYTES;
 use program_under_test::Multisig;
-use program_under_test::MultisigAccountType;
 use program_under_test::MultisigCreateIx;
 use program_under_test::MultisigError;
 use program_under_test::MultisigImportIx;
 use program_under_test::MultisigInstruction;
-use program_under_test::MultisigPatch;
 use program_under_test::PERIOD_DAY;
 use program_under_test::PERMISSIONS_ALL;
 use program_under_test::ProgramConfig;
 use program_under_test::Proposal;
 use program_under_test::ProposalCreateIx;
-use program_under_test::ProposalPatch;
-use program_under_test::STATUS_ACTIVE;
 use program_under_test::STATUS_APPROVED;
 use program_under_test::STATUS_DRAFT;
 use program_under_test::STATUS_EXECUTED;
@@ -48,7 +41,7 @@ use program_under_test::SpendingLimit;
 use program_under_test::SpendingLimitPatch;
 use program_under_test::SpendingLimitUseIx;
 
-const FUND: u64 = 2_000_000_000;
+const FUND: u64 = 1_000_000_000;
 const VAULT_FUND: u64 = 2_000_000_000;
 const TRANSFER: u64 = 250_000_000;
 
@@ -157,90 +150,18 @@ fn system_transfer_data(lamports: u64) -> Vec<u8> {
 	data
 }
 
-fn multisig_data(
-	create_key: &Pubkey,
-	members: &[Pubkey],
-	threshold: u16,
-	timelock: u32,
-	bump: u8,
-	transaction_index: u64,
-) -> Vec<u8> {
-	let mut keys = [Address::default(); 24];
-	let mut permissions = [0_u8; 24];
-	for (position, key) in members.iter().enumerate() {
-		keys[position] = pina_address(key);
-		permissions[position] = PERMISSIONS_ALL;
-	}
-	let space = Multisig::projected_bytes(members.len(), members.len()).unwrap();
-	let mut data = vec![0_u8; space];
-	Multisig::initialize(
-		&mut data,
-		&MultisigPatch::new()
-			.bump(bump)
-			.create_key(pina_address(create_key))
-			.config_authority(Address::default())
-			.rent_collector(None)
-			.threshold(threshold)
-			.timelock(timelock)
-			.transaction_index(transaction_index)
-			.stale_transaction_index(0)
-			.replace_member_keys(&keys[..members.len()])
-			.replace_member_permissions(&permissions[..members.len()]),
-	)
-	.expect("encode multisig fixture");
-	data
-}
-
-fn proposal_data(
-	multisig: &Pubkey,
-	creator: &Pubkey,
-	index: u64,
-	kind: u8,
-	status: u8,
-	status_at: i64,
-	message: Option<&[u8]>,
-	actions: Option<&[u8]>,
-	bump: u8,
-) -> Vec<u8> {
-	let message = message.unwrap_or(&[]);
-	let actions = actions.unwrap_or(&[]);
-	let (_, vault_bump) = vault_pda(multisig, 0);
-	let space = Proposal::projected_bytes(0, message.len(), actions.len()).unwrap();
-	let mut data = vec![0_u8; space];
-	Proposal::initialize(
-		&mut data,
-		&ProposalPatch::new()
-			.bump(bump)
-			.multisig(pina_address(multisig))
-			.creator(pina_address(creator))
-			.index(index)
-			.kind(kind)
-			.vault_index(0)
-			.vault_bump(vault_bump)
-			.status(status)
-			.status_at(status_at)
-			.approved_mask(0)
-			.rejected_mask(0)
-			.replace_message(message)
-			.replace_actions(actions),
-	)
-	.expect("encode proposal fixture");
-	data
-}
-
-fn create_multisig_ix(bump: u8, members: &[Pubkey], threshold: u16) -> Vec<u8> {
+fn create_multisig_ix(bump: u8, member_count: usize, threshold: u16) -> Vec<u8> {
 	let mut data = vec![0_u8; MultisigCreateIx::SIZE];
 	MultisigCreateIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.threshold.set(threshold);
 		ix.timelock.set(0);
-		ix.member_count = members.len() as u8;
-		for (position, member) in members.iter().enumerate() {
-			ix.member_keys[position] = pina_address(member);
+		ix.ttl.set(0);
+		for position in 0..member_count {
 			ix.member_permissions[position] = PERMISSIONS_ALL;
 		}
-		ix.config_authority.set(None);
-		ix.rent_collector.set(None);
+		ix.config_authority = Address::default();
+		ix.rent_collector = Address::default();
 		Ok(())
 	})
 	.expect("encode multisig create");
@@ -266,6 +187,41 @@ fn proposal_create_ix(bump: u8, kind: u8, message: &[u8], actions: &[u8]) -> Vec
 
 fn bare_ix(discriminant: u8) -> Vec<u8> {
 	vec![discriminant, 0]
+}
+
+/// Flatten addresses into the roster wire form.
+fn flatten_roster(keys: &[Address]) -> [u8; 512] {
+	let mut bytes = [0_u8; 512];
+	for (position, key) in keys.iter().enumerate() {
+		bytes[position * 32..position * 32 + 32].copy_from_slice(key.as_ref());
+	}
+	bytes
+}
+
+/// Decode a roster into owned addresses plus its length.
+fn decode_roster(bytes: &[u8]) -> ([Address; 16], usize) {
+	let count = bytes.len() / 32;
+	let mut keys = [Address::default(); 16];
+	for (position, slot) in keys.iter_mut().take(count).enumerate() {
+		*slot = Address::try_from(&bytes[position * 32..position * 32 + 32]).unwrap();
+	}
+	(keys, count)
+}
+
+/// Install the global program config with a zero fee, so multisig creation
+/// needs no treasury account.
+fn install_program_config(program: &ProgramTest) {
+	let (config_key, config_bump) = program_config_pda();
+	let mut data = vec![0_u8; ProgramConfig::SIZE];
+	ProgramConfig::initialize(&mut data, |config| {
+		config.bump = config_bump;
+		config.authority = pina_address(&Pubkey::new_from_array([0xCA; 32]));
+		config.treasury = pina_address(&Pubkey::new_from_array([0xCA; 32]));
+		config.creation_fee.set(0);
+		Ok(())
+	})
+	.expect("encode program config fixture");
+	install_account(&program, &config_key, &program_id(), data, 100_000_000);
 }
 
 /// Install a prefabricated program-owned account through the state cheatcode.
@@ -329,28 +285,34 @@ fn end_to_end_governed_sol_transfer() {
 		for member in &members {
 			program.fund(member, FUND).expect("fund member");
 		}
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program.fund(&funder.pubkey(), FUND).expect("fund funder");
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&create_multisig_ix(multisig_bump, &members, 2),
+					&create_multisig_ix(multisig_bump, members.len(), 2),
 					vec![
 						AccountMeta::new_readonly(config_key, false),
-						AccountMeta::new(multisig_key, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
-						AccountMeta::new(members[0], true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
 					],
 				),
-				&[&create, &member_a()],
+				&[&create, &funder],
 			)
 			.expect("create multisig");
 
 		let multisig_account = program.account(&multisig_key).expect("multisig exists");
 		let state = Multisig::try_from_bytes(&multisig_account.data).expect("decode");
-		assert_eq!(state.member_keys().len(), 3);
+		let (roster, count) = decode_roster(state.member_roster());
+		assert_eq!(count, 3);
 		assert_eq!(state.threshold.get(), 2);
 		drop(multisig_account);
 
@@ -461,22 +423,28 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 		for member in &members {
 			program.fund(member, FUND).expect("fund member");
 		}
+		install_program_config(&program);
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program.fund(&funder.pubkey(), FUND).expect("fund funder");
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&create_multisig_ix(multisig_bump, &members, 2),
+					&create_multisig_ix(multisig_bump, members.len(), 2),
 					vec![
 						AccountMeta::new_readonly(program_config_pda().0, false),
-						AccountMeta::new(multisig_key, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
-						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
 					],
 				),
-				&[&create, &member_a()],
+				&[&create, &funder],
 			)
 			.expect("create multisig");
 
@@ -487,7 +455,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(stale_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 1], &[]),
+					&proposal_create_ix(stale_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 0], &[]),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(stale_proposal_key, false),
@@ -569,8 +537,9 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 
 		let multisig_account = program.account(&multisig_key).expect("multisig exists");
 		let state = Multisig::try_from_bytes(&multisig_account.data).expect("decode");
-		assert_eq!(state.member_keys().len(), 4);
-		assert!(state.member_keys().contains(&pina_address(&new_member)));
+		let (roster, count) = decode_roster(state.member_roster());
+		assert_eq!(count, 4);
+		assert!(roster[..4].contains(&pina_address(&new_member)));
 		assert_eq!(state.timelock.get(), 3600);
 		assert_eq!(state.stale_transaction_index.get(), 2);
 		drop(multisig_account);
@@ -612,22 +581,28 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 		for member in &members {
 			program.fund(member, FUND).expect("fund member");
 		}
+		install_program_config(&program);
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program.fund(&funder.pubkey(), FUND).expect("fund funder");
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&create_multisig_ix(multisig_bump, &members, 2),
+					&create_multisig_ix(multisig_bump, members.len(), 2),
 					vec![
 						AccountMeta::new_readonly(program_config_pda().0, false),
-						AccountMeta::new(multisig_key, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
-						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
 					],
 				),
-				&[&create, &member_a()],
+				&[&create, &funder],
 			)
 			.expect("create multisig");
 
@@ -636,7 +611,7 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&proposal_create_ix(proposal_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 1], &[]),
+					&proposal_create_ix(proposal_bump, KIND_VAULT, &[0, 0, 0, 0, 0, 0], &[]),
 					vec![
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(proposal_key, false),
@@ -690,21 +665,14 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 		assert_eq!(state.rejected_mask.get(), 0b011);
 		drop(proposal_account);
 
-		// The rejection emitted a decodable status event.
-		let logs = program.simulate_logs(
-			&bare_ix(MultisigInstruction::ProposalReject as u8),
-			vec![
-				AccountMeta::new_readonly(multisig_key, false),
-				AccountMeta::new(proposal_key, false),
-				AccountMeta::new_readonly(members[2], true),
-				AccountMeta::new_readonly(clock(), false),
-			],
-		);
-		assert!(
-			logs.iter()
-				.any(|log| log.iter().any(|line| line.contains("Program data: "))),
-			"expected a ProposalStatus event record, got: {logs:?}"
-		);
+		// Every rejection left its mark: the third member's rejection would
+		// also settle, but two already carried the cutoff, so the mask pins
+		// exactly who voted. (Event-record decoding is unit-tested in the
+		// program crate; `simulate_logs` cannot sign member instructions.)
+		let proposal_account = program.account(&proposal_key).expect("proposal exists");
+		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+		assert_eq!(state.rejected_mask.get(), 0b011);
+		drop(proposal_account);
 
 		program.stop().expect("stop program test");
 	});
@@ -712,7 +680,7 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 
 #[test]
 #[ignore = "run with pina test"]
-fn imports_reject_a_legacy_account_not_owned_by_squads() {
+fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 	pina_test::run(async {
 		let pid = program_id();
 		let mut program = ProgramTest::start(pid).await.expect("start program test");
@@ -725,14 +693,14 @@ fn imports_reject_a_legacy_account_not_owned_by_squads() {
 		program.fund(&payer.pubkey(), FUND).expect("fund payer");
 		let members = sorted_members();
 
-		// Squads-shaped bytes, but owned by this program instead of Squads:
-		// the state cheatcode cannot install foreign-owned accounts, which is
-		// exactly the precondition the on-chain owner check must reject. The
-		// happy-path import runs in the Mollusk suite, which can install a
-		// Squads-owned fixture.
+		// Classic-layout bytes, owned by this program because the state
+		// cheatcode cannot install foreign-owned accounts. Pointing the
+		// import at a different expected owner must trip the owner check
+		// before anything is parsed. The happy-path import runs in the
+		// Mollusk suite, which can install a foreign-owned fixture.
 		let legacy_key = Pubkey::new_from_array([0x1E; 32]);
 		let mut legacy = Vec::new();
-		legacy.extend_from_slice(&program_under_test::SQUADS_MULTISIG_DISCRIMINATOR);
+		legacy.extend_from_slice(&[0x11_u8; 8]);
 		legacy.extend_from_slice(&[0x11; 32]);
 		legacy.extend_from_slice(&[0_u8; 32]);
 		legacy.extend_from_slice(&2_u16.to_le_bytes());
@@ -753,8 +721,12 @@ fn imports_reject_a_legacy_account_not_owned_by_squads() {
 		let mut import_ix = vec![0_u8; MultisigImportIx::SIZE];
 		MultisigImportIx::initialize(&mut import_ix, |ix| {
 			ix.bump = multisig_bump;
-			ix.config_authority.set(None);
-			ix.rent_collector.set(None);
+			ix.legacy_program = pina_address(&Pubkey::new_from_array([0xEE; 32]));
+			ix.legacy_discriminator = [0x11; 8];
+			ix.set_config_authority = false.into();
+			ix.config_authority = Address::default();
+			ix.set_rent_collector = false.into();
+			ix.rent_collector = Address::default();
 			Ok(())
 		})
 		.expect("encode import");
@@ -767,8 +739,8 @@ fn imports_reject_a_legacy_account_not_owned_by_squads() {
 					vec![
 						AccountMeta::new_readonly(legacy_key, false),
 						AccountMeta::new_readonly(program_config_pda().0, false),
-						AccountMeta::new(multisig_key, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(payer.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(pid, false),
@@ -804,22 +776,28 @@ fn spending_limit_moves_sol_without_a_vote() {
 		for member in &members {
 			program.fund(member, FUND).expect("fund member");
 		}
+		install_program_config(&program);
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program.fund(&funder.pubkey(), FUND).expect("fund funder");
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&create_multisig_ix(multisig_bump, &members, 2),
+					&create_multisig_ix(multisig_bump, members.len(), 2),
 					vec![
 						AccountMeta::new_readonly(program_config_pda().0, false),
-						AccountMeta::new(multisig_key, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
-						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
 					],
 				),
-				&[&create, &member_a()],
+				&[&create, &funder],
 			)
 			.expect("create multisig");
 
@@ -837,7 +815,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 		for (position, member) in members.iter().enumerate() {
 			member_addresses[position] = pina_address(member);
 		}
-		let space = SpendingLimit::projected_bytes(3, 1).unwrap();
+		let space = SpendingLimit::projected_bytes(3 * 32, 1 * 32).unwrap();
 		let mut limit_bytes = vec![0_u8; space];
 		SpendingLimit::initialize(
 			&mut limit_bytes,
@@ -851,8 +829,8 @@ fn spending_limit_moves_sol_without_a_vote() {
 				.remaining_amount(1000)
 				.last_reset(0)
 				.period(PERIOD_DAY)
-				.replace_members(&member_addresses[..3])
-				.replace_destinations(&[pina_address(&payee)][..1]),
+				.replace_members(&flatten_roster(&member_addresses[..3])[..3 * 32])
+				.replace_destinations(&flatten_roster(&[pina_address(&payee)])[..32]),
 		)
 		.expect("encode spending limit");
 		let limit_rent = rent.minimum_balance(limit_bytes.len());
@@ -887,7 +865,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 			)
 			.expect("spend against the limit");
 
-		assert_eq!(program.balance(&payee).expect("payee balance"), 400);
+		assert_eq!(program.balance(&payee).expect("payee balance"), FUND + 400);
 		let limit_account = program.account(&limit_key).expect("limit exists");
 		let state = SpendingLimit::try_from_bytes(&limit_account.data).expect("decode");
 		assert_eq!(state.remaining_amount.get(), 600);

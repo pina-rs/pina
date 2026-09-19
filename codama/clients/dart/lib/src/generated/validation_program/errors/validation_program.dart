@@ -33,20 +33,13 @@ const int validationProgramErrorInvalidEvent = 0x7; // 7
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _validationProgramErrorMessages = {
-  validationProgramErrorInvalidPolicyRange:
-      'The lower policy bound must not exceed the upper bound.',
-  validationProgramErrorInvalidAmount:
-      'An instruction amount is outside the absolute limits of this program.',
-  validationProgramErrorInvalidMemo:
-      'A human-readable memo is too short or too long.',
-  validationProgramErrorInvalidApprovals:
-      'A check must contain exactly two different approval codes.',
-  validationProgramErrorInvalidAccounts:
-      'The validated account list violates a relationship between accounts.',
-  validationProgramErrorAmountOutsidePolicy:
-      'The amount does not fall inside the bounds stored in the policy account.',
-  validationProgramErrorInvalidEvent:
-      'The event would describe an invalid policy check.',
+    validationProgramErrorInvalidPolicyRange: 'The lower policy bound must not exceed the upper bound.',
+    validationProgramErrorInvalidAmount: 'An instruction amount is outside the absolute limits of this program.',
+    validationProgramErrorInvalidMemo: 'A human-readable memo is too short or too long.',
+    validationProgramErrorInvalidApprovals: 'A check must contain exactly two different approval codes.',
+    validationProgramErrorInvalidAccounts: 'The validated account list violates a relationship between accounts.',
+    validationProgramErrorAmountOutsidePolicy: 'The amount does not fall inside the bounds stored in the policy account.',
+    validationProgramErrorInvalidEvent: 'The event would describe an invalid policy check.',
 };
 
 /// Get the error message for a ValidationProgram program error code.

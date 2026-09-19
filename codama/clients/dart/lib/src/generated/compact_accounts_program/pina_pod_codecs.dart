@@ -6,9 +6,7 @@ import 'dart:typed_data';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 
 Never _pinaPodCapacityError(String kind, Object length, int capacity) {
-  throw RangeError(
-    'PinaPod $kind length $length exceeds its capacity $capacity',
-  );
+  throw RangeError('PinaPod $kind length $length exceeds its capacity $capacity');
 }
 
 sealed class PinaPodFixedLayout {
@@ -68,13 +66,7 @@ final class PinaPodStringLayout extends PinaPodFixedLayout {
 
   @override
   void validate(Uint8List bytes, int offset) {
-    final length = _readPinaPodLength(
-      bytes,
-      offset,
-      prefixBytes,
-      capacity,
-      'string',
-    );
+    final length = _readPinaPodLength(bytes, offset, prefixBytes, capacity, 'string');
     utf8.decode(
       bytes.sublist(offset + prefixBytes, offset + prefixBytes + length),
       allowMalformed: false,
@@ -97,13 +89,7 @@ final class PinaPodVecLayout extends PinaPodFixedLayout {
 
   @override
   void validate(Uint8List bytes, int offset) {
-    final length = _readPinaPodLength(
-      bytes,
-      offset,
-      prefixBytes,
-      capacity,
-      'collection',
-    );
+    final length = _readPinaPodLength(bytes, offset, prefixBytes, capacity, 'collection');
     if (item == null) return;
     var itemOffset = offset + prefixBytes;
     for (var index = 0; index < length; index++) {
@@ -190,22 +176,20 @@ Decoder<List<T>> getPinaPodBoundedArrayDecoder<T, TCount>(
   };
 }
 
-Decoder<T> getPinaPodBoundedCountDecoder<T>(Decoder<T> decoder, int capacity) =>
-    transformDecoder<T, T>(decoder, (value, _, _) {
-      final count = switch (value) {
-        final int value => BigInt.from(value),
-        final BigInt value => value,
-        _ => throw ArgumentError.value(
-          value,
-          'value',
-          'expected an integer count',
-        ),
-      };
-      if (count > BigInt.from(capacity)) {
-        _pinaPodCapacityError('collection', count, capacity);
-      }
-      return value;
-    });
+Decoder<T> getPinaPodBoundedCountDecoder<T>(
+  Decoder<T> decoder,
+  int capacity,
+) => transformDecoder<T, T>(decoder, (value, _, _) {
+  final count = switch (value) {
+    final int value => BigInt.from(value),
+    final BigInt value => value,
+    _ => throw ArgumentError.value(value, 'value', 'expected an integer count'),
+  };
+  if (count > BigInt.from(capacity)) {
+    _pinaPodCapacityError('collection', count, capacity);
+  }
+  return value;
+});
 
 Encoder<String> getPinaPodBoundedStringEncoder(
   Encoder<String> encoder,
