@@ -42,8 +42,8 @@ const MAX_MEMBERS: usize = 24;
 #[account(discriminator = AccountType, compact)]
 pub struct Roster {
 	pub bump: u8,
-	pub members: Vec<Address, MAX_MEMBERS>,
 	pub slots: [u8; MAX_MEMBERS],
+	pub members: Vec<Address, MAX_MEMBERS>,
 }
 ```
 
