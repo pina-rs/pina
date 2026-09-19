@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "55555555555555555555555555555555555555555555",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "OracleState",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "227d9ed6d8ce4a76a53aa7a4f1af4323eed66eca5dfb59ecdc075ea80e7e56b6",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -31,23 +29,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 40,
-							"fields": [
-								{
-									"name": "authority",
-									"offset": 0,
-									"size": 32
-								},
-								{
-									"name": "price",
-									"offset": 32,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -62,17 +44,10 @@
 			"rustName": "InitializeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -102,7 +77,6 @@
 							}
 						]
 					},
-					"processSha256": "17f6eba5203219f10eb81750ee218eeb8adc564c8d3c108d53b0c2779c65d2c7",
 					"transition": null
 				}
 			]
@@ -116,8 +90,6 @@
 			"rustName": "UpdateInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "4b641f907065d52779b1b7268c9da6dcc22ed056410d84b486eb04d1088e2e04",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -126,18 +98,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "new_price",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -159,7 +120,6 @@
 							}
 						]
 					},
-					"processSha256": "f346d90db37631913ffa1b99e89c930f49bfd943d5c16189b8ffd4d132330901",
 					"transition": null
 				}
 			]
@@ -173,8 +133,6 @@
 			"rustName": "RotateAuthorityInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "7e3464012832d8790c4e8c2587f24806bda884d16b036b72be60e80a4e32d373",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -183,18 +141,7 @@
 								"rustType": "Address"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 32,
-							"fields": [
-								{
-									"name": "new_authority",
-									"offset": 0,
-									"size": 32
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -216,7 +163,6 @@
 							}
 						]
 					},
-					"processSha256": "f346d90db37631913ffa1b99e89c930f49bfd943d5c16189b8ffd4d132330901",
 					"transition": null
 				}
 			]

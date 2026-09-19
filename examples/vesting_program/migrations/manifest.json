@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "VestingState",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "6cf459c72a68b1aeb54c61d65907e1ab18f3ab9e6996a8368639f48b8fba5fd7",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -63,63 +61,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 138,
-							"fields": [
-								{
-									"name": "admin",
-									"offset": 0,
-									"size": 32
-								},
-								{
-									"name": "beneficiary",
-									"offset": 32,
-									"size": 32
-								},
-								{
-									"name": "mint",
-									"offset": 64,
-									"size": 32
-								},
-								{
-									"name": "total_amount",
-									"offset": 96,
-									"size": 8
-								},
-								{
-									"name": "claimed_amount",
-									"offset": 104,
-									"size": 8
-								},
-								{
-									"name": "start_ts",
-									"offset": 112,
-									"size": 8
-								},
-								{
-									"name": "cliff_ts",
-									"offset": 120,
-									"size": 8
-								},
-								{
-									"name": "end_ts",
-									"offset": 128,
-									"size": 8
-								},
-								{
-									"name": "cancelled",
-									"offset": 136,
-									"size": 1
-								},
-								{
-									"name": "bump",
-									"offset": 137,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -134,8 +76,6 @@
 			"rustName": "InitializeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "2f30bf3c9fb6bfb100f6628930a442e868f98660eea7c3d1dc4fc94f977f52e1",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -160,38 +100,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 33,
-							"fields": [
-								{
-									"name": "total_amount",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "start_ts",
-									"offset": 8,
-									"size": 8
-								},
-								{
-									"name": "cliff_ts",
-									"offset": 16,
-									"size": 8
-								},
-								{
-									"name": "end_ts",
-									"offset": 24,
-									"size": 8
-								},
-								{
-									"name": "bump",
-									"offset": 32,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -261,7 +170,6 @@
 							}
 						]
 					},
-					"processSha256": "4a9876086d7ac466a7f3a52058fdf4e9207003bfb888f1bc1bbb105b75b45c21",
 					"transition": null
 				}
 			]
@@ -275,8 +183,6 @@
 			"rustName": "ClaimInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "570e85ef9ebe7b433f64a94512a1e2524f45842e8b277f9f370cf3d82a57daf6",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -285,18 +191,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "amount",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -374,7 +269,6 @@
 							}
 						]
 					},
-					"processSha256": "8dff471bba0cf9284bc92c6bc4b477ebbc9c3bc415a342e8fee75ba734296ea5",
 					"transition": null
 				}
 			]
@@ -388,17 +282,10 @@
 			"rustName": "CancelInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -468,7 +355,6 @@
 							}
 						]
 					},
-					"processSha256": "6bd6beca94cc63892a9ca12bc4754ff72e86eeeb72a9e837c77e0da658ffd668",
 					"transition": null
 				}
 			]

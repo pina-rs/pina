@@ -464,31 +464,41 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 		.stderr(Stdio::piped())
 		.spawn()
 		.unwrap_or_else(|error| panic!("spawn deployment with held-open stdin: {error}"));
-	let deadline = Instant::now() + Duration::from_secs(3);
+	// The property under test is the marker the fake `solana` writes after
+	// reading EOF, so the loop waits for that rather than for the child to
+	// exit: Pina still has planning and receipt work to finish after the
+	// deployment child returns, and `cargo metadata` on a loaded machine takes
+	// over a second before the child is even spawned. The deadline is a hang
+	// bound only. Stdio stays held open for the whole test, so the child
+	// reads EOF solely because Pina redirected its stdin to the null device —
+	// a child that inherited Pina's stdin blocks forever and never writes the
+	// marker, which is what the deadline catches.
+	let deadline = Instant::now() + Duration::from_secs(30);
 
 	let timed_out = loop {
-		if child
-			.try_wait()
-			.unwrap_or_else(|error| panic!("poll deployment: {error}"))
-			.is_some()
-		{
+		if marker.is_file() {
 			break false;
 		}
 
 		if Instant::now() >= deadline {
-			drop(child.stdin.take());
 			break true;
 		}
 
 		std::thread::sleep(Duration::from_millis(10));
 	};
 
+	if timed_out {
+		// Release the pipe so a blocked child can finish before the error
+		// message reads its stderr.
+		drop(child.stdin.take());
+	}
+
 	let output = child
 		.wait_with_output()
 		.unwrap_or_else(|error| panic!("collect deployment: {error}"));
 	assert!(
 		!timed_out,
-		"Solana inherited Pina stdin and blocked; stderr: {}",
+		"Solana never read EOF, so it inherited Pina's open stdin; stderr: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
 	assert!(

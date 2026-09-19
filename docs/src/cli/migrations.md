@@ -185,13 +185,24 @@ When the exact planned inputs cannot be reproduced (for example a cleaned build 
 
 ## ABI document upgrades
 
-`formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.
+`abiVersion` belongs to Pina's migration document. It is independent of each account or instruction version, and it names the `pina_abi` release line that wrote the document: the value is the `major.minor` committed in `crates/pina_abi/ABI_VERSION`, which advances with a breaking `pina_abi` release and with nothing else.
 
-Manifest format 3 freezes the PinaPod codec plus payload-relative fixed offsets and compact header, prefix, capacity, tail-order, and alignment metadata. Pina derives that descriptor from its closed field grammar and rejects a stored descriptor that disagrees. Historical manifest format 2 documents are upgraded by deriving and rehashing this metadata; a format 3 manifest can downgrade to format 2 only through the matching inverse converter.
+Reads reject a document stamped above the running build, naming the supported version, and reject one below the oldest supported version with the remedy that regenerates it. Anything between is normalized through an ordered table of adjacent converters before the typed model is read, so a document an older release wrote still opens. Conversions run in memory only: no command rewrites a checked-in document as a side effect of reading it.
 
-Manifest format 4 records the `[migrations].auto` policy. A format 3 document upgrades with no policy; a format 4 document can downgrade to format 3 only after the policy is cleared, because format 3 cannot represent it.
+The 0.20 reset replaced the integer `formatVersion` counters. A document from an older release must be regenerated rather than read:
 
-Publication-ledger format 3 adds the recoverable pending deployment record. Format 2 ledgers upgrade with no pending deployment. A format 3 ledger can downgrade to format 2 only when no deployment is pending.
+```sh
+pina migrations sync
+```
+
+`pina abi schema` prints the JSON Schema for a document, generated from the same types that read and write it:
+
+```sh
+pina abi schema --document manifest > manifest.schema.json
+pina abi schema --document publications
+```
+
+Each version's schema is checked in under `crates/pina_abi/schemas/`, frozen beside its fixture under `crates/pina_abi/fixtures/<version>/`, and published under this book at a permanent URL — `https://pina-rs.github.io/pina/abi/schemas/<version>/manifest.schema.json` — which its `$id` names. Only the version this build writes can be printed; an older version's shape is recorded by its frozen fixture rather than reproduced under a new build.
 
 An ABI document upgrade does not consume an on-chain migration version.
 

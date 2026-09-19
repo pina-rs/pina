@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "PolicyState",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "af0c41a0121d7cbce909cd26987a1092c956456f12c9de17edb54ab56cd87e2e",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -39,33 +37,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 18,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "minimum",
-									"offset": 1,
-									"size": 8
-								},
-								{
-									"name": "maximum",
-									"offset": 9,
-									"size": 8
-								},
-								{
-									"name": "required_approvals",
-									"offset": 17,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -80,8 +52,6 @@
 			"rustName": "PolicyChecked",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "4dcb3bd09cf7c284a408e80a32634fb7984edf85d99ec5a40b8da7ba48bee387",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -102,33 +72,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 80,
-							"fields": [
-								{
-									"name": "amount",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "memo",
-									"offset": 8,
-									"size": 65
-								},
-								{
-									"name": "approvals",
-									"offset": 73,
-									"size": 6
-								},
-								{
-									"name": "required_approvals",
-									"offset": 79,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -143,8 +87,6 @@
 			"rustName": "InitializePolicyInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "af0c41a0121d7cbce909cd26987a1092c956456f12c9de17edb54ab56cd87e2e",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -165,33 +107,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 18,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "minimum",
-									"offset": 1,
-									"size": 8
-								},
-								{
-									"name": "maximum",
-									"offset": 9,
-									"size": 8
-								},
-								{
-									"name": "required_approvals",
-									"offset": 17,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -201,10 +117,7 @@
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,
-								"pda": null,
-								"constraints": [
-									"signer"
-								]
+								"pda": null
 							},
 							{
 								"name": "policy",
@@ -212,11 +125,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "policy",
-								"constraints": [
-									"distinct_from=authority",
-									"empty"
-								]
+								"pda": "policy"
 							},
 							{
 								"name": "system_program",
@@ -224,14 +133,10 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null,
-								"constraints": [
-									"program=system::ID"
-								]
+								"pda": null
 							}
 						]
 					},
-					"processSha256": "9fdbd53428c623ff04e0fded227e2e160aafb807d95625775eb71d121d96165c",
 					"transition": null
 				}
 			]
@@ -245,8 +150,6 @@
 			"rustName": "CheckPolicyInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "3015ea557bc12463709ea8d70bcb6834f6d6c8606de58af4394972fc10132fab",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -263,28 +166,7 @@
 								"rustType": "Vec<u8, 4>"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 79,
-							"fields": [
-								{
-									"name": "amount",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "memo",
-									"offset": 8,
-									"size": 65
-								},
-								{
-									"name": "approvals",
-									"offset": 73,
-									"size": 6
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -294,10 +176,7 @@
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,
-								"pda": null,
-								"constraints": [
-									"signer"
-								]
+								"pda": null
 							},
 							{
 								"name": "policy",
@@ -305,12 +184,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "policy",
-								"constraints": [
-									"distinct_from=authority",
-									"not_empty",
-									"owner=ID"
-								]
+								"pda": "policy"
 							},
 							{
 								"name": "audit",
@@ -318,11 +192,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": null,
-								"constraints": [
-									"distinct_from=policy",
-									"writable"
-								]
+								"pda": null
 							},
 							{
 								"name": "system_program",
@@ -330,14 +200,10 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null,
-								"constraints": [
-									"program=system::ID"
-								]
+								"pda": null
 							}
 						]
 					},
-					"processSha256": "56d510d47f5b35bcb39dcb1d5ab6f97342c8b0abfd451733c64c58e84da5e135",
 					"transition": null
 				}
 			]

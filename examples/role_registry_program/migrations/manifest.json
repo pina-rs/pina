@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "RegistryConfig",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "03133490fdfceec86b09a731bd858b3e4302146eaffc8d8ca9418c56b464fe72",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -35,28 +33,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 41,
-							"fields": [
-								{
-									"name": "admin",
-									"offset": 0,
-									"size": 32
-								},
-								{
-									"name": "role_count",
-									"offset": 32,
-									"size": 8
-								},
-								{
-									"name": "bump",
-									"offset": 40,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -71,8 +48,6 @@
 			"rustName": "RoleEntry",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "87145f3217bb24b6bcd5c0572de0786e40ee7999c6b17ee371336221294b24ad",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -101,43 +76,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 82,
-							"fields": [
-								{
-									"name": "registry",
-									"offset": 0,
-									"size": 32
-								},
-								{
-									"name": "role_id",
-									"offset": 32,
-									"size": 8
-								},
-								{
-									"name": "grantee",
-									"offset": 40,
-									"size": 32
-								},
-								{
-									"name": "permissions",
-									"offset": 72,
-									"size": 8
-								},
-								{
-									"name": "active",
-									"offset": 80,
-									"size": 1
-								},
-								{
-									"name": "bump",
-									"offset": 81,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -152,8 +91,6 @@
 			"rustName": "InitializeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "43124b1aa7c67081addd4259a24fbc507a54bca9953fea6e38dadfaceee4a8ef",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -162,18 +99,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 1,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -203,7 +129,6 @@
 							}
 						]
 					},
-					"processSha256": "79f88fba488bf17eaa6e78f614da37866cca1d0bf2ebd955f0163d008df09033",
 					"transition": null
 				}
 			]
@@ -217,8 +142,6 @@
 			"rustName": "AddRoleInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "921ddc37ea2f302f274d441962f4da8d55156d6db5a133301b08ebcebd7a4cf3",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -235,28 +158,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 17,
-							"fields": [
-								{
-									"name": "role_id",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "permissions",
-									"offset": 8,
-									"size": 8
-								},
-								{
-									"name": "bump",
-									"offset": 16,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -302,7 +204,6 @@
 							}
 						]
 					},
-					"processSha256": "ef3fd807e065c387a4aa6a824b36a2f0b157beafe6f98615fbef4e1c56d55bbc",
 					"transition": null
 				}
 			]
@@ -316,8 +217,6 @@
 			"rustName": "UpdateRoleInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "2fdd4c5ad4612c8fcedbd1eca6df4b99814e9897e41a304f770a11ef14138ea5",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -326,18 +225,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "permissions",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -367,7 +255,6 @@
 							}
 						]
 					},
-					"processSha256": "e5243343d5f83a1dd60625ce3fb06e56cd97b1633446a07e92a9f660f6a56de8",
 					"transition": null
 				}
 			]
@@ -381,17 +268,10 @@
 			"rustName": "DeactivateRoleInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -421,7 +301,6 @@
 							}
 						]
 					},
-					"processSha256": "e5243343d5f83a1dd60625ce3fb06e56cd97b1633446a07e92a9f660f6a56de8",
 					"transition": null
 				}
 			]
@@ -435,17 +314,10 @@
 			"rustName": "RotateAdminInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -475,7 +347,6 @@
 							}
 						]
 					},
-					"processSha256": "2ffb20a80d566a442d93fb4916cce6138b3dd130331386c6ee4a22dd8d98bf93",
 					"transition": null
 				}
 			]
