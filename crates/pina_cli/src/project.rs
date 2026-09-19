@@ -1506,7 +1506,7 @@ mode = "overwrite"
 		write_program(temp.path(), "counter");
 		fs::write(
 			temp.path().join(CONFIG_FILE_NAME),
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u64\"\n",
+			"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u64\"\n",
 		)
 		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
 
@@ -2188,7 +2188,7 @@ mode = "overwrite"
 		fs::write(
 			root.join(CONFIG_FILE_NAME),
 			format!(
-				"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n{migrations}"
+				"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{migrations}"
 			),
 		)
 		.unwrap_or_else(|error| panic!("failed to write config: {error}"));

@@ -15,7 +15,7 @@ The desired developer model is declarative:
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 ```
 
 ```rust
@@ -30,7 +30,7 @@ A program that wants every contract versioned should not have to repeat the anno
 
 ```toml
 [migrations]
-version-type = "u8"
+version_type = "u8"
 auto = true # or a staged subset such as ["accounts", "events"]
 ```
 
@@ -52,7 +52,7 @@ Every opted-in wire contract uses this envelope:
 
 The discriminator remains at offset zero. The version is little-endian and is hidden from generated accessors and patches. Version zero is the first migratable representation.
 
-`[migrations].version-type` is global for the program. Pina initially accepts `u8`, `u16`, and `u32`. It does not accept per-account or per-instruction overrides. The width may change while the program has no published migration-aware release. The first persistent publication freezes the width, byte order, and header offset for that program identity.
+`[migrations].version_type` is global for the program. Pina initially accepts `u8`, `u16`, and `u32`. It does not accept per-account or per-instruction overrides. The width may change while the program has no published migration-aware release. The first persistent publication freezes the width, byte order, and header offset for that program identity.
 
 Each account, instruction contract, and event advances independently. An instruction version snapshots both its payload and its process account ABI. Either a payload change or a compatible appended-optional process change advances the instruction version after publication.
 

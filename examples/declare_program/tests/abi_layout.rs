@@ -8,7 +8,7 @@
 
 // manifest-sha256: e537395071f2cf93dfd2dd05f5c12611a725cdb37add2089d25db127788818eb
 // program-id: Dec1areProgram11111111111111111111111111111
-// version-type: u8
+// version_type: u8
 
 #![allow(clippy::identity_op, clippy::eq_op)]
 #![allow(clippy::unreadable_literal)]
