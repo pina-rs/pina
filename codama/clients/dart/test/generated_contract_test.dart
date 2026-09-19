@@ -665,6 +665,7 @@ const expectedPrograms = <String>[
   'escrow_program',
   'events_program',
   'float_accounts_program',
+  'heap_alloc_program',
   'hello_solana_program',
   'migrations_program',
   'multisig_program',
