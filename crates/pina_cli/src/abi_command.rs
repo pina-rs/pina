@@ -72,9 +72,13 @@ mod tests {
 			let rendered =
 				render_schema(document, None).unwrap_or_else(|error| panic!("{document}: {error}"));
 			assert!(rendered.ends_with('\n'), "output must be redirect-safe");
+			// The schema names the release that wrote it and the permanent URL
+			// where it is published, so a consumer can cite a stable address.
 			assert!(
-				rendered.contains(ABI_VERSION),
-				"the schema must name the version it describes"
+				rendered.contains(&format!(
+					"https://pina-rs.github.io/pina/abi/schemas/{ABI_VERSION}/{document}.schema.json"
+				)),
+				"the schema must carry its published URL"
 			);
 			let explicit = render_schema(document, Some(ABI_VERSION))
 				.unwrap_or_else(|error| panic!("{document} at {ABI_VERSION}: {error}"));
@@ -98,14 +102,5 @@ mod tests {
 	fn schema_command_exit_codes_are_stable() {
 		assert_eq!(run_abi_schema("manifest", None), 0);
 		assert_eq!(run_abi_schema("other", None), 1);
-	}
-
-	#[test]
-	fn published_urls_are_permanent_and_versioned() {
-		let url =
-			published_schema_url("manifest", ABI_VERSION).unwrap_or_else(|| panic!("manifest URL"));
-		assert!(url.ends_with("/manifest.schema.json"));
-		assert!(url.contains(ABI_VERSION));
-		assert_eq!(published_schema_url("other", ABI_VERSION), None);
 	}
 }
