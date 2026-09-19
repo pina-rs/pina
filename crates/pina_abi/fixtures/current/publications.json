@@ -1,0 +1,35 @@
+{
+	"abiVersion": "0.20",
+	"receipts": [
+		{
+			"sequence": 0,
+			"rpcUrl": "fixture",
+			"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+			"executableSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+			"versions": {
+				"account:1:01": {
+					"version": 1,
+					"history": []
+				},
+				"account:1:02": {
+					"version": 1,
+					"history": []
+				},
+				"account:1:03": {
+					"version": 1,
+					"history": []
+				},
+				"event:1:04": {
+					"version": 1,
+					"history": []
+				},
+				"instruction:1:00": {
+					"version": 1,
+					"history": []
+				}
+			},
+			"previousReceiptSha256": null
+		}
+	]
+}

@@ -3036,19 +3036,46 @@ mod tests {
 		assert_eq!(AbiDocument::parse("other"), None);
 	}
 
-	/// The ABI version must name the crate's `major.minor`, so a released patch
-	/// cannot silently move the document contract.
+	/// The committed value must not lag the crate's `major.minor`, and a value
+	/// ahead of it is only legitimate while a changeset will catch the crate up.
+	///
+	/// This is the pre-release window: a shape-changing pull request advances
+	/// `ABI_VERSION` while `Cargo.toml` still names the released version, and the
+	/// `pina_abi` changeset carries the crate to meet it at release time. Any
+	/// other ahead state means the value was advanced with nothing to release it.
 	#[test]
-	fn abi_version_matches_the_crate_major_minor() {
+	fn abi_version_does_not_lag_the_crate_and_ahead_requires_a_changeset() {
 		let crate_version = Version::parse(env!("CARGO_PKG_VERSION"))
 			.unwrap_or_else(|error| panic!("crate version: {error}"));
 		let committed = current_abi_version();
+		let crate_minor = (crate_version.major, crate_version.minor);
+		let committed_minor = (committed.major, committed.minor);
 
-		assert_eq!(
-			(committed.major, committed.minor),
-			(crate_version.major, crate_version.minor),
-			"ABI_VERSION {committed} must match the crate's major.minor {crate_version}"
+		assert!(
+			committed_minor >= crate_minor,
+			"ABI_VERSION {committed} lags the crate's major.minor {crate_version}"
 		);
+
+		if committed_minor > crate_minor {
+			let changeset_dir =
+				std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.changeset");
+			let declares_pina_abi = std::fs::read_dir(&changeset_dir)
+				.map(|entries| {
+					entries.filter_map(Result::ok).any(|entry| {
+						let path = entry.path();
+						if path.extension().is_none_or(|extension| extension != "md") {
+							return false;
+						}
+						std::fs::read_to_string(&path).is_ok_and(|body| body.contains("pina_abi:"))
+					})
+				})
+				.unwrap_or(false);
+			assert!(
+				declares_pina_abi,
+				"ABI_VERSION {committed} leads the crate at {crate_version}; an active \
+				 `.changeset/*.md` entry for `pina_abi` must carry the crate to meet it"
+			);
+		}
 	}
 
 	/// The converter table must be gapless: every step advances the version,
@@ -3094,6 +3121,159 @@ mod tests {
 			None => assert_eq!(current, oldest),
 			Some(last) => assert_eq!(last, current, "the chain must reach the current version"),
 		}
+	}
+
+	/// Every frozen fixture must decode into the current model.
+	///
+	/// This is the gapless-walk guard: a document an older release wrote is
+	/// walked forward through the step table, so a missing or mis-wired
+	/// converter is a test failure rather than a user's runtime error.
+	#[test]
+	fn every_frozen_fixture_decodes_to_the_current_model() {
+		let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+		let mut walked = 0;
+
+		for entry in
+			std::fs::read_dir(&root).unwrap_or_else(|error| panic!("fixtures directory: {error}"))
+		{
+			let directory = entry
+				.unwrap_or_else(|error| panic!("fixture entry: {error}"))
+				.path();
+			if !directory.is_dir() {
+				continue;
+			}
+
+			let manifest_path = directory.join("manifest.json");
+			let bytes = std::fs::read(&manifest_path)
+				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
+			let manifest = decode_manifest(&bytes)
+				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
+			// The fixture must land on the current version, not merely decode.
+			assert_eq!(
+				manifest.abi_version,
+				ABI_VERSION,
+				"{} decoded to {}",
+				manifest_path.display(),
+				manifest.abi_version
+			);
+
+			let ledger_path = directory.join("publications.json");
+			let bytes = std::fs::read(&ledger_path)
+				.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
+			decode_publication_ledger(&bytes)
+				.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
+
+			walked += 1;
+		}
+
+		assert!(walked > 0, "the fixture matrix must not be empty");
+	}
+
+	/// A frozen fixture's schema must match the schema generated for the version
+	/// the fixture records, so a historical shape stays printable.
+	#[test]
+	fn frozen_fixture_schemas_match_their_recorded_version() {
+		let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+		for entry in
+			std::fs::read_dir(&root).unwrap_or_else(|error| panic!("fixtures directory: {error}"))
+		{
+			let directory = entry
+				.unwrap_or_else(|error| panic!("fixture entry: {error}"))
+				.path();
+			if !directory.is_dir() {
+				continue;
+			}
+			let manifest_path = directory.join("manifest.json");
+			let bytes = std::fs::read(&manifest_path)
+				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
+			let manifest = decode_manifest(&bytes)
+				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
+			// Only the current version's shape is representable by these types;
+			// an older fixture keeps its own frozen schema alongside it.
+			if manifest.abi_version == ABI_VERSION {
+				for kind in AbiDocument::ALL {
+					let schema_path = directory.join(kind.schema_file_name());
+					let frozen = std::fs::read_to_string(&schema_path)
+						.unwrap_or_else(|error| panic!("{}: {error}", schema_path.display()));
+					let generated = render_document_schema(kind)
+						.unwrap_or_else(|error| panic!("render: {error}"));
+					assert_eq!(
+						frozen,
+						generated,
+						"{} is stale; regenerate it with `pina abi schema --document {}`",
+						schema_path.display(),
+						kind.as_str()
+					);
+				}
+			}
+		}
+	}
+
+	/// The checked-in schema artifact must equal what this build generates, so
+	/// the published schema cannot drift from the types that enforce it.
+	#[test]
+	fn checked_in_schema_artifacts_match_the_generated_schema() {
+		for (kind, checked_in) in [
+			(
+				AbiDocument::Manifest,
+				include_str!("../schemas/manifest.schema.json"),
+			),
+			(
+				AbiDocument::Publications,
+				include_str!("../schemas/publications.schema.json"),
+			),
+		] {
+			let generated =
+				render_document_schema(kind).unwrap_or_else(|error| panic!("render: {error}"));
+			assert_eq!(
+				generated,
+				checked_in,
+				"{} is stale; regenerate it with `pina abi schema --document {}`",
+				kind.schema_file_name(),
+				kind.as_str()
+			);
+		}
+	}
+
+	/// The schema's own `required` list must name exactly the keys a document of
+	/// that shape carries, so a consumer validating against it accepts what the
+	/// tool writes and rejects a document missing a field.
+	#[test]
+	fn schema_required_fields_match_a_written_document() {
+		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		let document = serde_json::to_value(&manifest).unwrap();
+		let schema = document_schema(AbiDocument::Manifest);
+
+		let required = schema["required"]
+			.as_array()
+			.unwrap_or_else(|| panic!("manifest schema must declare required fields"));
+		let mut required = required
+			.iter()
+			.map(|value| {
+				value
+					.as_str()
+					.unwrap_or_else(|| panic!("required entries must be strings"))
+					.to_owned()
+			})
+			.collect::<Vec<_>>();
+		required.sort();
+
+		let mut present = document
+			.as_object()
+			.unwrap_or_else(|| panic!("a document is an object"))
+			.keys()
+			.cloned()
+			.collect::<Vec<_>>();
+		// `auto` is skipped when empty, so it is not required.
+		present.retain(|key| key != "auto");
+		present.sort();
+
+		assert_eq!(required, present);
+		assert_eq!(
+			schema["additionalProperties"],
+			serde_json::Value::Bool(false),
+			"the schema must forbid unknown fields to match `deny_unknown_fields`"
+		);
 	}
 
 	/// A document stamped with a version the table cannot reach must fail

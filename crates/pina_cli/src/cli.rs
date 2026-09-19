@@ -186,6 +186,16 @@ pub(crate) enum Commands {
 		command: MigrationCommands,
 	},
 
+	/// Inspect the Pina ABI document contract.
+	///
+	/// `schema` prints the JSON Schema of a document version, so editors, CI
+	/// jobs, and non-Rust toolchains can validate a checked-in manifest or
+	/// publication ledger without trusting its bytes.
+	Abi {
+		#[command(subcommand)]
+		command: AbiCommands,
+	},
+
 	/// Generate configured clients for the current Pina program.
 	///
 	/// Discovers the project, refreshes its IDL, and generates only the selected
@@ -1126,6 +1136,25 @@ pub(crate) enum KeysCommands {
 		/// Replace an existing keypair and rotate the source program ID.
 		#[arg(long)]
 		force: bool,
+	},
+}
+
+/// ABI document contract operations.
+#[derive(Subcommand, Debug)]
+pub(crate) enum AbiCommands {
+	/// Print the JSON Schema for one ABI document.
+	///
+	/// The schema is generated from the same types that read and write the
+	/// document, so it cannot drift from the code that enforces it. Output is
+	/// stable and newline-terminated, so it can be redirected to a file.
+	Schema {
+		/// Which document to describe.
+		#[arg(long, value_parser = ["manifest", "publications"], default_value = "manifest")]
+		document: String,
+		/// Document version to describe. Defaults to the version this build
+		/// writes; any version this build can still read is also accepted.
+		#[arg(long, value_name = "MAJOR.MINOR")]
+		version: Option<String>,
 	},
 }
 
