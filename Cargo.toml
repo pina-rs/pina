@@ -183,7 +183,10 @@ publish = false
 description = "Internal cross-crate test harness for the Pina workspace; never published."
 
 [dependencies]
-pina = { workspace = true, features = ["compact", "derive", "token"] }
+# `alloc` is here for `tests/expand`: macrotest copies this dependency into
+# the crate it generates, so the `nostd_entrypoint_alloc!` fixture can expand
+# against the real allocator instead of failing to resolve it.
+pina = { workspace = true, features = ["alloc", "compact", "derive", "token"] }
 pina_macros = { workspace = true, features = ["compact"] }
 
 [dev-dependencies]

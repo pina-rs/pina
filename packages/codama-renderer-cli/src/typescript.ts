@@ -273,9 +273,15 @@ function resolveEndpoint(value: string): string {
 }
 
 function clusterOf(endpoint: string): string {
-	if (endpoint.includes("api.mainnet-beta.solana.com")) return "";
-	if (endpoint.includes("api.devnet.solana.com")) return "devnet";
-	if (endpoint.includes("api.testnet.solana.com")) return "testnet";
+	let host: string;
+	try {
+		host = new URL(endpoint).hostname;
+	} catch {
+		return "";
+	}
+	if (host === "api.mainnet-beta.solana.com") return "";
+	if (host === "api.devnet.solana.com") return "devnet";
+	if (host === "api.testnet.solana.com") return "testnet";
 	return "";
 }
 

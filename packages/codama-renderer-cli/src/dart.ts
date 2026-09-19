@@ -326,8 +326,9 @@ String resolveEndpoint(String value) {
 /// understands the named clusters, and guessing a selector for an unknown host
 /// would produce a link that resolves to the wrong chain.
 String clusterOf(String endpoint) {
-  if (endpoint.contains('api.devnet.solana.com')) return 'devnet';
-  if (endpoint.contains('api.testnet.solana.com')) return 'testnet';
+  final host = Uri.tryParse(endpoint)?.host;
+  if (host == 'api.devnet.solana.com') return 'devnet';
+  if (host == 'api.testnet.solana.com') return 'testnet';
   return '';
 }
 
