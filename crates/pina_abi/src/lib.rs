@@ -905,19 +905,26 @@ impl ContractHistory {
 	}
 
 	/// Re-derive the process proof for the transition entering `number`.
+	///
+	/// Versions are contiguous, so a recorded entering transition guarantees
+	/// both neighbours exist; a history without a proof for this step simply
+	/// yields [`None`].
 	pub fn process_transition_into(
 		&self,
 		number: u32,
 	) -> Result<Option<ProcessTransition>, String> {
-		if self.transition_into(number).is_none() || number == 0 {
+		let Some(current) = self.version(number) else {
+			return Ok(None);
+		};
+		let Some(previous) = number
+			.checked_sub(1)
+			.and_then(|previous| self.version(previous))
+		else {
+			return Ok(None);
+		};
+		if current.transition.is_none() {
 			return Ok(None);
 		}
-		let previous = self
-			.version(number - 1)
-			.ok_or_else(|| format!("version {number} has no predecessor"))?;
-		let current = self
-			.version(number)
-			.ok_or_else(|| format!("version {number} does not exist"))?;
 		match (previous.process.as_ref(), current.process.as_ref()) {
 			(Some(source), Some(destination)) => {
 				classify_process_transition(source, destination).map(Some)

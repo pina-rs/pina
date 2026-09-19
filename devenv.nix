@@ -1039,6 +1039,7 @@ in
           -p pina_cli_renderer \
           -p pina_codama_renderer \
           -p pina_cpi_renderer \
+          -p pina_macros \
           -p pina_lints \
           -p pina_root \
           -p prop_amm_program \
