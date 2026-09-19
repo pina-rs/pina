@@ -6,9 +6,9 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: c5ccd61e1b6cebed728181c187e0052503c7ab62fcd4a05bff35c7437674df14
+// manifest-sha256: 4ada443d3121022aee4b56f29cbcfbe27898cc79461704d10aae78ee92182ba8
 // program-id: BZtBGtYSgERx2zN12aGgQ6sNLh5r7XtcNCafqmsizgqt
-// version-type: u8
+// version_type: u8
 
 #![allow(clippy::identity_op, clippy::eq_op)]
 #![allow(clippy::unreadable_literal)]
@@ -25,7 +25,7 @@ pub mod instruction_1_00 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "f0753a6ecc27d4882c1c9e15ff0b7e72f7627cd8439ce435b17acfe28a02bf14";
+	pub const SCHEMA_SHA256: &str = "f84fea2ce909521189b04f6ccc69f8bc191098770d9d7a08220ae6d3e34e43e6";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -55,7 +55,7 @@ pub mod instruction_1_01 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "dc1e46a6323760ad5c8314234b15b0af1f7ed33bb1da3f7d0d3d068e204ba262";
+	pub const SCHEMA_SHA256: &str = "40a1e384bd8e60a909f6d4b25e977a722bf5a18d50c9490d94b0a81548f27477";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
