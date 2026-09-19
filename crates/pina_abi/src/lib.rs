@@ -2207,15 +2207,6 @@ impl AbiDocument {
 		}
 	}
 
-	/// Stable file name for this document's fixture artifact.
-	#[must_use]
-	pub const fn fixture_file_name(self) -> &'static str {
-		match self {
-			Self::Manifest => "manifest.json",
-			Self::Publications => "publications.json",
-		}
-	}
-
 	/// Stable `--document` spelling.
 	#[must_use]
 	pub const fn as_str(self) -> &'static str {
@@ -3121,6 +3112,104 @@ mod tests {
 			None => assert_eq!(current, oldest),
 			Some(last) => assert_eq!(last, current, "the chain must reach the current version"),
 		}
+	}
+
+	/// Encoding a validated document must round-trip through the reader, so the
+	/// bytes `pina migrations make` writes are exactly what a later build reads.
+	#[test]
+	fn both_documents_encode_and_decode_through_the_same_model() {
+		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		let manifest_bytes =
+			encode_manifest(&manifest).unwrap_or_else(|error| panic!("encode manifest: {error}"));
+		assert_eq!(
+			decode_manifest(&manifest_bytes).unwrap_or_else(|error| panic!("decode: {error}")),
+			manifest
+		);
+
+		let receipt = PublicationReceipt {
+			sequence: 0,
+			rpc_url: "https://api.devnet.solana.com".to_owned(),
+			program_id: "program".to_owned(),
+			executable_sha256: "a".repeat(64),
+			manifest_sha256: "b".repeat(64),
+			versions: BTreeMap::from([(
+				"account:1:00".to_owned(),
+				PublishedContract {
+					version: 0,
+					history: vec![PublishedSchema {
+						schema_sha256: "c".repeat(64),
+						transition_sha256: None,
+					}],
+				},
+			)]),
+			previous_receipt_sha256: None,
+			abandoned: false,
+		};
+		let ledger = PublicationLedger {
+			abi_version: ABI_VERSION.to_owned(),
+			receipts: vec![receipt],
+			pending: None,
+		};
+		let ledger_bytes = encode_publication_ledger(&ledger)
+			.unwrap_or_else(|error| panic!("encode ledger: {error}"));
+		assert_eq!(
+			decode_publication_ledger(&ledger_bytes)
+				.unwrap_or_else(|error| panic!("decode: {error}")),
+			ledger
+		);
+
+		// An unpinned history stays valid and reports the version it made live.
+		let unpinned = PublishedContract::legacy(3);
+		assert_eq!(unpinned.version(), 3);
+		assert!(unpinned.history().is_empty());
+	}
+
+	/// An invalid document is refused at encode time, not written and then
+	/// rejected by the next reader.
+	#[test]
+	fn encoding_rejects_an_invalid_document() {
+		let mut manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		manifest.abi_version = "9.9".to_owned();
+		assert!(encode_manifest(&manifest).unwrap_err().contains("supports"));
+
+		let mut ledger = PublicationLedger::default();
+		ledger.abi_version = "9.9".to_owned();
+		assert!(
+			encode_publication_ledger(&ledger)
+				.unwrap_err()
+				.contains("supports")
+		);
+	}
+
+	/// The baseline is enforced by the walk rather than by the version check:
+	/// `validate_document_version` rejects only the future, so a reader
+	/// normalizes what it can and names the remedy for what it cannot.
+	#[test]
+	fn a_document_below_the_baseline_names_the_remedy() {
+		assert!(
+			validate_document_version("migration manifest", ABI_OLDEST_SUPPORTED).is_ok(),
+			"the oldest supported version must pass the version check"
+		);
+		assert!(
+			validate_document_version("migration manifest", ABI_VERSION).is_ok(),
+			"the current version must pass the version check"
+		);
+
+		let value = serde_json::Value::Object(serde_json::Map::new());
+		let walked = walk_document("migration manifest", "0.1", value).unwrap_err();
+		assert!(walked.contains("regenerate it with `pina migrations make`"));
+	}
+
+	/// An identity step returns the document unchanged, so a version that
+	/// advanced without a shape change still traverses the walk.
+	#[test]
+	fn an_identity_step_preserves_the_document() {
+		let value = serde_json::json!({"abiVersion": "0.20", "programId": "p"});
+		assert_eq!(
+			identity_step(value.clone()).unwrap_or_else(|error| panic!("{error}")),
+			value
+		);
+		assert!(ABI_OLDEST_SUPPORTED <= ABI_VERSION);
 	}
 
 	#[test]
