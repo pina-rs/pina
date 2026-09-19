@@ -1280,13 +1280,13 @@ mod tests {
 			.expect_err("non-literal array lengths must be rejected");
 		// The message must name the expression and the workaround, not report a
 		// generic unsupported field: the reader needs to know `WIDTH` is what
-		// could not be resolved.
+		// could not be resolved, and a free `const` is what to write.
 		assert!(
 			error.to_string().contains("WIDTH"),
 			"the diagnostic must name the expression: {error}"
 		);
 		assert!(
-			error.to_string().contains("const WIDTH: usize"),
+			error.to_string().contains("free `const NAME: usize"),
 			"the diagnostic must point at the workaround: {error}"
 		);
 	}
