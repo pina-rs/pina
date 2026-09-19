@@ -3123,6 +3123,238 @@ mod tests {
 		}
 	}
 
+	#[test]
+	fn derived_hashes_and_process_lookups_cover_an_instruction_history() {
+		let schema = fixed_schema(&[("amount", "u64")]);
+		let original = process(vec![process_account("authority", false)]);
+		let appended = process(vec![
+			process_account("authority", false),
+			process_account("referrer", true),
+		]);
+		let mut second = version(schema.clone(), Some(appended.clone()));
+		second.transition = Some(Transition {
+			mode: TransitionMode::Automatic,
+			renames: Vec::new(),
+			implementation_sha256: None,
+		});
+		let history = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 4).unwrap(),
+			rust_name: "Transfer".to_owned(),
+			versions: vec![version(schema, Some(original.clone())), second],
+		};
+
+		// The derived accessors must agree with the values they replace.
+		assert_eq!(
+			history
+				.version(0)
+				.map(SchemaVersion::process_sha256)
+				.flatten(),
+			Some(original.sha256())
+		);
+		assert_eq!(
+			history
+				.version(1)
+				.and_then(SchemaVersion::process_sha256)
+				.as_deref(),
+			Some(appended.sha256().as_str())
+		);
+
+		// Version zero has no entering transition, so no proof exists.
+		assert_eq!(
+			history
+				.process_transition_into(0)
+				.unwrap_or_else(|error| panic!("{error}")),
+			None
+		);
+		// A version with no recorded transition also has no proof.
+		assert_eq!(
+			history
+				.process_transition_into(9)
+				.unwrap_or_else(|error| panic!("{error}")),
+			None
+		);
+		// An account history carries no process, so the proof is absent.
+		let account = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
+			rust_name: "State".to_owned(),
+			versions: vec![version(fixed_schema(&[("value", "u64")]), None)],
+		};
+		assert_eq!(
+			account
+				.process_transition_into(0)
+				.unwrap_or_else(|error| panic!("{error}")),
+			None
+		);
+	}
+
+	#[test]
+	fn validation_reports_every_structural_violation() {
+		let schema = fixed_schema(&[("value", "u64")]);
+
+		// A history with no versions cannot describe a contract.
+		let empty = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
+			rust_name: "State".to_owned(),
+			versions: Vec::new(),
+		};
+		assert!(
+			empty
+				.validate(MigrationVersionType::U8)
+				.unwrap_err()
+				.contains("has no versions")
+		);
+
+		// An identity whose hex is not canonical is rejected on its own terms.
+		// Mutating it inside a manifest cannot reach this path, because the
+		// manifest key is derived from the identity and would mismatch first.
+		let mut identity = ContractIdentity::try_new(ContractKind::Account, 1, 0xAB).unwrap();
+		identity.discriminator_hex = "ZZ".to_owned();
+		assert!(
+			identity
+				.validate()
+				.unwrap_err()
+				.contains("invalid hex value")
+		);
+		identity.discriminator_hex = "AB".to_owned();
+		assert!(
+			identity
+				.validate()
+				.unwrap_err()
+				.contains("canonical lowercase hexadecimal")
+		);
+
+		// A version beyond the configured width cannot be encoded.
+		let narrow = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
+			rust_name: "State".to_owned(),
+			versions: vec![version(schema.clone(), None)],
+		};
+		let mut many = narrow.clone();
+		for _ in 0..=u32::from(u8::MAX) {
+			let mut next = version(schema.clone(), None);
+			next.transition = Some(Transition {
+				mode: TransitionMode::Automatic,
+				renames: Vec::new(),
+				implementation_sha256: None,
+			});
+			many.versions.push(next);
+		}
+		assert!(
+			many.validate(MigrationVersionType::U8)
+				.unwrap_err()
+				.contains("exceeds configured")
+		);
+	}
+
+	#[test]
+	fn manifest_contract_keys_must_match_their_identity() {
+		let mut manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		let (key, history) = manifest
+			.contracts
+			.iter()
+			.next()
+			.map(|(key, history)| (key.clone(), history.clone()))
+			.unwrap();
+		manifest.contracts.remove(&key);
+		manifest
+			.contracts
+			.insert("account:1:ff".to_owned(), history);
+
+		assert!(
+			manifest
+				.validate()
+				.unwrap_err()
+				.contains("does not match identity")
+		);
+	}
+
+	#[test]
+	fn events_reject_a_process_and_accounts_reject_a_compact_instruction() {
+		// An event that carries an instruction process is malformed.
+		let schema = fixed_schema(&[("value", "u64")]);
+		let mut entry = version(
+			schema.clone(),
+			Some(process(vec![process_account("a", false)])),
+		);
+		entry.transition = Some(Transition {
+			mode: TransitionMode::Automatic,
+			renames: Vec::new(),
+			implementation_sha256: None,
+		});
+		let event = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Event, 1, 1).unwrap(),
+			rust_name: "Changed".to_owned(),
+			versions: vec![entry],
+		};
+		assert!(
+			event
+				.validate(MigrationVersionType::U8)
+				.unwrap_err()
+				.contains("cannot contain an instruction process")
+		);
+
+		// An instruction with a compact schema is rejected too.
+		let compact = DataSchema::try_new(
+			LayoutKind::Compact,
+			vec![FieldSchema {
+				name: "name".to_owned(),
+				rust_type: "String<8>".to_owned(),
+			}],
+		)
+		.unwrap();
+		let instruction = ContractHistory {
+			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 1).unwrap(),
+			rust_name: "Send".to_owned(),
+			versions: vec![version(
+				compact,
+				Some(process(vec![process_account("a", false)])),
+			)],
+		};
+		assert!(
+			instruction
+				.validate(MigrationVersionType::U8)
+				.unwrap_err()
+				.contains("must use a fixed layout")
+		);
+	}
+
+	#[test]
+	fn a_rename_into_an_unknown_destination_field_is_rejected() {
+		let schema = fixed_schema(&[("value", "u64")]);
+		let mut second = version(schema.clone(), None);
+		second.transition = Some(Transition {
+			mode: TransitionMode::Automatic,
+			renames: vec![RenameMapping {
+				from: "value".to_owned(),
+				to: "absent".to_owned(),
+			}],
+			implementation_sha256: None,
+		});
+		let manifest = MigrationManifest {
+			abi_version: ABI_VERSION.to_owned(),
+			program_id: "program".to_owned(),
+			version_type: MigrationVersionType::U8,
+			auto: MigrationAuto::none(),
+			contracts: BTreeMap::from([(
+				ContractIdentity::try_new(ContractKind::Account, 1, 0xAB)
+					.unwrap()
+					.key(),
+				ContractHistory {
+					identity: ContractIdentity::try_new(ContractKind::Account, 1, 0xAB).unwrap(),
+					rust_name: "Profile".to_owned(),
+					versions: vec![version(schema, None), second],
+				},
+			)]),
+		};
+
+		assert!(
+			manifest
+				.validate()
+				.unwrap_err()
+				.contains("renames into unknown destination field")
+		);
+	}
+
 	/// Every frozen fixture must decode into the current model.
 	///
 	/// This is the gapless-walk guard: a document an older release wrote is

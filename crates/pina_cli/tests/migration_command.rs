@@ -797,3 +797,78 @@ fn auto_policy_reports_an_undeclared_rerun_directive_instead_of_clobbering() {
 		checked.1
 	);
 }
+
+/// `pina abi schema` prints a schema a consumer can validate against, and it
+/// refuses a document or version it cannot describe.
+#[test]
+fn abi_schema_prints_each_document_and_rejects_unknown_requests() {
+	let stdout = run(Command::new(env!("CARGO_BIN_EXE_pina")).args([
+		"abi",
+		"schema",
+		"--document",
+		"manifest",
+	]));
+	let schema: serde_json::Value =
+		serde_json::from_str(&stdout).unwrap_or_else(|error| panic!("parse schema: {error}"));
+	assert_eq!(
+		schema["$id"],
+		serde_json::json!(format!(
+			"https://pina-rs.github.io/pina/abi/schemas/{}/manifest.schema.json",
+			pina_abi::ABI_VERSION
+		))
+	);
+	// `deny_unknown_fields` must reach the schema, or a consumer would accept a
+	// document this build rejects.
+	assert_eq!(schema["additionalProperties"], serde_json::json!(false));
+	assert!(
+		schema["required"]
+			.as_array()
+			.is_some_and(|required| required.iter().any(|field| field == "abiVersion")),
+		"a manifest without an ABI version is not valid: {schema}"
+	);
+
+	// The ledger is described by its own schema at its own URL.
+	let stdout = run(Command::new(env!("CARGO_BIN_EXE_pina")).args([
+		"abi",
+		"schema",
+		"--document",
+		"publications",
+	]));
+	let schema: serde_json::Value =
+		serde_json::from_str(&stdout).unwrap_or_else(|error| panic!("parse schema: {error}"));
+	assert!(
+		schema["$id"]
+			.as_str()
+			.is_some_and(|id| id.ends_with("publications.schema.json")),
+		"ledger schema names its own document: {schema}"
+	);
+
+	// Naming the current version is the same as defaulting to it.
+	let explicit = run(Command::new(env!("CARGO_BIN_EXE_pina")).args([
+		"abi",
+		"schema",
+		"--document",
+		"manifest",
+		"--version",
+		pina_abi::ABI_VERSION,
+	]));
+	let manifest_schema = run(Command::new(env!("CARGO_BIN_EXE_pina")).args([
+		"abi",
+		"schema",
+		"--document",
+		"manifest",
+	]));
+	assert_eq!(explicit, manifest_schema);
+
+	// A version this build cannot print fails with the supported value named.
+	let (_, stderr) = run_failure(Command::new(env!("CARGO_BIN_EXE_pina")).args([
+		"abi",
+		"schema",
+		"--version",
+		"0.1",
+	]));
+	assert!(
+		stderr.contains("cannot be printed") && stderr.contains(pina_abi::ABI_VERSION),
+		"stderr: {stderr}"
+	);
+}
