@@ -96,3 +96,7 @@ Attack crates under `tmp/sweep/` are gitignored scratch; each report links its c
 - Kani proofs not re-run (worktree task failed on a package-spec error; CI covers them).
 - Two matrix scenarios INCONCLUSIVE (CPI wrong-id is host-test-pinned; 10-version depth stranding needs a purpose-built history — static case stands).
 - Codama renderers/clients and CI/publish hardening were covered by the 2026-09-18 audit and were not re-swept except where `pina_abi` intersects.
+
+## Reachability note on RC-1 / N2 (added post-consolidation)
+
+Neither framework finding is reachable from any shipped example's instruction surface tonight: every example places optionals trailing or in an all-optional tail (N2's shift needs a positional field after an optional), and every immutable-before-mutable pair is either a signer-checked authority (PDAs cannot sign) or a system/sysvar slot (exact address asserted). Both are therefore latent-for-downstream: a copied template that introduces the shape inherits the gap silently, which is what makes the macro/cursor fixes priority items rather than urgent patches.
