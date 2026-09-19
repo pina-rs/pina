@@ -251,8 +251,9 @@ pub const VERBOSE_LOGS_ENABLED: bool = false;
 /// An optional second argument overrides the maximum number of transaction
 /// accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
 ///
-/// The allocator is denied rather than merely unused: any dynamic allocation
-/// aborts at runtime. Programs that need the heap opt in explicitly with
+/// The allocator is denied rather than merely unused, so code that reaches for
+/// `alloc` still links but aborts at runtime the moment it allocates. Programs
+/// that need the heap opt in with the `alloc` feature and use
 /// [`nostd_entrypoint_alloc!`], which is identical apart from the global
 /// allocator it installs.
 #[macro_export]
@@ -283,10 +284,12 @@ macro_rules! nostd_entrypoint {
 /// ) -> ProgramResult
 /// ```
 ///
-/// Opt in only when the program needs the heap; [`nostd_entrypoint!`] keeps
-/// allocation impossible at compile time and remains the default for every
-/// other program. A heap-allocating crate declares the standard allocator
-/// itself:
+/// Requires Pina's `alloc` feature, which forwards `alloc` to pinocchio and is
+/// off by default; without it the macro fails to compile with a symbol naming
+/// the feature to enable. Opt in only when the program needs the heap:
+/// [`nostd_entrypoint!`] is the default for every other program. A
+/// heap-allocating crate enables the feature and declares the standard
+/// allocator itself:
 ///
 /// ```ignore
 /// extern crate alloc;
@@ -323,11 +326,26 @@ macro_rules! nostd_entrypoint_alloc {
 		});
 	};
 	($process_instruction:expr, $maximum:expr) => {
+		// The allocator macro only exists when pinocchio's `alloc` feature is
+		// on, which the Pina `alloc` feature forwards. Referencing the marker
+		// first makes a missing feature an unresolved symbol that names the
+		// remedy, instead of an error about `default_allocator!`.
+		const _: () = $crate::ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT;
 		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
 		$crate::pinocchio::default_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};
 }
+
+/// Capability marker for [`nostd_entrypoint_alloc!`].
+///
+/// Deliberately named after the remedy: the macro emits a reference to it, so
+/// a program that calls the macro without enabling the `alloc` feature fails
+/// to resolve a symbol that spells out the feature to enable. The macro cannot
+/// work without pinocchio's allocator, and the feature is the only switch for
+/// it, so this constant is the macro's compile-time dependency declaration.
+#[cfg(feature = "alloc")]
+pub const ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT: () = ();
 
 /// Logs a failure message with optional formatted detail.
 ///

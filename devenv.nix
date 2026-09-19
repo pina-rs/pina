@@ -351,6 +351,14 @@ in
       description = "Verify raw account resizing does not enable compact mode.";
       binary = "bash";
     };
+    "build:pina:alloc-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo check -p pina --no-default-features --features alloc --locked
+      '';
+      description = "Verify the heap opt-in builds without enabling anything else.";
+      binary = "bash";
+    };
     "build:pina:all-features" = {
       exec = ''
         set -euo pipefail
@@ -368,6 +376,7 @@ in
         build:pina:floats-only
         build:pina:fixed-only
         build:pina:account-resize-only
+        build:pina:alloc-only
         build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
       '';
@@ -383,6 +392,7 @@ in
         build:pina:floats-only
         build:pina:fixed-only
         build:pina:account-resize-only
+        build:pina:alloc-only
         build:pina:token-only
         build:pina:all-features
       '';

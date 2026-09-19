@@ -58,7 +58,7 @@ fn fill_instruction(bytes: u32, fill: u8) -> Instruction {
 /// built by the `program-e2e` job, which also runs this suite with
 /// `SBF_OUT_DIR` set; `Mollusk::new` panics on a missing file, so the check has
 /// to happen before it is called.
-fn try_create_mollusk(heap_size: u32) -> Option<Mollusk> {
+fn try_create_mollusk() -> Option<Mollusk> {
 	let so_name = "heap_alloc_program.so";
 	let search_dirs: Vec<std::path::PathBuf> = [
 		std::env::var("SBF_OUT_DIR").ok(),
@@ -74,7 +74,16 @@ fn try_create_mollusk(heap_size: u32) -> Option<Mollusk> {
 		return None;
 	}
 
-	let mut mollusk = Mollusk::new(&program_id(), "heap_alloc_program");
+	Some(Mollusk::new(&program_id(), "heap_alloc_program"))
+}
+
+/// Build a mollusk instance with the heap frame pinned to `heap_size`.
+///
+/// Pinning is what makes the boundary tests deterministic: they compare an
+/// allocation against a frame the test chose, not against whatever the runtime
+/// grants by default.
+fn try_create_pinned_mollusk(heap_size: u32) -> Option<Mollusk> {
+	let mut mollusk = try_create_mollusk()?;
 	mollusk.compute_budget.heap_size = heap_size;
 
 	Some(mollusk)
@@ -87,7 +96,9 @@ fn try_create_mollusk(heap_size: u32) -> Option<Mollusk> {
 /// guidance.
 #[test]
 fn the_default_heap_frame_is_32_kib() {
-	let Some(mollusk) = try_create_mollusk(DEFAULT_HEAP_FRAME) else {
+	// Deliberately unpinned: assigning `heap_size` first would make this
+	// assertion pass no matter what the runtime's default actually is.
+	let Some(mollusk) = try_create_mollusk() else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -108,7 +119,7 @@ fn fill_succeeds(mollusk: &Mollusk, bytes: u32, fill: u8) -> bool {
 /// A fill that fits inside the default frame succeeds without any request.
 #[test]
 fn a_fill_inside_the_default_frame_succeeds() {
-	let Some(mollusk) = try_create_mollusk(DEFAULT_HEAP_FRAME) else {
+	let Some(mollusk) = try_create_pinned_mollusk(DEFAULT_HEAP_FRAME) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -128,7 +139,7 @@ fn a_fill_inside_the_default_frame_succeeds() {
 /// asks for the whole thing aborts — the failure mode the docs warn about.
 #[test]
 fn a_fill_at_the_raw_frame_size_fails() {
-	let Some(mollusk) = try_create_mollusk(DEFAULT_HEAP_FRAME) else {
+	let Some(mollusk) = try_create_pinned_mollusk(DEFAULT_HEAP_FRAME) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -142,7 +153,7 @@ fn a_fill_at_the_raw_frame_size_fails() {
 /// Sizing a request to leave the bookkeeping word free is what actually works.
 #[test]
 fn a_fill_inside_the_frame_after_bookkeeping_succeeds() {
-	let Some(mollusk) = try_create_mollusk(DEFAULT_HEAP_FRAME) else {
+	let Some(mollusk) = try_create_pinned_mollusk(DEFAULT_HEAP_FRAME) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -163,7 +174,7 @@ fn a_fill_inside_the_frame_after_bookkeeping_succeeds() {
 /// aborted instruction, not a program error code it could handle.
 #[test]
 fn a_fill_past_the_frame_aborts() {
-	let Some(mollusk) = try_create_mollusk(DEFAULT_HEAP_FRAME) else {
+	let Some(mollusk) = try_create_pinned_mollusk(DEFAULT_HEAP_FRAME) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -191,7 +202,7 @@ fn a_fill_past_the_frame_aborts() {
 /// what decides the outcome, which is why the request belongs to the caller.
 #[test]
 fn raising_the_frame_lets_the_same_fill_succeed() {
-	let Some(mollusk) = try_create_mollusk(4 * DEFAULT_HEAP_FRAME) else {
+	let Some(mollusk) = try_create_pinned_mollusk(4 * DEFAULT_HEAP_FRAME) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
@@ -207,7 +218,7 @@ fn raising_the_frame_lets_the_same_fill_succeed() {
 #[test]
 fn the_maximum_frame_covers_a_fill_the_size_of_the_heap() {
 	let maximum_heap_frame: u32 = 256 * 1024;
-	let Some(mollusk) = try_create_mollusk(maximum_heap_frame) else {
+	let Some(mollusk) = try_create_pinned_mollusk(maximum_heap_frame) else {
 		eprintln!("skipping: build heap_alloc_program for SBF first");
 		return;
 	};
