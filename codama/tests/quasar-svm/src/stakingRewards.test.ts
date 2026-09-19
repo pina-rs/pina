@@ -1,9 +1,11 @@
 import {
+	createKeyedAssociatedTokenAccount,
 	createKeyedMintAccount,
 	createKeyedSystemAccount,
 	QuasarSvm,
 	SPL_TOKEN_PROGRAM_ID,
 } from "@blueshift-gg/quasar-svm/kit";
+import { getTokenDecoder } from "@solana-program/token";
 import {
 	type Address,
 	generateKeyPairSigner,
@@ -21,6 +23,7 @@ import {
 	getDepositInstruction,
 	getInitializePoolInstruction,
 	getOpenPositionInstruction,
+	getSetRewardIndexInstruction,
 } from "../../../clients/js/staking_rewards_program/src/generated/instructions";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../../../clients/js/staking_rewards_program/src/generated/programs";
 import {
@@ -206,6 +209,24 @@ describe("staking_rewards_program quasar e2e", () => {
 		expect(poolAfterDeposit.data.totalStaked).toBe(200n);
 		expect(positionAfterDeposit.data.stakedAmount).toBe(200n);
 
+		// One full index unit: the position accrues `staked` rewards, so the
+		// claim has something to release.
+		const dripResult = svm.processInstruction(
+			getSetRewardIndexInstruction({
+				admin,
+				poolState: poolPda,
+				newIndex: 1_000_000_000_000n,
+			}),
+			[
+				adminAccount,
+				expectSome(
+					depositResult.account(poolPda),
+					"pool state should exist before the drip",
+				),
+			],
+		);
+		dripResult.assertSuccess();
+
 		const claimResult = svm.processInstruction(
 			getClaimInstruction({
 				user,
@@ -213,13 +234,14 @@ describe("staking_rewards_program quasar e2e", () => {
 				poolState: poolPda,
 				positionState: positionPda,
 				userRewardAta: userRewardAta.address,
+				rewardVault,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
 			}),
 			[
 				userAccount,
 				rewardMint,
 				expectSome(
-					depositResult.account(poolPda),
+					dripResult.account(poolPda),
 					"pool state should exist before claim",
 				),
 				expectSome(
@@ -227,6 +249,11 @@ describe("staking_rewards_program quasar e2e", () => {
 					"position state should exist before claim",
 				),
 				userRewardAta,
+				await createKeyedAssociatedTokenAccount(
+					poolPda as Address,
+					rewardMint.address,
+					1_000n,
+				),
 			],
 		);
 		claimResult.assertSuccess();
@@ -237,6 +264,13 @@ describe("staking_rewards_program quasar e2e", () => {
 				"position state should exist after claim",
 			),
 		);
-		expect(positionAfterClaim.data.pendingRewards).toBeGreaterThanOrEqual(0n);
+		// The checkpoint advanced and the accrued reward was released, so the
+		// position holds nothing pending and the user received the payout.
+		expect(positionAfterClaim.data.pendingRewards).toBe(0n);
+		const rewardAtaAfterClaim = expectSome(
+			claimResult.account(userRewardAta.address, getTokenDecoder()),
+			"user reward ATA should exist after claim",
+		);
+		expect(rewardAtaAfterClaim.amount).toBe(200n);
 	});
 });

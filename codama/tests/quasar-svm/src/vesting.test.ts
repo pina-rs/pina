@@ -1,17 +1,52 @@
 import {
+	createKeyedAssociatedTokenAccount,
 	createKeyedMintAccount,
 	createKeyedSystemAccount,
 	QuasarSvm,
+	SPL_ASSOCIATED_TOKEN_PROGRAM_ID,
 	SPL_TOKEN_PROGRAM_ID,
 } from "@blueshift-gg/quasar-svm/kit";
 import { getTokenDecoder } from "@solana-program/token";
 import {
+	type Account,
 	type Address,
+	address,
 	generateKeyPairSigner,
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	lamports,
 } from "@solana/kit";
+
+/// The system program, the clock sysvar, and the associated-token program, as
+/// the addresses the program validates against.
+const SYSTEM_PROGRAM_ADDRESS = address("11111111111111111111111111111111");
+const SYSVAR_CLOCK_ADDRESS = address(
+	"SysvarC1ock11111111111111111111111111111111",
+);
+const SYSVAR_OWNER = address("Sysvar1111111111111111111111111111111111111");
+
+/// A clock sysvar account carrying `unixTimestamp`.
+///
+/// The account is owned by the sysvar program, not the system program, because
+/// the program asserts that ownership before reading the schedule comparison.
+/// The layout is five little-endian 64-bit fields; the timestamp is last.
+function createClockAccount(unixTimestamp: bigint): Account<Uint8Array> {
+	const data = new Uint8Array(40);
+	const view = new DataView(data.buffer);
+	for (const [index, value] of [0n, 0n, 0n, 0n, unixTimestamp].entries()) {
+		view.setBigUint64(index * 8, value, true);
+	}
+
+	return {
+		address: SYSVAR_CLOCK_ADDRESS,
+		programAddress: SYSVAR_OWNER,
+		lamports: lamports(1_000_000n),
+		data,
+		executable: false,
+		space: 40n,
+	};
+}
 import { describe, expect, test } from "vitest";
 import { decodeVestingState } from "../../../clients/js/vesting_program/src/generated/accounts";
 import {
@@ -49,12 +84,24 @@ async function deriveVestingPda(
 describe("vesting_program quasar e2e", () => {
 	test("initialize, claim, and cancel a vesting schedule", async () => {
 		using svm = new QuasarSvm();
+		// The schedule ends at 100; move the clock past it so the whole
+		// allocation has vested by the time Claim runs.
+		svm.setClock({
+			slot: 100n,
+			epochStartTimestamp: 0n,
+			epoch: 0n,
+			leaderScheduleEpoch: 0n,
+			unixTimestamp: 1_000n,
+		});
 		if (!loadProgram(svm, VESTING_PROGRAM_PROGRAM_ADDRESS, PROGRAM_NAME)) {
 			console.log(
 				`[SKIP] ${PROGRAM_NAME}.so not found. Build SBF binaries first.`,
 			);
 			return;
 		}
+		// The harness provides the SPL token and associated-token programs the
+		// release and refund paths CPI into, so only the program under test is
+		// loaded here.
 
 		const admin = await generateKeyPairSigner();
 		const beneficiary = await generateKeyPairSigner();
@@ -72,6 +119,7 @@ describe("vesting_program quasar e2e", () => {
 			mint.address,
 			0n,
 		);
+		const adminAta = await createAta(admin.address, mint.address, 0n);
 		const [vestingPda, bump] = await deriveVestingPda(
 			admin.address,
 			beneficiary.address,
@@ -81,6 +129,13 @@ describe("vesting_program quasar e2e", () => {
 			vestingPda as Address,
 			mint.address,
 			SPL_TOKEN_PROGRAM_ID as Address,
+		);
+		// Fund the vault with the allocation, so the release has something to
+		// pay out of and the refund has something to return.
+		const fundedVault = await createKeyedAssociatedTokenAccount(
+			vestingPda as Address,
+			mint.address,
+			1_000n,
 		);
 		const initializeResult = svm.processInstruction(
 			getInitializeInstruction({
@@ -124,6 +179,7 @@ describe("vesting_program quasar e2e", () => {
 				beneficiaryAta: beneficiaryAta.address,
 				vault: vaultAta,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
+				clock: SYSVAR_CLOCK_ADDRESS,
 				amount: 250n,
 			}),
 			[
@@ -133,11 +189,9 @@ describe("vesting_program quasar e2e", () => {
 					initializeResult.account(vestingPda),
 					"vesting state should exist before claim",
 				),
-				expectSome(
-					initializeResult.account(vaultAta),
-					"vault ATA should exist before claim",
-				),
+				fundedVault,
 				beneficiaryAta,
+				createClockAccount(1_000n),
 			],
 		);
 		claimResult.assertSuccess();
@@ -148,22 +202,21 @@ describe("vesting_program quasar e2e", () => {
 				"vesting state should exist after claim",
 			),
 		);
-		expect(claimedState.data.claimedAmount).toBe(250n);
-
 		const beneficiaryAtaAfterClaim = expectSome(
 			claimResult.account(beneficiaryAta.address, getTokenDecoder()),
 			"beneficiary ATA should exist after claim",
 		);
-		// This example is intentionally a state-transition scaffold. Claim records
-		// the released amount and ensures the destination ATA exists; token
-		// transfer policy is left to applications built on top of it.
-		expect(beneficiaryAtaAfterClaim.amount).toBe(0n);
+		// Claim releases the vested amount from the vault, so the beneficiary
+		// balance grows by exactly the claimed amount.
+		expect(claimedState.data.claimedAmount).toBe(250n);
+		expect(beneficiaryAtaAfterClaim.amount).toBe(250n);
 
 		const cancelResult = svm.processInstruction(
 			getCancelInstruction({
 				admin,
 				mint: mint.address,
 				vestingState: vestingPda,
+				adminAta: adminAta.address,
 				vault: vaultAta,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
 			}),
@@ -174,6 +227,7 @@ describe("vesting_program quasar e2e", () => {
 					claimResult.account(vestingPda),
 					"vesting state should exist before cancel",
 				),
+				adminAta,
 				expectSome(
 					claimResult.account(vaultAta),
 					"vault ATA should exist before cancel",
@@ -181,6 +235,13 @@ describe("vesting_program quasar e2e", () => {
 			],
 		);
 		cancelResult.assertSuccess();
+
+		// Cancel refunds the unclaimed balance to the admin and closes the vault.
+		const adminAtaAfterCancel = expectSome(
+			cancelResult.account(adminAta.address, getTokenDecoder()),
+			"admin ATA should exist after cancel",
+		);
+		expect(adminAtaAfterCancel.amount).toBe(750n);
 
 		const cancelledState = decodeVestingState(
 			expectSome(
