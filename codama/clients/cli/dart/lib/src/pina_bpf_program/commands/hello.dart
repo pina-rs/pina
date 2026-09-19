@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/pina_bpf_program.dart';
 
 final class HelloCommand extends Command<void> {
   HelloCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +20,7 @@ final class HelloCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getHelloInstruction(
       programAddress: context.programAddress,

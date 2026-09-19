@@ -14,17 +14,54 @@ final class MultisigImportCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('legacy_program', mandatory: true, help: "legacyProgram")
-      ..addOption('legacy_discriminator', mandatory: true, help: "legacyDiscriminator")
-      ..addOption('set_config_authority', mandatory: true, help: "setConfigAuthority")
+      ..addOption(
+        'legacy_discriminator',
+        mandatory: true,
+        help: "legacyDiscriminator",
+      )
+      ..addOption(
+        'set_config_authority',
+        mandatory: true,
+        help: "setConfigAuthority",
+      )
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
-      ..addOption('set_rent_collector', mandatory: true, help: "setRentCollector")
+      ..addOption(
+        'set_rent_collector',
+        mandatory: true,
+        help: "setRentCollector",
+      )
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
-      ..addOption('legacy_multisig', mandatory: true, help: "The legacy_multisig account")
-      ..addOption('program_config', mandatory: true, help: "The program_config account")
-      ..addOption('create_key', mandatory: false, help: "The create_key account [default: payer]")
-      ..addOption('multisig', mandatory: false, help: "The multisig account [default: derived]")
-      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
-      ..addOption('treasury', mandatory: true, help: "Treasury that collects the creation fee; absent when the fee is zero");
+      ..addOption(
+        'legacy_multisig',
+        mandatory: true,
+        help: "The legacy_multisig account",
+      )
+      ..addOption(
+        'program_config',
+        mandatory: true,
+        help: "The program_config account",
+      )
+      ..addOption(
+        'create_key',
+        mandatory: false,
+        help: "The create_key account [default: payer]",
+      )
+      ..addOption(
+        'multisig',
+        mandatory: false,
+        help: "The multisig account [default: derived]",
+      )
+      ..addOption(
+        'rent_payer',
+        mandatory: false,
+        help: "The rent_payer account [default: payer]",
+      )
+      ..addOption(
+        'treasury',
+        mandatory: true,
+        help:
+            "Treasury that collects the creation fee; absent when the fee is zero",
+      );
   }
 
   @override
@@ -37,28 +74,46 @@ final class MultisigImportCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
-    final programConfig = pubkey('--program-config', results['program_config']! as String);
+    final legacyMultisig = pubkey(
+      '--legacy-multisig',
+      results['legacy_multisig']! as String,
+    );
+    final programConfig = pubkey(
+      '--program-config',
+      results['program_config']! as String,
+    );
     final createKey = (results['create_key'] as String?) != null
         ? pubkey('--create-key', results['create_key']! as String)
         : context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
-          seeds: MultisigSeeds(createKey: createKey),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: MultisigSeeds(createKey: createKey),
+            programAddress: context.programAddress,
+          )).$1;
     final rentPayer = (results['rent_payer'] as String?) != null
         ? pubkey('--rent-payer', results['rent_payer']! as String)
         : context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
-    final legacyProgramValue = pubkey('--legacy-program', results['legacy_program']! as String);
-    final legacyDiscriminatorValue = base58Bytes('--legacy-discriminator', results['legacy_discriminator']! as String);
+    final legacyProgramValue = pubkey(
+      '--legacy-program',
+      results['legacy_program']! as String,
+    );
+    final legacyDiscriminatorValue = base58Bytes(
+      '--legacy-discriminator',
+      results['legacy_discriminator']! as String,
+    );
     final setConfigAuthorityValue = results['set_config_authority']! as String;
-    final configAuthorityValue = pubkey('--config-authority', results['config_authority']! as String);
+    final configAuthorityValue = pubkey(
+      '--config-authority',
+      results['config_authority']! as String,
+    );
     final setRentCollectorValue = results['set_rent_collector']! as String;
-    final rentCollectorValue = pubkey('--rent-collector', results['rent_collector']! as String);
+    final rentCollectorValue = pubkey(
+      '--rent-collector',
+      results['rent_collector']! as String,
+    );
     final instruction = getMultisigImportInstruction(
       programAddress: context.programAddress,
       legacyMultisig: legacyMultisig,

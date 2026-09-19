@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class PositionState {
   const PositionState({
@@ -22,9 +20,8 @@ class PositionState {
     required this.rewardDebt,
     required this.pendingRewards,
     required this.bump,
-  }) :
-      discriminator = 2,
-      migrationVersion = 0;
+  }) : discriminator = 2,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -50,12 +47,21 @@ class PositionState {
           bump == other.bump;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, pool, owner, stakedAmount, rewardDebt, pendingRewards, bump);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    pool,
+    owner,
+    stakedAmount,
+    rewardDebt,
+    pendingRewards,
+    bump,
+  );
 
   @override
-  String toString() => 'PositionState(discriminator: $discriminator, migrationVersion: $migrationVersion, pool: $pool, owner: $owner, stakedAmount: $stakedAmount, rewardDebt: $rewardDebt, pendingRewards: $pendingRewards, bump: $bump)';
+  String toString() =>
+      'PositionState(discriminator: $discriminator, migrationVersion: $migrationVersion, pool: $pool, owner: $owner, stakedAmount: $stakedAmount, rewardDebt: $rewardDebt, pendingRewards: $pendingRewards, bump: $bump)';
 }
-
 
 Encoder<PositionState> getPositionStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -97,20 +103,15 @@ Decoder<PositionState> getPositionStateDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'positionState account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'positionState account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (PositionState, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(2),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -123,29 +124,28 @@ Decoder<PositionState> getPositionStateDecoder() {
 
     return (
       PositionState(
-      pool: map['pool']! as Address,
-      owner: map['owner']! as Address,
-      stakedAmount: map['stakedAmount']! as BigInt,
-      rewardDebt: map['rewardDebt']! as BigInt,
-      pendingRewards: map['pendingRewards']! as BigInt,
-      bump: map['bump']! as int,
+        pool: map['pool']! as Address,
+        owner: map['owner']! as Address,
+        stakedAmount: map['stakedAmount']! as BigInt,
+        rewardDebt: map['rewardDebt']! as BigInt,
+        pendingRewards: map['pendingRewards']! as BigInt,
+        bump: map['bump']! as int,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() =>
-      FixedSizeDecoder<PositionState>(
-        fixedSize: structDecoder.fixedSize,
-        read: (bytes, offset) {
-          final bytesLength = bytes.length - offset;
-          if (bytesLength < structDecoder.fixedSize) {
-            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-          }
-          return readTopLevel(bytes, offset);
-        },
-      ),
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<PositionState>(
+      fixedSize: structDecoder.fixedSize,
+      read: (bytes, offset) {
+        final bytesLength = bytes.length - offset;
+        if (bytesLength < structDecoder.fixedSize) {
+          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+        }
+        return readTopLevel(bytes, offset);
+      },
+    ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<PositionState>(
         read: readTopLevel,
@@ -170,11 +170,11 @@ const int positionStateMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool positionStateNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 2) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 2) {
+    return false;
+  }
+  return data[1] < 0;
 }

@@ -10,8 +10,16 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 final class TouchCommand extends Command<void> {
   TouchCommand() {
     argParser
-      ..addOption('authority', mandatory: false, help: "The store's authority. Must sign [default: payer]")
-      ..addOption('store', mandatory: true, help: "When present, the counter inside is incremented by one");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The store's authority. Must sign [default: payer]",
+      )
+      ..addOption(
+        'store',
+        mandatory: true,
+        help: "When present, the counter inside is incremented by one",
+      );
   }
 
   @override

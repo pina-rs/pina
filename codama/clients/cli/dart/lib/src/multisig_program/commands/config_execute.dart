@@ -14,10 +14,22 @@ final class ConfigExecuteCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
-      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
+      ..addOption(
+        'member',
+        mandatory: false,
+        help: "The member account [default: payer]",
+      )
+      ..addOption(
+        'rent_payer',
+        mandatory: false,
+        help: "The rent_payer account [default: payer]",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption('spending_limit_accounts', mandatory: true, help: "Spending limit accounts referenced by add/remove spending-limit");
+      ..addOption(
+        'spending_limit_accounts',
+        mandatory: true,
+        help: "Spending limit accounts referenced by add/remove spending-limit",
+      );
   }
 
   @override
@@ -39,7 +51,10 @@ final class ConfigExecuteCommand extends Command<void> {
         ? pubkey('--rent-payer', results['rent_payer']! as String)
         : context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
-    final spendingLimitAccounts = pubkey('--spending-limit-accounts', results['spending_limit_accounts']! as String);
+    final spendingLimitAccounts = pubkey(
+      '--spending-limit-accounts',
+      results['spending_limit_accounts']! as String,
+    );
 
     final instruction = getConfigExecuteInstruction(
       programAddress: context.programAddress,

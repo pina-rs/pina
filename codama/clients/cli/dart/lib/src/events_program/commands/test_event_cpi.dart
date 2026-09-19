@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/events_program.dart';
 
 final class TestEventCpiCommand extends Command<void> {
   TestEventCpiCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +20,7 @@ final class TestEventCpiCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getTestEventCpiInstruction(
       programAddress: context.programAddress,

@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 bs58 = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true, features = ["derive", "std", "env"] }
-multisig-program-client = { path = "../../rust/multisig_program" }
+multisig-program-client = { path = "../../../rust/multisig_program" }
 serde_json = { workspace = true, default-features = true }
 solana-rpc-client = { workspace = true, default-features = true }
 solana-sdk = { workspace = true, default-features = true }

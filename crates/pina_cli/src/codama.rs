@@ -535,6 +535,33 @@ fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings>
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
+/// Relative path from one directory to another, using only `..` and the
+/// target's remaining components. Both inputs must be absolute or both
+/// relative; the caller passes generation outputs, which share a root.
+fn relative_dependency_path(from_dir: &Path, to_dir: &Path) -> String {
+	let mut from = from_dir.components().peekable();
+	let mut to = to_dir.components().peekable();
+	while let (Some(left), Some(right)) = (from.peek(), to.peek()) {
+		if left == right {
+			from.next();
+			to.next();
+		} else {
+			break;
+		}
+	}
+	let mut parts: Vec<String> = Vec::new();
+	for _ in from {
+		parts.push("..".to_string());
+	}
+	for part in to {
+		parts.push(part.as_os_str().to_string_lossy().into_owned());
+	}
+	if parts.is_empty() {
+		parts.push(".".to_string());
+	}
+	parts.join("/")
+}
+
 fn expand_cli_clients(mut clients: BTreeSet<ClientLanguage>) -> BTreeSet<ClientLanguage> {
 	let selected = [
 		ClientLanguage::CliRust,
@@ -690,7 +717,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			let crate_dir = plan.cli_rust_out.join(example);
 			validate_generation_target(&crate_dir, settings)?;
 			let client_dir = plan.rust_out.join(example);
-			let client_path = format!("../../rust/{example}");
+			let client_path = relative_dependency_path(&crate_dir, &client_dir);
 			let client_package = rust_client_package(&client_dir, example);
 			let render_config = CliRenderConfig {
 				mode: cli_render_mode(settings.mode),
