@@ -80,6 +80,17 @@ See `migration-dos-and-donts.md` — the maintainer-facing distillation (7 frame
 | `dynamic-auth.md`            | Multisig/role-registry battery (see file)                            |
 | `dynamic-float-tail.md`      | Float + long-tail battery (see file)                                 |
 
+## Branch state and handoff
+
+Worktree branch `security-sweep-2026-09-19` (cut from `feat/abi-version-reset` @ `3f7d38f9`) carries two commits:
+
+1. `fix(pina_abi)` — ABI-F1/F2 fixes with 4 new tests (`pina_abi` 141/141, `pina_macros` 62/62).
+2. `docs(security)` — this report directory.
+
+Verified locally: `cargo test -p pina_abi -p pina_macros`, clippy on the touched ranges (clean; pre-existing test-only warnings elsewhere in the crate), dprint format, and the full `test:all` workspace suite (exit 0, zero failures). **Not yet run for this branch per the pre-push checklist**: `lint:all`, `verify:security`, `coverage:all` (the two new validate branches are executed by the new tests, but the profiling build must confirm), `test:idl`, the Surfpool tier, the feature matrix, benchmarks, and Kani (the kani task could not start in this worktree — package-spec error "Failed to retrieve information for `pina`", worth investigating separately). Do not treat the branch as push-ready until those pass.
+
+Attack crates under `tmp/sweep/` are gitignored scratch; each report links its crate. The harness recipe every battery used (offline Surfnet + real artifacts) is documented in `dynamic-framework-probe.md` and is directly reusable for future sweeps and for turning any CONFIRMED finding into a regression suite.
+
 ## Not covered tonight (honest gaps)
 
 - Kani proofs not re-run (worktree task failed on a package-spec error; CI covers them).
