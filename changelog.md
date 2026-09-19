@@ -4,6 +4,228 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.20.0](https://github.com/pina-rs/pina/releases/tag/v0.20.0) (2026-09-19)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Name the stored-bump compact PDA loader for what it verifies
+
+_Packages:_ _pina_, _pina_macros_
+
+The release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.
+
+The weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.
+
+`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+### Features
+
+#### Add a checked discriminator write
+
+_Packages:_ _pina_
+
+`IntoDiscriminator::write_discriminator` returns `()` and drops the write when the destination slice is shorter than the discriminator: a `debug_assert!` fires in debug builds, but a release build silently leaves the buffer untouched. Generated code always sizes its buffers from `Self::BYTES`, so this only bit hand-written implementations, where a missing discriminator produces an account that looks initialized but decodes as an unknown type.
+
+The new `IntoDiscriminator::try_write_discriminator` reports the undersized buffer with `PinaProgramError::DataTooShort` (0xFFFF_FFFA, "Account or instruction data is shorter than the expected minimum") instead. That is the variant `HasMigrationVersion::write_le` and the migration decoders already return for a destination that cannot hold the value, so a caller sees one error for every short-buffer case.
+
+The method has a default implementation that length-checks and then delegates to `write_discriminator`, so a manual implementer inherits the checked path without writing anything; the primitive implementations (`u8`, `u16`, `u32`, `u64`) and `into_discriminator!` override it to write through `get_mut` in one step. `write_discriminator` is unchanged, and its doc comment now points new manual implementers at the checked form.
+
+Tests cover short buffers of every length up to `BYTES` (including a short inner slice of a long array), exact and oversized buffers, and that the checked write produces the same bytes as the unchecked one.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Accept const capacities in schemas
+
+_Packages:_ _pina_, _pina_abi_, _pina_cli_, _pina_macros_
+
+Compact account and instruction schemas now accept a `const` item wherever they previously required an integer literal:
+
+```rust
+const MAX_MEMBERS: usize = 24;
+
+#[account(discriminator = MultisigAccountType, compact)]
+pub struct Multisig {
+	pub bump: u8,
+	pub member_keys: Vec<Address, MAX_MEMBERS>,
+}
+```
+
+`Vec<T, N>`, `PodVec<T, N, PFX>`, `String<N>`, `PodString<N, PFX>`, an `Option<...>` around them, and fixed `[T; N]` arrays and instruction arguments all resolve a capacity through a constant. Constants may be arithmetic over other constants and may be declared in any module of the crate, so one bound is declared once and reused in the account, the instruction that writes it, and the helper that sizes it.
+
+Pina resolves each capacity during expansion and records the number it evaluates to. The ABI layer still receives concrete values, so replacing a literal with a constant of the same value leaves `migrations/manifest.json`, the generated `tests/abi_layout.rs` assertions, `MAX_SIZE`/`MIN_SIZE`/`HEADER_SIZE`, and `projected_bytes(...)` byte-identical, and `pina migrations check` and the Codama IDL unchanged.
+
+A capacity that cannot be evaluated at expansion time now fails the build with a diagnostic naming the expression and pointing at the workaround, instead of the previous `unsupported compact field` or `arrays require an integer literal length` message. An associated constant such as `Bounds::MAX_MEMBERS` is not resolved; declare the bound as a `const` item.
+
+`pina_abi` gains `SchemaConsts`, the shared evaluator both the macros and the CLI use so the two layers agree on what a constant means. `pina_cli` resolves capacities while it parses a program, so migration and IDL tooling reads the same numbers the compiler does.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #463](https://github.com/pina-rs/pina/pull/463) · _Closed issues:_ [#460](https://github.com/pina-rs/pina/issues/460)
+
+#### Reject event schemas that cannot fit the SBF stack
+
+_Packages:_ _pina_, _pina_macros_
+
+The generated `emit` function materializes a whole event record in one stack frame (`let mut record = [0u8; Self::SIZE];`) before calling into the runtime, so a large `#[event]` schema compiled cleanly and then exhausted the 4 KiB SBF stack at runtime — a self-inflicted denial of service with no compile-time signal.
+
+`pina` gains `MAX_EVENT_RECORD_BYTES`, set to `4096 - 512`. The 512-byte reserve is headroom for the callee frame and the caller's own frame, the same reasoning `MAX_MIGRATION_WORKSPACE` already applies to the historical-normalization workspace. Because the constant is public, the bound a caller can read is the bound the macro enforces.
+
+`pina_macros` emits a compile-time assertion in every `#[event]` expansion, so an oversized schema now fails the build with a message naming the struct and the remedy. A record exactly at the bound still compiles; the assertion is inclusive.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Match the Migrate trigger to the discriminator width
+
+_Packages:_ _pina_, _pina_macros_
+
+`#[discriminator]` reserves the all-ones value of the enum's own primitive, so a `u16` program reserves `0xffff` and a `u32` program reserves `0xffff_ffff`. The generated entrypoint guarded the reserved path with `is_migrate_instruction`, which only tests one byte, so for any program whose instruction enum used `primitive = u16`, `u32`, or `u64` the reserved discriminator never matched and `process_migrate` was unreachable.
+
+`pina` adds width-specific helpers alongside the existing one: `is_migrate_instruction_u16`, `is_migrate_instruction_u32`, and `is_migrate_instruction_u64`. Each matches only its own width, so a one-byte `0xff` is not a two-byte `0xffff` and neither prefix-matches the other. They compare the decoded little-endian value rather than a slice equality, keeping the inline comparison the one-byte helper already had instead of the `memcmp` call `data == CONSTANT.to_le_bytes()` would emit on SBF.
+
+`pina_macros` selects the helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` on a wider discriminator now reaches the reserved path. The generated guard for a default `u8` program is byte-identical to before, so the common case takes no compute regression. The documentation on the reserved-discriminator constants and in `docs/src/migrations/flow.md` now names the width pairing.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Name the stored-bump compact PDA loader for what it verifies
+
+_Packages:_ _pina_cli_
+
+The release that split the compact PDA loader into `with_pda` and `with_checked_pda` gave the two methods names that do not state their difference: `with_pda` kept its name while its verification was weakened from a canonical bump search to a single derivation from the account's stored bump. A program upgrading across that release lost canonical-bump rejection at every existing `with_pda` call site with no compiler signal.
+
+The weak loader is now `with_stored_bump_pda`, which says what it checks. The old `with_pda` name remains as a deprecated forwarding alias for one release, so existing calls compile but emit a `deprecated` warning naming the difference and pointing at `with_checked_pda` for the trustless case. `with_checked_pda` is unchanged.
+
+`pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+### Fixes
+
+#### Stop enabling `bytemuck` on `solana-address`/`solana-pubkey`
+
+_Packages:_ _pina_
+
+The workspace requested `solana-address/bytemuck` and `solana-pubkey/bytemuck`. Pina used `bytemuck` for its own pod primitives until the migration to `pinapod`, so nothing in the workspace reads the `Pod` or `Zeroable` derives those features add, and no first-party code calls a `bytemuck` API.
+
+Both entries now request what Pina actually depends on. `solana-address` asks for `copy`, which derives `Copy` on `Address` — the bound `pinapod`'s `ZcElem` requires and the only part of `bytemuck`'s feature set that was load-bearing. Requesting it directly removes the dependence on `bytemuck`'s implication, and on `pinocchio` and `pinapod` enabling `copy` transitively. `solana-pubkey` no longer requests `bytemuck` at all.
+
+Deployable programs are unchanged: `bytemuck` contributed no symbols to any built program, so all 24 `bpf-entrypoint` examples produce byte-identical sizes and an identical instruction mix with and without it. This is a dependency-graph cleanup, not a size or compute-unit change.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #464](https://github.com/pina-rs/pina/pull/464)
+
+#### Retry the lint driver probe while the kernel reports it busy
+
+_Packages:_ _pina_cli_
+
+`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.
+
+`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)
+
+#### Verify the lint driver download before installing it
+
+_Packages:_ _pina_cli_
+
+`pina lint` fetches a prebuilt driver binary, marks it executable, and runs it as its version probe. The download trusted the transport alone: no checksum was verified, the response body was read without a size bound, and the origin could be redirected through `PINA_LINT_DRIVER_*` environment variables.
+
+The download path now fetches the `sha256` published beside the asset, compares it against the bytes received, and refuses to install on mismatch, a malformed checksum, or a checksum file that is not valid UTF-8. A new `VerifiedDriver` type wraps the bytes so only a checksum-verified download can reach the installer — a future edit cannot silently reintroduce an unverified path, because the compiler rejects it. The body read is capped at 256 MiB, and the release workflow now uploads the standalone driver's `.sha256` beside the binary, which it previously did not (only the archives carried published checksums).
+
+A locally built driver (`pina lint --build-driver`) keeps its existing trust root — a cargo build against the pinned `pina_lints` release — and installs through a separate function, since no published checksum exists for an artifact built on the local machine.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Fix the IDL size message and sanitize doc topics
+
+_Packages:_ _pina_cli_
+
+`pina idl fetch` rejected raw client output above 8 MiB but reported the limit as "4 MiB". The check and the message now share one constant, `MAX_RAW_HEX_BYTES`, so the two cannot drift again, and the message states the true 8 MiB limit.
+
+`pina docs <topic>` joined the caller-supplied topic directly into `<PINA_TEMPLATES_DIR>/<topic>.t.md`, so a topic such as `../../etc/passwd` escaped the template directory. Only the file-name component of the topic is now used, and a topic with no file-name component fails with a clear error.
+
+The unused `tar` dependency is gone from `pina_cli` and the workspace dependency table; nothing in the crate referenced it, and the only other lockfile consumer is `agave-snapshots`, which declares it directly.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Reject Cargo library names that cannot be path components
+
+_Packages:_ _pina_cli_
+
+Cargo accepts any string as a `[lib] name` and reports it verbatim through `cargo metadata`, so a checked-in manifest controls the value. Pina joined that name into file and directory paths (`target/deploy`, generated IDL files, client crate directories) without validating it, so `[lib] name = "../../escaped"` made `pina generate` write outside the project root — reproduced with an artifact landing next to the project directory while the command reported success.
+
+`Project::discover` now validates the library name once, where it enters the project model, and rejects anything outside `[A-Za-z0-9_-]` with the new `ProjectError::InvalidLibraryName`. Cargo already refuses the empty name before metadata reaches pina. Validating at the ingestion point keeps every current and future path join safe instead of patching individual sinks, and no legitimate library name is affected because Cargo's own naming rules are a subset of the accepted set.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Qualify every `Address` in generated PDA code
+
+_Packages:_ _pina_macros_
+
+`#[pda]` emitted its generated `Address` types unqualified: the `program_id` parameter of `try_find_pda`, `find_pda`, and `assert_seeds`, and the seed parameter and stored field types of the generated seeds struct. Those spellings resolve against the user's own scope, so a program with its own type named `Address` could silently change which address type a generated signature takes. Every generated `Address` is now the crate-qualified form, matching what the surrounding generated code and the `#[account]` schema path already emitted.
+
+The expansion also emits the same identity proof the schema path uses — `const _: fn(Address) -> pina::Address = |value| value;` — but only when a declaration actually has an `Address` seed, so a numeric-only `#[pda]` never requires `Address` in scope. The proof binds the caller's bare `Address` spelling to the crate's type, so a future unqualified spelling is a compile error in the user's crate rather than a silent shadow.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Reject PDA declarations that cannot derive
+
+_Packages:_ _pina_macros_
+
+Every generated `#[pda]` derivation appends a bump seed: `try_find_pda` and `find_pda` search for the canonical one, `with_bump` supplies the stored or explicit one, and the generated loaders derive from the stored field. The runtime caps a derivation at 16 seeds total, so a declaration of 16 seeds produced 17 and no instruction could ever load the account.
+
+The macro now caps the declared list at 15 seeds and names both numbers in the error. The cap applies whether or not the declaration has a `bump =` field, because the bump-free variant derives through `try_find_pda` and appends a bump there. A declaration that previously compiled with 16 seeds was already unreachable at runtime; it now fails the build instead of shipping a PDA that always returns `InvalidSeeds`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Keep untrusted IDL names inside generated doc comments
+
+_Packages:_ _pina_cpi_renderer_
+
+`CamelCaseString` derives `Deserialize` on its inner `String`, so the normalization its constructor applies never runs for JSON input: a name read from an IDL reaches the renderer verbatim, newlines included. Two sites interpolated such a name straight into a single-line `///` comment — the CPI account line in `render_account` and the argument line in `render_argument` — so everything after an embedded newline was emitted as uncommented Rust. A crafted IDL handed to `pina cpi --idl` produced a generated crate containing attacker-chosen items, which then compile (and execute under `#[cfg(test)]`) in the victim's workspace.
+
+Both sites now route through `render_doc`, which splits on newlines and prefixes every line as a comment, so an embedded newline becomes another comment line instead of code. `pina_cpi_renderer` gains a regression test that deserializes a malicious IDL through the same `read_root_node` path `pina cpi` uses, asserts the newline survives parsing (so the test keeps exercising the real path), and fails if any payload line escapes its comment.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+### Notes
+
+#### Retry the lint driver probe while the kernel reports it busy
+
+_Packages:_ _pina_
+
+`pina lint` starts the driver it just installed to check that it loads. The kernel refuses an `exec` while a write descriptor for the same file is still open — including one a concurrent fork inherited — and the install-then-probe sequence can overlap with that window, so the probe failed with a busy error on a driver that was perfectly runnable. The spawn now retries briefly for that one error and fails immediately for anything else, which also stops the driver tests from flaking under a parallel test run.
+
+`pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)
+
+#### Reject empty escrow offers and prove the maker is writable
+
+_Packages:_ _pina_
+
+`escrow_program`'s `Make` handler now rejects an offer whose `amount_a` or `amount_b` is zero with a new `EscrowError::EmptyOffer` (code 2), before any account is created or any token moves. A zero `amount_b` let a maker escrow token A for nothing, and a zero `amount_a` let a taker receive the vault for nothing; both are fat-finger shapes rather than real offers. The variant is new rather than a reuse of `OfferKeyMismatch` or `TokenAccountMismatch`, because wire values are part of the program ABI and remapping an existing code would change what deployed clients decode. The doc comment on the variant becomes the message in the regenerated Codama IDL and the Rust, JavaScript, and Dart clients.
+
+`Take` now asserts the maker is writable next to the existing address check, so a read-only maker fails with Pina's own `InvalidAccountData` diagnostic instead of a generic runtime failure from the vault or escrow close CPIs. The `&mut AccountView` field already enforced this at parse time, so the assert is defense in depth: the test passes with it removed. It costs 16 CU on `Take` (32,241 to 32,257), which is the price of keeping the requirement visible in the handler, and the maker is credited twice there (vault rent and escrow rent).
+
+Two Surfpool cases cover the behavior: one asserts `EmptyOffer` and that no balance moves and no account is created, and one presents a read-only maker through a non-payer keypair and asserts the failure plus unchanged escrow, vault, and taker balances.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+#### Align the advisory gates on deny.toml
+
+_Packages:_ _pina_cli_
+
+`security:deny` ran `cargo-deny check bans licenses sources`, so the `[advisories]` section of `deny.toml` — and the four suppressions it documented — never executed. The task now runs the advisories check with `--workspace`, because cargo-deny's default graph roots at the workspace members' normal dependencies and therefore omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime) where every suppressed advisory actually lives. Without `--workspace` the check cannot see them at all.
+
+`security:audit` carried a second, different seven-id ignore list. `deny.toml` is now the single source of advisory policy: the task reads the `[advisories] ignore` array out of `deny.toml` and passes each id to `cargo-audit`, so the two gates cannot drift. Every suppression in that array carries a reachability justification and a review date, and each needs a tracking issue filed on the repository — the entries are all dev/test-only today, verified with `cargo tree -i <spec> -p pina -p pina_abi -p pina_macros -p pina_cli` and the `--workspace` cargo-deny run, but a file cannot open issues on its own.
+
+The `[advisories]` section also needed the `RUSTSEC-2021-0139`, `RUSTSEC-2024-0375`, `RUSTSEC-2024-0384`, `RUSTSEC-2020-0016`, `RUSTSEC-2025-0134`, and `RUSTSEC-2026-0173` entries that only the old cargo-audit list had, so moving advisories into the deny gate does not weaken it.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
+- **pina_codama_nodes**: **Pin the client contract test to the released surfaces.** The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+
 ## [0.19.0](https://github.com/pina-rs/pina/releases/tag/v0.19.0) (2026-09-18)
 
 Grouped release for `core`.

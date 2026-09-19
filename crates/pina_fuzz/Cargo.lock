@@ -332,7 +332,7 @@ checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
 
 [[package]]
 name = "pina"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "pastey",
  "pina_macros",
@@ -345,8 +345,9 @@ dependencies = [
 
 [[package]]
 name = "pina_abi"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
+ "proc-macro2",
  "quote",
  "serde",
  "serde_json",
@@ -366,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "darling",
  "heck",
