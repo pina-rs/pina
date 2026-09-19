@@ -19,7 +19,9 @@ use pina_test::TransactionError;
 use program_under_test::ACTION_ADD_MEMBER;
 use program_under_test::ACTION_SET_TIME_LOCK;
 use program_under_test::Address;
+use program_under_test::ConfigAuthorityExecuteIx;
 use program_under_test::ConfigInitializeIx;
+use program_under_test::ConfigUpdateIx;
 use program_under_test::KIND_CONFIG;
 use program_under_test::KIND_VAULT;
 use program_under_test::MAX_MESSAGE_BYTES;
@@ -33,7 +35,9 @@ use program_under_test::PERMISSIONS_ALL;
 use program_under_test::ProgramConfig;
 use program_under_test::Proposal;
 use program_under_test::ProposalCreateIx;
+use program_under_test::STATUS_ACTIVE;
 use program_under_test::STATUS_APPROVED;
+use program_under_test::STATUS_CANCELLED;
 use program_under_test::STATUS_DRAFT;
 use program_under_test::STATUS_EXECUTED;
 use program_under_test::STATUS_REJECTED;
@@ -139,7 +143,7 @@ fn encode_message_fixture(keys: &[Pubkey], instructions: &[(usize, &[u8], &[u8])
 		instructions,
 		&mut buffer,
 	)
-	.expect("encode message fixture");
+	.unwrap_or_else(|error| panic!("encode message fixture: {error:?}"));
 	buffer[..length].to_vec()
 }
 
@@ -157,14 +161,14 @@ fn create_multisig_ix(bump: u8, member_count: usize, threshold: u16) -> Vec<u8> 
 		ix.threshold.set(threshold);
 		ix.timelock.set(0);
 		ix.ttl.set(0);
-		for position in 0..member_count {
-			ix.member_permissions[position] = PERMISSIONS_ALL;
+		for slot in ix.member_permissions.iter_mut().take(member_count) {
+			*slot = PERMISSIONS_ALL;
 		}
 		ix.config_authority = Address::default();
 		ix.rent_collector = Address::default();
 		Ok(())
 	})
-	.expect("encode multisig create");
+	.unwrap_or_else(|error| panic!("encode multisig create: {error:?}"));
 	data
 }
 
@@ -220,18 +224,24 @@ fn decode_roster(bytes: &[u8]) -> ([Address; 16], usize) {
 
 /// Install the global program config with a zero fee, so multisig creation
 /// needs no treasury account.
-fn install_program_config(program: &ProgramTest) {
+fn install_program_config(program: &ProgramTest, authority: &Pubkey) {
 	let (config_key, config_bump) = program_config_pda();
 	let mut data = vec![0_u8; ProgramConfig::SIZE];
 	ProgramConfig::initialize(&mut data, |config| {
 		config.bump = config_bump;
-		config.authority = pina_address(&Pubkey::new_from_array([0xCA; 32]));
-		config.treasury = pina_address(&Pubkey::new_from_array([0xCA; 32]));
+		config.authority = pina_address(authority);
+		config.treasury = pina_address(authority);
 		config.creation_fee.set(0);
 		Ok(())
 	})
-	.expect("encode program config fixture");
-	install_account(&program, &config_key, &program_id(), data, 100_000_000);
+	.unwrap_or_else(|error| panic!("encode program config fixture: {error:?}"));
+	install_account(program, &config_key, &program_id(), data, 100_000_000);
+}
+
+/// The config authority keypair every config fixtures share: the seed is
+/// fixed so recorded benchmark paths stay deterministic.
+fn config_authority() -> Keypair {
+	Keypair::new_from_array([0xCA; 32])
 }
 
 /// Install a prefabricated program-owned account through the state cheatcode.
@@ -246,7 +256,7 @@ fn install_account(
 		.install_historical_account(
 			&pina_test::HistoricalAccount::new(0, *address, *owner, data).with_lamports(lamports),
 		)
-		.expect("install account fixture");
+		.unwrap_or_else(|error| panic!("install account fixture: {error:?}"));
 }
 
 #[test]
@@ -254,12 +264,14 @@ fn install_account(
 fn end_to_end_governed_sol_transfer() {
 	pina_test::run(async {
 		let pid = program_id();
-		let mut program = ProgramTest::start(pid).await.expect("start program test");
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let config_authority = Keypair::new_from_array([0xCA; 32]);
 		program
 			.fund(&config_authority.pubkey(), FUND)
-			.expect("fund authority");
+			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
 
 		// Bootstrap the global config with a zero fee.
 		let (config_key, config_bump) = program_config_pda();
@@ -270,7 +282,7 @@ fn end_to_end_governed_sol_transfer() {
 			ix.creation_fee.set(0);
 			Ok(())
 		})
-		.expect("encode config init");
+		.unwrap_or_else(|error| panic!("encode config init: {error:?}"));
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
@@ -284,19 +296,23 @@ fn end_to_end_governed_sol_transfer() {
 				),
 				&[&config_authority],
 			)
-			.expect("initialize program config");
+			.unwrap_or_else(|error| panic!("initialize program config: {error:?}"));
 
 		// Create a three-member, threshold-two multisig.
 		let create = create_key();
 		program
 			.fund(&create.pubkey(), FUND)
-			.expect("fund create key");
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
 		let members = sorted_members();
 		for member in &members {
-			program.fund(member, FUND).expect("fund member");
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
 		}
 		let funder = Keypair::new_from_array([0xF0; 32]);
-		program.fund(&funder.pubkey(), FUND).expect("fund funder");
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
@@ -317,18 +333,23 @@ fn end_to_end_governed_sol_transfer() {
 				),
 				&[&create, &funder],
 			)
-			.expect("create multisig");
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
 
-		let multisig_account = program.account(&multisig_key).expect("multisig exists");
-		let state = Multisig::try_from_bytes(&multisig_account.data).expect("decode");
-		let (roster, count) = decode_roster(state.member_roster());
+		let multisig_account = program
+			.account(&multisig_key)
+			.unwrap_or_else(|error| panic!("multisig exists: {error:?}"));
+		let state = Multisig::try_from_bytes(&multisig_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
+		let (_, count) = decode_roster(state.member_roster());
 		assert_eq!(count, 3);
 		assert_eq!(state.threshold.get(), 2);
 		drop(multisig_account);
 
 		// Fund the vault PDA and propose a SOL transfer out of it.
 		let (vault_key, _) = vault_pda(&multisig_key, 0);
-		program.fund(&vault_key, VAULT_FUND).expect("fund vault");
+		program
+			.fund(&vault_key, VAULT_FUND)
+			.unwrap_or_else(|error| panic!("fund vault: {error:?}"));
 		let payee = destination();
 		let message = encode_message_fixture(
 			&[vault_key, payee, system()],
@@ -352,9 +373,12 @@ fn end_to_end_governed_sol_transfer() {
 				),
 				&[&member_a()],
 			)
-			.expect("create vault proposal");
-		let proposal_account = program.account(&proposal_key).expect("proposal exists");
-		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+			.unwrap_or_else(|error| panic!("create vault proposal: {error:?}"));
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.status, STATUS_DRAFT);
 		assert_eq!(state.index.get(), 1);
 		drop(proposal_account);
@@ -379,10 +403,13 @@ fn end_to_end_governed_sol_transfer() {
 					),
 					&[signer],
 				)
-				.expect("advance proposal");
+				.unwrap_or_else(|error| panic!("advance proposal: {error:?}"));
 		}
-		let proposal_account = program.account(&proposal_key).expect("proposal exists");
-		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.status, STATUS_APPROVED);
 		drop(proposal_account);
 
@@ -403,18 +430,30 @@ fn end_to_end_governed_sol_transfer() {
 				),
 				&[&member_c()],
 			)
-			.expect("execute vault proposal");
+			.unwrap_or_else(|error| panic!("execute vault proposal: {error:?}"));
 
-		assert_eq!(program.balance(&payee).expect("payee balance"), TRANSFER);
 		assert_eq!(
-			program.balance(&vault_key).expect("vault balance"),
+			program
+				.balance(&payee)
+				.unwrap_or_else(|error| panic!("payee balance: {error:?}")),
+			TRANSFER
+		);
+		assert_eq!(
+			program
+				.balance(&vault_key)
+				.unwrap_or_else(|error| panic!("vault balance: {error:?}")),
 			VAULT_FUND - TRANSFER
 		);
-		let proposal_account = program.account(&proposal_key).expect("proposal exists");
-		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.status, STATUS_EXECUTED);
 
-		program.stop().expect("stop program test");
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
 
@@ -423,19 +462,25 @@ fn end_to_end_governed_sol_transfer() {
 fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 	pina_test::run(async {
 		let pid = program_id();
-		let mut program = ProgramTest::start(pid).await.expect("start program test");
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let create = create_key();
 		program
 			.fund(&create.pubkey(), FUND)
-			.expect("fund create key");
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
 		let members = sorted_members();
 		for member in &members {
-			program.fund(member, FUND).expect("fund member");
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
 		}
-		install_program_config(&program);
+		install_program_config(&program, &config_authority().pubkey());
 		let funder = Keypair::new_from_array([0xF0; 32]);
-		program.fund(&funder.pubkey(), FUND).expect("fund funder");
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
@@ -456,7 +501,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 				),
 				&[&create, &funder],
 			)
-			.expect("create multisig");
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
 
 		// A real draft vault proposal at index 1 that must go stale after the
 		// config change.
@@ -483,7 +528,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 				),
 				&[&member_a()],
 			)
-			.expect("create the stale-fated proposal");
+			.unwrap_or_else(|error| panic!("create the stale-fated proposal: {error:?}"));
 
 		// Propose adding a fourth member, then approve and execute it.
 		let new_member = Pubkey::new_from_array([0xD4; 32]);
@@ -510,7 +555,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 				),
 				&[&member_a()],
 			)
-			.expect("create config proposal");
+			.unwrap_or_else(|error| panic!("create config proposal: {error:?}"));
 		for (discriminant, signer) in [
 			(MultisigInstruction::ProposalActivate as u8, &member_a()),
 			(MultisigInstruction::ProposalApprove as u8, &member_a()),
@@ -530,7 +575,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 					),
 					&[signer],
 				)
-				.expect("advance config proposal");
+				.unwrap_or_else(|error| panic!("advance config proposal: {error:?}"));
 		}
 
 		program
@@ -549,10 +594,13 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 				),
 				&[&member_c(), &member_a()],
 			)
-			.expect("execute config proposal");
+			.unwrap_or_else(|error| panic!("execute config proposal: {error:?}"));
 
-		let multisig_account = program.account(&multisig_key).expect("multisig exists");
-		let state = Multisig::try_from_bytes(&multisig_account.data).expect("decode");
+		let multisig_account = program
+			.account(&multisig_key)
+			.unwrap_or_else(|error| panic!("multisig exists: {error:?}"));
+		let state = Multisig::try_from_bytes(&multisig_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		let (roster, count) = decode_roster(state.member_roster());
 		assert_eq!(count, 4);
 		assert!(roster[..4].contains(&pina_address(&new_member)));
@@ -578,7 +626,9 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 			.expect_err("stale proposal must not activate");
 		pina_test::assert_custom_error(&error, MultisigError::StaleProposal as u32);
 
-		program.stop().expect("stop program test");
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
 
@@ -587,19 +637,25 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 fn rejection_cutoff_settles_and_events_are_emitted() {
 	pina_test::run(async {
 		let pid = program_id();
-		let mut program = ProgramTest::start(pid).await.expect("start program test");
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let create = create_key();
 		program
 			.fund(&create.pubkey(), FUND)
-			.expect("fund create key");
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
 		let members = sorted_members();
 		for member in &members {
-			program.fund(member, FUND).expect("fund member");
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
 		}
-		install_program_config(&program);
+		install_program_config(&program, &config_authority().pubkey());
 		let funder = Keypair::new_from_array([0xF0; 32]);
-		program.fund(&funder.pubkey(), FUND).expect("fund funder");
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
@@ -620,7 +676,7 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 				),
 				&[&create, &funder],
 			)
-			.expect("create multisig");
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
 
 		let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, 1);
 		program
@@ -645,7 +701,7 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 				),
 				&[&member_a()],
 			)
-			.expect("create rejection-fated proposal");
+			.unwrap_or_else(|error| panic!("create rejection-fated proposal: {error:?}"));
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
@@ -660,7 +716,7 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 				),
 				&[&member_a()],
 			)
-			.expect("activate rejection-fated proposal");
+			.unwrap_or_else(|error| panic!("activate rejection-fated proposal: {error:?}"));
 
 		// Two rejections out of three voters (threshold two) settle the
 		// rejection: cutoff = 3 - 2 + 1.
@@ -679,10 +735,13 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 					),
 					&[signer],
 				)
-				.expect("reject proposal");
+				.unwrap_or_else(|error| panic!("reject proposal: {error:?}"));
 		}
-		let proposal_account = program.account(&proposal_key).expect("proposal exists");
-		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.status, STATUS_REJECTED);
 		assert_eq!(state.rejected_mask.get(), 0b011);
 		drop(proposal_account);
@@ -691,12 +750,17 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 		// also settle, but two already carried the cutoff, so the mask pins
 		// exactly who voted. (Event-record decoding is unit-tested in the
 		// program crate; `simulate_logs` cannot sign member instructions.)
-		let proposal_account = program.account(&proposal_key).expect("proposal exists");
-		let state = Proposal::try_from_bytes(&proposal_account.data).expect("decode");
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.rejected_mask.get(), 0b011);
 		drop(proposal_account);
 
-		program.stop().expect("stop program test");
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
 
@@ -705,14 +769,18 @@ fn rejection_cutoff_settles_and_events_are_emitted() {
 fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 	pina_test::run(async {
 		let pid = program_id();
-		let mut program = ProgramTest::start(pid).await.expect("start program test");
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let create = create_key();
 		program
 			.fund(&create.pubkey(), FUND)
-			.expect("fund create key");
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
 		let payer = member_a();
-		program.fund(&payer.pubkey(), FUND).expect("fund payer");
+		program
+			.fund(&payer.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund payer: {error:?}"));
 		let members = sorted_members();
 
 		// Classic-layout bytes, owned by this program because the state
@@ -751,7 +819,7 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 			ix.rent_collector = Address::default();
 			Ok(())
 		})
-		.expect("encode import");
+		.unwrap_or_else(|error| panic!("encode import: {error:?}"));
 
 		let error = program
 			.send_with_signers(
@@ -782,7 +850,9 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 			"expected InvalidAccountOwner, got: {error:?}"
 		);
 
-		program.stop().expect("stop program test");
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
 
@@ -791,16 +861,22 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 fn spending_limit_moves_sol_without_a_vote() {
 	pina_test::run(async {
 		let pid = program_id();
-		let mut program = ProgramTest::start(pid).await.expect("start program test");
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let create = create_key();
 		let members = sorted_members();
 		for member in &members {
-			program.fund(member, FUND).expect("fund member");
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
 		}
-		install_program_config(&program);
+		install_program_config(&program, &config_authority().pubkey());
 		let funder = Keypair::new_from_array([0xF0; 32]);
-		program.fund(&funder.pubkey(), FUND).expect("fund funder");
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
 		program
 			.send_with_signers(
@@ -821,15 +897,19 @@ fn spending_limit_moves_sol_without_a_vote() {
 				),
 				&[&create, &funder],
 			)
-			.expect("create multisig");
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
 
 		let (vault_key, _) = vault_pda(&multisig_key, 0);
 		let limit_create_key = Pubkey::new_from_array([0x51; 32]);
 		let (limit_key, limit_bump) = spending_limit_pda(&multisig_key, &limit_create_key);
 		let payee = destination();
 		// The payee must already be rent-exempt to receive lamports.
-		program.fund(&payee, FUND).expect("fund payee");
-		program.fund(&vault_key, VAULT_FUND).expect("fund vault");
+		program
+			.fund(&payee, FUND)
+			.unwrap_or_else(|error| panic!("fund payee: {error:?}"));
+		program
+			.fund(&vault_key, VAULT_FUND)
+			.unwrap_or_else(|error| panic!("fund vault: {error:?}"));
 
 		let rent = Rent::default();
 
@@ -837,7 +917,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 		for (position, member) in members.iter().enumerate() {
 			member_addresses[position] = pina_address(member);
 		}
-		let space = SpendingLimit::projected_bytes(3 * 32, 1 * 32).unwrap();
+		let space = SpendingLimit::projected_bytes(3 * 32, 32).unwrap();
 		let mut limit_bytes = vec![0_u8; space];
 		SpendingLimit::initialize(
 			&mut limit_bytes,
@@ -855,7 +935,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 				.replace_members(&flatten_roster(&member_addresses[..3])[..3 * 32])
 				.replace_destinations(&flatten_roster(&[pina_address(&payee)])[..32]),
 		)
-		.expect("encode spending limit");
+		.unwrap_or_else(|error| panic!("encode spending limit: {error:?}"));
 		let limit_rent = rent.minimum_balance(limit_bytes.len());
 		install_account(&program, &limit_key, &pid, limit_bytes, limit_rent);
 
@@ -865,7 +945,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 			ix.decimals = 9;
 			Ok(())
 		})
-		.expect("encode spending limit use");
+		.unwrap_or_else(|error| panic!("encode spending limit use: {error:?}"));
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
@@ -886,11 +966,19 @@ fn spending_limit_moves_sol_without_a_vote() {
 				),
 				&[&member_a()],
 			)
-			.expect("spend against the limit");
+			.unwrap_or_else(|error| panic!("spend against the limit: {error:?}"));
 
-		assert_eq!(program.balance(&payee).expect("payee balance"), FUND + 400);
-		let limit_account = program.account(&limit_key).expect("limit exists");
-		let state = SpendingLimit::try_from_bytes(&limit_account.data).expect("decode");
+		assert_eq!(
+			program
+				.balance(&payee)
+				.unwrap_or_else(|error| panic!("payee balance: {error:?}")),
+			FUND + 400
+		);
+		let limit_account = program
+			.account(&limit_key)
+			.unwrap_or_else(|error| panic!("limit exists: {error:?}"));
+		let state = SpendingLimit::try_from_bytes(&limit_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
 		assert_eq!(state.remaining_amount.get(), 600);
 
 		// A draw past the allowance is rejected.
@@ -900,7 +988,7 @@ fn spending_limit_moves_sol_without_a_vote() {
 			ix.decimals = 9;
 			Ok(())
 		})
-		.expect("encode overdraw");
+		.unwrap_or_else(|error| panic!("encode overdraw: {error:?}"));
 		let error = program
 			.send_with_signers(
 				Instruction::new_with_bytes(
@@ -924,6 +1012,284 @@ fn spending_limit_moves_sol_without_a_vote() {
 			.expect_err("overdraw must fail");
 		pina_test::assert_custom_error(&error, MultisigError::SpendingLimitExceeded as u32);
 
-		program.stop().expect("stop program test");
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+#[test]
+#[ignore = "run with pina test"]
+fn config_update_revocation_cancellation_authority_execute_and_close() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		// The installed config names the shared authority keypair, so
+		// ConfigUpdate runs against the real signer.
+		let config_authority = config_authority();
+		install_program_config(&program, &config_authority.pubkey());
+		let (config_key, _) = program_config_pda();
+		let mut update_ix = vec![0_u8; ConfigUpdateIx::SIZE];
+		ConfigUpdateIx::initialize(&mut update_ix, |ix| {
+			ix.set_treasury = false.into();
+			ix.treasury = Address::default();
+			ix.set_creation_fee = true.into();
+			ix.creation_fee.set(0);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode config update: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&update_ix,
+					vec![
+						AccountMeta::new_readonly(config_authority.pubkey(), true),
+						AccountMeta::new(config_key, false),
+					],
+				),
+				&[&config_authority],
+			)
+			.unwrap_or_else(|error| panic!("update program config: {error:?}"));
+
+		// A controlled multisig with a rent collector: the authority path and
+		// the close path both need it.
+		let create = create_key();
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		let authority = Keypair::new_from_array([0xEE; 32]);
+		let collector = Pubkey::new_from_array([0xCC; 32]);
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let mut controlled_ix = vec![0_u8; MultisigCreateIx::SIZE];
+		MultisigCreateIx::initialize(&mut controlled_ix, |ix| {
+			ix.bump = multisig_bump;
+			ix.threshold.set(2);
+			ix.timelock.set(0);
+			ix.ttl.set(0);
+			for slot in ix.member_permissions.iter_mut().take(members.len()) {
+				*slot = PERMISSIONS_ALL;
+			}
+			ix.config_authority = pina_address(&authority.pubkey());
+			ix.rent_collector = pina_address(&collector);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode controlled multisig create: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&controlled_ix,
+					vec![
+						AccountMeta::new_readonly(config_key, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create controlled multisig: {error:?}"));
+
+		// Approve to the threshold, then revoke one approval: the proposal
+		// must fall back to active.
+		let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, 1);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(
+						&multisig_key,
+						proposal_bump,
+						KIND_VAULT,
+						&[0, 0, 0, 0, 0, 0],
+						&[],
+					),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create the revocation-fated proposal: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&bare_ix(MultisigInstruction::ProposalActivate as u8),
+					vec![
+						AccountMeta::new_readonly(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("activate the revocation-fated proposal: {error:?}"));
+		for (discriminant, signer) in [
+			(MultisigInstruction::ProposalApprove as u8, &member_a()),
+			(MultisigInstruction::ProposalApprove as u8, &member_b()),
+			(MultisigInstruction::ProposalRevoke as u8, &member_a()),
+		] {
+			program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						pid,
+						&bare_ix(discriminant),
+						vec![
+							AccountMeta::new_readonly(multisig_key, false),
+							AccountMeta::new(proposal_key, false),
+							AccountMeta::new_readonly(signer.pubkey(), true),
+							AccountMeta::new_readonly(clock(), false),
+						],
+					),
+					&[signer],
+				)
+				.unwrap_or_else(|error| panic!("advance the revocation-fated proposal: {error:?}"));
+		}
+		let proposal_account = program
+			.account(&proposal_key)
+			.unwrap_or_else(|error| panic!("proposal exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&proposal_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(
+			state.status, STATUS_ACTIVE,
+			"revocation must settle back to active"
+		);
+		drop(proposal_account);
+
+		// A second draft the creator cancels outright.
+		let (draft_key, draft_bump) = proposal_pda(&multisig_key, 2);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(
+						&multisig_key,
+						draft_bump,
+						KIND_VAULT,
+						&[0, 0, 0, 0, 0, 0],
+						&[],
+					),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(draft_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create the cancellation-fated draft: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&bare_ix(MultisigInstruction::ProposalCancel as u8),
+					vec![
+						AccountMeta::new_readonly(multisig_key, false),
+						AccountMeta::new(draft_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("cancel the draft: {error:?}"));
+		let draft_account = program
+			.account(&draft_key)
+			.unwrap_or_else(|error| panic!("draft exists: {error:?}"));
+		let state = Proposal::try_from_bytes(&draft_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(state.status, STATUS_CANCELLED);
+		drop(draft_account);
+
+		// The controlled path: the authority executes a config action stream
+		// directly, no proposal required.
+		let mut actions = Vec::new();
+		actions.push(1_u8);
+		actions.push(ACTION_SET_TIME_LOCK);
+		actions.extend_from_slice(&3600_u32.to_le_bytes());
+		let mut authority_ix = vec![0_u8; ConfigAuthorityExecuteIx::SIZE];
+		ConfigAuthorityExecuteIx::initialize(&mut authority_ix, |ix| {
+			ix.actions_len.set(actions.len() as u16);
+			ix.actions[..actions.len()].copy_from_slice(&actions);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode authority execute: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&authority_ix,
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new_readonly(authority.pubkey(), true),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&authority, &funder],
+			)
+			.unwrap_or_else(|error| panic!("authority-execute the timelock change: {error:?}"));
+		let multisig_account = program
+			.account(&multisig_key)
+			.unwrap_or_else(|error| panic!("multisig exists: {error:?}"));
+		let state = Multisig::try_from_bytes(&multisig_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(state.timelock.get(), 3600);
+		drop(multisig_account);
+
+		// Terminal proposals pay their rent to the collector.
+		program.fund(&collector, 0).err();
+		let collector_balance = program
+			.balance(&collector)
+			.unwrap_or_else(|error| panic!("collector balance: {error:?}"));
+		program
+			.send_instruction(Instruction::new_with_bytes(
+				pid,
+				&bare_ix(MultisigInstruction::ProposalClose as u8),
+				vec![
+					AccountMeta::new_readonly(multisig_key, false),
+					AccountMeta::new(draft_key, false),
+					AccountMeta::new(collector, false),
+				],
+			))
+			.unwrap_or_else(|error| panic!("close the cancelled draft: {error:?}"));
+		assert!(
+			program
+				.balance(&collector)
+				.unwrap_or_else(|error| panic!("collector balance: {error:?}"))
+				> collector_balance,
+			"the close must refund the collector"
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
