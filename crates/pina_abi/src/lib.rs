@@ -609,6 +609,16 @@ impl DataSchema {
 		if self.codec != DataCodec::PinaPodV2 {
 			return Err("unsupported data codec".to_owned());
 		}
+		let mut seen = BTreeSet::new();
+		for field in &self.fields {
+			if !seen.insert(field.name.as_str()) {
+				return Err(format!(
+					"duplicate field name `{}` in schema; field names must be unique within a \
+					 version for rename matching and client byte mapping",
+					field.name
+				));
+			}
+		}
 		self.physical().map(|_| ())
 	}
 
@@ -947,6 +957,24 @@ impl ContractHistory {
 				self.identity.key()
 			)
 		})?;
+		// The macro expansion interpolates `rust_name` with `syn::Ident::new`,
+		// which panics on anything but a plain identifier, so validation must
+		// reject a hostile manifest here with a typed error instead.
+		if self.rust_name.starts_with("r#") {
+			return Err(format!(
+				"contract `{}` has a raw identifier rustName `{}`; expected a plain Rust \
+				 identifier",
+				self.identity.key(),
+				self.rust_name
+			));
+		}
+		if syn::parse_str::<syn::Ident>(&self.rust_name).is_err() {
+			return Err(format!(
+				"contract `{}` has a non-identifier rustName `{}`; expected a Rust identifier",
+				self.identity.key(),
+				self.rust_name
+			));
+		}
 		for (index, version) in self.versions.iter().enumerate() {
 			let number = u32::try_from(index).map_err(|_| {
 				format!(
@@ -3713,5 +3741,56 @@ mod tests {
 			error.contains("no ABI converter reaches"),
 			"a holed table must fail closed, got: {error}"
 		);
+	}
+
+	/// A hostile manifest must fail `validate` with a typed error instead of
+	/// panicking inside the macro that interpolates `rustName` with
+	/// `syn::Ident::new`.
+	#[test]
+	fn a_non_identifier_rust_name_fails_validation_with_a_typed_error() {
+		for hostile in ["not an ident", "", "1abc", "r#type", "type-2"] {
+			let manifest = {
+				let mut manifest = account_manifest(fixed_schema(&[("count", "u64")]));
+				let history = manifest.contracts.values_mut().next().unwrap();
+				history.rust_name = hostile.to_owned();
+				manifest
+			};
+			let history = manifest.contracts.values().next().unwrap();
+			let error = history
+				.validate(MigrationVersionType::U8)
+				.expect_err("hostile rustName must be rejected");
+			assert!(
+				error.contains("rustName"),
+				"error must name the offending rustName, got: {error}"
+			);
+		}
+	}
+
+	#[test]
+	fn a_plain_identifier_rust_name_passes_validation() {
+		let manifest = account_manifest(fixed_schema(&[("count", "u64")]));
+		let history = manifest.contracts.values().next().unwrap();
+		history
+			.validate(MigrationVersionType::U8)
+			.unwrap_or_else(|error| panic!("plain identifier must validate: {error}"));
+	}
+
+	/// Duplicate field names are grammar-valid but break rename matching and
+	/// client byte mapping, so validation must reject them per version.
+	#[test]
+	fn duplicate_field_names_fail_schema_validation() {
+		let schema = fixed_schema(&[("amount", "u64"), ("amount", "u64")]);
+		let error = schema.validate().expect_err("duplicates must be rejected");
+		assert!(
+			error.contains("duplicate field name `amount`"),
+			"error must name the duplicated field, got: {error}"
+		);
+	}
+
+	#[test]
+	fn distinct_field_names_pass_schema_validation() {
+		fixed_schema(&[("authority", "Address"), ("amount", "u64")])
+			.validate()
+			.unwrap_or_else(|error| panic!("distinct fields must validate: {error}"));
 	}
 }
