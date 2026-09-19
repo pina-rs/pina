@@ -41,39 +41,31 @@ fn schema(fields: &[(&str, &str)]) -> DataSchema {
 /// of growing payload size.
 fn manifest() -> MigrationManifest {
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
-	// Build the three-version ladder with valid adjacent transitions.
-	let version = |index: u32, fields: &[(&str, &str)]| {
+	// Build the three-version ladder with valid adjacent transitions. A version
+	// entry stores the transition entering it, so the version number is the
+	// position in this array and not a stored field.
+	let version = |fields: &[(&str, &str)]| {
 		SchemaVersion {
-			version: index,
-			schema_sha256: schema(fields).sha256(),
 			schema: schema(fields),
 			process: None,
-			process_sha256: None,
 			transition: None,
 		}
 	};
 	let v0_fields: &[(&str, &str)] = &[("value", "u64")];
 	let v1_fields: &[(&str, &str)] = &[("value", "u64"), ("extra", "u8")];
 	let v2_fields: &[(&str, &str)] = &[("value", "u64"), ("extra", "u8"), ("more", "u16")];
-	let v0 = version(0, v0_fields);
-	let mut v1 = version(1, v1_fields);
-	let mut v2 = version(2, v2_fields);
-	let transition = |from: &SchemaVersion, to: &SchemaVersion| {
+	let v0 = version(v0_fields);
+	let mut v1 = version(v1_fields);
+	let mut v2 = version(v2_fields);
+	let transition = || {
 		Transition {
-			from: from.version,
-			to: to.version,
 			mode: TransitionMode::Automatic,
 			renames: vec![],
-			source_schema_sha256: from.schema_sha256.clone(),
-			destination_schema_sha256: to.schema_sha256.clone(),
-			source_process_sha256: None,
-			destination_process_sha256: None,
-			process: None,
 			implementation_sha256: Some("implementation".to_owned()),
 		}
 	};
-	v1.transition = Some(transition(&v0, &v1));
-	v2.transition = Some(transition(&v1, &v2));
+	v1.transition = Some(transition());
+	v2.transition = Some(transition());
 	let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
 	manifest.contracts.insert(
 		identity.key(),

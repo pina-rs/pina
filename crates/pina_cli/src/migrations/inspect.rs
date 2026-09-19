@@ -225,10 +225,10 @@ pub fn decode_envelope<'manifest>(
 		let mut stored = [0_u8; 8];
 		stored[..version_bytes].copy_from_slice(&data[disc_bytes..disc_bytes + version_bytes]);
 		let stored_version = u64::from_le_bytes(stored);
-		let Some(current) = history.current() else {
+		let Some(current_version) = history.current_version() else {
 			return Some((history, 0, InspectState::UnknownContract));
 		};
-		if stored_version > u64::from(current.version) {
+		if stored_version > u64::from(current_version) {
 			return Some((
 				history,
 				u32::try_from(stored_version).unwrap_or(u32::MAX),
@@ -236,7 +236,7 @@ pub fn decode_envelope<'manifest>(
 			));
 		}
 
-		let state = if stored_version == u64::from(current.version) {
+		let state = if stored_version == u64::from(current_version) {
 			InspectState::Current
 		} else {
 			InspectState::Stale
@@ -278,7 +278,7 @@ pub fn pending_hops(
 	};
 	let mut hops = Vec::new();
 	let mut version = stored;
-	while version < history.current().map_or(0, |current| current.version) {
+	while version < history.current_version().unwrap_or(0) {
 		let to = version + 1;
 		let from_index = usize::try_from(version).unwrap_or(usize::MAX);
 		let to_index = usize::try_from(to).unwrap_or(usize::MAX);
@@ -333,7 +333,7 @@ pub fn build_report(
 		report.contract = Some(history.identity.key());
 		report.rust_name = Some(history.rust_name.clone());
 		report.stored_version = Some(stored);
-		report.current_version = history.current().map(|current| current.version);
+		report.current_version = history.current_version();
 		report.state = state;
 		if state == InspectState::Stale {
 			report.hops = pending_hops(
