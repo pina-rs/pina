@@ -502,7 +502,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		programError: "NotEnoughAccountKeys",
 	},
 	multisig_program: {
-		instruction: "config_initialize",
+		instruction: "configInitialize",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
