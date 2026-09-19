@@ -540,6 +540,18 @@ mod tests {
 		root
 	}
 
+	/// The structs declared by a file, for in-place edits.
+	///
+	/// The test sources declare structs only, so the filter never rejects one.
+	fn structs<'a>(file: &'a mut syn::File) -> impl Iterator<Item = &'a mut syn::ItemStruct> {
+		file.items.iter_mut().filter_map(|item| {
+			match item {
+				syn::Item::Struct(item) => Some(item),
+				_ => None,
+			}
+		})
+	}
+
 	/// Build a one-field struct whose field carries `ty`.
 	///
 	/// Tests need types that cannot be written in source text (a `Group`, for
@@ -557,30 +569,21 @@ mod tests {
 		item
 	}
 
-	/// Replace the length of the first `[T; N]` field in a one-field struct.
-	fn set_array_length(item: &mut syn::ItemStruct, len: &syn::Expr) {
+	/// Replace the type of every field, used for types that cannot be written as
+	/// source text.
+	fn set_field_type(item: &mut syn::ItemStruct, ty: &syn::Type) {
 		for field in item.fields.iter_mut() {
-			if let syn::Type::Array(array) = &mut field.ty {
-				array.len = len.clone();
-			}
+			field.ty = ty.clone();
 		}
 	}
 
 	/// Replace the capacity argument of the first `Vec<T, N>` field.
-	fn set_vec_capacity(item: &mut syn::ItemStruct, argument: syn::GenericArgument) {
+	///
+	/// The callers build a one-field struct whose field is a `Vec`, so the
+	/// capacity slot always exists.
+	fn set_vec_capacity(item: &mut syn::ItemStruct, ty: syn::Type) {
 		for field in item.fields.iter_mut() {
-			let syn::Type::Path(path) = &mut field.ty else {
-				continue;
-			};
-			let Some(segment) = path.path.segments.last_mut() else {
-				continue;
-			};
-			let syn::PathArguments::AngleBracketed(arguments) = &mut segment.arguments else {
-				continue;
-			};
-			if let Some(slot) = arguments.args.iter_mut().nth(1) {
-				*slot = argument.clone();
-			}
+			field.ty = ty.clone();
 		}
 	}
 
@@ -1058,14 +1061,11 @@ mod tests {
 	#[test]
 	fn reference_proofs_skip_a_grouped_expression() {
 		let table = table("const WIDTH: usize = 4;");
-		let mut grouped: syn::Expr = syn::parse_quote!(WIDTH);
-		if let syn::Expr::Path(inner) = grouped {
-			grouped = syn::Expr::Group(syn::ExprGroup {
-				attrs: Vec::new(),
-				group_token: syn::token::Group::default(),
-				expr: Box::new(syn::Expr::Path(inner)),
-			});
-		}
+		let grouped = syn::Expr::Group(syn::ExprGroup {
+			attrs: Vec::new(),
+			group_token: syn::token::Group::default(),
+			expr: Box::new(syn::parse_quote!(WIDTH)),
+		});
 		let mut arguments = syn::punctuated::Punctuated::new();
 		arguments.push(syn::GenericArgument::Type(syn::parse_quote!(u8)));
 		arguments.push(syn::GenericArgument::Const(grouped));
@@ -1175,23 +1175,22 @@ mod tests {
 				pub values: [u64; 4],
 			}
 		};
-		for item in file.items.iter_mut().filter_map(|item| {
-			match item {
-				syn::Item::Struct(item) => Some(item),
-				_ => None,
-			}
-		}) {
-			set_array_length(
-				item,
-				&syn::Expr::Block(syn::ExprBlock {
-					attrs: Vec::new(),
-					label: None,
-					block: syn::Block {
-						brace_token: syn::token::Brace::default(),
-						stmts: vec![syn::Stmt::Expr(inner.clone(), None)],
-					},
-				}),
-			);
+		let braced = syn::Type::Array(syn::TypeArray {
+			attrs: Vec::new(),
+			bracket_token: syn::token::Bracket::default(),
+			elem: Box::new(syn::parse_quote!(u64)),
+			semi_token: syn::token::Semi::default(),
+			len: syn::Expr::Block(syn::ExprBlock {
+				attrs: Vec::new(),
+				label: None,
+				block: syn::Block {
+					brace_token: syn::token::Brace::default(),
+					stmts: vec![syn::Stmt::Expr(inner, None)],
+				},
+			}),
+		});
+		for item in structs(&mut file) {
+			set_field_type(item, &braced);
 		}
 
 		table.normalize_file(&mut file);
@@ -1206,14 +1205,11 @@ mod tests {
 	#[test]
 	fn evaluate_handles_a_group_wrapped_expression() {
 		let table = table("const WIDTH: usize = 4;");
-		let mut expression: syn::Expr = syn::parse_quote!(WIDTH);
-		if let syn::Expr::Path(path) = expression {
-			expression = syn::Expr::Group(syn::ExprGroup {
-				attrs: Vec::new(),
-				group_token: syn::token::Group::default(),
-				expr: Box::new(syn::Expr::Path(path)),
-			});
-		}
+		let expression = syn::Expr::Group(syn::ExprGroup {
+			attrs: Vec::new(),
+			group_token: syn::token::Group::default(),
+			expr: Box::new(syn::parse_quote!(WIDTH)),
+		});
 
 		assert_eq!(table.resolve(&expression), Some(4));
 	}
@@ -1354,26 +1350,11 @@ mod tests {
 		let table = table("const WIDTH: usize = 4;");
 		let mut file: syn::File = syn::parse_quote! {
 			pub struct Words {
-				pub values: Vec<u8, 4>,
+				pub values: u8,
 			}
 		};
-		let qualified = syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-			attrs: Vec::new(),
-			qself: Some(syn::QSelf {
-				lt_token: syn::token::Lt::default(),
-				ty: Box::new(syn::parse_quote!(u8)),
-				position: 0,
-				as_token: None,
-				gt_token: syn::token::Gt::default(),
-			}),
-			path: syn::parse_quote!(Assoc),
-		}));
-		for item in file.items.iter_mut().filter_map(|item| {
-			match item {
-				syn::Item::Struct(item) => Some(item),
-				_ => None,
-			}
-		}) {
+		let qualified: syn::Type = syn::parse_quote!(Vec<u8, <u8 as Trait>::Assoc>);
+		for item in structs(&mut file) {
 			set_vec_capacity(item, qualified.clone());
 		}
 
@@ -1468,6 +1449,17 @@ mod tests {
 			printed.contains("external"),
 			"the declaration must survive: {printed}"
 		);
+	}
+
+	#[test]
+	fn structs_skips_items_that_are_not_structs() {
+		let mut file: syn::File = syn::parse_quote! {
+			pub const WIDTH: usize = 4;
+			pub fn helper() {}
+		};
+
+		// The iterator filters both items out, so nothing is yielded.
+		assert_eq!(structs(&mut file).count(), 0);
 	}
 
 	#[test]

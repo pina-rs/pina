@@ -708,4 +708,33 @@ mod tests {
 			Journal::find_pda(&second, &ID).0
 		);
 	}
+
+	#[test]
+	fn named_capacities_resolve_to_the_declared_bounds() {
+		// `Journal` declares its capacities as constants. These assertions pin
+		// the values those constants resolve to, so a bound that resolved
+		// differently would fail here instead of silently changing the layout.
+		assert_eq!(MAX_TITLE, 24);
+		assert_eq!(MAX_ENTRIES, 8);
+		assert_eq!(MAX_MARKERS, 8);
+		assert_eq!(MAX_NOTE, 64);
+
+		assert_eq!(Journal::TITLE_CAPACITY, MAX_TITLE);
+		assert_eq!(Journal::ENTRIES_CAPACITY, MAX_ENTRIES);
+		assert_eq!(Journal::MARKERS_CAPACITY, MAX_MARKERS);
+		assert_eq!(Journal::NOTE_CAPACITY, MAX_NOTE);
+
+		// The header and worst-case size follow from those capacities, so they
+		// are the same numbers a literal spelling produced.
+		assert_eq!(Journal::HEADER_SIZE, 60);
+		assert_eq!(Journal::MAX_SIZE, 221);
+	}
+
+	#[test]
+	fn the_rename_instruction_uses_the_title_bound() {
+		// The instruction's fixed array shares `MAX_TITLE` with the account, so
+		// the two bounds cannot drift apart. `RenameIx` is migratable, so its
+		// size includes the discriminator and version envelope.
+		assert_eq!(RenameIx::SIZE, 2 + 1 + MAX_TITLE);
+	}
 }

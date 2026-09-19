@@ -409,12 +409,10 @@ mod tests {
 		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
 		let src = dir.path().join("src");
 		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
-		fs::write(
-			src.join("lib.rs"),
-			"const MAX_MEMBERS: usize = 24;\n\npub struct Roster {\n\tpub bump: u8,\n\tpub \
-			 members: Vec<Address, MAX_MEMBERS>,\n\tpub width: [u8; MAX_MEMBERS],\n}",
-		)
-		.unwrap_or_else(|e| panic!("write: {e}"));
+		let source = "const MAX_MEMBERS: usize = 24;\n\npub struct Roster {\n\tpub bump: \
+		              u8,\n\tpub members: Vec<Address, MAX_MEMBERS>,\n\tpub width: [u8; \
+		              MAX_MEMBERS],\n}";
+		fs::write(src.join("lib.rs"), source).unwrap_or_else(|e| panic!("write: {e}"));
 
 		let files =
 			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
@@ -439,11 +437,9 @@ mod tests {
 		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
 		let src = dir.path().join("src");
 		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
-		fs::write(
-			src.join("lib.rs"),
-			"pub struct Roster {\n\tpub bump: u8,\n\tpub members: Vec<Address, MISSING>,\n}",
-		)
-		.unwrap_or_else(|e| panic!("write: {e}"));
+		let source =
+			"pub struct Roster {\n\tpub bump: u8,\n\tpub members: Vec<Address, MISSING>,\n}";
+		fs::write(src.join("lib.rs"), source).unwrap_or_else(|e| panic!("write: {e}"));
 
 		let files =
 			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
