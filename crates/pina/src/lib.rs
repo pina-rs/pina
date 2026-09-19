@@ -250,6 +250,11 @@ pub const VERBOSE_LOGS_ENABLED: bool = false;
 ///
 /// An optional second argument overrides the maximum number of transaction
 /// accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
+///
+/// The allocator is denied rather than merely unused: any dynamic allocation
+/// aborts at runtime. Programs that need the heap opt in explicitly with
+/// [`nostd_entrypoint_alloc!`], which is identical apart from the global
+/// allocator it installs.
 #[macro_export]
 macro_rules! nostd_entrypoint {
 	($process_instruction:expr) => {
@@ -258,6 +263,68 @@ macro_rules! nostd_entrypoint {
 	($process_instruction:expr, $maximum:expr) => {
 		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
 		$crate::pinocchio::no_allocator!();
+		$crate::pinocchio::nostd_panic_handler!();
+	};
+}
+
+/// Sets up a `no_std` Solana program entrypoint with a heap allocator.
+///
+/// This is [`nostd_entrypoint!`] with one difference: it installs
+/// `pinocchio::default_allocator!` — a `BumpAllocator` over the runtime's heap
+/// region — instead of `no_allocator!`, so `Box`, `Vec`, and the rest of
+/// `alloc` work. Everything else is unchanged, and the entry function keeps
+/// the same signature:
+///
+/// ```ignore
+/// fn process_instruction(
+///     program_id: &Address,
+///     accounts: &mut [AccountView],
+///     data: &[u8],
+/// ) -> ProgramResult
+/// ```
+///
+/// Opt in only when the program needs the heap; [`nostd_entrypoint!`] keeps
+/// allocation impossible at compile time and remains the default for every
+/// other program. A heap-allocating crate declares the standard allocator
+/// itself:
+///
+/// ```ignore
+/// extern crate alloc;
+///
+/// use alloc::boxed::Box;
+///
+/// nostd_entrypoint_alloc!(process_instruction);
+/// ```
+///
+/// An optional second argument overrides the maximum number of transaction
+/// accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
+///
+/// # Costs of opting in
+///
+/// These are the failure modes that `no_allocator!` makes impossible, and they
+/// are the reason this is opt-in rather than the default:
+///
+/// | Cost | Detail |
+/// | --- | --- |
+/// | Heap budget | The runtime grants a 32 KiB region by default, charged at 0 CU. A program that needs more requires the caller to send `ComputeBudgetInstruction::request_heap_frame`: the request must be a multiple of 1024 and at most 256 KiB, and each additional 32 KiB page costs 8 CU (`DEFAULT_HEAP_COST`). The allocator keeps its current position in the first word of that region, so the usable bytes are the granted frame minus one `usize`; a program that requests a frame sized for exactly its payload still aborts. |
+/// | Monotonic allocator | `BumpAllocator` only moves a pointer forward. Its `dealloc` is a no-op, so memory is never reclaimed within a transaction and a loop that allocates grows the heap for the whole instruction. |
+/// | Allocation failure aborts | An exhausted heap returns a null pointer, which `alloc` turns into an abort — not a `ProgramError`. Size the request against the worst case; there is no recoverable out-of-memory path. |
+/// | Client-side dependency | A program that needs more than 32 KiB shifts a runtime requirement onto every caller. Only the transaction that sends the heap-frame request gets the larger region, so a caller that forgets it fails at runtime while the same instruction succeeds elsewhere. |
+/// | Transaction-scoped | The heap is not persistent storage: nothing a program allocates is visible to another transaction, so anything that must outlive the instruction belongs in account data. |
+///
+/// The heap is a transaction-scoped arena, not a general-purpose allocator:
+/// prefer the zero-copy account types for anything stored in an account and
+/// reserve the heap for transient work that outgrows the stack.
+#[macro_export]
+macro_rules! nostd_entrypoint_alloc {
+	($process_instruction:expr) => {
+		$crate::nostd_entrypoint_alloc!($process_instruction, {
+			$crate::pinocchio::MAX_TX_ACCOUNTS
+		});
+	};
+	($process_instruction:expr, $maximum:expr) => {
+		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
+		$crate::pinocchio::default_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};
 }

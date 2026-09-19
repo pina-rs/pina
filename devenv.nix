@@ -681,6 +681,7 @@ in
           -p sysvar_checks_program \
           -p escrow_program \
           -p optional_accounts_program \
+          -p heap_alloc_program \
           -p pina_bpf_program \
           -p profile_program \
           -p validation_program
@@ -731,6 +732,12 @@ in
           "$cargo_build_sbf_real" \
             --skip-tools-install \
             --tools-version v1.54 \
+            --manifest-path examples/heap_alloc_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
             --manifest-path examples/escrow_program/Cargo.toml \
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
@@ -772,6 +779,7 @@ in
             --features bpf-entrypoint
         else
           cargo build-pina-bpf-program
+          cargo build-heap-alloc-program
           cargo build-escrow-program
           cargo build-migrations-program
           cargo build-optional-accounts-program
@@ -787,6 +795,7 @@ in
         # that the on-chain programs accept and process correctly.
         SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
           cargo test --locked \
+            -p heap_alloc_program --test heap_frames \
             -p migrations_program --test e2e \
             -p profile_program --test e2e \
             -p role_registry_program --test e2e \

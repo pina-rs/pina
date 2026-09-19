@@ -16,6 +16,7 @@ executables:
   escrow-program: escrow_program
   events-program: events_program
   float-accounts-program: float_accounts_program
+  heap-alloc-program: heap_alloc_program
   hello-solana-program: hello_solana_program
   optional-accounts-program: optional_accounts_program
   pina-bpf-program: pina_bpf_program

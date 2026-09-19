@@ -1,0 +1,101 @@
+{
+	"formatVersion": 4,
+	"programId": "BZtBGtYSgERx2zN12aGgQ6sNLh5r7XtcNCafqmsizgqt",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "AllocateInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "f0753a6ecc27d4882c1c9e15ff0b7e72f7627cd8439ce435b17acfe28a02bf14",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "value",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 8,
+							"fields": [
+								{
+									"name": "value",
+									"offset": 0,
+									"size": 8
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "FillInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "dc1e46a6323760ad5c8314234b15b0af1f7ed33bb1da3f7d0d3d068e204ba262",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bytes",
+								"rustType": "u32"
+							},
+							{
+								"name": "fill",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2",
+						"physical": {
+							"kind": "fixed",
+							"size": 5,
+							"fields": [
+								{
+									"name": "bytes",
+									"offset": 0,
+									"size": 4
+								},
+								{
+									"name": "fill",
+									"offset": 4,
+									"size": 1
+								}
+							]
+						}
+					},
+					"process": {
+						"accounts": []
+					},
+					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
+					"transition": null
+				}
+			]
+		}
+	}
+}

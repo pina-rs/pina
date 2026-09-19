@@ -1025,6 +1025,7 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | Example                                                                             | Description                                                                                   |
 | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | [`hello_solana_program`](examples/hello_solana_program)                             | Minimal program — entrypoint, accounts, logging                                               |
+| [`heap_alloc_program`](examples/heap_alloc_program)                                 | Opt-in heap allocation via `nostd_entrypoint_alloc!` and the bump allocator                   |
 | [`counter_program`](examples/counter_program)                                       | PDA state management with initialize and increment                                            |
 | [`transfer_sol_program`](examples/transfer_sol_program)                             | CPI and direct lamport transfers                                                              |
 | [`escrow_program`](examples/escrow_program)                                         | Full token escrow with SPL token operations                                                   |
