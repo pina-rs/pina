@@ -14,7 +14,12 @@ fn workspace_root() -> &'static Path {
 }
 
 fn reset_snapshot_dir(name: &str) -> PathBuf {
-	let path = std::env::temp_dir()
+	// Keep snapshot scratch space inside the workspace so recorded argument
+	// paths are the same relative form on every machine and CI runner; a
+	// system temp directory leaks absolute, environment-specific paths into
+	// the snapshots.
+	let path = workspace_root()
+		.join("target")
 		.join("pina-cli-snapshot-temp")
 		.join(name);
 	let _ = fs::remove_dir_all(&path);
