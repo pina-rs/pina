@@ -250,6 +250,50 @@ fn docs_unknown_topic_error_snapshot() {
 }
 
 #[test]
+fn docs_reject_a_topic_that_is_not_a_file_name() {
+	// `pina docs` joins the topic into `<topic>.t.md` under the templates
+	// directory, so a topic carrying a parent reference could read outside it.
+	// The command reduces the topic to its file name and refuses one that has
+	// none, which is the `..` and root cases.
+	for topic in ["..", "/"] {
+		let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+		command.args(["docs", topic]);
+		let output = command
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run pina docs: {error}"));
+
+		assert!(!output.status.success(), "`{topic}` must be refused");
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(
+			stderr.contains("is not a valid file name"),
+			"`{topic}` must report the invalid name: {stderr}"
+		);
+	}
+}
+
+#[test]
+fn docs_reduce_a_traversing_topic_to_its_file_name() {
+	// The parent reference is stripped rather than followed, so the lookup
+	// stays a direct child of the template directory and simply misses.
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["docs", "../secrets"]);
+	let output = command
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina docs: {error}"));
+
+	assert!(!output.status.success());
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("Topic `secrets` not found"),
+		"the parent reference must be stripped, not followed: {stderr}"
+	);
+	assert!(
+		!stderr.contains("not a valid file name"),
+		"a basenameable topic is not an invalid name: {stderr}"
+	);
+}
+
+#[test]
 fn docs_load_bundled_and_custom_topics() {
 	for (topic, expected) in [
 		("pina-overview", "Pina"),

@@ -1684,6 +1684,66 @@ mod tests {
 
 	/// A `#[discriminator]` enum inherits the primitive's checked write, so the
 	/// generated path reports a short buffer too.
+	/// An enum driven through the public `into_discriminator!` macro, so the
+	/// macro's generated `try_write_discriminator` is expanded and exercised
+	/// rather than only documented.
+	#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+	#[repr(u16)]
+	enum MacroDrivenDiscriminator {
+		First = 1,
+		Second = 2,
+	}
+
+	// The macro calls `Self::try_from` for parsing, so the enum supplies its
+	// own conversion rather than depending on a derive.
+	impl TryFrom<u16> for MacroDrivenDiscriminator {
+		type Error = ProgramError;
+
+		fn try_from(value: u16) -> Result<Self, Self::Error> {
+			match value {
+				1 => Ok(Self::First),
+				2 => Ok(Self::Second),
+				_ => Err(PinaProgramError::InvalidDiscriminator.into()),
+			}
+		}
+	}
+
+	into_discriminator!(MacroDrivenDiscriminator, u16);
+
+	#[test]
+	fn the_public_macro_generates_a_checked_discriminator_write() {
+		// The macro's write delegates to the primitive, so this covers the
+		// generated body and pins the two-byte layout.
+		let mut bytes = [0u8; 2];
+		MacroDrivenDiscriminator::Second
+			.try_write_discriminator(&mut bytes)
+			.unwrap_or_else(|error| panic!("macro write: {error:?}"));
+		assert_eq!(bytes, [2, 0]);
+		// The unchecked writer is generated alongside the checked one.
+		let mut unchecked = [0u8; 2];
+		MacroDrivenDiscriminator::Second.write_discriminator(&mut unchecked);
+		assert_eq!(unchecked, [2, 0]);
+
+		// A short buffer is refused rather than silently skipped.
+		assert_eq!(
+			MacroDrivenDiscriminator::Second.try_write_discriminator(&mut [0u8; 1]),
+			Err(PinaProgramError::DataTooShort.into())
+		);
+
+		// Parsing and matching round-trip through the macro's implementation.
+		let parsed = MacroDrivenDiscriminator::discriminator_from_bytes(&[2, 0])
+			.unwrap_or_else(|error| panic!("macro parse: {error:?}"));
+		assert_eq!(parsed, MacroDrivenDiscriminator::Second);
+		assert!(parsed.matches_discriminator(&[2, 0, 9]));
+		assert!(!parsed.matches_discriminator(&[1, 0]));
+		// A short read is rejected by the primitive parser the macro delegates
+		// to, which reports instruction-data length rather than account length.
+		assert_eq!(
+			MacroDrivenDiscriminator::discriminator_from_bytes(&[]),
+			Err(ProgramError::InvalidInstructionData)
+		);
+	}
+
 	#[test]
 	fn try_write_discriminator_reaches_generated_enums() {
 		let mut bytes = [0u8; 1];
