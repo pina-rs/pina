@@ -2134,7 +2134,7 @@ impl<'a, T: CpiProgramId> Program<'a, T> {
 ///
 /// This is the no-allocation counterpart to Anchor lang-v2's `ToCpiAccounts`.
 /// The const generic keeps the final account count explicit at compile time so
-/// Pina can stay within its allocator-free on-chain boundary.
+/// Pina programs stay allocator-free by default.
 pub trait ToCpiAccounts<'a, const ACCOUNTS: usize> {
 	/// Collect the handles in the exact order expected by the callee
 	/// instruction.
@@ -2188,8 +2188,9 @@ where
 	/// Invokes the CPI with additional PDA signer seeds.
 	///
 	/// Both invocation paths use Pinocchio's checked static-array implementation.
-	/// This keeps the context allocator-free and avoids unchecked invocation until
-	/// Pina can prove stronger duplicate-account and aliasing invariants.
+	/// This keeps the context allocator-free, which is the default for Pina
+	/// programs, and avoids unchecked invocation until Pina can prove stronger
+	/// duplicate-account and aliasing invariants.
 	#[inline(always)]
 	pub fn invoke_signed(&self, data: &[u8], signers: &[Signer<'_, '_>]) -> ProgramResult {
 		let handles = self.accounts.to_cpi_handles();

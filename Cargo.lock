@@ -25,7 +25,7 @@ name = "account_realloc_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -38,7 +38,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -1682,7 +1682,7 @@ dependencies = [
 name = "compact_accounts_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -1691,7 +1691,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -1914,7 +1914,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -1936,7 +1936,7 @@ name = "counter_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -1961,7 +1961,7 @@ dependencies = [
 name = "counter_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -2236,7 +2236,7 @@ dependencies = [
 name = "custom_errors_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -2245,7 +2245,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -2415,7 +2415,7 @@ dependencies = [
 name = "declare_id_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -2424,7 +2424,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -2454,7 +2454,7 @@ version = "0.0.0"
 name = "declare_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -2463,7 +2463,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -2818,7 +2818,7 @@ dependencies = [
 name = "duplicate_mutable_accounts_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -2827,7 +2827,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -3104,7 +3104,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -3126,7 +3126,7 @@ name = "escrow_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "tokio",
 ]
 
@@ -3147,7 +3147,7 @@ dependencies = [
 name = "escrow_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -3174,7 +3174,7 @@ dependencies = [
 name = "events_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -3183,7 +3183,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -3389,7 +3389,7 @@ dependencies = [
 name = "float_accounts_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -3398,7 +3398,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -3827,6 +3827,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "heap-alloc-program-client"
+version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina 0.19.0",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "heap-alloc-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "heap_alloc_program",
+ "pina_test",
+]
+
+[[package]]
+name = "heap_alloc_program"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm",
+ "pina 0.19.0",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+]
+
+[[package]]
+name = "heap_alloc_program_cli"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "clap",
+ "heap-alloc-program-client",
+ "serde_json",
+ "solana-rpc-client",
+ "solana-sdk",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "heap_alloc_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina 0.17.0",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3853,7 +3906,7 @@ dependencies = [
 name = "hello_solana_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -3862,7 +3915,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -5267,7 +5320,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -5290,7 +5343,7 @@ name = "migrations_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -5314,7 +5367,7 @@ dependencies = [
 name = "migrations_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -5858,7 +5911,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -5880,7 +5933,7 @@ name = "optional_accounts_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-program-error 3.0.1",
@@ -5906,7 +5959,7 @@ dependencies = [
 name = "optional_accounts_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -6129,12 +6182,25 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pina"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46db60a0956f061179805b4b18af80c742d02ac4a7db95d327d53d6884971fc5"
+dependencies = [
+ "pastey",
+ "pinapod 0.3.3",
+ "pinocchio",
+ "pinocchio-system",
+ "solana-address 2.6.1",
+]
+
+[[package]]
+name = "pina"
 version = "0.19.0"
 dependencies = [
  "fixed",
  "pastey",
  "pina_macros",
- "pinapod",
+ "pinapod 0.4.1",
  "pinocchio",
  "pinocchio-associated-token-account",
  "pinocchio-memo",
@@ -6170,7 +6236,7 @@ dependencies = [
 name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
  "prop_amm_program_cpi",
 ]
 
@@ -6180,7 +6246,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -6343,7 +6409,7 @@ dependencies = [
  "macrotest",
  "migrations_program",
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "pina_macros",
  "prettyplease 0.3.0",
  "profile_program",
@@ -6403,14 +6469,37 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c44a010bc0548a14eb99b3dfb7abafaf839bcd2b2d6ea38090085664d27039dc"
+dependencies = [
+ "pinapod-derive 0.3.3",
+ "solana-address 2.6.1",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinapod"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6874fdffa2bac55ecea40a23521b1811ee497cfe2770e647ee8fdc6d9c60920a"
 dependencies = [
  "fixed",
- "pinapod-derive",
+ "pinapod-derive 0.4.1",
  "solana-address 2.6.1",
  "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinapod-derive"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b800816ea8d3a8122046062829999d32e196b984d2fde42410b89e81c79777b6"
+dependencies = [
+ "proc-macro-crate 3.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -6688,7 +6777,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -6710,7 +6799,7 @@ name = "profile_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -6734,7 +6823,7 @@ dependencies = [
 name = "profile_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -6743,7 +6832,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -6765,7 +6854,7 @@ name = "prop_amm_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -6789,7 +6878,7 @@ dependencies = [
 name = "prop_amm_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -7319,7 +7408,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -7341,7 +7430,7 @@ name = "role_registry_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -7365,7 +7454,7 @@ dependencies = [
 name = "role_registry_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -7702,91 +7791,91 @@ dependencies = [
 name = "security_00_signer_authorization_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_01_account_data_matching_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_02_owner_checks_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_03_type_cosplay_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_04_initialization_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_05_arbitrary_cpi_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_06_duplicate_mutable_accounts_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_07_bump_seed_canonicalization_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_08_pda_sharing_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_09_closing_accounts_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_10_sysvar_address_checking_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_11_admin_key_compromise_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
 name = "security_12_oracle_integrity_secure"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -12274,7 +12363,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -12296,7 +12385,7 @@ name = "staking_rewards_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -12320,7 +12409,7 @@ dependencies = [
 name = "staking_rewards_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -12674,7 +12763,7 @@ dependencies = [
 name = "system_accounts_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -12683,7 +12772,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -12721,7 +12810,7 @@ dependencies = [
 name = "sysvar_checks_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -12730,7 +12819,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -12952,7 +13041,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -12973,7 +13062,7 @@ dependencies = [
 name = "todo_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -12993,7 +13082,7 @@ dependencies = [
 name = "todo_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -13283,7 +13372,7 @@ dependencies = [
 name = "transfer_sol_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -13292,7 +13381,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -13689,7 +13778,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -13710,7 +13799,7 @@ dependencies = [
 name = "validation_program"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -13730,7 +13819,7 @@ dependencies = [
 name = "validation_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]
@@ -13757,7 +13846,7 @@ version = "0.0.0"
 dependencies = [
  "num-derive 0.5.1",
  "num-traits",
- "pina",
+ "pina 0.19.0",
  "solana-account-info 3.1.1",
  "solana-cpi 3.1.0",
  "solana-instruction 3.4.1",
@@ -13779,7 +13868,7 @@ name = "vesting_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
- "pina",
+ "pina 0.19.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -13804,7 +13893,7 @@ dependencies = [
 name = "vesting_program_cpi"
 version = "0.0.0"
 dependencies = [
- "pina",
+ "pina 0.19.0",
 ]
 
 [[package]]

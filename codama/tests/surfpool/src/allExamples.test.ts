@@ -43,6 +43,7 @@ const EXAMPLE_PROGRAMS = [
 	"escrow_program",
 	"events_program",
 	"float_accounts_program",
+	"heap_alloc_program",
 	"hello_solana_program",
 	"migrations_program",
 	"optional_accounts_program",
@@ -494,6 +495,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
+	heap_alloc_program: { instruction: "allocate", accounts: "none" },
 	hello_solana_program: { instruction: "hello", accounts: "payerSigner" },
 	migrations_program: {
 		instruction: "update",
