@@ -49,7 +49,6 @@ use pina_abi::MigrationAuto;
 use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
-use pina_abi::ProcessContract;
 use pina_abi::PublicationLedger;
 use pina_abi::SchemaVersion;
 pub use prompt::DisambiguationQuestion;
@@ -400,19 +399,14 @@ pub fn make_migrations_with_answers(
 		);
 		match manifest.contracts.get_mut(&key) {
 			None => {
-				let schema_sha256 = source.schema.sha256();
-				let process_sha256 = source.process.as_ref().map(ProcessContract::sha256);
 				manifest.contracts.insert(
 					key.clone(),
 					ContractHistory {
 						identity: source.identity,
 						rust_name: source.rust_name,
 						versions: vec![SchemaVersion {
-							version: 0,
-							schema_sha256,
 							schema: source.schema,
 							process: source.process,
-							process_sha256,
 							transition: None,
 						}],
 					},
@@ -430,7 +424,9 @@ pub fn make_migrations_with_answers(
 					continue;
 				}
 
-				let latest_version = latest.version;
+				let latest_version = history.current_version().unwrap_or_else(|| {
+					panic!("decoded migration histories always contain a current version")
+				});
 				if ledger.version_is_frozen(&key, latest_version) {
 					let next = next_migration_version(&key, latest_version, manifest.version_type)?;
 					let (renames, dropped) = resolve_field_changes(
@@ -453,6 +449,7 @@ pub fn make_migrations_with_answers(
 							identity: &history.identity,
 							rust_name: &history.rust_name,
 							source: &effective,
+							source_version: latest_version,
 							stale_ladder: &stale_ladder,
 							renames,
 							destination_version: next,
@@ -462,12 +459,8 @@ pub fn make_migrations_with_answers(
 						},
 						&mut output,
 					)?;
-					let schema_sha256 = source.schema.sha256();
 					history.versions.push(SchemaVersion {
-						version: next,
-						schema_sha256,
 						schema: source.schema,
-						process_sha256: source.process.as_ref().map(ProcessContract::sha256),
 						process: source.process,
 						transition: Some(transition),
 					});
@@ -475,18 +468,14 @@ pub fn make_migrations_with_answers(
 				} else {
 					let replacement = if latest_version == 0 {
 						SchemaVersion {
-							version: 0,
-							schema_sha256: source.schema.sha256(),
 							schema: source.schema,
-							process_sha256: source.process.as_ref().map(ProcessContract::sha256),
 							process: source.process,
 							transition: None,
 						}
 					} else {
-						let previous = history
-							.versions
-							.get((latest_version - 1) as usize)
-							.expect("decoded histories contain every adjacent prior version");
+						let previous = history.version(latest_version - 1).unwrap_or_else(|| {
+							panic!("decoded histories contain every adjacent prior version")
+						});
 						// The draft's own transition carries the disambiguation
 						// answers recorded when it was created; reusing them
 						// keeps repeated `make` runs over the draft stable
@@ -511,6 +500,7 @@ pub fn make_migrations_with_answers(
 								identity: &history.identity,
 								rust_name: &history.rust_name,
 								source: &effective,
+								source_version: latest_version - 1,
 								stale_ladder: &stale_ladder,
 								renames,
 								destination_version: latest_version,
@@ -521,10 +511,7 @@ pub fn make_migrations_with_answers(
 							&mut output,
 						)?;
 						SchemaVersion {
-							version: latest_version,
-							schema_sha256: source.schema.sha256(),
 							schema: source.schema,
-							process_sha256: source.process.as_ref().map(ProcessContract::sha256),
 							process: source.process,
 							transition: Some(transition),
 						}
@@ -804,11 +791,14 @@ fn check_project_migrations_with_manifest(
 		let latest = history
 			.current()
 			.expect("validated migration histories always contain a current version");
+		let latest_version = history.current_version().unwrap_or_else(|| {
+			panic!("validated migration histories always contain a current version")
+		});
 		if latest.schema != source.schema || latest.process != source.process {
 			return Err(MigrationError::SchemaDrift {
 				kind: source.identity.kind.to_string(),
 				name: source.rust_name,
-				version: latest.version,
+				version: latest_version,
 			});
 		}
 		verify_transition_files(project, &ledger, &key, history)?;
@@ -816,19 +806,19 @@ fn check_project_migrations_with_manifest(
 			identity: key.clone(),
 			kind: source.identity.kind.to_string(),
 			rust_name: source.rust_name,
-			current_version: latest.version,
-			published: ledger.ever_published(&key, latest.version),
+			current_version: latest_version,
+			published: ledger.ever_published(&key, latest_version),
 			publication_pending: ledger.pending.as_ref().is_some_and(|pending| {
 				pending
 					.versions
 					.get(&key)
-					.is_some_and(|published| published.version >= latest.version)
+					.is_some_and(|published| published.version >= latest_version)
 			}),
-			schema_sha256: latest.schema_sha256.clone(),
+			schema_sha256: latest.schema_sha256(),
 			versions_remaining: manifest
 				.version_type
 				.max_version()
-				.saturating_sub(latest.version),
+				.saturating_sub(latest_version),
 		});
 	}
 	for (key, history) in &manifest.contracts {

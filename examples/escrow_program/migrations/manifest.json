@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "EscrowState",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "54e587b716d47ef7f550462841f84b925328fd7da905512aa6621cee4af1bf93",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -51,48 +49,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 121,
-							"fields": [
-								{
-									"name": "maker",
-									"offset": 0,
-									"size": 32
-								},
-								{
-									"name": "mint_a",
-									"offset": 32,
-									"size": 32
-								},
-								{
-									"name": "mint_b",
-									"offset": 64,
-									"size": 32
-								},
-								{
-									"name": "amount_a",
-									"offset": 96,
-									"size": 8
-								},
-								{
-									"name": "amount_b",
-									"offset": 104,
-									"size": 8
-								},
-								{
-									"name": "seed",
-									"offset": 112,
-									"size": 8
-								},
-								{
-									"name": "bump",
-									"offset": 120,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -107,8 +64,6 @@
 			"rustName": "MakeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "e155f58980a220851b3c2b43b076cf3aa1157d487c073a179fd9a5df07585f4b",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -129,33 +84,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 25,
-							"fields": [
-								{
-									"name": "seed",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "amount_a",
-									"offset": 8,
-									"size": 8
-								},
-								{
-									"name": "amount_b",
-									"offset": 16,
-									"size": 8
-								},
-								{
-									"name": "bump",
-									"offset": 24,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -233,7 +162,6 @@
 							}
 						]
 					},
-					"processSha256": "f38e0e7a171d32db054156188fe1fbd4c53d8557a8d3f82918538f76d65c4693",
 					"transition": null
 				}
 			]
@@ -247,17 +175,10 @@
 			"rustName": "TakeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -359,7 +280,6 @@
 							}
 						]
 					},
-					"processSha256": "28cd0c838f8b0e353ec28374da1fc6b4ff266250877704a16e678fb5bc1a9358",
 					"transition": null
 				}
 			]

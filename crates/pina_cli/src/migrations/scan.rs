@@ -269,7 +269,6 @@ pub(super) fn process_contract(instruction: &InstructionIr) -> ProcessContract {
 						}
 					}),
 					pda: account.pda_name.clone(),
-					constraints: account.constraints.clone(),
 				}
 			})
 			.collect(),

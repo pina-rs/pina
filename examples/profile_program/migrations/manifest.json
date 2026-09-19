@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "ProfileState",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "106cb0bb59760dfa5e3a98823c78ba6dcea0e4bd4fe99c5c38bcc96a15a0f08d",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -47,43 +45,7 @@
 								"rustType": "bool"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 239,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "name",
-									"offset": 1,
-									"size": 33
-								},
-								{
-									"name": "bio",
-									"offset": 34,
-									"size": 129
-								},
-								{
-									"name": "tags",
-									"offset": 163,
-									"size": 66
-								},
-								{
-									"name": "favorite_tag",
-									"offset": 229,
-									"size": 9
-								},
-								{
-									"name": "active",
-									"offset": 238,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -98,8 +60,6 @@
 			"rustName": "InitializeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "96a8b27d3b870dc7985d81165f71b0b76b25b9bd9d6174bab0718025c237ce3a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -116,28 +76,7 @@
 								"rustType": "String<128>"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 163,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								},
-								{
-									"name": "name",
-									"offset": 1,
-									"size": 33
-								},
-								{
-									"name": "bio",
-									"offset": 34,
-									"size": 129
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -167,7 +106,6 @@
 							}
 						]
 					},
-					"processSha256": "834479e7ff618affa381481644f39912c16778f1f8cdcd02c5e5ad2ea20a9f69",
 					"transition": null
 				}
 			]
@@ -181,8 +119,6 @@
 			"rustName": "UpdateProfileInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "b280d053464e789b6c18311087a0ff56aa79cc80d2d430f9b4ed602047e49648",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -195,23 +131,7 @@
 								"rustType": "String<128>"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 162,
-							"fields": [
-								{
-									"name": "name",
-									"offset": 0,
-									"size": 33
-								},
-								{
-									"name": "bio",
-									"offset": 33,
-									"size": 129
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -233,7 +153,6 @@
 							}
 						]
 					},
-					"processSha256": "78509eb16a32e4dc926b0df6ae5fa72111e7f9fad0e4ceac79daed216789a87a",
 					"transition": null
 				}
 			]
@@ -247,8 +166,6 @@
 			"rustName": "AddTagInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "825d8b4d539499c1741595397b14c86ae94b9d37132e61df1d04a466831c5c29",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -257,18 +174,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "tag",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -290,7 +196,6 @@
 							}
 						]
 					},
-					"processSha256": "78509eb16a32e4dc926b0df6ae5fa72111e7f9fad0e4ceac79daed216789a87a",
 					"transition": null
 				}
 			]
@@ -304,8 +209,6 @@
 			"rustName": "RemoveTagInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "5d8c15aec7304fb119516f7e6a54b5065fa92e0da963fceb08a15c89ddce3331",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -314,18 +217,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "index",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -347,7 +239,6 @@
 							}
 						]
 					},
-					"processSha256": "78509eb16a32e4dc926b0df6ae5fa72111e7f9fad0e4ceac79daed216789a87a",
 					"transition": null
 				}
 			]

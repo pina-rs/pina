@@ -265,6 +265,7 @@ proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
 rayon = { default-features = false, version = "^1.10" }
 same-file = { default-features = false, version = "^1" }
+schemars = { default-features = false, version = "^1", features = ["derive"] }
 semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }

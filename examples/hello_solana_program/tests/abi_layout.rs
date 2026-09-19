@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: f844c00cea745fabf42ad27cde7edc32abecb0137ad6408c1441e4a4d2b306e1
+// manifest-sha256: 5a9793b8c0513ab175c549240b7051d87211f6f31c90a590a1a8cde6cb64e017
 // program-id: DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A
 // version_type: u8
 
@@ -25,7 +25,7 @@ pub mod instruction_1_00 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a";
+	pub const SCHEMA_SHA256: &str = "4d30c5a987a69cde3f10c23b93498ead2a16de2576027c1cf287e3813769bdc3";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.

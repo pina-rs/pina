@@ -6269,6 +6269,8 @@ version = "0.19.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "schemars",
+ "semver",
  "serde",
  "serde_json",
  "sha2 0.11.0",

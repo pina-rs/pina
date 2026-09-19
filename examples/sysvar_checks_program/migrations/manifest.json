@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -17,17 +17,10 @@
 			"rustName": "SysvarsCheckInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -57,7 +50,6 @@
 							}
 						]
 					},
-					"processSha256": "09c1bd9a4a1fc42ee808e006009c249b6db351c898adaef06a0d31cb5b31494d",
 					"transition": null
 				}
 			]

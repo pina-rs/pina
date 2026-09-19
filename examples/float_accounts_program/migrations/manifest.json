@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "FloatDataAccount",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "120eba9c4197a411cb027c3337652d02d9c8ca01fdada5eb77a42c1efde23b9c",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -35,28 +33,7 @@
 								"rustType": "Address"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 44,
-							"fields": [
-								{
-									"name": "data_f64",
-									"offset": 0,
-									"size": 8
-								},
-								{
-									"name": "data_f32",
-									"offset": 8,
-									"size": 4
-								},
-								{
-									"name": "authority",
-									"offset": 12,
-									"size": 32
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -71,8 +48,6 @@
 			"rustName": "CreateInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -85,23 +60,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 12,
-							"fields": [
-								{
-									"name": "data_f32",
-									"offset": 0,
-									"size": 4
-								},
-								{
-									"name": "data_f64",
-									"offset": 4,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -131,7 +90,6 @@
 							}
 						]
 					},
-					"processSha256": "021b62f9f4f86369028d81f5b4d68f23b7d94d6dffe7a98066a568b9ca03aaa2",
 					"transition": null
 				}
 			]
@@ -145,8 +103,6 @@
 			"rustName": "UpdateInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "f27d3b96742926b88c7fb43cbdfe2b527f5ce93bc6017bf62d8fabd77bc0b84f",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -159,23 +115,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 12,
-							"fields": [
-								{
-									"name": "data_f32",
-									"offset": 0,
-									"size": 4
-								},
-								{
-									"name": "data_f64",
-									"offset": 4,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -197,7 +137,6 @@
 							}
 						]
 					},
-					"processSha256": "6cc241a695b4e826dcf2417b04ef7fa98a76182fd9315e82747de341e76779c2",
 					"transition": null
 				}
 			]

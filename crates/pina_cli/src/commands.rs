@@ -9,7 +9,9 @@ use clap::CommandFactory;
 use clap_complete::generate;
 use comfy_table::Table;
 use owo_colors::OwoColorize;
+use pina_cli::abi;
 
+use crate::cli::AbiCommands;
 use crate::cli::Cli;
 use crate::cli::ClientArg;
 use crate::cli::CodamaCommands;
@@ -52,6 +54,7 @@ pub(crate) fn run(cli: Cli) {
 		} => run_lint(project, fix, build_driver, explain),
 		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
+		Commands::Abi { command } => run_abi(command),
 		Commands::Generate {
 			project,
 			clients,
@@ -221,6 +224,18 @@ pub(crate) fn run(cli: Cli) {
 						npx,
 					});
 				}
+			}
+		}
+	}
+}
+
+/// Run an ABI document contract operation.
+fn run_abi(command: AbiCommands) {
+	match command {
+		AbiCommands::Schema { document, version } => {
+			let code = abi::run_abi_schema(&document, version.as_deref());
+			if code != 0 {
+				std::process::exit(code);
 			}
 		}
 	}

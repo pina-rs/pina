@@ -192,7 +192,6 @@ type = "npm"
 [group.core]
 packages = [
 	"pina",
-	"pina_abi",
 	"pina_cli",
 	"pina_lints",
 	"pina_macros",
@@ -224,6 +223,21 @@ changelog = { path = "changelog.md", format = "keep_a_changelog", include = "all
 versioned_files = [
 	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] },
 ]
+
+# The ABI document contract releases on its own axis. `pina_abi` sits outside
+# `core` so a CLI fix or renderer tweak cannot move the ABI version, while the
+# `abiVersion` the document records stays pinned to this package's
+# `major.minor`. `pina_cli` and `pina_macros` depend on `pina_abi`, so a release
+# here cascades into `core`; the reverse direction stays decoupled.
+[group.abi]
+packages = ["pina_abi"]
+tag = true
+release = true
+versioned_files = [
+	{ path = "crates/pina_abi/Cargo.toml", type = "cargo", fields = ["package.version"] },
+	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.dependencies.pina_abi.version"] },
+]
+changelog = { path = "crates/pina_abi/changelog.md", format = "keep_a_changelog" }
 
 [ecosystems.cargo]
 enabled = true

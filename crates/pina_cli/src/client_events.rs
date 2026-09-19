@@ -173,46 +173,65 @@ pub(crate) fn read_histories(program_dir: &Path) -> Result<EventClientHistoryInd
 
 impl EventClientHistory {
 	fn try_from(history: &ContractHistory) -> Result<Self, String> {
-		let current = history
-			.current()
+		let current_version = history
+			.current_version()
 			.ok_or_else(|| format!("event contract `{}` has no versions", history.rust_name))?;
 		let mut steps = Vec::new();
-		for index in 1..history.versions.len() {
-			let source = &history.versions[index - 1];
-			let destination = &history.versions[index];
+		// A transition sits on the version it converts into, so version `to`
+		// carries the step from `to - 1`.
+		for to in 1..history.versions.len() {
+			let to = u32::try_from(to).map_err(|_| {
+				format!(
+					"event contract `{}` has too many versions",
+					history.rust_name
+				)
+			})?;
+			let from = to - 1;
+			let source = history.version(from).ok_or_else(|| {
+				format!(
+					"event contract `{}` version {from} is missing",
+					history.rust_name
+				)
+			})?;
+			let destination = history.version(to).ok_or_else(|| {
+				format!(
+					"event contract `{}` version {to} is missing",
+					history.rust_name
+				)
+			})?;
 			let transition = destination.transition.as_ref().ok_or_else(|| {
 				format!(
-					"event contract `{}` version {} is missing its adjacent transition",
-					history.rust_name, destination.version,
+					"event contract `{}` version {to} is missing its adjacent transition",
+					history.rust_name,
 				)
 			})?;
 			let automatic = transition.mode == TransitionMode::Automatic;
 			let moves = if automatic {
 				field_moves(&source.schema, &destination.schema).ok_or_else(|| {
 					format!(
-						"event contract `{}` automatic transition v{} to v{} has no derivable \
-						 fixed-layout byte mapping",
-						history.rust_name, transition.from, transition.to,
+						"event contract `{}` automatic transition v{from} to v{to} has no \
+						 derivable fixed-layout byte mapping",
+						history.rust_name,
 					)
 				})?
 			} else {
 				Vec::new()
 			};
 			steps.push(EventProjectionStep {
-				from: transition.from,
-				to: transition.to,
+				from,
+				to,
 				automatic,
 				source_payload_size: source.schema.fixed_payload_size().ok_or_else(|| {
 					format!(
-						"event contract `{}` version {} is not a fixed layout",
-						history.rust_name, source.version,
+						"event contract `{}` version {from} is not a fixed layout",
+						history.rust_name,
 					)
 				})?,
 				destination_payload_size: destination.schema.fixed_payload_size().ok_or_else(
 					|| {
 						format!(
-							"event contract `{}` version {} is not a fixed layout",
-							history.rust_name, destination.version,
+							"event contract `{}` version {to} is not a fixed layout",
+							history.rust_name,
 						)
 					},
 				)?,
@@ -231,7 +250,7 @@ impl EventClientHistory {
 		Ok(Self {
 			rust_name: history.rust_name.clone(),
 			discriminator,
-			current_version: current.version,
+			current_version,
 			steps,
 		})
 	}
@@ -302,9 +321,7 @@ mod tests {
 	use pina_abi::DataCodec;
 	use pina_abi::DataSchema;
 	use pina_abi::FieldSchema;
-	use pina_abi::FixedFieldLayout;
 	use pina_abi::LayoutKind;
-	use pina_abi::PhysicalLayout;
 	use pina_abi::SchemaVersion;
 	use pina_abi::Transition;
 	use pina_abi::TransitionMode;
@@ -331,9 +348,13 @@ mod tests {
 		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/migrations_program")
 	}
 
-	/// A raw fixed schema whose physical descriptor is provided verbatim, so
-	/// deliberately inconsistent layouts can be exercised.
-	fn raw_schema(fields: &[(&str, &str)], sizes: &[u64]) -> DataSchema {
+	/// A raw fixed schema whose declared fields the closed grammar cannot lay
+	/// out, so its derived physical descriptor fails.
+	///
+	/// The descriptor is a derivation rather than a stored field now, so a
+	/// deliberately inconsistent layout can only be built by declaring a field
+	/// the grammar rejects.
+	fn undescribable_schema(fields: &[(&str, &str)]) -> DataSchema {
 		DataSchema {
 			layout: LayoutKind::Fixed,
 			fields: fields
@@ -346,48 +367,20 @@ mod tests {
 				})
 				.collect(),
 			codec: DataCodec::PinaPodV2,
-			physical: PhysicalLayout::Fixed {
-				size: sizes.iter().sum(),
-				fields: sizes
-					.iter()
-					.enumerate()
-					.map(|(index, size)| {
-						FixedFieldLayout {
-							name: fields[index].0.to_owned(),
-							offset: u64::try_from(index).unwrap_or(u64::MAX),
-							size: *size,
-						}
-					})
-					.collect(),
-			},
 		}
 	}
 
-	fn schema_version(
-		version: u32,
-		schema: DataSchema,
-		transition: Option<TransitionMode>,
-	) -> SchemaVersion {
+	fn schema_version(schema: DataSchema, transition: Option<TransitionMode>) -> SchemaVersion {
 		let transition = transition.map(|mode| {
 			Transition {
-				from: version - 1,
-				to: version,
 				mode,
 				renames: Vec::new(),
-				source_schema_sha256: String::new(),
-				destination_schema_sha256: String::new(),
-				source_process_sha256: None,
-				destination_process_sha256: None,
-				process: None,
 				implementation_sha256: None,
 			}
 		});
 		SchemaVersion {
-			version,
-			schema_sha256: schema.sha256(),
 			schema,
 			process: None,
-			process_sha256: None,
 			transition,
 		}
 	}
@@ -455,8 +448,8 @@ mod tests {
 		assert!(error.contains("has no versions"), "{error}");
 
 		let no_transition = event_history(vec![
-			schema_version(0, schema(&[("value", "u64")]), None),
-			schema_version(1, schema(&[("value", "u64")]), None),
+			schema_version(schema(&[("value", "u64")]), None),
+			schema_version(schema(&[("value", "u64")]), None),
 		]);
 		let error =
 			EventClientHistory::try_from(&no_transition).expect_err("v1 needs a transition");
@@ -476,9 +469,8 @@ mod tests {
 
 		// Automatic transitions need a derivable fixed-layout byte mapping.
 		let automatic_compact = event_history(vec![
-			schema_version(0, compact.clone(), None),
+			schema_version(compact.clone(), None),
 			schema_version(
-				1,
 				schema(&[("value", "u64"), ("memo", "u16")]),
 				Some(TransitionMode::Automatic),
 			),
@@ -492,17 +484,16 @@ mod tests {
 
 		// Manual transitions still need exact fixed payload sizes on both ends.
 		let manual_compact_source = event_history(vec![
-			schema_version(0, compact, None),
-			schema_version(1, schema(&[("value", "u64")]), Some(TransitionMode::Manual)),
+			schema_version(compact, None),
+			schema_version(schema(&[("value", "u64")]), Some(TransitionMode::Manual)),
 		]);
 		let error = EventClientHistory::try_from(&manual_compact_source)
 			.expect_err("compact sources have no exact payload size");
 		assert!(error.contains("version 0 is not a fixed layout"), "{error}");
 
 		let manual_compact_destination = event_history(vec![
-			schema_version(0, schema(&[("value", "u64")]), None),
+			schema_version(schema(&[("value", "u64")]), None),
 			schema_version(
-				1,
 				DataSchema::try_new(
 					LayoutKind::Compact,
 					vec![FieldSchema {
@@ -521,7 +512,7 @@ mod tests {
 
 	#[test]
 	fn history_parsing_rejects_discriminator_width_mismatches() {
-		let mut history = event_history(vec![schema_version(0, schema(&[("value", "u64")]), None)]);
+		let mut history = event_history(vec![schema_version(schema(&[("value", "u64")]), None)]);
 		history.identity.discriminator_bytes = 2;
 
 		let error =
@@ -531,16 +522,15 @@ mod tests {
 
 	#[test]
 	fn field_moves_rejects_inconsistent_physical_layouts() {
-		// The declared Rust type matches, so only the physical sizes disagree.
-		let source = raw_schema(&[("value", "u64")], &[4]);
-		let destination = raw_schema(&[("value", "u64")], &[8]);
-		assert!(field_moves(&source, &destination).is_none());
+		// A physical descriptor is derived from the declared fields rather than
+		// stored, so the reachable failure is a schema the closed grammar cannot
+		// lay out at all. It has no offsets and must not produce byte moves.
+		let undescribable = undescribable_schema(&[("value", "Widget")]);
+		let declared = schema(&[("value", "u64")]);
 
-		// A physical descriptor that omits a declared field has no offset.
-		let missing = raw_schema(&[("first", "u32"), ("second", "u16")], &[4]);
-		let declared = schema(&[("first", "u32"), ("second", "u16")]);
-		assert!(field_moves(&missing, &declared).is_none());
-		assert!(field_moves(&declared, &missing).is_none());
+		assert!(field_moves(&undescribable, &declared).is_none());
+		assert!(field_moves(&declared, &undescribable).is_none());
+		assert!(field_moves(&undescribable, &undescribable).is_none());
 	}
 
 	#[test]
@@ -665,20 +655,29 @@ mod tests {
 		)
 		.expect("write");
 		let error = read_histories(&directory).expect_err("a missing transition must fail");
-		assert!(error.contains("invalid adjacent transition"), "{error}");
-
-		// `pina_abi` validates content hashes before the facts are extracted.
+		assert!(error.contains("has no adjacent transition"), "{error}");
+		// `pina_abi` validates document content before the facts are extracted.
+		// Schema hashes are derived rather than stored now, so the incoherent
+		// document this exercises is a transition that renames a field the
+		// neighbouring versions do not declare.
 		let mut manifest = manual_event_history();
 		let key = manifest.contracts.keys().next().cloned().expect("key");
 		let history = manifest.contracts.get_mut(&key).expect("history");
-		history.versions[1].schema_sha256 = "00".repeat(32);
+		let transition = history.versions[1]
+			.transition
+			.as_mut()
+			.expect("manual transition");
+		transition.renames = vec![pina_abi::RenameMapping {
+			from: "missing".to_owned(),
+			to: "value".to_owned(),
+		}];
 		std::fs::write(
 			manifest_dir.join("manifest.json"),
 			serde_json::to_vec(&manifest).expect("serialize"),
 		)
 		.expect("write");
-		let error = read_histories(&directory).expect_err("hash drift must fail");
-		assert!(error.contains("schema hash does not match"), "{error}");
+		let error = read_histories(&directory).expect_err("incoherent history must fail");
+		assert!(error.contains("renames unknown source field"), "{error}");
 	}
 
 	/// One event history whose only transition changes a field type, which
@@ -693,16 +692,10 @@ mod tests {
 
 		let source = schema(&[("value", "u64")]);
 		let destination = schema(&[("value", "u32")]);
+		// The transition sits on version 1, the version it converts into.
 		let transition = Transition {
-			from: 0,
-			to: 1,
 			mode: TransitionMode::Manual,
 			renames: Vec::new(),
-			source_schema_sha256: source.sha256(),
-			destination_schema_sha256: destination.sha256(),
-			source_process_sha256: None,
-			destination_process_sha256: None,
-			process: None,
 			implementation_sha256: None,
 		};
 		let identity = ContractIdentity::try_new(ContractKind::Event, 1, 4)
@@ -713,19 +706,13 @@ mod tests {
 			rust_name: "ValueChangedEvent".to_owned(),
 			versions: vec![
 				SchemaVersion {
-					version: 0,
-					schema_sha256: source.sha256(),
-					schema: source.clone(),
+					schema: source,
 					process: None,
-					process_sha256: None,
 					transition: None,
 				},
 				SchemaVersion {
-					version: 1,
-					schema_sha256: destination.sha256(),
 					schema: destination,
 					process: None,
-					process_sha256: None,
 					transition: Some(transition),
 				},
 			],
