@@ -258,12 +258,15 @@ serde_json = { default-features = false, version = "^1", features = ["std"] }
 sha2 = { default-features = false, version = "^0.11" }
 solana-account = { version = "^4", default-features = false }
 solana-account-info = { version = "^3", default-features = false }
-solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }
+# `copy` derives `Copy` on `Address`, which `pinapod`'s `ZcElem` bound requires.
+# `bytemuck` also implies `copy` but additionally derives `Pod`/`Zeroable`, which
+# nothing in the workspace uses.
+solana-address = { default-features = false, version = "^2.0", features = ["copy", "curve25519", "decode"] }
 solana-cpi = { version = "^3", default-features = false }
 solana-instruction = { version = "^3", default-features = false }
 solana-program-error = { version = "^3", default-features = false }
 solana-program-log = { default-features = false, version = "^1.1" }
-solana-pubkey = { version = "^4", features = ["bytemuck"], default-features = false }
+solana-pubkey = { version = "^4", default-features = false }
 solana-rpc-client = { version = "^4", default-features = false }
 solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
