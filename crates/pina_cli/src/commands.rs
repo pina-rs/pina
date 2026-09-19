@@ -9,8 +9,8 @@ use clap::CommandFactory;
 use clap_complete::generate;
 use comfy_table::Table;
 use owo_colors::OwoColorize;
+use pina_cli::abi;
 
-use crate::abi_command;
 use crate::cli::AbiCommands;
 use crate::cli::Cli;
 use crate::cli::ClientArg;
@@ -233,7 +233,7 @@ pub(crate) fn run(cli: Cli) {
 fn run_abi(command: AbiCommands) {
 	match command {
 		AbiCommands::Schema { document, version } => {
-			let code = abi_command::run_abi_schema(&document, version.as_deref());
+			let code = abi::run_abi_schema(&document, version.as_deref());
 			if code != 0 {
 				std::process::exit(code);
 			}

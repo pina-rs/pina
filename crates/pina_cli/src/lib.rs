@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+pub mod abi;
 pub mod build;
 mod client_events;
 mod client_migrations;
