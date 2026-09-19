@@ -1734,8 +1734,18 @@ mod tests {
 		let parsed = MacroDrivenDiscriminator::discriminator_from_bytes(&[2, 0])
 			.unwrap_or_else(|error| panic!("macro parse: {error:?}"));
 		assert_eq!(parsed, MacroDrivenDiscriminator::Second);
+		assert_eq!(
+			MacroDrivenDiscriminator::discriminator_from_bytes(&[1, 0])
+				.unwrap_or_else(|error| panic!("macro parse: {error:?}")),
+			MacroDrivenDiscriminator::First
+		);
 		assert!(parsed.matches_discriminator(&[2, 0, 9]));
 		assert!(!parsed.matches_discriminator(&[1, 0]));
+		// An unknown value reaches the enum's own conversion and is refused.
+		assert_eq!(
+			MacroDrivenDiscriminator::discriminator_from_bytes(&[9, 0]),
+			Err(PinaProgramError::InvalidDiscriminator.into())
+		);
 		// A short read is rejected by the primitive parser the macro delegates
 		// to, which reports instruction-data length rather than account length.
 		assert_eq!(
