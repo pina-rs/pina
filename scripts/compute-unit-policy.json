@@ -23,7 +23,10 @@
 		"deltaCu": 500,
 		"deltaPercent": 10.0
 	},
-	"approvedTotals": {},
+	"approvedTotals": {
+		"staking_rewards_program": 8399,
+		"vesting_program": 6177
+	},
 	"runtimeApprovedTotals": {
 		"token_loader_cu_program/legacy_ata_success": 7723,
 		"token_loader_cu_program/legacy_ata_wrong_address": 7638,
@@ -31,7 +34,13 @@
 		"events_program/initialize": 298,
 		"events_program/testEvent": 298,
 		"events_program/testEventCpi": 297,
-		"staking_rewards_program/openPosition": 6528
+		"staking_rewards_program/openPosition": 6586,
+		"escrow_program/make": 37064,
+		"escrow_program/take": 32347,
+		"staking_rewards_program/claim": 17265,
+		"staking_rewards_program/deposit": 19001,
+		"staking_rewards_program/withdraw": 5668,
+		"vesting_program/claim": 22206
 	},
 	"runtimeExpectedOutcomes": {
 		"token_loader_cu_program/explicit_owner_assert_then_load": true,
