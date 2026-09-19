@@ -37,7 +37,7 @@
 		"staking_rewards_program/openPosition": 6586,
 		"escrow_program/make": 37064,
 		"escrow_program/take": 32347,
-		"staking_rewards_program/claim": 17265,
+		"staking_rewards_program/claim": 18885,
 		"staking_rewards_program/deposit": 19001,
 		"staking_rewards_program/withdraw": 5668,
 		"vesting_program/claim": 22206
