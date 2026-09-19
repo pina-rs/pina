@@ -1,6 +1,6 @@
 # ADR 0009: Version the ABI document on `pina_abi`'s own release line, reset its shape, and publish generated schemas
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-19
 - Owners: Pina maintainers
 - Related: [ADR 0007](./0007-first-class-versioned-abi.md), [ADR 0008](./0008-migration-ux-and-legacy-adoption.md), [ABI document versioning](../migrations/abi-versioning.md)
@@ -31,7 +31,7 @@ The structural precondition. monochange keeps its schema crates (`monochange_sch
 - the root workspace dependency pin (`Cargo.toml`'s `pina_abi = { path = "crates/pina_abi", version = "…" }`) gains a `versioned_files` rule so the release planner bumps it in lockstep with the crate;
 - `pina_cli` and `pina_macros` consume `pina_abi`, so a `pina_abi` release cascades into a core release. That direction is the point: the contract moves deliberately and consumers follow, while core releases never move the contract.
 
-Starting at `0.20.0` continues the workspace's version neighborhood and gives the reset epoch a clean name. It must not jump to `1.0.0`; see the bump table below.
+Starting at `0.20.0` continues the workspace's version neighborhood and gives the reset version a clean name. It must not jump to `1.0.0`; see the bump table below.
 
 ### A committed value, not a derived one
 
