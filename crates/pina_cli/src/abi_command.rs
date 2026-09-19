@@ -11,7 +11,6 @@ use pina_abi::ABI_VERSION;
 use pina_abi::AbiDocument;
 use pina_abi::parse_document_version;
 use pina_abi::render_document_schema;
-use pina_abi::schema_url;
 
 /// Resolve a requested document kind from the `--document` value.
 fn document_kind(value: &str) -> Result<AbiDocument, String> {
@@ -61,12 +60,6 @@ pub fn run_abi_schema(document: &str, version: Option<&str>) -> i32 {
 			1
 		}
 	}
-}
-
-/// The permanent URL where a document version's schema is published.
-#[must_use]
-pub fn published_schema_url(document: &str, version: &str) -> Option<String> {
-	AbiDocument::parse(document).map(|kind| schema_url(kind, version))
 }
 
 #[cfg(test)]
