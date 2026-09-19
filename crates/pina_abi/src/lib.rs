@@ -3200,6 +3200,95 @@ mod tests {
 		assert!(walked.contains("regenerate it with `pina migrations make`"));
 	}
 
+	/// A real converter step advances the walk and rewrites the document.
+	///
+	/// The shipped table is empty at the reset baseline, so this exercises the
+	/// machinery a later version will rely on: a step is applied only for the
+	/// version it starts at, and the walk stops as soon as it reaches the
+	/// target instead of running the remaining steps.
+	#[test]
+	fn the_walk_applies_each_step_once_and_stops_at_the_target() {
+		fn rename_from_v1(value: serde_json::Value) -> Result<serde_json::Value, String> {
+			let mut object = value
+				.as_object()
+				.cloned()
+				.ok_or_else(|| "expected an object".to_owned())?;
+			object.insert("seenV1".to_owned(), serde_json::Value::Bool(true));
+			Ok(serde_json::Value::Object(object))
+		}
+
+		fn rename_from_v2(value: serde_json::Value) -> Result<serde_json::Value, String> {
+			let mut object = value
+				.as_object()
+				.cloned()
+				.ok_or_else(|| "expected an object".to_owned())?;
+			object.insert("seenV2".to_owned(), serde_json::Value::Bool(true));
+			Ok(serde_json::Value::Object(object))
+		}
+
+		let steps = [
+			AbiStep {
+				from: "0.20",
+				to: "0.21",
+				convert: rename_from_v1,
+			},
+			AbiStep {
+				from: "0.21",
+				to: "0.22",
+				convert: rename_from_v2,
+			},
+		];
+
+		// Reading 0.20 toward 0.22 applies both steps in order.
+		let walked = walk_document_to(
+			"migration manifest",
+			"0.20",
+			serde_json::json!({"abiVersion": "0.20"}),
+			&steps,
+			"0.20",
+			"0.22",
+		)
+		.unwrap_or_else(|error| panic!("walk: {error}"));
+		assert_eq!(walked["seenV1"], serde_json::Value::Bool(true));
+		assert_eq!(walked["seenV2"], serde_json::Value::Bool(true));
+
+		// Reading 0.21 toward 0.22 skips the step it already passed.
+		let walked = walk_document_to(
+			"migration manifest",
+			"0.21",
+			serde_json::json!({"abiVersion": "0.21"}),
+			&steps,
+			"0.21",
+			"0.22",
+		)
+		.unwrap_or_else(|error| panic!("walk: {error}"));
+		assert!(
+			walked.get("seenV1").is_none(),
+			"0.20's step must not re-run"
+		);
+		assert_eq!(walked["seenV2"], serde_json::Value::Bool(true));
+
+		// A step that fails surfaces the converter's own error.
+		fn failing(_: serde_json::Value) -> Result<serde_json::Value, String> {
+			Err("converter refused the document".to_owned())
+		}
+		let failing_steps = [AbiStep {
+			from: "0.20",
+			to: "0.22",
+			convert: failing,
+		}];
+		let error = walk_document_to(
+			"migration manifest",
+			"0.20",
+			serde_json::json!({}),
+			&failing_steps,
+			"0.20",
+			"0.22",
+		)
+		.unwrap_err();
+		assert!(error.contains("converter refused the document"));
+	}
+
 	/// An identity step returns the document unchanged, so a version that
 	/// advanced without a shape change still traverses the walk.
 	#[test]
