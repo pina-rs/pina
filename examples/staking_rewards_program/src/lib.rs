@@ -555,6 +555,19 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		// associated token program derives the same seeds and rejects a mismatch
 		// with `InvalidSeeds` before its idempotent branch.
 		self.user_reward_ata.assert_writable()?;
+		// The payout is signed by the pool, so the source must provably be the
+		// pool's own reward vault. Without the derived-address check a caller
+		// could name any token account they control as the vault and the pool
+		// signature would authorise draining it.
+		self.reward_vault
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				self.pool_state.address(),
+				self.reward_mint.address(),
+				self.token_program.address(),
+			)?;
 
 		// Validate pool and position state, then update through the same position
 		// guard. Reloading it immutably first would validate it twice.

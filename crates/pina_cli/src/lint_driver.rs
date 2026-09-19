@@ -81,6 +81,20 @@ const DEFAULT_DRIVER_REPO: &str = "pina-rs/pina";
 /// How long one driver download may take, end to end.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// How long to keep retrying a spawn the kernel reports as busy.
+const BUSY_RETRY_WINDOW: Duration = Duration::from_millis(250);
+
+/// Pause between busy-spawn attempts.
+const BUSY_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+
+/// `ETXTBSY`: the file is open for writing somewhere, so it cannot be executed.
+#[cfg(unix)]
+const BUSY_ERRNO: i32 = 26;
+
+/// Non-Unix platforms have no equivalent of `ETXTBSY`.
+#[cfg(not(unix))]
+const BUSY_ERRNO: i32 = -1;
+
 /// Upper bound on a downloaded driver artifact.
 ///
 /// A real driver is a few MiB. The cap exists so a hostile or misconfigured
@@ -458,24 +472,47 @@ fn probe_output(bin: &Path, sysroot: &Path) -> Result<std::process::Output, Driv
 	probe_output_with_timeout(bin, sysroot, PROBE_TIMEOUT)
 }
 
+/// Start the driver, retrying briefly while the kernel reports the binary busy.
+///
+/// `exec` returns `ExecutableFileBusy` (`ETXTBSY`) when a write descriptor for
+/// the same file is still open in another process — including a descriptor a
+/// concurrent `fork` inherited. The install path writes and then runs the
+/// driver, so the two can overlap; a short bounded retry covers the window
+/// without hiding a genuinely unrunnable binary.
+fn spawn_driver(bin: &Path, sysroot: &Path) -> Result<std::process::Child, DriverError> {
+	let deadline = Instant::now() + BUSY_RETRY_WINDOW;
+	loop {
+		let attempt = Command::new(bin)
+			.envs(driver_library_environment(sysroot))
+			.stdin(Stdio::null())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.spawn();
+
+		match attempt {
+			Ok(child) => return Ok(child),
+			Err(source)
+				if source.raw_os_error() == Some(BUSY_ERRNO) && Instant::now() < deadline =>
+			{
+				std::thread::sleep(BUSY_RETRY_INTERVAL);
+			}
+			Err(source) => {
+				return Err(DriverError::RunDriver {
+					path: bin.to_path_buf(),
+					source,
+				});
+			}
+		}
+	}
+}
+
 /// Start the driver, capture its output, and give up after `timeout`.
 fn probe_output_with_timeout(
 	bin: &Path,
 	sysroot: &Path,
 	timeout: Duration,
 ) -> Result<std::process::Output, DriverError> {
-	let mut child = Command::new(bin)
-		.envs(driver_library_environment(sysroot))
-		.stdin(Stdio::null())
-		.stdout(Stdio::piped())
-		.stderr(Stdio::piped())
-		.spawn()
-		.map_err(|source| {
-			DriverError::RunDriver {
-				path: bin.to_path_buf(),
-				source,
-			}
-		})?;
+	let mut child = spawn_driver(bin, sysroot)?;
 
 	let deadline = Instant::now() + timeout;
 	loop {
@@ -561,10 +598,10 @@ fn fetch_verified(url: &str, identity: &ToolchainIdentity) -> Result<VerifiedDri
 			url: checksum_url.clone(),
 			toolchain: identity.to_string(),
 			message: format!(
-					"the published checksum could not be downloaded: {error}. Releases built \
-					 before 				 the driver checksum was published do not carry one; build the \
-					 driver with 				 `--build-driver` instead"
-				),
+				"the published checksum could not be downloaded: {error}. Releases built before \
+				 the driver checksum was published do not carry one; build the driver with \
+				 `--build-driver` instead"
+			),
 		}
 	})?)
 	.map_err(|error| {
@@ -1314,6 +1351,138 @@ mod tests {
 			!driver_loads(&driver, Path::new("/toolchain/sysroot")).expect("run the stub"),
 			"a driver that exits unsuccessfully must not be selected"
 		);
+	}
+
+	#[test]
+	fn a_missing_checksum_names_the_release_constraint() {
+		let payload = b"driver".to_vec();
+		// Serve the driver, then nothing: the checksum fetch fails, which is
+		// what a release predating the checksum publication looks like.
+		let (base, server) = serve_ok(&payload);
+		let identity = identity_fixture();
+
+		let error = fetch_verified(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect_err("a missing checksum must be refused");
+
+		let message = error.to_string();
+		assert!(
+			matches!(error, DriverError::Checksum { .. }),
+			"expected a checksum error, got: {message}"
+		);
+		assert!(
+			message.contains("could not be downloaded") && message.contains("--build-driver"),
+			"the error must name the missing checksum and the remedy: {message}"
+		);
+		let _ = server.join();
+	}
+
+	#[test]
+	fn a_non_utf8_checksum_body_is_rejected() {
+		let payload = b"driver".to_vec();
+		let (base, server) = serve_responses(vec![payload, vec![0xff, 0xfe, 0xfd]]);
+		let identity = identity_fixture();
+
+		let error = fetch_verified(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect_err("a non-UTF-8 checksum must be refused");
+
+		let message = error.to_string();
+		assert!(
+			matches!(error, DriverError::Checksum { .. }),
+			"expected a checksum error, got: {message}"
+		);
+		assert!(
+			message.contains("not valid UTF-8"),
+			"the error must say the checksum could not be read: {message}"
+		);
+		let _ = server.join();
+	}
+
+	#[test]
+	fn a_download_over_the_size_cap_is_refused() {
+		// The cap is 256 MiB; streaming more than that is what a hostile or
+		// misconfigured endpoint would do, so the read is bounded rather than
+		// sized to a real driver.
+		let mut oversized = vec![0u8; (MAX_DOWNLOAD_BYTES as usize) + 1];
+		oversized[0] = 1;
+		let (base, server) = serve_ok(&oversized);
+		let identity = identity_fixture();
+
+		let error = fetch(&format!("{base}/pina-lint-driver-host"), &identity)
+			.expect_err("an oversized download must be refused");
+
+		let message = error.to_string();
+		assert!(matches!(error, DriverError::Download { .. }), "{message}");
+		assert!(
+			message.contains("safety limit"),
+			"the error must name the cap: {message}"
+		);
+		let _ = server.join();
+	}
+
+	#[test]
+	fn a_checksum_error_names_the_install_refusal() {
+		// Pin the operator-facing text for the variant the checksum path returns.
+		let error = DriverError::Checksum {
+			url: "https://example.invalid/driver".to_string(),
+			toolchain: "1.95.0-nightly (7f99507f5)".to_string(),
+			message: "checksum mismatch".to_string(),
+		};
+		let message = error.to_string();
+
+		assert!(message.contains("Refusing to install"), "{message}");
+		assert!(message.contains("could not be verified"), "{message}");
+		assert!(message.contains("--build-driver"), "{message}");
+		assert!(message.contains(PINA_LINT_DRIVER_PATH), "{message}");
+	}
+
+	#[test]
+	fn the_busy_retry_window_tolerates_a_transient_open_for_write() {
+		// `ETXTBSY` is the only error the retry absorbs; a missing binary must
+		// fail immediately rather than spin for the whole window.
+		let started = Instant::now();
+		let error = spawn_driver(
+			Path::new("/definitely/not/a/real/driver"),
+			Path::new("/toolchain/sysroot"),
+		)
+		.expect_err("a missing binary must fail");
+
+		assert!(matches!(error, DriverError::RunDriver { .. }), "{error}");
+		assert!(
+			started.elapsed() < BUSY_RETRY_WINDOW,
+			"a non-busy failure must not consume the retry window"
+		);
+	}
+
+	#[test]
+	#[cfg(unix)]
+	fn a_driver_held_open_for_writing_is_retried_then_runs() {
+		// `exec` reports `ETXTBSY` while a write descriptor for the file is open
+		// elsewhere — the race the install-then-run path can hit. Hold one open
+		// across the first attempts and confirm the probe still succeeds once it
+		// closes, rather than failing the driver selection.
+		use std::io::Write as _;
+
+		let directory = tempfile::tempdir().expect("temp directory");
+		let driver = directory.path().join("busy-driver");
+		std::fs::write(&driver, "#!/bin/sh\nexit 0\n").expect("write stub driver");
+		set_executable(&driver).expect("permissions");
+
+		let mut held = std::fs::OpenOptions::new()
+			.write(true)
+			.open(&driver)
+			.expect("hold a write descriptor");
+		held.flush().expect("flush");
+
+		let releaser = std::thread::spawn(move || {
+			std::thread::sleep(BUSY_RETRY_INTERVAL * 3);
+			drop(held);
+		});
+
+		assert!(
+			driver_loads(&driver, Path::new("/toolchain/sysroot")).expect("run the stub"),
+			"a driver that becomes executable within the retry window must be selected"
+		);
+		releaser.join().expect("releaser joins");
 	}
 
 	#[test]

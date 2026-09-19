@@ -64,15 +64,31 @@ path = "src/lib.rs"
 		.unwrap_or_else(|error| panic!("failed to write Pina configuration: {error}"));
 }
 
+/// Write an executable script at `path`, atomically.
+///
+/// The script is written to a staging file and renamed into place, so no write
+/// descriptor is ever open on `path` when a test executes it. A plain write
+/// followed by an exec is a `Text file busy` race: the kernel refuses an
+/// `exec` while a descriptor for the same file is open anywhere, including in
+/// a child a concurrent `fork` inherited, which is how this fixture failed
+/// under a parallel test run.
 fn executable(path: &Path, contents: &str) {
-	fs::write(path, contents)
-		.unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
-	let mut permissions = fs::metadata(path)
-		.unwrap_or_else(|error| panic!("failed to inspect {}: {error}", path.display()))
+	let staging = path.with_extension("staging");
+	fs::write(&staging, contents)
+		.unwrap_or_else(|error| panic!("failed to write {}: {error}", staging.display()));
+	let mut permissions = fs::metadata(&staging)
+		.unwrap_or_else(|error| panic!("failed to inspect {}: {error}", staging.display()))
 		.permissions();
 	permissions.set_mode(0o755);
-	fs::set_permissions(path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
+	fs::set_permissions(&staging, permissions)
+		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", staging.display()));
+	fs::rename(&staging, path).unwrap_or_else(|error| {
+		panic!(
+			"failed to move {} into {}: {error}",
+			staging.display(),
+			path.display()
+		)
+	});
 }
 
 struct Fixture {
@@ -356,8 +372,16 @@ impl BundledFixture {
 		executable(&fake_cargo, FAKE_CARGO);
 
 		let pina = temp.path().join("pina");
-		fs::copy(env!("CARGO_BIN_EXE_pina"), &pina)
+		let pina_staging = temp.path().join("pina.staging");
+		fs::copy(env!("CARGO_BIN_EXE_pina"), &pina_staging)
 			.unwrap_or_else(|error| panic!("failed to copy the CLI: {error}"));
+		fs::rename(&pina_staging, &pina).unwrap_or_else(|error| {
+			panic!(
+				"failed to move {} into {}: {error}",
+				pina_staging.display(),
+				pina.display()
+			)
+		});
 
 		let driver = temp.path().join("pina_lint_driver");
 		if let Some(contents) = driver_contents {

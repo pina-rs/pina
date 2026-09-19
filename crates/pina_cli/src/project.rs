@@ -1384,6 +1384,13 @@ crate-type = ["cdylib", "lib"]
 				matches!(error, ProjectError::InvalidLibraryName { .. }),
 				"expected InvalidLibraryName for {library_name:?}, got {error}"
 			);
+			// Render the message too: the operator reads this text, so it must
+			// state the rule that rejected the name.
+			let message = error.to_string();
+			assert!(
+				message.contains("ASCII letters") && message.contains("cannot be used as a path"),
+				"the message must state the rule that rejected the name: {message}"
+			);
 		}
 	}
 
