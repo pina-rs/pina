@@ -1,4 +1,4 @@
-error: `[T; N]` arrays require a length this crate can evaluate, but `Bounds::WIDTH` cannot be evaluated at expansion time; write an integer literal, or declare `const Bounds::WIDTH: usize = ...;` in this crate (Pina resolves named constants, including arithmetic over them)
+error: `[T; N]` arrays require a length this crate can evaluate, but `Bounds::WIDTH` cannot be evaluated at expansion time; write an integer literal, or declare a free `const NAME: usize = ...;` in this crate (Pina resolves named constants, including arithmetic over them)
   --> tests/ui/fail/account_array_const_length.rs:17:20
    |
 17 |     pub values: [u64; Bounds::WIDTH],

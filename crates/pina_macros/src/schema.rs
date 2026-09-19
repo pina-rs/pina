@@ -647,8 +647,9 @@ fn capacity_argument_error(argument: &GenericArgument, name: &str) -> syn::Error
 				ty,
 				format!(
 					"{requirement}, but `{printed}` is not a `const` item; write an integer \
-					 literal, or declare `const {printed}: usize = ...;` at the crate root or in \
-					 a module (a value on a type is not resolved)"
+					 literal, or declare a free `const NAME: usize = ...;` at the crate root or \
+					 in a module (a value on a type is not resolved, and `const {printed}: usize` \
+					 would not compile)"
 				),
 			)
 		}
@@ -669,7 +670,7 @@ fn unresolved_capacity_error(expression: &Expr, requirement: &str) -> syn::Error
 		expression,
 		format!(
 			"{requirement}, but `{printed}` cannot be evaluated at expansion time; write an \
-			 integer literal, or declare `const {printed}: usize = ...;` in this crate (Pina \
+			 integer literal, or declare a free `const NAME: usize = ...;` in this crate (Pina \
 			 resolves named constants, including arithmetic over them)"
 		),
 	)

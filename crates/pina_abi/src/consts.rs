@@ -14,6 +14,7 @@
 //! failure names the expression instead of surfacing as an unreadable ABI type.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use quote::ToTokens as _;
@@ -21,20 +22,77 @@ use quote::ToTokens as _;
 /// Sentinel for a `const` item whose value has not been computed yet.
 const UNRESOLVED: i128 = i128::MIN;
 
+/// Apply an integer cast to a resolved value.
+///
+/// A capacity may be written as `(300u16 as u8) as usize`, and Rust records the
+/// truncated value. Ignoring the target type would resolve `300`, emit that
+/// capacity, and then fail the generated assertion. Only integer targets are
+/// modeled: any other cast is left unresolved so the schema grammar reports it.
+fn cast_int(value: i128, ty: &syn::Type) -> Option<i128> {
+	let syn::Type::Path(path) = ty else {
+		return None;
+	};
+	if path.qself.is_some() {
+		return None;
+	}
+	let name = path.path.segments.last()?.ident.to_string();
+
+	let bits = match name.as_str() {
+		"u8" | "i8" => 8,
+		"u16" | "i16" => 16,
+		"u32" | "i32" => 32,
+		"u64" | "i64" => 64,
+		"u128" | "i128" | "usize" | "isize" => return Some(value),
+		_ => return None,
+	};
+
+	// Truncate to the target width the way Rust does.
+	let mask = (1_i128 << bits) - 1;
+	let truncated = value & mask;
+	let signed = matches!(name.as_str(), "i8" | "i16" | "i32" | "i64");
+	if signed && truncated >= (1_i128 << (bits - 1)) {
+		Some(truncated - (1_i128 << bits))
+	} else {
+		Some(truncated)
+	}
+}
+
 /// Build an unsuffixed integer literal for a resolved capacity.
 /// The path a capacity expression names, if it is a bare or braced name.
-fn constant_path(expression: &syn::Expr) -> Option<&syn::Path> {
+/// Every constant path an expression reads.
+///
+/// A capacity may be arithmetic over constants (`WIDTH * 2`) or a braced name
+/// (`{WIDTH}`). Each name it reads is collected so the expansion can reference
+/// it, which keeps a private constant live and pins the value it resolved to.
+fn constant_paths(expression: &syn::Expr) -> Vec<&syn::Path> {
+	let mut paths = Vec::new();
+	collect_paths(expression, 0, &mut paths);
+	paths
+}
+
+fn collect_paths<'a>(expression: &'a syn::Expr, depth: usize, paths: &mut Vec<&'a syn::Path>) {
+	if depth > MAX_CONST_REFERENCE_DEPTH {
+		return;
+	}
+
 	match expression {
-		syn::Expr::Path(path) if path.qself.is_none() => Some(&path.path),
+		syn::Expr::Path(path) if path.qself.is_none() => paths.push(&path.path),
+		syn::Expr::Paren(paren) => collect_paths(&paren.expr, depth + 1, paths),
+		syn::Expr::Group(group) => collect_paths(&group.expr, depth + 1, paths),
+		syn::Expr::Unary(unary) => collect_paths(&unary.expr, depth + 1, paths),
+		syn::Expr::Cast(cast) => collect_paths(&cast.expr, depth + 1, paths),
+		syn::Expr::Binary(binary) => {
+			collect_paths(&binary.left, depth + 1, paths);
+			collect_paths(&binary.right, depth + 1, paths);
+		}
 		syn::Expr::Block(block) => {
-			match block.block.stmts.as_slice() {
-				[syn::Stmt::Expr(syn::Expr::Path(path), None)] if path.qself.is_none() => {
-					Some(&path.path)
+			for statement in &block.block.stmts {
+				if let syn::Stmt::Expr(inner, None) = statement {
+					collect_paths(inner, depth + 1, paths);
 				}
-				_ => None,
 			}
 		}
-		_ => None,
+		_ => {}
 	}
 }
 
@@ -71,6 +129,10 @@ const MAX_CONST_REFERENCE_DEPTH: usize = 64;
 pub struct SchemaConsts {
 	resolved: BTreeMap<String, i128>,
 	expressions: BTreeMap<String, String>,
+	/// Every qualified declaration seen, so a duplicate can be detected.
+	declared: BTreeSet<String>,
+	/// Names that resolve to more than one declaration.
+	ambiguous: BTreeSet<String>,
 }
 
 impl SchemaConsts {
@@ -332,10 +394,10 @@ impl SchemaConsts {
 			return proc_macro2::TokenStream::new();
 		};
 
-		let proof = match constant_path(length) {
-			Some(path) => self.reference_assertion(path),
-			None => proc_macro2::TokenStream::new(),
-		};
+		let mut proof = proc_macro2::TokenStream::new();
+		for path in constant_paths(length) {
+			proof.extend(self.reference_assertion(path));
+		}
 
 		*length = numeric_literal(value);
 		proof
@@ -369,45 +431,86 @@ impl SchemaConsts {
 		}
 	}
 
-	/// Look up the value a bare or module-qualified constant path names.
+	/// Look up the value a constant path names.
+	///
+	/// The lookup is scope-aware: a declaration is recorded under its
+	/// module-qualified path, and a name declared at more than one path is
+	/// treated as unknown. Selecting one by file order would size a schema with
+	/// the wrong number and change its ABI document, so an ambiguous name fails
+	/// the build instead.
 	///
 	/// A path whose leading segments are types (`Bounds::MAX_MEMBERS`) names an
 	/// associated constant, which expansion cannot evaluate. It is rejected
-	/// rather than matched against an unrelated free constant of the same name:
-	/// resolving wrongly would size a schema with the wrong number, while
-	/// failing to resolve fails the build with a diagnostic naming it.
+	/// rather than matched against an unrelated free constant of the same name.
 	fn lookup(&self, path: &syn::Path) -> Option<i128> {
 		let mut segments = path.segments.iter();
 		let last = segments.next_back()?;
 
+		let mut qualified = String::new();
 		for segment in segments {
 			let text = segment.ident.to_string();
-			// `crate`, `self`, and `super` qualify module paths; any other
-			// leading segment must be spelled like a module, not a type.
+			// `crate`, `self`, and `super` are module keywords; any other leading
+			// segment must be spelled like a module rather than a type.
 			let is_module = matches!(text.as_str(), "crate" | "self" | "super")
 				|| text.starts_with(|character: char| !character.is_ascii_uppercase());
 			if !is_module {
 				return None;
 			}
+			// `crate::limits::MAX` and `limits::MAX` name the same declaration.
+			if !matches!(text.as_str(), "crate" | "self" | "super") {
+				qualified.push_str(&text);
+				qualified.push_str("::");
+			}
 		}
 
-		let value = *self.resolved.get(&last.ident.to_string())?;
+		let ident = last.ident.to_string();
+		let key = if qualified.is_empty() {
+			ident.clone()
+		} else {
+			format!("{qualified}{ident}")
+		};
+
+		if self.ambiguous.contains(&key) || self.ambiguous.contains(&ident) {
+			return None;
+		}
+
+		let value = *self.resolved.get(&key)?;
 
 		(value != UNRESOLVED).then_some(value)
 	}
 
 	fn collect_items(&mut self, items: &[syn::Item]) {
+		self.collect_items_in(items, "");
+	}
+
+	/// Collect declarations, recording the module path each one lives at.
+	///
+	/// A name declared at two paths is marked ambiguous: resolving it to either
+	/// would silently change a schema's layout.
+	fn collect_items_in(&mut self, items: &[syn::Item], module: &str) {
 		for item in items {
 			match item {
 				syn::Item::Const(item_const) => {
-					let name = item_const.ident.to_string();
-					self.resolved.insert(name.clone(), UNRESOLVED);
+					let ident = item_const.ident.to_string();
+					let qualified = format!("{module}{ident}");
+
+					// A repeated declaration, at one path or across two, makes
+					// every spelling of the name unsafe to resolve.
+					if self.declared.contains(&qualified) || self.declared.contains(&ident) {
+						self.ambiguous.insert(ident.clone());
+						self.ambiguous.insert(qualified.clone());
+					}
+
+					self.declared.insert(ident.clone());
+					self.declared.insert(qualified.clone());
+					self.resolved.insert(qualified.clone(), UNRESOLVED);
 					self.expressions
-						.insert(name, item_const.expr.to_token_stream().to_string());
+						.insert(qualified, item_const.expr.to_token_stream().to_string());
 				}
 				syn::Item::Mod(item_mod) => {
 					if let Some((_, nested)) = &item_mod.content {
-						self.collect_items(nested);
+						let nested_module = format!("{module}{}::", item_mod.ident);
+						self.collect_items_in(nested, &nested_module);
 					}
 				}
 				_ => {}
@@ -472,7 +575,10 @@ impl SchemaConsts {
 			syn::Expr::Path(path) => self.lookup(&path.path),
 			syn::Expr::Paren(paren) => self.evaluate(&paren.expr, depth),
 			syn::Expr::Group(group) => self.evaluate(&group.expr, depth),
-			syn::Expr::Cast(cast) => self.evaluate(&cast.expr, depth),
+			syn::Expr::Cast(cast) => {
+				let value = self.evaluate(&cast.expr, depth)?;
+				cast_int(value, &cast.ty)
+			}
 			syn::Expr::Block(block) => {
 				match block.block.stmts.last() {
 					Some(syn::Stmt::Expr(inner, None)) => self.evaluate(inner, depth),
@@ -598,6 +704,217 @@ mod tests {
 			syn::parse_str(declaration).unwrap_or_else(|error| panic!("test item: {error}"));
 		table.normalize_item(&mut item);
 		item.fields.to_token_stream().to_string()
+	}
+
+	#[test]
+	fn a_capacity_expression_naming_a_non_path_does_not_resolve() {
+		// A method call is not something expansion can evaluate.
+		let table = SchemaConsts::empty();
+		let expression: syn::Expr = syn::parse_quote!(4.min(2));
+		assert_eq!(table.resolve(&expression), None);
+	}
+
+	#[test]
+	fn every_integer_cast_width_truncates() {
+		for (source, expected) in [
+			("(300u16 as u8) as usize", 44),
+			("(70000u32 as u16) as usize", 4464),
+			("(4294967296u64 as u32) as usize", 0),
+			("(1u32 as u8) as usize", 1),
+			("(1u64 as u16) as usize", 1),
+			("(1u128 as u32) as usize", 1),
+			("(4294967296u64 as i64) as usize", 4294967296),
+		] {
+			let table = table(&format!("const WIDTH: usize = {source};"));
+			assert_eq!(
+				table.resolve_path(&syn::parse_quote!(WIDTH)),
+				Some(expected),
+				"wrong value for `{source}`"
+			);
+		}
+	}
+
+	#[test]
+	fn collection_stops_at_the_depth_limit() {
+		let table = SchemaConsts::empty();
+		let expression: syn::Expr = syn::parse_quote!(WIDTH);
+		let mut paths = Vec::new();
+		collect_paths(&expression, MAX_CONST_REFERENCE_DEPTH + 1, &mut paths);
+		assert!(paths.is_empty(), "the depth limit must stop collection");
+	}
+
+	#[test]
+	fn collection_walks_every_expression_shape() {
+		let parenthesized: syn::Expr = syn::parse_quote!((WIDTH));
+		let negated: syn::Expr = syn::parse_quote!(-WIDTH);
+		let cast: syn::Expr = syn::parse_quote!(WIDTH as usize);
+
+		for expression in [parenthesized, negated, cast] {
+			let paths = constant_paths(&expression);
+			let printed = quote::ToTokens::to_token_stream(&expression).to_string();
+			assert_eq!(paths.len(), 1, "the name must be collected: {printed}");
+		}
+	}
+
+	#[test]
+	fn a_narrowing_cast_truncates_like_rust() {
+		// Rust evaluates `(300u16 as u8) as usize` to 44. Resolving 300 would
+		// emit a capacity the generated assertion then rejects.
+		let table = table("const WIDTH: usize = (300u16 as u8) as usize;");
+		assert_eq!(table.resolve_path(&syn::parse_quote!(WIDTH)), Some(44));
+	}
+
+	#[test]
+	fn a_widening_cast_keeps_the_value() {
+		let table = table("const WIDTH: usize = 4u8 as usize;");
+		assert_eq!(table.resolve_path(&syn::parse_quote!(WIDTH)), Some(4));
+	}
+
+	#[test]
+	fn a_negative_cast_wraps_to_its_unsigned_bits() {
+		let table = table("const WIDTH: usize = (-1i32 as u8) as usize;");
+		assert_eq!(table.resolve_path(&syn::parse_quote!(WIDTH)), Some(255));
+	}
+
+	#[test]
+	fn a_signed_cast_reinterprets_the_sign_bit() {
+		let table = table("const SMALL: i8 = 255u8 as i8;");
+		// A negative value is not a valid capacity, so `resolve_path` reports
+		// none; the evaluator itself sees the signed reinterpretation.
+		assert!(table.resolve_path(&syn::parse_quote!(SMALL)).is_none());
+		assert_eq!(
+			table.lookup(&syn::parse_quote!(SMALL)),
+			Some(i128::from(-1i8))
+		);
+	}
+
+	#[test]
+	fn a_cast_to_a_non_path_type_does_not_resolve() {
+		let table = SchemaConsts::empty();
+		let inner: syn::Expr = syn::parse_quote!(4);
+		let expression = syn::Expr::Cast(syn::ExprCast {
+			attrs: Vec::new(),
+			expr: Box::new(inner),
+			as_token: syn::token::As::default(),
+			ty: Box::new(syn::parse_quote!([u8; 4])),
+		});
+
+		assert_eq!(table.resolve(&expression), None);
+	}
+
+	#[test]
+	fn a_cast_through_a_qualified_type_does_not_resolve() {
+		let table = SchemaConsts::empty();
+		let inner: syn::Expr = syn::parse_quote!(4);
+		let expression = syn::Expr::Cast(syn::ExprCast {
+			attrs: Vec::new(),
+			expr: Box::new(inner),
+			as_token: syn::token::As::default(),
+			ty: Box::new(syn::parse_quote!(<u8 as Trait>::Assoc)),
+		});
+
+		assert_eq!(table.resolve(&expression), None);
+	}
+
+	#[test]
+	fn a_non_integer_cast_does_not_resolve() {
+		let table = table("const WIDTH: usize = 4.0f32 as usize;");
+		// The float literal does not evaluate, so the cast cannot either.
+		assert!(table.resolve_path(&syn::parse_quote!(WIDTH)).is_none());
+	}
+
+	#[test]
+	fn a_cast_to_an_unknown_type_does_not_resolve() {
+		let table = table("const WIDTH: usize = 4u8 as Wrapper;");
+		assert!(table.resolve_path(&syn::parse_quote!(WIDTH)).is_none());
+	}
+
+	#[test]
+	fn a_name_declared_in_two_modules_does_not_resolve() {
+		// `alpha::MAX` is 4 and `beta::MAX` is 8. Picking either by file order
+		// would silently change a schema layout, so both stay unresolved.
+		let table = table(
+			"mod alpha { pub const MAX: usize = 4; }\nmod beta { pub const MAX: usize = 8; }",
+		);
+		assert!(table.resolve_path(&syn::parse_quote!(MAX)).is_none());
+		assert!(table.resolve_path(&syn::parse_quote!(alpha::MAX)).is_none());
+		assert!(table.resolve_path(&syn::parse_quote!(beta::MAX)).is_none());
+	}
+
+	#[test]
+	fn a_unique_qualified_name_still_resolves() {
+		let table = table("mod alpha { pub const MAX: usize = 4; }");
+		assert_eq!(table.resolve_path(&syn::parse_quote!(alpha::MAX)), Some(4));
+		assert_eq!(
+			table.resolve_path(&syn::parse_quote!(crate::alpha::MAX)),
+			Some(4)
+		);
+		// `MAX` alone is not in scope at the crate root.
+		assert!(table.resolve_path(&syn::parse_quote!(MAX)).is_none());
+	}
+
+	#[test]
+	fn a_repeated_name_at_the_root_does_not_resolve() {
+		let table = table("const WIDTH: usize = 4;\nconst WIDTH: usize = 8;");
+		assert!(table.resolve_path(&syn::parse_quote!(WIDTH)).is_none());
+	}
+
+	#[test]
+	fn a_crate_qualified_path_resolves_like_a_bare_one() {
+		let table = table("const WIDTH: usize = 4;");
+		assert_eq!(
+			table.resolve_path(&syn::parse_quote!(crate::WIDTH)),
+			Some(4)
+		);
+	}
+
+	#[test]
+	fn an_arithmetic_capacity_references_every_constant_it_reads() {
+		let table = table("const WIDTH: usize = 4;\nconst RATIO: usize = 3;");
+		let mut item: syn::ItemStruct = syn::parse_quote! {
+			struct Words {
+				pub values: [u64; WIDTH * RATIO],
+			}
+		};
+
+		let proofs = table.normalize_item(&mut item).to_string();
+
+		// A private constant used only here must stay live, so both names are
+		// referenced and each is pinned to its own value.
+		assert!(
+			proofs.contains("WIDTH"),
+			"WIDTH must be referenced: {proofs}"
+		);
+		assert!(
+			proofs.contains("RATIO"),
+			"RATIO must be referenced: {proofs}"
+		);
+		assert!(
+			proofs.contains("(WIDTH) as usize == 4"),
+			"WIDTH's value must be pinned: {proofs}"
+		);
+		assert!(
+			proofs.contains("(RATIO) as usize == 3"),
+			"RATIO's value must be pinned: {proofs}"
+		);
+	}
+
+	#[test]
+	fn an_arithmetic_capacity_resolves_through_a_cast() {
+		let table = table("const WIDTH: usize = (300u16 as u8) as usize;");
+		let mut item: syn::ItemStruct = syn::parse_quote! {
+			struct Words {
+				pub values: [u64; WIDTH],
+			}
+		};
+
+		// The proof pins the truncated value, so it agrees with the emitted
+		// capacity.
+		let proofs = table.normalize_item(&mut item).to_string();
+		assert!(
+			proofs.contains("44"),
+			"the truncated value must be pinned: {proofs}"
+		);
 	}
 
 	#[test]
@@ -1090,8 +1407,13 @@ mod tests {
 			},
 		}));
 
-		// A grouped capacity is not a plain path, so no reference is emitted.
-		assert!(table.normalize_item(&mut item).is_empty());
+		// A grouped capacity still reads `WIDTH`, so the proof is emitted and
+		// the constant stays live.
+		let proofs = table.normalize_item(&mut item).to_string();
+		assert!(
+			proofs.contains("WIDTH"),
+			"the grouped name must be referenced: {proofs}"
+		);
 	}
 
 	#[test]
@@ -1513,13 +1835,13 @@ mod tests {
 		let block: syn::Expr = syn::parse_quote!({
 			let width = 4;
 		});
-		assert!(constant_path(&block).is_none());
+		assert!(constant_paths(&block).is_empty());
 	}
 
 	#[test]
 	fn a_capacity_expression_that_is_neither_a_path_nor_a_block_yields_no_path() {
 		let literal: syn::Expr = syn::parse_quote!(4);
-		assert!(constant_path(&literal).is_none());
+		assert!(constant_paths(&literal).is_empty());
 	}
 
 	#[test]
