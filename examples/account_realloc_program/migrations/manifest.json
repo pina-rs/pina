@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "Sample",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "a7f6a372ae49e07ad968dde550fa9bd3d575386a7f89ee51b00c976b70d96428",
 					"schema": {
 						"layout": "compact",
 						"fields": [
@@ -35,39 +33,7 @@
 								"rustType": "Vec<u64, 64>"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "compact",
-							"headerSize": 35,
-							"maximumSize": 547,
-							"tailAlignment": 8,
-							"fields": [
-								{
-									"name": "bump",
-									"headerOffset": 0,
-									"headerSize": 1
-								},
-								{
-									"name": "authority",
-									"headerOffset": 1,
-									"headerSize": 32
-								},
-								{
-									"name": "values",
-									"headerOffset": 33,
-									"headerSize": 2,
-									"tail": {
-										"index": 0,
-										"kind": "vector",
-										"optional": false,
-										"prefixBytes": 2,
-										"capacity": 64,
-										"elementSize": 8,
-										"maximumBytes": 512
-									}
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"transition": null
 				}
@@ -82,8 +48,6 @@
 			"rustName": "ReallocIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "d2ce47968c8b46d4a65bc8af10a6f4f01a762e40f00d6f18f2e96dcf816fd831",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -92,18 +56,7 @@
 								"rustType": "u16"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 2,
-							"fields": [
-								{
-									"name": "len",
-									"offset": 0,
-									"size": 2
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -133,7 +86,6 @@
 							}
 						]
 					},
-					"processSha256": "78a93205d51649ceecf9ea8d03d6d5eb4c865b167e988f239e8c4be3c65f2296",
 					"transition": null
 				}
 			]
@@ -147,8 +99,6 @@
 			"rustName": "Realloc2Ix",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "d2ce47968c8b46d4a65bc8af10a6f4f01a762e40f00d6f18f2e96dcf816fd831",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -157,18 +107,7 @@
 								"rustType": "u16"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 2,
-							"fields": [
-								{
-									"name": "len",
-									"offset": 0,
-									"size": 2
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -206,7 +145,6 @@
 							}
 						]
 					},
-					"processSha256": "1e0faa16ac67ae2fb6cbd80976047409b6db4dccf1c2a99b0b625b82d2df2aa4",
 					"transition": null
 				}
 			]
@@ -220,8 +158,6 @@
 			"rustName": "InitializeIx",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "43124b1aa7c67081addd4259a24fbc507a54bca9953fea6e38dadfaceee4a8ef",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -230,18 +166,7 @@
 								"rustType": "u8"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 1,
-							"fields": [
-								{
-									"name": "bump",
-									"offset": 0,
-									"size": 1
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -271,7 +196,6 @@
 							}
 						]
 					},
-					"processSha256": "387db94bbd5b23c150daac6401dede14dde2b072c56947ebb2d226767f163023",
 					"transition": null
 				}
 			]

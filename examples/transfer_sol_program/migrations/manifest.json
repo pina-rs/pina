@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG",
 	"versionType": "u8",
 	"auto": [
@@ -17,8 +17,6 @@
 			"rustName": "CpiTransferInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "570e85ef9ebe7b433f64a94512a1e2524f45842e8b277f9f370cf3d82a57daf6",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -27,18 +25,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "amount",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -68,7 +55,6 @@
 							}
 						]
 					},
-					"processSha256": "5c7c851770f9bbc49bc576bc802b2de242e10c2ec19cf27d3aeeaa9fd0c888a3",
 					"transition": null
 				}
 			]
@@ -82,8 +68,6 @@
 			"rustName": "DirectTransferInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "570e85ef9ebe7b433f64a94512a1e2524f45842e8b277f9f370cf3d82a57daf6",
 					"schema": {
 						"layout": "fixed",
 						"fields": [
@@ -92,18 +76,7 @@
 								"rustType": "u64"
 							}
 						],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 8,
-							"fields": [
-								{
-									"name": "amount",
-									"offset": 0,
-									"size": 8
-								}
-							]
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -125,7 +98,6 @@
 							}
 						]
 					},
-					"processSha256": "e2d3903d1348c98d7a58b51c1fd92db7c8d0f6f4447deca5c785748081d484b0",
 					"transition": null
 				}
 			]

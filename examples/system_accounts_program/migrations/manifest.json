@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -17,17 +17,10 @@
 			"rustName": "InitializeInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": [
@@ -49,7 +42,6 @@
 							}
 						]
 					},
-					"processSha256": "155e0e2ec844660bcd52f56d418daf6cc69c4d55ea83714704206285f1d21ba5",
 					"transition": null
 				}
 			]

@@ -1,5 +1,5 @@
 {
-	"formatVersion": 4,
+	"abiVersion": "0.20",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -17,22 +17,14 @@
 			"rustName": "HelloInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -46,22 +38,14 @@
 			"rustName": "HelloNoMsgInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -75,22 +59,14 @@
 			"rustName": "HelloNextInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -104,22 +80,14 @@
 			"rustName": "RequireEqInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -133,22 +101,14 @@
 			"rustName": "RequireNeqInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -162,22 +122,14 @@
 			"rustName": "RequireGtInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
@@ -191,22 +143,14 @@
 			"rustName": "RequireGteInstruction",
 			"versions": [
 				{
-					"version": 0,
-					"schemaSha256": "0964b5ff00a94fb98f2536839ca6abc68a04f31d844cbac2a3aa627a73eeca5a",
 					"schema": {
 						"layout": "fixed",
 						"fields": [],
-						"codec": "pinaPodV2",
-						"physical": {
-							"kind": "fixed",
-							"size": 0,
-							"fields": []
-						}
+						"codec": "pinaPodV2"
 					},
 					"process": {
 						"accounts": []
 					},
-					"processSha256": "f80c7a28c7780081af8b273543b91fc9a1f29fbe2891e5f67218e4952bd2154a",
 					"transition": null
 				}
 			]
