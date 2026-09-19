@@ -2,8 +2,9 @@
 name = "pina_abi"
 # Deliberately literal rather than `{ workspace = true }`. This crate owns its
 # own release group so the version recorded in `ABI_VERSION` can track it
-# without moving on every `core` release.
-version = "0.20.0"
+# without moving on every `core` release. The breaking changeset below carries
+# this to 0.20.0, where it meets the committed `ABI_VERSION`.
+version = "0.19.0"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
