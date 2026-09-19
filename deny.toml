@@ -4,6 +4,10 @@ all-features = true
 [advisories]
 db-path = "target/advisory-db"
 db-urls = ["https://github.com/RustSec/advisory-db.git"]
+# The libgit2 fetch cargo-deny uses by default fails silently on the CI
+# runners (the database clones but loads empty), so fetch through the git
+# CLI instead. The advisory check itself is unchanged.
+git-fetch-with-cli = true
 # This list is the repository's single advisory policy: `security:deny` runs
 # the advisories check, and `security:audit` passes no ignore list of its own.
 #
