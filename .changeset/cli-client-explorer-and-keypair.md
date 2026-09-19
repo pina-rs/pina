@@ -2,7 +2,7 @@
 pina_codama_renderer_cli: fix
 ---
 
-# Fix the generated CLI clients' Explorer links and keypair validation
+# Fix CLI Explorer links and keypair validation
 
 The Dart CLI renderer printed an Explorer URL without a cluster selector, so a signature from a devnet or testnet run linked to the mainnet Explorer page. It now derives the selector from the resolved endpoint and appends `?cluster=devnet` or `?cluster=testnet`. Mainnet Beta and arbitrary custom endpoints stay bare, because the Explorer only understands the named clusters and a guessed selector for an unknown host would point at the wrong chain.
 
