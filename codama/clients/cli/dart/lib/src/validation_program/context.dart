@@ -45,6 +45,7 @@ class CliContext {
     required this.programAddress,
     required this.simulate,
     required this.json,
+    required this.cluster,
   });
 
   final Rpc rpc;
@@ -52,6 +53,9 @@ class CliContext {
   final Address programAddress;
   final bool simulate;
   final bool json;
+
+  /// Explorer cluster selector for [programAddress]'s endpoint, or empty.
+  final String cluster;
 
   Address get payerAddress => getAddressFromPublicKey(payer.publicKey);
 
@@ -121,7 +125,10 @@ class CliContext {
       stdout.writeln(jsonEncode({'signature': signature}));
     } else {
       stdout.writeln('Signature: ${signature.toString()}');
-      stdout.writeln('https://explorer.solana.com/tx/${signature.toString()}');
+      final suffix = cluster.isEmpty ? '' : '?cluster=$cluster';
+      stdout.writeln(
+        'https://explorer.solana.com/tx/${signature.toString()}$suffix',
+      );
     }
   }
 
@@ -203,17 +210,39 @@ String resolveEndpoint(String value) {
   return endpoint;
 }
 
+/// The Explorer cluster selector for a resolved endpoint.
+///
+/// Mainnet Beta has no selector, so it returns an empty string and the URL is
+/// left bare. Arbitrary custom endpoints also return empty: the Explorer only
+/// understands the named clusters, and guessing a selector for an unknown host
+/// would produce a link that resolves to the wrong chain.
+String clusterOf(String endpoint) {
+  final host = Uri.tryParse(endpoint)?.host;
+  if (host == 'api.devnet.solana.com') return 'devnet';
+  if (host == 'api.testnet.solana.com') return 'testnet';
+  return '';
+}
+
 KeyPair loadKeypair(String path) {
   final expanded = path.startsWith('~/')
       ? '${Platform.environment['HOME']}/${path.substring(2)}'
       : path;
-  final bytes = (jsonDecode(File(expanded).readAsStringSync()) as List<Object?>)
-      .map((byte) => (byte! as num).toInt())
-      .toList();
-  if (bytes.length != 64) {
+  final decoded = jsonDecode(File(expanded).readAsStringSync());
+  if (decoded is! List || decoded.length != 64) {
     throw CliError(
       'could not load payer keypair: expected a JSON array of 64 bytes',
     );
+  }
+  // A byte outside 0-255 would be silently truncated by `Uint8List.fromList`,
+  // producing a different signer than the file asked for.
+  final bytes = <int>[];
+  for (final byte in decoded) {
+    if (byte is! int || byte < 0 || byte > 255) {
+      throw CliError(
+        'could not load payer keypair: every byte must be an integer from 0 to 255',
+      );
+    }
+    bytes.add(byte);
   }
   return KeyPair(
     privateKey: Uint8List.fromList(bytes.sublist(0, 32)),
@@ -223,14 +252,16 @@ KeyPair loadKeypair(String path) {
 
 Future<CliContext> createContext(ArgResults globals) {
   return Future.sync(() {
+    final endpoint = resolveEndpoint(globals['url']! as String);
     return CliContext._(
-      rpc: createSolanaRpc(url: resolveEndpoint(globals['url']! as String)),
+      rpc: createSolanaRpc(url: endpoint),
       payer: loadKeypair(globals['keypair']! as String),
       programAddress: (globals['program-id'] as String?) != null
           ? pubkey('--program-id', globals['program-id']! as String)
           : Address("GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"),
       simulate: globals['simulate'] as bool? ?? false,
       json: globals['json'] as bool? ?? false,
+      cluster: clusterOf(endpoint),
     );
   });
 }

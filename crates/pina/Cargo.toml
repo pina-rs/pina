@@ -11,6 +11,11 @@ description = "a solana and pinocchio smart contract framework"
 
 [features]
 default = ["logs", "derive"]
+# Enables the heap: forwards `alloc` to pinocchio and makes
+# `nostd_entrypoint_alloc!` available. Without it, `nostd_entrypoint!` denies
+# allocation and dynamic allocation aborts at runtime. Leave it off unless a
+# program actually needs `Box`, `Vec`, or the slice-based CPI helpers.
+alloc = ["pinocchio/alloc"]
 # Static, allocation-free diagnostics. Failure paths log a fixed message so
 # programs do not link `core::fmt`.
 logs = ["dep:solana-program-log"]
@@ -39,7 +44,7 @@ fixed = { workspace = true, optional = true }
 pastey = { workspace = true, default-features = true }
 pina_macros = { workspace = true, optional = true }
 pinapod = { workspace = true, default-features = true }
-pinocchio = { workspace = true, default-features = true }
+pinocchio = { workspace = true, default-features = false, features = ["copy", "sha2"] }
 pinocchio-associated-token-account = { workspace = true, optional = true, default-features = true }
 pinocchio-memo = { workspace = true, optional = true, default-features = true }
 pinocchio-system = { workspace = true, default-features = true }

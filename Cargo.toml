@@ -12,6 +12,7 @@ members = [
 	"codama/clients/cli/rust/escrow_program",
 	"codama/clients/cli/rust/events_program",
 	"codama/clients/cli/rust/float_accounts_program",
+	"codama/clients/cli/rust/heap_alloc_program",
 	"codama/clients/cli/rust/hello_solana_program",
 	"codama/clients/cli/rust/migrations_program",
 	"codama/clients/cli/rust/multisig_program",
@@ -37,6 +38,7 @@ members = [
 	"codama/clients/cpi/escrow_program",
 	"codama/clients/cpi/events_program",
 	"codama/clients/cpi/float_accounts_program",
+	"codama/clients/cpi/heap_alloc_program",
 	"codama/clients/cpi/hello_solana_program",
 	"codama/clients/cpi/migrations_program",
 	"codama/clients/cpi/multisig_program",
@@ -62,6 +64,7 @@ members = [
 	"codama/clients/rust/escrow_program",
 	"codama/clients/rust/events_program",
 	"codama/clients/rust/float_accounts_program",
+	"codama/clients/rust/heap_alloc_program",
 	"codama/clients/rust/hello_solana_program",
 	"codama/clients/rust/migrations_program",
 	"codama/clients/rust/multisig_program",
@@ -108,6 +111,8 @@ members = [
 	"examples/events_program/tests/surfpool",
 	"examples/float_accounts_program",
 	"examples/float_accounts_program/tests/surfpool",
+	"examples/heap_alloc_program",
+	"examples/heap_alloc_program/tests/surfpool",
 	"examples/hello_solana_program",
 	"examples/hello_solana_program/tests/surfpool",
 	"examples/migrations_program",
@@ -178,7 +183,10 @@ publish = false
 description = "Internal cross-crate test harness for the Pina workspace; never published."
 
 [dependencies]
-pina = { workspace = true, features = ["compact", "derive", "token"] }
+# `alloc` is here for `tests/expand`: macrotest copies this dependency into
+# the crate it generates, so the `nostd_entrypoint_alloc!` fixture can expand
+# against the real allocator instead of failing to resolve it.
+pina = { workspace = true, features = ["alloc", "compact", "derive", "token"] }
 pina_macros = { workspace = true, features = ["compact"] }
 
 [dev-dependencies]

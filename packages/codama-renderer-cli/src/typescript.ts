@@ -273,21 +273,36 @@ function resolveEndpoint(value: string): string {
 }
 
 function clusterOf(endpoint: string): string {
-	if (endpoint.includes("api.mainnet-beta.solana.com")) return "";
-	if (endpoint.includes("api.devnet.solana.com")) return "devnet";
-	if (endpoint.includes("api.testnet.solana.com")) return "testnet";
+	let host: string;
+	try {
+		host = new URL(endpoint).hostname;
+	} catch {
+		return "";
+	}
+	if (host === "api.mainnet-beta.solana.com") return "";
+	if (host === "api.devnet.solana.com") return "devnet";
+	if (host === "api.testnet.solana.com") return "testnet";
 	return "";
 }
 
 async function loadKeypair(path: string): Promise<KeyPairSigner> {
 	const expanded = path.startsWith("~/") ? \`\${homedir()}/\${path.slice(2)}\` : path;
-	const bytes = JSON.parse(readFileSync(expanded, "utf8")) as number[];
+	const bytes = JSON.parse(readFileSync(expanded, "utf8")) as unknown;
 	if (!Array.isArray(bytes) || bytes.length !== 64) {
 		throw new CliError(
 			\`could not load payer keypair \\\`\${expanded}\\\`: expected a JSON array of 64 bytes\`,
 		);
 	}
-	return await createKeyPairSignerFromBytes(new Uint8Array(bytes));
+	// A value outside 0-255 would be silently wrapped by \`Uint8Array\`,
+	// producing a different signer than the file asked for.
+	for (const byte of bytes) {
+		if (!Number.isInteger(byte) || (byte as number) < 0 || (byte as number) > 255) {
+			throw new CliError(
+			\`could not load payer keypair \\\`\${expanded}\\\`: every byte must be an integer from 0 to 255\`,
+		);
+		}
+	}
+	return await createKeyPairSignerFromBytes(new Uint8Array(bytes as number[]));
 }
 `;
 
