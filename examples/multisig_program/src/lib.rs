@@ -1369,6 +1369,8 @@ fn read_option_address(bytes: &[u8], offset: usize) -> Result<Option<Address>, P
 ///
 /// Layout (Anchor/Borsh, little-endian) shared by the deployed multisig
 /// programs that store their roster inline:
+///
+/// ```text
 /// 8..40    `create_key`
 /// 40..72   `config_authority`
 /// 72..74   threshold u16
