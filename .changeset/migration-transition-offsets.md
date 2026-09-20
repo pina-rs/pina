@@ -1,5 +1,6 @@
 ---
 pina_cli: fix
+pina_skill: none
 ---
 
 # Read transition offsets from the stored schema

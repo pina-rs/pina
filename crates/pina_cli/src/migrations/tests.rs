@@ -3885,11 +3885,15 @@ fn manual_answers_generate_an_editable_transition_for_a_rename() {
 	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with manual answer: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+	// Windows reports manual transition paths with the `\\?\` extended-length
+	// prefix while `join` builds a plain path, so compare the file names.
 	assert_eq!(
-		output.manual_transitions,
-		[fixture
-			.root
-			.join("migrations/transitions/account_1_01/v0_to_v1.rs")]
+		output
+			.manual_transitions
+			.iter()
+			.map(|path| path.file_name().and_then(|name| name.to_str()))
+			.collect::<Vec<_>>(),
+		[Some("v0_to_v1.rs")]
 	);
 
 	let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
