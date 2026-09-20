@@ -1,5 +1,4 @@
 ---
-pina_abi: feat
 pina_cli: fix
 ---
 
