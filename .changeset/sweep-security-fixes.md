@@ -2,7 +2,7 @@
 pina: fix
 pina_macros: breaking
 pina_abi: fix
-pina_codama_nodes: patch
+pina_codama_nodes: fix
 ---
 
 # Close the confirmed 2026-09-19 sweep findings
