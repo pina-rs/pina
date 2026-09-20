@@ -1,6 +1,5 @@
 //! Generation and verification of migration transition sources.
 
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,9 +19,9 @@ use pina_abi::TransitionMode;
 
 use super::CreateMigrationsOutput;
 use super::MigrationError;
-use super::diff::MoveDirection;
-use super::diff::automatic_direction;
-use super::diff::transition_mode;
+use super::diff::MovePlan;
+use super::diff::SourceIntent;
+use super::diff::automatic_move_plan;
 use super::remedy::ACCOUNT_GROWTH_REMEDY;
 use super::remedy::LAMPORT_BUDGET_REMEDY;
 use super::storage::write_atomic;
@@ -32,6 +31,8 @@ use crate::project::Project;
 pub(super) struct TransitionRequest<'a> {
 	pub(super) identity: &'a ContractIdentity,
 	pub(super) rust_name: &'a str,
+	/// The version as it is stored on the wire. Byte offsets and source sizes
+	/// come from here, never from the developer's renamed reading of it.
 	pub(super) source: &'a SchemaVersion,
 	/// Version number of `source`: the index of the version this transition
 	/// leaves.
@@ -41,7 +42,9 @@ pub(super) struct TransitionRequest<'a> {
 	/// Each entry carries its own version number, which the version index no
 	/// longer stores.
 	pub(super) stale_ladder: &'a [(u32, &'a SchemaVersion)],
-	pub(super) renames: Vec<pina_abi::RenameMapping>,
+	/// The developer's resolved reading of which stored field becomes which, and
+	/// which stored bytes are deliberately discarded or converted by hand.
+	pub(super) intent: SourceIntent,
 	pub(super) destination_version: u32,
 	pub(super) destination: &'a DataSchema,
 	pub(super) destination_process: Option<&'a ProcessContract>,
@@ -59,7 +62,7 @@ pub(super) fn create_transition(
 		source,
 		source_version,
 		stale_ladder,
-		renames,
+		intent,
 		destination_version,
 		destination,
 		destination_process,
@@ -73,20 +76,28 @@ pub(super) fn create_transition(
 		source.process.as_ref(),
 		destination_process,
 	)?;
-	let mode = transition_mode(&source.schema, destination);
+	// One proof decides both the recorded mode and the emitted bytes, so a
+	// transition can never be labelled automatic while writing movement its own
+	// plan never justified. The proof already refuses developer-owned
+	// conversions, so its verdict is the mode.
+	let plan = automatic_move_plan(&source.schema, &intent, destination);
+	let mode = if plan.is_some() {
+		TransitionMode::Automatic
+	} else {
+		TransitionMode::Manual
+	};
 	let path = transition_path(project, identity, source_version, destination_version);
-	let generated = match mode {
-		TransitionMode::Automatic => {
+	let generated = match (&mode, &plan) {
+		(TransitionMode::Automatic, Some(plan)) => {
 			automatic_transition_source(
 				identity,
 				project.migration_version_type,
-				source,
 				source_version,
 				destination_version,
-				destination,
+				plan,
 			)
 		}
-		TransitionMode::Manual => {
+		_ => {
 			manual_transition_source(
 				identity,
 				project.migration_version_type,
@@ -124,7 +135,7 @@ pub(super) fn create_transition(
 	let implementation_sha256 = Some(hash_transition_file(&path)?);
 	Ok(Transition {
 		mode,
-		renames,
+		renames: intent.renames,
 		implementation_sha256,
 	})
 }
@@ -378,47 +389,25 @@ pub(super) fn process_transition(
 	}
 }
 
+/// Render an automatic transition from its proof.
+///
+/// The plan already carries payload-relative offsets, so this is a pure
+/// translation into source: header bytes are added, moves are emitted in the
+/// plan's own order, and zero fills come last so they cannot be overwritten by a
+/// later copy.
 pub(super) fn automatic_transition_source(
 	identity: &ContractIdentity,
 	version_type: MigrationVersionType,
-	source: &SchemaVersion,
 	source_version: u32,
 	destination_version: u32,
-	destination: &DataSchema,
+	plan: &MovePlan,
 ) -> String {
-	let discriminator_bytes = usize::from(identity.discriminator_bytes);
-	let header = discriminator_bytes + version_type.bytes();
-	let source_size = header + source.schema.fixed_payload_size().unwrap_or(0);
-	let destination_size = header + destination.fixed_payload_size().unwrap_or(0);
+	let header = usize::from(identity.discriminator_bytes) + version_type.bytes();
+	let source_size = header + plan.source_size;
+	let destination_size = header + plan.destination_size;
 	let working_size = source_size.max(destination_size);
-	let source_offsets = source.schema.fixed_field_offsets().unwrap_or_default();
-	let destination_offsets = destination.fixed_field_offsets().unwrap_or_default();
-	let source_types = source
-		.schema
-		.fields
-		.iter()
-		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
-		.collect::<BTreeMap<_, _>>();
-	let direction = automatic_direction(&source.schema, destination)
-		.expect("automatic transition must have a safe move direction");
-	let mut mapped = destination
-		.fields
-		.iter()
-		.filter_map(|field| {
-			if source_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
-				return None;
-			}
-			let &(source_offset, size) = source_offsets.get(&field.name)?;
-			let &(destination_offset, _) = destination_offsets.get(&field.name)?;
-			Some((source_offset, destination_offset, size))
-		})
-		.collect::<Vec<_>>();
-	match direction {
-		MoveDirection::Forward => mapped.sort_by_key(|(source, ..)| *source),
-		MoveDirection::Backward => mapped.sort_by_key(|(source, ..)| std::cmp::Reverse(*source)),
-	}
 	let mut moves = String::new();
-	for (source_offset, destination_offset, size) in mapped {
+	for (source_offset, destination_offset, size) in plan.ordered_moves() {
 		let source_start = header + source_offset;
 		let source_end = source_start + size;
 		let destination_start = header + destination_offset;
@@ -427,17 +416,8 @@ pub(super) fn automatic_transition_source(
 			"\tdata.copy_within({source_start}..{source_end}, {destination_start});"
 		);
 	}
-	let source_names = source_types.keys().copied().collect::<Vec<_>>();
 	let mut zeroes = String::new();
-	for field in &destination.fields {
-		if source_names.contains(&field.name.as_str())
-			&& source_types.get(field.name.as_str()) == Some(&field.rust_type.as_str())
-		{
-			continue;
-		}
-		let &(destination_offset, size) = destination_offsets
-			.get(&field.name)
-			.expect("fixed layout offsets contain every destination field");
+	for (destination_offset, size) in &plan.zero_fills {
 		let start = header + destination_offset;
 		let end = start + size;
 		let _ = writeln!(zeroes, "\tdata[{start}..{end}].fill(0);");

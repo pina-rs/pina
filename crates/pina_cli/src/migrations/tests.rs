@@ -39,6 +39,14 @@ use crate::ir::DiscriminatorIr;
 use crate::ir::InstructionIr;
 use crate::project::Project;
 
+/// Build one recorded rename mapping.
+fn pin_rename(from: &str, to: &str) -> pina_abi::RenameMapping {
+	pina_abi::RenameMapping {
+		from: from.to_owned(),
+		to: to.to_owned(),
+	}
+}
+
 fn schema(layout: LayoutKind, fields: &[(&str, &str)]) -> DataSchema {
 	DataSchema::try_new(
 		layout,
@@ -62,8 +70,17 @@ fn automatic_fixed_migration_allows_direction_safe_add_and_remove() {
 		&[("authority", "Address"), ("count", "u64")],
 	);
 	let new = schema(LayoutKind::Fixed, &[("count", "u64"), ("enabled", "bool")]);
+	// `authority` is dropped deliberately, which the developer acknowledges
+	// before the proof will consider the change automatic.
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["authority".to_owned()]),
+		..SourceIntent::default()
+	};
 
-	assert_eq!(transition_mode(&old, &new), TransitionMode::Automatic);
+	assert_eq!(
+		transition_mode(&old, &intent, &new),
+		TransitionMode::Automatic
+	);
 }
 
 #[test]
@@ -77,7 +94,10 @@ fn automatic_fixed_migration_rejects_true_field_reordering() {
 		&[("count", "u64"), ("authority", "Address")],
 	);
 
-	assert_eq!(transition_mode(&old, &reordered), TransitionMode::Manual);
+	assert_eq!(
+		transition_mode(&old, &SourceIntent::default(), &reordered),
+		TransitionMode::Manual
+	);
 }
 
 #[test]
@@ -252,7 +272,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				source: &source,
 				source_version: 0,
 				stale_ladder: &[(0, &source)],
-				renames: Vec::new(),
+				intent: SourceIntent::default(),
 				destination_version: 1,
 				destination: &source_schema,
 				destination_process: Some(&escalated),
@@ -284,7 +304,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				source: &account_source,
 				source_version: 0,
 				stale_ladder: &[(0, &account_source)],
-				renames: Vec::new(),
+				intent: SourceIntent::default(),
 				destination_version: 1,
 				destination: &destination,
 				destination_process: None,
@@ -335,28 +355,21 @@ fn direction_and_manual_sizing_cover_every_layout_shape() {
 		LayoutKind::Fixed,
 		&[("first", "u8"), ("inserted", "u128"), ("second", "u8")],
 	);
-	assert!(automatic_direction(&mixed_source, &mixed_destination).is_none());
+	let mixed_intent = SourceIntent {
+		dropped: BTreeSet::from(["removed".to_owned()]),
+		..SourceIntent::default()
+	};
+	// One field moves right while another moves left, so no single copy order
+	// is safe.
+	assert!(automatic_move_plan(&mixed_source, &mixed_intent, &mixed_destination).is_none());
 
 	let source_schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
 	let destination = schema(LayoutKind::Fixed, &[("prefix", "u8"), ("value", "u64")]);
-	assert!(matches!(
-		automatic_direction(&source_schema, &destination),
-		Some(MoveDirection::Backward)
-	));
-	let source = SchemaVersion {
-		schema: source_schema,
-		process: None,
-		transition: None,
-	};
+	let plan = automatic_move_plan(&source_schema, &SourceIntent::default(), &destination)
+		.expect("inserting a leading field keeps every field moving right");
+	assert_eq!(plan.direction, MoveDirection::Backward);
 	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
-	let generated = automatic_transition_source(
-		&identity,
-		MigrationVersionType::U8,
-		&source,
-		0,
-		1,
-		&destination,
-	);
+	let generated = automatic_transition_source(&identity, MigrationVersionType::U8, 0, 1, &plan);
 	assert!(generated.contains("copy_within(2..10, 3)"));
 
 	let compact = schema(LayoutKind::Compact, &[("name", "String<4>")]);
@@ -2012,8 +2025,14 @@ fn field_type_changes_and_compact_changes_are_manual() {
 	let changed = schema(LayoutKind::Fixed, &[("count", "u32")]);
 	let compact = schema(LayoutKind::Compact, &[("label", "String<8>")]);
 
-	assert_eq!(transition_mode(&old, &changed), TransitionMode::Manual);
-	assert_eq!(transition_mode(&old, &compact), TransitionMode::Manual);
+	assert_eq!(
+		transition_mode(&old, &SourceIntent::default(), &changed),
+		TransitionMode::Manual
+	);
+	assert_eq!(
+		transition_mode(&old, &SourceIntent::default(), &compact),
+		TransitionMode::Manual
+	);
 }
 
 struct ClosedTerminal;
@@ -2173,10 +2192,13 @@ fn recorded_renames_contradicted_by_flags_fail_closed() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[pina_abi::RenameMapping {
-			from: "value".to_owned(),
-			to: "points".to_owned(),
-		}],
+		&SourceIntent {
+			renames: vec![pina_abi::RenameMapping {
+				from: "value".to_owned(),
+				to: "points".to_owned(),
+			}],
+			..SourceIntent::default()
+		},
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2206,7 +2228,7 @@ fn renames_must_target_added_fields() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2229,27 +2251,30 @@ fn recorded_renames_settle_draft_refreshes_without_asking_again() {
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[pina_abi::RenameMapping {
-			from: "value".to_owned(),
-			to: "points".to_owned(),
-		}],
+		&SourceIntent {
+			renames: vec![pina_abi::RenameMapping {
+				from: "value".to_owned(),
+				to: "points".to_owned(),
+			}],
+			..SourceIntent::default()
+		},
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("settled draft refresh: {error:?}"));
 	assert_eq!(
-		renames,
+		intent.renames,
 		vec![pina_abi::RenameMapping {
 			from: "value".to_owned(),
 			to: "points".to_owned(),
 		}]
 	);
-	assert!(dropped.is_empty());
+	assert!(intent.dropped.is_empty());
 }
 
 #[test]
@@ -2265,41 +2290,41 @@ fn interactive_rename_prompts_resolve_ambiguities() {
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 	let mut warnings = Vec::new();
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("answered rename: {error:?}"));
 	assert_eq!(
-		renames,
+		intent.renames,
 		vec![pina_abi::RenameMapping {
 			from: "value".to_owned(),
 			to: "points".to_owned(),
 		}]
 	);
-	assert!(dropped.is_empty());
+	assert!(intent.dropped.is_empty());
 
 	let mut reader: &[u8] = b"n\n";
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 	let mut warnings = Vec::new();
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("declined rename: {error:?}"));
-	assert!(renames.is_empty());
-	assert!(dropped.contains("value"));
+	assert!(intent.renames.is_empty());
+	assert!(intent.dropped.contains("value"));
 	assert!(
 		warnings
 			.iter()
@@ -2316,7 +2341,7 @@ fn interactive_rename_prompts_resolve_ambiguities() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2341,18 +2366,18 @@ fn interactive_removal_prompts_collect_acknowledgements() {
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 	let mut warnings = Vec::new();
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("acknowledged removal: {error:?}"));
-	assert!(renames.is_empty());
-	assert!(dropped.contains("value"));
+	assert!(intent.renames.is_empty());
+	assert!(intent.dropped.contains("value"));
 	assert!(
 		warnings
 			.iter()
@@ -2368,7 +2393,7 @@ fn interactive_removal_prompts_collect_acknowledgements() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2395,18 +2420,18 @@ fn dropped_fields_without_candidates_warn_without_questions() {
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("acknowledged unpaired removal: {error:?}"));
-	assert!(renames.is_empty());
-	assert!(dropped.contains("value"));
+	assert!(intent.renames.is_empty());
+	assert!(intent.dropped.contains("value"));
 	assert!(
 		warnings
 			.iter()
@@ -2416,21 +2441,22 @@ fn dropped_fields_without_candidates_warn_without_questions() {
 }
 
 #[test]
-fn effective_schema_rebuilds_reject_corrupted_manifest_schemas() {
+fn corrupted_manifest_schemas_fail_validation_before_a_transition_is_planned() {
 	let mut version = SchemaVersion {
 		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
 		process: None,
 		transition: None,
 	};
 	// A hand-edited manifest can carry a field type the closed grammar
-	// rejects; the rebuilt effective schema must fail instead of building a
-	// broken transition from it.
+	// rejects. Manifest validation is the gate that fails, so no transition is
+	// ever planned from a schema the generator cannot measure.
 	version.schema.fields[0].rust_type = "Widget".to_owned();
-
-	let rejection = effective_source_schema(&version, &[], &BTreeSet::new())
-		.expect_err("corrupted field types must fail the rebuild");
+	let rejection = version
+		.schema
+		.validate()
+		.expect_err("corrupted field types must fail schema validation");
 	assert!(
-		format!("{rejection}").contains("produce an invalid schema"),
+		rejection.contains("unsupported fixed ABI type"),
 		"{rejection}"
 	);
 }
@@ -2496,7 +2522,7 @@ fn unpaired_removal_without_candidate_asks_with_flags_when_not_interactive() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2532,7 +2558,7 @@ fn one_added_field_cannot_receive_two_renames() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2566,7 +2592,7 @@ fn unclaimed_candidates_pair_once_across_several_removals() {
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
@@ -2786,7 +2812,7 @@ fn create_transition_propagates_manual_layout_errors() {
 			source: &source,
 			source_version: 0,
 			stale_ladder: &[(0, &source)],
-			renames: vec![],
+			intent: SourceIntent::default(),
 			destination_version: 1,
 			destination: &destination,
 			destination_process: Some(&process),
@@ -2916,6 +2942,7 @@ fn flag_answers_override_persisted_answers_without_conflict() {
 	let persisted = crate::project::MigrationsAnswersConfig {
 		rename: vec!["value:points".to_owned()],
 		assume_removed: vec![],
+		manual: vec![],
 	};
 	let answers = MigrationAnswers::from_layers(&persisted, &["value:total".to_owned()], &[], true)
 		.unwrap_or_else(|error| panic!("layer overriding answers: {error}"));
@@ -2926,24 +2953,24 @@ fn flag_answers_override_persisted_answers_without_conflict() {
 	let mut transcript = Vec::new();
 	let mut prompts = PromptIo::new(&mut reader, &mut transcript, true);
 
-	let (renames, dropped) = resolve_field_changes(
+	let intent = resolve_field_changes(
 		"account:1:01",
 		&source,
 		&destination,
-		&[],
+		&SourceIntent::default(),
 		&answers,
 		&mut warnings,
 		&mut prompts,
 	)
 	.unwrap_or_else(|error| panic!("resolved override: {error:?}"));
 	assert_eq!(
-		renames,
+		intent.renames,
 		vec![pina_abi::RenameMapping {
 			from: "value".to_owned(),
 			to: "total".to_owned(),
 		}]
 	);
-	assert!(dropped.is_empty());
+	assert!(intent.dropped.is_empty());
 }
 
 #[test]
@@ -2951,6 +2978,7 @@ fn flag_answers_contradicting_persisted_answers_fail_closed() {
 	let persisted = crate::project::MigrationsAnswersConfig {
 		rename: vec!["value:points".to_owned()],
 		assume_removed: vec![],
+		manual: vec![],
 	};
 	let removal_conflict =
 		MigrationAnswers::from_layers(&persisted, &[], &["value".to_owned()], true)
@@ -3241,5 +3269,1108 @@ fn make_reports_an_unreadable_abi_layout_guard() {
 	assert!(
 		matches!(error, MigrationError::Read { .. }),
 		"expected a read error, got {error}"
+	);
+}
+
+/// Read a `const NAME: usize = VALUE;` out of a generated transition.
+///
+/// The generator wraps the constants in a `pub(crate)` module, so the
+/// declaration may carry that visibility prefix; only the name and value are
+/// load-bearing here.
+fn generated_constant(generated: &str, name: &str) -> usize {
+	let prefix = format!("const {name}: usize = ");
+	generated
+		.lines()
+		.find_map(|line| {
+			let line = line.trim();
+			let line = line.strip_prefix("pub(crate) ").unwrap_or(line);
+			line.strip_prefix(&prefix)
+		})
+		.and_then(|value| value.trim_end_matches(';').parse::<usize>().ok())
+		.unwrap_or_else(|| panic!("generated transition has no `{name}`:\n{generated}"))
+}
+
+/// Apply a generated automatic transition to raw account bytes.
+///
+/// The generator emits `data.copy_within(a..b, c);` and `data[d..e].fill(0);`
+/// statements. Interpreting those statements is the only way to prove the
+/// offsets are right: a plan whose numbers are self-consistent can still read
+/// and write the wrong bytes, and asserting on the rendered text cannot tell
+/// the difference. Anything the interpreter does not recognize is a panic, so
+/// the generator cannot quietly start emitting a form these tests ignore.
+///
+/// The buffer handling mirrors the on-chain executor: the account is grown to
+/// `WORKING_SIZE` before `migrate` runs, the transition edits it in place, and
+/// the result is then shrunk to `DESTINATION_SIZE`. Growing first matters for
+/// transitions that write above the stored length.
+fn apply_automatic_transition(generated: &str, mut data: Vec<u8>) -> Vec<u8> {
+	let working_size = generated_constant(generated, "WORKING_SIZE");
+	let destination_size = generated_constant(generated, "DESTINATION_SIZE");
+	assert!(
+		data.len() <= working_size,
+		"executor only grows an account, never shrinks before `migrate`"
+	);
+	data.resize(working_size, 0);
+	let mut copies = 0;
+	let mut fills = 0;
+	for line in generated.lines() {
+		let line = line.trim();
+		// Skip the `if data.len() < WORKING_SIZE { return; }` guard and the
+		// braces that surround it; every other line is a byte edit or a panic.
+		if !line.starts_with("data[") && !line.starts_with("data.") {
+			continue;
+		}
+		let Some(statement) = line.strip_suffix(';') else {
+			panic!("unterminated transition statement: {line}");
+		};
+		if let Some(rest) = statement.strip_prefix("data.") {
+			if let Some(arguments) = rest.strip_prefix("copy_within(") {
+				let arguments = arguments
+					.strip_suffix(')')
+					.unwrap_or_else(|| panic!("unterminated copy_within: {line}"));
+				let (range, destination) = arguments
+					.split_once(", ")
+					.unwrap_or_else(|| panic!("copy_within needs two arguments: {line}"));
+				let (start, end) = range
+					.split_once("..")
+					.unwrap_or_else(|| panic!("copy_within needs a range: {line}"));
+				let start = start
+					.parse::<usize>()
+					.unwrap_or_else(|error| panic!("copy source start: {error}"));
+				let end = end
+					.parse::<usize>()
+					.unwrap_or_else(|error| panic!("copy source end: {error}"));
+				let destination = destination
+					.parse::<usize>()
+					.unwrap_or_else(|error| panic!("copy destination: {error}"));
+				assert!(
+					end <= data.len() && destination + (end - start) <= data.len(),
+					"transition statement {line} runs past {} bytes",
+					data.len()
+				);
+				// `copy_within` is memmove semantics: the plan's ordering is what
+				// makes overlapping copies safe, so the interpreter must not
+				// buffer for the generator.
+				data.copy_within(start..end, destination);
+				copies += 1;
+				continue;
+			}
+			panic!("unrecognized data statement: {line}");
+		}
+		if let Some(arguments) = statement.strip_prefix("data[") {
+			let (range, operation) = arguments
+				.split_once("].")
+				.unwrap_or_else(|| panic!("malformed fill statement: {line}"));
+			assert_eq!(
+				operation, "fill(0)",
+				"the only supported fill writes zeroes: {line}"
+			);
+			let (start, end) = range
+				.split_once("..")
+				.unwrap_or_else(|| panic!("fill needs a range: {line}"));
+			let start = start
+				.parse::<usize>()
+				.unwrap_or_else(|error| panic!("fill start: {error}"));
+			let end = end
+				.parse::<usize>()
+				.unwrap_or_else(|error| panic!("fill end: {error}"));
+			assert!(
+				end <= data.len(),
+				"fill {line} runs past {} bytes",
+				data.len()
+			);
+			data[start..end].fill(0);
+			fills += 1;
+			continue;
+		}
+		panic!("unrecognized transition statement: {line}");
+	}
+	// The guard's own `data.len()` is a read, not an edit, so count only the
+	// statements that reach the interpreter above.
+	let edits = generated
+		.lines()
+		.filter(|line| {
+			let line = line.trim();
+			(line.starts_with("data[") || line.starts_with("data.")) && line.ends_with(';')
+		})
+		.count();
+	assert_eq!(
+		copies + fills,
+		edits,
+		"every generated byte edit must be interpreted:\n{generated}"
+	);
+	assert!(
+		copies + fills > 0,
+		"a transition with no byte movement cannot be verified:\n{generated}"
+	);
+	data.truncate(destination_size);
+	data
+}
+
+/// Read one field out of an already-generated destination payload.
+fn field_bytes(data: &[u8], offsets: &BTreeMap<String, (usize, usize)>, name: &str) -> Vec<u8> {
+	let &(offset, size) = offsets
+		.get(name)
+		.unwrap_or_else(|| panic!("destination has no field `{name}`"));
+	data[offset..offset + size].to_vec()
+}
+
+/// Payload offsets for a schema, panicking when it is not fixed.
+fn offsets(schema: &DataSchema) -> BTreeMap<String, (usize, usize)> {
+	schema
+		.fixed_field_offsets()
+		.unwrap_or_else(|| panic!("test schema must be a fixed layout"))
+}
+
+/// Plan and generate an automatic transition, failing closed when the proof
+/// refuses the change.
+fn generate_automatic(
+	stored: &DataSchema,
+	intent: &SourceIntent,
+	destination: &DataSchema,
+	version_type: MigrationVersionType,
+) -> (String, MovePlan) {
+	let plan = automatic_move_plan(stored, intent, destination).unwrap_or_else(|| {
+		panic!(
+			"expected an automatic plan for {:?} -> {:?}",
+			stored.fields.iter().map(|f| &f.name).collect::<Vec<_>>(),
+			destination
+				.fields
+				.iter()
+				.map(|f| &f.name)
+				.collect::<Vec<_>>()
+		)
+	});
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let generated = automatic_transition_source(&identity, version_type, 0, 1, &plan);
+	(generated, plan)
+}
+
+/// Encode a fixed-layout version payload by concatenating field values.
+fn payload(offsets: &BTreeMap<String, (usize, usize)>, values: &[(&str, &[u8])]) -> Vec<u8> {
+	let total = offsets.values().map(|(o, s)| o + s).max().unwrap_or(0);
+	let mut out = vec![0_u8; total];
+	for (name, value) in values {
+		let &(offset, size) = offsets
+			.get(*name)
+			.unwrap_or_else(|| panic!("no field `{name}`"));
+		assert_eq!(value.len(), size, "field `{name}` takes {size} bytes");
+		out[offset..offset + size].copy_from_slice(value);
+	}
+	out
+}
+
+/// Every removed field keeps occupying its bytes, so a retained field that
+/// follows one must be read from the stored offset, not the compacted one.
+///
+/// This is the regression test for the offset bug: the generator previously
+/// derived offsets from a source schema with dropped fields removed, which made
+/// the surviving field after a removal read the *removed* field's bytes. Every
+/// value here is a distinct byte, so a wrong offset is unambiguous.
+#[test]
+fn automatic_transition_reads_retained_fields_from_the_stored_layout() {
+	// Stored v0: a, b, c. Destination v1: a, c (the middle field is dropped).
+	let stored = schema(LayoutKind::Fixed, &[("a", "u8"), ("b", "u8"), ("c", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("a", "u8"), ("c", "u8")]);
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["b".to_owned()]),
+		..SourceIntent::default()
+	};
+
+	let (generated, plan) =
+		generate_automatic(&stored, &intent, &destination, MigrationVersionType::U8);
+	// The stored payload is three bytes even though only two survive.
+	assert_eq!(plan.source_size, 3);
+	assert_eq!(plan.destination_size, 2);
+	// Header (1 discriminator + 1 version) plus the three stored payload bytes.
+	assert!(generated.contains("SOURCE_SIZE: usize = 5"), "{generated}");
+	assert!(
+		generated.contains("DESTINATION_SIZE: usize = 4"),
+		"{generated}"
+	);
+
+	let stored_offsets = offsets(&stored);
+	let destination_offsets = offsets(&destination);
+	let header = 2_usize;
+	let mut account = vec![1_u8, 0];
+	account.extend(payload(
+		&stored_offsets,
+		&[("a", &[0xAA]), ("b", &[0xBB]), ("c", &[0xCC])],
+	));
+
+	let migrated = apply_automatic_transition(&generated, account);
+	let body = &migrated[header..];
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "c"),
+		vec![0xCC],
+		"`c` must keep its own byte, not inherit the dropped field's"
+	);
+	assert_eq!(field_bytes(body, &destination_offsets, "a"), vec![0xAA]);
+}
+
+/// The same proof for a removal at the head, where every retained field shifts
+/// down and the last one is most easily overwritten.
+#[test]
+fn automatic_transition_handles_a_leading_removal_without_shifting_bytes() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("gone", "u64"), ("first", "u8"), ("second", "u16")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("first", "u8"), ("second", "u16")]);
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["gone".to_owned()]),
+		..SourceIntent::default()
+	};
+
+	let (generated, _) =
+		generate_automatic(&stored, &intent, &destination, MigrationVersionType::U8);
+
+	let stored_offsets = offsets(&stored);
+	let destination_offsets = offsets(&destination);
+	let mut account = vec![1_u8, 0];
+	account.extend(payload(
+		&stored_offsets,
+		&[
+			("gone", &[0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF]),
+			("first", &[0x11]),
+			("second", &[0x22, 0x33]),
+		],
+	));
+
+	let migrated = apply_automatic_transition(&generated, account);
+	let body = &migrated[2..];
+	assert_eq!(field_bytes(body, &destination_offsets, "first"), vec![0x11]);
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "second"),
+		vec![0x22, 0x33]
+	);
+}
+
+/// A rename is a stored field arriving under a new name, so its bytes move from
+/// the *old* name's offset. The stored schema is what supplies that offset.
+#[test]
+fn automatic_transition_moves_renamed_bytes_from_the_stored_field() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("value", "u64")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("points", "u64")],
+	);
+	let intent = SourceIntent {
+		renames: vec![pina_abi::RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}],
+		..SourceIntent::default()
+	};
+
+	let (generated, plan) =
+		generate_automatic(&stored, &intent, &destination, MigrationVersionType::U8);
+	assert_eq!(plan.moves.len(), 2, "both fields survive the rename");
+	assert_eq!(plan.zero_fills.len(), 0, "a rename creates nothing new");
+
+	let stored_offsets = offsets(&stored);
+	let destination_offsets = offsets(&destination);
+	let authority = [7_u8; 32];
+	let mut account = vec![1_u8, 0];
+	account.extend(payload(
+		&stored_offsets,
+		&[
+			("authority", &authority),
+			("value", &[0x39, 0x30, 0, 0, 0, 0, 0, 0]),
+		],
+	));
+
+	let migrated = apply_automatic_transition(&generated, account);
+	let body = &migrated[2..];
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "points"),
+		vec![0x39, 0x30, 0, 0, 0, 0, 0, 0]
+	);
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "authority"),
+		authority
+	);
+}
+
+/// An inserted field with no stored counterpart is zero-filled, and the fields
+/// around it must still arrive intact.
+#[test]
+fn automatic_transition_zero_fills_an_inserted_field_and_keeps_neighbours() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("value", "u64")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[
+			("authority", "Address"),
+			("enabled", "bool"),
+			("value", "u64"),
+		],
+	);
+	let intent = SourceIntent::default();
+
+	let (generated, plan) =
+		generate_automatic(&stored, &intent, &destination, MigrationVersionType::U8);
+	assert_eq!(plan.zero_fills.len(), 1);
+
+	let stored_offsets = offsets(&stored);
+	let destination_offsets = offsets(&destination);
+	let authority = [3_u8; 32];
+	let mut account = vec![1_u8, 0];
+	account.extend(payload(
+		&stored_offsets,
+		&[
+			("authority", &authority),
+			("value", &[1, 2, 3, 4, 5, 6, 7, 8]),
+		],
+	));
+
+	let migrated = apply_automatic_transition(&generated, account);
+	let body = &migrated[2..];
+	assert_eq!(field_bytes(body, &destination_offsets, "enabled"), vec![0]);
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "value"),
+		vec![1, 2, 3, 4, 5, 6, 7, 8]
+	);
+	assert_eq!(
+		field_bytes(body, &destination_offsets, "authority"),
+		authority
+	);
+}
+
+/// Widening the version envelope must not shift the payload offsets the plan
+/// reports: the plan is payload-relative and the generator adds the header.
+#[test]
+fn automatic_transition_offsets_are_payload_relative_across_version_widths() {
+	let stored = schema(LayoutKind::Fixed, &[("a", "u8"), ("b", "u8"), ("c", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("a", "u8"), ("c", "u8")]);
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["b".to_owned()]),
+		..SourceIntent::default()
+	};
+	let plan =
+		automatic_move_plan(&stored, &intent, &destination).expect("removal after a survives");
+	assert_eq!(
+		plan.source_size, 3,
+		"the stored payload keeps the dropped byte"
+	);
+	assert_eq!(plan.moves, vec![(0, 0, 1), (2, 1, 1)]);
+
+	for version_type in [
+		MigrationVersionType::U8,
+		MigrationVersionType::U16,
+		MigrationVersionType::U32,
+	] {
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let generated = automatic_transition_source(&identity, version_type, 0, 1, &plan);
+		let header = 1 + version_type.bytes();
+		let expected_source = header + 3;
+		assert!(
+			generated.contains(&format!("SOURCE_SIZE: usize = {expected_source}")),
+			"{version_type:?}: {generated}"
+		);
+		// The last surviving field is read from stored offset 2 regardless of
+		// how wide the header is.
+		assert!(
+			generated.contains(&format!(
+				"copy_within({}..{}, {})",
+				header + 2,
+				header + 3,
+				header + 1
+			)),
+			"{version_type:?}: {generated}"
+		);
+	}
+}
+
+/// A field that moves right and a field that moves left cannot be expressed as
+/// one sequence of `copy_within` calls, so the proof refuses it.
+#[test]
+fn automatic_plan_refuses_two_way_movement() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("removed", "u64"), ("first", "u8"), ("second", "u8")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("first", "u8"), ("inserted", "u128"), ("second", "u8")],
+	);
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["removed".to_owned()]),
+		..SourceIntent::default()
+	};
+	assert!(automatic_move_plan(&stored, &intent, &destination).is_none());
+}
+
+/// A stored field whose type changes in place reinterprets live bytes, so it is
+/// never automatic even when the widths happen to match.
+#[test]
+fn automatic_plan_refuses_a_same_width_type_change() {
+	for (before, after) in [
+		("u64", "i64"),
+		("u32", "f32"),
+		("u8", "bool"),
+		("Address", "[u8; 32]"),
+	] {
+		let stored = schema(LayoutKind::Fixed, &[("value", before)]);
+		let destination = schema(LayoutKind::Fixed, &[("value", after)]);
+		assert!(
+			automatic_move_plan(&stored, &SourceIntent::default(), &destination).is_none(),
+			"{before} -> {after} must stay manual"
+		);
+	}
+}
+
+/// Every stored field must be accounted for. A type change in the middle leaves
+/// the changed field unpaired, and the plan fails closed rather than emitting
+/// copies that skip it.
+#[test]
+fn automatic_plan_requires_every_stored_field_to_be_accounted_for() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("head", "u8"), ("amount", "u32"), ("tail", "u8")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("head", "u8"), ("amount", "u64"), ("tail", "u8")],
+	);
+	assert!(
+		automatic_move_plan(&stored, &SourceIntent::default(), &destination).is_none(),
+		"an unpaired stored field cannot be copied or discarded silently"
+	);
+}
+
+/// Two destination fields may not claim the same stored field: the second copy
+/// would duplicate bytes the developer meant to place once.
+#[test]
+fn automatic_plan_refuses_two_fields_reading_one_stored_field() {
+	let stored = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("left", "u64"), ("right", "u64")]);
+	let intent = SourceIntent {
+		renames: vec![
+			pina_abi::RenameMapping {
+				from: "value".to_owned(),
+				to: "left".to_owned(),
+			},
+			pina_abi::RenameMapping {
+				from: "value".to_owned(),
+				to: "right".to_owned(),
+			},
+		],
+		..SourceIntent::default()
+	};
+	assert!(automatic_move_plan(&stored, &intent, &destination).is_none());
+}
+
+/// A manual conversion is developer-owned by definition, so the proof refuses
+/// the change even when the byte movement would otherwise be trivial.
+#[test]
+fn manual_intent_forces_a_manual_transition() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("first_name", "String<8>"), ("last_name", "String<8>")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("name", "String<16>")]);
+	let intent = SourceIntent {
+		renames: vec![pina_abi::RenameMapping {
+			from: "first_name".to_owned(),
+			to: "name".to_owned(),
+		}],
+		manual: BTreeSet::from(["name".to_owned()]),
+		dropped: BTreeSet::from(["last_name".to_owned()]),
+		..SourceIntent::default()
+	};
+	assert!(automatic_move_plan(&stored, &intent, &destination).is_none());
+	assert_eq!(
+		transition_mode(&stored, &intent, &destination),
+		TransitionMode::Manual
+	);
+}
+
+/// A rename that only changes the name is automatic; the same rename with a
+/// manual answer is not. This is the escape hatch that lets a developer own the
+/// conversion without making the schema look different.
+#[test]
+fn a_manual_answer_turns_an_otherwise_automatic_rename_into_a_manual_transition() {
+	let stored = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("points", "u64")]);
+	let rename = pina_abi::RenameMapping {
+		from: "value".to_owned(),
+		to: "points".to_owned(),
+	};
+	let automatic = SourceIntent {
+		renames: vec![rename.clone()],
+		..SourceIntent::default()
+	};
+	assert_eq!(
+		transition_mode(&stored, &automatic, &destination),
+		TransitionMode::Automatic
+	);
+
+	let manual = SourceIntent {
+		renames: vec![rename],
+		manual: BTreeSet::from(["points".to_owned()]),
+		..SourceIntent::default()
+	};
+	assert_eq!(
+		transition_mode(&stored, &manual, &destination),
+		TransitionMode::Manual
+	);
+}
+
+/// An unacknowledged removal cannot become automatic: the stored bytes would be
+/// copied over a retained field or silently left behind.
+#[test]
+fn an_unacknowledged_removal_is_not_automatic() {
+	let stored = schema(LayoutKind::Fixed, &[("a", "u8"), ("b", "u8"), ("c", "u8")]);
+	let destination = schema(LayoutKind::Fixed, &[("a", "u8"), ("c", "u8")]);
+	assert!(
+		automatic_move_plan(&stored, &SourceIntent::default(), &destination).is_none(),
+		"dropping `b` needs the developer's acknowledgement"
+	);
+}
+
+/// A trailing removal shifts nothing, so it stays automatic with or without the
+/// dropped field's bytes being read by anything.
+#[test]
+fn a_trailing_removal_shifts_nothing() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("a", "u8"), ("b", "u8"), ("stale", "u64")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("a", "u8"), ("b", "u8")]);
+	let intent = SourceIntent {
+		dropped: BTreeSet::from(["stale".to_owned()]),
+		..SourceIntent::default()
+	};
+	let plan = automatic_move_plan(&stored, &intent, &destination).expect("trailing removal");
+	assert_eq!(plan.moves, vec![(0, 0, 1), (1, 1, 1)]);
+
+	let stored_offsets = offsets(&stored);
+	let destination_offsets = offsets(&destination);
+	let mut account = vec![1_u8, 0];
+	account.extend(payload(
+		&stored_offsets,
+		&[("a", &[0x0A]), ("b", &[0x0B]), ("stale", &[9; 8])],
+	));
+	let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let generated = automatic_transition_source(&identity, MigrationVersionType::U8, 0, 1, &plan);
+	let migrated = apply_automatic_transition(&generated, account);
+	let body = &migrated[2..];
+	assert_eq!(field_bytes(body, &destination_offsets, "a"), vec![0x0A]);
+	assert_eq!(field_bytes(body, &destination_offsets, "b"), vec![0x0B]);
+}
+
+/// The rename escape hatch: a fixed-layout rename that Pina would otherwise
+/// generate can be handed to the developer so a conversion such as combining
+/// two fields into one is written by hand.
+#[test]
+fn manual_answers_generate_an_editable_transition_for_a_rename() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	write_state_source(&fixture, "points: u64");
+
+	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["points".to_owned()], true)
+		.unwrap_or_else(|error| panic!("answers: {error}"));
+	let output = make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make with manual answer: {error:?}"));
+	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+	assert_eq!(
+		output.manual_transitions,
+		[fixture
+			.root
+			.join("migrations/transitions/account_1_01/v0_to_v1.rs")]
+	);
+
+	let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+		.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+		.expect("fixture manifest");
+	let transition = manifest.contracts["account:1:01"].versions[1]
+		.transition
+		.as_ref()
+		.expect("advanced version carries a transition");
+	assert_eq!(transition.mode, TransitionMode::Manual);
+	// The manual field is derived from `mode` plus the recorded renames, so the
+	// recorded history is what keeps a repeated run manual.
+	assert_eq!(
+		recorded_intent(Some(transition)).manual,
+		BTreeSet::from(["points".to_owned()]),
+		"the manual answer survives into the recorded intent"
+	);
+
+	let generated = std::fs::read_to_string(
+		fixture
+			.root
+			.join("migrations/transitions/account_1_01/v0_to_v1.rs"),
+	)
+	.unwrap_or_else(|error| panic!("read transition: {error}"));
+	assert!(
+		generated.contains("TODO(pina-manual-migration)"),
+		"the developer owns the body: {generated}"
+	);
+	assert!(
+		generated.contains("SOURCE_SIZE: usize = 10"),
+		"the preflight still describes the stored shape: {generated}"
+	);
+}
+
+/// A manual answer is a standing instruction: replacing the stub body and
+/// re-running `make` must not regenerate an automatic transition over it.
+#[test]
+fn a_manual_answer_keeps_the_developers_body_across_repeated_runs() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	write_state_source(&fixture, "points: u64");
+
+	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["points".to_owned()], true)
+		.unwrap_or_else(|error| panic!("answers: {error}"));
+	make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make with manual answer: {error:?}"));
+
+	let path = fixture
+		.root
+		.join("migrations/transitions/account_1_01/v0_to_v1.rs");
+	let body = "// developer-owned conversion\npub(crate) const FROM_VERSION: u32 = \
+	            0;\npub(crate) const TO_VERSION: u32 = 1;\npub(crate) const SOURCE_SIZE: usize = \
+	            10;\npub(crate) const DESTINATION_SIZE: usize = 10;\npub(crate) const \
+	            WORKING_SIZE: usize = 10;\npub(crate) fn migrate(data: &mut [u8]) {\n\tlet _ = \
+	            data;\n}\n";
+	std::fs::write(&path, body).unwrap_or_else(|error| panic!("write body: {error}"));
+
+	// A run whose recorded answers already include the manual field keeps the
+	// developer's body instead of replacing it with a regenerated stub.
+	let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+		.unwrap_or_else(|error| panic!("re-run make: {error:?}"));
+	assert_eq!(output.unchanged_contracts, ["account:1:01".to_owned()]);
+	let after = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert_eq!(after, body, "the developer's conversion must survive");
+}
+
+/// `--manual` names an added field. Naming anything else is a mistake worth
+/// reporting rather than silently ignoring.
+#[test]
+fn manual_answers_reject_fields_the_change_did_not_add() {
+	let source = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let destination = schema(LayoutKind::Fixed, &[("value", "u64"), ("added", "u8")]);
+	let answers =
+		MigrationAnswers::from_flags_with_manual(&[], &[], &["value".to_owned()], true).unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, false);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&SourceIntent::default(),
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("`--manual value` names a retained field");
+	assert!(
+		format!("{rejection}")
+			.contains("`--manual value` names a field that this change did not add"),
+		"{rejection}"
+	);
+}
+
+/// `--manual` claims an added field's value, and a rename pairs it with a
+/// stored field. Acknowledging that stored field's removal contradicts both, so
+/// the pair fails closed instead of leaving a conversion without its input.
+#[test]
+fn manual_and_removal_answers_contradict_each_other() {
+	let source = schema(
+		LayoutKind::Fixed,
+		&[("first_name", "String<8>"), ("last_name", "String<8>")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("name", "String<17>")]);
+	let answers = MigrationAnswers::from_flags_with_manual(
+		&["first_name:name".to_owned()],
+		&["first_name".to_owned()],
+		&["name".to_owned()],
+		true,
+	)
+	.unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, false);
+
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&SourceIntent::default(),
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("a field cannot be both renamed and discarded");
+	assert!(
+		format!("{rejection}")
+			.contains("field `first_name` is answered with both `--rename` and `--assume-removed`"),
+		"{rejection}"
+	);
+}
+
+/// Combining two stored fields into one is the motivating case: a manual answer
+/// pairs the destination with a stored field even when the types differ, so the
+/// developer can write the conversion.
+#[test]
+fn manual_answers_pair_a_destination_with_a_differently_typed_stored_field() {
+	let source = schema(
+		LayoutKind::Fixed,
+		&[("first_name", "String<8>"), ("last_name", "String<8>")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("name", "String<17>")]);
+	let answers = MigrationAnswers::from_flags_with_manual(
+		&["first_name:name".to_owned()],
+		&["last_name".to_owned()],
+		&["name".to_owned()],
+		true,
+	)
+	.unwrap();
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, false);
+
+	let intent = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&SourceIntent::default(),
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("manual pairing: {error}"));
+	assert_eq!(
+		intent.renames,
+		[pin_rename("first_name", "name")],
+		"the destination pairs with the field whose bytes it reads"
+	);
+	assert_eq!(intent.manual, BTreeSet::from(["name".to_owned()]));
+	assert_eq!(intent.dropped, BTreeSet::from(["last_name".to_owned()]));
+	assert!(
+		automatic_move_plan(&source, &intent, &destination).is_none(),
+		"a manual field is never automatic"
+	);
+}
+
+/// A type change without `--manual` still fails closed, and the message names
+/// the flag that makes it legal.
+#[test]
+fn a_type_changing_rename_needs_a_manual_answer() {
+	let source = schema(LayoutKind::Fixed, &[("amount", "u16")]);
+	let destination = schema(LayoutKind::Fixed, &[("amount", "u64")]);
+	let answers = MigrationAnswers::from_flags(&["amount:amount".to_owned()], &[], true);
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, false);
+
+	// `amount` is retained, so the rename cannot target it at all.
+	let rejection = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&SourceIntent::default(),
+		&answers.unwrap_or_else(|error| panic!("answers: {error}")),
+		&mut warnings,
+		&mut prompts,
+	)
+	.expect_err("a retained field is not a rename target");
+	assert!(
+		format!("{rejection}").contains("was not removed by this change"),
+		"{rejection}"
+	);
+}
+
+/// A width change under an unchanged name is a manual transition, and the
+/// generated stub reports both stored and destination sizes so the developer
+/// can see the conversion they own.
+#[test]
+fn a_same_name_width_change_generates_a_manual_stub_with_both_sizes() {
+	let fixture = published_fixture_with(&[("amount", "u16")]);
+	publish_current(&fixture);
+	write_state_source(&fixture, "amount: u64");
+
+	let output =
+		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("make with widen: {error:?}"));
+	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
+	assert_eq!(output.manual_transitions.len(), 1);
+
+	let generated = std::fs::read_to_string(
+		fixture
+			.root
+			.join("migrations/transitions/account_1_01/v0_to_v1.rs"),
+	)
+	.unwrap_or_else(|error| panic!("read transition: {error}"));
+	assert!(
+		generated.contains("Source version: 0 (4 bytes)"),
+		"{generated}"
+	);
+	assert!(
+		generated.contains("Destination version: 1 (10 bytes)"),
+		"{generated}"
+	);
+}
+
+/// Manual answers travel with the persisted table like the other disambiguation
+/// answers, so a fresh clone reproduces the developer's conversion.
+#[test]
+fn persisted_manual_answers_replay_without_flags() {
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: vec!["first_name:name".to_owned()],
+		assume_removed: vec!["last_name".to_owned()],
+		manual: vec!["name".to_owned()],
+	};
+	let answers = MigrationAnswers::from_layers_with_manual(&persisted, &[], &[], &[], false)
+		.unwrap_or_else(|error| panic!("replay persisted answers: {error}"));
+	assert_eq!(
+		answers.manual,
+		BTreeSet::from(["name".to_owned()]),
+		"the manual conversion is remembered without a flag"
+	);
+	assert_eq!(
+		answers.renames.get("first_name").map(String::as_str),
+		Some("name")
+	);
+
+	// The persisted answers resolve the same diff the flags did, producing a
+	// manual transition rather than a generated one.
+	let source = schema(
+		LayoutKind::Fixed,
+		&[("first_name", "String<8>"), ("last_name", "String<8>")],
+	);
+	let destination = schema(LayoutKind::Fixed, &[("name", "String<17>")]);
+	let mut warnings = Vec::new();
+	let mut reader: &[u8] = b"";
+	let mut transcript = Vec::new();
+	let mut prompts = PromptIo::new(&mut reader, &mut transcript, false);
+	let intent = resolve_field_changes(
+		"account:1:01",
+		&source,
+		&destination,
+		&SourceIntent::default(),
+		&answers,
+		&mut warnings,
+		&mut prompts,
+	)
+	.unwrap_or_else(|error| panic!("resolve persisted answers: {error}"));
+	assert!(automatic_move_plan(&source, &intent, &destination).is_none());
+}
+
+/// A flag answer replaces the persisted answer for the same destination field
+/// in either direction: the developer's newest answer is the one that applies.
+#[test]
+fn flag_answers_replace_conflicting_persisted_manual_answers() {
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: vec!["first_name:name".to_owned()],
+		assume_removed: Vec::new(),
+		manual: Vec::new(),
+	};
+	// `--manual name` upgrades a persisted automatic rename into a manual one.
+	let manual = MigrationAnswers::from_layers_with_manual(
+		&persisted,
+		&[],
+		&[],
+		&["name".to_owned()],
+		false,
+	)
+	.unwrap_or_else(|error| panic!("flag manual over persisted rename: {error}"));
+	assert!(manual.manual.contains("name"));
+	assert!(
+		!manual.renames.contains_key("first_name"),
+		"the persisted rename is superseded, not layered underneath"
+	);
+
+	// And a persisted manual answer is replaced by an explicit flag rename:
+	// moving the bytes verbatim is a different decision from converting them.
+	let persisted_manual = crate::project::MigrationsAnswersConfig {
+		rename: Vec::new(),
+		assume_removed: Vec::new(),
+		manual: vec!["name".to_owned()],
+	};
+	let renamed = MigrationAnswers::from_layers_with_manual(
+		&persisted_manual,
+		&["first_name:name".to_owned()],
+		&[],
+		&[],
+		false,
+	)
+	.unwrap_or_else(|error| panic!("flag rename over persisted manual: {error}"));
+	assert!(!renamed.manual.contains("name"));
+	assert_eq!(
+		renamed.renames.get("first_name").map(String::as_str),
+		Some("name")
+	);
+}
+
+/// Answers that contradict each other fail closed whichever source they come
+/// from: a persisted answer must not silently override a flag, or the reverse.
+#[test]
+fn persisted_and_flag_manual_answers_fail_closed_on_contradiction() {
+	// A persisted removal of the field a flag now converts by hand.
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: Vec::new(),
+		assume_removed: vec!["name".to_owned()],
+		manual: Vec::new(),
+	};
+	let rejection = MigrationAnswers::from_layers_with_manual(
+		&persisted,
+		&[],
+		&[],
+		&["name".to_owned()],
+		false,
+	)
+	.expect_err("a persisted removal cannot coexist with a manual conversion");
+	assert!(
+		rejection.contains("contradicts the persisted removal"),
+		"{rejection}"
+	);
+
+	// And the reverse: a flag removal against a persisted manual conversion.
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: Vec::new(),
+		assume_removed: Vec::new(),
+		manual: vec!["name".to_owned()],
+	};
+	let rejection = MigrationAnswers::from_layers_with_manual(
+		&persisted,
+		&[],
+		&["name".to_owned()],
+		&[],
+		false,
+	)
+	.expect_err("a persisted manual conversion cannot coexist with a removal");
+	assert!(
+		rejection.contains("contradicts the persisted manual conversion"),
+		"{rejection}"
+	);
+}
+
+/// A `--manual` answer on a brand-new field has no rename to record it, so the
+/// recorded mode is the only durable marker. A later schema change re-derives
+/// the draft, and the developer's body must survive that refresh instead of
+/// being replaced by a generated transition.
+#[test]
+fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	// A plain addition would be automatic; the developer chooses to own it.
+	write_state_source(&fixture, "value: u64, derived: u64");
+
+	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["derived".to_owned()], true)
+		.unwrap_or_else(|error| panic!("answers: {error}"));
+	let output = make_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("make with manual add: {error:?}"));
+	assert_eq!(output.manual_transitions.len(), 1, "{output:?}");
+
+	let path = fixture
+		.root
+		.join("migrations/transitions/account_1_01/v0_to_v1.rs");
+	let body = "// developer-owned conversion\npub(crate) const FROM_VERSION: u32 = \
+	            0;\npub(crate) const TO_VERSION: u32 = 1;\npub(crate) const SOURCE_SIZE: usize = \
+	            10;\npub(crate) const DESTINATION_SIZE: usize = 18;\npub(crate) const \
+	            WORKING_SIZE: usize = 18;\npub(crate) fn migrate(data: &mut [u8]) {\n\tlet _ = \
+	            data;\n}\n";
+	std::fs::write(&path, body).unwrap_or_else(|error| panic!("write body: {error}"));
+
+	// A further change to the same draft forces the transition to be re-derived.
+	// Without a durable marker the mode would flip to automatic and the body
+	// would be regenerated over.
+	write_state_source(&fixture, "value: u64, derived: u64, extra: u16");
+	let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+		.unwrap_or_else(|error| panic!("refresh draft: {error:?}"));
+	assert_eq!(output.updated_drafts, ["account:1:01@1".to_owned()]);
+	assert_eq!(
+		output.manual_transitions.len(),
+		1,
+		"the transition stays manual across the refresh: {output:?}"
+	);
+
+	let after = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert_eq!(after, body, "the developer's conversion must survive");
+}
+
+/// A manual transition Pina could not prove — an in-place type change — is
+/// recorded with an empty `manual` set, since no answer named a field. The
+/// recorded mode alone has to keep it manual across a refresh.
+#[test]
+fn an_unprovable_transition_stays_manual_without_a_named_field() {
+	let stored = schema(LayoutKind::Fixed, &[("amount", "u16")]);
+	let destination = schema(LayoutKind::Fixed, &[("amount", "u64")]);
+
+	let plan = automatic_move_plan(&stored, &SourceIntent::default(), &destination);
+	assert!(plan.is_none(), "a width change is not provable");
+	assert_eq!(
+		transition_mode(&stored, &SourceIntent::default(), &destination),
+		TransitionMode::Manual
+	);
+
+	// Recording that mode reproduces an intent that still refuses to generate.
+	let recorded = SourceIntent {
+		force_manual: true,
+		..SourceIntent::default()
+	};
+	assert!(recorded.manual.is_empty());
+	assert!(
+		automatic_move_plan(&stored, &recorded, &destination).is_none(),
+		"a recorded manual transition is never re-derived as automatic"
+	);
+}
+
+/// A compact layout has no fixed offsets to prove, so the plan refuses it and
+/// the developer owns the conversion. Both directions of the pair are covered:
+/// compact source, compact destination, and the mixed shape.
+#[test]
+fn automatic_plan_refuses_every_non_fixed_layout() {
+	let fixed = schema(LayoutKind::Fixed, &[("name", "u64")]);
+	let compact = schema(LayoutKind::Compact, &[("name", "String<8>")]);
+	let intent = SourceIntent {
+		renames: vec![pin_rename("name", "name")],
+		dropped: BTreeSet::from(["name".to_owned()]),
+		..SourceIntent::default()
+	};
+
+	for (stored, destination) in [(&compact, &compact), (&compact, &fixed), (&fixed, &compact)] {
+		assert!(
+			automatic_move_plan(stored, &intent, destination).is_none(),
+			"a non-fixed layout ({:?} -> {:?}) must stay manual",
+			stored.layout,
+			destination.layout
+		);
+	}
+}
+
+/// A flag removal against a persisted manual conversion fails closed, mirroring
+/// the check for a persisted rename. Both are answers about what happens to one
+/// field's bytes, so a stale `pina.toml` must not silently drop the conversion.
+#[test]
+fn flag_removals_contradicting_a_persisted_manual_answer_fail_closed() {
+	let persisted = crate::project::MigrationsAnswersConfig {
+		rename: Vec::new(),
+		assume_removed: Vec::new(),
+		manual: vec!["name".to_owned()],
+	};
+	let rejection = MigrationAnswers::from_layers_with_manual(
+		&persisted,
+		&[],
+		&["name".to_owned()],
+		&[],
+		false,
+	)
+	.expect_err("a flag removal cannot contradict a persisted manual conversion");
+	assert!(
+		rejection.contains("contradicts the persisted manual conversion"),
+		"{rejection}"
 	);
 }

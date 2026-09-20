@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use pina_abi::DataSchema;
 use pina_abi::FieldSchema;
 use pina_abi::LayoutKind;
-use pina_abi::SchemaVersion;
+#[cfg(test)]
 use pina_abi::TransitionMode;
 
 use super::MigrationError;
@@ -21,23 +21,31 @@ use super::prompt::RenameAnswer;
 /// runs over a draft stay stable. Unanswered candidates become interactive
 /// prompts on a terminal, or a structured error that names the exact flags
 /// that answer them.
+///
+/// A rename that would otherwise be written automatically can instead be
+/// answered with a manual conversion when the developer needs to transform the
+/// bytes rather than move them, which is what `--manual <field>` records.
 pub(super) fn resolve_field_changes(
 	contract: &str,
 	source: &DataSchema,
 	destination: &DataSchema,
-	previous_renames: &[pina_abi::RenameMapping],
+	previous: &SourceIntent,
 	answers: &MigrationAnswers,
 	warnings: &mut Vec<String>,
 	prompts: &mut PromptIo<'_>,
-) -> Result<(Vec<pina_abi::RenameMapping>, BTreeSet<String>), MigrationError> {
+) -> Result<SourceIntent, MigrationError> {
 	// Only renames whose source field still exists apply to this hop;
 	// earlier hops' renames are already baked into the stored schema.
-	let mut renames: Vec<pina_abi::RenameMapping> = previous_renames
+	let mut renames: Vec<pina_abi::RenameMapping> = previous
+		.renames
 		.iter()
 		.filter(|mapping| source.fields.iter().any(|field| field.name == mapping.from))
 		.cloned()
 		.collect();
 	let mut dropped = answers.removed.clone();
+	// A manual answer names a destination field; the stored field it replaces
+	// carries the bytes the developer converts by hand.
+	let manual = answers.manual.clone();
 
 	for mapping in &renames {
 		if let Some(to) = answers.renames.get(&mapping.from)
@@ -77,6 +85,17 @@ pub(super) fn resolve_field_changes(
 		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
 		.collect::<BTreeMap<_, _>>();
 
+	// A manual answer has to name an added field. Naming a retained field would
+	// ask for a hand-written value on a field the destination already reads
+	// verbatim, and the answer would be silently dropped.
+	for field in &manual {
+		if !added_types.contains_key(field.as_str()) {
+			return Err(MigrationError::InvalidHistory(format!(
+				"contract `{contract}`: `--manual {field}` names a field that this change did not \
+				 add; a manual conversion replaces an added field's value",
+			)));
+		}
+	}
 	// Validate every answer against this diff before it can influence a
 	// transition: `--assume-removed` naming a retained field would silently
 	// zero its live data through the effective schema, and `--rename` naming
@@ -118,10 +137,15 @@ pub(super) fn resolve_field_changes(
 		let &from_type = removed_types
 			.get(from.as_str())
 			.expect("removed_types was just checked for `from`");
-		if from_type != to_type {
+		// A generated rename copies bytes verbatim, so the two types must match
+		// exactly. `--manual` is the escape hatch that makes a differing type
+		// legal: the developer writes the conversion, so the width and meaning
+		// of the destination are theirs to decide.
+		if from_type != to_type && !manual.contains(to.as_str()) {
 			return Err(MigrationError::InvalidHistory(format!(
 				"contract `{contract}`: `--rename {from}:{to}` changes the field type \
-				 (`{from_type}` to `{to_type}`); write a manual transition instead",
+				 (`{from_type}` to `{to_type}`); add `--manual {to}` to write that conversion by \
+				 hand, or pick a field of the same type",
 			)));
 		}
 	}
@@ -216,6 +240,17 @@ pub(super) fn resolve_field_changes(
 			}
 			continue;
 		};
+		// A developer who asked for a manual conversion already owns this
+		// field's value, so the pairing question is settled by naming the
+		// destination: the stored bytes are the input to their conversion.
+		if manual.contains(candidate.name.as_str()) {
+			claimed_targets.insert(candidate.name.clone());
+			renames.push(pina_abi::RenameMapping {
+				from: removed_field.name.clone(),
+				to: candidate.name.clone(),
+			});
+			continue;
+		}
 		let question = DisambiguationQuestion {
 			contract: contract.to_owned(),
 			from: removed_field.name.clone(),
@@ -256,95 +291,204 @@ pub(super) fn resolve_field_changes(
 	}
 
 	renames.sort();
-	Ok((renames, dropped))
+	Ok(SourceIntent {
+		renames,
+		dropped,
+		manual: manual.clone(),
+		// A `--manual` answer this run is as durable as a recorded one: it keeps
+		// the developer's body across later refreshes of the same draft.
+		force_manual: previous.force_manual || !manual.is_empty(),
+	})
 }
 
-/// Apply confirmed renames and acknowledged removals to a copy of the source
-/// schema so the ordinary diff, mode classifier, and generator see the
-/// developer's intent instead of the ambiguous raw diff.
-pub(super) fn effective_source_schema(
-	source: &SchemaVersion,
-	renames: &[pina_abi::RenameMapping],
-	dropped: &BTreeSet<String>,
-) -> Result<SchemaVersion, MigrationError> {
-	let mut fields = source.schema.fields.clone();
-	for field in &mut fields {
-		if let Some(mapping) = renames.iter().find(|mapping| mapping.from == field.name) {
-			field.name = mapping.to.clone();
+/// The developer's resolved reading of one schema change.
+///
+/// Field *pairing* follows these logical names, but every byte offset in a
+/// generated transition comes from the stored schema: a renamed field keeps its
+/// original name on the wire, and a dropped field keeps occupying its bytes.
+#[derive(Clone, Debug, Default)]
+pub(super) struct SourceIntent {
+	/// Confirmed renames, pairing an original field name with its new one.
+	pub(super) renames: Vec<pina_abi::RenameMapping>,
+	/// Fields whose stored bytes the developer acknowledged discarding.
+	pub(super) dropped: BTreeSet<String>,
+	/// Fields whose conversion the developer writes by hand.
+	pub(super) manual: BTreeSet<String>,
+	/// Whether the developer owns this conversion outright.
+	///
+	/// Distinct from a non-empty `manual`: a recorded manual transition is a
+	/// standing instruction even when it names no field, which is the case when
+	/// the change was unprovable (a type change, say) rather than answered. It
+	/// is what a draft refresh replays so a developer-authored body survives.
+	pub(super) force_manual: bool,
+}
+
+impl SourceIntent {
+	/// The stored field name whose bytes a destination field inherits.
+	fn renamed_from(&self, destination: &str) -> Option<&str> {
+		self.renames
+			.iter()
+			.find(|mapping| mapping.to == destination)
+			.map(|mapping| mapping.from.as_str())
+	}
+}
+
+/// Byte-level proof that one adjacent transition is expressible as in-place
+/// copies plus zero fills.
+///
+/// Offsets are payload-relative, so the generator and its tests reason about a
+/// transition without knowing the discriminator or version width.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct MovePlan {
+	/// Stored payload size the plan reads from.
+	pub(super) source_size: usize,
+	/// Destination payload size the plan writes.
+	pub(super) destination_size: usize,
+	/// `(stored offset, destination offset, size)` for each field whose bytes
+	/// survive the change.
+	pub(super) moves: Vec<(usize, usize, usize)>,
+	/// `(destination offset, size)` for each field with no stored counterpart.
+	pub(super) zero_fills: Vec<(usize, usize)>,
+	/// Order that keeps every copy from overwriting a source a later copy still
+	/// has to read.
+	pub(super) direction: MoveDirection,
+}
+
+impl MovePlan {
+	/// Surviving-field copies in an order that cannot clobber an unread source.
+	///
+	/// Copying a field overwrites its destination, which may still hold bytes a
+	/// later copy reads. When every field moves to a higher offset, the highest
+	/// source must be read first; when none does, ascending source order is
+	/// safe because each write lands at or below a source already consumed.
+	pub(super) fn ordered_moves(&self) -> Vec<(usize, usize, usize)> {
+		let mut moves = self.moves.clone();
+		match self.direction {
+			MoveDirection::Forward => moves.sort_by_key(|(source, ..)| *source),
+			MoveDirection::Backward => moves.sort_by_key(|(source, ..)| std::cmp::Reverse(*source)),
 		}
-	}
-	fields.retain(|field| !dropped.contains(field.name.as_str()));
-	let rebuilt = DataSchema::try_new(source.schema.layout, fields).map_err(|reason| {
-		MigrationError::InvalidHistory(format!(
-			"resolved field changes produce an invalid schema: {reason}"
-		))
-	})?;
-	let mut effective = source.clone();
-	effective.schema = rebuilt;
-	Ok(effective)
-}
-
-pub(super) fn transition_mode(source: &DataSchema, destination: &DataSchema) -> TransitionMode {
-	if source.layout != LayoutKind::Fixed || destination.layout != LayoutKind::Fixed {
-		return TransitionMode::Manual;
-	}
-	let destination_fields = destination
-		.fields
-		.iter()
-		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
-		.collect::<BTreeMap<_, _>>();
-	let compatible = source.fields.iter().all(|field| {
-		destination_fields
-			.get(field.name.as_str())
-			.is_none_or(|destination_type| **destination_type == field.rust_type)
-	});
-	if compatible
-		&& source.fixed_payload_size().is_some()
-		&& destination.fixed_payload_size().is_some()
-		&& automatic_direction(source, destination).is_some()
-	{
-		TransitionMode::Automatic
-	} else {
-		TransitionMode::Manual
+		moves
 	}
 }
 
-#[derive(Clone, Copy)]
+/// How a surviving field's bytes travel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum MoveDirection {
+	/// No field moves to a higher offset, so copies run in ascending order.
 	Forward,
+	/// Every field moves to a higher offset, so copies run in descending order.
 	Backward,
 }
 
-pub(super) fn automatic_direction(
-	source: &DataSchema,
+/// Prove and plan the byte movement for an automatic transition.
+///
+/// `None` means the change cannot be expressed as ordered in-place copies plus
+/// zero fills, and the developer owns a manual transition. The proof is the
+/// single source of truth for both the mode decision and the generated bytes,
+/// so a transition can never be labelled automatic and then emit offsets that
+/// contradict its own plan.
+pub(super) fn automatic_move_plan(
+	stored: &DataSchema,
+	intent: &SourceIntent,
 	destination: &DataSchema,
-) -> Option<MoveDirection> {
-	let source_offsets = source.fixed_field_offsets()?;
+) -> Option<MovePlan> {
+	// A manual conversion is developer-owned by definition: the generated bytes
+	// for that field would be a guess, so the change is not expressible as
+	// copies and zero fills.
+	if intent.force_manual || !intent.manual.is_empty() {
+		return None;
+	}
+	if stored.layout != LayoutKind::Fixed || destination.layout != LayoutKind::Fixed {
+		return None;
+	}
+	let source_offsets = stored.fixed_field_offsets()?;
 	let destination_offsets = destination.fixed_field_offsets()?;
-	let destination_types = destination
-		.fields
-		.iter()
-		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
-		.collect::<BTreeMap<_, _>>();
-	let mut previous_destination = None;
-	let mut moves_left = false;
-	let mut moves_right = false;
-	for field in &source.fields {
-		if destination_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
+	let mut moves = Vec::with_capacity(destination.fields.len());
+	let mut zero_fills = Vec::new();
+	let mut matched = BTreeSet::new();
+	for field in &destination.fields {
+		let &(destination_offset, destination_size) = destination_offsets.get(&field.name)?;
+		let stored_name = intent
+			.renamed_from(field.name.as_str())
+			.unwrap_or(field.name.as_str());
+		let Some(&(source_offset, source_size)) = source_offsets.get(stored_name) else {
+			// No stored counterpart: a genuinely new field, which starts zeroed
+			// instead of copying. A rename that lands on a retained name is
+			// rejected by `resolve_field_changes` before it reaches this proof.
+			zero_fills.push((destination_offset, destination_size));
 			continue;
-		}
-		let (source_offset, _) = source_offsets.get(&field.name)?;
-		let (destination_offset, _) = destination_offsets.get(&field.name)?;
-		if previous_destination.is_some_and(|previous| *destination_offset < previous) {
+		};
+		// The stored type must match exactly. Equal width is not enough: reading
+		// `u64` bytes as `i64`, or `u32` as `f32`, silently reinterprets a live
+		// value, so those changes stay manual.
+		let stored_type = stored
+			.fields
+			.iter()
+			.find(|candidate| candidate.name == stored_name)
+			.map(|candidate| candidate.rust_type.as_str());
+		if stored_type != Some(field.rust_type.as_str()) {
 			return None;
 		}
-		previous_destination = Some(*destination_offset);
-		moves_left |= destination_offset < source_offset;
-		moves_right |= destination_offset > source_offset;
+		// Two destination fields may not read one stored field: the second copy
+		// would duplicate bytes the developer meant to place once.
+		if !matched.insert(stored_name) {
+			return None;
+		}
+		moves.push((source_offset, destination_offset, source_size));
+	}
+	// Every stored field must be accounted for: either its bytes move to a
+	// destination field or the developer explicitly discarded them. A retained
+	// name whose type changed fails here, because nothing pairs it.
+	let accounted = stored
+		.fields
+		.iter()
+		.all(|field| matched.contains(field.name.as_str()) || intent.dropped.contains(&field.name));
+	if !accounted {
+		return None;
+	}
+	let direction = move_direction(&moves)?;
+	Some(MovePlan {
+		source_size: stored.fixed_payload_size()?,
+		destination_size: destination.fixed_payload_size()?,
+		moves,
+		zero_fills,
+		direction,
+	})
+}
+
+/// Order the copies must run in, or `None` when no single order is safe.
+///
+/// A field moving right can overwrite a source that a field moving left has yet
+/// to read, so a change that moves one field each way is not expressible as a
+/// sequence of copies and needs the developer.
+fn move_direction(moves: &[(usize, usize, usize)]) -> Option<MoveDirection> {
+	let mut moves_left = false;
+	let mut moves_right = false;
+	for (source, destination, _) in moves {
+		moves_left |= destination < source;
+		moves_right |= destination > source;
 	}
 	match (moves_left, moves_right) {
 		(true, true) => None,
 		(false, true) => Some(MoveDirection::Backward),
 		(true | false, false) => Some(MoveDirection::Forward),
+	}
+}
+
+/// The mode one adjacent transition is recorded with.
+///
+/// Kept as a named entry point so tests can classify a change without
+/// generating it. It is exactly the plan's own verdict, which is what keeps a
+/// recorded mode from disagreeing with the bytes `make` writes.
+#[cfg(test)]
+pub(super) fn transition_mode(
+	stored: &DataSchema,
+	intent: &SourceIntent,
+	destination: &DataSchema,
+) -> TransitionMode {
+	if automatic_move_plan(stored, intent, destination).is_some() {
+		TransitionMode::Automatic
+	} else {
+		TransitionMode::Manual
 	}
 }

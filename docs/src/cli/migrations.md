@@ -135,9 +135,24 @@ pina migrations create --assume-removed score       # discard it; `points` start
 
 `--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `create` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
 
+A third answer hands one field's conversion to you. `--manual <field>` names an **added** field and makes the whole transition manual, so the generated file is a stub you complete instead of a byte move Pina chose:
+
+```bash
+# Combine `first_name` and `last_name` into `name` yourself.
+pina migrations create --rename first_name:name --assume-removed last_name --manual name
+```
+
+`--manual` is also the way to make a rename whose type changed legal: a generated rename copies bytes verbatim and so requires identical types, while `--manual` records that you own the interpretation. The answer is recorded, so repeated `create` runs keep generating the manual draft rather than re-deriving an automatic transition over your body.
+
+`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `create` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
+
+Answers that contradict each other fail closed rather than picking a winner, whichever source they came from: a field cannot be both renamed and discarded, and a manual conversion cannot also discard the stored bytes it reads.
+
 ## Resolve a manual transition
 
-Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, or ambiguous field move creates a manual Rust file with `TODO(pina-manual-migration)`.
+Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, an ambiguous field move, or a `--manual` answer creates a manual Rust file with `TODO(pina-manual-migration)`.
+
+Every generated transition reads its byte offsets from the **stored** schema. A removed field keeps occupying its bytes, so a transition that drops a field in the middle of a layout still reads the fields after it from their original offsets — and its `SOURCE_SIZE` counts the bytes that are actually on the account.
 
 Replace the generated body. Pina preflights the exact historical shape for every account. Fixed transitions have generated size constants and their generated `migrate` stub starts with a length guard; keep it. A transition involving compact data also has `target_size` and `working_size` functions. They inspect already-validated historical bytes and must return a valid destination allocation without mutating the account. The `migrate` function is then total for that accepted source and must fully initialize every active destination byte.
 

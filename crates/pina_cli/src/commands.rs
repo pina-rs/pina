@@ -215,6 +215,7 @@ fn run_migrations(command: MigrationCommands) {
 			project,
 			renames,
 			assume_removed,
+			manual,
 			no_interactive,
 			envelope_ack,
 			json,
@@ -226,6 +227,7 @@ fn run_migrations(command: MigrationCommands) {
 				&project,
 				&renames,
 				&assume_removed,
+				&manual,
 				no_interactive,
 			) {
 				Ok(mut answers) => {
@@ -315,6 +317,7 @@ fn run_migrations(command: MigrationCommands) {
 			project,
 			renames,
 			assume_removed,
+			manual,
 			no_interactive,
 			envelope_ack,
 			json,
@@ -323,6 +326,7 @@ fn run_migrations(command: MigrationCommands) {
 				&project,
 				&renames,
 				&assume_removed,
+				&manual,
 				no_interactive,
 			) {
 				Ok(mut answers) => {
@@ -616,14 +620,16 @@ fn build_migration_answers(
 	project_path: &Path,
 	renames: &[String],
 	removed: &[String],
+	manual: &[String],
 	no_interactive: bool,
 ) -> Result<pina_cli::migrations::MigrationAnswers, String> {
 	let project =
 		pina_cli::project::Project::discover(project_path).map_err(|error| error.to_string())?;
-	pina_cli::migrations::MigrationAnswers::from_layers(
+	pina_cli::migrations::MigrationAnswers::from_layers_with_manual(
 		&project.migration_answers,
 		renames,
 		removed,
+		manual,
 		no_interactive,
 	)
 }
