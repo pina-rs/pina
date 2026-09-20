@@ -30,10 +30,10 @@
 	},
 	"devDependencies": {
 		"@codama/nodes-from-anchor": "1.5.5",
-		"@solana/kit": "^8.2.0",
-		"@solana/program-client-core": "^8.2.0",
+		"@solana/kit": "^8.3.0",
+		"@solana/program-client-core": "^8.3.0",
 		"@solana/surfpool": "^1.5.0",
-		"@types/node": "^26.4.0",
+		"@types/node": "^26.5.1",
 		"commander": "^15.0.0",
 		"tsx": "^4.23.13",
 		"typescript": "^7.0.2"
