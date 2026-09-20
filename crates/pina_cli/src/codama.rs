@@ -423,29 +423,6 @@ pub fn generate_project_clients(
 	})
 }
 
-fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings> {
-	[
-		ClientLanguage::Cpi,
-		ClientLanguage::Rust,
-		ClientLanguage::Typescript,
-		ClientLanguage::Dart,
-		ClientLanguage::CliRust,
-		ClientLanguage::CliTs,
-		ClientLanguage::CliDart,
-	]
-	.into_iter()
-	.map(|language| {
-		(
-			language,
-			GenerationSettings {
-				mode: GenerationMode::Auto,
-				scaffold: true,
-			},
-		)
-	})
-	.collect()
-}
-
 /// Add each selected CLI's base client and warn when several CLIs are picked.
 /// Relative path from one directory to another, using only `..` and the
 /// target's remaining components. Both inputs must be absolute or both
@@ -1304,6 +1281,29 @@ mod tests {
 			stdout: stdout.to_vec(),
 			stderr: stderr.to_vec(),
 		}
+	}
+
+	fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings> {
+		[
+			ClientLanguage::Cpi,
+			ClientLanguage::Rust,
+			ClientLanguage::Typescript,
+			ClientLanguage::Dart,
+			ClientLanguage::CliRust,
+			ClientLanguage::CliTs,
+			ClientLanguage::CliDart,
+		]
+		.into_iter()
+		.map(|language| {
+			(
+				language,
+				GenerationSettings {
+					mode: GenerationMode::Auto,
+					scaffold: true,
+				},
+			)
+		})
+		.collect()
 	}
 
 	fn empty_plan(npx: impl Into<String>) -> GenerationPlan {
