@@ -467,12 +467,16 @@ pub fn create_migrations_with_answers(
 				});
 				if ledger.version_is_frozen(&key, latest_version) {
 					let next = next_migration_version(&key, latest_version, manifest.version_type)?;
-					let previous = recorded_intent(latest.transition.as_ref());
+					// The frozen version's recorded transition describes the hop
+					// that produced it, not this new adjacent one. Its renames
+					// are already baked into the stored schema, and replaying its
+					// manual mode here would brand every hop after a hand-written
+					// transition manual forever.
 					let intent = resolve_field_changes(
 						&key,
 						&latest.schema,
 						&source.schema,
-						&previous,
+						&SourceIntent::default(),
 						answers,
 						&mut output.data_warnings,
 						&mut prompts,

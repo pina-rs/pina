@@ -4334,6 +4334,81 @@ fn an_unprovable_transition_stays_manual_without_a_named_field() {
 	);
 }
 
+/// A recorded manual transition describes only the hop it was written for.
+/// The change that follows it is a fresh diff: seeding that new hop with the
+/// previous hop's manual mode would brand every later hop manual forever, even
+/// one the byte-level proof fully justifies.
+#[test]
+fn a_manual_hop_does_not_brand_later_hops_manual() {
+	let fixture = published_fixture_with(&[("value", "u64")]);
+	publish_current(&fixture);
+
+	// A same-name width change has no automatic proof, so v0 -> v1 is manual.
+	write_state_source(&fixture, "value: u32");
+	let manual_hop =
+		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("manual make: {error:?}"));
+	assert_eq!(manual_hop.advanced_versions, ["account:1:01@1".to_owned()]);
+
+	// Publishing v1 freezes it, but only once the developer replaces the TODO
+	// body; the narrowing implementation mirrors what a developer would write.
+	let stub_path = fixture
+		.root
+		.join("migrations/transitions/account_1_01/v0_to_v1.rs");
+	let stub = std::fs::read_to_string(&stub_path)
+		.unwrap_or_else(|error| panic!("read transition stub: {error}"));
+	let implemented = stub
+		.replace(
+			"// TODO(pina-manual-migration): the source shape is preflighted; this conversion \
+			 must be total and fully initialize destination.",
+			"// Narrows the u64 value into u32, saturating at u32::MAX.",
+		)
+		.replace(
+			"\tlet _ = data;\n}",
+			concat!(
+				"\tlet wide = u64::from_le_bytes(data[2..10].try_into().unwrap());\n",
+				"\tlet narrowed = u32::try_from(wide).unwrap_or(u32::MAX);\n",
+				"\tdata[2..6].copy_from_slice(&narrowed.to_le_bytes());\n",
+				"\tdata[6..10].fill(0);\n",
+				"}",
+			),
+		);
+	assert_ne!(
+		stub, implemented,
+		"the stub TODO body should be replaceable"
+	);
+	std::fs::write(&stub_path, implemented)
+		.unwrap_or_else(|error| panic!("write transition: {error}"));
+	make_migrations(&fixture.root).unwrap_or_else(|error| panic!("refresh draft hash: {error:?}"));
+	publish_current(&fixture);
+
+	// Freezing v1 makes the next source change a new adjacent hop. Adding a
+	// field is provable, so it must record automatic despite the manual hop
+	// beneath it.
+	write_state_source(&fixture, "value: u32, extra: u64");
+	let automatic_hop = make_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("make after manual hop: {error:?}"));
+	assert_eq!(
+		automatic_hop.advanced_versions,
+		["account:1:01@2".to_owned()]
+	);
+	let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+		.unwrap_or_else(|error| panic!("load manifest: {error:?}"))
+		.expect("fixture manifest");
+	let later = manifest.contracts["account:1:01"].versions[2]
+		.transition
+		.as_ref()
+		.expect("the new hop carries a transition");
+	assert_eq!(later.mode, TransitionMode::Automatic);
+
+	// The manual hop itself keeps its recorded mode: the flag belongs to the
+	// hop that earned it, and a refresh of that draft still replays it.
+	let manual = manifest.contracts["account:1:01"].versions[1]
+		.transition
+		.as_ref()
+		.expect("the manual hop carries a transition");
+	assert_eq!(manual.mode, TransitionMode::Manual);
+}
+
 /// A compact layout has no fixed offsets to prove, so the plan refuses it and
 /// the developer owns the conversion. Both directions of the pair are covered:
 /// compact source, compact destination, and the mixed shape.
@@ -4529,5 +4604,5 @@ fn manual_stub_embeds_the_offset_comment() {
 		generated.contains("// Payload offsets, relative to the version envelope header:"),
 		"{generated}"
 	);
-	assert!(generated.contains("// value  0..8   0..4"), "{generated}");
+	assert!(generated.contains("// value  0..8    0..4"), "{generated}");
 }
