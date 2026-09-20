@@ -1112,6 +1112,11 @@ pub(crate) fn version_type_tokens(version_type: MigrationVersionType) -> proc_ma
 /// would ever be checked on the wire.
 pub(crate) struct InstructionEnvelopeGate {
 	/// `discriminant value → newest recorded version`, sorted by value.
+	///
+	/// Only instructions whose recorded schema has zero user fields are
+	/// listed: a payload instruction's own parse already validates the version
+	/// through its generated `try_from_bytes`, so gating it again would tax
+	/// every dispatch for no added safety.
 	versions: Vec<(u64, u32)>,
 	version_type: MigrationVersionType,
 }
@@ -1247,6 +1252,14 @@ fn instruction_envelope_gate_at(
 		.contracts
 		.values()
 		.filter(|history| history.identity.kind == ContractKind::Instruction)
+		.filter(|history| {
+			// Zero-field instructions are the fail-open case: with no payload
+			// to parse, nothing else ever reads the version byte.
+			history
+				.versions
+				.last()
+				.is_some_and(|version| version.schema.fields.is_empty())
+		})
 		.map(|history| {
 			let value = history.identity.discriminator_value().map_err(|error| {
 				syn::Error::new_spanned(
@@ -1951,9 +1964,37 @@ mod tests {
 		discriminator: u64,
 		version_count: usize,
 	) -> ContractHistory {
+		gate_contract_with_fields(kind, discriminator, version_count, "value: u64")
+	}
+
+	/// A contract whose recorded schema declares no user fields.
+	///
+	/// Zero-field instructions are the only dispatch the envelope gate covers:
+	/// a payload instruction's own parse validates its version byte.
+	fn gate_zero_field_contract(
+		kind: ContractKind,
+		discriminator: u64,
+		version_count: usize,
+	) -> ContractHistory {
+		gate_contract_with_fields(kind, discriminator, version_count, "")
+	}
+
+	fn gate_contract_with_fields(
+		kind: ContractKind,
+		discriminator: u64,
+		version_count: usize,
+		fields: &str,
+	) -> ContractHistory {
 		let identity = ContractIdentity::try_new(kind, 1, discriminator)
 			.unwrap_or_else(|error| panic!("test identity: {error}"));
-		let schema = pina_abi::data_schema(&item_struct("Placeholder"), LayoutKind::Fixed)
+		let source = if fields.is_empty() {
+			"struct Placeholder {}".to_owned()
+		} else {
+			format!("struct Placeholder {{ {fields} }}")
+		};
+		let item: syn::ItemStruct =
+			syn::parse_str(&source).unwrap_or_else(|error| panic!("test item: {error}"));
+		let schema = pina_abi::data_schema(&item, LayoutKind::Fixed)
 			.unwrap_or_else(|error| panic!("test schema: {error}"));
 		// Only instruction contracts record a process; the encode path
 		// requires one on their first version.
@@ -2004,10 +2045,14 @@ mod tests {
 		let path = write_gate_manifest(
 			temp.path(),
 			&[
-				// A three-version instruction ladder pins its newest version.
-				gate_contract(ContractKind::Instruction, 0, 3),
-				// A single-version instruction pins version zero.
-				gate_contract(ContractKind::Instruction, 5, 1),
+				// A three-version zero-field instruction ladder pins its
+				// newest version.
+				gate_zero_field_contract(ContractKind::Instruction, 0, 3),
+				// A single-version zero-field instruction pins version zero.
+				gate_zero_field_contract(ContractKind::Instruction, 5, 1),
+				// A payload instruction validates its own version byte in the
+				// generated parse, so it is not gated at dispatch.
+				gate_contract(ContractKind::Instruction, 6, 1),
 				// Events and accounts are enveloped too, but they are not
 				// dispatched through the instruction space.
 				gate_contract(ContractKind::Event, 9, 1),
@@ -2028,6 +2073,13 @@ mod tests {
 		// A manifest with no instruction contracts leaves the plain parser.
 		let path = write_gate_manifest(temp.path(), &[gate_contract(ContractKind::Account, 1, 1)]);
 		assert!(gate_at(&path).is_none());
+
+		// A payload instruction is not gated: its parse checks the version.
+		let path = write_gate_manifest(
+			temp.path(),
+			&[gate_contract(ContractKind::Instruction, 2, 1)],
+		);
+		assert!(gate_at(&path).is_none());
 	}
 
 	#[test]
@@ -2035,7 +2087,7 @@ mod tests {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let path = write_gate_manifest(
 			temp.path(),
-			&[gate_contract(ContractKind::Instruction, 0, 1)],
+			&[gate_zero_field_contract(ContractKind::Instruction, 0, 1)],
 		);
 		let gate = instruction_envelope_gate_at(
 			&syn::Ident::new("Instruction", proc_macro2::Span::call_site()),

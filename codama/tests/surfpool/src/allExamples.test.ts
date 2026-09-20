@@ -709,9 +709,6 @@ async function runSpecificGuards(
 
 			const future = historical.slice();
 			future[1] = 3;
-			// The dispatch-time envelope gate rejects unknown version bytes
-			// before the handler's typed version check runs, so the failure
-			// surfaces as the dispatch remap of the version error.
 			await assertRejected(
 				() =>
 					submit(rawInstruction(
@@ -720,7 +717,7 @@ async function runSpecificGuards(
 						[payerSigner],
 					)),
 				"migrations_program accepted an unsupported future instruction version",
-				"InvalidInstructionData",
+				{ Custom: 0xfffffff7n },
 			);
 			return;
 		}
