@@ -130,7 +130,7 @@ pina abi schema --document manifest > manifest.schema.json
 
 ## Upgrading from pre-0.20 integer formats
 
-The integer `formatVersion` era is retired, not migrated. After upgrading Pina:
+The integer `formatVersion` era is retired, not migrated. [Migrate to the reset ABI document](./abi-document-reset.md) walks the conversion. After upgrading Pina:
 
 1. run `pina migrations sync` (or `pina migrations make`) in the program directory — every checked-in draft is regenerated at the current `abiVersion`;
 2. commit the rewritten `manifest.json` and `publications.json`.

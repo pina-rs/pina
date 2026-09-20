@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-19
 - Owners: Pina maintainers
-- Related: [ADR 0007](./0007-first-class-versioned-abi.md), [ADR 0008](./0008-migration-ux-and-legacy-adoption.md), [ABI document versioning](../migrations/abi-versioning.md)
+- Related: [ADR 0007](./0007-first-class-versioned-abi.md), [ADR 0008](./0008-migration-ux-and-legacy-adoption.md), [ABI document versioning](../migrations/abi-versioning.md), [Migrate to the reset ABI document](../migrations/abi-document-reset.md)
 
 ## Context
 

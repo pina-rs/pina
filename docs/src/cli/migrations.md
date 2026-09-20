@@ -189,11 +189,7 @@ When the exact planned inputs cannot be reproduced (for example a cleaned build 
 
 Reads reject a document stamped above the running build, naming the supported version, and reject one below the oldest supported version with the remedy that regenerates it. Anything between is normalized through an ordered table of adjacent converters before the typed model is read, so a document an older release wrote still opens. Conversions run in memory only: no command rewrites a checked-in document as a side effect of reading it.
 
-The 0.20 reset replaced the integer `formatVersion` counters. A document from an older release must be regenerated rather than read:
-
-```sh
-pina migrations sync
-```
+The 0.20 reset replaced the integer `formatVersion` counters, and documents from older releases must be converted once before any Pina command can read them — `make` and `sync` included. [Migrate to the reset ABI document](./migrations/abi-document-reset.md) walks the conversion for both deployed and not-yet-deployed programs.
 
 `pina abi schema` prints the JSON Schema for a document, generated from the same types that read and write it:
 
