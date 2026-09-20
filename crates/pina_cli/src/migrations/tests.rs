@@ -142,6 +142,7 @@ fn manual_account_transition_is_total_after_schema_preflight() {
 		0,
 		1,
 		&destination,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("manual account transition: {error:?}"));
 	assert!(account_source.contains("fn migrate(data: &mut [u8]) {"));
@@ -155,6 +156,7 @@ fn manual_account_transition_is_total_after_schema_preflight() {
 		0,
 		1,
 		&destination,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("manual transition: {error:?}"));
 
@@ -182,6 +184,7 @@ fn compact_account_transition_uses_checked_runtime_sizing() {
 		0,
 		1,
 		&destination,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("manual transition: {error:?}"));
 
@@ -385,6 +388,7 @@ fn direction_and_manual_sizing_cover_every_layout_shape() {
 		0,
 		1,
 		&destination,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("manual transition: {error:?}"));
 
@@ -2700,6 +2704,7 @@ fn manual_instruction_transitions_require_fixed_layouts() {
 		0,
 		1,
 		&compact_destination,
+		&[],
 	)
 	.expect_err("a compact instruction destination must fail closed");
 	assert!(
@@ -2720,6 +2725,7 @@ fn manual_instruction_transitions_require_fixed_layouts() {
 		0,
 		1,
 		&fixed_destination,
+		&[],
 	)
 	.expect_err("a compact instruction source must fail closed");
 	assert!(
@@ -4373,4 +4379,155 @@ fn flag_removals_contradicting_a_persisted_manual_answer_fail_closed() {
 		rejection.contains("contradicts the persisted manual conversion"),
 		"{rejection}"
 	);
+}
+
+/// The manual stub's offset comment shows each field's stored range beside its
+/// destination range, aligned in fixed columns. These tests exercise the
+/// comment directly: every layout family, rename pairing, and annotation.
+#[test]
+fn offset_comment_aligns_fixed_removal_and_addition() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("value", "u64"), ("memo", "u16")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("memo", "u16"), ("flags", "u8")],
+	);
+
+	let comment = layout_comment(&stored, &destination, &[]);
+	let lines: Vec<&str> = comment.trim_end().split('\n').collect();
+	assert_eq!(
+		lines[0], "// Payload offsets, relative to the version envelope header:",
+		"{comment}"
+	);
+	// The header row and every field row share the same column padding.
+	assert_eq!(lines[1], "// field      stored  destination", "{comment}");
+	// Rows follow stored declaration order, then added fields in destination
+	// order, so a reader scans the stored layout top to bottom.
+	assert_eq!(lines[2], "// authority  0..32   0..32", "{comment}");
+	assert_eq!(
+		lines[3], "// value      32..40  -            (removed)",
+		"{comment}"
+	);
+	assert_eq!(lines[4], "// memo       40..42  32..34", "{comment}");
+	assert_eq!(
+		lines[5], "// flags      -       34..35       (added)",
+		"{comment}"
+	);
+	assert!(
+		!comment.contains("  \n"),
+		"no row may end in trailing padding: {comment:?}"
+	);
+}
+
+#[test]
+fn offset_comment_pairs_a_renamed_field_under_its_new_name() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("first_name", "String<8>")],
+	);
+	let destination = schema(
+		LayoutKind::Fixed,
+		&[("authority", "Address"), ("name", "String<20>")],
+	);
+	let renames = vec![pin_rename("first_name", "name")];
+	let comment = layout_comment(&stored, &destination, &renames);
+	assert!(
+		comment.contains("// name       32..41  32..53"),
+		"the renamed field shows its stored bytes under the new name: {comment}"
+	);
+	assert!(
+		!comment.contains("first_name"),
+		"the stored name must not appear as its own row: {comment}"
+	);
+}
+
+#[test]
+fn offset_comment_annotates_compact_tails() {
+	let stored = schema(
+		LayoutKind::Fixed,
+		&[("owner", "Address"), ("balance", "u64")],
+	);
+	let destination = schema(
+		LayoutKind::Compact,
+		&[
+			("owner", "Address"),
+			("title", "String<12>"),
+			("tags", "Vec<u16, 3>"),
+		],
+	);
+
+	let comment = layout_comment(&stored, &destination, &[]);
+	assert!(
+		comment.contains("// balance  32..40  -            (removed)"),
+		"{comment}"
+	);
+	assert!(
+		comment.contains("(string prefix, capacity 12)"),
+		"a string tail's prefix location and capacity are named: {comment}"
+	);
+	assert!(
+		comment.contains("(vector prefix, capacity 3, 2-byte elements)"),
+		"a vector tail's element width is named: {comment}"
+	);
+	// The title tail's prefix sits at payload offset 32: one presence byte the
+	// conversion must read before its payload.
+	assert!(
+		comment.contains("title") && comment.contains("32..33"),
+		"tail prefix ranges are exact: {comment}"
+	);
+}
+
+#[test]
+fn offset_comment_marks_optional_tails_and_header_fields() {
+	let source = schema(
+		LayoutKind::Compact,
+		&[("title", "String<12>"), ("note", "Option<String<64>>")],
+	);
+	let destination = schema(
+		LayoutKind::Compact,
+		&[
+			("title", "String<12>"),
+			("note", "Option<String<64>>"),
+			("tags", "Vec<u32, 5>"),
+		],
+	);
+	let comment = layout_comment(&source, &destination, &[]);
+	assert!(
+		comment.contains("optional"),
+		"an optional tail's presence byte is named: {comment}"
+	);
+	assert!(
+		comment.contains("(vector prefix, capacity 5, 4-byte elements)"),
+		"{comment}"
+	);
+}
+
+/// The stub embeds the comment, so the developer opening the file sees the
+/// offsets without running anything.
+#[test]
+fn manual_stub_embeds_the_offset_comment() {
+	let account = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+	let source = SchemaVersion {
+		schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+		process: None,
+		transition: None,
+	};
+	let destination = schema(LayoutKind::Fixed, &[("value", "u32")]);
+	let generated = manual_transition_source(
+		&account,
+		MigrationVersionType::U8,
+		&source,
+		0,
+		1,
+		&destination,
+		&[],
+	)
+	.unwrap_or_else(|error| panic!("stub: {error:?}"));
+	assert!(
+		generated.contains("// Payload offsets, relative to the version envelope header:"),
+		"{generated}"
+	);
+	assert!(generated.contains("// value  0..8   0..4"), "{generated}");
 }

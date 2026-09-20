@@ -16,6 +16,7 @@ use pina_abi::ContractHistory;
 use pina_abi::ContractKind;
 use pina_abi::DataSchema;
 use pina_abi::MANIFEST_PATH;
+use pina_abi::RenameMapping;
 use pina_abi::TransitionMode;
 
 /// One adjacent event projection, payload-relative to the version envelope.
@@ -207,13 +208,15 @@ impl EventClientHistory {
 			})?;
 			let automatic = transition.mode == TransitionMode::Automatic;
 			let moves = if automatic {
-				field_moves(&source.schema, &destination.schema).ok_or_else(|| {
-					format!(
-						"event contract `{}` automatic transition v{from} to v{to} has no \
-						 derivable fixed-layout byte mapping",
-						history.rust_name,
-					)
-				})?
+				field_moves(&source.schema, &destination.schema, &transition.renames).ok_or_else(
+					|| {
+						format!(
+							"event contract `{}` automatic transition v{from} to v{to} has no \
+							 derivable fixed-layout byte mapping",
+							history.rust_name,
+						)
+					},
+				)?
 			} else {
 				Vec::new()
 			};
@@ -259,7 +262,16 @@ impl EventClientHistory {
 /// Reproduce the byte moves `pina migrations create` writes for an automatic
 /// transition: destination fields keep their name and Rust type, source bytes
 /// move to the destination offset, and fields without a match stay zero.
-fn field_moves(source: &DataSchema, destination: &DataSchema) -> Option<Vec<EventFieldMove>> {
+/// Derive the byte moves a client-side event projection applies.
+///
+/// Pairing follows the recorded renames first: a renamed field's bytes live
+/// under their *stored* name, so matching by identical destination name alone
+/// would leave the renamed field zeroed in the projection.
+fn field_moves(
+	source: &DataSchema,
+	destination: &DataSchema,
+	renames: &[RenameMapping],
+) -> Option<Vec<EventFieldMove>> {
 	let source_offsets = source.fixed_field_offsets()?;
 	let destination_offsets = destination.fixed_field_offsets()?;
 	let source_types = source
@@ -270,10 +282,16 @@ fn field_moves(source: &DataSchema, destination: &DataSchema) -> Option<Vec<Even
 
 	let mut moves = Vec::new();
 	for field in &destination.fields {
-		if source_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
+		// A renamed field's bytes live under their stored name; every other
+		// field pairs with the destination name itself.
+		let stored = renames
+			.iter()
+			.find(|mapping| mapping.to == field.name)
+			.map_or(field.name.as_str(), |mapping| mapping.from.as_str());
+		if source_types.get(stored) != Some(&field.rust_type.as_str()) {
 			continue;
 		}
-		let (source_offset, source_size) = source_offsets.get(&field.name)?;
+		let (source_offset, source_size) = source_offsets.get(stored)?;
 		let (destination_offset, destination_size) = destination_offsets.get(&field.name)?;
 		// A field's byte width is a property of its Rust type; automatic
 		// transitions only match identical types, so the sizes agree.
@@ -528,9 +546,54 @@ mod tests {
 		let undescribable = undescribable_schema(&[("value", "Widget")]);
 		let declared = schema(&[("value", "u64")]);
 
-		assert!(field_moves(&undescribable, &declared).is_none());
-		assert!(field_moves(&declared, &undescribable).is_none());
-		assert!(field_moves(&undescribable, &undescribable).is_none());
+		assert!(field_moves(&undescribable, &declared, &[]).is_none());
+		assert!(field_moves(&declared, &undescribable, &[]).is_none());
+		assert!(field_moves(&undescribable, &undescribable, &[]).is_none());
+	}
+
+	#[test]
+	fn renamed_fields_move_under_their_stored_name() {
+		// An answered rename pairs the stored `value` bytes with the
+		// destination `points` slot. Matching by destination name alone would
+		// skip the pair and leave `points` zeroed in the projected record.
+		let source = schema(&[("memo", "u16"), ("value", "u64")]);
+		let destination = schema(&[("memo", "u16"), ("points", "u64")]);
+		let renames = vec![RenameMapping {
+			from: "value".to_owned(),
+			to: "points".to_owned(),
+		}];
+
+		let moves = field_moves(&source, &destination, &renames)
+			.unwrap_or_else(|| panic!("a rename must have a byte mapping"));
+		assert_eq!(
+			moves,
+			[
+				EventFieldMove {
+					source_offset: 0,
+					destination_offset: 0,
+					size: 2,
+				},
+				EventFieldMove {
+					source_offset: 2,
+					destination_offset: 2,
+					size: 8,
+				},
+			],
+			"both fields move; the renamed one pairs with its stored bytes",
+		);
+
+		// Without the rename the same diff is not an automatic pairing at all,
+		// because no stored field is named `points`.
+		let unrenamed = field_moves(&source, &destination, &[])
+			.unwrap_or_else(|| panic!("the unrenamed diff still moves the shared field"));
+		assert_eq!(
+			unrenamed,
+			[EventFieldMove {
+				source_offset: 0,
+				destination_offset: 0,
+				size: 2,
+			}],
+		);
 	}
 
 	#[test]
@@ -538,7 +601,7 @@ mod tests {
 		let source = schema(&[("value", "u64")]);
 		let destination = schema(&[("value", "u64"), ("memo", "u16")]);
 
-		let moves = field_moves(&source, &destination)
+		let moves = field_moves(&source, &destination, &[])
 			.unwrap_or_else(|| panic!("v0 to v1 must have a byte mapping"));
 		assert_eq!(
 			moves,
@@ -556,7 +619,7 @@ mod tests {
 		let source = schema(&[("first", "u32"), ("second", "u16"), ("gone", "u8")]);
 		let destination = schema(&[("gone", "u8"), ("second", "u16"), ("first", "u32")]);
 
-		let moves = field_moves(&source, &destination).unwrap_or_else(|| panic!("mapping"));
+		let moves = field_moves(&source, &destination, &[]).unwrap_or_else(|| panic!("mapping"));
 		let mut keyed = moves
 			.iter()
 			.map(|step| (step.destination_offset, step.source_offset, step.size))
@@ -577,7 +640,7 @@ mod tests {
 		.unwrap_or_else(|error| panic!("schema: {error}"));
 		let destination = schema(&[("code", "String<5>")]);
 
-		assert!(field_moves(&source, &destination).is_none());
+		assert!(field_moves(&source, &destination, &[]).is_none());
 	}
 
 	#[test]
