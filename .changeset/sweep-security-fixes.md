@@ -13,6 +13,8 @@ The generated PDA seed slices now emit in declaration order instead of constants
 
 Enveloped instructions now pin the migration version byte at dispatch through an `IntoDiscriminator` gate derived from the checked-in manifest: a missing or unknown version byte fails closed before any handler runs, closing the zero-field fail-open. Programs whose manifests declare no instruction contracts expand to identical code.
 
+The gate covers exactly the zero-field instructions where the fail-open existed — 38 across the workspace, at a cost of 3-9 CU each, recorded as reviewed `runtimeApprovedTotals` in `scripts/compute-unit-policy.json` (payload instructions already validate their version in the generated parse, so their dispatch is bit-identical to before).
+
 A migration manifest whose `rustName` is not a plain Rust identifier now fails validation with a typed error instead of panicking inside the macro expansion, and duplicate field names within one schema version are rejected per version.
 
 The account migration executor zero-fills the grown region before each transition applies, matching the instruction and event workspaces, so a hand-written transition that skips an added field commits zeros rather than the account's own realloc residue.
