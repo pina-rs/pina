@@ -385,6 +385,7 @@ fn expand_home(path: &str) -> String {
 pub fn program_error_name(code: u32) -> Option<&'static str> {
 	match code {
 		0 => Some("AuthorityMismatch"),
+		1 => Some("NonFiniteFloat"),
 		_ => None,
 	}
 }

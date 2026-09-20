@@ -6,10 +6,20 @@ use pina::*;
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
 // Rent-exemption head room for on-demand growth: roughly 6,960 lamports per
-// grown byte (3,480 per byte-year at the two-year exemption threshold), so
-// 20,000 covers the example's one-to-two byte growth steps with margin.
+// grown byte (3,480 per byte-year at the two-year exemption threshold). The
+// budget must fund a whole stale ladder, not one step. `ManualState` grows
+// three bytes across its v0→v1→v2 history (u8 → u16, then the compact
+// `String<5>`), so the full reserved `Migrate` ladder needs exactly
+// 3 × 6,960 = 20,880 lamports. The previous 20,000 cap funded the first step
+// and then failed the cumulative check on the second — after the first effect
+// had already landed, which aborts the instruction as a panic — stranding
+// every v0 `ManualState` behind permanent `ProgramFailedToComplete` failures
+// on both the reserved route and the inline `Update` path (security sweep
+// finding N1). 24,000 covers the ladder with margin while keeping the
+// two-`State` sweep (2 × 13,920 = 27,840) above the cap, which the surfpool
+// suite pins as the shared-budget rejection.
 // `pina migrations make` prints the same estimate when a transition grows.
-const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
+const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 24_000;
 
 /// Instruction discriminator.
 ///

@@ -61,13 +61,14 @@ export function getCounterStateDiscriminator2Bytes(): ReadonlyUint8Array {
  * `CounterAccountType::CounterState`.
  * - `initialize` and `try_from_bytes` helpers for caller-owned storage.
  *
- * Layout (10 bytes total):
+ * Layout (11 bytes total):
  * ```text
- * | offset | size | field         |
- * |--------|------|---------------|
- * | 0      | 1    | discriminator |
- * | 1      | 1    | bump          |
- * | 2      | 8    | count (little-endian u64) |
+ * | offset | size | field                     |
+ * |--------|------|---------------------------|
+ * | 0      | 1    | discriminator             |
+ * | 1      | 1    | migration version byte    |
+ * | 2      | 1    | bump                      |
+ * | 3      | 8    | count (little-endian u64) |
  * ```
  */
 export type CounterState = {

@@ -35,6 +35,9 @@ pub struct DepositArgs {
 	/// The `user_stake_ata` account
 	#[arg(long)]
 	user_stake_ata: String,
+	/// The `stake_vault` account
+	#[arg(long)]
+	stake_vault: String,
 	/// The `token_program` account
 	#[arg(long)]
 	token_program: String,
@@ -49,6 +52,7 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
 	let position_state = CliContext::pubkey("--position_state", &args.position_state)?;
 	let user_stake_ata = CliContext::pubkey("--user_stake_ata", &args.user_stake_ata)?;
+	let stake_vault = CliContext::pubkey("--stake_vault", &args.stake_vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = DepositInstructionData::new(|data| {
 		data.amount.set(args.amount);
@@ -65,6 +69,7 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 		pool_state,
 		position_state,
 		user_stake_ata,
+		stake_vault,
 		associated_token_program: Pubkey::from_str_const(
 			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 		),

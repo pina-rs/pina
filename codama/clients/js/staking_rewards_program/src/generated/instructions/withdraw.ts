@@ -61,6 +61,7 @@ export type WithdrawInstruction<
 	TAccountPoolState extends string | AccountMeta<string> = string,
 	TAccountPositionState extends string | AccountMeta<string> = string,
 	TAccountUserStakeAta extends string | AccountMeta<string> = string,
+	TAccountStakeVault extends string | AccountMeta<string> = string,
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
@@ -83,6 +84,8 @@ export type WithdrawInstruction<
 			TAccountUserStakeAta extends string
 				? WritableAccount<TAccountUserStakeAta>
 				: TAccountUserStakeAta,
+			TAccountStakeVault extends string ? WritableAccount<TAccountStakeVault>
+				: TAccountStakeVault,
 			TAccountTokenProgram extends string
 				? ReadonlyAccount<TAccountTokenProgram>
 				: TAccountTokenProgram,
@@ -142,6 +145,7 @@ export type WithdrawInput<
 	TAccountPoolState extends string = string,
 	TAccountPositionState extends string = string,
 	TAccountUserStakeAta extends string = string,
+	TAccountStakeVault extends string = string,
 	TAccountTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 > = {
@@ -150,6 +154,7 @@ export type WithdrawInput<
 	poolState: Address<TAccountPoolState>;
 	positionState: Address<TAccountPositionState>;
 	userStakeAta: Address<TAccountUserStakeAta>;
+	stakeVault: Address<TAccountStakeVault>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	amount: WithdrawInstructionDataArgs["amount"];
@@ -161,6 +166,7 @@ export function getWithdrawInstruction<
 	TAccountPoolState extends string,
 	TAccountPositionState extends string,
 	TAccountUserStakeAta extends string,
+	TAccountStakeVault extends string,
 	TAccountTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TProgramAddress extends Address =
@@ -172,6 +178,7 @@ export function getWithdrawInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserStakeAta,
+		TAccountStakeVault,
 		TAccountTokenProgram,
 		TAccountSystemProgram
 	>,
@@ -183,6 +190,7 @@ export function getWithdrawInstruction<
 	TAccountPoolState,
 	TAccountPositionState,
 	TAccountUserStakeAta,
+	TAccountStakeVault,
 	TAccountTokenProgram,
 	TAccountSystemProgram
 > {
@@ -197,6 +205,7 @@ export function getWithdrawInstruction<
 		poolState: { value: input.poolState ?? null, isWritable: true },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userStakeAta: { value: input.userStakeAta ?? null, isWritable: true },
+		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 	};
@@ -224,6 +233,7 @@ export function getWithdrawInstruction<
 			getAccountMeta("poolState", accounts.poolState),
 			getAccountMeta("positionState", accounts.positionState),
 			getAccountMeta("userStakeAta", accounts.userStakeAta),
+			getAccountMeta("stakeVault", accounts.stakeVault),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
@@ -238,6 +248,7 @@ export function getWithdrawInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserStakeAta,
+		TAccountStakeVault,
 		TAccountTokenProgram,
 		TAccountSystemProgram
 	>);
@@ -254,8 +265,9 @@ export type ParsedWithdrawInstruction<
 		poolState: TAccountMetas[2];
 		positionState: TAccountMetas[3];
 		userStakeAta: TAccountMetas[4];
-		tokenProgram: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
+		stakeVault: TAccountMetas[5];
+		tokenProgram: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
 	};
 	data: WithdrawInstructionData;
 };
@@ -269,12 +281,12 @@ export function parseWithdrawInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 8) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 8,
 			},
 		);
 	}
@@ -292,6 +304,7 @@ export function parseWithdrawInstruction<
 			poolState: getNextAccount(),
 			positionState: getNextAccount(),
 			userStakeAta: getNextAccount(),
+			stakeVault: getNextAccount(),
 			tokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},

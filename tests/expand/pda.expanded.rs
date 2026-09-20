@@ -1386,6 +1386,94 @@ impl<'a> VaultStateSeedsWithBump<'a> {
         pina::PdaSigner::from_seed_array(self.as_seed_array())
     }
 }
+/// Interleaved constant and variable seeds: the derived slice order must
+/// match this declaration order exactly — the IDL publishes declaration
+/// order, and a client deriving from the published order must land on the
+/// same address the program verifies.
+pub struct InterleavedSeedState {
+    pub user: Address,
+}
+const _: fn(Address) -> pina::Address = |value| value;
+///The PDA seeds for `InterleavedSeedState`.
+pub struct InterleavedSeedStateSeeds<'a> {
+    ///The `user` seed.
+    pub user: &'a pina::Address,
+}
+#[automatically_derived]
+#[doc(hidden)]
+unsafe impl<'a> ::core::clone::TrivialClone for InterleavedSeedStateSeeds<'a> {}
+#[automatically_derived]
+impl<'a> ::core::clone::Clone for InterleavedSeedStateSeeds<'a> {
+    #[inline]
+    fn clone(&self) -> InterleavedSeedStateSeeds<'a> {
+        let _: ::core::clone::AssertParamIsClone<&'a pina::Address>;
+        *self
+    }
+}
+#[automatically_derived]
+impl<'a> ::core::marker::Copy for InterleavedSeedStateSeeds<'a> {}
+///The PDA seeds for `InterleavedSeedState`, including the bump seed.
+pub struct InterleavedSeedStateSeedsWithBump<'a> {
+    inner: InterleavedSeedStateSeeds<'a>,
+    _bump: [u8; 1],
+}
+impl InterleavedSeedState {
+    /// Build the PDA seeds for this account.
+    pub fn seeds<'a>(user: &'a pina::Address) -> InterleavedSeedStateSeeds<'a> {
+        InterleavedSeedStateSeeds { user }
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    pub fn try_find_pda(
+        user: &pina::Address,
+        program_id: &pina::Address,
+    ) -> ::core::option::Option<(pina::Address, u8)> {
+        let seeds = Self::seeds(user);
+        pina::try_find_program_address(&seeds.as_slices(), program_id)
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no valid PDA exists for the given seeds.
+    pub fn find_pda(
+        user: &pina::Address,
+        program_id: &pina::Address,
+    ) -> (pina::Address, u8) {
+        Self::try_find_pda(user, program_id)
+            .unwrap_or_else(|| {
+                ::core::panicking::panic_fmt(
+                    format_args!("could not find program address from seeds"),
+                );
+            })
+    }
+}
+impl<'a> InterleavedSeedStateSeeds<'a> {
+    /// The seeds as byte slices, without the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 3usize] {
+        [b"prefix", self.user.as_ref(), b"suffix"]
+    }
+    /// Append the bump seed to the seeds.
+    pub fn with_bump(&self, bump: u8) -> InterleavedSeedStateSeedsWithBump<'a> {
+        InterleavedSeedStateSeedsWithBump {
+            inner: *self,
+            _bump: [bump],
+        }
+    }
+}
+impl<'a> InterleavedSeedStateSeedsWithBump<'a> {
+    /// The seeds as byte slices, including the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 4usize] {
+        [b"prefix", self.inner.user.as_ref(), b"suffix", &self._bump]
+    }
+    /// The seeds as Pinocchio CPI seed values, including the bump seed.
+    pub fn as_seed_array(&self) -> [pina::Seed<'_>; 4usize] {
+        self.as_slices().map(pina::Seed::from)
+    }
+    /// The seeds as an owned PDA signer helper.
+    pub fn to_signer(&self) -> pina::PdaSigner<'_, 4usize> {
+        pina::PdaSigner::from_seed_array(self.as_seed_array())
+    }
+}
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TodoState {
     #[pinapod(skip_accessor, skip_patch)]

@@ -271,6 +271,69 @@ fn cannot_add_the_same_role_twice() {
 	});
 }
 
+/// Rotating admin to the zero address is rejected: the zero address can never
+/// sign, so accepting it would brick every later admin instruction. The
+/// rejected rotation leaves the stored admin untouched, so the registry keeps
+/// working.
+#[test]
+#[ignore = "run with pina test"]
+fn rotate_admin_rejects_the_zero_address() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let admin = program.payer();
+		let (registry, bump) = registry_pda(&program_id, &admin);
+
+		program
+			.send_instruction(initialize_instruction(&program, &admin, &registry, bump))
+			.expect("execute Initialize");
+
+		let rotate = program.instruction(
+			&[RegistryInstruction::RotateAdmin as u8, 0u8],
+			vec![
+				AccountMeta::new_readonly(admin, true),
+				AccountMeta::new_readonly(Pubkey::default(), false),
+				AccountMeta::new(registry, false),
+			],
+		);
+		let error = program
+			.send_instruction(rotate)
+			.expect_err("the zero address can never sign, so it is not a valid admin");
+		// The exact variant matters: a test that only prints the error passes
+		// when the program fails for an unrelated reason.
+		pina_test::assert_custom_error(&error, RegistryError::ZeroAddressAdmin as u32);
+
+		let account = program.account(&registry).expect("fetch registry");
+		assert_eq!(
+			&account.data[2..34],
+			admin.to_bytes(),
+			"the rejected rotation left the stored admin untouched"
+		);
+
+		// Admin operations still work after the rejected rotation.
+		let grantee = Pubkey::new_from_array([2; 32]);
+		program.fund(&grantee, 1_000_000_000).expect("fund grantee");
+		let (role_entry, role_bump) = role_entry_pda(&program_id, &registry, 1);
+		program
+			.send_instruction(add_role_instruction(
+				&program,
+				&admin,
+				&grantee,
+				&registry,
+				&role_entry,
+				1,
+				0b0001,
+				role_bump,
+			))
+			.expect("AddRole still works after the rejected rotation");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// RotateAdmin transfers admin ownership; the former admin can no longer add
 /// roles.
 #[test]

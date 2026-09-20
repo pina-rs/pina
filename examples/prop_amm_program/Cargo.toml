@@ -23,8 +23,10 @@ pina = { workspace = true, features = ["logs", "derive"] }
 mollusk-svm = { workspace = true, default-features = true }
 solana-account = { workspace = true, default-features = true }
 solana-instruction = { workspace = true, default-features = true }
+solana-keypair = "~3.1"
 solana-pubkey = { workspace = true, default-features = true }
 solana-sdk-ids = { workspace = true, default-features = true }
+solana-signer = "~3.0"
 
 [lints]
 workspace = true

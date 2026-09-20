@@ -16,9 +16,12 @@ import { FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 /** The signer is not the authority recorded on the account. */
 export const FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH = 0x0; // 0
+/** A float payload is NaN or infinite; only finite values are stored. */
+export const FLOAT_ACCOUNTS_PROGRAM_ERROR__NON_FINITE_FLOAT = 0x1; // 1
 
 export type FloatAccountsProgramError =
-	typeof FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH;
+	| typeof FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH
+	| typeof FLOAT_ACCOUNTS_PROGRAM_ERROR__NON_FINITE_FLOAT;
 
 let floatAccountsProgramErrorMessages:
 	| Record<FloatAccountsProgramError, string>
@@ -27,6 +30,8 @@ if (process.env["NODE_ENV"] !== "production") {
 	floatAccountsProgramErrorMessages = {
 		[FLOAT_ACCOUNTS_PROGRAM_ERROR__AUTHORITY_MISMATCH]:
 			`The signer is not the authority recorded on the account.`,
+		[FLOAT_ACCOUNTS_PROGRAM_ERROR__NON_FINITE_FLOAT]:
+			`A float payload is NaN or infinite; only finite values are stored.`,
 	};
 }
 

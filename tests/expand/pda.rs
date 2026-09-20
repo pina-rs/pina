@@ -47,6 +47,15 @@ pub struct VaultState {
 	pub user: Address,
 }
 
+/// Interleaved constant and variable seeds: the derived slice order must
+/// match this declaration order exactly — the IDL publishes declaration
+/// order, and a client deriving from the published order must land on the
+/// same address the program verifies.
+#[pda(crate = pina, seeds = [b"prefix", user: Address, b"suffix"])]
+pub struct InterleavedSeedState {
+	pub user: Address,
+}
+
 #[account(crate = pina, discriminator = PdaDisc, variant = TodoState)]
 #[pda(seeds = [b"todo", owner: Address], bump = bump)]
 pub struct TodoState {

@@ -6,6 +6,23 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use program_under_test::ID;
+use program_under_test::UPDATE_AUTHORITY;
+
+/// The committed fixture seed: the 32 ASCII bytes of a descriptive phrase,
+/// documented on `UPDATE_AUTHORITY` in `src/lib.rs`. Deterministic, and
+/// outside the uniform-seed brute-force space the old `[7u8; 32]` fixture
+/// lived in.
+const UPDATE_AUTHORITY_SEED: [u8; 32] = *b"pina example fixture updater key";
+
+fn fixture_update_authority() -> Keypair {
+	let keypair = Keypair::new_from_array(UPDATE_AUTHORITY_SEED);
+	assert_eq!(
+		keypair.pubkey(),
+		UPDATE_AUTHORITY,
+		"the committed fixture seed must keep deriving UPDATE_AUTHORITY"
+	);
+	keypair
+}
 use program_under_test::PropAmmInstruction;
 
 fn initialize_instruction(
@@ -185,6 +202,56 @@ fn rotate_hands_over_the_oracle_authority() {
 			account.data[2..34],
 			new_authority.pubkey().to_bytes(),
 			"the oracle authority is rotated on-chain"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The rebuilt fixture update authority — deterministic from the committed
+/// seed, and no longer recoverable from a uniform one — can still sign a
+/// price update, so the D1 reseed introduced no functional regression.
+#[test]
+#[ignore = "run with pina test"]
+fn fixture_update_authority_still_publishes_prices() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let payer = program.payer();
+		let oracle = Keypair::new_from_array([2; 32]);
+
+		program
+			.send_with_signers(
+				initialize_instruction(&program, &payer, &oracle.pubkey()),
+				&[&oracle],
+			)
+			.expect("execute Initialize");
+
+		let update_authority = fixture_update_authority();
+		program
+			.fund(&update_authority.pubkey(), 1_000_000_000)
+			.expect("fund the fixture update authority");
+
+		program
+			.send_with_signers(
+				update_instruction(
+					&program,
+					&oracle.pubkey(),
+					&update_authority.pubkey(),
+					999_999,
+				),
+				&[&update_authority],
+			)
+			.expect("the fixture update authority signs the price update");
+
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			&account.data[34..42],
+			&999_999_u64.to_le_bytes(),
+			"the authorized update wrote the new price on-chain"
 		);
 
 		program.stop().expect("stop isolated program test");

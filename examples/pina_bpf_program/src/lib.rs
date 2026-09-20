@@ -246,7 +246,7 @@ mod tests {
 
 	#[test]
 	fn parse_instruction_accepts_matching_program_id() {
-		let data = [PinaBpfInstruction::Hello as u8];
+		let data = [PinaBpfInstruction::Hello as u8, 0];
 		let instruction = parse_instruction::<PinaBpfInstruction>(&ID, &ID, &data);
 		assert!(matches!(instruction, Ok(PinaBpfInstruction::Hello)));
 	}

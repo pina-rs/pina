@@ -68,6 +68,8 @@ pub enum RegistryError {
 	RoleAlreadyExists = 1,
 	/// The role exists but was deactivated, so it grants nothing.
 	RoleInactive = 2,
+	/// The proposed admin is the zero address, which can never sign.
+	ZeroAddressAdmin = 3,
 }
 
 #[discriminator]
@@ -323,7 +325,14 @@ impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 		// account immutably before the mutable load would validate it twice.
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		self.admin.assert_address(&registry_config.admin)?;
-		registry_config.admin = *self.new_admin.address();
+
+		// The zero address can never sign, so storing it as the admin would
+		// brick every later admin instruction permanently.
+		let new_admin = *self.new_admin.address();
+		if new_admin == Address::default() {
+			return Err(RegistryError::ZeroAddressAdmin.into());
+		}
+		registry_config.admin = new_admin;
 
 		Ok(())
 	}

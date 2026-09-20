@@ -31,6 +31,11 @@ final class DepositCommand extends Command<void> {
         help: "The user_stake_ata account",
       )
       ..addOption(
+        'stake_vault',
+        mandatory: true,
+        help: "The stake_vault account",
+      )
+      ..addOption(
         'token_program',
         mandatory: true,
         help: "The token_program account",
@@ -60,6 +65,10 @@ final class DepositCommand extends Command<void> {
       '--user-stake-ata',
       results['user_stake_ata']! as String,
     );
+    final stakeVault = pubkey(
+      '--stake-vault',
+      results['stake_vault']! as String,
+    );
     final tokenProgram = pubkey(
       '--token-program',
       results['token_program']! as String,
@@ -72,6 +81,7 @@ final class DepositCommand extends Command<void> {
       poolState: poolState,
       positionState: positionState,
       userStakeAta: userStakeAta,
+      stakeVault: stakeVault,
       associatedTokenProgram: Address(
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
       ),

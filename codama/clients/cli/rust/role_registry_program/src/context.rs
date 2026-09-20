@@ -387,6 +387,7 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		0 => Some("InvalidPermissions"),
 		1 => Some("RoleAlreadyExists"),
 		2 => Some("RoleInactive"),
+		3 => Some("ZeroAddressAdmin"),
 		_ => None,
 	}
 }

@@ -77,11 +77,7 @@ impl MigrationExpansion {
 	}
 
 	pub(crate) fn version_type_tokens(&self) -> proc_macro2::TokenStream {
-		match self.version_type {
-			MigrationVersionType::U8 => quote!(u8),
-			MigrationVersionType::U16 => quote!(u16),
-			MigrationVersionType::U32 => quote!(u32),
-		}
+		version_type_tokens(self.version_type)
 	}
 
 	pub(crate) fn field(&self, patchable: bool) -> syn::Field {
@@ -1097,6 +1093,186 @@ impl MigrationExpansion {
 
 const MAX_INLINE_STEPS: u16 = 8;
 
+/// Render the Rust integer type for one program-wide version encoding.
+pub(crate) fn version_type_tokens(version_type: MigrationVersionType) -> proc_macro2::TokenStream {
+	match version_type {
+		MigrationVersionType::U8 => quote!(u8),
+		MigrationVersionType::U16 => quote!(u16),
+		MigrationVersionType::U32 => quote!(u32),
+	}
+}
+
+/// The instruction-space envelope gate for one `#[discriminator]` enum.
+///
+/// Derived from the checked-in manifest: every recorded instruction contract
+/// pins its discriminant value to the newest version the program knows, so
+/// instruction dispatch cannot accept a version byte the deployed program
+/// never emitted. Zero-field instructions are the motivation — their programs
+/// have no payload to parse, so without this gate no byte in the version slot
+/// would ever be checked on the wire.
+pub(crate) struct InstructionEnvelopeGate {
+	/// `discriminant value → newest recorded version`, sorted by value.
+	versions: Vec<(u64, u32)>,
+	version_type: MigrationVersionType,
+}
+
+impl InstructionEnvelopeGate {
+	/// Emit an envelope-checking `IntoDiscriminator` implementation.
+	///
+	/// The generated parse keeps every error the discriminator check produces,
+	/// reports a missing version byte as `InvalidInstructionData` (the same
+	/// wrong-width error the payload path returns), and reports an unknown or
+	/// future version as `InvalidMigrationVersion` (the same typed error the
+	/// payload path returns). Known stale versions still parse: migration-aware
+	/// dispatch receives them and normalizes.
+	pub(crate) fn implementation(
+		&self,
+		crate_path: &syn::Path,
+		enum_name: &syn::Ident,
+		primitive: &impl quote::ToTokens,
+	) -> proc_macro2::TokenStream {
+		let version_type = version_type_tokens(self.version_type);
+		let version_bytes = self.version_type.bytes();
+		let header_end = quote!(
+			(::core::mem::size_of::<#primitive>() + #version_bytes)
+		);
+		let arms = self.versions.iter().map(|(value, current)| {
+			// Unsuffixed so the arm infers the enum's primitive width: the
+			// manifest stores discriminators as `u64` regardless of encoding.
+			let value = proc_macro2::Literal::u64_unsuffixed(*value);
+			quote! {
+				#value => ::core::option::Option::Some(#current as #version_type),
+			}
+		});
+
+		quote! {
+			const _: () = assert!(
+				::core::mem::size_of::<#enum_name>() == ::core::mem::size_of::<#primitive>(),
+				concat!(
+					"The size of the enum `",
+					stringify!(#enum_name),
+					"` must match the size of its primitive representation
+					`",
+					stringify!(#primitive),
+					"`."
+				),
+			);
+
+			impl #crate_path::IntoDiscriminator for #enum_name {
+				#[inline]
+				fn discriminator_from_bytes(
+					bytes: &[u8],
+				) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+					let value =
+						<#primitive as #crate_path::IntoDiscriminator>::discriminator_from_bytes(
+							bytes,
+						)?;
+					if let ::core::option::Option::Some(current) =
+						Self::__pina_instruction_envelope_current(value)
+					{
+						let encoded = bytes
+							.get(::core::mem::size_of::<#primitive>()..#header_end)
+							.ok_or(#crate_path::ProgramError::InvalidInstructionData)?;
+						let mut stored = [0_u8; #version_bytes];
+						stored.copy_from_slice(encoded);
+						if #version_type::from_le_bytes(stored) > current {
+							return Err(#crate_path::PinaProgramError::InvalidMigrationVersion
+								.into());
+						}
+					}
+					<#primitive as #crate_path::IntoDiscriminator>::discriminator_from_bytes(bytes)
+						.and_then(|value| Self::try_from(value))
+				}
+
+				fn write_discriminator(&self, bytes: &mut [u8]) {
+					(*self as #primitive).write_discriminator(bytes);
+				}
+
+				fn try_write_discriminator(
+					&self,
+					bytes: &mut [u8],
+				) -> ::core::result::Result<(), #crate_path::ProgramError> {
+					(*self as #primitive).try_write_discriminator(bytes)
+				}
+
+				fn matches_discriminator(&self, bytes: &[u8]) -> bool {
+					(*self as #primitive).matches_discriminator(bytes)
+				}
+			}
+
+			impl #enum_name {
+				/// Newest recorded version per enveloped instruction
+				/// discriminant, or `None` when the discriminant names an
+				/// unenveloped instruction space.
+				#[doc(hidden)]
+				const fn __pina_instruction_envelope_current(
+					value: #primitive,
+				) -> ::core::option::Option<#version_type> {
+					match value {
+						#(#arms)*
+						_ => ::core::option::Option::None,
+					}
+				}
+			}
+		}
+	}
+}
+
+/// Resolve the instruction-space envelope gate for a `#[discriminator]` enum.
+///
+/// Returns `None` when the expanding crate has no migration manifest or the
+/// manifest records no instruction contracts: programs that never opted into
+/// envelopes keep the plain discriminator parser and its exact expansion.
+pub(crate) fn instruction_envelope_gate(
+	enum_name: &syn::Ident,
+) -> syn::Result<Option<InstructionEnvelopeGate>> {
+	let Some((program_dir, _prefix)) = discover_program_dir() else {
+		return Ok(None);
+	};
+	instruction_envelope_gate_at(enum_name, &program_dir.join(MANIFEST_PATH))
+}
+
+/// Pure variant for tests: resolve the gate from the manifest at `path`.
+fn instruction_envelope_gate_at(
+	enum_name: &syn::Ident,
+	path: &std::path::Path,
+) -> syn::Result<Option<InstructionEnvelopeGate>> {
+	let Some(manifest) = read_validated_manifest(enum_name, path)? else {
+		return Ok(None);
+	};
+
+	let mut versions = manifest
+		.contracts
+		.values()
+		.filter(|history| history.identity.kind == ContractKind::Instruction)
+		.map(|history| {
+			let value = history.identity.discriminator_value().map_err(|error| {
+				syn::Error::new_spanned(
+					enum_name,
+					format!("invalid migration manifest discriminator: {error}"),
+				)
+			})?;
+			// `manifest.validate()` bounds every version number by the
+			// encoding's maximum, so the subtraction cannot underflow and the
+			// stored current version always fits the encoding.
+			let current = history.versions.len().saturating_sub(1) as u32;
+
+			Ok((value, current))
+		})
+		.collect::<syn::Result<Vec<_>>>()?;
+	versions.sort_unstable();
+	versions.dedup();
+
+	if versions.is_empty() {
+		return Ok(None);
+	}
+
+	Ok(Some(InstructionEnvelopeGate {
+		versions,
+		version_type: manifest.version_type,
+	}))
+}
+
 /// Resolve whether one schema declaration opts into ABI history.
 ///
 /// The checked-in manifest is the only policy source: an explicit per-item
@@ -1285,20 +1461,25 @@ pub(crate) fn manifest_account_ladder(
 	manifest_account_ladder_at(enum_name, &program_dir.join(MANIFEST_PATH))
 }
 
-/// Pure variant for tests: derive the ladder from the manifest at `path`.
-fn manifest_account_ladder_at(
+/// Read and validate the manifest at `path` for diagnostics anchored at
+/// `enum_name`.
+///
+/// Returns `None` when the file does not exist. Every reader that derives
+/// macro output from the checked-in manifest shares this function so a hostile
+/// or stale document is reported identically.
+fn read_validated_manifest(
 	enum_name: &syn::Ident,
 	path: &std::path::Path,
-) -> syn::Result<Vec<proc_macro2::Ident>> {
+) -> syn::Result<Option<MigrationManifest>> {
 	let source = match std::fs::read(path) {
 		Ok(source) => source,
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
 		Err(error) => {
 			return Err(syn::Error::new_spanned(
 				enum_name,
 				format!(
-					"the reserved `Migrate` routing cannot read {} ({error}); repair the file, or \
-					 delete it if the program should not opt into migrations",
+					"the migration-aware discriminator cannot read {} ({error}); repair the file, \
+					 or delete it if the program should not opt into migrations",
 					path.display()
 				),
 			));
@@ -1316,6 +1497,18 @@ fn manifest_account_ladder_at(
 			format!("invalid migration manifest {}: {error}", path.display()),
 		)
 	})?;
+
+	Ok(Some(manifest))
+}
+
+/// Pure variant for tests: derive the ladder from the manifest at `path`.
+fn manifest_account_ladder_at(
+	enum_name: &syn::Ident,
+	path: &std::path::Path,
+) -> syn::Result<Vec<proc_macro2::Ident>> {
+	let Some(manifest) = read_validated_manifest(enum_name, path)? else {
+		return Ok(Vec::new());
+	};
 
 	let ladder = manifest
 		.contracts
@@ -1749,6 +1942,126 @@ mod tests {
 	fn item_struct(name: &str) -> ItemStruct {
 		syn::parse_str(&format!("struct {name} {{ value: u64 }}"))
 			.unwrap_or_else(|error| panic!("test item: {error}"))
+	}
+
+	fn gate_contract(
+		kind: ContractKind,
+		discriminator: u64,
+		version_count: usize,
+	) -> ContractHistory {
+		let identity = ContractIdentity::try_new(kind, 1, discriminator)
+			.unwrap_or_else(|error| panic!("test identity: {error}"));
+		let schema = pina_abi::data_schema(&item_struct("Placeholder"), LayoutKind::Fixed)
+			.unwrap_or_else(|error| panic!("test schema: {error}"));
+		// Only instruction contracts record a process; the encode path
+		// requires one on their first version.
+		let process = (kind == ContractKind::Instruction).then_some(pina_abi::ProcessContract {
+			accounts: Vec::new(),
+		});
+		ContractHistory {
+			identity,
+			rust_name: "Placeholder".to_owned(),
+			versions: (0..version_count)
+				.map(|number| {
+					SchemaVersion {
+						schema: schema.clone(),
+						process: process.clone(),
+						// Version zero carries no transition; every later
+						// version records its (never-executed) adjacent step.
+						transition: (number > 0).then_some(pina_abi::Transition {
+							mode: pina_abi::TransitionMode::Automatic,
+							renames: Vec::new(),
+							implementation_sha256: None,
+						}),
+					}
+				})
+				.collect(),
+		}
+	}
+
+	fn write_gate_manifest(dir: &Path, contracts: &[ContractHistory]) -> PathBuf {
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		for contract in contracts {
+			manifest
+				.contracts
+				.insert(contract.identity.key(), contract.clone());
+		}
+		write_manifest(dir, &encode(&manifest))
+	}
+
+	fn gate_at(path: &Path) -> Option<Vec<(u64, u32)>> {
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		instruction_envelope_gate_at(&enum_name, path)
+			.unwrap_or_else(|error| panic!("resolve gate: {error}"))
+			.map(|gate| gate.versions)
+	}
+
+	#[test]
+	fn envelope_gate_pins_only_instruction_contracts_to_their_newest_version() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let path = write_gate_manifest(
+			temp.path(),
+			&[
+				// A three-version instruction ladder pins its newest version.
+				gate_contract(ContractKind::Instruction, 0, 3),
+				// A single-version instruction pins version zero.
+				gate_contract(ContractKind::Instruction, 5, 1),
+				// Events and accounts are enveloped too, but they are not
+				// dispatched through the instruction space.
+				gate_contract(ContractKind::Event, 9, 1),
+				gate_contract(ContractKind::Account, 7, 1),
+			],
+		);
+
+		assert_eq!(gate_at(&path), Some(vec![(0, 2), (5, 0)]));
+	}
+
+	#[test]
+	fn envelope_gate_is_absent_without_a_manifest_or_instruction_contracts() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+
+		// No manifest file: the program never opted into envelopes.
+		assert!(gate_at(&temp.path().join(MANIFEST_PATH)).is_none());
+
+		// A manifest with no instruction contracts leaves the plain parser.
+		let path = write_gate_manifest(temp.path(), &[gate_contract(ContractKind::Account, 1, 1)]);
+		assert!(gate_at(&path).is_none());
+	}
+
+	#[test]
+	fn envelope_gate_implementation_renders_the_fail_closed_check() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let path = write_gate_manifest(
+			temp.path(),
+			&[gate_contract(ContractKind::Instruction, 0, 1)],
+		);
+		let gate = instruction_envelope_gate_at(
+			&syn::Ident::new("Instruction", proc_macro2::Span::call_site()),
+			&path,
+		)
+		.unwrap_or_else(|error| panic!("resolve gate: {error}"))
+		.unwrap_or_else(|| panic!("an instruction contract must produce a gate"));
+		let crate_path: syn::Path = syn::parse_quote!(::pina);
+		let enum_name: syn::Ident = syn::parse_quote!(Instruction);
+		let primitive: syn::Path = syn::parse_quote!(u8);
+		let rendered = gate
+			.implementation(&crate_path, &enum_name, &primitive)
+			.to_string();
+
+		// A missing version byte is a wrong-width error; an unknown version is
+		// the same typed error the payload path returns.
+		assert!(
+			rendered.contains("__pina_instruction_envelope_current"),
+			"rendered: {rendered}"
+		);
+		assert!(
+			rendered.contains("InvalidInstructionData"),
+			"rendered: {rendered}"
+		);
+		assert!(
+			rendered.contains("InvalidMigrationVersion"),
+			"rendered: {rendered}"
+		);
 	}
 
 	#[test]

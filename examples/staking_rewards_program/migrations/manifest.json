@@ -318,6 +318,14 @@
 								"pda": null
 							},
 							{
+								"name": "stake_vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "associated_token_program",
 								"writable": false,
 								"signer": false,
@@ -402,6 +410,14 @@
 							},
 							{
 								"name": "user_stake_ata",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "stake_vault",
 								"writable": true,
 								"signer": false,
 								"optional": false,

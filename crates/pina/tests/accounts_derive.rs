@@ -113,10 +113,13 @@ struct AccountValidationVocabulary<'a> {
 	pub executable: &'a AccountView,
 	#[pina(validate(program = system::ID))]
 	pub system_program: &'a AccountView,
-	#[pina(validate(sysvar = CLOCK_SYSVAR_ID))]
-	pub clock: Option<&'a AccountView>,
 	#[pina(validate(empty))]
 	pub empty: &'a AccountView,
+	// Optional fields are declarable only in trailing positions: an absent
+	// optional consumes its program-address filler slot, so a positional field
+	// after one would shift bindings at runtime.
+	#[pina(validate(sysvar = CLOCK_SYSVAR_ID))]
+	pub clock: Option<&'a AccountView>,
 }
 
 #[cfg(feature = "validation")]
@@ -547,19 +550,27 @@ struct TestAccountsOptionalMut<'a> {
 	pub optional: Option<&'a mut AccountView>,
 }
 
-#[derive(Accounts)]
+#[cfg(feature = "validation")]
+#[derive(Accounts, Debug)]
 #[pina(crate = pina)]
-#[allow(dead_code)]
-struct TestAccountsOptionalLeadingMut<'a> {
-	pub optional: Option<&'a mut AccountView>,
-	pub one: &'a mut AccountView,
+struct TestAccountsImmutableLeadingMut<'a> {
+	pub one: &'a AccountView,
+	#[pina(validate(distinct_from = one, error = ProgramError::Custom(70)))]
+	pub two: &'a mut AccountView,
 }
 
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
-struct TestAccountsOptionalThenImmutable<'a> {
-	pub optional: Option<&'a mut AccountView>,
+struct TestAccountsMutThenImmutableReadonly<'a> {
+	pub one: &'a mut AccountView,
+	pub two: &'a AccountView,
+}
+
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct TestAccountsPlainImmutableLeadingMut<'a> {
 	pub one: &'a AccountView,
+	pub two: &'a mut AccountView,
 }
 
 /// Builds an address whose first byte is `byte`, keeping test keys unique.
@@ -825,10 +836,13 @@ fn test_accounts_derive_optional_mutable_rejects_readonly_value() {
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
-/// A present optional mutable account that aliases a later required writable
-/// account is rejected by the duplicate-writable guard.
+/// A writable account that aliases an earlier immutable-declared slot parses
+/// by default: same-address immutable bindings are a deliberate idiom (a
+/// signer that also pays rent), so the runtime duplicate guard only compares
+/// `&mut`-declared pairs. Programs that rely on distinctness opt in with
+/// `distinct_from` (sweep finding RC-1) — see the paired test below.
 #[test]
-fn test_accounts_derive_optional_mutable_rejects_duplicate_alias() {
+fn test_accounts_derive_immutable_leading_mutable_alias_parses_by_default() {
 	let ix_data = [3u8; 100];
 	let shared_key = key_from_byte(9);
 	let mut input = create_input_with_layout(2, &ix_data, |_| true, |_| false, |_| shared_key);
@@ -836,14 +850,35 @@ fn test_accounts_derive_optional_mutable_rejects_duplicate_alias() {
 	// SAFETY: the buffer encodes exactly two accounts.
 	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
 
-	let result = TestAccountsOptionalLeadingMut::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
-	assert!(result.is_err_and(|error| error.eq(&PinaProgramError::DuplicateMutableAccount.into())));
+	let result =
+		TestAccountsPlainImmutableLeadingMut::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	let parsed = result.unwrap();
+	assert_eq!(parsed.one.address(), &shared_key);
+	assert_eq!(parsed.two.address(), &shared_key);
+}
+
+/// The same aliasing shape with an explicit `distinct_from` opt-in is
+/// rejected at validation time with the declared custom error, closing the
+/// RC-1 exploit path for programs that rely on slot distinctness.
+#[cfg(feature = "validation")]
+#[test]
+fn test_accounts_derive_distinct_from_rejects_the_writable_alias() {
+	let ix_data = [3u8; 100];
+	let shared_key = key_from_byte(9);
+	let mut input = create_input_with_layout(2, &ix_data, |_| true, |_| false, |_| shared_key);
+	let mut accounts = [UNINIT; 2];
+	// SAFETY: the buffer encodes exactly two accounts.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let result =
+		TestAccountsImmutableLeadingMut::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	assert!(matches!(result, Err(ProgramError::Custom(70))));
 }
 
 /// A duplicate alias is accepted when the second occurrence stays readonly,
 /// matching the existing behaviour of required immutable fields.
 #[test]
-fn test_accounts_derive_optional_mutable_allows_readonly_duplicate() {
+fn test_accounts_derive_mutable_then_readonly_allows_duplicate() {
 	let ix_data = [3u8; 100];
 	let shared_key = key_from_byte(9);
 	let mut input = create_input_with_layout(2, &ix_data, |i| i == 0, |_| false, |_| shared_key);
@@ -851,12 +886,11 @@ fn test_accounts_derive_optional_mutable_allows_readonly_duplicate() {
 	// SAFETY: the buffer encodes exactly two accounts.
 	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
 
-	// The first slot is an optional mutable field; the second is readonly so
-	// no writable alias exists and parsing succeeds.
+	// The first slot is mutable; the second is readonly so no writable alias
+	// exists and parsing succeeds.
 	let result =
-		TestAccountsOptionalThenImmutable::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
-	assert!(result.is_ok());
+		TestAccountsMutThenImmutableReadonly::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
 	let parsed = result.unwrap();
-	assert!(parsed.optional.is_some());
 	assert_eq!(parsed.one.address(), &shared_key);
+	assert_eq!(parsed.two.address(), &shared_key);
 }

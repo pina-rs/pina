@@ -155,3 +155,43 @@ fn rejects_unparseable_instruction_data() {
 		program.stop().expect("stop isolated program test");
 	});
 }
+
+/// A zero-field instruction is still version-gated: only the current envelope
+/// dispatches against the deployed artifact (sweep finding F-2).
+///
+/// These instructions carry no payload, so without the discriminator-space
+/// envelope gate nothing else would check the version byte on the wire.
+#[test]
+#[ignore = "run with pina test"]
+fn instruction_envelope_pins_the_version_byte() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		// The current envelope confirms and emits its record.
+		let logs = program
+			.simulate_logs(&[EventsInstruction::Initialize as u8, 0u8], Vec::new())
+			.expect("current envelope simulates");
+		assert_eq!(
+			decoded_event_records(&logs).len(),
+			1,
+			"the current envelope must dispatch; logs: {logs:#?}"
+		);
+
+		// An unknown version byte fails at dispatch.
+		let error = program
+			.send(&[EventsInstruction::Initialize as u8, 7u8], Vec::new())
+			.expect_err("an unknown version byte cannot dispatch");
+		assert_eq!(error.operation(), "execute program instruction");
+
+		// So does a missing version byte.
+		let error = program
+			.send(&[EventsInstruction::Initialize as u8], Vec::new())
+			.expect_err("a missing version byte cannot dispatch");
+		assert_eq!(error.operation(), "execute program instruction");
+
+		program.stop().expect("stop isolated program test");
+	});
+}

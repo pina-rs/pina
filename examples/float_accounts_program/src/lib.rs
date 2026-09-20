@@ -22,6 +22,8 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub enum FloatError {
 	/// The signer is not the authority recorded on the account.
 	AuthorityMismatch = 0,
+	/// A float payload is NaN or infinite; only finite values are stored.
+	NonFiniteFloat = 1,
 }
 
 #[discriminator]
@@ -67,6 +69,16 @@ pub struct UpdateAccounts<'a> {
 	pub authority: &'a AccountView,
 }
 
+/// Rejects non-finite float payloads (NaN and ±∞) before they can land in
+/// account data. Subnormals and −0.0 are finite and accepted.
+fn assert_finite(data_f32: f32, data_f64: f64) -> ProgramResult {
+	if data_f32.is_nan() || data_f32.is_infinite() || data_f64.is_nan() || data_f64.is_infinite() {
+		return Err(FloatError::NonFiniteFloat.into());
+	}
+
+	Ok(())
+}
+
 fn apply_create(
 	account: &mut FloatDataAccountZc,
 	authority: &Address,
@@ -99,6 +111,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		let args = CreateInstruction::try_from_bytes(data)?;
 		let data_f32 = f32::from_bits(args.data_f32.get());
 		let data_f64 = f64::from_bits(args.data_f64.get());
+		assert_finite(data_f32, data_f64)?;
 
 		self.authority.assert_signer()?;
 		self.account.assert_empty()?;
@@ -131,6 +144,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		let args = UpdateInstruction::try_from_bytes(data)?;
 		let data_f32 = f32::from_bits(args.data_f32.get());
 		let data_f64 = f64::from_bits(args.data_f64.get());
+		assert_finite(data_f32, data_f64)?;
 
 		self.authority.assert_signer()?;
 
@@ -244,5 +258,56 @@ mod tests {
 		let data = [FloatInstruction::Create as u8];
 		let result = parse_instruction::<FloatInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
+	}
+
+	#[test]
+	fn assert_finite_rejects_nan_and_infinity() {
+		// Quiet NaN, signaling NaN with a payload, and ±Infinity, per width.
+		let f32_patterns = [
+			f32::NAN.to_bits(),
+			0x7f80_0001,
+			f32::INFINITY.to_bits(),
+			f32::NEG_INFINITY.to_bits(),
+		];
+		for bits in f32_patterns {
+			let result = assert_finite(f32::from_bits(bits), 1.0);
+			assert!(matches!(
+				result,
+				Err(ProgramError::Custom(code)) if code == FloatError::NonFiniteFloat as u32
+			));
+		}
+
+		let f64_patterns = [
+			f64::NAN.to_bits(),
+			0x7ff0_0000_0000_0001,
+			f64::INFINITY.to_bits(),
+			f64::NEG_INFINITY.to_bits(),
+		];
+		for bits in f64_patterns {
+			let result = assert_finite(1.0, f64::from_bits(bits));
+			assert!(matches!(
+				result,
+				Err(ProgramError::Custom(code)) if code == FloatError::NonFiniteFloat as u32
+			));
+		}
+	}
+
+	#[test]
+	fn assert_finite_accepts_subnormals_and_negative_zero() {
+		// −0.0 in both widths.
+		assert!(assert_finite(-0.0, -0.0).is_ok());
+
+		// Minimum and largest-magnitude subnormals, signed both ways.
+		assert!(assert_finite(f32::from_bits(1), f64::from_bits(1)).is_ok());
+		assert!(
+			assert_finite(
+				f32::from_bits(0x807f_ffff),
+				f64::from_bits(0x800f_ffff_ffff_ffff)
+			)
+			.is_ok()
+		);
+
+		// Ordinary finite extremes.
+		assert!(assert_finite(f32::MIN, f64::MAX).is_ok());
 	}
 }

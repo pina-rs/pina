@@ -488,9 +488,9 @@ impl<'a> ::core::fmt::Debug for DefaultCrateAccounts<'a> {
 #[pina(crate = pina)]
 pub struct MakeAccounts<'a> {
     pub maker: &'a mut AccountView,
+    pub system_program: &'a AccountView,
     pub escrow: Option<&'a mut AccountView>,
     pub witness: Option<&'a AccountView>,
-    pub system_program: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 4usize;
@@ -498,14 +498,14 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
         let maker = cursor.next_mut()?;
+        let system_program = cursor.next()?;
         let escrow = cursor.next_mut_opt()?;
         let witness = cursor.next_opt()?;
-        let system_program = cursor.next()?;
         Ok(Self {
             maker,
+            system_program,
             escrow,
             witness,
-            system_program,
         })
     }
     #[inline]
@@ -518,6 +518,17 @@ impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        const SLOT_IS_MUTABLE: [bool; 4usize] = [true, false, true, false];
+        let slot_count = accounts.len().min(SLOT_IS_MUTABLE.len());
+        for (i, slot) in accounts.iter().take(slot_count).enumerate() {
+            for (j, other) in accounts.iter().take(slot_count).enumerate().skip(i + 1) {
+                if (SLOT_IS_MUTABLE[i] || SLOT_IS_MUTABLE[j]) && slot.is_writable()
+                    && other.is_writable() && slot.address() == other.address()
+                {
+                    return Err(pina::PinaProgramError::DuplicateMutableAccount.into());
+                }
+            }
+        }
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
@@ -549,12 +560,12 @@ impl<'a> ::core::fmt::Debug for MakeAccounts<'a> {
             "MakeAccounts",
             "maker",
             &self.maker,
+            "system_program",
+            &self.system_program,
             "escrow",
             &self.escrow,
             "witness",
-            &self.witness,
-            "system_program",
-            &&self.system_program,
+            &&self.witness,
         )
     }
 }

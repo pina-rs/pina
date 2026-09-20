@@ -331,6 +331,15 @@
 				"docs": [
 					"The signer is not the authority recorded on the account."
 				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "nonFiniteFloat",
+				"code": 1,
+				"message": "A float payload is NaN or infinite; only finite values are stored.",
+				"docs": [
+					"A float payload is NaN or infinite; only finite values are stored."
+				]
 			}
 		]
 	}

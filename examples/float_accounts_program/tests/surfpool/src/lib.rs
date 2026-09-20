@@ -5,6 +5,7 @@ use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
+use program_under_test::FloatError;
 use program_under_test::FloatInstruction;
 use program_under_test::ID;
 
@@ -203,6 +204,220 @@ fn update_rejects_a_stranger_signer() {
 			.expect_err("a stranger cannot update floats");
 		assert_eq!(error.operation(), "execute program instruction");
 		eprintln!("stranger update error: {}", error.message());
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Create rejects non-finite payloads: quiet NaN, signaling NaN with a
+/// payload, and ±Inf all die with `NonFiniteFloat` and never create an
+/// account.
+#[test]
+#[ignore = "run with pina test"]
+fn create_rejects_non_finite_floats() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let authority = program.payer();
+
+		// Quiet NaN in both widths.
+		let nan_account = Keypair::new_from_array([4; 32]);
+		let error = program
+			.send_with_signers(
+				create_instruction(
+					&program,
+					&nan_account.pubkey(),
+					&authority,
+					f32::NAN.to_bits(),
+					f64::NAN.to_bits(),
+				),
+				&[&nan_account],
+			)
+			.expect_err("a quiet-NaN payload must not create an account");
+		pina_test::assert_custom_error(&error, FloatError::NonFiniteFloat as u32);
+
+		// Signaling NaN with a nonzero payload (raw bit patterns).
+		let snan_account = Keypair::new_from_array([5; 32]);
+		let error = program
+			.send_with_signers(
+				create_instruction(
+					&program,
+					&snan_account.pubkey(),
+					&authority,
+					0x7f80_0001u32,
+					0x7ff0_0000_0000_0001u64,
+				),
+				&[&snan_account],
+			)
+			.expect_err("a signaling-NaN payload must not create an account");
+		pina_test::assert_custom_error(&error, FloatError::NonFiniteFloat as u32);
+
+		// ±Infinity.
+		let inf_account = Keypair::new_from_array([6; 32]);
+		let error = program
+			.send_with_signers(
+				create_instruction(
+					&program,
+					&inf_account.pubkey(),
+					&authority,
+					f32::INFINITY.to_bits(),
+					f64::NEG_INFINITY.to_bits(),
+				),
+				&[&inf_account],
+			)
+			.expect_err("an infinite payload must not create an account");
+		pina_test::assert_custom_error(&error, FloatError::NonFiniteFloat as u32);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Update rejects non-finite payloads: overwriting finite stored values with
+/// NaN or +Inf fails with `NonFiniteFloat` and leaves the stored bits alone.
+#[test]
+#[ignore = "run with pina test"]
+fn update_rejects_non_finite_floats() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let authority = program.payer();
+		let account = Keypair::new_from_array([2; 32]);
+
+		program
+			.send_with_signers(
+				create_instruction(
+					&program,
+					&account.pubkey(),
+					&authority,
+					1.0_f32.to_bits(),
+					2.0_f64.to_bits(),
+				),
+				&[&account],
+			)
+			.expect("execute Create");
+
+		let error = program
+			.send_instruction(update_instruction(
+				&program,
+				&account.pubkey(),
+				&authority,
+				f32::NAN.to_bits(),
+				f64::INFINITY.to_bits(),
+			))
+			.expect_err("non-finite payloads must not overwrite stored values");
+		pina_test::assert_custom_error(&error, FloatError::NonFiniteFloat as u32);
+
+		// The stored values are untouched by the rejected update.
+		let raw = program
+			.account(&account.pubkey())
+			.expect("fetch float account");
+		assert_eq!(
+			&raw.data[2..10],
+			2.0_f64.to_bits().to_le_bytes(),
+			"f64 bits unchanged"
+		);
+		assert_eq!(
+			&raw.data[10..14],
+			1.0_f32.to_bits().to_le_bytes(),
+			"f32 bits unchanged"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Finite edge values are accepted bit-exact: −0.0 and the minimum
+/// subnormals land on-chain, and a normal value still round-trips through
+/// Update afterwards.
+#[test]
+#[ignore = "run with pina test"]
+fn finite_edge_values_are_accepted_bit_exact() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let authority = program.payer();
+		let account = Keypair::new_from_array([7; 32]);
+
+		let neg_zero_f32 = -0.0_f32;
+		let min_subnormal_f32 = f32::from_bits(1);
+		let min_subnormal_f64 = f64::from_bits(1);
+
+		program
+			.send_with_signers(
+				create_instruction(
+					&program,
+					&account.pubkey(),
+					&authority,
+					min_subnormal_f32.to_bits(),
+					min_subnormal_f64.to_bits(),
+				),
+				&[&account],
+			)
+			.expect("the minimum subnormals are finite");
+
+		let raw = program
+			.account(&account.pubkey())
+			.expect("fetch float account");
+		assert_eq!(
+			&raw.data[2..10],
+			min_subnormal_f64.to_bits().to_le_bytes(),
+			"min-subnormal f64 stored bit-exact"
+		);
+		assert_eq!(
+			&raw.data[10..14],
+			min_subnormal_f32.to_bits().to_le_bytes(),
+			"min-subnormal f32 stored bit-exact"
+		);
+
+		// −0.0 is finite and accepted over Update.
+		program
+			.send_instruction(update_instruction(
+				&program,
+				&account.pubkey(),
+				&authority,
+				neg_zero_f32.to_bits(),
+				(-0.0_f64).to_bits(),
+			))
+			.expect("−0.0 is finite");
+
+		let raw = program
+			.account(&account.pubkey())
+			.expect("fetch float account");
+		assert_eq!(
+			&raw.data[2..10],
+			(-0.0_f64).to_bits().to_le_bytes(),
+			"−0.0 f64 stored bit-exact"
+		);
+		assert_eq!(
+			&raw.data[10..14],
+			neg_zero_f32.to_bits().to_le_bytes(),
+			"−0.0 f32 stored bit-exact"
+		);
+
+		// A normal value still round-trips afterwards.
+		program
+			.send_instruction(update_instruction(
+				&program,
+				&account.pubkey(),
+				&authority,
+				1.5_f32.to_bits(),
+				2.5_f64.to_bits(),
+			))
+			.expect("execute Update with finite values");
+		let raw = program
+			.account(&account.pubkey())
+			.expect("fetch float account");
+		assert_eq!(&raw.data[2..10], 2.5_f64.to_bits().to_le_bytes());
+		assert_eq!(&raw.data[10..14], 1.5_f32.to_bits().to_le_bytes());
 
 		program.stop().expect("stop isolated program test");
 	});

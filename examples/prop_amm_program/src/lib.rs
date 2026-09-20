@@ -34,9 +34,20 @@ use pina::*;
 declare_id!("55555555555555555555555555555555555555555555");
 
 /// Matches the Anchor v2 benchmark's hard-coded updater key.
+///
+/// The benchmark shape keeps a fixed, source-visible updater key so the test
+/// suites can rebuild the signing key deterministically. A fixed seed must
+/// therefore stay committed, but never a uniform one: the previous fixture
+/// derived the key from `[7u8; 32]`, so anyone reading this public source
+/// recovered the private key — and with it full price control — in at most
+/// 256 guesses (security sweep finding D1). The keypair seed is instead the
+/// 32 ASCII bytes of `b"pina example fixture updater key"`: still fully
+/// deterministic, but outside the repeated-single-byte brute-force space that
+/// `tests/update_authority.rs` sweeps. A real program must generate its
+/// authority keypair off-circuit and commit only the public key.
 pub const UPDATE_AUTHORITY: Address = Address::new_from_array([
-	234, 74, 108, 99, 226, 156, 82, 10, 190, 245, 80, 123, 19, 46, 197, 249, 149, 71, 118, 174,
-	190, 190, 123, 146, 66, 30, 234, 105, 20, 70, 210, 44,
+	9, 236, 45, 194, 55, 26, 2, 54, 152, 179, 31, 243, 24, 140, 167, 99, 120, 168, 252, 172, 10,
+	173, 160, 155, 241, 194, 170, 126, 40, 228, 171, 52,
 ]);
 
 #[error]
@@ -154,9 +165,12 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		let args = UpdateInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		assert_update_authority(*self.authority)?;
-
+		// Validate the oracle account before the authority so a caller that
+		// passed the wrong oracle sees the account error instead of
+		// `UnauthorizedUpdateAuthority`, which would send integrators chasing
+		// the wrong key.
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
+		assert_update_authority(*self.authority)?;
 		oracle.price = args.new_price;
 
 		Ok(())

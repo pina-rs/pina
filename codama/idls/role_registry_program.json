@@ -864,6 +864,15 @@
 				"docs": [
 					"The role exists but was deactivated, so it grants nothing."
 				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "zeroAddressAdmin",
+				"code": 3,
+				"message": "The proposed admin is the zero address, which can never sign.",
+				"docs": [
+					"The proposed admin is the zero address, which can never sign."
+				]
 			}
 		]
 	}
