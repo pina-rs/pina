@@ -146,7 +146,11 @@
     "MigrationAuto": {
       "description": "Contract kinds enveloped without a per-item token, in stable order.",
       "items": {
-        "type": "string"
+        "enum": [
+          "accounts",
+          "instructions",
+          "events"
+        ]
       },
       "type": "array",
       "uniqueItems": true
