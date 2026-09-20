@@ -496,7 +496,7 @@ fn own_rows(schema: &DataSchema) -> Vec<(String, String, String)> {
 			};
 			let mut note = format!("{kind} prefix, capacity {}", tail.capacity);
 			if tail.element_size > 1 {
-				note.push_str(&format!(", {}-byte elements", tail.element_size));
+				note = format!("{note}, {}-byte elements", tail.element_size);
 			}
 			if tail.optional {
 				note.push_str(", optional");
