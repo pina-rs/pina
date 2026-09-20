@@ -266,7 +266,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [8u8; 32].into();
-		let data = [EventsInstruction::Initialize as u8];
+		let data = [EventsInstruction::Initialize as u8, 0];
 		let result = parse_instruction::<EventsInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}
