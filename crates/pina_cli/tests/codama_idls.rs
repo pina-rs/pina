@@ -171,7 +171,7 @@ fn codama_idl_fixtures_match_generated_output() {
 
 		assert_eq!(
 			generated_json, fixture_json,
-			"IDL fixture drift detected for {}. Run `scripts/generate-codama-idls.sh` and commit \
+			"IDL fixture drift detected for {}. Run `scripts/generate-pina-clients.sh` and commit \
 			 the updated fixture.",
 			example_name,
 		);

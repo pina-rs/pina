@@ -61,7 +61,7 @@ format_codama_outputs() {
 trap '
 	status=$?
 	if [ "$status" -ne 0 ]; then
-		echo "verify-codama-idls.sh failed with exit code $status" >&2
+		echo "verify-pina-clients.sh failed with exit code $status" >&2
 		show_codama_diff
 	fi
 ' EXIT
@@ -197,16 +197,16 @@ fi
 
 cargo test --locked "${CLI_ARGS[@]}"
 
-echo "Checking deterministic Codama output regeneration..."
+echo "Checking deterministic client output regeneration..."
 GENERATED_STATUS="$(
 	git -C "$ROOT" status --porcelain=v1 --untracked-files=all -- \
 		"$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR"
 )"
 
 if [ -n "$GENERATED_STATUS" ]; then
-	echo "Detected Codama output drift after regeneration and formatting. Output must be committed and deterministic." >&2
+	echo "Detected client output drift after regeneration and formatting. Output must be committed and deterministic." >&2
 	show_codama_diff
 	exit 1
 fi
 
-echo "Codama generation and validation checks passed."
+echo "Client generation and validation checks passed."
