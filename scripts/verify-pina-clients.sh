@@ -61,7 +61,7 @@ format_codama_outputs() {
 trap '
 	status=$?
 	if [ "$status" -ne 0 ]; then
-		echo "verify-codama-idls.sh failed with exit code $status" >&2
+		echo "verify-pina-clients.sh failed with exit code $status" >&2
 		show_codama_diff
 	fi
 ' EXIT
@@ -76,18 +76,8 @@ pnpm install --frozen-lockfile --config.confirm-modules-purge=false
 # its bundle has to exist before generation runs.
 pnpm --dir "$ROOT" run build:codama-renderer-cli
 
-echo "Generating Codama IDLs and clients for all examples..."
-cargo run -p pina_cli --quiet -- codama generate \
-	--examples-dir "$ROOT/examples" \
-	--idls-dir "$IDL_DIR" \
-	--rust-out "$RUST_CLIENTS_DIR" \
-	--cpi-out "$CPI_CLIENTS_DIR" \
-	--js-out "$JS_CLIENTS_DIR" \
-	--dart-out "$DART_CLIENTS_DIR" \
-	--cli-rust-out "$CLI_RUST_CLIENTS_DIR" \
-	--cli-ts-out "$CLI_JS_CLIENTS_DIR" \
-	--cli-dart-out "$CLI_DART_CLIENTS_DIR" \
-	--npx node
+echo "Generating IDLs and clients for all examples with pina generate..."
+bash "$ROOT/scripts/generate-pina-clients.sh"
 
 if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
 	echo "No *.json fixtures were generated in $IDL_DIR" >&2
@@ -207,16 +197,16 @@ fi
 
 cargo test --locked "${CLI_ARGS[@]}"
 
-echo "Checking deterministic Codama output regeneration..."
+echo "Checking deterministic client output regeneration..."
 GENERATED_STATUS="$(
 	git -C "$ROOT" status --porcelain=v1 --untracked-files=all -- \
 		"$IDL_DIR" "$RUST_CLIENTS_DIR" "$CPI_CLIENTS_DIR" "$JS_CLIENTS_DIR" "$DART_CLIENTS_DIR" "$CLI_CLIENTS_DIR"
 )"
 
 if [ -n "$GENERATED_STATUS" ]; then
-	echo "Detected Codama output drift after regeneration and formatting. Output must be committed and deterministic." >&2
+	echo "Detected client output drift after regeneration and formatting. Output must be committed and deterministic." >&2
 	show_codama_diff
 	exit 1
 fi
 
-echo "Codama generation and validation checks passed."
+echo "Client generation and validation checks passed."

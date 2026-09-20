@@ -71,7 +71,7 @@ pina idl -p ./programs/counter_program --name counter_v2
 
 The command exits unsuccessfully when the path is not a readable program crate, `[package].name` is absent, modules cannot be resolved, more than one source file defines `process_instruction`, declarations conflict, PDA attributes or validation links cannot be resolved, a supported schema cannot be represented safely, or JSON/output-file writing fails. Diagnostics include source or path context where available. These checks are fail-closed: the CLI does not silently omit malformed PDA metadata or choose one of several entrypoint dispatch sources.
 
-For complete client generation, continue with [`pina codama generate`](./codama-generate.md).
+For complete client generation, continue with [`pina generate`](./generate.md).
 
 ## Canonical Program Metadata
 

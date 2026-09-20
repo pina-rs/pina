@@ -41,16 +41,16 @@ update:deps
 <!-- {=codamaWorkflowCommands} -->
 
 ```bash
-# Generate Codama IDLs for all examples.
+# Generate IDLs and clients for all examples.
 codama:idl:all
 
 # Generate Rust + CPI + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/CPI/JS/Dart clients in one command.
-pina codama generate
+# Generate one project's configured clients.
+pina generate
 
-# Run the complete Codama pipeline.
+# Run the complete generation and validation pipeline.
 codama:test
 
 # Run IDL fixture drift + validation checks used by CI.

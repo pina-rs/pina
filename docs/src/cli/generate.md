@@ -47,6 +47,8 @@ clients/
 └── cli-dart/
 ```
 
-Pina rejects filesystem-root and symbolic-link generation targets before a renderer runs. `pina codama generate` remains available for the repository-wide, explicitly pathed compatibility workflow.
+Pina rejects filesystem-root and symbolic-link generation targets before a renderer runs.
+
+Generate every program in a repository by running the command once per project; `scripts/generate-pina-clients.sh` does exactly that for this repository's examples.
 
 See [Project Configuration](./configuration.md) for client defaults and the distinction between configuration-relative and command-line paths.

@@ -39,10 +39,8 @@ use std::path::Path;
 use codama_nodes::RootNode;
 pub use pina_abi::MigrationVersionType;
 
-pub use crate::codama::CodamaGenerateOptions;
 pub use crate::codama::ProjectGenerateOptions;
 pub use crate::codama::ProjectGenerateOutput;
-pub use crate::codama::generate_codama;
 pub use crate::codama::generate_project_clients;
 use crate::codegen::try_ir_to_root_node_with_migrations;
 pub use crate::cpi::CpiGenerateOptions;

@@ -99,8 +99,9 @@ jobs:
               - crates/pina_macros/**
               - crates/pina_codama_renderer/**
               - crates/pina_cpi_renderer/**
-              - scripts/generate-codama-idls.sh
-              - scripts/verify-codama-idls.sh
+              - crates/pina_cli_renderer/**
+              - scripts/generate-pina-clients.sh
+              - scripts/verify-pina-clients.sh
               - pnpm-lock.yaml
             pina_test:
               - crates/pina_test/**
@@ -533,18 +534,18 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: verify codama generation
+      - name: verify generated clients
         run: test:idl
         shell: devenv shell -c -- bash -e {0}
 
-      - name: show codama diff on failure
+      - name: show generated client diff on failure
         if: failure()
         run: |
-          git --no-pager status --short -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
+          git --no-pager status --short -- codama/
           echo
-          git --no-pager diff --stat -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
+          git --no-pager diff --stat -- codama/
           echo
-          git --no-pager diff -- codama/idls codama/clients/rust codama/clients/js codama/clients/cli
+          git --no-pager diff -- codama/
         shell: bash
 
   # The workspace build is fully covered on pull requests by the `test` and

@@ -481,20 +481,6 @@ fn deploy_help_snapshot() {
 }
 
 #[test]
-fn codama_help_snapshot() {
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command.args(["codama", "--help"]);
-	assert_cmd_snapshot!("codama_help", command);
-}
-
-#[test]
-fn codama_generate_help_snapshot() {
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command.args(["codama", "generate", "--help"]);
-	assert_cmd_snapshot!("codama_generate_help", command);
-}
-
-#[test]
 fn idl_stdout_is_machine_readable_json() {
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.current_dir(workspace_root())
@@ -607,158 +593,6 @@ fn idl_success_output_snapshot() {
 		.current_dir(workspace_root())
 		.args(["idl", "--path", "examples/declare_id_program"]);
 	assert_cmd_snapshot!("idl_success_output", command);
-}
-
-#[test]
-fn codama_generate_success_output_snapshot() {
-	let temp_dir = reset_snapshot_dir("codama_generate_success");
-	let fake_npx = create_fake_npx(&temp_dir);
-	let idls_dir = temp_dir.join("idls");
-	let rust_out = temp_dir.join("rust");
-	let cpi_out = temp_dir.join("cpi");
-	let js_out = temp_dir.join("js");
-	let dart_out = temp_dir.join("dart");
-	// The pipeline hardens the existing JavaScript and Dart clients in place:
-	// it appends the migration-aware decoders to every account module, writes
-	// the reserved `Migrate` composer, and patches the program plugin. Seed the
-	// fake destinations with the committed generated trees so they look like a
-	// real prior generation instead of empty directories.
-	copy_tree(
-		&workspace_root().join("codama/clients/js/counter_program/src/generated"),
-		&js_out.join("counter_program/src/generated"),
-	)
-	.unwrap_or_else(|error| panic!("failed to seed fake JS client tree: {error}"));
-	copy_tree(
-		&workspace_root().join("codama/clients/dart/lib/src/generated/counter_program"),
-		&dart_out.join("lib/src/generated/counter_program"),
-	)
-	.unwrap_or_else(|error| panic!("failed to seed fake Dart client tree: {error}"));
-
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command
-		.current_dir(workspace_root())
-		.arg("codama")
-		.arg("generate")
-		.arg("--examples-dir")
-		.arg("examples")
-		.arg("--idls-dir")
-		.arg(workspace_relative(&idls_dir))
-		.arg("--rust-out")
-		.arg(workspace_relative(&rust_out))
-		.arg("--cpi-out")
-		.arg(workspace_relative(&cpi_out))
-		.arg("--js-out")
-		.arg(workspace_relative(&js_out))
-		.arg("--dart-out")
-		.arg(workspace_relative(&dart_out))
-		.arg("--example")
-		.arg("counter_program")
-		.arg("--npx")
-		.arg(fake_npx);
-	assert_cmd_snapshot!("codama_generate_success_output", command);
-
-	assert!(
-		idls_dir.join("counter_program.json").is_file(),
-		"expected generated counter_program IDL at {}",
-		idls_dir.join("counter_program.json").display()
-	);
-	assert!(
-		rust_out
-			.join("counter_program")
-			.join("src/generated/mod.rs")
-			.is_file(),
-		"expected generated Rust client module at {}",
-		rust_out
-			.join("counter_program")
-			.join("src/generated/mod.rs")
-			.display()
-	);
-	assert!(
-		cpi_out
-			.join("counter_program")
-			.join("src/generated/mod.rs")
-			.is_file(),
-		"expected generated CPI client module at {}",
-		cpi_out
-			.join("counter_program")
-			.join("src/generated/mod.rs")
-			.display()
-	);
-	assert!(
-		dart_out.join("lib/counter_program.dart").is_file(),
-		"expected generated Dart package entrypoint at {}",
-		dart_out.join("lib/counter_program.dart").display()
-	);
-	assert!(
-		js_out
-			.join("counter_program")
-			.join("src/generated/pinaPodCodecs.ts")
-			.is_file(),
-		"expected generated JavaScript validation helpers at {}",
-		js_out
-			.join("counter_program")
-			.join("src/generated/pinaPodCodecs.ts")
-			.display()
-	);
-}
-
-#[test]
-fn codama_generate_unknown_example_error_snapshot() {
-	let temp_dir = reset_snapshot_dir("codama_generate_unknown_example");
-	let fake_npx = create_fake_npx(&temp_dir);
-
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command
-		.current_dir(workspace_root())
-		.arg("codama")
-		.arg("generate")
-		.arg("--examples-dir")
-		.arg("examples")
-		.arg("--idls-dir")
-		.arg(workspace_relative(&temp_dir.join("idls")))
-		.arg("--rust-out")
-		.arg(workspace_relative(&temp_dir.join("rust")))
-		.arg("--js-out")
-		.arg(workspace_relative(&temp_dir.join("js")))
-		.arg("--dart-out")
-		.arg(workspace_relative(&temp_dir.join("dart")))
-		.arg("--example")
-		.arg("does_not_exist")
-		.arg("--npx")
-		.arg(fake_npx);
-	assert_cmd_snapshot!("codama_generate_unknown_example_error", command);
-}
-
-#[test]
-fn codama_generate_missing_examples_path_error_snapshot() {
-	let temp_dir = reset_snapshot_dir("codama_generate_missing_examples");
-	let fake_npx = create_fake_npx(&temp_dir);
-
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command
-		.current_dir(workspace_root())
-		.arg("codama")
-		.arg("generate")
-		.arg("--examples-dir")
-		.arg(workspace_relative(&temp_dir.join("missing_examples")))
-		.arg("--idls-dir")
-		.arg(workspace_relative(&temp_dir.join("idls")))
-		.arg("--rust-out")
-		.arg(workspace_relative(&temp_dir.join("rust")))
-		.arg("--js-out")
-		.arg(workspace_relative(&temp_dir.join("js")))
-		.arg("--dart-out")
-		.arg(workspace_relative(&temp_dir.join("dart")))
-		.arg("--npx")
-		.arg(fake_npx);
-	let output = command
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina codama generate: {error}"));
-	let stderr = String::from_utf8_lossy(&output.stderr);
-
-	assert!(!output.status.success());
-	assert!(stderr.contains("Failed to read examples directory"));
-	assert!(stderr.contains("missing_examples"));
 }
 
 #[cfg(unix)]
@@ -1023,17 +857,6 @@ fn executable_script_with_exit(project: &Path, exit_code: u8) -> PathBuf {
 	let path = project.join("failed-surfpool.sh");
 	create_executable(&path, &format!("#!/bin/sh\nexit {exit_code}\n"));
 	path
-}
-
-#[test]
-fn codama_generate_invalid_argument_error_snapshot() {
-	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
-	command
-		.current_dir(workspace_root())
-		.arg("codama")
-		.arg("generate")
-		.arg("--example");
-	assert_cmd_snapshot!("codama_generate_invalid_argument_error", command);
 }
 
 #[test]

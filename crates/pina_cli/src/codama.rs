@@ -181,7 +181,13 @@ function publishDartCli() {
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
-		publishDirectory(join(stagingRoot, "bin"), join(outputRoot, "bin"));
+		// The Dart CLI package is shared by every program, so publishing the
+		// whole staged bin directory would drop the entrypoints of programs
+		// that are not part of this invocation.
+		publishFile(
+			join(stagingRoot, "bin", `${name}.dart`),
+			join(outputRoot, "bin", `${name}.dart`),
+		);
 	}
 	publishFile(
 		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
@@ -288,39 +294,6 @@ dependencies:
 }
 "#;
 
-/// Options for workspace-wide Codama generation across all examples.
-///
-/// Mirrors the `pina codama generate` arguments: source examples, IDL fixtures,
-/// and one output directory per generated client ecosystem.
-#[derive(Debug, Clone)]
-pub struct CodamaGenerateOptions {
-	/// Directory containing the example program crates.
-	pub examples_dir: PathBuf,
-	/// Directory holding the committed `codama/idls` fixtures.
-	pub idls_dir: PathBuf,
-	/// Output directory for generated Rust client crates.
-	pub rust_out: PathBuf,
-	/// Output directory for generated CPI client crates.
-	pub cpi_out: PathBuf,
-	/// Output directory for generated TypeScript clients.
-	pub js_out: PathBuf,
-	/// Output directory for generated Dart clients.
-	pub dart_out: PathBuf,
-	/// Output directory for generated Rust CLI crates. CLI generation is
-	/// skipped when unset.
-	pub cli_rust_out: Option<PathBuf>,
-	/// Output directory for generated TypeScript CLI applications. CLI
-	/// generation is skipped when unset.
-	pub cli_ts_out: Option<PathBuf>,
-	/// Output directory for the generated Dart CLI package. CLI generation
-	/// is skipped when unset.
-	pub cli_dart_out: Option<PathBuf>,
-	/// Example names to generate; empty selects every example.
-	pub examples: Vec<String>,
-	/// Command used to invoke Node-based Codama tooling.
-	pub npx: String,
-}
-
 /// Options for project-aware client generation.
 #[derive(Debug, Clone)]
 pub struct ProjectGenerateOptions {
@@ -371,67 +344,6 @@ struct BoundedOutput {
 	status: ExitStatus,
 	stdout: Vec<u8>,
 	stderr: Vec<u8>,
-}
-
-/// Generate IDL fixtures and all configured clients for the selected examples.
-///
-/// Returns the names of every example that was generated, in sorted order.
-pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
-	let examples = collect_examples(options)?;
-	let programs = examples
-		.iter()
-		.map(|example| (example.clone(), options.examples_dir.join(example)))
-		.collect();
-	let plan = GenerationPlan {
-		programs,
-		override_idl_names: false,
-		cpi_package_names: examples
-			.iter()
-			.map(|example| (example.clone(), example.clone()))
-			.collect(),
-		idls_dir: options.idls_dir.clone(),
-		rust_out: options.rust_out.clone(),
-		cpi_out: options.cpi_out.clone(),
-		typescript_out: options.js_out.clone(),
-		dart_out: options.dart_out.clone(),
-		cli_rust_out: options.cli_rust_out.clone().unwrap_or_default(),
-		cli_ts_out: options.cli_ts_out.clone().unwrap_or_default(),
-		cli_dart_out: options.cli_dart_out.clone().unwrap_or_default(),
-		clients: expand_cli_clients(
-			[
-				ClientLanguage::Cpi,
-				ClientLanguage::Rust,
-				ClientLanguage::Typescript,
-				ClientLanguage::Dart,
-			]
-			.into_iter()
-			.chain(
-				options
-					.cli_rust_out
-					.is_some()
-					.then_some(ClientLanguage::CliRust),
-			)
-			.chain(
-				options
-					.cli_ts_out
-					.is_some()
-					.then_some(ClientLanguage::CliTs),
-			)
-			.chain(
-				options
-					.cli_dart_out
-					.is_some()
-					.then_some(ClientLanguage::CliDart),
-			)
-			.collect(),
-		),
-		generation: default_generation_settings(),
-		npx: options.npx.clone(),
-	};
-
-	generate_plan(&plan)?;
-
-	Ok(examples)
 }
 
 /// Generate selected clients for the project discovered from `project_dir`.
@@ -509,29 +421,6 @@ pub fn generate_project_clients(
 		clients_dir,
 		clients: clients.into_iter().collect(),
 	})
-}
-
-fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings> {
-	[
-		ClientLanguage::Cpi,
-		ClientLanguage::Rust,
-		ClientLanguage::Typescript,
-		ClientLanguage::Dart,
-		ClientLanguage::CliRust,
-		ClientLanguage::CliTs,
-		ClientLanguage::CliDart,
-	]
-	.into_iter()
-	.map(|language| {
-		(
-			language,
-			GenerationSettings {
-				mode: GenerationMode::Auto,
-				scaffold: true,
-			},
-		)
-	})
-	.collect()
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
@@ -1030,53 +919,6 @@ fn selected_output_dirs(plan: &GenerationPlan) -> Vec<&Path> {
 	paths
 }
 
-fn collect_examples(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
-	let mut available = std::fs::read_dir(&options.examples_dir)
-		.map_err(|source| {
-			CodamaError::ReadExamples {
-				path: options.examples_dir.clone(),
-				source,
-			}
-		})?
-		.filter_map(Result::ok)
-		.filter(|entry| entry.path().is_dir())
-		.filter_map(|entry| entry.file_name().into_string().ok())
-		.collect::<Vec<_>>();
-
-	available.sort();
-
-	if available.is_empty() {
-		return Err(CodamaError::NoExamples {
-			path: options.examples_dir.clone(),
-		});
-	}
-
-	if options.examples.is_empty() {
-		return Ok(available);
-	}
-
-	let available_set = available.iter().cloned().collect::<BTreeSet<_>>();
-	for requested in &options.examples {
-		if !available_set.contains(requested) {
-			return Err(CodamaError::UnknownExample {
-				example: requested.clone(),
-				available: available.join(", "),
-			});
-		}
-	}
-
-	let mut selected: Vec<_> = options
-		.examples
-		.iter()
-		.cloned()
-		.collect::<BTreeSet<_>>()
-		.into_iter()
-		.collect();
-	selected.sort();
-
-	Ok(selected)
-}
-
 fn run_client_generation(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
@@ -1439,6 +1281,29 @@ mod tests {
 			stdout: stdout.to_vec(),
 			stderr: stderr.to_vec(),
 		}
+	}
+
+	fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings> {
+		[
+			ClientLanguage::Cpi,
+			ClientLanguage::Rust,
+			ClientLanguage::Typescript,
+			ClientLanguage::Dart,
+			ClientLanguage::CliRust,
+			ClientLanguage::CliTs,
+			ClientLanguage::CliDart,
+		]
+		.into_iter()
+		.map(|language| {
+			(
+				language,
+				GenerationSettings {
+					mode: GenerationMode::Auto,
+					scaffold: true,
+				},
+			)
+		})
+		.collect()
 	}
 
 	fn empty_plan(npx: impl Into<String>) -> GenerationPlan {

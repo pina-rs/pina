@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 205
 info:
   program: pina
   args:
@@ -11,7 +12,7 @@ exit_code: 0
 ----- stdout -----
 Generate, inspect, and publish canonical Codama IDLs.
 
-Bare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. The generate subcommand spells that action explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.
+Bare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.
 
 Usage: pina idl [OPTIONS] [COMMAND]
 

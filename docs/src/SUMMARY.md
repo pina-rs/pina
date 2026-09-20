@@ -22,7 +22,6 @@
   - [Generate Shell Completions](./cli/completions.md)
   - [Profile an SBF Program](./cli/profile.md)
   - [Deploy a Program](./cli/deploy.md)
-  - [Generate Codama Clients](./cli/codama-generate.md)
   - [Automation and Agent Usage](./cli/automation.md)
 - [Agent Skill](./agent-skill.md)
 - [Core Concepts](./core-concepts.md)

@@ -199,28 +199,17 @@ in
     "codama:idl:all" = {
       exec = ''
         set -euo pipefail
-        "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
+        "$DEVENV_ROOT/scripts/generate-pina-clients.sh"
         dprint fmt "codama/**"
       '';
-      description = "Generate Codama IDLs for all example programs.";
+      description = "Generate IDLs and clients for all example programs.";
       binary = "bash";
     };
     "codama:clients:generate" = {
       exec = ''
         set -euo pipefail
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
-        pina codama generate \
-          --examples-dir "$DEVENV_ROOT/examples" \
-          --idls-dir "$DEVENV_ROOT/codama/idls" \
-          --rust-out "$DEVENV_ROOT/codama/clients/rust" \
-          --cpi-out "$DEVENV_ROOT/codama/clients/cpi" \
-          --js-out "$DEVENV_ROOT/codama/clients/js" \
-          --dart-out "$DEVENV_ROOT/codama/clients/dart" \
-          --cli-rust-out "$DEVENV_ROOT/codama/clients/cli/rust" \
-          --cli-ts-out "$DEVENV_ROOT/codama/clients/cli/ts" \
-          --cli-dart-out "$DEVENV_ROOT/codama/clients/cli/dart" \
-          --npx node
+        "$DEVENV_ROOT/scripts/generate-pina-clients.sh"
         dprint fmt "codama/**"
         # `dart format` picks its style from the package's resolved language
         # version, so the package config has to exist before formatting.
@@ -229,15 +218,15 @@ in
         (cd "$DEVENV_ROOT/codama/clients/cli/dart" && dart pub get --enforce-lockfile)
         dart format "$DEVENV_ROOT/codama/clients/cli/dart"
       '';
-      description = "Generate Codama IDLs and Rust/CPI/JS/Dart/CLI clients for all examples.";
+      description = "Generate Rust/CPI/JS/Dart/CLI clients for all examples with pina generate.";
       binary = "bash";
     };
     "codama:test" = {
       exec = ''
         set -euo pipefail
-        bash "$DEVENV_ROOT/codama/test.sh"
+        bash "$DEVENV_ROOT/scripts/verify-pina-clients.sh"
       '';
-      description = "Run the full Codama integration pipeline.";
+      description = "Run the full client generation and validation pipeline.";
       binary = "bash";
     };
     "generate:keypair" = {
@@ -408,6 +397,10 @@ in
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
+        # through this workspace package, so its bundle has to exist before the
+        # Rust suite runs. `dist` is not committed.
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
@@ -938,17 +931,17 @@ in
     "idl:generate" = {
       exec = ''
         set -euo pipefail
-        "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
+        "$DEVENV_ROOT/scripts/generate-pina-clients.sh"
       '';
-      description = "Generate Codama IDLs for all examples.";
+      description = "Generate IDLs and clients for all examples with pina generate.";
       binary = "bash";
     };
     "verify:idls" = {
       exec = ''
         set -euo pipefail
-        ${lib.escapeShellArg "${currentDir}/scripts/verify-codama-idls.sh"}
+        ${lib.escapeShellArg "${currentDir}/scripts/verify-pina-clients.sh"}
       '';
-      description = "Verify Codama generation, fixture drift, validation, and deterministic output.";
+      description = "Verify client generation, fixture drift, validation, and deterministic output.";
       binary = "bash";
     };
     "test:idl" = {
@@ -956,7 +949,7 @@ in
         set -euo pipefail
         ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/verify:idls"}
       '';
-      description = "Run full Codama integration and deterministic generation checks.";
+      description = "Run full client integration and deterministic generation checks.";
       binary = "bash";
     };
     "test:surfpool" = {
@@ -1020,6 +1013,10 @@ in
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
+        # through this workspace package, so its bundle has to exist before the
+        # Rust suite runs. `dist` is not committed.
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand

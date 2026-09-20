@@ -108,16 +108,16 @@ With `devenv`, the full workflow is available via built-in scripts:
 <!-- {=codamaWorkflowCommands} -->
 
 ```bash
-# Generate Codama IDLs for all examples.
+# Generate IDLs and clients for all examples.
 codama:idl:all
 
 # Generate Rust + CPI + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/CPI/JS/Dart clients in one command.
-pina codama generate
+# Generate one project's configured clients.
+pina generate
 
-# Run the complete Codama pipeline.
+# Run the complete generation and validation pipeline.
 codama:test
 
 # Run IDL fixture drift + validation checks used by CI.
@@ -131,7 +131,7 @@ pnpm run test:quasar-svm
 
 Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native PinaPod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
 
-`pina codama generate` also augments the stock JavaScript output with PinaPod boundary checks. Generated encoders reject values that exceed fixed or compact field capacity rather than truncating them. Decoders enforce discriminators, prefixes, strict UTF-8, and canonical boolean and option tags. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
+`pina generate` also augments the stock JavaScript output with PinaPod boundary checks. Generated encoders reject values that exceed fixed or compact field capacity rather than truncating them. Decoders enforce discriminators, prefixes, strict UTF-8, and canonical boolean and option tags. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
 
 End-to-end setup steps:
 
@@ -183,10 +183,10 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls` and the `codama/clients` tree with `pina generate`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
-- generated Rust and CPI clients compile
+- generated Rust, CPI, and Rust CLI clients compile, and the Rust CLI crates pass their tests
 - generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`

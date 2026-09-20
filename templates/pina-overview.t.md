@@ -178,7 +178,6 @@ cargo nextest run  # Faster parallel test execution
 - `pina completions <shell>`: generate a shell completion script
 - `pina profile [path.so]`: profile a compiled or discovered SBF binary statically
 - `pina deploy`: plan and execute an explicit cluster deployment
-- `pina codama generate`: run the legacy repository-wide client workflow
 
 <!-- {/pinaCliCommands} -->
 

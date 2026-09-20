@@ -4,7 +4,7 @@
 	"type": "module",
 	"packageManager": "pnpm@11.25.0",
 	"scripts": {
-		"generate": "pnpm run build:codama-renderer-cpi >/dev/null 2>&1 || true; pnpm run build:codama-renderer-cli && cargo run -p pina_cli -- codama generate --npx node",
+		"generate": "bash scripts/generate-pina-clients.sh",
 		"check:js": "tsc --noEmit -p codama/tsconfig.json && tsc --noEmit -p codama/tsconfig.cli.json",
 		"check:scripts": "tsc --noEmit -p tsconfig.scripts.json",
 		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",

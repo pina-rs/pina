@@ -25,8 +25,7 @@ use pina_cli::GenerationMode;
 	              verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt \
 	              another program's IDL as one, 'pina doctor' for agent-readable diagnostics, \
 	              'pina keys' for program identity, and 'pina completions' for shell integration. \
-	              Low-level IDL, profiling, terminal documentation, and the legacy \
-	              repository-wide Codama workflow remain available.",
+	              Low-level IDL, profiling, and terminal documentation remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
@@ -360,9 +359,9 @@ pub(crate) enum Commands {
 	/// Generate, inspect, and publish canonical Codama IDLs.
 	///
 	/// Bare invocation preserves local generation: it parses PATH and emits a
-	/// Codama root-node JSON document. The generate subcommand spells that action
-	/// explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a
-	/// deployed program through the pinned official Program Metadata client.
+	/// Codama root-node JSON document. Fetch, diff, and publish manage canonical
+	/// `idl` metadata for a deployed program through the pinned official Program
+	/// Metadata client.
 	#[command(after_help = "Examples:\n  pina idl\n  pina idl --path \
 	                        ./programs/counter_program\n  pina idl -p ./programs/counter_program \
 	                        -o ./idls/counter_program.json\n  pina idl -p \
@@ -771,15 +770,6 @@ Safety:
 		/// `PINA_DEPLOY_CLUSTER` environment variables.
 		#[arg(long, value_name = "COMMAND")]
 		remote_command: Option<String>,
-	},
-
-	/// Run Codama IDL and client-generation workflows.
-	///
-	/// Use the generate subcommand to extract every selected program IDL and
-	/// render the corresponding Rust, JavaScript, and Dart clients.
-	Codama {
-		#[command(subcommand)]
-		command: CodamaCommands,
 	},
 }
 
@@ -1437,108 +1427,4 @@ impl SurfpoolCluster {
 			Self::Testnet => "testnet",
 		}
 	}
-}
-
-/// Codama-related generation workflows.
-#[derive(Subcommand, Debug)]
-pub(crate) enum CodamaCommands {
-	/// Generate IDLs and Rust, JavaScript, and Dart clients.
-	///
-	/// Discovers Pina programs below `EXAMPLES_DIR`, optionally filters them with
-	/// repeatable --example arguments, writes IDLs, and renders all four client
-	/// targets. The command fails when a requested example does not exist or a
-	/// renderer exits unsuccessfully.
-	#[command(
-		after_help = "Examples:\n  pina codama generate\n  pina codama generate --example \
-		              counter_program --example todo_program\n  pina codama generate \
-		              --examples-dir ./programs --idls-dir ./idls \\\n                --rust-out \
-		              ./clients/rust --cpi-out ./clients/cpi --js-out ./clients/js --dart-out \
-		              ./clients/dart\n\nRequirements:\n  The selected --npx executable, or the \
-		              default pnpm fallback, must be available when JavaScript and Dart client \
-		              rendering runs."
-	)]
-	Generate {
-		/// Directory containing Pina program crates. Defaults to `examples`.
-		#[arg(
-			long,
-			default_value = "examples",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		examples_dir: PathBuf,
-
-		/// Directory for generated Codama IDL JSON files. Defaults to `codama/idls`.
-		#[arg(
-			long,
-			default_value = "codama/idls",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		idls_dir: PathBuf,
-
-		/// Directory for generated Rust client crates. Defaults to `codama/clients/rust`.
-		#[arg(
-			long,
-			default_value = "codama/clients/rust",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		rust_out: PathBuf,
-
-		/// Directory for generated CPI crates. Defaults to `codama/clients/cpi`.
-		#[arg(
-			long,
-			default_value = "codama/clients/cpi",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		cpi_out: PathBuf,
-
-		/// Directory for generated JavaScript client packages. Defaults to `codama/clients/js`.
-		#[arg(
-			long,
-			default_value = "codama/clients/js",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		js_out: PathBuf,
-
-		/// Directory for the generated Dart client package. Defaults to `codama/clients/dart`.
-		#[arg(
-			long,
-			default_value = "codama/clients/dart",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		dart_out: PathBuf,
-
-		/// Output directory for generated Rust CLI crates. Omit to skip
-		/// CLI generation.
-		#[arg(long, value_name = "DIR")]
-		cli_rust_out: Option<PathBuf>,
-
-		/// Output directory for generated TypeScript CLI applications.
-		/// Omit to skip CLI generation.
-		#[arg(long, value_name = "DIR")]
-		cli_ts_out: Option<PathBuf>,
-
-		/// Output directory for the generated Dart CLI package. Omit to
-		/// skip CLI generation.
-		#[arg(long, value_name = "DIR")]
-		cli_dart_out: Option<PathBuf>,
-
-		/// Program name to generate. Repeat to select multiple programs.
-		/// When omitted, every program below --examples-dir is generated.
-		#[arg(long = "example", value_name = "NAME")]
-		examples: Vec<String>,
-
-		/// Executable used to invoke the Codama JavaScript renderers. Defaults to `npx`.
-		#[arg(
-			long,
-			default_value = "npx",
-			hide_default_value = true,
-			value_name = "COMMAND"
-		)]
-		npx: String,
-	},
 }
