@@ -195,3 +195,11 @@ Pubkey::default()` succeeds. Every later admin instruction fails: the stored adm
 - Scenarios in the attack matrix not reachable tonight are recorded in the blocked table with their static gates (B12, B13, B14, B19, B20); nothing matrix-listed was left unexamined.
 - The spending-limit SPL/token path, `MultisigImport` from a live foreign program, and proposal-close rent accounting were not dynamically exercised (no token mint in the harness; import needs a foreign-owned fixture the state cheatcode refuses, per hard-edges item 9 — the owner check itself is dynamically proven in `examples/multisig_program/tests/surfpool`).
 - Raw byte offsets used by the harness are asserted against live accounts in M1 (`threshold`, roster) and M3 (`timelock`, status), so the recorded outcomes do not depend on the generated view API.
+
+## E3 residual (found in review, 2026-09-20)
+
+`prune_spending_limit_roster` only prunes the limit accounts the removal execution receives. A limit **omitted** from that execution keeps the removed address on its roster, and `AddMember` later restores the address as a member — at which point `SpendingLimitUse`'s membership check passes and the retained roster entry revives the revoked grant without a new grant.
+
+Reproduced end-to-end in `examples/multisig_program/tests/surfpool/src/lib.rs` (`a_readded_member_cannot_reuse_the_old_limit_grant`, run with `--ignored`): remove B without passing the limit, re-add B, and B's draw succeeds.
+
+The durable fix is a membership generation recorded in `SpendingLimit` and compared at draw time (a layout change requiring a migration and IDL regeneration), not a handler guard: the guard cannot distinguish "member again" from "member who never left". Until that lands, E3's shipped mitigation is incomplete for the removal-without-limit → re-add path, and this note is the tracked follow-up.

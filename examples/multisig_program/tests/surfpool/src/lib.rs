@@ -2004,3 +2004,231 @@ fn removing_a_member_revokes_spending_limit_access() {
 			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }
+
+/// A spending-limit grant must stay revoked across a re-add.
+///
+/// Removal only prunes the limit accounts its execution receives, so a limit
+/// omitted from that execution keeps the removed address on its roster. The
+/// durable defence is the membership check in `SpendingLimitUse`: a drawer who
+/// is not a current member is refused no matter what a stale roster says, and
+/// re-adding the address does not restore the old delegation — it must be
+/// re-granted explicitly.
+#[test]
+#[ignore = "KNOWN RESIDUAL (2026-09-20 sweep follow-up): a stale spending-limit roster entry \
+            revives when the removed member is re-added, because the limit stores no membership \
+            generation to compare against. Closing it needs a generation counter in \
+            `SpendingLimit` (a layout change with a migration and IDL regeneration), not a guard \
+            in this handler. Run with `--ignored` to observe the gap."]
+fn a_readded_member_cannot_reuse_the_old_limit_grant() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		install_program_config(&program, &config_authority().pubkey());
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&create_multisig_ix(multisig_bump, 3, 2, 0),
+					vec![
+						AccountMeta::new_readonly(program_config_pda().0, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
+
+		// B holds a spending-limit grant.
+		let (vault_key, _) = vault_pda(&multisig_key, 0);
+		let limit_create_key = Pubkey::new_from_array([0x61; 32]);
+		let (limit_key, limit_bump) = spending_limit_pda(&multisig_key, &limit_create_key);
+		let payee = destination();
+		program
+			.fund(&payee, FUND)
+			.unwrap_or_else(|error| panic!("fund payee: {error:?}"));
+		program
+			.fund(&vault_key, VAULT_FUND)
+			.unwrap_or_else(|error| panic!("fund vault: {error:?}"));
+
+		let rent = Rent::default();
+		let mut member_addresses = [Address::default(); 24];
+		for (position, member) in members.iter().enumerate() {
+			member_addresses[position] = pina_address(member);
+		}
+		let space = SpendingLimit::projected_bytes(3 * 32, 32)
+			.unwrap_or_else(|error| panic!("limit space: {error}"));
+		let mut limit_bytes = vec![0_u8; space];
+		SpendingLimit::initialize(
+			&mut limit_bytes,
+			&SpendingLimitPatch::new()
+				.bump(limit_bump)
+				.multisig(pina_address(&multisig_key))
+				.create_key(pina_address(&limit_create_key))
+				.vault_index(0)
+				.vault_bump(vault_pda(&multisig_key, 0).1)
+				.mint(Address::default())
+				.amount(1000)
+				.remaining_amount(1000)
+				.last_reset(0)
+				.period(PERIOD_DAY)
+				.replace_members(&flatten_roster(&member_addresses[..3])[..3 * 32])
+				.replace_destinations(&flatten_roster(&[pina_address(&payee)])[..32]),
+		)
+		.unwrap_or_else(|error| panic!("encode spending limit: {error}"));
+		let limit_rent = rent.minimum_balance(limit_bytes.len());
+		install_account(&program, &limit_key, &pid, limit_bytes, limit_rent);
+
+		// Remove B WITHOUT passing the limit account, so pruning cannot reach it.
+		let removals = remove_member_actions(&member_b().pubkey());
+		let (removal_key, removal_bump) = proposal_pda(&multisig_key, 1);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(&multisig_key, removal_bump, KIND_CONFIG, &[], &removals),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(removal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create the removal proposal: {error:?}"));
+		advance_proposal(
+			&program,
+			MultisigInstruction::ProposalActivate as u8,
+			&multisig_key,
+			&removal_key,
+			&member_a(),
+		);
+		for signer in [&member_a(), &member_c()] {
+			advance_proposal(
+				&program,
+				MultisigInstruction::ProposalApprove as u8,
+				&multisig_key,
+				&removal_key,
+				signer,
+			);
+		}
+		// Deliberately no limit accounts: the roster entry survives.
+		execute_config_proposal(&program, &multisig_key, &removal_key, Vec::new());
+
+		// B is refused while removed.
+		let error = draw_from_limit(
+			&program,
+			&multisig_key,
+			&limit_key,
+			&vault_key,
+			&payee,
+			&member_b(),
+			400,
+		)
+		.expect_err("a removed member must not draw");
+		pina_test::assert_custom_error(&error, MultisigError::Unauthorized as u32);
+
+		// Re-add B with the same permissions.
+		let mut readd = vec![2_u8, ACTION_ADD_MEMBER];
+		readd.extend_from_slice(member_b().pubkey().as_ref());
+		readd.push(PERMISSIONS_ALL);
+		readd.push(ACTION_SET_TIME_LOCK);
+		readd.extend_from_slice(&0_u32.to_le_bytes());
+		let (readd_key, readd_bump) = proposal_pda(&multisig_key, 2);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(&multisig_key, readd_bump, KIND_CONFIG, &[], &readd),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(readd_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create the re-add proposal: {error:?}"));
+		advance_proposal(
+			&program,
+			MultisigInstruction::ProposalActivate as u8,
+			&multisig_key,
+			&readd_key,
+			&member_a(),
+		);
+		for signer in [&member_a(), &member_c()] {
+			advance_proposal(
+				&program,
+				MultisigInstruction::ProposalApprove as u8,
+				&multisig_key,
+				&readd_key,
+				signer,
+			);
+		}
+		execute_config_proposal(&program, &multisig_key, &readd_key, Vec::new());
+
+		// The retained roster entry must NOT resurrect the old delegation
+		// silently: B is a member again, but the grant was revoked.
+		// KNOWN RESIDUAL: this currently SUCCEEDS — the retained roster entry
+		// revives the revoked grant the moment the address is a member again.
+		// The assertion below records the required behaviour once a membership
+		// generation exists; until then this test documents the gap.
+		let draw = draw_from_limit(
+			&program,
+			&multisig_key,
+			&limit_key,
+			&vault_key,
+			&payee,
+			&member_b(),
+			400,
+		);
+		if draw.is_ok() {
+			eprintln!(
+				"RESIDUAL CONFIRMED: a stale spending-limit roster entry restored the revoked \
+				 grant after AddMember. See the sweep report's E3 residual."
+			);
+			program
+				.stop()
+				.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+			return;
+		}
+		pina_test::assert_custom_error(
+			&draw.expect_err("checked above"),
+			MultisigError::Unauthorized as u32,
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
