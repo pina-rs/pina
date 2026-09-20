@@ -2100,6 +2100,80 @@ mod tests {
 		);
 	}
 
+	/// A manifest that reaches `decode_manifest` but cannot be decoded must
+	/// fail the build with the manifest path named rather than panic or let
+	/// the declaration fall through to the plain, ungated parser.
+	#[test]
+	fn manifest_read_rejects_an_undecodable_document() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		// Valid JSON with a malformed manifest body: `decode_manifest` fails.
+		let path = write_manifest(
+			temp.path(),
+			br#"{"abiVersion":"not-a-version","programId":"x","versionType":"u8","contracts":{}}"#,
+		);
+
+		let item: syn::ItemStruct = syn::parse_quote!(
+			struct State {
+				value: u64,
+			}
+		);
+		let error = match read_manifest_at(&item, temp.path()) {
+			Err(error) => error,
+			Ok(_) => panic!("an undecodable manifest must fail the build"),
+		};
+		assert!(
+			error.to_string().contains("invalid migration manifest"),
+			"the error must name the manifest, got: {error}"
+		);
+		let _ = path;
+	}
+
+	/// A manifest whose stored discriminator cannot be resolved must fail the
+	/// build rather than silently leaving a zero-field instruction ungated.
+	#[test]
+	fn envelope_gate_rejects_an_unresolvable_discriminator() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		let history = gate_zero_field_contract(ContractKind::Instruction, 1, 1);
+		manifest.contracts.insert(history.identity.key(), history);
+
+		// Rewrite the discriminator width so the stored hex no longer matches
+		// the declared width: the document decodes and the map key still
+		// agrees, but `discriminator_value` cannot resolve it.
+		let mut value: serde_json::Value = serde_json::from_slice(&encode(&manifest))
+			.unwrap_or_else(|error| panic!("re-decode encoded manifest: {error}"));
+		let entry = {
+			let contracts = value["contracts"]
+				.as_object_mut()
+				.unwrap_or_else(|| panic!("contracts is an object"));
+			let entry = contracts
+				.values_mut()
+				.next()
+				.unwrap_or_else(|| panic!("the manifest has one contract"));
+			entry["identity"]["discriminatorBytes"] = serde_json::Value::Number(2.into());
+			entry.clone()
+		};
+		let contracts = value["contracts"]
+			.as_object_mut()
+			.unwrap_or_else(|| panic!("contracts is an object"));
+		contracts.clear();
+		contracts.insert("instruction:2:01".to_owned(), entry);
+		let path = write_manifest(
+			temp.path(),
+			&serde_json::to_vec(&value).unwrap_or_else(|error| panic!("re-encode: {error}")),
+		);
+
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		let error = match instruction_envelope_gate_at(&enum_name, &path) {
+			Err(error) => error,
+			Ok(_) => panic!("an unresolvable discriminator must fail the build"),
+		};
+		assert!(
+			error.to_string().contains("discriminator"),
+			"the error must name the discriminator, got: {error}"
+		);
+	}
+
 	/// Every instruction contract whose recorded newest version records no
 	/// user fields is gated; one with fields is not.
 	#[test]
