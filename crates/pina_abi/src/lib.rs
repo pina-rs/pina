@@ -348,8 +348,9 @@ impl std::fmt::Display for ContractKind {
 }
 
 // `MigrationAuto` has hand-written serde impls, so its schema is hand-written
-// too: the document records a sorted array of the `[migrations].auto` kind
-// names, and the schema must describe exactly that.
+// too. The name list comes from `ContractKind::config_name`, the same source
+// the deserializer resolves through `from_config_name`, so the schema can never
+// accept a spelling the reader rejects.
 impl schemars::JsonSchema for MigrationAuto {
 	fn schema_name() -> std::borrow::Cow<'static, str> {
 		"MigrationAuto".into()
@@ -359,8 +360,12 @@ impl schemars::JsonSchema for MigrationAuto {
 		"pina_abi::MigrationAuto".into()
 	}
 
-	fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-		let items = <String as schemars::JsonSchema>::json_schema(generator);
+	fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+		let names = ContractKind::ALL
+			.iter()
+			.map(|kind| kind.config_name())
+			.collect::<Vec<_>>();
+		let items = serde_json::json!({ "enum": names });
 		schemars::json_schema!({
 			"type": "array",
 			"description": "Contract kinds enveloped without a per-item token, in stable order.",
@@ -3624,6 +3629,53 @@ mod tests {
 				}
 			}
 		}
+	}
+
+	/// The `auto` schema must accept exactly the kind names the reader accepts.
+	///
+	/// A consumer validating against the published schema would otherwise admit
+	/// a document this build rejects, which is worse than no schema at all.
+	#[test]
+	fn auto_schema_enumerates_the_kinds_the_reader_accepts() {
+		let schema = document_schema(AbiDocument::Manifest);
+		let names = schema["$defs"]["MigrationAuto"]["items"]["enum"]
+			.as_array()
+			.unwrap_or_else(|| panic!("`auto` items must enumerate the valid kinds"))
+			.iter()
+			.map(|name| {
+				name.as_str()
+					.unwrap_or_else(|| panic!("kind names must be strings"))
+					.to_owned()
+			})
+			.collect::<Vec<_>>();
+
+		// Every advertised name is accepted, and every accepted name is
+		// advertised: the two directions are proved against the same reader.
+		let mut expected = ContractKind::ALL
+			.iter()
+			.map(|kind| kind.config_name().to_owned())
+			.collect::<Vec<_>>();
+		expected.sort();
+		let mut advertised = names.clone();
+		advertised.sort();
+		assert_eq!(advertised, expected);
+
+		for name in &names {
+			let encoded = serde_json::to_string(&vec![name]).unwrap();
+			assert!(
+				serde_json::from_str::<MigrationAuto>(&encoded).is_ok(),
+				"the schema advertises `{name}`, which the reader must accept"
+			);
+		}
+
+		// A spelling the reader rejects must not be advertised, and a document
+		// using one must still fail to decode.
+		assert!(
+			!names.iter().any(|name| name == "states"),
+			"`states` is not a kind name and must not appear in the schema"
+		);
+		let unknown = r#"{"abiVersion":"0.20","programId":"p","versionType":"u8","auto":["states"],"contracts":{}}"#;
+		assert!(decode_manifest(unknown.as_bytes()).is_err());
 	}
 
 	/// The checked-in schema artifact must equal what this build generates, so
