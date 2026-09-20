@@ -1,10 +1,23 @@
 [project]
 program = "."
+idl_dir = "{{root}}/codama/idls"
 
 [migrations]
 version_type = "u8"
 auto = true
 
 [clients]
-output = "clients"
-languages = ["cpi", "rust", "typescript"]
+output = "{{root}}/codama/clients"
+languages = ["cpi", "rust", "typescript", "dart", "cli-rust", "cli-ts", "cli-dart"]
+
+[clients.typescript]
+output = "js"
+
+[clients.cli-rust]
+output = "cli/rust"
+
+[clients.cli-ts]
+output = "cli/ts"
+
+[clients.cli-dart]
+output = "cli/dart"

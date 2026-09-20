@@ -76,18 +76,8 @@ pnpm install --frozen-lockfile --config.confirm-modules-purge=false
 # its bundle has to exist before generation runs.
 pnpm --dir "$ROOT" run build:codama-renderer-cli
 
-echo "Generating Codama IDLs and clients for all examples..."
-cargo run -p pina_cli --quiet -- codama generate \
-	--examples-dir "$ROOT/examples" \
-	--idls-dir "$IDL_DIR" \
-	--rust-out "$RUST_CLIENTS_DIR" \
-	--cpi-out "$CPI_CLIENTS_DIR" \
-	--js-out "$JS_CLIENTS_DIR" \
-	--dart-out "$DART_CLIENTS_DIR" \
-	--cli-rust-out "$CLI_RUST_CLIENTS_DIR" \
-	--cli-ts-out "$CLI_JS_CLIENTS_DIR" \
-	--cli-dart-out "$CLI_DART_CLIENTS_DIR" \
-	--npx node
+echo "Generating IDLs and clients for all examples with pina generate..."
+bash "$ROOT/scripts/generate-pina-clients.sh"
 
 if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
 	echo "No *.json fixtures were generated in $IDL_DIR" >&2

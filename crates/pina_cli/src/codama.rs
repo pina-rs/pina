@@ -181,7 +181,13 @@ function publishDartCli() {
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
-		publishDirectory(join(stagingRoot, "bin"), join(outputRoot, "bin"));
+		// The Dart CLI package is shared by every program, so publishing the
+		// whole staged bin directory would drop the entrypoints of programs
+		// that are not part of this invocation.
+		publishFile(
+			join(stagingRoot, "bin", `${name}.dart`),
+			join(outputRoot, "bin", `${name}.dart`),
+		);
 	}
 	publishFile(
 		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),

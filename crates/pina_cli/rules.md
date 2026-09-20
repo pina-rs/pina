@@ -153,10 +153,10 @@ If the IDL should _not_ infer something, add a negative test so the behavior is 
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls` and the `codama/clients` tree with `pina generate`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
-- generated Rust and CPI clients compile
+- generated Rust, CPI, and Rust CLI clients compile, and the Rust CLI crates pass their tests
 - generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`

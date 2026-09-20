@@ -1374,3 +1374,91 @@ fn generate_falls_back_from_missing_npx_to_pnpm() {
 	assert!(!failed.status.success());
 	assert!(String::from_utf8_lossy(&failed.stderr).contains("npx (or fallback pnpm dlx)"));
 }
+
+/// The Dart CLI package is shared by every program in a workspace, so
+/// generating one project must not disturb the entrypoints emitted for the
+/// others. `publishDartCli` originally replaced the whole `bin/` directory per
+/// program, which deleted every sibling entrypoint.
+#[test]
+fn generate_cli_dart_preserves_sibling_program_entrypoints() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let workspace = workspace_root();
+	let first = temp.path().join("first_program");
+	let second = temp.path().join("second_program");
+	write_project(&first);
+	write_project(&second);
+	// Both programs share one Dart CLI package, so they need distinct library
+	// names for their barrels and entrypoints to coexist.
+	let second_manifest = fs::read_to_string(second.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("failed to read second manifest: {error}"))
+		.replace("name = \"custom_program\"", "name = \"second_program\"");
+	fs::write(second.join("Cargo.toml"), second_manifest)
+		.unwrap_or_else(|error| panic!("failed to rewrite second manifest: {error}"));
+	let second_source = fs::read_to_string(second.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("failed to read second source: {error}"))
+		.replace("CustomInstruction", "SecondInstruction");
+	fs::write(second.join("src/lib.rs"), second_source)
+		.unwrap_or_else(|error| panic!("failed to rewrite second source: {error}"));
+
+	// A shared clients root puts both programs inside one Dart CLI package.
+	for program in [&first, &second] {
+		fs::write(
+			program.join("pina.toml"),
+			"[clients]\noutput = \"clients\"\nlanguages = [\"rust\", \
+			 \"cli-rust\"]\n\n[clients.cli-rust]\noutput = \"cli/rust\"\n",
+		)
+		.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+		// The renderer resolves its CLI package from the workspace install.
+		std::os::unix::fs::symlink(workspace.join("node_modules"), program.join("node_modules"))
+			.unwrap_or_else(|error| {
+				panic!("failed to expose workspace Node dependencies: {error}")
+			});
+	}
+	let shared = temp.path().join("shared");
+	fs::create_dir_all(&shared)
+		.unwrap_or_else(|error| panic!("failed to create shared root: {error}"));
+	let target = temp.path().join("custom-target");
+	let cargo = fake_cargo(temp.path());
+
+	let generate = |program: &Path| {
+		project_command(program, &cargo, &target)
+			.args([
+				"generate",
+				"--client",
+				"cli-dart",
+				"--output",
+				shared.to_string_lossy().as_ref(),
+				"--npx",
+				"node",
+			])
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run generation: {error}"))
+	};
+
+	let first_output = generate(&first);
+	assert!(
+		first_output.status.success(),
+		"first generation failed: {}",
+		String::from_utf8_lossy(&first_output.stderr)
+	);
+	let entrypoints = shared.join("cli-dart/bin");
+	assert!(
+		entrypoints.join("custom_program.dart").is_file(),
+		"first program entrypoint was not generated"
+	);
+
+	let second_output = generate(&second);
+	assert!(
+		second_output.status.success(),
+		"second generation failed: {}",
+		String::from_utf8_lossy(&second_output.stderr)
+	);
+	assert!(
+		entrypoints.join("second_program.dart").is_file(),
+		"second program entrypoint was not generated"
+	);
+	assert!(
+		entrypoints.join("custom_program.dart").is_file(),
+		"generating a second program deleted the first program's entrypoint"
+	);
+}
