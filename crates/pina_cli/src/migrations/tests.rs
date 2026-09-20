@@ -3882,7 +3882,7 @@ fn manual_answers_generate_an_editable_transition_for_a_rename() {
 
 	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["points".to_owned()], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with manual answer: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 	assert_eq!(
@@ -3934,7 +3934,7 @@ fn a_manual_answer_keeps_the_developers_body_across_repeated_runs() {
 
 	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["points".to_owned()], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with manual answer: {error:?}"));
 
 	let path = fixture
@@ -3949,7 +3949,7 @@ fn a_manual_answer_keeps_the_developers_body_across_repeated_runs() {
 
 	// A run whose recorded answers already include the manual field keeps the
 	// developer's body instead of replacing it with a regenerated stub.
-	let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+	let output = create_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
 		.unwrap_or_else(|error| panic!("re-run make: {error:?}"));
 	assert_eq!(output.unchanged_contracts, ["account:1:01".to_owned()]);
 	let after = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("read: {error}"));
@@ -4108,8 +4108,8 @@ fn a_same_name_width_change_generates_a_manual_stub_with_both_sizes() {
 	publish_current(&fixture);
 	write_state_source(&fixture, "amount: u64");
 
-	let output =
-		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("make with widen: {error:?}"));
+	let output = create_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("make with widen: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 	assert_eq!(output.manual_transitions.len(), 1);
 
@@ -4276,7 +4276,7 @@ fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 
 	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["derived".to_owned()], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with manual add: {error:?}"));
 	assert_eq!(output.manual_transitions.len(), 1, "{output:?}");
 
@@ -4294,7 +4294,7 @@ fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 	// Without a durable marker the mode would flip to automatic and the body
 	// would be regenerated over.
 	write_state_source(&fixture, "value: u64, derived: u64, extra: u16");
-	let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+	let output = create_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
 		.unwrap_or_else(|error| panic!("refresh draft: {error:?}"));
 	assert_eq!(output.updated_drafts, ["account:1:01@1".to_owned()]);
 	assert_eq!(
@@ -4346,7 +4346,7 @@ fn a_manual_hop_does_not_brand_later_hops_manual() {
 	// A same-name width change has no automatic proof, so v0 -> v1 is manual.
 	write_state_source(&fixture, "value: u32");
 	let manual_hop =
-		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("manual make: {error:?}"));
+		create_migrations(&fixture.root).unwrap_or_else(|error| panic!("manual make: {error:?}"));
 	assert_eq!(manual_hop.advanced_versions, ["account:1:01@1".to_owned()]);
 
 	// Publishing v1 freezes it, but only once the developer replaces the TODO
@@ -4378,14 +4378,15 @@ fn a_manual_hop_does_not_brand_later_hops_manual() {
 	);
 	std::fs::write(&stub_path, implemented)
 		.unwrap_or_else(|error| panic!("write transition: {error}"));
-	make_migrations(&fixture.root).unwrap_or_else(|error| panic!("refresh draft hash: {error:?}"));
+	create_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("refresh draft hash: {error:?}"));
 	publish_current(&fixture);
 
 	// Freezing v1 makes the next source change a new adjacent hop. Adding a
 	// field is provable, so it must record automatic despite the manual hop
 	// beneath it.
 	write_state_source(&fixture, "value: u32, extra: u64");
-	let automatic_hop = make_migrations(&fixture.root)
+	let automatic_hop = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("make after manual hop: {error:?}"));
 	assert_eq!(
 		automatic_hop.advanced_versions,
