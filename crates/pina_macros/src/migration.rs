@@ -2063,6 +2063,59 @@ mod tests {
 		assert_eq!(gate_at(&path), Some(vec![(0, 2), (5, 0)]));
 	}
 
+	/// A manifest that cannot be read or decoded must fail the build with the
+	/// manifest path and remedy, not silently drop the gate and let a
+	/// zero-field instruction accept any version byte again.
+	#[test]
+	fn envelope_gate_fails_closed_on_a_broken_manifest() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+
+		// Unreadable: the path is a directory, so `read` fails with something
+		// other than NotFound.
+		let unreadable = temp.path().join("migrations").join("manifest.json");
+		std::fs::create_dir_all(&unreadable).unwrap_or_else(|error| panic!("mkdir: {error}"));
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		let error = match instruction_envelope_gate_at(&enum_name, &unreadable) {
+			Err(error) => error,
+			Ok(_) => panic!("an unreadable manifest must fail"),
+		};
+		assert!(
+			error.to_string().contains("cannot read"),
+			"the error must name the read failure, got: {error}"
+		);
+
+		// Undecodable: valid JSON that is not a manifest.
+		let directory = temp.path().join("broken");
+		std::fs::create_dir_all(&directory).unwrap_or_else(|error| panic!("mkdir: {error}"));
+		let path = directory.join("manifest.json");
+		std::fs::write(&path, b"{\"unexpected\": true}")
+			.unwrap_or_else(|error| panic!("write: {error}"));
+		let error = match instruction_envelope_gate_at(&enum_name, &path) {
+			Err(error) => error,
+			Ok(_) => panic!("an undecodable manifest must fail"),
+		};
+		assert!(
+			error.to_string().contains("invalid migration manifest"),
+			"the error must name the manifest, got: {error}"
+		);
+	}
+
+	/// Every instruction contract whose recorded newest version records no
+	/// user fields is gated; one with fields is not.
+	#[test]
+	fn envelope_gate_covers_only_zero_field_instructions() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let path = write_gate_manifest(
+			temp.path(),
+			&[
+				gate_zero_field_contract(ContractKind::Instruction, 1, 2),
+				gate_contract(ContractKind::Instruction, 2, 2),
+			],
+		);
+
+		assert_eq!(gate_at(&path), Some(vec![(1, 1)]));
+	}
+
 	#[test]
 	fn envelope_gate_is_absent_without_a_manifest_or_instruction_contracts() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
