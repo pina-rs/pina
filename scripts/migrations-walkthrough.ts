@@ -303,7 +303,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 				account: profile,
 				payer,
 				program_id: &ID,
-				max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 			}
 			.invoke::<Profile>()?;
 			let mut profile = profile.as_account_mut::<Profile>(&ID)?;
@@ -540,21 +540,40 @@ async function deploy(
 	context: StepContext,
 	artifact: string,
 ): Promise<Deployed> {
-	try {
+	const attempt = async (): Promise<void> => {
 		context.network.surfnet.deploy({
 			programId: context.programId,
 			soPath: artifact,
 		});
+		// A wedged engine still accepts the deploy call but never answers the
+		// next RPC. Probe it with a short-timeout request before handing
+		// control back, so the run restarts the network here instead of
+		// spending undici's five-minute header timeout on the first submit.
+		const response = await fetch(context.network.rpcUrl, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+			signal: AbortSignal.timeout(10_000),
+		});
+		if (!response.ok) {
+			throw new Error(`survival probe failed: ${response.status}`);
+		}
+	};
+	try {
+		await attempt();
 	} catch {
 		// Surfpool's engine occasionally dies under the memory pressure of an
-		// SBF build. Restart the network, reload the newest artifact, and
-		// restore the logical account state so the narrative continues.
+		// SBF build — or wedges without dying, which the probe above catches.
+		// Restart the network, reload the newest artifact, and restore the
+		// logical account state so the narrative continues.
 		console.error("Surfpool network died; restarting and restoring state");
+		try {
+			context.network.surfnet.stop();
+		} catch {
+			// The engine is already gone; the restart below replaces it.
+		}
 		context.network = await startNetwork();
-		context.network.surfnet.deploy({
-			programId: context.programId,
-			soPath: artifact,
-		});
+		await attempt();
 		context.network.surfnet.setAccount(
 			context.profileAddress,
 			context.profileLamports,
@@ -1174,31 +1193,36 @@ function verifyGeneratedClients(): void {
 	const dependencyBlock = rootManifest.slice(
 		rootManifest.indexOf("[workspace.dependencies]"),
 	);
+	const workspaceVersionOf = (name: string): string => {
+		const line = dependencyBlock
+			.split("\n")
+			.find((candidate) => candidate.startsWith(`${name} = `));
+		const version = line?.match(/version = "([^"]+)"/)?.[1];
+		if (!version) {
+			throw new Error(
+				`dependency ${name} missing from the workspace table`,
+			);
+		}
+		return version;
+	};
 	const pinned = rustManifest.replace(
 		/(\w[\w-]*) = \{ workspace = true, ([^}]*) \}/g,
 		(_match, name: string, rest: string) => {
 			if (name === "pina") {
-				return `{ path = ${
+				// The path dependency's version must match the local crate's
+				// manifest, so read it from the workspace table rather than
+				// pinning a release that drifts as `crates/pina` moves on.
+				return `pina = { path = ${
 					JSON.stringify(`${REPO}/crates/pina`)
-				}, version = "0.15.0", features = ["compact"] }`
-					.replace("{", `{pina = `)
-					.replace(/^\{pina = /, "pina = {");
-			}
-			const line = dependencyBlock
-				.split("\n")
-				.find((candidate) => candidate.startsWith(`${name} = `));
-			if (!line) {
-				throw new Error(
-					`dependency ${name} missing from the workspace table`,
-				);
-			}
-			const version = line.match(/version = "([^"]+)"/)?.[1];
-			if (!version) {
-				throw new Error(`dependency ${name} has no pinned version`);
+				}, version = ${
+					JSON.stringify(workspaceVersionOf("pina"))
+				}, features = ["compact"] }`;
 			}
 			// The generated entry decides feature flags; the workspace only
 			// contributes the version.
-			return `${name} = { version = "${version}", ${rest.trim()} }`;
+			return `${name} = { version = "${
+				workspaceVersionOf(name)
+			}", ${rest.trim()} }`;
 		},
 	);
 	writeFileSync(
