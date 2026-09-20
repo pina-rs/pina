@@ -2,7 +2,7 @@
 pina_abi: fix
 ---
 
-# Enumerate the auto policy's kind names in the ABI document schema
+# Enumerate the auto policy's kind names in the schema
 
 `MigrationAuto` has hand-written serde impls, so its JSON Schema is hand-written too, and it described its items as any string. A consumer validating a manifest against the published schema therefore admitted `["states"]` while the reader rejected it with `unknown migration kind` — the schema promised more than the code accepted, which defers the failure to runtime.
 
