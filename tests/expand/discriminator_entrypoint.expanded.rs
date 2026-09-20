@@ -449,17 +449,6 @@ impl<'a> pina::TryFromAccountInfos<'a> for InitializeAccounts<'a> {
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        const SLOT_IS_MUTABLE: [bool; 3usize] = [false, true, false];
-        let slot_count = accounts.len().min(SLOT_IS_MUTABLE.len());
-        for (i, slot) in accounts.iter().take(slot_count).enumerate() {
-            for (j, other) in accounts.iter().take(slot_count).enumerate().skip(i + 1) {
-                if (SLOT_IS_MUTABLE[i] || SLOT_IS_MUTABLE[j]) && slot.is_writable()
-                    && other.is_writable() && slot.address() == other.address()
-                {
-                    return Err(pina::PinaProgramError::DuplicateMutableAccount.into());
-                }
-            }
-        }
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
@@ -522,17 +511,6 @@ impl<'a> pina::TryFromAccountInfos<'a> for IncrementAccounts<'a> {
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        const SLOT_IS_MUTABLE: [bool; 2usize] = [false, true];
-        let slot_count = accounts.len().min(SLOT_IS_MUTABLE.len());
-        for (i, slot) in accounts.iter().take(slot_count).enumerate() {
-            for (j, other) in accounts.iter().take(slot_count).enumerate().skip(i + 1) {
-                if (SLOT_IS_MUTABLE[i] || SLOT_IS_MUTABLE[j]) && slot.is_writable()
-                    && other.is_writable() && slot.address() == other.address()
-                {
-                    return Err(pina::PinaProgramError::DuplicateMutableAccount.into());
-                }
-            }
-        }
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
