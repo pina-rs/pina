@@ -1421,6 +1421,16 @@ fn generate_cli_dart_preserves_sibling_program_entrypoints() {
 	let target = temp.path().join("custom-target");
 	let cargo = fake_cargo(temp.path());
 
+	// `cli-dart` renders through this workspace package, which ships only its
+	// built `dist`. Fail with the remedy instead of a Node module-resolution
+	// stack when the bundle has not been built.
+	let renderer = workspace.join("packages/codama-renderer-cli/dist/index.js");
+	assert!(
+		renderer.is_file(),
+		"missing renderer bundle at {}. Build it with `pnpm run build:codama-renderer-cli`.",
+		renderer.display()
+	);
+
 	let generate = |program: &Path| {
 		project_command(program, &cargo, &target)
 			.args([

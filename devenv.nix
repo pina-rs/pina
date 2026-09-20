@@ -397,6 +397,10 @@ in
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
+        # through this workspace package, so its bundle has to exist before the
+        # Rust suite runs. `dist` is not committed.
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
@@ -1009,6 +1013,10 @@ in
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
+        # through this workspace package, so its bundle has to exist before the
+        # Rust suite runs. `dist` is not committed.
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
