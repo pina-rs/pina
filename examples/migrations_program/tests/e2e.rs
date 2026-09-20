@@ -367,8 +367,8 @@ fn migration_budget_is_checked_before_funding_or_resize() {
 	);
 
 	// The account is 100,000 lamports below rent exemption, so the deficit
-	// exceeds the example's 20,000 lamport budget and reports the lamport
-	// budget failure rather than the workspace or growth code.
+	// dwarfs the example's `MAX_INLINE_MIGRATION_LAMPORTS` budget and reports
+	// the lamport budget failure rather than the workspace or growth code.
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
 		&accounts,
@@ -504,9 +504,12 @@ fn future_account_version_is_rejected_without_trial_decoding() {
 
 /// Compute-unit ceiling for the current-version update hot path.
 ///
-/// The version check adds one envelope read over a non-migratable instruction;
-/// growth beyond this budget means the hot path started doing historical work.
-const CURRENT_UPDATE_CU_BUDGET: u64 = 1_000;
+/// Two envelope reads: the handler's own version check plus the dispatch-time
+/// envelope gate that pins the instruction's version byte to the manifest
+/// (fail-closed against unknown version bytes on zero-field and payload
+/// instructions alike). Growth beyond this budget means the hot path started
+/// doing historical work.
+const CURRENT_UPDATE_CU_BUDGET: u64 = 1_250;
 
 /// Compute-unit ceiling for the full on-demand migration path: historical
 /// payload normalization, the complete two-step account ladder, rent

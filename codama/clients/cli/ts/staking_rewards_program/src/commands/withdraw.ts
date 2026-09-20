@@ -28,6 +28,7 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 		"--user-stake-ata <userStakeAta>",
 		"The `user_stake_ata` account",
 	)
+	.requiredOption("--stake-vault <stakeVault>", "The `stake_vault` account")
 	.requiredOption(
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
@@ -41,6 +42,7 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 			poolState: pubkey("--pool-state", options.poolState),
 			positionState: pubkey("--position-state", options.positionState),
 			userStakeAta: pubkey("--user-stake-ata", options.userStakeAta),
+			stakeVault: pubkey("--stake-vault", options.stakeVault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
 		const instruction = getWithdrawInstruction(

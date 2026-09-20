@@ -441,6 +441,7 @@ describe("staking rewards JS client contracts", () => {
 			poolState,
 			positionState,
 			userStakeAta,
+			stakeVault,
 			tokenProgram,
 			amount: 42n,
 		} as any);
@@ -450,6 +451,7 @@ describe("staking rewards JS client contracts", () => {
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userStakeAta, role: WRITABLE },
+			{ address: stakeVault, role: WRITABLE },
 			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
@@ -465,6 +467,7 @@ describe("staking rewards JS client contracts", () => {
 			poolState,
 			positionState,
 			userStakeAta,
+			stakeVault,
 			tokenProgram,
 			amount: 7n,
 		} as any);
@@ -474,6 +477,7 @@ describe("staking rewards JS client contracts", () => {
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userStakeAta, role: WRITABLE },
+			{ address: stakeVault, role: WRITABLE },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);

@@ -51,7 +51,9 @@ mod tests {
 
 	#[test]
 	fn parse_instruction_accepts_matching_program_id() {
-		let data = [DeclareIdInstruction::Initialize as u8];
+		// The migration envelope's version byte is part of the wire format even
+		// for zero-field instructions; the dispatch gate rejects its absence.
+		let data = [DeclareIdInstruction::Initialize as u8, 0];
 		let instruction = parse_instruction::<DeclareIdInstruction>(&ID, &ID, &data);
 		assert!(matches!(instruction, Ok(DeclareIdInstruction::Initialize)));
 	}
@@ -59,7 +61,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [7u8; 32].into();
-		let data = [DeclareIdInstruction::Initialize as u8];
+		let data = [DeclareIdInstruction::Initialize as u8, 0];
 		let result = parse_instruction::<DeclareIdInstruction>(&wrong_program_id, &ID, &data);
 
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));

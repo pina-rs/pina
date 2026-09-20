@@ -19,6 +19,7 @@ pub struct Deposit {
 	pub pool_state: solana_pubkey::Pubkey,
 	pub position_state: solana_pubkey::Pubkey,
 	pub user_stake_ata: solana_pubkey::Pubkey,
+	pub stake_vault: solana_pubkey::Pubkey,
 	pub associated_token_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
@@ -31,6 +32,7 @@ impl Deposit {
 		pool_state: solana_pubkey::Pubkey,
 		position_state: solana_pubkey::Pubkey,
 		user_stake_ata: solana_pubkey::Pubkey,
+		stake_vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
@@ -39,6 +41,7 @@ impl Deposit {
 			pool_state,
 			position_state,
 			user_stake_ata,
+			stake_vault,
 			associated_token_program: solana_pubkey::pubkey!(
 				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 			),
@@ -57,7 +60,7 @@ impl Deposit {
 		data: DepositInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.user, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.stake_mint,
@@ -70,6 +73,10 @@ impl Deposit {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.user_stake_ata,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.stake_vault,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(

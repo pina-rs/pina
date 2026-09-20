@@ -577,7 +577,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [9u8; 32].into();
-		let data = [VestingInstruction::Initialize as u8];
+		let data = [VestingInstruction::Initialize as u8, 0];
 		let result = parse_instruction::<VestingInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}

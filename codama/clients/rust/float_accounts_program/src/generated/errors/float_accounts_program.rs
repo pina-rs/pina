@@ -17,6 +17,10 @@ pub enum FloatAccountsProgramError {
 	/// 0 - The signer is not the authority recorded on the account.
 	#[error("The signer is not the authority recorded on the account.")]
 	AuthorityMismatch = 0x0,
+	/// A float payload is NaN or infinite; only finite values are stored.
+	/// 1 - A float payload is NaN or infinite; only finite values are stored.
+	#[error("A float payload is NaN or infinite; only finite values are stored.")]
+	NonFiniteFloat = 0x1,
 }
 
 impl From<FloatAccountsProgramError> for solana_program_error::ProgramError {

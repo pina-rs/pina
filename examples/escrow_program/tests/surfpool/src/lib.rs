@@ -521,6 +521,325 @@ fn make_rejects_a_zero_amount() {
 
 /// The maker receives both the vault rent and the escrow rent during `Take`,
 /// so a read-only maker must be refused instead of reaching the close CPIs.
+/// Create a wallet's associated token account idempotently, paid and signed by
+/// an explicit payer keypair. The ATA program never requires the wallet's
+/// signature, so this is exactly how a griefer pre-creates a vault whose
+/// wallet is a derivable escrow PDA.
+fn create_ata_idempotent(
+	program: &ProgramTest,
+	payer: &Keypair,
+	wallet: &Pubkey,
+	mint: &Pubkey,
+) -> Result<Pubkey, TestError> {
+	let ata = ata_of(wallet, mint);
+	// ATA `CreateIdempotent` = tag 1.
+	let create = Instruction::new_with_bytes(
+		ata_program_id(),
+		&[1u8],
+		vec![
+			AccountMeta::new(payer.pubkey(), true),
+			AccountMeta::new(ata, false),
+			AccountMeta::new_readonly(*wallet, false),
+			AccountMeta::new_readonly(*mint, false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
+			AccountMeta::new_readonly(token_program_id(), false),
+		],
+	);
+	program.send_with_signers(create, &[payer])?;
+
+	Ok(ata)
+}
+
+#[test]
+#[ignore = "run with pina test"]
+fn make_tolerates_a_precreated_empty_vault() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([23; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let maker = program.payer();
+		let mint_a_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 21).expect("provision mint A");
+		let mint_b_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 22).expect("provision mint B");
+
+		let taker = Keypair::new_from_array([24; 32]);
+		program.fund(&taker.pubkey(), FUND).expect("fund taker");
+		let attacker = Keypair::new_from_array([29; 32]);
+		program
+			.fund(&attacker.pubkey(), FUND)
+			.expect("fund attacker");
+
+		let maker_ata_a = ata_of(&maker, &mint_a_pubkey);
+		let maker_ata_b = ata_of(&maker, &mint_b_pubkey);
+		let taker_ata_a = ata_of(&taker.pubkey(), &mint_a_pubkey);
+		let taker_ata_b = ata_of(&taker.pubkey(), &mint_b_pubkey);
+
+		provision_ata(
+			&program,
+			&maker,
+			&maker,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+		provision_ata(&program, &maker, &maker, &mint_b_pubkey, None, 0)
+			.expect("maker token B ATA");
+		provision_ata(&program, &maker, &taker.pubkey(), &mint_a_pubkey, None, 0)
+			.expect("taker token A ATA");
+		provision_ata(
+			&program,
+			&maker,
+			&taker.pubkey(),
+			&mint_b_pubkey,
+			Some(&mint_authority),
+			TAKER_OFFER,
+		)
+		.expect("taker token B ATA");
+
+		let seed = 31u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		// The D2 grief: before the maker does anything, an attacker derives the
+		// escrow PDA from public seeds and creates its vault ATA — the ATA
+		// program needs no wallet signature. The vault exists and is empty, so
+		// a plain empty-account rejection would strand this `(maker, seed)`
+		// slot forever.
+		let attacker_vault = create_ata_idempotent(&program, &attacker, &escrow, &mint_a_pubkey)
+			.expect("attacker pre-creates the derived vault");
+		assert_eq!(attacker_vault, vault, "the attacker created the real vault");
+		assert_eq!(
+			token_amount(&program.account(&vault).expect("pre-created vault exists")),
+			0,
+			"the pre-created vault is empty"
+		);
+
+		// The maker's `Make` now succeeds instead of dying on the vault check.
+		program
+			.send_instruction(make_instruction(
+				&program,
+				&maker,
+				&mint_a_pubkey,
+				&mint_b_pubkey,
+				&maker_ata_a,
+				&escrow,
+				&vault,
+				seed,
+				bump,
+				OFFER_A,
+				OFFER_B,
+			))
+			.expect("Make succeeds despite the pre-created empty vault");
+
+		let escrow_account = program.account(&escrow).expect("escrow state exists");
+		assert_escrow(
+			&escrow_account,
+			&maker,
+			&mint_a_pubkey,
+			&mint_b_pubkey,
+			OFFER_A,
+			OFFER_B,
+			seed,
+			bump,
+		);
+		assert_eq!(
+			token_amount(&program.account(&vault).expect("vault exists after Make")),
+			OFFER_A,
+			"the vault holds exactly the escrowed token A"
+		);
+
+		// The escrow still completes a full make/take round trip.
+		program
+			.send_with_signers(
+				take_instruction(
+					&program,
+					&taker.pubkey(),
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&taker_ata_a,
+					&taker_ata_b,
+					&maker,
+					&maker_ata_b,
+					&escrow,
+					&vault,
+					true,
+				),
+				&[&taker],
+			)
+			.expect("execute Take");
+
+		assert_eq!(
+			token_amount(&program.account(&taker_ata_a).expect("taker token A ATA")),
+			OFFER_A,
+			"taker received the escrowed token A"
+		);
+		assert_eq!(
+			token_amount(&program.account(&maker_ata_b).expect("maker token B ATA")),
+			OFFER_B,
+			"maker received the offered token B"
+		);
+		assert_eq!(
+			token_amount(&program.account(&taker_ata_b).expect("taker token B ATA")),
+			TAKER_OFFER - OFFER_B,
+			"taker paid exactly OFFER_B"
+		);
+		assert!(
+			program.account(&escrow).is_err(),
+			"escrow closed after Take"
+		);
+		assert!(program.account(&vault).is_err(), "vault closed after Take");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The tolerance is exact: a pre-created vault holding tokens, or one derived
+/// from the wrong mint, still rejects `Make` with the same
+/// `AccountAlreadyInitialized` error the plain empty-account check produced
+/// before the tolerance existed.
+#[test]
+#[ignore = "run with pina test"]
+fn make_still_rejects_a_prefunded_or_wrong_mint_vault() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([27; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let maker = program.payer();
+		let mint_a_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 25).expect("provision mint A");
+		let mint_b_pubkey =
+			provision_mint(&program, &maker, &mint_authority, 26).expect("provision mint B");
+
+		let attacker = Keypair::new_from_array([30; 32]);
+		program
+			.fund(&attacker.pubkey(), FUND)
+			.expect("fund attacker");
+
+		let maker_ata_a = ata_of(&maker, &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&maker,
+			&maker,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+
+		const GRIEF_AMOUNT: u64 = 1_000;
+		let seed = 32u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		// A correctly derived vault that the attacker prefunded with tokens.
+		create_ata_idempotent(&program, &attacker, &escrow, &mint_a_pubkey)
+			.expect("attacker pre-creates the derived vault");
+		mint_into(
+			&program,
+			&mint_a_pubkey,
+			&vault,
+			&mint_authority,
+			GRIEF_AMOUNT,
+		)
+		.expect("prefund the vault with token A");
+
+		let error = program
+			.send_instruction(make_instruction(
+				&program,
+				&maker,
+				&mint_a_pubkey,
+				&mint_b_pubkey,
+				&maker_ata_a,
+				&escrow,
+				&vault,
+				seed,
+				bump,
+				OFFER_A,
+				OFFER_B,
+			))
+			.expect_err("a prefunded vault must still reject Make");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::AccountAlreadyInitialized
+			)),
+			"the rejection matches the pre-tolerance empty-account error"
+		);
+		assert!(
+			program.account(&escrow).is_err(),
+			"a rejected Make must not create the escrow"
+		);
+		assert_eq!(
+			token_amount(&program.account(&vault).expect("vault intact")),
+			GRIEF_AMOUNT,
+			"the griefing deposit stays untouched"
+		);
+
+		// A vault derived from the wrong mint is foreign to this escrow and is
+		// rejected with the same error.
+		let wrong_vault = ata_of(&escrow, &mint_b_pubkey);
+		create_ata_idempotent(&program, &attacker, &escrow, &mint_b_pubkey)
+			.expect("create the wrong-mint vault");
+		mint_into(
+			&program,
+			&mint_b_pubkey,
+			&wrong_vault,
+			&mint_authority,
+			GRIEF_AMOUNT,
+		)
+		.expect("prefund the wrong-mint vault");
+
+		let error = program
+			.send_instruction(make_instruction(
+				&program,
+				&maker,
+				&mint_a_pubkey,
+				&mint_b_pubkey,
+				&maker_ata_a,
+				&escrow,
+				&wrong_vault,
+				seed,
+				bump,
+				OFFER_A,
+				OFFER_B,
+			))
+			.expect_err("a wrong-mint vault must still reject Make");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::AccountAlreadyInitialized
+			)),
+			"the wrong-mint rejection matches the pre-tolerance error"
+		);
+		assert!(
+			program.account(&escrow).is_err(),
+			"a wrong-mint rejection must not create the escrow"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The maker receives both the vault rent and the escrow rent during `Take`,
+/// so a read-only maker must be refused instead of reaching the close CPIs.
 #[test]
 #[ignore = "run with pina test"]
 fn take_requires_a_writable_maker() {

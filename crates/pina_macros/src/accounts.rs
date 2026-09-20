@@ -174,6 +174,50 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		parse_fields.push(parse_field);
 		field_kinds.push((field, field_kind));
 	}
+
+	// A positional field after an optional field is rejected at compile time.
+	// An absent optional consumes its program-address filler slot, so an
+	// account list that drops the filler while preserving the slot count makes
+	// every later binding shift by one: the parser still runs each field's
+	// property validations, but against the wrong accounts. Trailing optionals
+	// and a trailing `remaining` slice are the supported shapes.
+	for (index, (field, kind)) in field_kinds.iter().enumerate() {
+		let optional = matches!(
+			kind,
+			AccountFieldKind::OptionalImmutable | AccountFieldKind::OptionalMutable
+		);
+		if !optional {
+			continue;
+		}
+		for (later_field, later_kind) in &field_kinds[index + 1..] {
+			if matches!(
+				later_kind,
+				AccountFieldKind::Immutable | AccountFieldKind::Mutable | AccountFieldKind::Nested
+			) {
+				return syn::Error::new_spanned(
+					field
+						.ident
+						.as_ref()
+						.expect("internal error: `Accounts` field without an ident"),
+					format!(
+						"optional account `{}` cannot be followed by positional account `{}`: an \
+						 absent optional consumes its program-address filler slot, so dropping \
+						 the filler shifts every later binding by one slot and each validation \
+						 runs against the wrong account; move the optional fields to the end",
+						field
+							.ident
+							.as_ref()
+							.expect("internal error: `Accounts` field without an ident"),
+						later_field
+							.ident
+							.as_ref()
+							.expect("internal error: `Accounts` field without an ident"),
+					),
+				)
+				.to_compile_error();
+			}
+		}
+	}
 	#[cfg(feature = "validation")]
 	let validation_impl = match generate_validation_impl(
 		struct_name,
@@ -861,6 +905,45 @@ mod tests {
 			account_field_kind(&syn::parse_quote!(Option<&mut pina::AccountView>))
 				.unwrap_or_else(|error| panic!("qualified mutable AccountView reference: {error}"),),
 			AccountFieldKind::OptionalMutable
+		);
+	}
+
+	/// An optional field may not precede a positional field: an absent optional
+	/// consumes its program-address filler slot, so a dropped filler shifts
+	/// every later binding by one slot.
+	#[test]
+	fn optional_fields_before_positional_fields_are_rejected() {
+		let expansion = expand(quote! {
+			#[derive(Accounts)]
+			struct Shifted<'a> {
+				authority: &'a AccountView,
+				watcher: Option<&'a AccountView>,
+				vault: &'a mut AccountView,
+			}
+		});
+		let rendered = expansion.to_string();
+		assert!(
+			rendered.contains("cannot be followed by positional account"),
+			"the derive must reject the shifted shape, got: {rendered}"
+		);
+
+		// A `remaining` slice after an optional is the supported shape: the
+		// slice absorbs whatever follows, so no binding depends on filler
+		// presence.
+		let allowed = expand(quote! {
+			#[derive(Accounts)]
+			struct Trailing<'a> {
+				authority: &'a AccountView,
+				treasury: Option<&'a mut AccountView>,
+				#[pina(remaining)]
+				members: &'a [AccountView],
+			}
+		});
+		assert!(
+			!allowed
+				.to_string()
+				.contains("cannot be followed by positional account"),
+			"a trailing remaining slice must stay allowed"
 		);
 	}
 }

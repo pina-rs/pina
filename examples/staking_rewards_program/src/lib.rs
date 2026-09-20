@@ -2,15 +2,19 @@
 //!
 //! This example demonstrates the account and validation shape of a staking
 //! lifecycle:
-//! - initialize a rewards pool
+//! - initialize a rewards pool with a stake vault and a reward vault
 //! - open per-user positions
-//! - record deposits and withdrawals
-//! - update reward bookkeeping against a position account
+//! - deposit stake tokens into the stake vault and withdraw them back out
+//! - update reward bookkeeping against a position account and release
+//!   accrued rewards from the reward vault
 //!
-//! This is not a staking product. Deposit, withdraw, and claim do not transfer
-//! tokens, and the example does not define reward emissions, funding, or
-//! solvency. See the example README and the book's production-readiness guide
-//! before adapting it for an asset-bearing program.
+//! This is not a staking product. Deposits and withdrawals do move real stake
+//! tokens to and from the pool's stake vault, and claims release real reward
+//! tokens from the reward vault, but the example still defines no reward
+//! emissions, funding, or solvency: the index only moves when the admin calls
+//! `SetRewardIndex`, and nothing refills the vaults. See the example README
+//! and the book's production-readiness guide before adapting it for
+//! production use.
 
 #![allow(missing_docs)]
 #![allow(clippy::inline_always)]
@@ -165,6 +169,7 @@ pub struct DepositAccounts<'a> {
 	pub pool_state: &'a mut AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_stake_ata: &'a AccountView,
+	pub stake_vault: &'a mut AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -176,7 +181,8 @@ pub struct WithdrawAccounts<'a> {
 	pub stake_mint: &'a AccountView,
 	pub pool_state: &'a mut AccountView,
 	pub position_state: &'a mut AccountView,
-	pub user_stake_ata: &'a AccountView,
+	pub user_stake_ata: &'a mut AccountView,
+	pub stake_vault: &'a mut AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
@@ -394,40 +400,109 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		// associated token program derives the same seeds and rejects a mismatch
 		// with `InvalidSeeds` before its idempotent branch.
 		self.user_stake_ata.assert_writable()?;
+		// The depositor signs the transfer, but custody only backs the pool's
+		// ledger if the tokens land in the pool's own stake vault. Without the
+		// derived-address check a caller could deposit into a token account they
+		// still control and be credited `staked_amount` all the same.
+		self.stake_vault
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				self.pool_state.address(),
+				self.stake_mint.address(),
+				self.token_program.address(),
+			)?;
 
-		// Validate pool and position state, then write through the same guards.
-		// Reloading each account immutably first would validate it twice. Both
-		// guards are released before the ATA CPI below.
+		// Validate pool and position state, then release the guards for the
+		// token CPIs below. Reloading each account immutably first would
+		// validate it twice.
 		let pool_handle = *self.pool_state;
 		let user_handle = *self.user;
+		{
+			let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+			let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
+
+			if pool_state.paused.get() {
+				return Err(StakingError::PoolPaused.into());
+			}
+
+			if amount == 0 {
+				return Err(StakingError::InvalidAmount.into());
+			}
+
+			assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
+			assert_position_access(pool_handle, user_handle, &position_state)?;
+		}
+
+		// Ensure user's stake ATA exists
+		associated_token_account::instructions::CreateIdempotent {
+			funding_account: self.user,
+			account: self.user_stake_ata,
+			wallet: self.user,
+			mint: self.stake_mint,
+			system_program: self.system_program,
+			token_program: self.token_program,
+		}
+		.invoke()?;
+
+		// Take custody of the deposit before the ledger is touched: the position
+		// is credited only once the tokens sit in the stake vault, so a
+		// depositor without them fails the transfer instead of acquiring free
+		// share weight against the reward vault. The depositor signs; no pool
+		// signature is involved.
+		let stake_decimals = {
+			let mint = self
+				.stake_mint
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
+			mint.decimals()
+		};
+
+		let vault_before = self
+			.stake_vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
+
+		token::instructions::TransferChecked::new(
+			self.user_stake_ata,
+			self.stake_mint,
+			self.stake_vault,
+			self.user,
+			amount,
+			stake_decimals,
+		)
+		.invoke_with_program(self.token_program.address())?;
+
+		// Credit the observed vault delta rather than the requested amount: a
+		// transfer-fee extension or a partial delivery can otherwise make the
+		// ledger claim more stake than the vault actually holds.
+		let vault_after = self
+			.stake_vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
+		let received = vault_after
+			.checked_sub(vault_before)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		// Credit the position now that custody is held. The rewards the
+		// existing stake has earned are banked before the stake changes, so an
+		// amount deposited now cannot claim rewards from before it arrived,
+		// and the checkpoint advances with the index.
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-
-		if pool_state.paused.get() {
-			return Err(StakingError::PoolPaused.into());
-		}
-
-		if amount == 0 {
-			return Err(StakingError::InvalidAmount.into());
-		}
-
-		assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
-		assert_position_access(pool_handle, user_handle, &position_state)?;
 
 		let next_staked = position_state
 			.staked_amount
 			.get()
-			.checked_add(amount)
+			.checked_add(received)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 		let next_total_staked = pool_state
 			.total_staked
 			.get()
-			.checked_add(amount)
+			.checked_add(received)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		// Bank the rewards the existing stake has earned before the stake
-		// changes, so an amount deposited now cannot claim rewards from
-		// before it arrived, and the checkpoint advances with the index.
 		let index = pool_state.reward_index.get();
 		let banked = position_state
 			.pending_rewards
@@ -444,19 +519,6 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		position_state.pending_rewards.set(banked);
 		position_state.reward_debt.set(index);
 		pool_state.total_staked.set(next_total_staked);
-		drop(position_state);
-		drop(pool_state);
-
-		// Ensure user's stake ATA exists
-		associated_token_account::instructions::CreateIdempotent {
-			funding_account: self.user,
-			account: self.user_stake_ata,
-			wallet: self.user,
-			mint: self.stake_mint,
-			system_program: self.system_program,
-			token_program: self.token_program,
-		}
-		.invoke()?;
 
 		Ok(())
 	}
@@ -482,9 +544,23 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				self.stake_mint.address(),
 				self.token_program.address(),
 			)?;
+		// The principal is signed out by the pool, so the source must provably
+		// be the pool's own stake vault. Without the derived-address check a
+		// caller could name any token account they control as the vault and the
+		// pool signature would authorise draining it.
+		self.stake_vault
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				self.pool_state.address(),
+				self.stake_mint.address(),
+				self.token_program.address(),
+			)?;
 
 		// Validate pool and position state, then write through the same guards.
-		// Reloading each account immutably first would validate it twice.
+		// Reloading each account immutably first would validate it twice. Both
+		// guards are released before the token CPI below.
 		let pool_handle = *self.pool_state;
 		let user_handle = *self.user;
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
@@ -535,6 +611,36 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				.checked_sub(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
 		);
+
+		let pool_bump = pool_state.bump;
+		let pool_stake_mint = pool_state.stake_mint;
+		let pool_reward_mint = pool_state.reward_mint;
+		drop(position_state);
+		drop(pool_state);
+
+		// Return the principal from the pool's stake vault. The pool is the
+		// vault's authority, so the pool PDA signs.
+		let pool_seeds = PoolState::seeds(&pool_stake_mint, &pool_reward_mint).with_bump(pool_bump);
+		let signer = pool_seeds.to_signer();
+		let signers = [signer.as_signer()];
+
+		let stake_decimals = {
+			let mint = self
+				.stake_mint
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
+			mint.decimals()
+		};
+
+		token::instructions::TransferChecked::new(
+			self.stake_vault,
+			self.stake_mint,
+			self.user_stake_ata,
+			self.pool_state,
+			amount,
+			stake_decimals,
+		)
+		.invoke_signed_with_program(&signers, self.token_program.address())?;
 
 		Ok(())
 	}
@@ -756,7 +862,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [5u8; 32].into();
-		let data = [StakingInstruction::InitializePool as u8];
+		let data = [StakingInstruction::InitializePool as u8, 0];
 		let result = parse_instruction::<StakingInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}

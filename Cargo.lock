@@ -6879,8 +6879,10 @@ dependencies = [
  "pina",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
+ "solana-keypair",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+ "solana-signer",
 ]
 
 [[package]]

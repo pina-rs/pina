@@ -99,7 +99,7 @@ mod tests {
 
 	#[test]
 	fn parse_instruction_accepts_matching_program_id() {
-		let data = [DeclareProgramInstruction::ValidateExternalProgram as u8];
+		let data = [DeclareProgramInstruction::ValidateExternalProgram as u8, 0];
 		let instruction = parse_instruction::<DeclareProgramInstruction>(&ID, &ID, &data);
 		assert!(matches!(
 			instruction,
@@ -110,7 +110,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [9u8; 32].into();
-		let data = [DeclareProgramInstruction::ValidateExternalProgram as u8];
+		let data = [DeclareProgramInstruction::ValidateExternalProgram as u8, 0];
 		let result = parse_instruction::<DeclareProgramInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}

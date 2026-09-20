@@ -74,9 +74,9 @@ pub struct DefaultCrateAccounts<'a> {
 #[pina(crate = pina)]
 pub struct MakeAccounts<'a> {
 	pub maker: &'a mut AccountView,
+	pub system_program: &'a AccountView,
 	pub escrow: Option<&'a mut AccountView>,
 	pub witness: Option<&'a AccountView>,
-	pub system_program: &'a AccountView,
 }
 
 /// A basic three-account layout derives without error.

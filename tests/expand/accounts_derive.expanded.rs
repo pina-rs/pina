@@ -488,9 +488,9 @@ impl<'a> ::core::fmt::Debug for DefaultCrateAccounts<'a> {
 #[pina(crate = pina)]
 pub struct MakeAccounts<'a> {
     pub maker: &'a mut AccountView,
+    pub system_program: &'a AccountView,
     pub escrow: Option<&'a mut AccountView>,
     pub witness: Option<&'a AccountView>,
-    pub system_program: &'a AccountView,
 }
 impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 4usize;
@@ -498,14 +498,14 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
         let maker = cursor.next_mut()?;
+        let system_program = cursor.next()?;
         let escrow = cursor.next_mut_opt()?;
         let witness = cursor.next_opt()?;
-        let system_program = cursor.next()?;
         Ok(Self {
             maker,
+            system_program,
             escrow,
             witness,
-            system_program,
         })
     }
     #[inline]
@@ -549,12 +549,12 @@ impl<'a> ::core::fmt::Debug for MakeAccounts<'a> {
             "MakeAccounts",
             "maker",
             &self.maker,
+            "system_program",
+            &self.system_program,
             "escrow",
             &self.escrow,
             "witness",
-            &self.witness,
-            "system_program",
-            &&self.system_program,
+            &&self.witness,
         )
     }
 }

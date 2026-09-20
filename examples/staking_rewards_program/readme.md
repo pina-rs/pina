@@ -13,15 +13,15 @@ Staking pools with check-pointed reward accrual and reward release.
 - Pool initialization with stake and reward vault ATAs.
 - Per-user position PDAs keyed by pool + owner.
 - Deposit, withdraw, and claim validation and bookkeeping flows.
+- Stake custody: `Deposit` transfers the deposited stake tokens into the pool's stake vault and `Withdraw` transfers the principal back out, so the vault balance always equals the pool's `total_staked`.
 - Reward accrual through a monotone pool `reward_index` (rewards per staked token, scaled by `REWARD_INDEX_SCALE`) with a per-position `reward_debt` checkpoint. `SetRewardIndex` is the authority's drip and may only raise the index; deposit and withdraw bank the position's accrued rewards before the stake changes, so a new deposit cannot claim rewards earned before it arrived.
 - Reward release: `Claim` transfers the accrued amount out of the pool's reward vault, signed by the pool PDA.
 
-The `tests/surfpool` suite funds both vaults through real mints and asserts the balances around every step, including that a second claim without a new drip is refused and that a regressed reward index is rejected. It reports a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
+The `tests/surfpool` suite funds both vaults through real mints and asserts the balances around every step, including that a deposit from a wallet without stake tokens is refused, that the stake vault balance tracks `total_staked` through deposits and withdrawals, that a second claim without a new drip is refused, and that a regressed reward index is rejected. It reports a skip when the SBF binary is missing, so build the binary first when using this suite as a deployment gate.
 
 ## Deliberately out of scope
 
 - Reward funding schedules, emissions curves, and solvency guarantees: the authority decides when and by how much the index moves, and a claim fails if the reward vault cannot cover it.
-- Transfers into and out of the PDA-controlled stake vault.
 - Pause administration, position closure, pool shutdown, and recovery policy.
 
 See the book's [Production Readiness](../../docs/src/production-readiness.md) checklist for the invariants and adversarial tests a real staking program needs.

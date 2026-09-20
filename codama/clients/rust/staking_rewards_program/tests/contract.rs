@@ -91,17 +91,19 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	assert_eq!(open_ix.data, vec![1, 0, 5]);
 
 	let user_stake_ata = Pubkey::new_unique();
+	let stake_vault = Pubkey::new_unique();
 	let deposit = Deposit::new(
 		admin,
 		stake_mint,
 		pool_state,
 		position_state,
 		user_stake_ata,
+		stake_vault,
 		token_program,
 	);
 	let deposit_payload = DepositInstructionData::new(|data| data.amount.set(250)).unwrap();
 	let deposit_ix = deposit.instruction(deposit_payload);
-	assert_eq!(deposit_ix.accounts.len(), 8);
+	assert_eq!(deposit_ix.accounts.len(), 9);
 	assert_eq!(deposit_ix.accounts[0], AccountMeta::new(admin, true));
 	assert_eq!(
 		deposit_ix.accounts[1],
@@ -112,12 +114,13 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		deposit_ix.accounts[4],
 		AccountMeta::new(user_stake_ata, false)
 	);
+	assert_eq!(deposit_ix.accounts[5], AccountMeta::new(stake_vault, false));
 	assert_eq!(
-		deposit_ix.accounts[5],
+		deposit_ix.accounts[6],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
 	assert_eq!(
-		deposit_ix.accounts[6],
+		deposit_ix.accounts[7],
 		AccountMeta::new_readonly(token_program, false)
 	);
 	let mut expected_deposit = vec![2, 0];
@@ -130,11 +133,12 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		pool_state,
 		position_state,
 		user_stake_ata,
+		stake_vault,
 		token_program,
 	);
 	let withdraw_payload = WithdrawInstructionData::new(|data| data.amount.set(125)).unwrap();
 	let withdraw_ix = withdraw.instruction(withdraw_payload);
-	assert_eq!(withdraw_ix.accounts.len(), 7);
+	assert_eq!(withdraw_ix.accounts.len(), 8);
 	assert_eq!(
 		withdraw_ix.accounts[1],
 		AccountMeta::new_readonly(stake_mint, false)
@@ -145,7 +149,11 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		AccountMeta::new(position_state, false)
 	);
 	assert_eq!(
-		withdraw_ix.accounts[6],
+		withdraw_ix.accounts[5],
+		AccountMeta::new(stake_vault, false)
+	);
+	assert_eq!(
+		withdraw_ix.accounts[7],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
 	let mut expected_withdraw = vec![3, 0];

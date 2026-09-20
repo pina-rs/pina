@@ -41,6 +41,10 @@ pub struct Withdraw<'account> {
 	/// Required privileges: writable.
 	pub user_stake_ata: &'account AccountView,
 
+	/// CPI account `stakeVault`.
+	/// Required privileges: writable.
+	pub stake_vault: &'account AccountView,
+
 	/// CPI account `tokenProgram`.
 	/// Required privileges: read-only.
 	pub token_program: &'account AccountView,
@@ -89,12 +93,13 @@ impl<'account> Withdraw<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 7] = [
+		let accounts: [CpiHandle<'_>; 8] = [
 			CpiHandle::readonly_signer(self.user),
 			CpiHandle::readonly(self.stake_mint),
 			CpiHandle::writable(self.pool_state)?,
 			CpiHandle::writable(self.position_state)?,
 			CpiHandle::writable(self.user_stake_ata)?,
+			CpiHandle::writable(self.stake_vault)?,
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.system_program),
 		];

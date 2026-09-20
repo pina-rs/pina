@@ -61,6 +61,7 @@ export type DepositInstruction<
 	TAccountPoolState extends string | AccountMeta<string> = string,
 	TAccountPositionState extends string | AccountMeta<string> = string,
 	TAccountUserStakeAta extends string | AccountMeta<string> = string,
+	TAccountStakeVault extends string | AccountMeta<string> = string,
 	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
 		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -85,6 +86,8 @@ export type DepositInstruction<
 			TAccountUserStakeAta extends string
 				? WritableAccount<TAccountUserStakeAta>
 				: TAccountUserStakeAta,
+			TAccountStakeVault extends string ? WritableAccount<TAccountStakeVault>
+				: TAccountStakeVault,
 			TAccountAssociatedTokenProgram extends string
 				? ReadonlyAccount<TAccountAssociatedTokenProgram>
 				: TAccountAssociatedTokenProgram,
@@ -147,6 +150,7 @@ export type DepositInput<
 	TAccountPoolState extends string = string,
 	TAccountPositionState extends string = string,
 	TAccountUserStakeAta extends string = string,
+	TAccountStakeVault extends string = string,
 	TAccountAssociatedTokenProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
@@ -156,6 +160,7 @@ export type DepositInput<
 	poolState: Address<TAccountPoolState>;
 	positionState: Address<TAccountPositionState>;
 	userStakeAta: Address<TAccountUserStakeAta>;
+	stakeVault: Address<TAccountStakeVault>;
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
@@ -168,6 +173,7 @@ export function getDepositInstruction<
 	TAccountPoolState extends string,
 	TAccountPositionState extends string,
 	TAccountUserStakeAta extends string,
+	TAccountStakeVault extends string,
 	TAccountAssociatedTokenProgram extends string,
 	TAccountTokenProgram extends string,
 	TAccountSystemProgram extends string,
@@ -180,6 +186,7 @@ export function getDepositInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserStakeAta,
+		TAccountStakeVault,
 		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
@@ -192,6 +199,7 @@ export function getDepositInstruction<
 	TAccountPoolState,
 	TAccountPositionState,
 	TAccountUserStakeAta,
+	TAccountStakeVault,
 	TAccountAssociatedTokenProgram,
 	TAccountTokenProgram,
 	TAccountSystemProgram
@@ -207,6 +215,7 @@ export function getDepositInstruction<
 		poolState: { value: input.poolState ?? null, isWritable: true },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userStakeAta: { value: input.userStakeAta ?? null, isWritable: true },
+		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isWritable: false,
@@ -244,6 +253,7 @@ export function getDepositInstruction<
 			getAccountMeta("poolState", accounts.poolState),
 			getAccountMeta("positionState", accounts.positionState),
 			getAccountMeta("userStakeAta", accounts.userStakeAta),
+			getAccountMeta("stakeVault", accounts.stakeVault),
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
@@ -259,6 +269,7 @@ export function getDepositInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserStakeAta,
+		TAccountStakeVault,
 		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
@@ -276,9 +287,10 @@ export type ParsedDepositInstruction<
 		poolState: TAccountMetas[2];
 		positionState: TAccountMetas[3];
 		userStakeAta: TAccountMetas[4];
-		associatedTokenProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
-		systemProgram: TAccountMetas[7];
+		stakeVault: TAccountMetas[5];
+		associatedTokenProgram: TAccountMetas[6];
+		tokenProgram: TAccountMetas[7];
+		systemProgram: TAccountMetas[8];
 	};
 	data: DepositInstructionData;
 };
@@ -292,12 +304,12 @@ export function parseDepositInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDepositInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -315,6 +327,7 @@ export function parseDepositInstruction<
 			poolState: getNextAccount(),
 			positionState: getNextAccount(),
 			userStakeAta: getNextAccount(),
+			stakeVault: getNextAccount(),
 			associatedTokenProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),

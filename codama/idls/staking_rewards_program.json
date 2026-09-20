@@ -597,6 +597,13 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "stakeVault",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "associatedTokenProgram",
 						"isWritable": false,
 						"isSigner": false,
@@ -734,6 +741,13 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "userStakeAta",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "stakeVault",
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false

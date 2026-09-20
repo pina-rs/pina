@@ -15,6 +15,10 @@ const int roleRegistryProgramErrorRoleAlreadyExists = 0x1; // 1
 /// Message: "The role exists but was deactivated, so it grants nothing."
 const int roleRegistryProgramErrorRoleInactive = 0x2; // 2
 
+/// The proposed admin is the zero address, which can never sign.
+/// Message: "The proposed admin is the zero address, which can never sign."
+const int roleRegistryProgramErrorZeroAddressAdmin = 0x3; // 3
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _roleRegistryProgramErrorMessages = {
   roleRegistryProgramErrorInvalidPermissions:
@@ -23,6 +27,8 @@ const Map<int, String> _roleRegistryProgramErrorMessages = {
       'A role with this address is already registered.',
   roleRegistryProgramErrorRoleInactive:
       'The role exists but was deactivated, so it grants nothing.',
+  roleRegistryProgramErrorZeroAddressAdmin:
+      'The proposed admin is the zero address, which can never sign.',
 };
 
 /// Get the error message for a RoleRegistryProgram program error code.

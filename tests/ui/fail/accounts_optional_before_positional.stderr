@@ -1,0 +1,5 @@
+error: optional account `watcher` cannot be followed by positional account `vault`: an absent optional consumes its program-address filler slot, so dropping the filler shifts every later binding by one slot and each validation runs against the wrong account; move the optional fields to the end
+  --> tests/ui/fail/accounts_optional_before_positional.rs:10:6
+   |
+10 |     pub watcher: Option<&'a AccountView>,
+   |         ^^^^^^^

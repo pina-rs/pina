@@ -1,9 +1,10 @@
 //! End-to-end tests for the staking_rewards_program.
 //!
 //! These tests exercise the OpenPosition instruction (which performs a
-//! system-program CPI to create the position PDA), the Withdraw instruction
-//! (which only updates on-chain state — no token CPI), and various validation
-//! error paths for Deposit, Withdraw, and Claim.
+//! system-program CPI to create the position PDA), the Deposit and Withdraw
+//! instructions (which move stake tokens through the pool's stake vault via a
+//! token-program CPI), and various validation error paths for Deposit,
+//! Withdraw, and Claim.
 //!
 //! ## Prerequisites
 //!
@@ -99,7 +100,41 @@ fn try_create_mollusk() -> Option<Mollusk> {
 		return None;
 	}
 
-	Some(Mollusk::new(&program_id(), "staking_rewards_program"))
+	let mut mollusk = Mollusk::new(&program_id(), "staking_rewards_program");
+	// The custody-path fixtures run the deposit and withdrawal CPIs against the
+	// real programs; Mollusk resolves an ELF by name from `SBF_OUT_DIR`, so one
+	// is available exactly when the test task staged it next to the program.
+	for (program_id, name) in staged_cpi_programs() {
+		mollusk.add_program(&program_id, name);
+	}
+
+	Some(mollusk)
+}
+
+/// The real CPI programs the custody-path fixtures need, when staged.
+fn staged_cpi_programs() -> Vec<(Pubkey, &'static str)> {
+	let dirs: Vec<std::path::PathBuf> = ["SBF_OUT_DIR", "BPF_OUT_DIR"]
+		.into_iter()
+		.filter_map(|key| std::env::var(key).ok())
+		.map(std::path::PathBuf::from)
+		.chain(std::iter::once(std::path::PathBuf::from("tests/fixtures")))
+		.collect();
+
+	[
+		(spl_token_program_id(), "spl_token"),
+		(spl_ata_program_id(), "spl_ata"),
+	]
+	.into_iter()
+	.filter(|(_, name)| {
+		dirs.iter()
+			.any(|dir| dir.join(format!("{name}.so")).is_file())
+	})
+	.collect()
+}
+
+/// Whether the real programs the stake custody transfers need are staged.
+fn transfer_cpis_available() -> bool {
+	staged_cpi_programs().len() == 2
 }
 
 /// Derive the position PDA for a given pool / owner pair.
@@ -107,6 +142,18 @@ fn try_create_mollusk() -> Option<Mollusk> {
 /// Seeds: `[b"position", pool, owner]`
 fn derive_position_pda(pool: &Pubkey, owner: &Pubkey) -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[b"position", pool.as_ref(), owner.as_ref()], &program_id())
+}
+
+/// Derive the pool PDA for a mint pair.
+///
+/// Seeds: `[b"pool", stake_mint, reward_mint]`. The custody-path fixtures need
+/// the canonical address and its bump because `Withdraw` signs the principal
+/// transfer with the stored pool seeds.
+fn derive_pool_pda(stake_mint: &Pubkey, reward_mint: &Pubkey) -> (Pubkey, u8) {
+	Pubkey::find_program_address(
+		&[b"pool", stake_mint.as_ref(), reward_mint.as_ref()],
+		&program_id(),
+	)
 }
 
 /// Derive the Associated Token Account address for a given wallet and mint
@@ -206,6 +253,51 @@ fn mock_mint_account(lamports: u64) -> Account {
 	}
 }
 
+/// Build a real SPL mint image for a fixture whose instruction runs a token
+/// CPI.
+///
+/// The token program validates the mint's own state and decimals on every
+/// `TransferChecked`, so a zeroed buffer is rejected even though the program
+/// only reads the owner and address. Layout: the absent mint authority, supply,
+/// decimals, the initialized flag, then the absent freeze authority.
+fn initialized_mint_account(decimals: u8, supply: u64) -> Account {
+	let mut data = vec![0u8; 82];
+	data[36..44].copy_from_slice(&supply.to_le_bytes());
+	data[44] = decimals;
+	data[45] = 1; // COption::Some — is_initialized
+
+	Account {
+		lamports: 1_000_000_000,
+		data,
+		owner: spl_token_program_id(),
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
+/// Build a real SPL token account image for a fixture whose instruction runs a
+/// token CPI.
+///
+/// The custody paths execute against the actual SPL Token program, which
+/// deserializes this layout: `mint`, `owner`, the little-endian amount, the
+/// absent-delegate slot, then the account state. A zeroed buffer fails that
+/// parse with "stored owner or mint does not match".
+fn token_account(mint: &Pubkey, owner: &Pubkey, amount: u64) -> Account {
+	let mut data = vec![0u8; 165];
+	data[..32].copy_from_slice(mint.as_ref());
+	data[32..64].copy_from_slice(owner.as_ref());
+	data[64..72].copy_from_slice(&amount.to_le_bytes());
+	data[108] = 1; // AccountState::Initialized
+
+	Account {
+		lamports: 1_000_000_000,
+		data,
+		owner: spl_token_program_id(),
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
 /// Token program stub: executable, owned by the BPF loader, at the SPL Token
 /// program address.  Mollusk's `assert_addresses` only checks the key.
 fn token_program_account() -> (Pubkey, Account) {
@@ -279,6 +371,18 @@ fn claim_ix_data() -> Vec<u8> {
 const SKIP_MSG: &str = "[SKIP] staking_rewards_program SBF binary not found. Build it first with \
                         `cargo build --release --target bpfel-unknown-none -p \
                         staking_rewards_program -Z build-std -F bpf-entrypoint`.";
+
+/// Reported when a fixture needs the real CPI programs and the harness has not
+/// staged them. The Surfpool suite covers the same transfers on a real runtime.
+const CPI_SKIP_MSG: &str = "[SKIP] the real SPL Token and associated-token programs are not \
+                            staged; place spl_token.so and spl_ata.so in SBF_OUT_DIR to run the \
+                            custody-path fixtures";
+
+/// The token balance of a real SPL token account image, at the fixed amount
+/// offset every `TransferChecked` touches.
+fn token_amount(account: &Account) -> u64 {
+	u64::from_le_bytes(account.data[64..72].try_into().expect("token amount"))
+}
 
 // ---------------------------------------------------------------------------
 // OpenPosition Tests
@@ -396,29 +500,39 @@ fn open_position_creates_position_state() {
 // ---------------------------------------------------------------------------
 
 /// Verify that `Withdraw` decreases `staked_amount` and `total_staked` by the
-/// requested amount.
+/// requested amount and transfers the principal out of the stake vault.
 ///
-/// Withdraw only updates on-chain state — it issues no token CPI — so the
-/// full instruction can be executed and its results verified.
+/// The principal is signed out by the pool PDA, so the fixture needs the real
+/// SPL Token program staged; without it the test skips and the Surfpool suite
+/// covers the same transfer on a real runtime.
 #[test]
 fn withdraw_updates_balances() {
 	let Some(mollusk) = try_create_mollusk() else {
 		eprintln!("{SKIP_MSG}");
 		return;
 	};
+	if !transfer_cpis_available() {
+		eprintln!("{CPI_SKIP_MSG}");
+		return;
+	}
 
 	let user = Pubkey::new_unique();
 	let stake_mint = Pubkey::new_unique();
-	let pool_state_key = Pubkey::new_unique();
-	let position_state_key = Pubkey::new_unique();
-	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	// The canonical pool PDA and its bump: `Withdraw` signs the principal
+	// transfer with the stored seeds, so the runtime must be able to derive the
+	// same address.
+	let (pool_state_key, pool_bump) = derive_pool_pda(&stake_mint, &reward_mint);
+	let position_state_key = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
-	// Withdraw 100 from a position with 200 staked; pool has 500 total.
+	// Withdraw 100 from a position with 200 staked; the pool has 500 total and
+	// the vault holds the 200 tokens custody actually backed.
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&withdraw_ix_data(100),
@@ -428,6 +542,7 @@ fn withdraw_updates_balances() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -438,7 +553,7 @@ fn withdraw_updates_balances() {
 			user,
 			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
 		),
-		(stake_mint, mock_mint_account(1_000_000)),
+		(stake_mint, initialized_mint_account(6, 200)),
 		(
 			pool_state_key,
 			pool_state_account(
@@ -447,7 +562,7 @@ fn withdraw_updates_balances() {
 				&reward_mint,
 				500,
 				false,
-				0,
+				pool_bump,
 				pool_lamports,
 				0,
 			),
@@ -456,10 +571,10 @@ fn withdraw_updates_balances() {
 			position_state_key,
 			position_state_account(&pool_state_key, &user, 200, 0, 0, 0, pos_lamports),
 		),
-		// ATA stub: only the address is checked — data contents don't matter.
+		(user_stake_ata, token_account(&stake_mint, &user, 0)),
 		(
-			user_stake_ata,
-			Account::new(1, 165, &spl_token_program_id()),
+			stake_vault,
+			token_account(&stake_mint, &pool_state_key, 200),
 		),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -492,6 +607,26 @@ fn withdraw_updates_balances() {
 		"total_staked should be 500 - 100 = 400"
 	);
 
+	// The principal moved: the user's ATA received it, the vault released it.
+	assert_eq!(
+		token_amount(
+			result
+				.get_account(&user_stake_ata)
+				.expect("user ATA after Withdraw")
+		),
+		100,
+		"the withdrawn principal must land in the user's stake ATA"
+	);
+	assert_eq!(
+		token_amount(
+			result
+				.get_account(&stake_vault)
+				.expect("stake vault after Withdraw")
+		),
+		100,
+		"the withdrawn principal must leave the stake vault"
+	);
+
 	eprintln!(
 		"[CU] Withdraw: {} compute units consumed",
 		result.compute_units_consumed
@@ -514,6 +649,7 @@ fn withdraw_insufficient_balance_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -528,6 +664,7 @@ fn withdraw_insufficient_balance_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -560,6 +697,7 @@ fn withdraw_insufficient_balance_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -586,6 +724,7 @@ fn withdraw_from_paused_pool_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -599,6 +738,7 @@ fn withdraw_from_paused_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -632,6 +772,7 @@ fn withdraw_from_paused_pool_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -659,6 +800,7 @@ fn withdraw_zero_amount_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -672,6 +814,7 @@ fn withdraw_zero_amount_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -704,6 +847,7 @@ fn withdraw_zero_amount_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -732,6 +876,7 @@ fn withdraw_wrong_owner_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_b_stake_ata = derive_ata(&user_b, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -745,6 +890,7 @@ fn withdraw_wrong_owner_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_b_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -777,6 +923,7 @@ fn withdraw_wrong_owner_fails() {
 			user_b_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -805,6 +952,7 @@ fn withdraw_wrong_pool_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -818,6 +966,7 @@ fn withdraw_wrong_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -850,6 +999,7 @@ fn withdraw_wrong_pool_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -885,6 +1035,7 @@ fn deposit_paused_pool_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -898,6 +1049,7 @@ fn deposit_paused_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -932,6 +1084,7 @@ fn deposit_paused_pool_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -960,6 +1113,7 @@ fn deposit_zero_amount_fails() {
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -973,6 +1127,7 @@ fn deposit_zero_amount_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1006,6 +1161,7 @@ fn deposit_zero_amount_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -1034,7 +1190,10 @@ fn deposit_wrong_stake_mint_fails() {
 	let position_state_key = Pubkey::new_unique();
 	let admin = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
+	// The vault follows the instruction's mint so the derived-address check
+	// passes and the mismatch with the pool's stored mint is what fires.
 	let user_stake_ata = derive_ata(&user, &wrong_stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &wrong_stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -1048,6 +1207,7 @@ fn deposit_wrong_stake_mint_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1081,6 +1241,7 @@ fn deposit_wrong_stake_mint_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -1115,6 +1276,7 @@ fn deposit_wrong_owner_fails() {
 	let reward_mint = Pubkey::new_unique();
 	// ATA derived for user_b (the signer) — must match what the program checks.
 	let user_b_stake_ata = derive_ata(&user_b, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
 
 	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
@@ -1128,6 +1290,7 @@ fn deposit_wrong_owner_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_b_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1163,6 +1326,7 @@ fn deposit_wrong_owner_fails() {
 			user_b_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		(stake_vault, Account::new(1, 165, &spl_token_program_id())),
 		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
@@ -1172,6 +1336,133 @@ fn deposit_wrong_owner_fails() {
 		&instruction,
 		&accounts,
 		&[Check::err(StakingError::Unauthorized.into())],
+	);
+}
+
+/// Verify that a funded `Deposit` transfers the stake into the pool's stake
+/// vault and credits the position only alongside that transfer.
+///
+/// The depositor's ATA already exists and holds the tokens, so
+/// `CreateIdempotent` takes its idempotent branch and the custody
+/// `TransferChecked` does the moving. The fixture needs the real SPL Token and
+/// associated-token programs staged; without them the test skips and the
+/// Surfpool suite covers the same transfer on a real runtime.
+#[test]
+fn deposit_transfers_stake_into_vault() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+	if !transfer_cpis_available() {
+		eprintln!("{CPI_SKIP_MSG}");
+		return;
+	}
+
+	let user = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let pool_state_key = derive_pool_pda(&stake_mint, &reward_mint).0;
+	let position_state_key = Pubkey::new_unique();
+	let user_stake_ata = derive_ata(&user, &stake_mint);
+	let stake_vault = derive_ata(&pool_state_key, &stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
+
+	// Deposit 100 of the 100 tokens the depositor holds.
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&deposit_ix_data(100),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new(stake_vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(stake_mint, initialized_mint_account(6, 100)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				0,
+				false,
+				0,
+				pool_lamports,
+				0,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, 0, 0, 0, 0, pos_lamports),
+		),
+		(user_stake_ata, token_account(&stake_mint, &user, 100)),
+		(stake_vault, token_account(&stake_mint, &pool_state_key, 0)),
+		associated_token_program_account(),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+
+	// The ledger credited exactly what moved into custody.
+	let pos_account = result
+		.get_account(&position_state_key)
+		.expect("position_state should exist after Deposit");
+	let pos_state: &PositionStateZc =
+		<PositionState as pina::PinaPodFixed>::read_exact(&pos_account.data).unwrap();
+	assert_eq!(
+		pos_state.staked_amount.get(),
+		100,
+		"staked_amount should equal the deposited amount"
+	);
+	let pool_account = result
+		.get_account(&pool_state_key)
+		.expect("pool_state should exist after Deposit");
+	let pool_st: &PoolStateZc =
+		<PoolState as pina::PinaPodFixed>::read_exact(&pool_account.data).unwrap();
+	assert_eq!(
+		pool_st.total_staked.get(),
+		100,
+		"total_staked should equal the deposited amount"
+	);
+	assert_eq!(
+		token_amount(
+			result
+				.get_account(&stake_vault)
+				.expect("stake vault after Deposit")
+		),
+		100,
+		"the deposit must arrive in the stake vault"
+	);
+	assert_eq!(
+		token_amount(
+			result
+				.get_account(&user_stake_ata)
+				.expect("user ATA after Deposit")
+		),
+		0,
+		"the deposit must leave the depositor's ATA"
+	);
+
+	eprintln!(
+		"[CU] Deposit: {} compute units consumed",
+		result.compute_units_consumed
 	);
 }
 

@@ -131,6 +131,19 @@ pub(crate) fn expand(
 		};
 	};
 
+	// A program whose manifest records enveloped instruction contracts pins
+	// its instruction space to the versions the deployed program knows, so a
+	// zero-field instruction is version-gated exactly like one with a payload.
+	let envelope_gate = match crate::migration::instruction_envelope_gate(&enum_name) {
+		Ok(value) => value,
+		Err(error) => return error.to_compile_error(),
+	};
+	let into_discriminator = if let Some(gate) = &envelope_gate {
+		gate.implementation(crate_path, &enum_name, primitive)
+	} else {
+		quote! { #crate_path::into_discriminator!(#enum_name, #primitive); }
+	};
+
 	let mut consts = Vec::new();
 	let mut match_arms = Vec::new();
 	let mut reserved_assertions = Vec::new();
@@ -200,7 +213,7 @@ pub(crate) fn expand(
 			}
 		}
 
-		#crate_path::into_discriminator!(#enum_name, #primitive);
+		#into_discriminator
 	};
 
 	let (uniqueness_marker, entrypoint_impl) = match entrypoint_expansion {

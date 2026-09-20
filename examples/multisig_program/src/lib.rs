@@ -1683,6 +1683,11 @@ fn apply_config_actions(
 			ConfigActionView::RemoveMember { key } => {
 				let position = member_index(&working.member_keys[..working.member_count], &key)
 					.ok_or(MultisigError::NotAMember)?;
+				// Compaction re-binds every positional vote bit above
+				// `position` to a different member. Prior proposals never run
+				// with shifted bits: `changed` freezes them below
+				// `stale_transaction_index`, and every effect path —
+				// VaultExecute included — rejects stale proposals.
 				working
 					.member_keys
 					.copy_within(position + 1..working.member_count, position);
@@ -1691,6 +1696,12 @@ fn apply_config_actions(
 					.copy_within(position + 1..working.member_count, position);
 				working.member_count -= 1;
 				working.changed = true;
+				prune_spending_limit_roster(
+					multisig_key,
+					&key,
+					spending_limit_accounts,
+					rent_payer,
+				)?;
 			}
 			ConfigActionView::ChangeThreshold { threshold } => {
 				working.threshold = threshold;
@@ -1808,6 +1819,63 @@ fn find_mut_by_address<'a>(
 	accounts
 		.iter_mut()
 		.find(|account| account.address() == address)
+}
+
+/// Revoke a removed member's delegated draw rights: drop them from every
+/// spending-limit roster in the remaining accounts, and close a limit whose
+/// roster empties, exactly like `RemoveSpendingLimit` retires an allowance.
+///
+/// Limits the caller did not pass stay untouched, but they cannot lend
+/// authority either: [`SpendingLimitUseAccounts`] independently requires the
+/// drawer to be a current member of the multisig, so revocation never depends
+/// on which limit accounts a removal execution happened to receive.
+fn prune_spending_limit_roster(
+	multisig_key: &Address,
+	removed: &Address,
+	spending_limit_accounts: &mut [AccountView],
+	rent_payer: &mut AccountView,
+) -> Result<(), ProgramError> {
+	for account in spending_limit_accounts.iter_mut() {
+		if account.assert_owner(&ID).is_err() {
+			continue;
+		}
+		let mut create_key = Address::default();
+		let mut members = [Address::default(); MAX_SPENDING_LIMIT_MEMBERS];
+		let mut member_count = 0;
+		let parsed = account.with_compact_account::<SpendingLimit, _>(&ID, |limit| {
+			if limit.multisig != *multisig_key {
+				return Err(ProgramError::InvalidSeeds);
+			}
+			create_key = limit.create_key;
+			member_count = decode_roster(limit.members(), &mut members)?;
+			Ok(())
+		});
+		// The remaining accounts are best-effort for this action: anything
+		// that is not a spending limit of this multisig is skipped.
+		if parsed.is_err() {
+			continue;
+		}
+		SpendingLimit::assert_seeds(account, multisig_key, &create_key, &ID)?;
+		let Some(position) = member_index(&members[..member_count], removed) else {
+			continue;
+		};
+		members.copy_within(position + 1..member_count, position);
+		member_count -= 1;
+		if member_count == 0 {
+			account.close_account_zeroed(&ID, &mut *rent_payer)?;
+		} else {
+			UpdateResizableAccount {
+				account,
+				rent_account: &mut *rent_payer,
+				program_id: &ID,
+				patch: SpendingLimitPatch::new().replace_members(
+					&flatten_roster::<512>(&members[..member_count])[..member_count * 32],
+				),
+			}
+			.invoke::<SpendingLimit>()?;
+		}
+	}
+	Ok(())
 }
 
 /// A working copy of a multisig's mutable state, accumulated while applying
@@ -2548,11 +2616,16 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 		if proposal.kind != KIND_VAULT {
 			return Err(MultisigError::InvalidProposalKind.into());
 		}
-		// A proposal approved before the roster changed stays executable:
-		// the recorded consent already met the old threshold. The timelock
-		// still anchors at approval time.
 		if proposal.status != STATUS_APPROVED {
 			return Err(MultisigError::InvalidProposalStatus.into());
+		}
+		// Stale consent never moves money: a proposal left behind by a
+		// consensus change dies here like on every other member instruction.
+		// Roster compaction re-binds vote-mask positions, so executing a
+		// pre-change proposal would attribute consent to members who never
+		// gave it.
+		if proposal.index <= multisig.stale_transaction_index {
+			return Err(MultisigError::StaleProposal.into());
 		}
 		let now = read_timestamp(self.clock)?;
 		let elapsed = now
@@ -2840,6 +2913,12 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 		if elapsed < i64::from(multisig.timelock) {
 			return Err(MultisigError::TimeLockNotReleased.into());
 		}
+		// Expired consent dies with the proposal here too: the path that
+		// rewrites governance must not run on a lifetime the multisig has
+		// already outlived.
+		if is_expired(proposal.expires_at, now) {
+			return Err(MultisigError::ProposalExpired.into());
+		}
 
 		let mut actions = [0_u8; MAX_ACTIONS_BYTES];
 		let mut actions_len = 0;
@@ -2933,7 +3012,14 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 
 		// Validate the multisig account is the real stored-bump PDA before
 		// trusting anything the spending limit says about it.
-		MultisigSnapshot::load(self.multisig)?;
+		let multisig = MultisigSnapshot::load(self.multisig)?;
+		// The limit roster delegates, it does not mint membership: a drawer
+		// removed from the multisig is refused even when a limit roster still
+		// names them, so revocation never depends on which limit accounts the
+		// removal execution received.
+		if !multisig.is_member(&member_key) {
+			return Err(MultisigError::Unauthorized.into());
+		}
 
 		let mut limit_create_key = Address::default();
 		let mut mint = Address::default();

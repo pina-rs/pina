@@ -106,6 +106,79 @@ fn reserved_migrate_instruction_advances_a_stale_account() {
 	});
 }
 
+/// A v0 `ManualState` walks its full two-step ladder (3 → 4 → 6 bytes: u8 →
+/// u16 → the compact `String<5>`) through the reserved instruction and lands
+/// on the current compact representation. The three grown bytes cost
+/// 3 × 6,960 = 20,880 lamports of rent; before the lamport budget covered the
+/// whole ladder, the first step mutated the account and the second step's
+/// cumulative budget check (20,880 > 20,000) then failed post-effect, so the
+/// program panicked and the transaction rolled back — stranding the account
+/// behind permanent `ProgramFailedToComplete` failures (sweep finding N1).
+#[test]
+#[ignore = "run with pina test"]
+fn reserved_migrate_walks_a_manual_state_ladder_to_completion() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let manual_state = Pubkey::new_from_array([0x28; 32]);
+
+		// v0 `ManualState`: discriminator 02, migration version 0, and
+		// `amount: u8` = 255 — the value whose current code is "255", which is
+		// what makes the ladder grow the full three bytes.
+		program
+			.install_historical_account(&HistoricalAccount::new(
+				0,
+				manual_state,
+				program_id,
+				vec![2, 0, 255],
+			))
+			.expect("install v0 manual state");
+		let stale = program
+			.account(&manual_state)
+			.expect("read stale manual state");
+		assert_eq!(stale.data.len(), 3);
+
+		// Ladder slots run `[payer, systemProgram, state, manualState,
+		// compactState, state]`; the placeholders skip the `State` and
+		// `CompactState` slots and the trailing slot is simply absent.
+		program
+			.send(
+				&[MIGRATE_DISCRIMINATOR],
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new_readonly(system_program(), false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new(manual_state, false),
+					AccountMeta::new_readonly(program_id, false),
+				],
+			)
+			.expect("execute reserved Migrate across the full ManualState ladder");
+
+		let migrated = program
+			.account(&manual_state)
+			.expect("read migrated manual state");
+		// amount 255 became the compact code "255": the 6-byte current
+		// representation `[02, 02, 03, '2', '5', '5']`.
+		assert_eq!(
+			migrated.data.len(),
+			6,
+			"the ladder reached the current size"
+		);
+		assert_eq!(&migrated.data[0..2], &[2, 2], "the version is current");
+		assert_eq!(migrated.data[2], 3);
+		assert_eq!(
+			&migrated.data[3..6],
+			b"255",
+			"the code preserves the amount"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// A client may send only the slots it needs and fill the rest with the
 /// program address; a foreign account in a declared slot fails closed.
 #[test]
@@ -192,10 +265,15 @@ fn reserved_migrate_instruction_shares_one_lamport_budget_across_slots() {
 				.expect("install historical state");
 		}
 
-		// Each v0 state is rent-exempt at 42 bytes, so each migration tops up
-		// two bytes of rent (13,920 lamports). The 20,000-lamport cap funds
-		// either account alone but never both, and the transaction fails
-		// atomically with the budget error.
+		// Each v0 state is rent-exempt at 42 bytes and grows two bytes across
+		// its ladder (two steps, 6,960 lamports each, 13,920 per account), so
+		// two accounts need 27,840 lamports — above the 24,000-lamport cap,
+		// which the cap must exceed for `ManualState`'s deeper ladder. The
+		// cumulative budget crosses the cap on the second account's second
+		// step, after its first effect has landed, so the executor aborts the
+		// instruction with the post-effect panic instead of a typed error —
+		// the exact fail-closed shape the sweep's N1 finding documents. The
+		// failure is still atomic.
 		let rejection = program.send(
 			&[MIGRATE_DISCRIMINATOR],
 			vec![
@@ -208,9 +286,13 @@ fn reserved_migrate_instruction_shares_one_lamport_budget_across_slots() {
 			],
 		);
 		let error = rejection.expect_err("two growing migrations must exceed the shared budget");
-		assert!(
-			error.message().contains("fffffff2"),
-			"expected the lamport budget error, got: {}",
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::ProgramFailedToComplete
+			)),
+			"expected the post-effect budget abort, got: {}",
 			error.message()
 		);
 		for state in [&state_a, &state_b] {

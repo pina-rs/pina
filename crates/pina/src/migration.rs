@@ -813,7 +813,15 @@ mod executor {
 				finish_after_mutation(self.execute_funding_transfer(step.funding));
 			}
 			if step.working_size > self.account.data_len() {
+				let old_len = self.account.data_len();
 				finish_after_mutation(self.account.resize(step.working_size));
+				// Zero-fill the grown region before the transition runs so a
+				// hand-written transition that skips an added field commits
+				// zeros, never the account's own realloc residue. This mirrors
+				// the instruction/event workspaces and is defense in depth:
+				// transitions are still required to write every added byte.
+				let mut data = finish_after_mutation(self.account.try_borrow_mut());
+				data[old_len..].fill(0);
 			}
 			if let Some(payload) = step.payload.take() {
 				let mut data = finish_after_mutation(self.account.try_borrow_mut());

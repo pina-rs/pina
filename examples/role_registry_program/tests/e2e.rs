@@ -594,6 +594,75 @@ fn rotate_admin_changes_admin() {
 	);
 }
 
+/// Rotating admin to the zero address must fail with `ZeroAddressAdmin`: the
+/// zero address can never sign, so storing it as the admin would brick every
+/// later admin instruction permanently.
+#[test]
+fn rotate_admin_to_the_zero_address_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let admin = Pubkey::new_unique();
+	let (registry_pda, registry_bump) = derive_registry_pda(&admin);
+
+	// Initialize.
+	let init_ix = Instruction::new_with_bytes(
+		program_id(),
+		&initialize_ix_data(registry_bump),
+		vec![
+			AccountMeta::new(admin, true),
+			AccountMeta::new(registry_pda, false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let init_result = mollusk.process_and_validate_instruction(
+		&init_ix,
+		&[
+			(
+				admin,
+				Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			),
+			(registry_pda, Account::default()),
+			keyed_account_for_system_program(),
+		],
+		&[Check::success()],
+	);
+
+	let admin_after_init = init_result
+		.get_account(&admin)
+		.cloned()
+		.unwrap_or_else(|| panic!("admin not found after Initialize"));
+	let registry_after_init = init_result
+		.get_account(&registry_pda)
+		.cloned()
+		.unwrap_or_else(|| panic!("registry_pda not found after Initialize"));
+
+	// RotateAdmin naming the zero address as the new admin.
+	let zero_address = Pubkey::default();
+	let rotate_ix = Instruction::new_with_bytes(
+		program_id(),
+		&rotate_admin_ix_data(),
+		vec![
+			AccountMeta::new_readonly(admin, true),
+			AccountMeta::new_readonly(zero_address, false),
+			AccountMeta::new(registry_pda, false),
+		],
+	);
+
+	mollusk.process_and_validate_instruction(
+		&rotate_ix,
+		&[
+			(admin, admin_after_init),
+			(zero_address, Account::default()),
+			(registry_pda, registry_after_init),
+		],
+		&[Check::err(RegistryError::ZeroAddressAdmin.into())],
+	);
+}
+
 /// Pre-populate a `RoleEntry` with `active = false` and attempt to run
 /// DeactivateRole. The program should reject it with `RoleInactive`.
 #[test]

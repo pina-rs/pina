@@ -25,6 +25,10 @@ pub enum RoleRegistryProgramError {
 	/// 2 - The role exists but was deactivated, so it grants nothing.
 	#[error("The role exists but was deactivated, so it grants nothing.")]
 	RoleInactive = 0x2,
+	/// The proposed admin is the zero address, which can never sign.
+	/// 3 - The proposed admin is the zero address, which can never sign.
+	#[error("The proposed admin is the zero address, which can never sign.")]
+	ZeroAddressAdmin = 0x3,
 }
 
 impl From<RoleRegistryProgramError> for solana_program_error::ProgramError {

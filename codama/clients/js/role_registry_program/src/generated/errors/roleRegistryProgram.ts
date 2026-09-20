@@ -20,11 +20,14 @@ export const ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS = 0x0; // 0
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS = 0x1; // 1
 /** The role exists but was deactivated, so it grants nothing. */
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE = 0x2; // 2
+/** The proposed admin is the zero address, which can never sign. */
+export const ROLE_REGISTRY_PROGRAM_ERROR__ZERO_ADDRESS_ADMIN = 0x3; // 3
 
 export type RoleRegistryProgramError =
 	| typeof ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS
 	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS
-	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE;
+	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE
+	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ZERO_ADDRESS_ADMIN;
 
 let roleRegistryProgramErrorMessages:
 	| Record<RoleRegistryProgramError, string>
@@ -37,6 +40,8 @@ if (process.env["NODE_ENV"] !== "production") {
 			`A role with this address is already registered.`,
 		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE]:
 			`The role exists but was deactivated, so it grants nothing.`,
+		[ROLE_REGISTRY_PROGRAM_ERROR__ZERO_ADDRESS_ADMIN]:
+			`The proposed admin is the zero address, which can never sign.`,
 	};
 }
 

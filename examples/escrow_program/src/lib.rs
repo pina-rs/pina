@@ -143,10 +143,44 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
-		// The address check lives in the `Create` CPI below: the associated token
-		// program derives the same `[wallet, token_program, mint]` seeds and
-		// rejects a mismatch with `InvalidSeeds` before it creates anything.
-		self.vault.assert_empty()?.assert_writable()?;
+		// The vault is the ATA of the escrow PDA (wallet = escrow), so anyone
+		// can derive — and create — it before `Make` runs; rejecting any
+		// pre-existing account outright lets a zero-cost griefer strand every
+		// future `Make` for a chosen `(maker, seed)` slot (security sweep
+		// finding D2). Tolerate a pre-created vault only when it is exactly
+		// the account `Make` would have created itself: the derived ATA of
+		// this escrow PDA and mint under the same token program — which also
+		// pins the token-program owner and the stored wallet and mint —
+		// holding zero tokens, with no delegate, and writable for the credit
+		// below. Every rejection on this path keeps the original
+		// `AccountAlreadyInitialized` error, so failure attribution is
+		// unchanged for accounts the tolerance does not accept. An empty
+		// account still follows the plain `assert_empty` + `assert_writable`
+		// path; the address check for that path lives in the `Create` CPI
+		// below: the associated token program derives the same
+		// `[wallet, token_program, mint]` seeds and rejects a mismatch with
+		// `InvalidSeeds` before it creates anything.
+		let create_vault = match self.vault.assert_empty() {
+			Ok(empty) => {
+				empty.assert_writable()?;
+				true
+			}
+			Err(rejected) => {
+				let tolerated = self.vault.assert_writable().is_ok()
+					&& self
+						.vault
+						.as_associated_token_account(
+							self.escrow.address(),
+							self.mint_a.address(),
+							&token_program,
+						)
+						.is_ok_and(|vault| vault.amount() == 0 && vault.delegate().is_none());
+				if !tolerated {
+					return Err(rejected);
+				}
+				false
+			}
+		};
 
 		// Create and initialize the escrow account atomically.
 		//
@@ -176,16 +210,19 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			Ok(())
 		})?;
 
-		// Create the vault token account
-		associated_token_account::instructions::Create {
-			account: self.vault,
-			funding_account: self.maker,
-			wallet: self.escrow,
-			mint: self.mint_a,
-			system_program: self.system_program,
-			token_program: self.token_program,
+		// Create the vault token account — skipped when a legitimate empty
+		// vault already exists (see the tolerance above).
+		if create_vault {
+			associated_token_account::instructions::Create {
+				account: self.vault,
+				funding_account: self.maker,
+				wallet: self.escrow,
+				mint: self.mint_a,
+				system_program: self.system_program,
+				token_program: self.token_program,
+			}
+			.invoke()?;
 		}
-		.invoke()?;
 		let vault_before = self
 			.vault
 			.as_token_account_for_program(&token_program)?
@@ -405,7 +442,7 @@ mod tests {
 	#[test]
 	fn parse_instruction_rejects_program_id_mismatch() {
 		let wrong_program_id: Address = [9u8; 32].into();
-		let data = [EscrowInstruction::Make as u8];
+		let data = [EscrowInstruction::Make as u8, 0];
 		let result = parse_instruction::<EscrowInstruction>(&wrong_program_id, &ID, &data);
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}
