@@ -1,7 +1,7 @@
 //! Remedy text shared by migration cost warnings and the on-chain executor
 //! errors.
 //!
-//! `pina migrations make` quotes these strings when it warns about a growing
+//! `pina migrations create` quotes these strings when it warns about a growing
 //! account, and the cost preview (#341) reuses them, so a pre-deploy warning
 //! and the `PinaProgramError` a transaction fails with name the same fix. Each
 //! string mirrors the rustdoc on the matching `pina::PinaProgramError`
@@ -19,7 +19,7 @@ pub(crate) const ACCOUNT_GROWTH_REMEDY: &str =
 ///
 /// The executor returns that code when the rent deficit exceeds the
 /// `max_lamports` budget the program passes to `MigrateAccount` or
-/// `MigrateContext`. The `make` growth warning quotes this string so the
+/// `MigrateContext`. The `create` growth warning quotes this string so the
 /// printed estimate and the on-chain failure name the same constant.
 pub(crate) const LAMPORT_BUDGET_REMEDY: &str =
 	"raise the program's lamport budget (`max_lamports` passed to `MigrateAccount` or \

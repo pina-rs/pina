@@ -57,7 +57,7 @@ pub enum PinaProgramError {
 	///
 	/// Raise the program's `max_lamports` constant — the migrations example
 	/// calls it `MAX_INLINE_MIGRATION_LAMPORTS` — until it covers the quoted
-	/// deficit, or pass a larger budget to the sweep. `pina migrations make`
+	/// deficit, or pass a larger budget to the sweep. `pina migrations create`
 	/// prints the estimated deficit for each growing transition, about 6,960
 	/// lamports per grown byte.
 	MigrationLamportBudgetExceeded = 0xFFFF_FFF2,
@@ -87,7 +87,7 @@ pub enum PinaProgramError {
 	/// before they fall further behind. The reserved `Migrate` instruction
 	/// (`MigrateContext`) is the out-of-band route when the touching
 	/// instruction cannot carry a payer, but it enforces the same step cap.
-	/// Regenerate transitions with `pina migrations make` when a plan's version
+	/// Regenerate transitions with `pina migrations create` when a plan's version
 	/// or size shape drifted rather than an account being stale.
 	MigrationUnavailable = 0xFFFF_FFF6,
 	/// A stored version is malformed, unknown, or newer than this program.

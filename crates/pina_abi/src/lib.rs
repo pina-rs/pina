@@ -837,7 +837,7 @@ pub struct RenameMapping {
 #[serde(deny_unknown_fields)]
 pub struct Transition {
 	pub mode: TransitionMode,
-	/// Disambiguated field renames answered through `pina migrations make`.
+	/// Disambiguated field renames answered through `pina migrations create`.
 	/// Renames record source intent so repeated runs stay stable and the
 	/// generated transition moves bytes instead of dropping them.
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1170,7 +1170,7 @@ impl MigrationManifest {
 		let found = matches.next().ok_or_else(|| {
 			format!(
 				"{kind} `{rust_name}` is opted into migrations but has no snapshot; run `pina \
-				 migrations make`"
+				 migrations create`"
 			)
 		})?;
 		if matches.next().is_some() {
@@ -1274,7 +1274,7 @@ fn walk_document_to(
 	if start < oldest {
 		return Err(format!(
 			"{kind} records ABI version {start}, which predates the oldest supported version \
-			 {oldest}; regenerate it with `pina migrations make`"
+			 {oldest}; regenerate it with `pina migrations create`"
 		));
 	}
 	if start == current {
@@ -3155,7 +3155,7 @@ mod tests {
 	}
 
 	/// Encoding a validated document must round-trip through the reader, so the
-	/// bytes `pina migrations make` writes are exactly what a later build reads.
+	/// bytes `pina migrations create` writes are exactly what a later build reads.
 	#[test]
 	fn both_documents_encode_and_decode_through_the_same_model() {
 		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
@@ -3237,7 +3237,7 @@ mod tests {
 
 		let value = serde_json::Value::Object(serde_json::Map::new());
 		let walked = walk_document("migration manifest", "0.1", value).unwrap_err();
-		assert!(walked.contains("regenerate it with `pina migrations make`"));
+		assert!(walked.contains("regenerate it with `pina migrations create`"));
 	}
 
 	/// A real converter step advances the walk and rewrites the document.

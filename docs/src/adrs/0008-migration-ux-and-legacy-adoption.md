@@ -10,7 +10,7 @@
 ADR 0007 established the versioned ABI, on-demand account migration, and the publication ledger. Dogfooding the full developer loop while advancing the migrations example to a second generation confirmed the core experience:
 
 - opting in is one annotation and one `pina.toml` setting;
-- forgetting `pina migrations make` fails the build with the exact remedy;
+- forgetting `pina migrations create` fails the build with the exact remedy;
 - drafts are replaceable, published history is pinned, and `deploy` records publication automatically;
 - inline migration works with an explicitly capped payer.
 
@@ -43,7 +43,7 @@ pub mod __pina_migrate {
 }
 ```
 
-The handler dispatches each account by its leading discriminator to the matching `MigratableAccount` implementation and runs the same executor the inline path uses, with the same step, growth, and lamport caps. Accounts whose discriminator matches no migratable contract, accounts not owned by the program, and duplicated mutable accounts fail closed. The developer wires one match arm in the program entrypoint (`Migrate => __pina_migrate::process(...)`) so instruction routing stays explicit, and `pina migrations make` fails the build until that arm exists.
+The handler dispatches each account by its leading discriminator to the matching `MigratableAccount` implementation and runs the same executor the inline path uses, with the same step, growth, and lamport caps. Accounts whose discriminator matches no migratable contract, accounts not owned by the program, and duplicated mutable accounts fail closed. The developer wires one match arm in the program entrypoint (`Migrate => __pina_migrate::process(...)`) so instruction routing stays explicit, and `pina migrations create` fails the build until that arm exists.
 
 This is the instruction clients prepend when an account is stale: the payer authorizes exactly the migration cost, then the business instruction runs without migration plumbing in its own account list. Business instructions keep their inline-migration behavior; the dedicated instruction is the escape hatch for payers that the historical request could not name.
 
@@ -61,7 +61,7 @@ The helper never migrates silently at rest: migration happens inside a transacti
 
 A program that launched without migrations adopts them with `#[account(discriminator = ..., migrations, legacy)]`:
 
-- The first `pina migrations make` records a `legacyBase` schema — the pre-migration wire layout without the version envelope — alongside version zero, whose payload is the legacy payload unchanged.
+- The first `pina migrations create` records a `legacyBase` schema — the pre-migration wire layout without the version envelope — alongside version zero, whose payload is the legacy payload unchanged.
 - The generated planner recognizes legacy bytes before any versioned layout: exact-shape validation of the legacy base runs last, after every versioned current and historical layout has had its exact chance. Two layouts accepting the same bytes is an ambiguity error at generation time, so runtime detection stays deterministic.
 - The legacy-to-v0 transition is generated: insert the version envelope (version zero) and shift the payload; growth follows the ordinary rent and payer rules.
 - Instructions and events adopt the same way. Unversioned historical instruction data is shorter by the version width, which the existing exact-length historical replay already distinguishes.

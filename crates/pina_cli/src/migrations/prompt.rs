@@ -12,7 +12,7 @@ use serde::Serialize;
 /// A source field disappeared and a destination field of the same type
 /// appeared: either the field was renamed (its bytes must move) or the old
 /// field was removed and a new one added (old data is discarded and the new
-/// field starts zeroed). `pina migrations make` refuses to guess.
+/// field starts zeroed). `pina migrations create` refuses to guess.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct DisambiguationQuestion {
 	/// Contract identity key the question belongs to.
@@ -55,7 +55,7 @@ impl DisambiguationQuestion {
 			.collect::<String>();
 		format!(
 			"ambiguous field changes need an explicit answer before this migration can be \
-			 generated{question_lines}\nRun `pina migrations make` again with those flags, or \
+			 generated{question_lines}\nRun `pina migrations create` again with those flags, or \
 			 answer the prompts interactively on a terminal"
 		)
 	}
@@ -189,7 +189,7 @@ impl<'io> PromptIo<'io> {
 	/// Prompt once for one plausible rename.
 	///
 	/// The loop tolerates two invalid answers; every third failure aborts so a
-	/// wedged terminal cannot stall `pina migrations make` forever.
+	/// wedged terminal cannot stall `pina migrations create` forever.
 	pub(super) fn prompt_rename(&mut self, question: &DisambiguationQuestion) -> RenameAnswer {
 		for _ in 0..3 {
 			let _ = writeln!(

@@ -20,7 +20,7 @@ version_type = "u8"
 auto = true # or ["accounts", "events", "instructions"], or a staged subset
 ```
 
-`pina migrations make` records the policy in `migrations/manifest.json` and snapshots every contract of the listed kinds, so the manifest stays the checked-in source of truth that macros consult. A declaration the manifest does not record yet still fails the build with the `pina migrations make` remedy. Because a proc macro does not re-expand when `pina.toml` changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `make` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change.
+`pina migrations create` records the policy in `migrations/manifest.json` and snapshots every contract of the listed kinds, so the manifest stays the checked-in source of truth that macros consult. A declaration the manifest does not record yet still fails the build with the `pina migrations create` remedy. Because a proc macro does not re-expand when `pina.toml` changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `create` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change.
 
 ```text
                  ┌──────────────────────────────┐
@@ -32,12 +32,12 @@ auto = true # or ["accounts", "events", "instructions"], or a staged subset
                  ┌──────────────────────────────┐
                  │ `pina build` / macro drift   │
                  │ gate fails:                  │
-                 │ "run pina migrations make"   │
+                 │ "run pina migrations create"   │
                  └──────────────┬───────────────┘
                                 │
                                 ▼
                  ┌──────────────────────────────┐
-        ┌────────│   `pina migrations make`     │─────────┐
+        ┌────────│   `pina migrations create`     │─────────┐
         │        └──────────────┬───────────────┘         │
         │                       │                         │
         │ ambiguous change?     │ plain change            │ unpaired removal
@@ -93,7 +93,7 @@ auto = true # or ["accounts", "events", "instructions"], or a staged subset
         └──────────────────────────────┘
 ```
 
-Once a version appears in a receipt or pending record it is frozen: `make` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check.
+Once a version appears in a receipt or pending record it is frozen: `create` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check.
 
 ### Persisted answers
 
@@ -105,7 +105,7 @@ rename = ["value:points"]
 assume_removed = []
 ```
 
-`make` consults the table before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename (for example `--assume-removed value` when the file renames `value`) fails closed. Fresh clones and CI therefore replay an answer made locally without anyone re-deriving flag lists, and `--json` failures print a machine-actionable envelope carrying the message plus the exact outstanding questions.
+`create` consults the table before prompting, command-line flags override it per field, and a flag that contradicts a persisted rename (for example `--assume-removed value` when the file renames `value`) fails closed. Fresh clones and CI therefore replay an answer made locally without anyone re-deriving flag lists, and `--json` failures print a machine-actionable envelope carrying the message plus the exact outstanding questions.
 
 ## Runtime flow inside the program
 
@@ -198,9 +198,9 @@ Migration that only moves bytes is free beyond compute. Migration that makes an 
 
 - the program transfers only the **deficit** (rent-exempt minimum at the new size minus what the account already holds), never more;
 - the payer is the instruction's declared migration payer — a transaction signer, or one of the program's own PDAs signing through `invoke_signed`;
-- the transfer is capped by the `max_lamports` budget the program passes to the executor. An undersized budget fails the whole transaction with `MigrationLamportBudgetExceeded` — nothing is half-migrated — but the account also stays stale until the budget is raised, so size it deliberately. The error names the budget to raise, and `pina migrations make` quotes the same deficit figure before you deploy.
+- the transfer is capped by the `max_lamports` budget the program passes to the executor. An undersized budget fails the whole transaction with `MigrationLamportBudgetExceeded` — nothing is half-migrated — but the account also stays stale until the budget is raised, so size it deliberately. The error names the budget to raise, and `pina migrations create` quotes the same deficit figure before you deploy.
 
-A planning figure for that budget: rent exemption costs about **6,960 lamports per byte** (3,480 lamports per byte-year at the two-year exemption threshold), so growing an account by _N_ bytes needs roughly `N × 6,960` lamports of head room on top of what the account already holds. `pina migrations make` prints a warning with the exact growth and estimate whenever a transition grows an account or keeps a compact (capacity-driven) layout, and adds the remedy for the failure the grown account would hit on chain.
+A planning figure for that budget: rent exemption costs about **6,960 lamports per byte** (3,480 lamports per byte-year at the two-year exemption threshold), so growing an account by _N_ bytes needs roughly `N × 6,960` lamports of head room on top of what the account already holds. `pina migrations create` prints a warning with the exact growth and estimate whenever a transition grows an account or keeps a compact (capacity-driven) layout, and adds the remedy for the failure the grown account would hit on chain.
 
 The executor keeps the workspace, realloc-growth, and lamport budgets as separate codes, so each failure names one fix:
 
@@ -213,7 +213,7 @@ The executor keeps the workspace, realloc-growth, and lamport budgets as separat
 
 Builds before the split reported the workspace, account-growth, and lamport-budget failures as `MigrationBudgetExceeded` (`0xFFFF_FFF5`); `MigrationUnavailable` was already its own code and was not part of that split. The aggregate code stays reserved so published binaries remain decodable.
 
-The growth check covers the whole supported ladder, not one hop: the executor captures the account size before the first step, so a v0 account walking two individually sub-limit transitions can still cross `MAX_PERMITTED_DATA_INCREASE` in one instruction. `pina migrations make` warns on that cumulative worst case, and publishing an intermediate version only resets the cap when it migrates in its own transaction.
+The growth check covers the whole supported ladder, not one hop: the executor captures the account size before the first step, so a v0 account walking two individually sub-limit transitions can still cross `MAX_PERMITTED_DATA_INCREASE` in one instruction. `pina migrations create` warns on that cumulative worst case, and publishing an intermediate version only resets the cap when it migrates in its own transaction.
 
 Two consequences follow from the payer model:
 
@@ -448,7 +448,7 @@ Run out of versions and nothing can fix it afterwards. Two facts decide how much
 
 **Versions are counted per contract, not per program.** Every account, instruction, and event owns an independent history that starts at `0`, keyed by its own discriminator in `migrations/manifest.json`. A program can hold one account at version `3` and another still at `0`; they do not share a counter, and exhausting one says nothing about the rest. So the budget is "255 versions of _this one contract_", not "255 versions of the program".
 
-**The width is program-wide and freezes at the first publication.** `[migrations].version_type` chooses one width for every contract, and once a version appears in a publication receipt it cannot be changed: `make` and `check` both fail with `VersionTypeChanged`, and receipts pin the manifest hash. Before the first release the width is still yours to choose — delete the `migrations/` directory and re-run `make` with the wider setting to re-baseline. After the first release there is no widening path.
+**The width is program-wide and freezes at the first publication.** `[migrations].version_type` chooses one width for every contract, and once a version appears in a publication receipt it cannot be changed: `create` and `check` both fail with `VersionTypeChanged`, and receipts pin the manifest hash. Before the first release the width is still yours to choose — delete the `migrations/` directory and re-run `create` with the wider setting to re-baseline. After the first release there is no widening path.
 
 That combination makes `u8` the right default. 255 versions of a single account type is not a realistic lifetime for a program that migrates sensibly, and it costs one byte per enveloped account; `u16` costs two and is worth choosing up front only if you expect a single contract to exceed 255 revisions.
 
@@ -460,7 +460,7 @@ account State v3 (published, 252 version(s) remaining)
 
 ### When a contract does reach its ceiling
 
-`pina migrations make` fails closed with `VersionExhausted` rather than wrapping. There is no silent reuse of version numbers, and the on-chain side rejects out-of-range versions via `try_from_u32` instead of truncating, so a wrapped version can never be written or misread.
+`pina migrations create` fails closed with `VersionExhausted` rather than wrapping. There is no silent reuse of version numbers, and the on-chain side rejects out-of-range versions via `try_from_u32` instead of truncating, so a wrapped version can never be written or misread.
 
 The remedy is a **successor contract**, not a larger counter:
 

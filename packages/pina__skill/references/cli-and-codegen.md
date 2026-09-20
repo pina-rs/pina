@@ -154,7 +154,7 @@ Pina's generated clients preserve discriminator-first layouts and PinaPod bounda
 
 ## Migration-aware generated clients
 
-Generated code reads the checked-in `migrations/manifest.json`, so run `pina migrations make` before regenerating clients and never hand-edit a generated file. For every opted-in contract the Rust, TypeScript, and Dart clients emit:
+Generated code reads the checked-in `migrations/manifest.json`, so run `pina migrations create` before regenerating clients and never hand-edit a generated file. For every opted-in contract the Rust, TypeScript, and Dart clients emit:
 
 - `<Account>MIGRATION_VERSION` (Dart `stateMigrationVersion`) — the schema version this client was generated from. Encoders stamp it into the envelope automatically; callers never pass a version. Decoders enforce it and reject other versions with a stale/future distinction: `getPinaPodMigrationVersionDecoder` in TypeScript, `StateVersionError::{Stale, Future}` in Rust, and the generated Dart equivalent. A stale split tells the caller to migrate the account on chain and retry; a future split tells the caller to upgrade the client.
 - `<account>NeedsMigration(bytes)` (Rust `state_needs_migration`) — a cheap envelope check that returns true only when the bytes name this account's discriminator and carry a version older than the client's schema. Foreign discriminators and future versions return false; the decoder explains those when the account is decoded.

@@ -28,7 +28,7 @@ require_canonical_instruction_dispatch_for_idl = "deny"
 version_type = "u8"
 auto = true
 
-# Optional persisted disambiguation answers for `pina migrations make`.
+# Optional persisted disambiguation answers for `pina migrations create`.
 [migrations.answers]
 rename = ["value:points"]
 assume_removed = []
@@ -101,14 +101,14 @@ Override the selection for one run with repeatable `--client cpi`, `--client rus
 
 These settings opt a program into version-envelope management. See [the migration flow](../migrations/flow.md) for the on-chain behavior; this section covers only the configuration.
 
-| Field                               | Required | Default | Meaning                                                                                                                                                                                                              |
-| ----------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations.version_type`           | no       | `u8`    | Width of the version envelope: `u8`, `u16`, or `u32`. A width must be chosen before the first publication; the runtime implements only these three. `version-type` is accepted as a deprecated alias.                |
-| `migrations.auto`                   | no       | `false` | Program-wide opt-in for `pina migrations make`. `true` enrolls every contract kind, `false` disables the policy, and a list enrolls only the named kinds: `accounts`, `events`, or `instructions`.                   |
-| `migrations.answers.rename`         | no       | `[]`    | Persisted rename answers in `from:to` form (for example `"value:points"`). `pina migrations make` consults them before prompting; command-line flags override them per field, and a contradicting flag fails closed. |
-| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way. `assume-removed` is accepted as a deprecated alias.                                                                                                 |
+| Field                               | Required | Default | Meaning                                                                                                                                                                                                                |
+| ----------------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations.version_type`           | no       | `u8`    | Width of the version envelope: `u8`, `u16`, or `u32`. A width must be chosen before the first publication; the runtime implements only these three. `version-type` is accepted as a deprecated alias.                  |
+| `migrations.auto`                   | no       | `false` | Program-wide opt-in for `pina migrations create`. `true` enrolls every contract kind, `false` disables the policy, and a list enrolls only the named kinds: `accounts`, `events`, or `instructions`.                   |
+| `migrations.answers.rename`         | no       | `[]`    | Persisted rename answers in `from:to` form (for example `"value:points"`). `pina migrations create` consults them before prompting; command-line flags override them per field, and a contradicting flag fails closed. |
+| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way. `assume-removed` is accepted as a deprecated alias.                                                                                                   |
 
-`auto = true` enrolls every kind, so it cannot be combined with a kind list. `pina migrations make` records the resolved policy into `migrations/manifest.json`, which becomes the checked-in source of truth that macros consult; hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out with an explicit `migrations = false` attribute.
+`auto = true` enrolls every kind, so it cannot be combined with a kind list. `pina migrations create` records the resolved policy into `migrations/manifest.json`, which becomes the checked-in source of truth that macros consult; hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out with an explicit `migrations = false` attribute.
 
 ## Generation modes
 

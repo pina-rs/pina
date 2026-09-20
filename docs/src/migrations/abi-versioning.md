@@ -10,7 +10,7 @@ A Pina program carries three unrelated kinds of version, and confusing them is t
 
 | Axis                       | Example value                 | Who owns it                   | Changes when                                     |
 | -------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------ |
-| On-chain contract version  | `3` (integer in the envelope) | Pina, allocated by `make`     | an account, instruction, or event schema changes |
+| On-chain contract version  | `3` (integer in the envelope) | Pina, allocated by `create`   | an account, instruction, or event schema changes |
 | ABI document `abiVersion`  | `"0.20"`                      | `pina_abi`'s own release line | a breaking `pina_abi` release — and nothing else |
 | `pina_abi` package version | `0.20.3`                      | the release planner           | any `pina_abi` release, including patches        |
 
@@ -132,7 +132,7 @@ pina abi schema --document manifest > manifest.schema.json
 
 The integer `formatVersion` era is retired, not migrated. [Migrate to the reset ABI document](./abi-document-reset.md) walks the conversion. After upgrading Pina:
 
-1. run `pina migrations sync` (or `pina migrations make`) in the program directory — every checked-in draft is regenerated at the current `abiVersion`;
+1. run `pina migrations sync` (or `pina migrations create`) in the program directory — every checked-in draft is regenerated at the current `abiVersion`;
 2. commit the rewritten `manifest.json` and `publications.json`.
 
 A ledger that pinned a real deployment would have no upgrade path from the integer formats. None exists today — the only non-empty receipt in any example records the `fixture` cluster — and accepting that one-time stranding is recorded in [ADR 0009](../adrs/0009-abi-document-versioning.md).

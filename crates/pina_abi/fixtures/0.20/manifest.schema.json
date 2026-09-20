@@ -304,7 +304,7 @@
           "$ref": "#/$defs/TransitionMode"
         },
         "renames": {
-          "description": "Disambiguated field renames answered through `pina migrations make`.\nRenames record source intent so repeated runs stay stable and the\ngenerated transition moves bytes instead of dropping them.",
+          "description": "Disambiguated field renames answered through `pina migrations create`.\nRenames record source intent so repeated runs stay stable and the\ngenerated transition moves bytes instead of dropping them.",
           "items": {
             "$ref": "#/$defs/RenameMapping"
           },

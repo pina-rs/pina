@@ -303,7 +303,7 @@ version_type = "u8"</span></div>
 		<div class="step-num">3</div>
 		<div>
 			<div class="step-title">The build catches the change</div>
-			<div class="step-what">Compilation fails with one instruction: run <code class="inline">pina migrations make</code>.</div>
+			<div class="step-what">Compilation fails with one instruction: run <code class="inline">pina migrations create</code>.</div>
 		</div>
 		<div class="step-caret">▶</div>
 	</button>
@@ -311,7 +311,7 @@ version_type = "u8"</span></div>
 		<div class="cmd"><span class="prompt">$ </span>pina build
 <span class="comment">error: State changed since the recorded schema (v1).
        Its data schema or instruction process ABI changed.
-       Run `pina migrations make` and review the transition.</span></div>
+       Run `pina migrations create` and review the transition.</span></div>
 		<p>You cannot ship a wire-format change without a migration. The build refuses until the change is recorded, and CI runs the same gate through <code class="inline">pina migrations check</code>.</p>
 		<details class="under">
 			<summary>What happens under the hood</summary>
@@ -327,12 +327,12 @@ version_type = "u8"</span></div>
 		<div class="step-num">4</div>
 		<div>
 			<div class="step-title">Record the migration</div>
-			<div class="step-what"><code class="inline">pina migrations make</code> handles most changes on its own. Renames and removals ask one question.</div>
+			<div class="step-what"><code class="inline">pina migrations create</code> handles most changes on its own. Renames and removals ask one question.</div>
 		</div>
 		<div class="step-caret">▶</div>
 	</button>
 	<div class="step-body">
-		<div class="cmd"><span class="prompt">$ </span>pina migrations make
+		<div class="cmd"><span class="prompt">$ </span>pina migrations create
 <span class="comment">contract `state`: appended field `revision: u8`
   → automatic transition generated (zero-fill new field)
 ✓ recorded version 2 for state</span></div>
@@ -343,12 +343,12 @@ version_type = "u8"</span></div>
   [y] rename, preserve the stored data
   [n] remove, discard the stored data and zero-fill `balance`</span></div>
 		<p>On a terminal you answer interactively. In CI or an agent, the same questions arrive as JSON, or as a failure that names the flag to run:</p>
-		<div class="cmd"><span class="prompt">$ </span>pina migrations make <span class="flag">--json</span>
+		<div class="cmd"><span class="prompt">$ </span>pina migrations create <span class="flag">--json</span>
 <span class="comment">stdout: [{"contract":"state","from":"value","to":"balance","rustType":"u64"}]
 stderr: error: ambiguous field changes need an explicit answer
   - `state`: was `value` renamed to `balance` (type `u64`)?
     answer with --rename value:balance, or --assume-removed value</span>
-<span class="prompt">$ </span>pina migrations make <span class="flag">--rename value:balance</span>   <span class="comment"># non-interactive answer</span></div>
+<span class="prompt">$ </span>pina migrations create <span class="flag">--rename value:balance</span>   <span class="comment"># non-interactive answer</span></div>
 		<div class="box warn"><b>Removing a field always needs an explicit yes.</b> You confirm interactively, or pass <code class="inline">--assume-removed</code>. Every dropped field also prints a warning naming what was discarded.</div>
 		<details class="under">
 			<summary>What happens under the hood</summary>
@@ -554,7 +554,7 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 </svg>
 </div>
 
-<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent — about 6,960 lamports per byte at the two-year exemption threshold — never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). An undersized cap fails the transaction with <code class="inline">MigrationLamportBudgetExceeded</code>, which names the constant to raise; <code>pina migrations make</code> prints the same deficit estimate before you deploy. Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
+<div class="box info" style="margin-top: 20px;"><b>Who pays?</b> If a migration grows the account, the transaction's payer tops up rent — about 6,960 lamports per byte at the two-year exemption threshold — never more than a per-program cap the developer sets (<code class="inline">max_lamports</code>). An undersized cap fails the transaction with <code class="inline">MigrationLamportBudgetExceeded</code>, which names the constant to raise; <code>pina migrations create</code> prints the same deficit estimate before you deploy. Shrinking migrations charge nothing and never refund; the lamports stay in the account. The instruction rewrite itself costs compute units in the same transaction, bounded by <code class="inline">MAX_INLINE_STEPS</code> and a 1 KiB stack workspace. Generated code does not compile if a payload needs more than that.</div>
 
 <!-- ============ PART 3: CLIENTS ============ -->
 <h2>Part 3: old clients, new clients, who does what</h2>
@@ -663,7 +663,7 @@ if let Some(state) = state {
 <p class="lead">Everything a developer or an agent needs, in one table.</p>
 <table>
 	<tr><th>Command</th><th>When</th><th>What it does</th></tr>
-	<tr><td><code>pina migrations make</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
+	<tr><td><code>pina migrations create</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
 	<tr><td><code>pina migrations check</code></td><td>CI, pre-commit</td><td>Non-mutating gate. Catches drift, unfinished TODO transitions, and any edit to frozen published files. Exits 1 with a readable reason.</td></tr>
 	<tr><td><code>pina migrations status</code></td><td>Curiosity, support</td><td>Reports each contract's local version and publication state. <code>--json</code> for tooling.</td></tr>
 	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>

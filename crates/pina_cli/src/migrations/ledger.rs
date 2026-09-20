@@ -406,7 +406,7 @@ pub(super) fn load_publication_ledger(path: &Path) -> Result<PublicationLedger, 
 /// Versions beyond zero only exist after a publication, so a manifest with
 /// advanced versions and no ledger file means the publication evidence was
 /// deleted or never committed. Treating that state as drafts would let
-/// `pina migrations make` rewrite published history in place.
+/// `pina migrations create` rewrite published history in place.
 pub(super) fn load_publication_ledger_for_manifest(
 	path: &Path,
 	manifest: &MigrationManifest,

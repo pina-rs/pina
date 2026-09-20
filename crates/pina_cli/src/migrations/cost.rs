@@ -7,7 +7,7 @@
 //! developer can size `max_lamports` and `MAX_INLINE_STEPS` deliberately.
 //!
 //! Every figure is a planning estimate. Rent uses the same
-//! `RENT_EXEMPT_LAMPORTS_PER_BYTE` convention as the `make` growth warning,
+//! `RENT_EXEMPT_LAMPORTS_PER_BYTE` convention as the `create` growth warning,
 //! compute units reuse `pina_profile`'s static estimate instead of deriving a
 //! second cost model, and a figure that cannot be estimated says so instead of
 //! printing a misleading zero.
@@ -53,7 +53,7 @@ pub(crate) const CU_MODEL: &str = "sum of `pina profile` static estimates for th
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MigrationCostPreview {
-	/// Rent convention shared with the `make` growth warning.
+	/// Rent convention shared with the `create` growth warning.
 	pub rent_lamports_per_byte: u64,
 	/// Framework cap on adjacent transitions per instruction.
 	pub max_inline_steps: u32,
@@ -63,7 +63,7 @@ pub struct MigrationCostPreview {
 	pub cu_model: String,
 	/// Compiled SBF artifact the CU estimates were read from, when one was found.
 	pub artifact: Option<PathBuf>,
-	/// Remedy quoted when a ladder's rent must be funded, shared with `make`.
+	/// Remedy quoted when a ladder's rent must be funded, shared with `create`.
 	pub lamport_budget_remedy: String,
 	/// Remedy quoted when one step's growth exceeds the runtime realloc cap.
 	pub account_growth_remedy: String,

@@ -121,7 +121,7 @@ fn create_fake_workflow_project(name: &str) -> (PathBuf, PathBuf, PathBuf, PathB
 	// These snapshots exercise the Surfpool workflow wiring, not migrations.
 	// `pina test` builds first, and a scaffolded project now enables migrations
 	// by default, so without a recorded baseline the build would fail closed
-	// with the `pina migrations make` remedy rather than reaching the workflow
+	// with the `pina migrations create` remedy rather than reaching the workflow
 	// under test.
 	fs::write(
 		project.join("pina.toml"),

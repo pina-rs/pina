@@ -17,7 +17,7 @@ use super::prompt::RenameAnswer;
 
 /// Resolve every ambiguous field change for one contract against the answers.
 ///
-/// Previously recorded transition renames count as answers so repeated `make`
+/// Previously recorded transition renames count as answers so repeated `create`
 /// runs over a draft stay stable. Unanswered candidates become interactive
 /// prompts on a terminal, or a structured error that names the exact flags
 /// that answer them.
