@@ -907,4 +907,43 @@ mod tests {
 			AccountFieldKind::OptionalMutable
 		);
 	}
+
+	/// An optional field may not precede a positional field: an absent optional
+	/// consumes its program-address filler slot, so a dropped filler shifts
+	/// every later binding by one slot.
+	#[test]
+	fn optional_fields_before_positional_fields_are_rejected() {
+		let expansion = expand(quote! {
+			#[derive(Accounts)]
+			struct Shifted<'a> {
+				authority: &'a AccountView,
+				watcher: Option<&'a AccountView>,
+				vault: &'a mut AccountView,
+			}
+		});
+		let rendered = expansion.to_string();
+		assert!(
+			rendered.contains("cannot be followed by positional account"),
+			"the derive must reject the shifted shape, got: {rendered}"
+		);
+
+		// A `remaining` slice after an optional is the supported shape: the
+		// slice absorbs whatever follows, so no binding depends on filler
+		// presence.
+		let allowed = expand(quote! {
+			#[derive(Accounts)]
+			struct Trailing<'a> {
+				authority: &'a AccountView,
+				treasury: Option<&'a mut AccountView>,
+				#[pina(remaining)]
+				members: &'a [AccountView],
+			}
+		});
+		assert!(
+			!allowed
+				.to_string()
+				.contains("cannot be followed by positional account"),
+			"a trailing remaining slice must stay allowed"
+		);
+	}
 }
