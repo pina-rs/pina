@@ -421,15 +421,37 @@ impl BundledFixture {
 		fs::read_to_string(&self.log)
 			.unwrap_or_else(|error| panic!("failed to read command log: {error}"))
 	}
+
+	/// Run the copied CLI, retrying a spawn that fails with `ETXTBSY`.
+	///
+	/// The fixture writes the CLI copy with `fs::copy` and renames it into
+	/// place; on Linux CI the exec that immediately follows can transiently
+	/// see the inode as still open for writing (the same race `cargo` retries
+	/// around when it spawns a freshly linked rustc). The failure is
+	/// intermittent — observed on runners across separate merges — and a
+	/// bounded retry is the honest guard: the alternative, a test that flakes
+	/// on kernel timing, tells us nothing about the CLI.
+	fn run(&self) -> std::process::Output {
+		const ETXTBSY: i32 = 26;
+		let mut backoff_ms = 25;
+		for attempt in 0..5 {
+			match self.command().output() {
+				Ok(output) => return output,
+				Err(error) if error.raw_os_error() == Some(ETXTBSY) && attempt < 4 => {
+					std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
+					backoff_ms *= 2;
+				}
+				Err(error) => panic!("failed to run pina lint: {error}"),
+			}
+		}
+		unreachable!("the loop returns or panics on every path");
+	}
 }
 
 #[test]
 fn lint_runs_the_prebuilt_driver_bundled_next_to_the_cli() {
 	let fixture = BundledFixture::new("pina-lint-bundled", Some("#!/bin/bash\nexit 0\n"));
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	let output = fixture.run();
 	assert!(
 		output.status.success(),
 		"pina lint failed: {}",
@@ -465,10 +487,7 @@ fn log_exists(fixture: &BundledFixture) -> bool {
 #[test]
 fn unloadable_bundled_driver_is_not_selected_and_reports_a_remedy() {
 	let fixture = BundledFixture::new("pina-lint-bundled-broken", Some("#!/bin/bash\nexit 9\n"));
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	let output = fixture.run();
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
@@ -492,10 +511,7 @@ fn unloadable_bundled_driver_is_not_selected_and_reports_a_remedy() {
 #[test]
 fn missing_bundled_driver_is_reported() {
 	let fixture = BundledFixture::new("pina-lint-bundled-missing", None);
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	let output = fixture.run();
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
@@ -516,10 +532,7 @@ fn a_cached_driver_is_reused_without_touching_the_bundle() {
 		.unwrap_or_else(|error| panic!("failed to create the cache directory: {error}"));
 	executable(&cached, "#!/bin/bash\nexit 0\n");
 
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	let output = fixture.run();
 	assert!(
 		output.status.success(),
 		"pina lint failed: {}",

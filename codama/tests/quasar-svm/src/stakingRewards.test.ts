@@ -168,6 +168,9 @@ describe("staking_rewards_program quasar e2e", () => {
 		expect(openPositionState.data.owner).toBe(user.address);
 		expect(openPositionState.data.stakedAmount).toBe(0n);
 
+		// The deposit now takes custody through the pool's stake vault, which
+		// initializePool created. The invoked programs resolve from the
+		// registered set, exactly as initializePool's own CPIs do.
 		const depositResult = svm.processInstruction(
 			getDepositInstruction({
 				user,
@@ -175,6 +178,7 @@ describe("staking_rewards_program quasar e2e", () => {
 				poolState: poolPda,
 				positionState: positionPda,
 				userStakeAta: userStakeAta.address,
+				stakeVault,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
 				amount: 200n,
 			}),
@@ -190,6 +194,10 @@ describe("staking_rewards_program quasar e2e", () => {
 					"position state should exist before deposit",
 				),
 				userStakeAta,
+				expectSome(
+					initializePoolResult.account(stakeVault),
+					"stake vault should exist after initializePool",
+				),
 			],
 		);
 		depositResult.assertSuccess();
