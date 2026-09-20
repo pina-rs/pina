@@ -1163,6 +1163,9 @@ impl InstructionEnvelopeGate {
 				fn discriminator_from_bytes(
 					bytes: &[u8],
 				) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+					// One parse feeds both the envelope gate and the final
+					// conversion: the gate must not pay a second decode on the
+					// dispatch hot path.
 					let value =
 						<#primitive as #crate_path::IntoDiscriminator>::discriminator_from_bytes(
 							bytes,
@@ -1180,8 +1183,7 @@ impl InstructionEnvelopeGate {
 								.into());
 						}
 					}
-					<#primitive as #crate_path::IntoDiscriminator>::discriminator_from_bytes(bytes)
-						.and_then(|value| Self::try_from(value))
+					Self::try_from(value)
 				}
 
 				fn write_discriminator(&self, bytes: &mut [u8]) {

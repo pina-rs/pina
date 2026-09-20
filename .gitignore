@@ -104,3 +104,8 @@ crates/pina_fuzz/fuzz/artifacts/
 .video_agent/
 /worktrees/
 sbf-build.log
+coverage-final*.log
+ci-local*.log
+sbf-build.log
+kani-quick.log
+test-all.log
