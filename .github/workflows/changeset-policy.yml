@@ -59,7 +59,7 @@ jobs:
         id: changed
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
       - name: run changeset policy
-        uses: monochange/actions/changeset-policy@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
+        uses: monochange/actions/changeset-policy@4c881e8caf28056185bc5ff854eab100f880a0e9 # v0.9.2
         with:
           # Coverage-based verification: every changed package must be covered
           # by a changeset. Passing explicit changed paths instead of `from`
