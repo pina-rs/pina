@@ -5,6 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Output;
 
 use pina_cli::project::Project;
 use tempfile::TempDir;
@@ -1460,5 +1461,523 @@ fn generate_cli_dart_preserves_sibling_program_entrypoints() {
 	assert!(
 		entrypoints.join("custom_program.dart").is_file(),
 		"generating a second program deleted the first program's entrypoint"
+	);
+}
+
+// ---------------------------------------------------------------------------
+// `pina generate` coverage: each client ecosystem, output overrides, modes,
+// and the failure paths a user can actually reach.
+// ---------------------------------------------------------------------------
+
+/// Generate with a fully local renderer so no Node.js download is attempted.
+fn generate_local_dart(project: &Path, cargo: &Path, target: &Path, args: &[&str]) -> Output {
+	project_command(project, cargo, target)
+		.args(["generate", "--client", "dart"])
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generate: {error}"))
+}
+
+#[test]
+fn generate_output_override_redirects_every_selected_client() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	let overridden = temp.path().join("relocated");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args([
+			"generate",
+			"--client",
+			"typescript",
+			"--output",
+			overridden.to_string_lossy().as_ref(),
+			"--npx",
+			npx.to_string_lossy().as_ref(),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		overridden.join("typescript/custom_program").is_dir(),
+		"--output did not relocate the TypeScript client"
+	);
+	assert!(
+		!project.join("clients/typescript").exists(),
+		"--output left the configured client directory populated"
+	);
+}
+
+#[test]
+fn generate_project_flag_discovers_from_an_unrelated_directory() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	let elsewhere = temp.path().join("elsewhere");
+	write_project(&project);
+	fs::create_dir_all(&elsewhere)
+		.unwrap_or_else(|error| panic!("failed to create unrelated directory: {error}"));
+	let cargo = fake_cargo(temp.path());
+
+	// Run from a directory that is not inside the project and point at it with
+	// `--project`, which is the documented way to generate another checkout.
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(&elsewhere)
+		.env("CARGO", &cargo)
+		.env("REAL_CARGO", env!("CARGO"))
+		.env("CARGO_TARGET_DIR", &target)
+		.args(["generate", "--client", "rust", "--project"])
+		.arg(&project)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(project.join("clients/rust/custom_program").is_dir());
+	assert!(target.join("idl/custom_program.json").is_file());
+}
+
+#[test]
+fn generate_rejects_an_update_mode_destination_that_does_not_exist() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "rust", "--mode", "update"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(!output.status.success());
+	assert!(
+		String::from_utf8_lossy(&output.stderr)
+			.contains("the destination is empty or does not exist"),
+		"unexpected error: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+#[test]
+fn generate_rejects_an_unknown_client_language() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cobol"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(!output.status.success());
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("invalid value") && stderr.contains("cobol"),
+		"unexpected error: {stderr}"
+	);
+}
+
+#[test]
+fn generate_rejects_a_manifest_with_an_unknown_client_language() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"rust\", \"cobol\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!output.status.success(),
+		"an unknown language in pina.toml must fail generation"
+	);
+	assert!(
+		String::from_utf8_lossy(&output.stderr).contains("cobol"),
+		"the error should name the unsupported language: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+#[test]
+fn generate_reports_an_unknown_manifest_field() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"rust\"]\nnot_a_field = true\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!output.status.success(),
+		"an unknown pina.toml field must fail closed"
+	);
+	assert!(
+		String::from_utf8_lossy(&output.stderr).contains("not_a_field"),
+		"the error should name the unknown field: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+#[test]
+fn generate_cli_rust_implies_the_rust_client_it_depends_on() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	// `cli-rust` consumes the Rust client crate, so selecting only the CLI must
+	// still emit the client it links against.
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cli-rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		project.join("clients/rust/custom_program").is_dir(),
+		"cli-rust did not imply the rust client"
+	);
+	assert!(
+		project.join("clients/cli-rust/custom_program").is_dir(),
+		"the cli-rust client was not generated"
+	);
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(
+		stdout.contains("cli-rust") && stdout.contains("rust"),
+		"the summary should report both clients: {stdout}"
+	);
+}
+
+#[test]
+fn generate_cli_rust_produces_a_buildable_crate_shaped_like_the_documented_contract() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cli-rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let cli = project.join("clients/cli-rust/custom_program");
+	assert!(
+		cli.join(".pina-generated").is_file(),
+		"missing ownership marker"
+	);
+	let manifest = fs::read_to_string(cli.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("failed to read CLI manifest: {error}"));
+	assert!(
+		manifest.contains("custom-program-client"),
+		"the CLI must depend on the generated Rust client: {manifest}"
+	);
+	let main = fs::read_to_string(cli.join("src/main.rs"))
+		.unwrap_or_else(|error| panic!("failed to read CLI main: {error}"));
+	assert!(
+		main.contains("initialize"),
+		"the CLI should expose one subcommand per instruction: {main}"
+	);
+}
+
+#[test]
+fn generate_cli_rust_refuses_to_update_a_directory_it_does_not_own() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let first = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cli-rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(first.status.success());
+
+	// Simulate a hand-written crate occupying the destination: without the
+	// marker, regeneration must refuse rather than clobber it.
+	let cli = project.join("clients/cli-rust/custom_program");
+	fs::remove_file(cli.join(".pina-generated"))
+		.unwrap_or_else(|error| panic!("failed to remove marker: {error}"));
+	fs::write(cli.join("handwritten.rs"), "// mine\n")
+		.unwrap_or_else(|error| panic!("failed to write sentinel: {error}"));
+
+	let second = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cli-rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run regeneration: {error}"));
+	assert!(
+		!second.status.success(),
+		"regeneration must refuse a destination without the ownership marker"
+	);
+	assert!(
+		cli.join("handwritten.rs").is_file(),
+		"the hand-written file was destroyed"
+	);
+}
+
+#[test]
+fn generate_overwrite_replaces_a_foreign_entrypoint_and_no_scaffold_omits_manifests() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"rust\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+
+	let seeded = project.join("clients/rust/custom_program/src/generated");
+	fs::create_dir_all(&seeded)
+		.unwrap_or_else(|error| panic!("failed to seed generated source: {error}"));
+	fs::write(seeded.join("stale.rs"), "// stale\n")
+		.unwrap_or_else(|error| panic!("failed to write stale file: {error}"));
+	fs::write(
+		project.join("clients/rust/custom_program/src/lib.rs"),
+		"// foreign\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to write foreign entrypoint: {error}"));
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--mode", "overwrite", "--no-scaffold"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	assert!(
+		!seeded.join("stale.rs").exists(),
+		"overwrite must clear stale generated source"
+	);
+	assert!(
+		!project
+			.join("clients/rust/custom_program/Cargo.toml")
+			.exists(),
+		"--no-scaffold must not write a crate manifest"
+	);
+}
+
+#[test]
+fn generate_dart_renders_a_shared_package_with_one_library_per_program() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+
+	let output = generate_local_dart(
+		&project,
+		&cargo,
+		&target,
+		&["--npx", npx.to_string_lossy().as_ref()],
+	);
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let dart = project.join("clients/dart");
+	assert!(
+		dart.join("lib/src/generated/custom_program").is_dir(),
+		"the Dart package should contain one generated directory per program"
+	);
+	assert!(
+		dart.join("lib/src/generated/custom_program/custom_program.dart")
+			.is_file(),
+		"the rendered program library should be present"
+	);
+}
+
+#[test]
+fn generate_reports_a_renderer_failure_without_leaving_a_partial_client() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"typescript\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.env("FAKE_NPX_FAIL", "1")
+		.args(["generate", "--npx", npx.to_string_lossy().as_ref()])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(!output.status.success());
+	assert!(
+		!project
+			.join("clients/typescript/custom_program/src/generated")
+			.exists(),
+		"a failed renderer must not leave partially generated output"
+	);
+}
+
+#[test]
+fn generate_refreshes_the_idl_when_the_program_source_changes() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let first = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(first.status.success());
+	let idl = target.join("idl/custom_program.json");
+	let before =
+		fs::read_to_string(&idl).unwrap_or_else(|error| panic!("failed to read IDL: {error}"));
+	assert!(before.contains("initialize"));
+
+	// Add an instruction and confirm the refreshed IDL reflects it, so the
+	// documented "refreshes its IDL" behavior is actually exercised.
+	let source = fs::read_to_string(project.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("failed to read program source: {error}"));
+	// Adding a routed instruction must surface in the refreshed IDL. A bare
+	// enum variant is not enough: the extractor needs the payload struct and a
+	// matching dispatch arm.
+	let extended = source
+		.replace("\tInitialize = 0,\n", "\tInitialize = 0,\n\tReset = 1,\n")
+		.replace(
+			"#[derive(Accounts)]\npub struct InitializeAccounts<'a> {\n\tpub payer: &'a \
+			 AccountView,\n}\n",
+			"#[instruction(discriminator = CustomInstruction::Reset)]\npub struct \
+			 ResetInstruction {\n\tpub value: u8,\n}\n\n#[derive(Accounts)]\npub struct \
+			 InitializeAccounts<'a> {\n\tpub payer: &'a \
+			 AccountView,\n}\n\n#[derive(Accounts)]\npub struct ResetAccounts<'a> {\n\tpub payer: \
+			 &'a AccountView,\n}\n",
+		)
+		.replace(
+			"impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {\n\tfn process(self, \
+			 data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
+			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
+			 tOk(())\n\t}\n}\n",
+			"impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {\n\tfn process(self, \
+			 data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
+			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
+			 tOk(())\n\t}\n}\n\nimpl<'a> ProcessAccountInfos<'a> for ResetAccounts<'a> {\n\tfn \
+			 process(self, data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
+			 ResetInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
+			 tOk(())\n\t}\n}\n",
+		)
+		.replace(
+			"\t\tCustomInstruction::Initialize => \
+			 {\n\t\t\tInitializeAccounts::try_from((program_id, accounts))?.process(data)\n\t\t}\n",
+			"\t\tCustomInstruction::Initialize => \
+			 {\n\t\t\tInitializeAccounts::try_from((program_id, \
+			 accounts))?.process(data)\n\t\t}\n\t\tCustomInstruction::Reset => \
+			 {\n\t\t\tResetAccounts::try_from((program_id, accounts))?.process(data)\n\t\t}\n",
+		);
+	assert_ne!(
+		source, extended,
+		"the fixture should contain the marker enum"
+	);
+	fs::write(project.join("src/lib.rs"), extended)
+		.unwrap_or_else(|error| panic!("failed to extend program source: {error}"));
+
+	let second = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run regeneration: {error}"));
+	assert!(
+		second.status.success(),
+		"regeneration failed: {}",
+		String::from_utf8_lossy(&second.stderr)
+	);
+	let after = fs::read_to_string(&idl)
+		.unwrap_or_else(|error| panic!("failed to read refreshed IDL: {error}"));
+	assert!(
+		after.contains("reset"),
+		"the IDL was not refreshed from the edited source"
+	);
+}
+
+#[test]
+fn generate_uses_the_configured_per_language_output_directories() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"generated\"\nlanguages = [\"rust\", \
+		 \"cpi\"]\n\n[clients.cpi]\noutput = \"onchain/cpi\"\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		output.status.success(),
+		"generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	assert!(
+		project.join("generated/rust/custom_program").is_dir(),
+		"the shared clients output was not honored"
+	);
+	assert!(
+		project
+			.join("generated/onchain/cpi/custom_program")
+			.is_dir(),
+		"the per-language output override was not honored"
 	);
 }

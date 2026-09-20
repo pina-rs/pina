@@ -1,6 +1,6 @@
 # Rules for Reliable IDL Generation
 
-These rules describe the source shapes Pina's IDL extractor recognizes most reliably. If you stay inside them, `pina idl` and `pina codama generate` should produce stable, complete output.
+These rules describe the source shapes Pina's IDL extractor recognizes most reliably. If you stay inside them, `pina idl` and `pina generate` should produce stable, complete output.
 
 ## 1. Parser entrypoint and module graph
 

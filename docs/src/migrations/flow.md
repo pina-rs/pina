@@ -84,7 +84,7 @@ auto = true # or ["accounts", "events", "instructions"], or a staged subset
         └──────────────┬───────────────┘
                        ▼
         ┌──────────────────────────────┐
-        │ `pina codama generate`       │
+        │ `pina generate`             │
         │ TypeScript, Rust, Dart, CPI  │
         │ clients embed the CURRENT    │
         │ version as an omitted        │

@@ -203,18 +203,19 @@ pina deploy --project ./programs/my_program --cluster devnet \
 
 Every remote write requires confirmation or `--yes`; named mainnet and custom remote endpoints also require `--allow-mainnet`. Query-bearing RPC URLs are rejected because the external Agave `solana` executable receives its endpoint through process arguments. Keypair reads are size-bounded and, on Unix, require owner-private permissions. The program keypair is validated against `declare_id!` before planning and revalidated immediately before deployment.
 
-### `pina codama generate`
+### `pina generate`
 
 <br>
 
-Generate Codama IDLs and Rust/CPI/JavaScript/Dart clients from one or more example program crates.
+Refresh a project's IDL and generate its configured client ecosystems.
 
 ```bash
-pina codama generate
-pina codama generate --example counter_program --example todo_program
+pina generate
+pina generate --client rust --client cli-rust
+pina generate --project ./programs/counter --output ./generated
 ```
 
-The combined command keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding.
+Generation keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding. Generating a whole repository means running the command once per project; `scripts/generate-pina-clients.sh` does that for this repository's examples.
 
 ## Library API
 
@@ -254,7 +255,7 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-The stock visitor emits the correct wire layout, but its generic codecs are intentionally permissive. Use `pina codama generate` when you want the generated JavaScript client to enforce the same PinaPod values and compact capacities as the on-chain program.
+The stock visitor emits the correct wire layout, but its generic codecs are intentionally permissive. Use `pina generate` when you want the generated JavaScript client to enforce the same PinaPod values and compact capacities as the on-chain program.
 
 ### Pina-style Rust clients
 

@@ -43,7 +43,7 @@ Supporting scripts:
 
 The generated Dart package lives in `codama/clients/dart`. It exposes one package-root library per example, pins dependency resolution in `pubspec.lock`, and checks all 26 example IDLs as a single inventory. CI runs `dart format`, `dart analyze --fatal-infos`, and `dart test` over the checked-in output.
 
-Generation is driven entirely by the Pina CLI. `pina generate` discovers a project through its `pina.toml`, refreshes its IDL, and renders only the configured client ecosystems, which keeps the repository dogfooding the same command that users run. The `pina codama generate` subcommand remains available as a repository-wide, explicitly pathed compatibility workflow.
+Generation is driven entirely by the Pina CLI. `pina generate` discovers a project through its `pina.toml`, refreshes its IDL, and renders only the configured client ecosystems, which keeps the repository dogfooding the same command that users run. Generating a whole repository means running the command once per project.
 
 For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`, `create`, `update`, or `overwrite`) and `scaffold`, with optional overrides under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. Dart is also the Flutter target. Update mode replaces only generated sources, so user-owned manifests and entrypoints can be customized without being rewritten. See [Project Configuration](./cli/configuration.md) for the complete schema.
 

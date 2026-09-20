@@ -12,11 +12,10 @@ pina --help
 pina <command> --help
 ```
 
-For Codama, inspect both levels:
+For client generation, inspect the command and its ecosystems:
 
 ```bash
-pina codama --help
-pina codama generate --help
+pina generate --help
 ```
 
 For deployment verification, inspect the group and selected leaf:

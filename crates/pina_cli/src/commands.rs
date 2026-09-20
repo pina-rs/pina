@@ -14,7 +14,6 @@ use pina_cli::abi;
 use crate::cli::AbiCommands;
 use crate::cli::Cli;
 use crate::cli::ClientArg;
-use crate::cli::CodamaCommands;
 use crate::cli::Commands;
 use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
@@ -194,37 +193,6 @@ pub(crate) fn run(cli: Cli) {
 				record_publication,
 				remote_command,
 			);
-		}
-		Commands::Codama { command } => {
-			match command {
-				CodamaCommands::Generate {
-					examples_dir,
-					idls_dir,
-					rust_out,
-					cpi_out,
-					js_out,
-					dart_out,
-					cli_rust_out,
-					cli_ts_out,
-					cli_dart_out,
-					examples,
-					npx,
-				} => {
-					run_codama_generate(&pina_cli::CodamaGenerateOptions {
-						examples_dir,
-						idls_dir,
-						rust_out,
-						cpi_out,
-						js_out,
-						dart_out,
-						cli_rust_out,
-						cli_ts_out,
-						cli_dart_out,
-						examples,
-						npx,
-					});
-				}
-			}
 		}
 	}
 }
@@ -1769,23 +1737,6 @@ fn print_comparison_status(report: &pina_profile::ComparisonReport) {
 			);
 		}
 	}
-}
-
-fn run_codama_generate(options: &pina_cli::CodamaGenerateOptions) {
-	let generated_examples = match pina_cli::generate_codama(options) {
-		Ok(examples) => examples,
-		Err(err) => {
-			eprintln!("{} {}", "Error".red().bold(), err);
-			std::process::exit(1);
-		}
-	};
-
-	println!(
-		"{} Generated Codama IDLs and Rust/CPI/JavaScript/Dart clients for {} example(s): {}",
-		"✔".green(),
-		generated_examples.len(),
-		generated_examples.join(", "),
-	);
 }
 
 #[cfg(test)]

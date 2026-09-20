@@ -1,6 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 165
+assertion_line: 170
 info:
   program: pina
   args:
@@ -11,7 +11,7 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt another program's IDL as one, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt another program's IDL as one, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, and terminal documentation remain available.
 
 Usage: pina <COMMAND>
 
@@ -54,8 +54,6 @@ Commands:
           Verify deployed programs and publish source-build records
   deploy
           Deploy a compiled Pina program through the Solana CLI
-  codama
-          Run Codama IDL and client-generation workflows
   help
           Print this message or the help of the given subcommand(s)
 

@@ -3,7 +3,7 @@
 	"kind": "cli-surface",
 	"tool": {
 		"name": "pina",
-		"version": "0.17.0"
+		"version": "0.19.0"
 	},
 	"provenance": {
 		"extractor": "clap",
@@ -114,12 +114,71 @@
 				},
 				{
 					"names": [
+						"--no-lto"
+					],
+					"canonical_name": "--no-lto",
+					"hidden": false,
+					"global": false,
+					"summary": "Skip the default fat-LTO link for the deployed program",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--no-size-profile"
+					],
+					"canonical_name": "--no-size-profile",
+					"hidden": false,
+					"global": false,
+					"summary": "Skip the production release profile (LTO, codegen-units=1, opt-level=3)",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--overflow-checks"
+					],
+					"canonical_name": "--overflow-checks",
+					"hidden": false,
+					"global": false,
+					"summary": "Keep arithmetic overflow checks enabled in the production profile",
+					"description": "Keep arithmetic overflow checks enabled in the production profile.\n\nBy default `pina build` disables them so overflow wraps instead of panicking, unless the workspace manifest sets `overflow-checks = true`, which the profile respects. Pass this flag when a program must fail loudly on overflow. It costs a small amount of size.",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
 						"--verify"
 					],
 					"canonical_name": "--verify",
 					"hidden": false,
 					"global": false,
 					"summary": "Build deterministically with solana-verify and Docker instead of Cargo directly",
+					"description": "Build deterministically with solana-verify and Docker instead of Cargo directly.\n\nThe size profile is not applied to a verified build: the artifact has to stay reproducible from its recorded Git revision, so the profile must be declared under `[profile.release]` in the workspace manifest.",
 					"value": {
 						"kind": "flag",
 						"required": false,
@@ -156,7 +215,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Run Pina's official security lints against the current program",
-			"description": "Run Pina's official security lints against the current program.\n\nDiscovers the nearest pina.toml or Cargo package, resolves the `pina_lint_driver` binary shipped next to this CLI on supported platforms, and runs cargo check with the driver as `RUSTC_WORKSPACE_WRAPPER`. Lint levels configured in the [lints] table of pina.toml are honored. Use --fix to apply machine-applicable suggestions; review every resulting source change.",
+			"description": "Run Pina's official security lints against the current program.\n\nDiscovers the nearest pina.toml or Cargo package, resolves a `pina_lint_driver` built for the project's active toolchain, and runs cargo check with the driver as `RUSTC_WORKSPACE_WRAPPER`. Lint levels configured in the [lints] table of pina.toml are honored. Use --fix to apply machine-applicable suggestions; review every resulting source change.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -200,6 +259,42 @@
 							"true",
 							"false"
 						]
+					}
+				},
+				{
+					"names": [
+						"--build-driver"
+					],
+					"canonical_name": "--build-driver",
+					"hidden": false,
+					"global": false,
+					"summary": "Build the lint driver from source with the active toolchain",
+					"description": "Build the lint driver from source with the active toolchain.\n\nUse this on a toolchain Pina publishes no prebuilt driver for. The build compiles the `pina_lints` release matching this CLI, so it needs the `rustc-dev` and `rust-src` components of the active toolchain.",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--explain"
+					],
+					"canonical_name": "--explain",
+					"hidden": false,
+					"global": false,
+					"summary": "Print the full reference for one lint and exit without linting",
+					"description": "Print the full reference for one lint and exit without linting.\n\nAccepts the lint name, with or without the `pina::` prefix. The same reference is available for every lint under `docs/src/lint-reference.md`.",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
 					}
 				}
 			]
@@ -303,6 +398,25 @@
 									"false"
 								],
 								"default": "false"
+							}
+						},
+						{
+							"names": [
+								"--envelope-ack"
+							],
+							"canonical_name": "--envelope-ack",
+							"hidden": false,
+							"global": false,
+							"summary": "Acknowledge that enveloping an already-published contract changes its wire format",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
 							}
 						},
 						{
@@ -484,6 +598,25 @@
 							"hidden": false,
 							"global": false,
 							"summary": "Never prompt for disambiguation, even on a terminal",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--envelope-ack"
+							],
+							"canonical_name": "--envelope-ack",
+							"hidden": false,
+							"global": false,
+							"summary": "Acknowledge that enveloping an already-published contract changes its wire format",
 							"value": {
 								"kind": "flag",
 								"required": false,
@@ -696,6 +829,80 @@
 									"true",
 									"false"
 								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"abi"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Inspect the Pina ABI document contract",
+			"description": "Inspect the Pina ABI document contract.\n\n`schema` prints the JSON Schema of a document version, so editors, CI jobs, and non-Rust toolchains can validate a checked-in manifest or publication ledger without trusting its bytes.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"commands": [
+				{
+					"path": [
+						"abi",
+						"schema"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Print the JSON Schema for one ABI document",
+					"description": "Print the JSON Schema for one ABI document.\n\nThe schema is generated from the same types that read and write the document, so it cannot drift from the code that enforces it. Output is stable and newline-terminated, so it can be redirected to a file.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--document"
+							],
+							"canonical_name": "--document",
+							"hidden": false,
+							"global": false,
+							"summary": "Which document to describe",
+							"value": {
+								"kind": "enum",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"enum_values": [
+									"manifest",
+									"publications"
+								],
+								"default": "manifest"
+							}
+						},
+						{
+							"names": [
+								"--version"
+							],
+							"canonical_name": "--version",
+							"hidden": false,
+							"global": false,
+							"summary": "Document version to describe. Defaults to the version this build writes; any version this build can still read is also accepted",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
 							}
 						}
 					]
@@ -957,6 +1164,192 @@
 						"variadic": false,
 						"default": "npx"
 					}
+				},
+				{
+					"names": [
+						"--skip-unsupported-instructions"
+					],
+					"canonical_name": "--skip-unsupported-instructions",
+					"hidden": false,
+					"global": false,
+					"summary": "Skip instructions the renderer cannot express instead of failing the render; skipped instructions are listed in the generated `instructions/mod.rs`",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						],
+						"default": "false"
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"import"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Import a foreign program's IDL as a supported CPI crate",
+			"description": "Import a foreign program's IDL as a supported CPI crate.\n\nFetches the IDL from a file, a URL, or the program's on-chain canonical metadata, renders a standalone Pina CPI crate, and stamps the generated README with provenance: the IDL's SHA-256, where it came from, and the generator version. Re-running against an unchanged IDL is a no-op, and running it against a changed one rewrites the crate and updates the provenance block.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--program-id"
+					],
+					"canonical_name": "--program-id",
+					"hidden": false,
+					"global": false,
+					"summary": "Program ID the CPI crate targets",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--idl"
+					],
+					"canonical_name": "--idl",
+					"hidden": false,
+					"global": false,
+					"summary": "Read the IDL from a local file",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--url"
+					],
+					"canonical_name": "--url",
+					"hidden": false,
+					"global": false,
+					"summary": "Fetch the IDL from an HTTP(S) URL",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--cluster"
+					],
+					"canonical_name": "--cluster",
+					"hidden": false,
+					"global": false,
+					"summary": "Fetch the IDL from a cluster's canonical program metadata",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "mainnet-beta"
+					}
+				},
+				{
+					"names": [
+						"--output"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory to write the crate into. Defaults to `clients/cpi`",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--mode"
+					],
+					"canonical_name": "--mode",
+					"hidden": false,
+					"global": false,
+					"summary": "How to handle an existing output directory",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"auto",
+							"create",
+							"update",
+							"overwrite"
+						],
+						"default": "auto"
+					}
+				},
+				{
+					"names": [
+						"--npx"
+					],
+					"canonical_name": "--npx",
+					"hidden": false,
+					"global": false,
+					"summary": "Executable used to normalize Anchor IDLs. Defaults to npx",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "npx"
+					}
+				},
+				{
+					"names": [
+						"--skip-unsupported-instructions"
+					],
+					"canonical_name": "--skip-unsupported-instructions",
+					"hidden": false,
+					"global": false,
+					"summary": "Skip instructions the renderer cannot express instead of failing the render; skipped instructions are listed in the generated `instructions/mod.rs`",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						],
+						"default": "false"
+					}
+				}
+			],
+			"positionals": [
+				{
+					"name": "name",
+					"hidden": false,
+					"summary": "Name for the imported crate, used as `clients/cpi/<name>`",
+					"value": {
+						"kind": "string",
+						"required": true,
+						"repeatable": true,
+						"variadic": false
+					}
 				}
 			]
 		},
@@ -967,7 +1360,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Generate, inspect, and publish canonical Codama IDLs",
-			"description": "Generate, inspect, and publish canonical Codama IDLs.\n\nBare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. The generate subcommand spells that action explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.",
+			"description": "Generate, inspect, and publish canonical Codama IDLs.\n\nBare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -2957,217 +3350,6 @@
 						"repeatable": true,
 						"variadic": false
 					}
-				}
-			]
-		},
-		{
-			"path": [
-				"codama"
-			],
-			"hidden": false,
-			"max_bump": "major",
-			"summary": "Run Codama IDL and client-generation workflows",
-			"description": "Run Codama IDL and client-generation workflows.\n\nUse the generate subcommand to extract every selected program IDL and render the corresponding Rust, JavaScript, and Dart clients.",
-			"parser": {
-				"flags_are_posix_noncompliant": false,
-				"options_must_precede_arguments": false,
-				"option_arg_separators": [
-					" ",
-					"="
-				]
-			},
-			"commands": [
-				{
-					"path": [
-						"codama",
-						"generate"
-					],
-					"hidden": false,
-					"max_bump": "major",
-					"summary": "Generate IDLs and Rust, JavaScript, and Dart clients",
-					"description": "Generate IDLs and Rust, JavaScript, and Dart clients.\n\nDiscovers Pina programs below `EXAMPLES_DIR`, optionally filters them with repeatable --example arguments, writes IDLs, and renders all four client targets. The command fails when a requested example does not exist or a renderer exits unsuccessfully.",
-					"parser": {
-						"flags_are_posix_noncompliant": false,
-						"options_must_precede_arguments": false,
-						"option_arg_separators": [
-							" ",
-							"="
-						]
-					},
-					"options": [
-						{
-							"names": [
-								"--examples-dir"
-							],
-							"canonical_name": "--examples-dir",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory containing Pina program crates. Defaults to `examples`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "examples"
-							}
-						},
-						{
-							"names": [
-								"--idls-dir"
-							],
-							"canonical_name": "--idls-dir",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory for generated Codama IDL JSON files. Defaults to `codama/idls`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "codama/idls"
-							}
-						},
-						{
-							"names": [
-								"--rust-out"
-							],
-							"canonical_name": "--rust-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory for generated Rust client crates. Defaults to `codama/clients/rust`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "codama/clients/rust"
-							}
-						},
-						{
-							"names": [
-								"--cpi-out"
-							],
-							"canonical_name": "--cpi-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory for generated CPI crates. Defaults to `codama/clients/cpi`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "codama/clients/cpi"
-							}
-						},
-						{
-							"names": [
-								"--js-out"
-							],
-							"canonical_name": "--js-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory for generated JavaScript client packages. Defaults to `codama/clients/js`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "codama/clients/js"
-							}
-						},
-						{
-							"names": [
-								"--dart-out"
-							],
-							"canonical_name": "--dart-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Directory for the generated Dart client package. Defaults to `codama/clients/dart`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "codama/clients/dart"
-							}
-						},
-						{
-							"names": [
-								"--cli-rust-out"
-							],
-							"canonical_name": "--cli-rust-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Output directory for generated Rust CLI crates. Omit to skip CLI generation",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false
-							}
-						},
-						{
-							"names": [
-								"--cli-ts-out"
-							],
-							"canonical_name": "--cli-ts-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Output directory for generated TypeScript CLI applications. Omit to skip CLI generation",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false
-							}
-						},
-						{
-							"names": [
-								"--cli-dart-out"
-							],
-							"canonical_name": "--cli-dart-out",
-							"hidden": false,
-							"global": false,
-							"summary": "Output directory for the generated Dart CLI package. Omit to skip CLI generation",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false
-							}
-						},
-						{
-							"names": [
-								"--example"
-							],
-							"canonical_name": "--example",
-							"hidden": false,
-							"global": false,
-							"summary": "Program name to generate. Repeat to select multiple programs. When omitted, every program below --examples-dir is generated",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false
-							}
-						},
-						{
-							"names": [
-								"--npx"
-							],
-							"canonical_name": "--npx",
-							"hidden": false,
-							"global": false,
-							"summary": "Executable used to invoke the Codama JavaScript renderers. Defaults to `npx`",
-							"value": {
-								"kind": "string",
-								"required": false,
-								"repeatable": true,
-								"variadic": false,
-								"default": "npx"
-							}
-						}
-					]
 				}
 			]
 		}

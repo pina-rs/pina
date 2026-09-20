@@ -131,7 +131,7 @@ pnpm run test:quasar-svm
 
 Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native PinaPod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
 
-`pina codama generate` also augments the stock JavaScript output with PinaPod boundary checks. Generated encoders reject values that exceed fixed or compact field capacity rather than truncating them. Decoders enforce discriminators, prefixes, strict UTF-8, and canonical boolean and option tags. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
+`pina generate` also augments the stock JavaScript output with PinaPod boundary checks. Generated encoders reject values that exceed fixed or compact field capacity rather than truncating them. Decoders enforce discriminators, prefixes, strict UTF-8, and canonical boolean and option tags. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
 
 End-to-end setup steps:
 

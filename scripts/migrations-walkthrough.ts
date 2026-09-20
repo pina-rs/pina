@@ -26,7 +26,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
 import process from "node:process";
 
 import {
@@ -206,9 +206,17 @@ function scaffoldProgram(programId: string): void {
 		[
 			"[project]",
 			'program = "."',
+			`idl_dir = ${JSON.stringify(relative(PROGRAM_DIR, IDLS_DIR))}`,
 			"",
 			"[migrations]",
 			'version_type = "u8"',
+			"",
+			"[clients]",
+			`output = ${JSON.stringify(relative(PROGRAM_DIR, CLIENTS))}`,
+			'languages = ["cpi", "rust", "typescript", "dart"]',
+			"",
+			"[clients.typescript]",
+			'output = "js"',
 			"",
 		].join("\n"),
 	);
@@ -516,35 +524,10 @@ function buildSbf(): string {
 function generateClients(step: number): string {
 	const jsRoot = resolve(CLIENTS, "js", PROGRAM_NAME);
 	rmSync(resolve(CLIENTS, "js"), { recursive: true, force: true });
-	mustRun(
-		"cargo",
-		[
-			"run",
-			"-q",
-			"-p",
-			"pina_cli",
-			"--locked",
-			"--",
-			"codama",
-			"generate",
-			"--npx",
-			"node",
-			"--examples-dir",
-			resolve(WORK, "examples"),
-			"--idls-dir",
-			IDLS_DIR,
-			"--rust-out",
-			resolve(CLIENTS, "rust"),
-			"--cpi-out",
-			resolve(CLIENTS, "cpi"),
-			"--js-out",
-			resolve(CLIENTS, "js"),
-			"--dart-out",
-			resolve(CLIENTS, "dart"),
-		],
-		{},
-		"codama generate",
-	);
+	// Paths are relative to the discovered `pina.toml`, which sits beside the
+	// program under `target/`, so they climb back out to the walkthrough's own
+	// IDL and client directories.
+	mustPina(["generate", "--npx", "node"], PROGRAM_DIR, "pina generate");
 	const historyRoot = resolve(CLIENT_HISTORY, `step-${step}`, "js");
 	mkdirSync(resolve(historyRoot, PROGRAM_NAME), { recursive: true });
 	cpSync(jsRoot, resolve(historyRoot, PROGRAM_NAME), {

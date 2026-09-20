@@ -25,7 +25,7 @@ pina completions --help
 pina profile --help
 pina deploy --help
 pina migrations --help
-pina codama generate --help
+pina generate --help
 ```
 
 Use `pina docs` to list bundled terminal topics. Custom topics can be supplied through `PINA_TEMPLATES_DIR` when a project maintains its own operational guidance.
@@ -140,14 +140,15 @@ Do not describe an export as one transaction. Preserve the complete upstream `[T
 
 ## Repository-wide client generation
 
-Use the legacy Codama surface when a repository intentionally generates clients for several example programs in one command:
+`pina generate` generates the clients for one project, discovered through its `pina.toml`. To generate a whole repository, run it once per project:
 
 ```sh
-pina codama generate --examples-dir ./programs --idls-dir ./idls \
-  --rust-out ./clients/rust --js-out ./clients/js --dart-out ./clients/dart
+for project in ./programs/*/; do
+  pina generate --project "$project"
+done
 ```
 
-Use repeatable `--example` filters for a focused run. Generated roots may be replaced; never store hand-written code inside them.
+Output locations come from each project's `[clients]` table, so a repository controls per-language roots in configuration rather than on the command line. Generated roots may be replaced; never store hand-written code inside them.
 
 Pina's generated clients preserve discriminator-first layouts and PinaPod boundary checks. Compact client codecs enforce declared capacity at both encode and decode boundaries. If a repository uses a custom renderer command, keep that command as the source of truth.
 

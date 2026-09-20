@@ -96,18 +96,6 @@ pub enum CodamaError {
 	#[error("No programs were selected for generation")]
 	NoPrograms,
 
-	#[error("Failed to read examples directory at {path}: {source}")]
-	ReadExamples {
-		path: PathBuf,
-		source: std::io::Error,
-	},
-
-	#[error("No examples found in {path}")]
-	NoExamples { path: PathBuf },
-
-	#[error("Unknown example `{example}`. Available examples: {available}")]
-	UnknownExample { example: String, available: String },
-
 	#[error("Failed to create directory {path}: {source}")]
 	CreateDir {
 		path: PathBuf,
@@ -266,34 +254,6 @@ mod tests {
 	fn idl_error_other_display() {
 		let err = IdlError::Other("something went wrong".to_owned());
 		assert_eq!(err.to_string(), "something went wrong");
-	}
-
-	#[test]
-	fn codama_error_read_examples_display() {
-		let err = CodamaError::ReadExamples {
-			path: PathBuf::from("/tmp/examples"),
-			source: dummy_io_error(),
-		};
-		assert!(err.to_string().contains("/tmp/examples"));
-	}
-
-	#[test]
-	fn codama_error_no_examples_display() {
-		let err = CodamaError::NoExamples {
-			path: PathBuf::from("/tmp/examples"),
-		};
-		assert!(err.to_string().contains("/tmp/examples"));
-	}
-
-	#[test]
-	fn codama_error_unknown_example_display() {
-		let err = CodamaError::UnknownExample {
-			example: "missing".to_owned(),
-			available: "a, b, c".to_owned(),
-		};
-		let msg = err.to_string();
-		assert!(msg.contains("missing"));
-		assert!(msg.contains("a, b, c"));
 	}
 
 	#[test]
