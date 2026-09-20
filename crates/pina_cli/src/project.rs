@@ -140,7 +140,7 @@ pub struct Project {
 	pub migration_version_type: MigrationVersionType,
 	/// Program-wide migration opt-in policy from `[migrations].auto`.
 	///
-	/// `pina migrations make` records this policy into the manifest, which is
+	/// `pina migrations create` records this policy into the manifest, which is
 	/// the only policy source macros consult.
 	pub migration_auto: MigrationAuto,
 	/// Persisted disambiguation answers from `[migrations.answers]`.
@@ -179,7 +179,7 @@ struct MigrationsConfig {
 	/// key in `pina.toml`; `snake_case` is the canonical spelling.
 	#[serde(alias = "version-type")]
 	version_type: MigrationVersionType,
-	/// Kinds automatically enveloped by `pina migrations make`. Accepts `true`
+	/// Kinds automatically enveloped by `pina migrations create`. Accepts `true`
 	/// (every kind), `false`, or a list of kind names, so the raw TOML value is
 	/// resolved into [`MigrationAuto`] with actionable errors.
 	auto: Option<toml::Value>,

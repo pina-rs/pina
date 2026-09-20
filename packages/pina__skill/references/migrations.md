@@ -11,7 +11,7 @@ Every opted-in contract writes:
 ```
 
 - The version sits immediately after the discriminator, is little-endian, and is never written by application source. Macros inject it from `migrations/manifest.json`.
-- Version `0` is the first captured shape. `pina migrations make` allocates later versions; source code never declares a number.
+- Version `0` is the first captured shape. `pina migrations create` allocates later versions; source code never declares a number.
 - Versions are counted per contract, not per program: every account, instruction, and event owns an independent history that starts at `0`, so a program can hold one contract at version `3` and another at `0`.
 - The width is program-wide through `[migrations].version_type` in `pina.toml`: `"u8"` (the default and the recommendation), `"u16"`, or `"u32"`. `"u64"` is rejected at configuration parse; discriminator width is a separate setting that does support `u64`.
 - Prefer `u8`: 255 versions of one contract is not a realistic ceiling, and it is the cheapest envelope. Choose a wider width before the first release only when one contract is expected to exceed 255 versions.
@@ -55,8 +55,8 @@ auto = true # every kind, or ["accounts", "events", "instructions"], or false
 
 - `auto` accepts `true`, `false`, or a list of exactly `accounts`, `events`, and `instructions`. Unknown names, duplicates, and mixing a boolean with a kind list are configuration errors.
 - Staging a subset is meaningful: instruction envelopes change payload bytes and ripple into CPI call sites, so `auto = ["accounts", "events"]` is a useful intermediate step. Event envelopes are immutable and projected rather than rewritten.
-- `pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` (manifest format 4) and snapshots every contract of the listed kinds. Macros read the recorded policy, so a declaration covered by `auto` still fails the build with the `pina migrations make` remedy until it has a snapshot.
-- When a policy is recorded, `make` scaffolds a `build.rs`:
+- `pina migrations create` records the resolved policy as `auto` in `migrations/manifest.json` (manifest format 4) and snapshots every contract of the listed kinds. Macros read the recorded policy, so a declaration covered by `auto` still fails the build with the `pina migrations create` remedy until it has a snapshot.
+- When a policy is recorded, `create` scaffolds a `build.rs`:
 
 ```rust
 fn main() {
@@ -64,9 +64,9 @@ fn main() {
 }
 ```
 
-Scaffolding is idempotent and never overwrites a hand-written build script; `make` prints the exact line to add instead, and `pina migrations check` fails until the directive is present. The directive exists because proc macros do not re-expand when `pina.toml` or the manifest changes, so a policy flip must trigger expansion from the manifest alone.
+Scaffolding is idempotent and never overwrites a hand-written build script; `create` prints the exact line to add instead, and `pina migrations check` fails until the directive is present. The directive exists because proc macros do not re-expand when `pina.toml` or the manifest changes, so a policy flip must trigger expansion from the manifest alone.
 
-- Enabling `auto` on an already-launched program inserts an envelope into every listed contract. `make` records one history entry per newly enveloped contract and the change is a deliberate wire-format change; on a new program it is simply the version-zero baseline.
+- Enabling `auto` on an already-launched program inserts an envelope into every listed contract. `create` records one history entry per newly enveloped contract and the change is a deliberate wire-format change; on a new program it is simply the version-zero baseline.
 - `migrations = false` cannot remove an envelope the manifest already records, and dropping a kind from `auto` is rejected the same way. Stripping an envelope is a wire-format change that must be recorded deliberately.
 
 ## The loop
@@ -74,13 +74,13 @@ Scaffolding is idempotent and never overwrites a hand-written build script; `mak
 Run from the program directory:
 
 ```sh
-pina migrations make      # snapshot source changes and generate adjacent transitions
+pina migrations create    # snapshot source changes and generate adjacent transitions
 pina migrations check     # non-mutating build/CI gate; the same drift checks `pina build` enforces
 pina migrations status    # version + publication state per contract, plus a cost preview
-pina migrations sync      # make -> build -> generate for unambiguous changes
+pina migrations sync      # create -> build -> generate for unambiguous changes
 ```
 
-- `make` writes `migrations/manifest.json`, `migrations/publications.json`, and `migrations/transitions/<contract>/vN_to_vM.rs`, then prints any manual transition paths and growth warnings. It replaces an unpublished draft in place; once the version appears in a publication receipt or a pending deployment it appends the next version instead.
+- `create` writes `migrations/manifest.json`, `migrations/publications.json`, and `migrations/transitions/<contract>/vN_to_vM.rs`, then prints any manual transition paths and growth warnings. It replaces an unpublished draft in place; once the version appears in a publication receipt or a pending deployment it appends the next version instead.
 - `check` fails on source drift, a missing snapshot, an unfinished or hash-changed transition, a changed published schema, a version-width mismatch, or a missing build-script rerun directive. `check --json` stays a status-only array.
 - `status` runs the same drift checks as `check`, prints `kind name vN (draft|published|publication pending)`, and ends with the cost preview below. `status --json` keeps the status array unchanged under `statuses` and adds a `costPreview` object.
 - `pina migrations inspect <ADDRESS> [--url <RPC>] [--json]` reads one on-chain account and reports its stored version against the manifest plus the pending adjacent hops with byte sizes and approximate rent delta. It exits non-zero when the account is stale or from the future.
@@ -90,8 +90,8 @@ pina migrations sync      # make -> build -> generate for unambiguous changes
 Ambiguous renames (a field disappears while a same-typed field appears) fail with the exact flags:
 
 ```sh
-pina migrations make --rename value:points    # preserve the stored bytes
-pina migrations make --assume-removed value   # discard them; the new field starts zeroed
+pina migrations create --rename value:points    # preserve the stored bytes
+pina migrations create --assume-removed value   # discard them; the new field starts zeroed
 ```
 
 Answers persist in `[migrations.answers]` in `pina.toml` (`rename = ["value:points"]`, `assume_removed = []`), so fresh clones and CI replay a local decision. With `--json`, `--no-interactive`, or no terminal, an unanswered question is a hard failure: the question array prints on stdout, the human-readable error on stderr, exit status 1.
@@ -100,7 +100,7 @@ Answers persist in `[migrations.answers]` in `pina.toml` (`rename = ["value:poin
 
 `pina migrations status` ends with a static planning estimate, never a quote. It derives from the checked-in manifest and, when present, `pina profile`'s per-symbol estimates of the compiled SBF artifact, and it prints the two models alongside the figures so they stay interpretable:
 
-- Per account contract: current size (compact schemas quote their declared capacity), the bytes a version-0 day-one account grows, and that growth's rent deficit at the same ~6,960 lamports per grown byte the `make` warning uses.
+- Per account contract: current size (compact schemas quote their declared capacity), the bytes a version-0 day-one account grows, and that growth's rent deficit at the same ~6,960 lamports per grown byte the `create` warning uses.
 - Per instruction process: the worst-case ladder a stale account it names can trigger — the oldest version within `MAX_INLINE_STEPS` (8) of current, one adjacent transition per step — with its step count, rent, and static CU estimate. A history with more than eight transitions quotes a ladder that starts partway up and adds a note that a day-one account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
 - Program-wide: the touching transaction funding the most rent (size `max_lamports` from it) and, independently, the instruction with the longest worst-case ladder (size `MAX_INLINE_STEPS` from it). They need not be the same instruction, and each names its own.
 
@@ -111,13 +111,13 @@ Instruction processes link to account contracts by account-slot name, and only a
 ## Source of truth: the manifest
 
 - `migrations/manifest.json` is the only policy source procedural macros consult; they never read `pina.toml`. It is checked in and hash-chained, which keeps builds deterministic and reproducible.
-- A missing, undecodable, or stale manifest fails macro expansion with the `pina migrations make` remedy; the build is blocked rather than silently degraded.
+- A missing, undecodable, or stale manifest fails macro expansion with the `pina migrations create` remedy; the build is blocked rather than silently degraded.
 - Do not hand-edit the manifest, the publication ledger, or generated transition files. If `migrations/publications.json` is lost while the manifest records advanced versions, every later check fails because published history must stay pinned; restore the ledger from version control.
 - ABI document formats are independent of on-chain versions. Manifest format 3 freezes the PinaPod codec and physical descriptor; format 4 adds the `auto` policy. Publication-ledger format 3 adds the pending deployment record. An ABI document upgrade never consumes an on-chain migration version.
 
 ## Generated vs manual transitions
 
-`make` generates automatic transitions for direction-safe fixed-layout changes: exact field copies, safe reordering, zero-fill for unambiguous additions, plus the generated size constants and length guard.
+`create` generates automatic transitions for direction-safe fixed-layout changes: exact field copies, safe reordering, zero-fill for unambiguous additions, plus the generated size constants and length guard.
 
 Type changes, compact layouts, and ambiguous moves produce a manual file containing `TODO(pina-manual-migration)`. Replace the body:
 
@@ -125,7 +125,7 @@ Type changes, compact layouts, and ambiguous moves produce a manual file contain
 - A manual account `migrate` is total for the accepted source and must fully initialize every active destination byte. It cannot reject once funding or resizing may have happened: a failure there aborts the instruction instead of returning a catchable error. Validate rejectable value constraints in `target_size`/`working_size`, which run before any mutation.
 - Instruction and event transitions run in scratch space and may reject invalid semantic values before dispatch.
 
-An unfinished `TODO`, or a transition that no longer matches its recorded SHA-256, blocks macro expansion until the body is filled and `make` re-runs to record the hash. Published transition code and its schemas are immutable; fix a defect with a new version.
+An unfinished `TODO`, or a transition that no longer matches its recorded SHA-256, blocks macro expansion until the body is filled and `create` re-runs to record the hash. Published transition code and its schemas are immutable; fix a defect with a new version.
 
 ## Runtime behavior
 
@@ -164,7 +164,7 @@ If a writable touch genuinely cannot be scheduled, generated accounts expose a r
 | `MigrationUnavailable`           | A stale account is further behind than the generated `MAX_INLINE_STEPS` (at most 8 adjacent transitions), the plan is not exactly the next adjacent step, or a reserved-instruction slot index is past the 63-slot bitmask. | Rebalance the history into more frequent, smaller versions and migrate accounts before they fall further behind. The reserved `Migrate` route is the out-of-band path but enforces the same step cap. |
 | `MigrationWorkspaceExceeded`     | A generated transition's `WORKING_SIZE` is below its `CURRENT_SIZE`, or a caller-supplied workspace is shorter than `WORKING_SIZE`.                                                                                         | Give the workspace at least `WORKING_SIZE` bytes. Generated `with_current_*` helpers already size it at the compile-time maximum, which stays at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes).    |
 | `MigrationAccountGrowthExceeded` | One step would grow the account past the runtime reallocation limit, `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes), over the account's size at instruction start.                                                            | Publish intermediate versions so the change grows across separate transactions; no lamport budget raises this limit.                                                                                  |
-| `MigrationLamportBudgetExceeded` | The cumulative rent deficit of the planned steps exceeds the `max_lamports` the program passes to `MigrateAccount` or `MigrateContext`.                                                                                     | Raise the program's `max_lamports` constant (for example `MAX_INLINE_MIGRATION_LAMPORTS`) to cover the quoted deficit. `make` prints the estimated deficit for each growing transition.               |
+| `MigrationLamportBudgetExceeded` | The cumulative rent deficit of the planned steps exceeds the `max_lamports` the program passes to `MigrateAccount` or `MigrateContext`.                                                                                     | Raise the program's `max_lamports` constant (for example `MAX_INLINE_MIGRATION_LAMPORTS`) to cover the quoted deficit. `create` prints the estimated deficit for each growing transition.             |
 
 Also expect `MigrationRequired` (a stale account was touched without a migration path) and `InvalidMigrationVersion` (the stored version is unknown or newer than the program).
 
@@ -174,9 +174,9 @@ Builds before the split reported the workspace, growth, and lamport failures as 
 
 Versions are counted per contract, not per program: each account, instruction, and event owns an independent history starting at `0`, so a `u8` program gives every contract its own 255-version budget. `pina migrations status` prints what is left (`account State v3 (published, 252 version(s) remaining)`), and `status --json`/`check --json` carry it as `versionsRemaining`.
 
-The width is program-wide and freezes at the first persistent publication, so it cannot be widened after release. Pre-launch, the only widening path is deleting `migrations/` and re-running `make` with the wider setting, which re-baselines history; there is nothing deployed to stay compatible with yet.
+The width is program-wide and freezes at the first persistent publication, so it cannot be widened after release. Pre-launch, the only widening path is deleting `migrations/` and re-running `create` with the wider setting, which re-baselines history; there is nothing deployed to stay compatible with yet.
 
-Reaching the ceiling is terminal for that contract. `make` fails closed with `VersionExhausted` and the on-chain path rejects out-of-range versions instead of truncating, so no version number is ever reused. The remedy is a successor contract: a new discriminator with a fresh version-0 history, plus a bridge instruction that reads the exhausted account through the current loaders and writes the successor, with clients sweeping accounts lazily. History cannot be pruned, because a program cannot enumerate its own accounts.
+Reaching the ceiling is terminal for that contract. `create` fails closed with `VersionExhausted` and the on-chain path rejects out-of-range versions instead of truncating, so no version number is ever reused. The remedy is a successor contract: a new discriminator with a fresh version-0 history, plus a bridge instruction that reads the exhausted account through the current loaders and writes the successor, with clients sweeping accounts lazily. History cannot be pruned, because a program cannot enumerate its own accounts.
 
 ## Honest limits
 

@@ -31,9 +31,9 @@ auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
 
 `auto` accepts `true` (every kind), `false` (the default), or a list of `accounts`, `events`, and `instructions`; any other name is a configuration error. Staging a subset is meaningful because the kinds have different costs: instruction envelopes change payload bytes and ripple into CPI call sites, so `auto = ["accounts", "events"]` is a useful middle step.
 
-`pina migrations make` records the resolved policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. The manifest is the single source of truth for macros: they never read `pina.toml`, because a proc macro does not re-expand when an unrelated toml file changes. A struct that is not yet snapshotted still fails the build with the existing "run `pina migrations make`" error, so the workflow is unchanged.
+`pina migrations create` records the resolved policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. The manifest is the single source of truth for macros: they never read `pina.toml`, because a proc macro does not re-expand when an unrelated toml file changes. A struct that is not yet snapshotted still fails the build with the existing "run `pina migrations create`" error, so the workflow is unchanged.
 
-Because the policy lives in the manifest, flipping it re-expands every contract without a source edit. When a policy is recorded, `make` scaffolds a `build.rs` containing:
+Because the policy lives in the manifest, flipping it re-expands every contract without a source edit. When a policy is recorded, `create` scaffolds a `build.rs` containing:
 
 ```rust
 fn main() {
@@ -41,24 +41,24 @@ fn main() {
 }
 ```
 
-The scaffold is idempotent and never overwrites an existing hand-written build script; `make` prints the exact line to add instead, and `pina migrations check` fails until it is present.
+The scaffold is idempotent and never overwrites an existing hand-written build script; `create` prints the exact line to add instead, and `pina migrations check` fails until it is present.
 
-Per-item `migrations = false` keeps one contract out of an auto policy. Removing the envelope from a contract the manifest already records is an error rather than a silent opt-out: stripping an envelope is a wire-format change, so the build fails with the contract identity and the required remedy. Dropping a kind from `[migrations].auto` is rejected the same way. Enabling auto on an already-launched program inserts an envelope into every contract of the listed kinds — one recorded history entry per contract through `make` — while a new program simply captures that baseline.
+Per-item `migrations = false` keeps one contract out of an auto policy. Removing the envelope from a contract the manifest already records is an error rather than a silent opt-out: stripping an envelope is a wire-format change, so the build fails with the contract identity and the required remedy. Dropping a kind from `[migrations].auto` is rejected the same way. Enabling auto on an already-launched program inserts an envelope into every contract of the listed kinds — one recorded history entry per contract through `create` — while a new program simply captures that baseline.
 
 ## Capture a draft
 
 Run the migration generator after the source ABI changes:
 
 ```bash
-pina migrations make
+pina migrations create
 pina migrations status
 ```
 
 Pina writes `migrations/manifest.json`, `migrations/publications.json`, and adjacent transition files under `migrations/transitions/`.
 
-If the current version has never been deployed to a non-local cluster, `make` replaces that draft. If a publication receipt or pending deployment contains the version, `make` appends the next version.
+If the current version has never been deployed to a non-local cluster, `create` replaces that draft. If a publication receipt or pending deployment contains the version, `create` appends the next version.
 
-When a transition grows an account, `make` prints the estimated rent deficit (about 6,960 lamports per grown byte), names the program constant to raise (`max_lamports`, for example `MAX_INLINE_MIGRATION_LAMPORTS`), and points at the on-chain error an undersized budget produces: `MigrationLamportBudgetExceeded`. Cumulative worst-case growth across the supported stale ladder — every version a stale account may still hold within `MAX_INLINE_STEPS`, not only the adjacent hop — beyond the runtime's 10,240-byte (`MAX_PERMITTED_DATA_INCREASE`) per-instruction realloc cap warns separately, because no budget raises that limit; it points at `MigrationAccountGrowthExceeded`. Both warnings quote the same numbers as the `PinaProgramError` rustdoc, so the pre-deploy estimate and a failed transaction name the same fix.
+When a transition grows an account, `create` prints the estimated rent deficit (about 6,960 lamports per grown byte), names the program constant to raise (`max_lamports`, for example `MAX_INLINE_MIGRATION_LAMPORTS`), and points at the on-chain error an undersized budget produces: `MigrationLamportBudgetExceeded`. Cumulative worst-case growth across the supported stale ladder — every version a stale account may still hold within `MAX_INLINE_STEPS`, not only the adjacent hop — beyond the runtime's 10,240-byte (`MAX_PERMITTED_DATA_INCREASE`) per-instruction realloc cap warns separately, because no budget raises that limit; it points at `MigrationAccountGrowthExceeded`. Both warnings quote the same numbers as the `PinaProgramError` rustdoc, so the pre-deploy estimate and a failed transaction name the same fix.
 
 Commit the manifest, publication ledger, and transition files. Do not generate them during a build.
 
@@ -66,13 +66,13 @@ Commit the manifest, publication ledger, and transition files. Do not generate t
 
 `pina migrations status` ends with a cost preview derived from the checked-in history and, when the compiled SBF artifact exists, from `pina profile`'s static per-function estimates. It reports:
 
-- per account contract: current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the same 6,960-lamports-per-grown-byte convention the `make` warning uses;
+- per account contract: current size, the bytes a version-0 (day-one) account grows, and the approximate rent deficit at the same 6,960-lamports-per-grown-byte convention the `create` warning uses;
 - per instruction process: the worst-case adjacent-step ladder a stale account the process names can trigger, with the step count, the rent that ladder funds, and a static CU estimate;
 - one program-wide summary that sizes both budgets deliberately: the touching transaction funding the most rent (`max_lamports`) and, independently, the longest worst-case ladder (`MAX_INLINE_STEPS`) — each names its instruction, because they need not be the same one.
 
 The preview prints the ladder model and the CU model so the numbers stay interpretable. When the history has more than eight transitions, the quoted ladder starts partway up and a note explains that a version-0 account instead fails with `MigrationUnavailable`; the day-one growth figure still counts every pending byte.
 
-Two models keep the numbers interpretable. Rent reuses `RENT_EXEMPT_LAMPORTS_PER_BYTE` from the `make` warning, and the CU estimate sums `pina profile`'s static estimates for the generated adjacent `migrate` functions, so it excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. An artifact that has not been built, cannot be parsed, or lacks a transition function makes the CU figure print an explicit `CU unavailable: ...` reason instead of a zero.
+Two models keep the numbers interpretable. Rent reuses `RENT_EXEMPT_LAMPORTS_PER_BYTE` from the `create` warning, and the CU estimate sums `pina profile`'s static estimates for the generated adjacent `migrate` functions, so it excludes executor overhead (resize, rent transfer, validation) and runtime branch or loop effects. An artifact that has not been built, cannot be parsed, or lacks a transition function makes the CU figure print an explicit `CU unavailable: ...` reason instead of a zero.
 
 Instruction processes link to account contracts by account-slot name, and only a `writable`, non-signer slot can hold an account the executor migrates. A writable, non-signer slot that names no checked-in account contract produces an explicit note instead of silently costing nothing — the symptom of a renamed account or a slot typo. Read-only and signer slots (authorities, payers, programs) can never be migrated, so they are skipped without noise.
 
@@ -123,17 +123,17 @@ A figure that cannot be estimated serializes as `{ "status": "unavailable", "rea
 
 ## Disambiguate renames
 
-A field that disappears while another field of the same type appears is ambiguous: a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations make` refuses to guess:
+A field that disappears while another field of the same type appears is ambiguous: a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations create` refuses to guess:
 
 - On a terminal it prompts field by field and records the answer.
 - With `--no-interactive`, or when no terminal is attached, it fails with one line per question naming the exact flags that answer it:
 
 ```bash
-pina migrations make --rename score:points          # preserve the renamed data
-pina migrations make --assume-removed score         # discard it; `points` starts zeroed
+pina migrations create --rename score:points        # preserve the renamed data
+pina migrations create --assume-removed score       # discard it; `points` starts zeroed
 ```
 
-`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `make` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
+`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `create` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
 
 ## Resolve a manual transition
 
@@ -189,7 +189,7 @@ When the exact planned inputs cannot be reproduced (for example a cleaned build 
 
 Reads reject a document stamped above the running build, naming the supported version, and reject one below the oldest supported version with the remedy that regenerates it. Anything between is normalized through an ordered table of adjacent converters before the typed model is read, so a document an older release wrote still opens. Conversions run in memory only: no command rewrites a checked-in document as a side effect of reading it.
 
-The 0.20 reset replaced the integer `formatVersion` counters, and documents from older releases must be converted once before any Pina command can read them — `make` and `sync` included. [Migrate to the reset ABI document](./migrations/abi-document-reset.md) walks the conversion for both deployed and not-yet-deployed programs.
+The 0.20 reset replaced the integer `formatVersion` counters, and documents from older releases must be converted once before any Pina command can read them — `create` and `sync` included. [Migrate to the reset ABI document](./migrations/abi-document-reset.md) walks the conversion for both deployed and not-yet-deployed programs.
 
 `pina abi schema` prints the JSON Schema for a document, generated from the same types that read and write it:
 
@@ -206,7 +206,7 @@ An ABI document upgrade does not consume an on-chain migration version.
 
 | Command                  | Result                                                         |
 | ------------------------ | -------------------------------------------------------------- |
-| `pina migrations make`   | Capture source changes and create or refresh one draft         |
+| `pina migrations create` | Capture source changes and create or refresh one draft         |
 | `pina migrations check`  | Fail on source, schema, process, transition, or version drift  |
 | `pina migrations status` | Show each current version, its publication state, and the cost |
 

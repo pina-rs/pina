@@ -698,7 +698,7 @@ mod tests {
 	fn an_explicit_ladder_without_a_budget_still_requires_a_manifest() {
 		// Dropping the budget made it optional, not the history: naming
 		// contracts still demands a checked-in snapshot, so the unit-test
-		// environment (no manifest) reports the `make` remedy rather than
+		// environment (no manifest) reports the `create` remedy rather than
 		// expanding a ladder it cannot verify.
 		let args = args(quote!(entrypoint, migrations(State)));
 		let mut item_enum = enum_of(quote!(
@@ -709,7 +709,7 @@ mod tests {
 		let error = expand(&args, &mut item_enum).unwrap_err();
 
 		assert!(
-			error.to_string().contains("pina migrations make"),
+			error.to_string().contains("pina migrations create"),
 			"unexpected message: {error}"
 		);
 	}
@@ -851,7 +851,7 @@ mod tests {
 
 		let message = error.to_string();
 		assert!(
-			message.contains("pina migrations make"),
+			message.contains("pina migrations create"),
 			"message: {message}"
 		);
 	}

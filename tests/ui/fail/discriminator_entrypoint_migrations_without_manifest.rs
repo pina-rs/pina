@@ -1,6 +1,6 @@
 //! A migration ladder must resolve against the checked-in manifest. The
 //! dispatch macro reads the same policy source as `#[account]`, so a program
-//! with no manifest fails with the `pina migrations make` remedy instead of an
+//! with no manifest fails with the `pina migrations create` remedy instead of an
 //! unsatisfied `MigratableAccount` bound at the `run_optional` call.
 
 use pina::*;

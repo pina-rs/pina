@@ -256,7 +256,7 @@ impl EventClientHistory {
 	}
 }
 
-/// Reproduce the byte moves `pina migrations make` writes for an automatic
+/// Reproduce the byte moves `pina migrations create` writes for an automatic
 /// transition: destination fields keep their name and Rust type, source bytes
 /// move to the destination offset, and fields without a match stay zero.
 fn field_moves(source: &DataSchema, destination: &DataSchema) -> Option<Vec<EventFieldMove>> {
@@ -681,7 +681,7 @@ mod tests {
 	}
 
 	/// One event history whose only transition changes a field type, which
-	/// `pina migrations make` records as manual.
+	/// `pina migrations create` records as manual.
 	fn manual_event_history() -> pina_abi::MigrationManifest {
 		use pina_abi::ContractHistory;
 		use pina_abi::ContractIdentity;

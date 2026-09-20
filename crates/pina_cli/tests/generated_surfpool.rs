@@ -86,18 +86,18 @@ fn initialized_project_executes_its_starter_instruction_on_surfpool() {
 	);
 
 	// The scaffolded project enables migrations, so its build fails with the
-	// `make` remedy until the version-0 baseline is recorded. The placeholder
+	// `create` remedy until the version-0 baseline is recorded. The placeholder
 	// program address is still in place here, which is consistent: the
 	// isolated Surfpool deploy never leaves the loopback, and the recorded
 	// history binds to the address the project is tested under.
-	let make = Command::new(pina)
-		.args(["migrations", "make", "--project"])
+	let create = Command::new(pina)
+		.args(["migrations", "create", "--project"])
 		.arg(&project)
 		.status()
-		.unwrap_or_else(|error| panic!("failed to run pina migrations make: {error}"));
+		.unwrap_or_else(|error| panic!("failed to run pina migrations create: {error}"));
 	assert!(
-		make.success(),
-		"generated project migrations make failed with {make}"
+		create.success(),
+		"generated project migrations create failed with {create}"
 	);
 
 	let test = Command::new(pina)

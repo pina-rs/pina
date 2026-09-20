@@ -1,4 +1,4 @@
-error: this program declares a migration ladder, but its `migrations/manifest.json` does not exist; run `pina migrations make`
+error: this program declares a migration ladder, but its `migrations/manifest.json` does not exist; run `pina migrations create`
   --> tests/ui/fail/discriminator_entrypoint_migrations_without_manifest.rs:11:10
    |
 11 | pub enum Instruction {

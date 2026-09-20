@@ -33,11 +33,11 @@ From the program directory:
 
 ```sh
 rm -rf migrations
-pina migrations make --no-interactive
+pina migrations create --no-interactive
 pina migrations check
 ```
 
-`make` rebuilds the manifest from source at `abiVersion` `"0.20"`, regenerates `tests/abi_layout.rs`, and recreates the publication ledger on your next deploy. Draft version history collapses to version zero — which is exactly why this path is for programs nothing has been deployed to yet.
+`create` rebuilds the manifest from source at `abiVersion` `"0.20"`, regenerates `tests/abi_layout.rs`, and recreates the publication ledger on your next deploy. Draft version history collapses to version zero — which is exactly why this path is for programs nothing has been deployed to yet.
 
 ## Keep your history
 
@@ -98,9 +98,9 @@ jq -f convert-publications.jq migrations/publications.json > publications.next &
 	mv publications.next migrations/publications.json
 ```
 
-Two things happen here, and both are deliberate. The `cluster` label is gone from receipts — the credential-free `rpcUrl` is the record now, and the pending record keeps its label because `pina deploy` matches on it. And each receipt's `history` is emptied, which marks it _unpinned_: the old pins hashed a document shape that no longer exists, so keeping them would fail every future check, while emptying them keeps what matters — the recorded version, which is what freezes published history and keeps `make` append-only.
+Two things happen here, and both are deliberate. The `cluster` label is gone from receipts — the credential-free `rpcUrl` is the record now, and the pending record keeps its label because `pina deploy` matches on it. And each receipt's `history` is emptied, which marks it _unpinned_: the old pins hashed a document shape that no longer exists, so keeping them would fail every future check, while emptying them keeps what matters — the recorded version, which is what freezes published history and keeps `create` append-only.
 
-`make` rewrites the manifest canonically but never rewrites the ledger, so the converted ledger stays as you wrote it.
+`create` rewrites the manifest canonically but never rewrites the ledger, so the converted ledger stays as you wrote it.
 
 ### 3. Repair the receipt chain — only if you hold more than one receipt
 
@@ -129,12 +129,12 @@ Run it once on `migrations/publications.json` with `serde_json` added as a depen
 ### 4. Regenerate and verify
 
 ```sh
-pina migrations make --no-interactive
+pina migrations create --no-interactive
 pina migrations check
 pina migrations status
 ```
 
-`make` rewrites the manifest canonically and regenerates `tests/abi_layout.rs`. `check` must pass before anything builds. `status` is your proof the conversion preserved state: every contract shows the same version number it showed before the upgrade, and deployed contracts still read `published`. Confirm one live account still loads with `pina migrations inspect <ADDRESS>`, then commit the rewritten documents.
+`create` rewrites the manifest canonically and regenerates `tests/abi_layout.rs`. `check` must pass before anything builds. `status` is your proof the conversion preserved state: every contract shows the same version number it showed before the upgrade, and deployed contracts still read `published`. Confirm one live account still loads with `pina migrations inspect <ADDRESS>`, then commit the rewritten documents.
 
 ### Re-pin if published-schema tamper evidence matters to you
 
@@ -166,8 +166,8 @@ Added: `walk_document` and `AbiStep` for converter tables, `parse_document_versi
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `missing a string \`abiVersion\` field`                                                                     | a pre-0.20 document — this guide                                                                                |
 | `records ABI version 9.9, but this Pina build supports 0.20; upgrade Pina`                                  | the document is newer than your build — upgrade Pina; the check is a capability marker, like `Cargo.lock`       |
-| `predates the oldest supported version 0.20; regenerate it with \`pina migrations make\``                   | a document older than the reset — [Start fresh](#start-fresh)                                                   |
+| `predates the oldest supported version 0.20; regenerate it with \`pina migrations create\``                 | a document older than the reset — [Start fresh](#start-fresh)                                                   |
 | `publication receipt 1 does not extend the previous hash`                                                   | a converted multi-receipt ledger whose chain was not repaired — [Re-link the receipt chain](#keep-your-history) |
 | `pins ... for ... , which the manifest does not record` or `pinned schema ... but the manifest now records` | a receipt history that was not emptied — [Keep your history](#keep-your-history)                                |
 
-After the conversion, `abiVersion` is maintained for you: `pina migrations make` writes the current version, and the value advances only when a future `pina_abi` release changes the document contract — never for a CLI fix, never for a program schema change.
+After the conversion, `abiVersion` is maintained for you: `pina migrations create` writes the current version, and the value advances only when a future `pina_abi` release changes the document contract — never for a CLI fix, never for a program schema change.

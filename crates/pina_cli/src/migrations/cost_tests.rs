@@ -18,7 +18,7 @@ use pina_profile::ProgramProfile;
 
 use super::*;
 
-/// Exact rent figure the `make` warning quotes, repeated so a constant change
+/// Exact rent figure the `create` warning quotes, repeated so a constant change
 /// fails this test instead of silently shifting every expectation.
 const RENT_PER_BYTE: u64 = 6_960;
 

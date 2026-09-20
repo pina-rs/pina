@@ -177,7 +177,7 @@ pub(crate) enum Commands {
 
 	/// Create and verify checked-in ABI migrations.
 	///
-	/// `make` snapshots the current desired schema. It rewrites an unpublished
+	/// `create` snapshots the current desired schema. It rewrites an unpublished
 	/// draft in place and advances only after that version has been published.
 	/// `check` is the non-mutating build/CI gate. `status` reports the same checks.
 	Migrations {
@@ -1151,9 +1151,9 @@ pub(crate) enum AbiCommands {
 /// ABI migration history operations.
 #[derive(Subcommand, Debug)]
 pub(crate) enum MigrationCommands {
-	/// Runs make -> build -> generate in one step: the default loop for
+	/// Runs create -> build -> generate in one step: the default loop for
 	/// unambiguous changes. Refuses with the same question payloads as
-	/// `make` when the diff needs a disambiguation answer.
+	/// `create` when the diff needs a disambiguation answer.
 	Sync {
 		/// Directory inside the project to discover. Defaults to the current directory.
 		#[arg(short, long, default_value = ".", hide_default_value = true)]
@@ -1200,7 +1200,7 @@ pub(crate) enum MigrationCommands {
 		json: bool,
 	},
 	/// Snapshot source changes and generate the adjacent transition.
-	Make {
+	Create {
 		/// Directory inside the project to discover.
 		#[arg(short, long, default_value = ".", hide_default_value = true)]
 		project: PathBuf,

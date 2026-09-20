@@ -76,7 +76,7 @@ use crate::project::ProjectError;
 /// Result of creating or refreshing draft migrations.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MakeMigrationsOutput {
+pub struct CreateMigrationsOutput {
 	pub manifest: PathBuf,
 	pub created_contracts: Vec<String>,
 	pub advanced_versions: Vec<String>,
@@ -169,12 +169,13 @@ pub enum MigrationError {
 
 	#[error(
 		"The generated ABI layout test {path} is stale and no longer matches the manifest. Run \
-		 `pina migrations make` to regenerate it."
+		 `pina migrations create` to regenerate it."
 	)]
 	AbiLayoutTestStale { path: PathBuf },
 
 	#[error(
-		"The generated ABI layout test {path} is missing. Run `pina migrations make` to create it."
+		"The generated ABI layout test {path} is missing. Run `pina migrations create` to create \
+		 it."
 	)]
 	AbiLayoutTestMissing { path: PathBuf },
 
@@ -194,15 +195,15 @@ pub enum MigrationError {
 
 	#[error(
 		"Migration auto policy is recorded as {found}, but pina.toml configures {expected}. Run \
-		 `pina migrations make` to record the policy flip."
+		 `pina migrations create` to record the policy flip."
 	)]
 	AutoPolicyChanged { expected: String, found: String },
 
 	#[error(
 		"{kind} `{name}` ({identity}) is recorded in the migration manifest but is no longer \
 		 migration-aware. Removing an envelope is a wire-format change that `pina migrations \
-		 make` must record deliberately; restore its migration coverage (a `migrations` token or \
-		 the matching `[migrations].auto` kind) or retire the contract deliberately."
+		 create` must record deliberately; restore its migration coverage (a `migrations` token \
+		 or the matching `[migrations].auto` kind) or retire the contract deliberately."
 	)]
 	EnvelopeRemoval {
 		kind: String,
@@ -212,7 +213,7 @@ pub enum MigrationError {
 
 	#[error(
 		"Migration auto policy requires the exact line `{directive}` in {path}. Run `pina \
-		 migrations make` to scaffold a missing script, or add that line to the existing build \
+		 migrations create` to scaffold a missing script, or add that line to the existing build \
 		 script."
 	)]
 	BuildScriptRerunMissing {
@@ -232,13 +233,13 @@ pub enum MigrationError {
 	},
 
 	#[error(
-		"Migration-aware {kind} `{name}` has no checked-in snapshot. Run `pina migrations make`."
+		"Migration-aware {kind} `{name}` has no checked-in snapshot. Run `pina migrations create`."
 	)]
 	MissingSnapshot { kind: String, name: String },
 
 	#[error(
 		"Migration-aware {kind} `{name}` differs from version {version}. Its data schema or \
-		 instruction process ABI changed. Run `pina migrations make` and review the transition."
+		 instruction process ABI changed. Run `pina migrations create` and review the transition."
 	)]
 	SchemaDrift {
 		kind: String,
@@ -248,7 +249,7 @@ pub enum MigrationError {
 
 	#[error(
 		"Migration implementation {path} differs from the recorded hash for {kind} `{name}` \
-		 version {version}. Run `pina migrations make` and review the transition."
+		 version {version}. Run `pina migrations create` and review the transition."
 	)]
 	TransitionDrift {
 		kind: String,
@@ -290,7 +291,7 @@ pub enum MigrationError {
 
 	#[error(
 		"Manual migration {path} is unfinished. Replace the `TODO(pina-manual-migration)` body \
-		 and run `pina migrations make`."
+		 and run `pina migrations create`."
 	)]
 	ManualTransitionIncomplete { path: PathBuf },
 
@@ -337,15 +338,15 @@ pub enum MigrationError {
 ///
 /// An unfrozen latest version is mutable. A published or pending latest
 /// version is immutable and a source change appends one adjacent version.
-pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationError> {
-	make_migrations_with_answers(start, &MigrationAnswers::default())
+pub fn create_migrations(start: &Path) -> Result<CreateMigrationsOutput, MigrationError> {
+	create_migrations_with_answers(start, &MigrationAnswers::default())
 }
 
-/// [`make_migrations`] with explicit disambiguation answers.
-pub fn make_migrations_with_answers(
+/// [`create_migrations`] with explicit disambiguation answers.
+pub fn create_migrations_with_answers(
 	start: &Path,
 	answers: &MigrationAnswers,
-) -> Result<MakeMigrationsOutput, MigrationError> {
+) -> Result<CreateMigrationsOutput, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
 	// Attach the process terminal once: with a tty the disambiguation
@@ -357,7 +358,7 @@ pub fn make_migrations_with_answers(
 	let mut stdin_lock = stdin.lock();
 	let mut stdout_lock = stdout.lock();
 	let mut prompts = PromptIo::new(&mut stdin_lock, &mut stdout_lock, interactive);
-	// `make` records the policy configured in `pina.toml`; every later reader
+	// `create` records the policy configured in `pina.toml`; every later reader
 	// (macros, build, IDL) trusts only the manifest.
 	let auto = project.migration_auto.clone();
 	let current = scan_current_contracts(&project, &auto)?;
@@ -371,9 +372,9 @@ pub fn make_migrations_with_answers(
 	validate_program_configuration(&project, &current.program_id, &manifest)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
 
-	let mut output = MakeMigrationsOutput {
+	let mut output = CreateMigrationsOutput {
 		manifest: manifest_path.clone(),
-		..MakeMigrationsOutput::default()
+		..CreateMigrationsOutput::default()
 	};
 	let mut seen = BTreeMap::new();
 
@@ -478,7 +479,7 @@ pub fn make_migrations_with_answers(
 						});
 						// The draft's own transition carries the disambiguation
 						// answers recorded when it was created; reusing them
-						// keeps repeated `make` runs over the draft stable
+						// keeps repeated `create` runs over the draft stable
 						// instead of re-asking settled questions.
 						let (renames, dropped) = resolve_field_changes(
 							&key,
@@ -621,7 +622,7 @@ fn verify_abi_layout_test(
 /// `rustfmt` re-wraps the long `SCHEMA_SHA256` constants and collapses
 /// single-element `FIELDS` arrays, so a formatted guard file is never
 /// byte-identical to generator output. Comparing normalized whitespace keeps
-/// `pina migrations make` and `fix:format` from fighting: the guard still fails
+/// `pina migrations create` and `fix:format` from fighting: the guard still fails
 /// closed on any real change (a value, a constant name, a module), which is what
 /// it exists to catch.
 fn layout_tests_agree(existing: &str, generated: &str) -> bool {
@@ -745,7 +746,7 @@ fn check_project_migrations_with_manifest(
 	let manifest = load_manifest(&manifest_path)?;
 	// Verification follows the recorded policy because that is what macros
 	// expanded against; a policy difference is reported below as a stale
-	// manifest that only `make` may refresh.
+	// manifest that only `create` may refresh.
 	let auto = manifest.as_ref().map_or_else(
 		|| project.migration_auto.clone(),
 		|manifest| manifest.auto.clone(),

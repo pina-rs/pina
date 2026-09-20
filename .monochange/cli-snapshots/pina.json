@@ -306,7 +306,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Create and verify checked-in ABI migrations",
-			"description": "Create and verify checked-in ABI migrations.\n\n`make` snapshots the current desired schema. It rewrites an unpublished draft in place and advances only after that version has been published. `check` is the non-mutating build/CI gate. `status` reports the same checks.",
+			"description": "Create and verify checked-in ABI migrations.\n\n`create` snapshots the current desired schema. It rewrites an unpublished draft in place and advances only after that version has been published. `check` is the non-mutating build/CI gate. `status` reports the same checks.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -323,7 +323,7 @@
 					],
 					"hidden": false,
 					"max_bump": "major",
-					"summary": "Runs make -> build -> generate in one step: the default loop for unambiguous changes. Refuses with the same question payloads as `make` when the diff needs a disambiguation answer",
+					"summary": "Runs create -> build -> generate in one step: the default loop for unambiguous changes. Refuses with the same question payloads as `create` when the diff needs a disambiguation answer",
 					"parser": {
 						"flags_are_posix_noncompliant": false,
 						"options_must_precede_arguments": false,
@@ -529,7 +529,7 @@
 				{
 					"path": [
 						"migrations",
-						"make"
+						"create"
 					],
 					"hidden": false,
 					"max_bump": "major",

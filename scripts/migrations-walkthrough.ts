@@ -3,7 +3,7 @@
 //
 // This is the executable narrative of a project that fully embraces Pina
 // migrations. Each step modifies the program source, runs the real Pina CLI
-// (`migrations make`, `check`, `deploy`), rebuilds the SBF artifact, loads it
+// (`migrations create`, `check`, `deploy`), rebuilds the SBF artifact, loads it
 // onto an isolated Surfpool network, regenerates every client (TypeScript,
 // Rust, Dart), and proves that clients — including clients generated at
 // earlier steps — keep working against the newest deployment.
@@ -616,16 +616,16 @@ interface StepContext {
 async function step1_genesis(context: StepContext): Promise<void> {
 	say("Step 1 — initial deployment: every contract is migratable from day one");
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"initial make",
+		"initial create",
 	);
 	expect(
 		output.includes("Created account:1:01@0") &&
 			output.includes("Created account:1:02@0") &&
 			output.includes("Created instruction:1:00@0") &&
 			output.includes("Created event:1:03@0"),
-		"make captures Profile, Journal, Update, and ProfileChanged at version 0",
+		"create captures Profile, Journal, Update, and ProfileChanged at version 0",
 	);
 	const artifact = buildSbf();
 	await deploy(context, artifact);
@@ -669,9 +669,9 @@ async function step2_add_field(context: StepContext): Promise<void> {
 		),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after adding a field",
+		"create after adding a field",
 	);
 	expect(
 		output.includes("Advanced account:1:01@1"),
@@ -734,7 +734,7 @@ async function step3_rename(context: StepContext): Promise<void> {
 	);
 	const question = pina([
 		"migrations",
-		"make",
+		"create",
 		"--project",
 		PROGRAM_DIR,
 		"--no-interactive",
@@ -747,7 +747,7 @@ async function step3_rename(context: StepContext): Promise<void> {
 	);
 	const json = pina([
 		"migrations",
-		"make",
+		"create",
 		"--project",
 		PROGRAM_DIR,
 		"--no-interactive",
@@ -761,7 +761,7 @@ async function step3_rename(context: StepContext): Promise<void> {
 	const output = mustPina(
 		[
 			"migrations",
-			"make",
+			"create",
 			"--project",
 			PROGRAM_DIR,
 			"--no-interactive",
@@ -769,7 +769,7 @@ async function step3_rename(context: StepContext): Promise<void> {
 			"score:points",
 		],
 		PROGRAM_DIR,
-		"make with rename answer",
+		"create with rename answer",
 	);
 	expect(
 		output.includes("Advanced account:1:01@2"),
@@ -830,9 +830,9 @@ async function step4_type_change(context: StepContext): Promise<void> {
 			),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after type change",
+		"create after type change",
 	);
 	expect(
 		output.includes("Manual migration required") &&
@@ -878,13 +878,13 @@ async function step4_type_change(context: StepContext): Promise<void> {
 		);
 	writeFileSync(transitionPath, filled);
 	const finalized = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make records the implemented transition",
+		"create records the implemented transition",
 	);
 	expect(
 		finalized.includes("Updated draft account:1:01@3"),
-		"re-running make refreshes the draft with the manual body's recorded hash",
+		"re-running create refreshes the draft with the manual body's recorded hash",
 	);
 	const artifact = buildSbf();
 	await deploy(context, artifact);
@@ -916,9 +916,9 @@ async function step5_compact_growth(context: StepContext): Promise<void> {
 		),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after compact growth",
+		"create after compact growth",
 	);
 	expect(
 		output.includes("Manual migration required") &&
@@ -963,9 +963,9 @@ async function step5_compact_growth(context: StepContext): Promise<void> {
 		);
 	writeFileSync(transitionPath, filled);
 	mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make records the compact transition",
+		"create records the compact transition",
 	);
 	const artifact = buildSbf();
 	await deploy(context, artifact);
@@ -994,9 +994,9 @@ async function step6_instruction_payload(context: StepContext): Promise<void> {
 		),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after payload growth",
+		"create after payload growth",
 	);
 	expect(
 		output.includes("Advanced instruction:1:00@1"),
@@ -1042,9 +1042,9 @@ async function step7_optional_accounts(context: StepContext): Promise<void> {
 		),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after process growth",
+		"create after process growth",
 	);
 	expect(
 		output.includes("Advanced instruction:1:00@2"),
@@ -1086,9 +1086,9 @@ async function step8_event(context: StepContext): Promise<void> {
 		),
 	);
 	const output = mustPina(
-		["migrations", "make", "--project", PROGRAM_DIR, "--no-interactive"],
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
 		PROGRAM_DIR,
-		"make after event growth",
+		"create after event growth",
 	);
 	expect(
 		output.includes("Advanced event:1:03@1"),
@@ -1126,7 +1126,7 @@ async function step9_removal(context: StepContext): Promise<void> {
 	);
 	const question = pina([
 		"migrations",
-		"make",
+		"create",
 		"--project",
 		PROGRAM_DIR,
 		"--no-interactive",
@@ -1139,7 +1139,7 @@ async function step9_removal(context: StepContext): Promise<void> {
 	const output = mustPina(
 		[
 			"migrations",
-			"make",
+			"create",
 			"--project",
 			PROGRAM_DIR,
 			"--no-interactive",
@@ -1147,7 +1147,7 @@ async function step9_removal(context: StepContext): Promise<void> {
 			"active",
 		],
 		PROGRAM_DIR,
-		"make with removal answer",
+		"create with removal answer",
 	);
 	expect(
 		output.includes("Advanced account:1:01@4"),

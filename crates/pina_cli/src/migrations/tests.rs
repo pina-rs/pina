@@ -258,7 +258,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				destination_process: Some(&escalated),
 				preserve_manual: false,
 			},
-			&mut MakeMigrationsOutput::default(),
+			&mut CreateMigrationsOutput::default(),
 		),
 		Err(MigrationError::ProcessChanged { .. })
 	));
@@ -290,7 +290,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				destination_process: None,
 				preserve_manual: false,
 			},
-			&mut MakeMigrationsOutput::default(),
+			&mut CreateMigrationsOutput::default(),
 		),
 		Err(MigrationError::CreateDirectory { .. })
 	));
@@ -304,14 +304,14 @@ fn migration_lifecycle_propagates_transition_failures_for_frozen_and_draft_versi
 		.unwrap_or_else(|error| panic!("block frozen transition directory: {error}"));
 	write_state_source(&frozen, "value: u64, enabled: bool");
 	assert!(matches!(
-		make_migrations(&frozen.root),
+		create_migrations(&frozen.root),
 		Err(MigrationError::CreateDirectory { .. })
 	));
 
 	let draft = publication_fixture();
 	publish_current(&draft);
 	write_state_source(&draft, "value: u64, enabled: bool");
-	make_migrations(&draft.root)
+	create_migrations(&draft.root)
 		.unwrap_or_else(|error| panic!("create version-one draft: {error}"));
 	let transitions = draft.root.join("migrations/transitions");
 	std::fs::remove_dir_all(&transitions)
@@ -320,7 +320,7 @@ fn migration_lifecycle_propagates_transition_failures_for_frozen_and_draft_versi
 		.unwrap_or_else(|error| panic!("block draft transition directory: {error}"));
 	write_state_source(&draft, "value: u64, enabled: bool, counter: u16");
 	assert!(matches!(
-		make_migrations(&draft.root),
+		create_migrations(&draft.root),
 		Err(MigrationError::CreateDirectory { .. })
 	));
 }
@@ -541,7 +541,7 @@ fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
 		Err(MigrationError::MissingSnapshot { .. })
 	));
 
-	let created = make_migrations(&fixture.root)
+	let created = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("create migration history: {error}"));
 	assert_eq!(created.created_contracts, ["account:1:01"]);
 	let statuses = migration_status(&fixture.root)
@@ -556,11 +556,11 @@ fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
 	assert_eq!(metadata.version_type, MigrationVersionType::U8);
 	assert_eq!(metadata.current_versions.get("account:1:01"), Some(&0));
 
-	let unchanged = make_migrations(&fixture.root)
+	let unchanged = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("refresh unchanged draft: {error}"));
 	assert_eq!(unchanged.unchanged_contracts, ["account:1:01"]);
 	write_state_source(&fixture, "value: u64, enabled: bool");
-	let updated = make_migrations(&fixture.root)
+	let updated = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("replace draft version zero: {error}"));
 	assert_eq!(updated.updated_drafts, ["account:1:01@0"]);
 	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check replaced draft: {error}"));
@@ -575,7 +575,7 @@ fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
 		Err(MigrationError::ContractRemoved { .. })
 	));
 	assert!(matches!(
-		make_migrations(&fixture.root),
+		create_migrations(&fixture.root),
 		Err(MigrationError::ContractRemoved { .. })
 	));
 }
@@ -630,7 +630,7 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 		7
 	);
 
-	let output = make_migrations(&fixture.root)
+	let output = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("snapshot complete fixture: {error}"));
 	assert_eq!(output.created_contracts.len(), 5);
 	assert_eq!(output.auto, ["accounts", "instructions", "events"]);
@@ -643,7 +643,7 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 		.expect("auto run writes a manifest");
 	assert_eq!(manifest.auto, MigrationAuto::all());
 	// A second run verifies the scaffold instead of rewriting it.
-	let unchanged = make_migrations(&fixture.root)
+	let unchanged = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("refresh auto fixture: {error}"));
 	assert!(matches!(
 		unchanged.build_script,
@@ -700,7 +700,7 @@ fn event_discovery_rejects_invalid_unresolved_and_duplicate_contracts() {
 #[test]
 fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
 	let fixture = migration_fixture();
-	make_migrations(&fixture.root)
+	create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("create baseline history: {error}"));
 	write_state_source(&fixture, "value: u16");
 	assert!(matches!(
@@ -751,7 +751,7 @@ fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
 #[test]
 fn lifecycle_rejects_a_new_contract_without_a_snapshot() {
 	let fixture = migration_fixture();
-	make_migrations(&fixture.root)
+	create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("create baseline history: {error}"));
 	std::fs::write(
 		fixture.root.join("src/lib.rs"),
@@ -929,7 +929,7 @@ fn publication_records_exact_artifact_and_freezes_current_versions() {
 		),
 	)
 	.unwrap_or_else(|error| panic!("change source during pending deployment: {error}"));
-	let advanced = make_migrations(&fixture.root)
+	let advanced = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("advance frozen pending version: {error}"));
 	assert_eq!(advanced.advanced_versions, ["account:1:01@1"]);
 	let resumed = begin_publication(
@@ -967,7 +967,7 @@ fn publication_records_exact_artifact_and_freezes_current_versions() {
 	assert_eq!(ledger.receipts.len(), 1);
 
 	write_state_source(&fixture, "value: u64, enabled: bool, count: u16");
-	let refreshed = make_migrations(&fixture.root)
+	let refreshed = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("replace unpublished version one: {error}"));
 	assert_eq!(refreshed.updated_drafts, ["account:1:01@1"]);
 	check_migrations(&fixture.root)
@@ -1137,7 +1137,7 @@ fn missing_ledger_with_advanced_versions_fails_closed() {
 	.unwrap_or_else(|error| panic!("write manifest: {error}"));
 
 	// Losing the ledger must fail closed instead of unfreezing history:
-	// without this check `make` would rewrite published v1 in place.
+	// without this check `create` would rewrite published v1 in place.
 	std::fs::remove_file(fixture.root.join(PUBLICATIONS_PATH))
 		.unwrap_or_else(|error| panic!("remove ledger: {error}"));
 	let rejection = check_migrations(&fixture.root)
@@ -1348,7 +1348,7 @@ fn transition_files_fail_closed_before_and_after_publication() {
 	let fixture = publication_fixture();
 	publish_current(&fixture);
 	write_state_source(&fixture, "value: u32");
-	let generated = make_migrations(&fixture.root)
+	let generated = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("generate manual transition: {error}"));
 	let path = generated.manual_transitions[0].clone();
 	assert!(matches!(
@@ -1362,12 +1362,12 @@ fn transition_files_fail_closed_before_and_after_publication() {
 		check_migrations(&fixture.root),
 		Err(MigrationError::TransitionDrift { .. })
 	));
-	let refreshed = make_migrations(&fixture.root)
+	let refreshed = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("refresh manual hash: {error}"));
 	assert_eq!(refreshed.updated_drafts, ["account:1:01@1"]);
 	check_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("check completed transition: {error}"));
-	let unchanged = make_migrations(&fixture.root)
+	let unchanged = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("keep matching draft hash: {error}"));
 	assert_eq!(unchanged.unchanged_contracts, ["account:1:01"]);
 
@@ -1379,14 +1379,14 @@ fn transition_files_fail_closed_before_and_after_publication() {
 		Err(MigrationError::FrozenImplementationChanged { .. })
 	));
 	assert!(matches!(
-		make_migrations(&fixture.root),
+		create_migrations(&fixture.root),
 		Err(MigrationError::FrozenImplementationChanged { .. })
 	));
 
 	let missing = publication_fixture();
 	publish_current(&missing);
 	write_state_source(&missing, "value: u64, enabled: bool");
-	let generated = make_migrations(&missing.root)
+	let generated = create_migrations(&missing.root)
 		.unwrap_or_else(|error| panic!("generate automatic transition: {error}"));
 	let manifest = load_manifest(&generated.manifest)
 		.unwrap_or_else(|error| panic!("read generated manifest: {error}"))
@@ -1415,7 +1415,7 @@ fn transition_files_fail_closed_before_and_after_publication() {
 		Err(MigrationError::MissingTransition { .. })
 	));
 	assert!(matches!(
-		make_migrations(&missing.root),
+		create_migrations(&missing.root),
 		Err(MigrationError::MissingTransition { .. })
 	));
 	assert!(matches!(
@@ -1569,7 +1569,7 @@ fn ambiguous_renames_require_answers_and_generate_copies() {
 
 	// Non-interactive runs fail with the exact command that answers the
 	// question instead of guessing between rename and remove+add.
-	let rejection = make_migrations_with_answers(
+	let rejection = create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,
@@ -1589,7 +1589,7 @@ fn ambiguous_renames_require_answers_and_generate_copies() {
 	// disambiguation in the manifest.
 	let answers = MigrationAnswers::from_flags(&["value:points".to_owned()], &[], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with rename: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 	assert!(output.data_warnings.is_empty());
@@ -1621,7 +1621,7 @@ fn ambiguous_renames_require_answers_and_generate_copies() {
 
 	// Re-running make without answers stays stable: the recorded rename
 	// already answers the question, so nothing re-asks or rewrites.
-	let output = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+	let output = create_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
 		.unwrap_or_else(|error| panic!("re-run make: {error:?}"));
 	assert_eq!(output.unchanged_contracts, ["account:1:01".to_owned()]);
 }
@@ -1634,7 +1634,7 @@ fn assumed_removals_drop_data_with_a_warning() {
 
 	let answers = MigrationAnswers::from_flags(&[], &["value".to_owned()], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with removal: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 	assert!(
@@ -1666,7 +1666,7 @@ fn answers_naming_fields_outside_the_diff_fail_closed() {
 
 	let removal = MigrationAnswers::from_flags(&[], &["value".to_owned()], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let rejection = make_migrations_with_answers(&retained.root, &removal)
+	let rejection = create_migrations_with_answers(&retained.root, &removal)
 		.expect_err("answers must match the diff they answer");
 	let rendered = format!("{rejection}");
 	assert!(
@@ -1676,7 +1676,7 @@ fn answers_naming_fields_outside_the_diff_fail_closed() {
 
 	let rename = MigrationAnswers::from_flags(&["value:points".to_owned()], &[], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let rejection = make_migrations_with_answers(&retained.root, &rename)
+	let rejection = create_migrations_with_answers(&retained.root, &rename)
 		.expect_err("answers must match the diff they answer");
 	let rendered = format!("{rejection}");
 	assert!(
@@ -1691,7 +1691,7 @@ fn answers_naming_fields_outside_the_diff_fail_closed() {
 	let both =
 		MigrationAnswers::from_flags(&["value:points".to_owned()], &["value".to_owned()], true)
 			.unwrap_or_else(|error| panic!("answers: {error}"));
-	let rejection = make_migrations_with_answers(&ambiguous.root, &both)
+	let rejection = create_migrations_with_answers(&ambiguous.root, &both)
 		.expect_err("one field cannot carry two answers");
 	let rendered = format!("{rejection}");
 	assert!(
@@ -1705,7 +1705,7 @@ fn answers_naming_fields_outside_the_diff_fail_closed() {
 	write_state_source(&retyped, "total: u32");
 	let changed_type = MigrationAnswers::from_flags(&["count:total".to_owned()], &[], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let rejection = make_migrations_with_answers(&retyped.root, &changed_type)
+	let rejection = create_migrations_with_answers(&retyped.root, &changed_type)
 		.expect_err("type-changing renames are manual");
 	let rendered = format!("{rejection}");
 	assert!(rendered.contains("changes the field type"), "{rendered}");
@@ -1723,7 +1723,7 @@ fn rename_answers_select_their_own_target() {
 
 	let answers = MigrationAnswers::from_flags(&["one:three".to_owned()], &[], true)
 		.unwrap_or_else(|error| panic!("answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with overriding rename: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 	let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
@@ -1750,7 +1750,7 @@ fn growing_transitions_warn_about_rent_funding() {
 	// v0 is 10 bytes; adding `enabled: bool` grows the account to 11.
 	write_state_source(&fixture, "value: u64, enabled: bool");
 
-	let output = make_migrations(&fixture.root)
+	let output = create_migrations(&fixture.root)
 		.unwrap_or_else(|error| panic!("make growth transition: {error:?}"));
 	let warning = output
 		.data_warnings
@@ -1801,7 +1801,7 @@ fn oversized_growth_warns_about_the_runtime_realloc_cap() {
 		.map(|(name, ty)| (name.as_str(), ty.as_str()))
 		.collect::<Vec<_>>();
 	let destination = schema(LayoutKind::Fixed, &fields);
-	let mut output = MakeMigrationsOutput::default();
+	let mut output = CreateMigrationsOutput::default();
 	warn_about_account_growth(
 		&identity,
 		"State",
@@ -1890,7 +1890,7 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	let destination = growing_schema(1_500);
 
 	// The adjacent hop alone stays under the runtime cap.
-	let mut adjacent_only = MakeMigrationsOutput::default();
+	let mut adjacent_only = CreateMigrationsOutput::default();
 	warn_about_account_growth(
 		&identity,
 		"State",
@@ -1910,7 +1910,7 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	);
 
 	// A v0 account walks both hops, so the cumulative growth crosses the cap.
-	let mut output = MakeMigrationsOutput::default();
+	let mut output = CreateMigrationsOutput::default();
 	warn_about_account_growth(
 		&identity,
 		"State",
@@ -1951,7 +1951,7 @@ fn cumulative_ladder_growth_warns_about_the_runtime_cap() {
 	);
 }
 
-/// The same two sub-limit hops through a real `make` run: the caller must
+/// The same two sub-limit hops through a real `create` run: the caller must
 /// assemble the whole supported stale ladder, not only the adjacent schema.
 #[test]
 fn make_warns_when_a_stale_ladder_exceeds_the_runtime_cap_cumulatively() {
@@ -1959,8 +1959,8 @@ fn make_warns_when_a_stale_ladder_exceeds_the_runtime_cap_cumulatively() {
 	publish_current(&fixture);
 	// v0 is 10 bytes; v1 adds 750 u64 fields (6,000 bytes), still under the cap.
 	write_state_source(&fixture, &growing_fields(750));
-	let first =
-		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("create v1 draft: {error:?}"));
+	let first = create_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("create v1 draft: {error:?}"));
 	assert!(
 		!first
 			.data_warnings
@@ -1973,8 +1973,8 @@ fn make_warns_when_a_stale_ladder_exceeds_the_runtime_cap_cumulatively() {
 	// Publish v1 so the next source appends v2 instead of replacing a draft.
 	publish_current(&fixture);
 	write_state_source(&fixture, &growing_fields(1_500));
-	let second =
-		make_migrations(&fixture.root).unwrap_or_else(|error| panic!("create v2 draft: {error:?}"));
+	let second = create_migrations(&fixture.root)
+		.unwrap_or_else(|error| panic!("create v2 draft: {error:?}"));
 	let warning = second
 		.data_warnings
 		.iter()
@@ -2441,7 +2441,7 @@ fn draft_refreshes_ask_new_questions_through_the_recorded_history() {
 	publish_current(&fixture);
 	write_state_source(&fixture, "points: u64, beta: u64");
 	let answers = MigrationAnswers::from_flags(&["alpha:points".to_owned()], &[], true).unwrap();
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("record the rename on the draft: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 
@@ -2449,7 +2449,7 @@ fn draft_refreshes_ask_new_questions_through_the_recorded_history() {
 	// `total` appears, and the recorded `alpha:points` rename no longer
 	// answers the new question, so the refresh must ask instead of guessing.
 	write_state_source(&fixture, "points: u64, total: u64");
-	let rejection = make_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+	let rejection = create_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
 		.expect_err("an unanswered draft refresh must ask again");
 	let rendered = format!("{rejection}");
 	assert!(
@@ -2600,7 +2600,7 @@ fn growth_warnings_only_apply_to_account_contracts() {
 		LayoutKind::Fixed,
 		&[("value", "u64"), ("padding", "u64"), ("extra", "u64")],
 	);
-	let mut output = MakeMigrationsOutput::default();
+	let mut output = CreateMigrationsOutput::default();
 	warn_about_account_growth(
 		&identity,
 		"Update",
@@ -2628,7 +2628,7 @@ fn compact_growth_warnings_estimate_rent_from_capacity() {
 		LayoutKind::Compact,
 		&[("label", "String<8>"), ("tags", "Vec<u16, 2>")],
 	);
-	let mut output = MakeMigrationsOutput::default();
+	let mut output = CreateMigrationsOutput::default();
 	warn_about_account_growth(
 		&identity,
 		"State",
@@ -2776,7 +2776,7 @@ fn create_transition_propagates_manual_layout_errors() {
 		transition: None,
 	};
 	let destination = schema(LayoutKind::Compact, &[("label", "String<8>")]);
-	let mut output = MakeMigrationsOutput::default();
+	let mut output = CreateMigrationsOutput::default();
 
 	let rejection = create_transition(
 		&project,
@@ -2811,7 +2811,7 @@ fn reconciliation_fails_when_the_manifest_disappears() {
 	)
 	.into();
 	write_state_source(&fixture, "value: u64, padding: u64");
-	make_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance draft: {error:?}"));
+	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance draft: {error:?}"));
 	begin_publication(
 		&fixture.root,
 		"devnet",
@@ -2906,7 +2906,7 @@ fn persisted_answers_answer_makes_without_flags() {
 
 	let answers = MigrationAnswers::from_layers(&project.migration_answers, &[], &[], false)
 		.unwrap_or_else(|error| panic!("layer answers: {error}"));
-	let output = make_migrations_with_answers(&fixture.root, &answers)
+	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make with persisted answers: {error:?}"));
 	assert_eq!(output.advanced_versions, ["account:1:01@1".to_owned()]);
 }
@@ -2968,7 +2968,7 @@ fn flag_answers_contradicting_persisted_answers_fail_closed() {
 #[test]
 fn abi_layout_test_records_manifest_geometry() {
 	let fixture = publication_fixture();
-	make_migrations_with_answers(
+	create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,
@@ -3011,7 +3011,7 @@ fn abi_layout_test_records_manifest_geometry() {
 	);
 }
 
-/// Regeneration must be idempotent: running `make` twice produces identical
+/// Regeneration must be idempotent: running `create` twice produces identical
 /// bytes, so `check` can compare content instead of guessing.
 #[test]
 fn abi_layout_test_regeneration_is_stable() {
@@ -3020,12 +3020,12 @@ fn abi_layout_test_regeneration_is_stable() {
 		no_interactive: true,
 		..MigrationAnswers::default()
 	};
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("first make: {error}"));
 	let first = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
 		.unwrap_or_else(|error| panic!("read first: {error}"));
 
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("second make: {error}"));
 	let second = std::fs::read(fixture.root.join(ABI_LAYOUT_TEST_PATH))
 		.unwrap_or_else(|error| panic!("read second: {error}"));
@@ -3042,7 +3042,7 @@ fn check_rejects_a_stale_abi_layout_test() {
 		no_interactive: true,
 		..MigrationAnswers::default()
 	};
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make: {error}"));
 
 	// Simulate a hand edit that no longer matches the manifest.
@@ -3064,8 +3064,8 @@ fn check_rejects_a_stale_abi_layout_test() {
 ///
 /// `rustfmt` re-wraps the long `SCHEMA_SHA256` constants past 100 columns, so a
 /// formatted file is never byte-identical to generator output. `fix:format` runs
-/// on every checkout, so byte equality would leave `make` and the formatter
-/// fighting: format, then `check`, then `make`, forever.
+/// on every checkout, so byte equality would leave `create` and the formatter
+/// fighting: format, then `check`, then `create`, forever.
 #[test]
 fn formatting_the_abi_layout_test_keeps_it_current() {
 	let fixture = publication_fixture();
@@ -3073,7 +3073,7 @@ fn formatting_the_abi_layout_test_keeps_it_current() {
 		no_interactive: true,
 		..MigrationAnswers::default()
 	};
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make: {error}"));
 	check_migrations_with_abi_layout(&fixture.root)
 		.unwrap_or_else(|error| panic!("freshly generated guard must pass: {error}"));
@@ -3107,7 +3107,7 @@ fn check_requires_the_abi_layout_test_when_history_exists() {
 		no_interactive: true,
 		..MigrationAnswers::default()
 	};
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make: {error}"));
 	std::fs::remove_file(fixture.root.join(ABI_LAYOUT_TEST_PATH))
 		.unwrap_or_else(|error| panic!("remove test: {error}"));
@@ -3128,7 +3128,7 @@ fn check_accepts_a_current_abi_layout_test() {
 		no_interactive: true,
 		..MigrationAnswers::default()
 	};
-	make_migrations_with_answers(&fixture.root, &answers)
+	create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("make: {error}"));
 
 	check_migrations_with_abi_layout(&fixture.root)
@@ -3160,7 +3160,7 @@ fn enveloping_new_contracts_on_a_live_program_requires_acknowledgement() {
 	)
 	.unwrap_or_else(|error| panic!("write expanded source: {error}"));
 
-	let error = make_migrations_with_answers(
+	let error = create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,
@@ -3195,7 +3195,7 @@ fn envelope_acknowledgement_allows_the_change() {
 	)
 	.unwrap_or_else(|error| panic!("write expanded source: {error}"));
 
-	make_migrations_with_answers(
+	create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,
@@ -3211,7 +3211,7 @@ fn envelope_acknowledgement_allows_the_change() {
 #[test]
 fn enveloping_on_an_unpublished_program_needs_no_acknowledgement() {
 	let fixture = publication_fixture();
-	make_migrations_with_answers(
+	create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,
@@ -3229,7 +3229,7 @@ fn make_reports_an_unreadable_abi_layout_guard() {
 	let guard = fixture.root.join(ABI_LAYOUT_TEST_PATH);
 	std::fs::create_dir_all(&guard).unwrap_or_else(|error| panic!("create dir: {error}"));
 
-	let error = make_migrations_with_answers(
+	let error = create_migrations_with_answers(
 		&fixture.root,
 		&MigrationAnswers {
 			no_interactive: true,

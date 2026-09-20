@@ -53,18 +53,18 @@ The policy is _declared here but recorded in the manifest_: the macros read the 
 ## Step 3: Snapshot the history
 
 ```sh
-pina migrations make
+pina migrations create
 ```
 
 This records the resolved policy in `migrations/manifest.json`, snapshots the current schema of every contract of the listed kinds, and generates an adjacent transition for each change it can prove structurally. Commit the manifest with your source: it is the hash-chained source of truth the build consults.
 
-A declaration the manifest does not record yet fails the build with the `pina migrations make` remedy, so you cannot forget a contract by accident.
+A declaration the manifest does not record yet fails the build with the `pina migrations create` remedy, so you cannot forget a contract by accident.
 
-Adding `migrations` to a program that is already published is a bulk wire-format change: for each newly enveloped contract, `make` records the envelope as a migration step rather than pretending the bytes already had one.
+Adding `migrations` to a program that is already published is a bulk wire-format change: for each newly enveloped contract, `create` records the envelope as a migration step rather than pretending the bytes already had one.
 
 ## Step 4: Keep the build honest
 
-When a policy is recorded, `make` scaffolds a build script so a policy flip re-expands every contract without a source edit:
+When a policy is recorded, `create` scaffolds a build script so a policy flip re-expands every contract without a source edit:
 
 ```rust
 fn main() {
@@ -78,7 +78,7 @@ The scaffold is idempotent and never overwrites a hand-written build script — 
 
 Structural changes generate themselves (added, removed, reordered, or reseated fields). Semantic ones do not: a rename that changes meaning, a type narrowing, a split or merge of a field, or an authority change stops the build until you implement the transition and supply fixtures. That is the intended safety property — Pina will not guess what a value should become.
 
-Run `pina migrations make` after every schema change; when it reports an unresolved transition, implement it there. Fixed-account transitions are total and infallible once the exact source shape is validated; manual instruction and event transitions run in scratch space, so they can reject a value before anything is written.
+Run `pina migrations create` after every schema change; when it reports an unresolved transition, implement it there. Fixed-account transitions are total and infallible once the exact source shape is validated; manual instruction and event transitions run in scratch space, so they can reject a value before anything is written.
 
 ## Step 6: Know the bill before you ship
 
@@ -89,7 +89,7 @@ pina migrations status --json
 
 The status output now carries the cost preview: per contract, the current size, the pending growth for a day-one account, and the approximate rent deficit at the established ~6,960 lamports per grown byte; per instruction, the worst-case adjacent-step ladder a stale account can trigger with its static compute estimate; and a program-wide summary of the most expensive touching transaction. Sizing `max_lamports` and `MAX_INLINE_STEPS` stops being guesswork.
 
-When a transition grows an account, `make` states the estimated deficit and names the on-chain error a too-small budget produces. Each budget failure is separately diagnosable on-chain, and each error's rustdoc names its remedy:
+When a transition grows an account, `create` states the estimated deficit and names the on-chain error a too-small budget produces. Each budget failure is separately diagnosable on-chain, and each error's rustdoc names its remedy:
 
 | Condition                                   | Error                            | Remedy                                                                          |
 | ------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
@@ -145,4 +145,4 @@ The framework ergonomics for the second option are specified in [ADR 0008](../ad
 - `pina test --compatibility` to exercise every historical version of every contract against checked-in fixtures.
 - `pina migrations status` to review the cost picture before deploying.
 
-Once those pass and the manifest is committed, the next schema change flows through `make` instead of through a breaking deploy.
+Once those pass and the manifest is committed, the next schema change flows through `create` instead of through a breaking deploy.

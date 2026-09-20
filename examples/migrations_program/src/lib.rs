@@ -18,7 +18,7 @@ declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 // finding N1). 24,000 covers the ladder with margin while keeping the
 // two-`State` sweep (2 × 13,920 = 27,840) above the cap, which the surfpool
 // suite pins as the shared-budget rejection.
-// `pina migrations make` prints the same estimate when a transition grows.
+// `pina migrations create` prints the same estimate when a transition grows.
 const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 24_000;
 
 /// Instruction discriminator.

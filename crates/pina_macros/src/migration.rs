@@ -1313,8 +1313,8 @@ pub(crate) fn resolve_opt_in(
 					format!(
 						"`migrations = false` on `{}` would remove an envelope the migration \
 						 manifest already records; removing an envelope is a wire-format change \
-						 that `pina migrations make` must record deliberately. Keep the contract \
-						 migration-aware or retire its history first",
+						 that `pina migrations create` must record deliberately. Keep the \
+						 contract migration-aware or retire its history first",
 						item.ident
 					),
 				));
@@ -1387,7 +1387,7 @@ fn read_manifest_at(
 				format!(
 					"`{}` cannot resolve its migration policy because {} could not be read \
 					 ({error}); repair the file, or delete it if the program should not opt into \
-					 migrations (`pina migrations make` regenerates it)",
+					 migrations (`pina migrations create` regenerates it)",
 					item.ident,
 					path.display()
 				),
@@ -1413,7 +1413,7 @@ fn read_manifest_at(
 ///
 /// Declarations covered by the manifest's auto policy resolve exactly like an
 /// explicit `migrations` token, so a new contract still fails the build with
-/// the `pina migrations make` remedy until it has a snapshot.
+/// the `pina migrations create` remedy until it has a snapshot.
 pub(crate) fn expansion(
 	item: &ItemStruct,
 	kind: ContractKind,
@@ -1451,7 +1451,7 @@ fn resolve_manifest(
 		syn::Error::new_spanned(
 			item,
 			format!(
-				"{} is opted into migrations, but {} does not exist; run `pina migrations make`",
+				"{} is opted into migrations, but {} does not exist; run `pina migrations create`",
 				item.ident,
 				program_dir.join(MANIFEST_PATH).display()
 			),
@@ -1539,7 +1539,7 @@ fn manifest_account_ladder_at(
 ///
 /// The generated ladder calls `MigratableAccount`, so a contract with no
 /// snapshot would otherwise fail later as an unsatisfied trait bound. Reporting
-/// the `pina migrations make` remedy here keeps the failure mode identical to
+/// the `pina migrations create` remedy here keeps the failure mode identical to
 /// a schema that opts into migrations without a snapshot.
 pub(crate) fn verify_migration_contracts(
 	enum_name: &syn::Ident,
@@ -1577,7 +1577,7 @@ fn verify_ladder(
 			return Err(syn::Error::new_spanned(
 				enum_name,
 				"this program declares a migration ladder, but its `migrations/manifest.json` \
-				 does not exist; run `pina migrations make`",
+				 does not exist; run `pina migrations create`",
 			));
 		}
 		Err(error) => {
@@ -1585,7 +1585,7 @@ fn verify_ladder(
 				enum_name,
 				format!(
 					"the migration ladder cannot be verified because `migrations/manifest.json` \
-					 could not be read ({error}); run `pina migrations make` to regenerate it"
+					 could not be read ({error}); run `pina migrations create` to regenerate it"
 				),
 			));
 		}
@@ -1660,7 +1660,7 @@ fn verify_transition_files(
 				item,
 				format!(
 					"manual migration {} is unfinished; replace its TODO body and run `pina \
-					 migrations make`",
+					 migrations create`",
 					path.display()
 				),
 			));
@@ -1671,7 +1671,7 @@ fn verify_transition_files(
 				item,
 				format!(
 					"migration transition {} differs from its checked-in hash; run `pina \
-					 migrations make`",
+					 migrations create`",
 					path.display()
 				),
 			));
@@ -1909,7 +1909,7 @@ fn verify_source_schema(
 		item,
 		format!(
 			"migration-aware schema `{}` differs from its checked-in snapshot; run `pina \
-			 migrations make` and review the generated transition",
+			 migrations create` and review the generated transition",
 			item.ident
 		),
 	))
@@ -1925,6 +1925,7 @@ mod tests {
 	use pina_abi::MigrationManifest;
 	use pina_abi::MigrationVersionType;
 	use pina_abi::SchemaVersion;
+	use pina_abi::Transition;
 	use tempfile::TempDir;
 
 	use super::*;
@@ -1957,6 +1958,133 @@ mod tests {
 	fn item_struct(name: &str) -> ItemStruct {
 		syn::parse_str(&format!("struct {name} {{ value: u64 }}"))
 			.unwrap_or_else(|error| panic!("test item: {error}"))
+	}
+
+	fn test_schema(item: &ItemStruct) -> pina_abi::DataSchema {
+		let schema = pina_abi::data_schema(item, LayoutKind::Fixed);
+		schema.unwrap_or_else(|error| panic!("schema: {error}"))
+	}
+
+	fn test_account_identity() -> ContractIdentity {
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1);
+		identity.unwrap_or_else(|error| panic!("identity: {error}"))
+	}
+
+	fn canonical_root(temp: &TempDir) -> PathBuf {
+		let root = std::fs::canonicalize(temp.path());
+		root.unwrap_or_else(|error| panic!("root: {error}"))
+	}
+
+	/// A manifest whose contract carries an adjacent transition, with the
+	/// transition source `body` written to the path the macro reads.
+	fn manifest_with_transition(
+		root: &Path,
+		item: &ItemStruct,
+		mode: TransitionMode,
+		body: &[u8],
+		record_hash_of: Option<&[u8]>,
+	) -> MigrationManifest {
+		let schema = test_schema(item);
+		let identity = test_account_identity();
+		let path = root.join(pina_abi::transition_path(&identity, 0, 1));
+		let parent = path.parent().unwrap_or_else(|| panic!("no parent"));
+		std::fs::create_dir_all(parent).unwrap_or_else(|error| panic!("dir: {error}"));
+		std::fs::write(&path, body).unwrap_or_else(|error| panic!("write transition: {error}"));
+		let history = ContractHistory {
+			identity,
+			rust_name: item.ident.to_string(),
+			versions: vec![
+				SchemaVersion {
+					schema: schema.clone(),
+					process: None,
+					transition: None,
+				},
+				SchemaVersion {
+					schema,
+					process: None,
+					transition: Some(Transition {
+						mode,
+						renames: Vec::new(),
+						implementation_sha256: Some(pina_abi::sha256_bytes(
+							record_hash_of.unwrap_or(body),
+						)),
+					}),
+				},
+			],
+		};
+		let key = history.identity.key();
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		manifest.contracts.insert(key, history);
+		manifest
+	}
+
+	#[test]
+	fn an_unfinished_manual_transition_names_the_create_remedy() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+		let root = canonical_root(&temp);
+		let item = item_struct("State");
+		let body = b"fn migrate() { /* TODO(pina-manual-migration) */ }";
+		let manifest = manifest_with_transition(&root, &item, TransitionMode::Manual, body, None);
+		let history = manifest.contracts.values().next().unwrap();
+
+		let error =
+			verify_transition_files(&item, &root, history).expect_err("a TODO body is unfinished");
+		let message = error.to_string();
+		assert!(message.contains("is unfinished"), "message: {message}");
+		assert!(
+			message.contains("pina migrations create"),
+			"message: {message}"
+		);
+	}
+
+	#[test]
+	fn a_transition_whose_hash_drifted_names_the_create_remedy() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+		let root = canonical_root(&temp);
+		let item = item_struct("State");
+		// The file on disk is finished, but the manifest recorded the hash of
+		// different bytes, so the checked-in pin no longer matches.
+		let manifest = manifest_with_transition(
+			&root,
+			&item,
+			TransitionMode::Automatic,
+			b"fn migrate() {}",
+			Some(b"fn migrate() { /* other */ }"),
+		);
+		let history = manifest.contracts.values().next().unwrap();
+
+		let error = verify_transition_files(&item, &root, history)
+			.expect_err("a drifted transition is rejected");
+		let message = error.to_string();
+		assert!(
+			message.contains("differs from its checked-in hash"),
+			"message: {message}"
+		);
+		assert!(
+			message.contains("pina migrations create"),
+			"message: {message}"
+		);
+	}
+
+	#[test]
+	fn a_schema_drifted_from_its_snapshot_names_the_create_remedy() {
+		let item = item_struct("State");
+		let parsed = syn::parse_str::<ItemStruct>("struct State { value: u32 }");
+		let other = parsed.unwrap_or_else(|error| panic!("other: {error}"));
+		let expected = test_schema(&other);
+		let actual = test_schema(&item);
+
+		let error = verify_source_schema(&item, &actual, &expected)
+			.expect_err("a changed field type is schema drift");
+		let message = error.to_string();
+		assert!(
+			message.contains("differs from its checked-in snapshot"),
+			"message: {message}"
+		);
+		assert!(
+			message.contains("pina migrations create"),
+			"message: {message}"
+		);
 	}
 
 	fn gate_contract(
@@ -2500,7 +2628,7 @@ mod tests {
 		);
 		assert!(message.contains("could not be read"), "message: {message}");
 		assert!(
-			message.contains("pina migrations make"),
+			message.contains("pina migrations create"),
 			"message: {message}"
 		);
 		assert!(
@@ -2549,7 +2677,7 @@ mod tests {
 		let message = error.to_string();
 		assert!(message.contains("does not exist"), "message: {message}");
 		assert!(
-			message.contains("pina migrations make"),
+			message.contains("pina migrations create"),
 			"message: {message}"
 		);
 		assert!(
@@ -2606,7 +2734,7 @@ mod tests {
 		let message = error.to_string();
 		assert!(message.contains("does not exist"), "message: {message}");
 		assert!(
-			message.contains("pina migrations make"),
+			message.contains("pina migrations create"),
 			"message: {message}"
 		);
 		// The diagnostic must not embed the resolved path: it contains the cargo

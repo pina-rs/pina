@@ -162,7 +162,7 @@ impl MigrationFixture {
 		)
 		.unwrap_or_else(|error| panic!("write fixture manifest: {error}"));
 		// Deliberately the legacy kebab-case key: this fixture keeps the
-		// back-compat alias on the end-to-end `migrations make` path.
+		// back-compat alias on the end-to-end `migrations create` path.
 		fs::write(
 			root.join("pina.toml"),
 			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n",
@@ -320,7 +320,7 @@ fn run_failure(command: &mut Command) -> (String, String) {
 #[test]
 fn migration_commands_report_draft_pending_published_and_updated_states() {
 	let fixture = MigrationFixture::new(true);
-	let made = run(&mut fixture.command("make"));
+	let made = run(&mut fixture.command("create"));
 	assert!(made.contains("Created account:1:01@0"));
 
 	let draft = run(&mut fixture.command("status"));
@@ -347,7 +347,7 @@ fn migration_commands_report_draft_pending_published_and_updated_states() {
 	assert!(published.contains("published"));
 
 	fixture.write_fields("value: u32");
-	let advanced = run(&mut fixture.command("make"));
+	let advanced = run(&mut fixture.command("create"));
 	assert!(advanced.contains("Advanced account:1:01@1"));
 	assert!(advanced.contains("Manual migration required"));
 	let identity = pina_abi::ContractIdentity::try_new(pina_abi::ContractKind::Account, 1, 1)
@@ -357,22 +357,48 @@ fn migration_commands_report_draft_pending_published_and_updated_states() {
 		.join(pina_abi::transition_path(&identity, 0, 1));
 	fs::write(&transition, "pub(crate) fn migrate(_: &mut [u8]) {}\n")
 		.unwrap_or_else(|error| panic!("complete migration: {error}"));
-	let refreshed = run(fixture.command("make").arg("--json"));
+	let refreshed = run(fixture.command("create").arg("--json"));
 	assert!(refreshed.contains("updatedDrafts"));
 
 	fixture.write_fields("value: u16");
-	let updated = run(&mut fixture.command("make"));
+	let updated = run(&mut fixture.command("create"));
 	assert!(updated.contains("Updated draft account:1:01@1"));
 }
 
 #[test]
-fn make_reports_answer_and_question_failures_for_agents() {
+fn sync_reports_a_failure_before_reaching_the_build_stage() {
 	let fixture = MigrationFixture::new(true);
-	let made = run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
+
+	// A corrupt manifest makes the create stage fail, so sync must report the
+	// same error envelope and exit non-zero instead of building a program whose
+	// migration history it could not read.
+	fs::write(fixture.root.join("migrations/manifest.json"), b"{ corrupt")
+		.unwrap_or_else(|error| panic!("corrupt manifest: {error}"));
+
+	let (stdout, stderr) = run_failure(fixture.command("sync").arg("--json"));
+	assert!(stdout.contains("\"error\""), "stdout: {stdout}");
+	assert!(stderr.contains("Error"), "stderr: {stderr}");
+
+	// Without --json the failure stays a human-readable line on stderr.
+	let (stdout, stderr) = run_failure(&mut fixture.command("sync"));
+	assert!(stdout.is_empty(), "stdout: {stdout}");
+	assert!(stderr.contains("Error"), "stderr: {stderr}");
+}
+
+#[test]
+fn create_reports_answer_and_question_failures_for_agents() {
+	let fixture = MigrationFixture::new(true);
+	let made = run(&mut fixture.command("create"));
 	assert!(made.contains("Created account:1:01@0"));
 
 	// A malformed answer flag fails at parse time before any project work.
-	let malformed = run_failure(fixture.command("make").arg("--rename").arg("no-separator"));
+	let malformed = run_failure(
+		fixture
+			.command("create")
+			.arg("--rename")
+			.arg("no-separator"),
+	);
 	assert!(malformed.1.contains("Error"), "stderr: {}", malformed.1);
 
 	// A published version cannot change silently: the ambiguous rename fails
@@ -381,7 +407,7 @@ fn make_reports_answer_and_question_failures_for_agents() {
 	fixture.write_fields("points: u64");
 	let questions = run_failure(
 		fixture
-			.command("make")
+			.command("create")
 			.arg("--no-interactive")
 			.arg("--json"),
 	);
@@ -394,7 +420,7 @@ fn make_reports_answer_and_question_failures_for_agents() {
 	);
 
 	// Without --json the questions stay on stderr only.
-	let plain = run_failure(fixture.command("make").arg("--no-interactive"));
+	let plain = run_failure(fixture.command("create").arg("--no-interactive"));
 	assert!(plain.0.is_empty(), "stdout: {}", plain.0);
 	assert!(
 		plain.1.contains("ambiguous field changes"),
@@ -404,20 +430,20 @@ fn make_reports_answer_and_question_failures_for_agents() {
 
 	// Any other failure goes through the generic error arm.
 	let corrupt = MigrationFixture::new(true);
-	run(&mut corrupt.command("make"));
+	run(&mut corrupt.command("create"));
 	fs::write(corrupt.root.join("migrations/manifest.json"), b"{ corrupt")
 		.unwrap_or_else(|error| panic!("corrupt manifest: {error}"));
-	let broken = run_failure(&mut corrupt.command("make"));
+	let broken = run_failure(&mut corrupt.command("create"));
 	assert!(broken.1.contains("Error"), "stderr: {}", broken.1);
 }
 
 #[test]
-fn make_prints_rent_warnings_for_growing_transitions() {
+fn create_prints_rent_warnings_for_growing_transitions() {
 	let fixture = MigrationFixture::new(true);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	fixture.publish(true);
 	fixture.write_fields("value: u64, enabled: bool");
-	let grown = run(&mut fixture.command("make"));
+	let grown = run(&mut fixture.command("create"));
 	assert!(
 		grown.contains("grows from 10 to 11 bytes"),
 		"stdout: {grown}"
@@ -430,7 +456,7 @@ fn reconcile_reports_clear_pending_and_abandoned_states() {
 	// With a recorded history but no pending publication, reconcile reports
 	// nothing to do.
 	let fixture = MigrationFixture::new(true);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	let clear = run(&mut fixture.command("reconcile"));
 	assert!(clear.contains("No pending deployment."), "stdout: {clear}");
 
@@ -459,7 +485,7 @@ fn reconcile_reports_clear_pending_and_abandoned_states() {
 
 	// Abandoning freezes the shipped versions either way.
 	let abandoned_fixture = MigrationFixture::new(true);
-	run(&mut abandoned_fixture.command("make"));
+	run(&mut abandoned_fixture.command("create"));
 	abandoned_fixture.publish(false);
 	let abandoned = run(&mut abandoned_fixture.command("reconcile").arg("--abandon"));
 	assert!(
@@ -497,13 +523,13 @@ fn status_reports_projects_without_migration_aware_contracts() {
 fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
 	let fixture = MigrationFixture::new(true);
 	fixture.write_source(&migratable_program_source("value: u64", "value: u64"));
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	fixture.publish(true);
 	fixture.write_source(&migratable_program_source(
 		"value: u64, enabled: bool",
 		"value: u64, memo: u16",
 	));
-	let advanced = run(&mut fixture.command("make"));
+	let advanced = run(&mut fixture.command("create"));
 	assert!(
 		advanced.contains("Advanced account:1:01@1"),
 		"stdout: {advanced}"
@@ -601,10 +627,10 @@ fn status_previews_costs_and_json_agrees_with_human_output() {
 #[test]
 fn status_says_cu_is_unavailable_without_an_artifact() {
 	let fixture = MigrationFixture::new(true);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	fixture.publish(true);
 	fixture.write_fields("value: u64, enabled: bool");
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 
 	let human = run(&mut fixture.command("status"));
 	let json = run(fixture.command("status").arg("--json"));
@@ -627,10 +653,10 @@ fn status_says_cu_is_unavailable_without_an_artifact() {
 #[test]
 fn status_reports_an_unreadable_artifact_reason() {
 	let fixture = MigrationFixture::new(true);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	fixture.publish(true);
 	fixture.write_fields("value: u64, enabled: bool");
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	write_sbf_artifact(&fixture.root, b"not an ELF");
 
 	let json = run(fixture.command("status").arg("--json"));
@@ -651,7 +677,7 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	fixture.configure_auto("auto = [\"accounts\", \"events\"]\n");
 	fixture.write_source(AUTO_SOURCE);
 
-	let made = run(&mut fixture.command("make"));
+	let made = run(&mut fixture.command("create"));
 	assert!(made.contains("Created account:1:01@0"), "stdout: {made}");
 	assert!(made.contains("Created event:1:03@0"), "stdout: {made}");
 	assert!(
@@ -672,7 +698,7 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	let scaffold = fs::read_to_string(fixture.build_script())
 		.unwrap_or_else(|error| panic!("read scaffold: {error}"));
 	assert!(scaffold.contains(&format!("\"{directive}\"")), "{scaffold}");
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 	assert_eq!(
 		fs::read_to_string(fixture.build_script())
 			.unwrap_or_else(|error| panic!("read scaffold: {error}")),
@@ -680,18 +706,18 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	);
 	run(&mut fixture.command("check"));
 
-	// Adding instructions to the policy requires `make` and records exactly one
+	// Adding instructions to the policy requires `create` and records exactly one
 	// new envelope contract instead of rewriting the recorded ones.
 	fixture.configure_auto("auto = true\n");
 	let stale = run_failure(&mut fixture.command("check"));
 	assert!(
 		stale
 			.1
-			.contains("Run `pina migrations make` to record the policy flip"),
+			.contains("Run `pina migrations create` to record the policy flip"),
 		"stderr: {}",
 		stale.1
 	);
-	let flipped = run(&mut fixture.command("make"));
+	let flipped = run(&mut fixture.command("create"));
 	assert!(
 		flipped.contains("Created instruction:1:02@0"),
 		"stdout: {flipped}"
@@ -709,10 +735,10 @@ fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
 	let fixture = MigrationFixture::new(false);
 	fixture.configure_auto("auto = true\n");
 	fixture.write_source(AUTO_SOURCE);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 
 	fixture.configure_auto("auto = [\"events\"]\n");
-	let dropped = run_failure(&mut fixture.command("make"));
+	let dropped = run_failure(&mut fixture.command("create"));
 	assert!(
 		dropped
 			.1
@@ -731,16 +757,16 @@ fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
 }
 
 #[test]
-fn migrations_false_on_a_recorded_contract_fails_make_and_check() {
+fn migrations_false_on_a_recorded_contract_fails_create_and_check() {
 	let fixture = MigrationFixture::new(true);
-	run(&mut fixture.command("make"));
+	run(&mut fixture.command("create"));
 
 	fixture.write_source(&format!(
 		"use pina::*;\ndeclare_id!(\"{PROGRAM_ID}\");\n#[discriminator]\nenum Kind {{ State = 1 \
 		 }}\n#[account(discriminator = Kind::State, migrations = false)]\nstruct State {{ value: \
 		 u64 }}\n"
 	));
-	let made = run_failure(&mut fixture.command("make"));
+	let made = run_failure(&mut fixture.command("create"));
 	assert!(
 		made.1
 			.contains("Removing an envelope is a wire-format change"),
@@ -776,7 +802,7 @@ fn auto_policy_reports_an_undeclared_rerun_directive_instead_of_clobbering() {
 	fs::write(fixture.build_script(), handwritten)
 		.unwrap_or_else(|error| panic!("write hand-written build script: {error}"));
 
-	let made = run(&mut fixture.command("make"));
+	let made = run(&mut fixture.command("create"));
 	assert!(
 		made.contains("cargo:rerun-if-changed=migrations/manifest.json"),
 		"stdout: {made}"

@@ -62,13 +62,13 @@ Existing unversioned data is not silently treated as version zero. Its first pay
 
 A `[migrations].auto` list opts whole contract kinds in without per-item annotations. The vocabulary is exactly `accounts`, `events`, and `instructions`, and `auto = true` is sugar for all three. Unknown names, duplicates, and mixing the boolean with a kind list are configuration errors. Staging a subset is supported because the kinds carry different costs: an instruction envelope changes payload bytes and ripples into CPI call sites.
 
-The resolved policy is recorded in `migrations/manifest.json`, and the manifest remains the only policy source procedural macros consult. Macros must not read `pina.toml`: the manifest is the checked-in, hash-chained document that keeps builds deterministic and reproducible, and a proc macro does not re-expand when an unrelated toml file changes, so a toml read would leave stale expansions after a policy flip. `pina migrations make` therefore records the policy and snapshots every contract of the listed kinds, and a declaration without a snapshot still fails the build with the existing `pina migrations make` remedy.
+The resolved policy is recorded in `migrations/manifest.json`, and the manifest remains the only policy source procedural macros consult. Macros must not read `pina.toml`: the manifest is the checked-in, hash-chained document that keeps builds deterministic and reproducible, and a proc macro does not re-expand when an unrelated toml file changes, so a toml read would leave stale expansions after a policy flip. `pina migrations create` therefore records the policy and snapshots every contract of the listed kinds, and a declaration without a snapshot still fails the build with the existing `pina migrations create` remedy.
 
 Per-item `migrations = false` overrides the global policy for one contract. Removing an envelope from a contract the manifest already records is an error rather than a silent opt-out, because stripping an envelope changes the wire format. The same rejection applies when a kind is dropped from `auto`. Recording an envelope removal as a deliberate migration is a future retirement flow; this ADR only fixes the fail-closed behavior.
 
-Enabling auto on an already-launched program is a bulk wire-format change: `make` records one history entry per newly enveloped contract. Existing live bytes of those contracts have no envelope, so the developer must treat the addition like any other deliberate wire-format change. For a new program it is simply the version-zero baseline.
+Enabling auto on an already-launched program is a bulk wire-format change: `create` records one history entry per newly enveloped contract. Existing live bytes of those contracts have no envelope, so the developer must treat the addition like any other deliberate wire-format change. For a new program it is simply the version-zero baseline.
 
-Because the macros read the manifest, a policy flip must re-expand contracts without a source edit. When a policy is recorded, `pina migrations make` scaffolds a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. Scaffolding is idempotent, never overwrites a hand-written build script, and reports the exact line to add when it cannot write safely; `pina migrations check` fails until the directive is present.
+Because the macros read the manifest, a policy flip must re-expand contracts without a source edit. When a policy is recorded, `pina migrations create` scaffolds a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. Scaffolding is idempotent, never overwrites a hand-written build script, and reports the exact line to add when it cannot write safely; `pina migrations check` fails until the directive is present.
 
 ### Current IDL and ABI history
 
@@ -97,7 +97,7 @@ Pina's ABI document has its own `formatVersion`, separate from every on-chain co
 
 ### Drafts and publication
 
-Local iteration has one replaceable draft head per changed contract. `pina migrations make` captures the current ABI. It replaces an unpublished draft without consuming another version. If the current head has appeared in a persistent release, it allocates the next version.
+Local iteration has one replaceable draft head per changed contract. `pina migrations create` captures the current ABI. It replaces an unpublished draft without consuming another version. If the current head has appeared in a persistent release, it allocates the next version.
 
 `pina build` never creates or changes migration history. It fails on ABI drift, an unresolved custom transition, a modified published schema or transition, version exhaustion, or a version-width mismatch.
 

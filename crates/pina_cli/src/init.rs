@@ -105,7 +105,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!();
 	println!("    cd {}", project_dir.display());
 	println!("    # 1. Set your program address in src/lib.rs, then snapshot the ABI:");
-	println!("    pina migrations make           # record the version-0 baseline");
+	println!("    pina migrations create         # record the version-0 baseline");
 	println!();
 	println!("    pina lint                      # run Pina's security lints");
 	println!("    pina build                     # build SBF and generate the IDL");
@@ -115,7 +115,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("    pina generate                  # generate configured clients");
 	println!();
 	println!(
-		"  Run `pina migrations make` only after the declared program address is final: the \
+		"  Run `pina migrations create` only after the declared program address is final: the \
 		 recorded history is bound to that address."
 	);
 	println!();
@@ -126,7 +126,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 /// Migrations are on by default. The recorded history is bound to the declared
 /// program address, so the manifest is deliberately *not* scaffolded here: the
 /// placeholder `declare_id!` would pin the history to an address the user is
-/// about to replace. `pina migrations make` is the bootstrap step, and it runs
+/// about to replace. `pina migrations create` is the bootstrap step, and it runs
 /// once the real address is in place.
 fn pina_toml_template() -> String {
 	r#"[project]
@@ -155,7 +155,7 @@ auto = true
 ///
 /// A proc macro does not re-expand when `pina.toml` or the manifest changes, so
 /// the recorded `auto` policy needs this directive to take effect on the next
-/// build. `pina migrations make` scaffolds the same file when it is missing, and
+/// build. `pina migrations create` scaffolds the same file when it is missing, and
 /// the crate-level doc comment keeps the script warning-clean in projects that
 /// lint with `-D warnings`.
 fn build_script_template() -> String {
@@ -647,7 +647,7 @@ mod tests {
 			Some(true)
 		);
 
-		// The scaffold must not pre-record a history: `make` pins the declared
+		// The scaffold must not pre-record a history: `create` pins the declared
 		// program address, and the scaffold still carries the placeholder.
 		assert!(!dir.path.join("migrations").exists());
 

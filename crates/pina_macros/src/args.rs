@@ -758,7 +758,7 @@ mod tests {
 	fn migrations_rejects_string_spellings_the_scanner_cannot_see() {
 		// `darling`'s `bool` also accepts `"true"`/`"false"`, but the CLI scanner
 		// only reads boolean literals. Accepting the string here would let the
-		// macro and `pina migrations make` disagree about the same declaration.
+		// macro and `pina migrations create` disagree about the same declaration.
 		let meta: syn::Meta =
 			syn::parse_str(r#"account(discriminator = Kind::State, migrations = "false")"#)
 				.unwrap_or_else(|error| panic!("parse account meta: {error}"));

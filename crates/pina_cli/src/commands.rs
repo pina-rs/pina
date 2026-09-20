@@ -244,7 +244,7 @@ fn run_migrations(command: MigrationCommands) {
 				}
 			};
 			let output =
-				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+				match pina_cli::migrations::create_migrations_with_answers(&project, &answers) {
 					Ok(output) => output,
 					Err(error) => {
 						if json {
@@ -311,7 +311,7 @@ fn run_migrations(command: MigrationCommands) {
 				}
 			}
 		}
-		MigrationCommands::Make {
+		MigrationCommands::Create {
 			project,
 			renames,
 			assume_removed,
@@ -341,7 +341,7 @@ fn run_migrations(command: MigrationCommands) {
 				}
 			};
 			let output =
-				match pina_cli::migrations::make_migrations_with_answers(&project, &answers) {
+				match pina_cli::migrations::create_migrations_with_answers(&project, &answers) {
 					Ok(output) => output,
 					Err(error) => {
 						if json {
@@ -579,8 +579,8 @@ fn run_doctor(path: &Path, json: bool) {
 	}
 }
 
-/// Print the auto-policy and build-script notices shared by `make` and `sync`.
-fn print_migration_notices(output: &pina_cli::migrations::MakeMigrationsOutput) {
+/// Print the auto-policy and build-script notices shared by `create` and `sync`.
+fn print_migration_notices(output: &pina_cli::migrations::CreateMigrationsOutput) {
 	use pina_cli::migrations::BuildScriptStatus;
 
 	if !output.auto.is_empty() {
