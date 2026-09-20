@@ -103,3 +103,4 @@ crates/pina_fuzz/fuzz/artifacts/
 # Local agent scratch state and nested worktrees
 .video_agent/
 /worktrees/
+sbf-build.log
