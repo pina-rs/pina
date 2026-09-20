@@ -30,6 +30,7 @@
 - [Declarative Validation](./validation.md)
 - [How ABI Migrations Flow](./migrations/flow.md)
 - [ABI document versioning](./migrations/abi-versioning.md)
+- [Migrate to the reset ABI document](./migrations/abi-document-reset.md)
 - [Migrate to automatic migrations](./migrations/automatic-migrations.md)
 - [Migrate to PinaPod v0.2](./migrations/pinapod-v0.2.md)
 - [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
