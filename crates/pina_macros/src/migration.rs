@@ -2075,13 +2075,14 @@ mod tests {
 		let unreadable = temp.path().join("migrations").join("manifest.json");
 		std::fs::create_dir_all(&unreadable).unwrap_or_else(|error| panic!("mkdir: {error}"));
 		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
-		let error = match instruction_envelope_gate_at(&enum_name, &unreadable) {
-			Err(error) => error,
-			Ok(_) => panic!("an unreadable manifest must fail"),
-		};
+		let error = instruction_envelope_gate_at(&enum_name, &unreadable)
+			.err()
+			.map(|error| error.to_string());
 		assert!(
-			error.to_string().contains("cannot read"),
-			"the error must name the read failure, got: {error}"
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("cannot read")),
+			"the error must name the read failure, got: {error:?}"
 		);
 
 		// Undecodable: valid JSON that is not a manifest.
@@ -2090,13 +2091,14 @@ mod tests {
 		let path = directory.join("manifest.json");
 		std::fs::write(&path, b"{\"unexpected\": true}")
 			.unwrap_or_else(|error| panic!("write: {error}"));
-		let error = match instruction_envelope_gate_at(&enum_name, &path) {
-			Err(error) => error,
-			Ok(_) => panic!("an undecodable manifest must fail"),
-		};
+		let error = instruction_envelope_gate_at(&enum_name, &path)
+			.err()
+			.map(|error| error.to_string());
 		assert!(
-			error.to_string().contains("invalid migration manifest"),
-			"the error must name the manifest, got: {error}"
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("invalid migration manifest")),
+			"the error must name the manifest, got: {error:?}"
 		);
 	}
 
@@ -2117,13 +2119,14 @@ mod tests {
 				value: u64,
 			}
 		);
-		let error = match read_manifest_at(&item, temp.path()) {
-			Err(error) => error,
-			Ok(_) => panic!("an undecodable manifest must fail the build"),
-		};
+		let error = read_manifest_at(&item, temp.path())
+			.err()
+			.map(|error| error.to_string());
 		assert!(
-			error.to_string().contains("invalid migration manifest"),
-			"the error must name the manifest, got: {error}"
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("invalid migration manifest")),
+			"the error must name the manifest, got: {error:?}"
 		);
 		let _ = path;
 	}
@@ -2164,13 +2167,14 @@ mod tests {
 		);
 
 		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
-		let error = match instruction_envelope_gate_at(&enum_name, &path) {
-			Err(error) => error,
-			Ok(_) => panic!("an unresolvable discriminator must fail the build"),
-		};
+		let error = instruction_envelope_gate_at(&enum_name, &path)
+			.err()
+			.map(|error| error.to_string());
 		assert!(
-			error.to_string().contains("discriminator"),
-			"the error must name the discriminator, got: {error}"
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("discriminator")),
+			"the error must name the discriminator, got: {error:?}"
 		);
 	}
 
