@@ -6,22 +6,26 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/multisig_program.dart';
 
 final class FetchProgramConfigCommand extends Command<void> {
   FetchProgramConfigCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
   String get name => 'program-config';
 
   @override
-  String get description => "Global program configuration: the authority that may update it, the";
+  String get description =>
+      "Global program configuration: the authority that may update it, the";
 
   @override
   Future<void> run() async {
@@ -38,17 +42,12 @@ final class FetchProgramConfigCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeProgramConfig(encoded);
-    printFields(
-      context.json,
-      'program-config',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'authority': account.data.authority,
-        'treasury': account.data.treasury,
-        'creation_fee': account.data.creationFee,
-      },
-    );
+    printFields(context.json, 'program-config', address, <String, Object?>{
+      'bump': account.data.bump,
+      'authority': account.data.authority,
+      'treasury': account.data.treasury,
+      'creation_fee': account.data.creationFee,
+    });
   }
 }
 
@@ -56,26 +55,32 @@ final class FetchMultisigCommand extends Command<void> {
   FetchMultisigCommand() {
     argParser
       ..addOption('address', help: 'Account address; overrides PDA derivation.')
-      ..addOption('create_key', mandatory: true, help: "PDA seed `create_key`.");
+      ..addOption(
+        'create_key',
+        mandatory: true,
+        help: "PDA seed `create_key`.",
+      );
   }
 
   @override
   String get name => 'multisig';
 
   @override
-  String get description => "A multisig: consensus parameters plus the sorted member roster.";
+  String get description =>
+      "A multisig: consensus parameters plus the sorted member roster.";
 
   @override
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final createKeyValue = pubkey('--create-key', results['create_key']! as String);
+    final createKeyValue = pubkey(
+      '--create-key',
+      results['create_key']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findMultisigPda(
-            seeds: MultisigSeeds(
-              createKey: createKeyValue,
-            ),
+            seeds: MultisigSeeds(createKey: createKeyValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -88,24 +93,19 @@ final class FetchMultisigCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeMultisig(encoded);
-    printFields(
-      context.json,
-      'multisig',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'create_key': account.data.createKey,
-        'config_authority': account.data.configAuthority,
-        'rent_collector': account.data.rentCollector,
-        'threshold': account.data.threshold,
-        'timelock': account.data.timelock,
-        'ttl': account.data.ttl,
-        'transaction_index': account.data.transactionIndex,
-        'stale_transaction_index': account.data.staleTransactionIndex,
-        'member_roster': account.data.memberRoster,
-        'member_permissions': account.data.memberPermissions,
-      },
-    );
+    printFields(context.json, 'multisig', address, <String, Object?>{
+      'bump': account.data.bump,
+      'create_key': account.data.createKey,
+      'config_authority': account.data.configAuthority,
+      'rent_collector': account.data.rentCollector,
+      'threshold': account.data.threshold,
+      'timelock': account.data.timelock,
+      'ttl': account.data.ttl,
+      'transaction_index': account.data.transactionIndex,
+      'stale_transaction_index': account.data.staleTransactionIndex,
+      'member_roster': account.data.memberRoster,
+      'member_permissions': account.data.memberPermissions,
+    });
   }
 }
 
@@ -121,7 +121,8 @@ final class FetchProposalCommand extends Command<void> {
   String get name => 'proposal';
 
   @override
-  String get description => "A proposal: vote state and payload in one account.";
+  String get description =>
+      "A proposal: vote state and payload in one account.";
 
   @override
   Future<void> run() async {
@@ -132,10 +133,7 @@ final class FetchProposalCommand extends Command<void> {
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findProposalPda(
-            seeds: ProposalSeeds(
-              multisig: multisigValue,
-              index: indexValue,
-            ),
+            seeds: ProposalSeeds(multisig: multisigValue, index: indexValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -148,28 +146,23 @@ final class FetchProposalCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeProposal(encoded);
-    printFields(
-      context.json,
-      'proposal',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'multisig': account.data.multisig,
-        'creator': account.data.creator,
-        'index': account.data.index,
-        'kind': account.data.kind,
-        'vault_index': account.data.vaultIndex,
-        'vault_bump': account.data.vaultBump,
-        'status': account.data.status,
-        'status_at': account.data.statusAt,
-        'expires_at': account.data.expiresAt,
-        'approved_mask': account.data.approvedMask,
-        'rejected_mask': account.data.rejectedMask,
-        'ephemeral_bumps': account.data.ephemeralBumps,
-        'message': account.data.message,
-        'actions': account.data.actions,
-      },
-    );
+    printFields(context.json, 'proposal', address, <String, Object?>{
+      'bump': account.data.bump,
+      'multisig': account.data.multisig,
+      'creator': account.data.creator,
+      'index': account.data.index,
+      'kind': account.data.kind,
+      'vault_index': account.data.vaultIndex,
+      'vault_bump': account.data.vaultBump,
+      'status': account.data.status,
+      'status_at': account.data.statusAt,
+      'expires_at': account.data.expiresAt,
+      'approved_mask': account.data.approvedMask,
+      'rejected_mask': account.data.rejectedMask,
+      'ephemeral_bumps': account.data.ephemeralBumps,
+      'message': account.data.message,
+      'actions': account.data.actions,
+    });
   }
 }
 
@@ -178,21 +171,29 @@ final class FetchSpendingLimitCommand extends Command<void> {
     argParser
       ..addOption('address', help: 'Account address; overrides PDA derivation.')
       ..addOption('multisig', mandatory: true, help: "PDA seed `multisig`.")
-      ..addOption('create_key', mandatory: true, help: "PDA seed `create_key`.");
+      ..addOption(
+        'create_key',
+        mandatory: true,
+        help: "PDA seed `create_key`.",
+      );
   }
 
   @override
   String get name => 'spending-limit';
 
   @override
-  String get description => "A member-scoped allowance to spend from a vault without a vote.";
+  String get description =>
+      "A member-scoped allowance to spend from a vault without a vote.";
 
   @override
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final multisigValue = pubkey('--multisig', results['multisig']! as String);
-    final createKeyValue = pubkey('--create-key', results['create_key']! as String);
+    final createKeyValue = pubkey(
+      '--create-key',
+      results['create_key']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findSpendingLimitPda(
@@ -212,25 +213,20 @@ final class FetchSpendingLimitCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeSpendingLimit(encoded);
-    printFields(
-      context.json,
-      'spending-limit',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-        'multisig': account.data.multisig,
-        'create_key': account.data.createKey,
-        'vault_index': account.data.vaultIndex,
-        'vault_bump': account.data.vaultBump,
-        'mint': account.data.mint,
-        'amount': account.data.amount,
-        'remaining_amount': account.data.remainingAmount,
-        'last_reset': account.data.lastReset,
-        'period': account.data.period,
-        'members': account.data.members,
-        'destinations': account.data.destinations,
-      },
-    );
+    printFields(context.json, 'spending-limit', address, <String, Object?>{
+      'bump': account.data.bump,
+      'multisig': account.data.multisig,
+      'create_key': account.data.createKey,
+      'vault_index': account.data.vaultIndex,
+      'vault_bump': account.data.vaultBump,
+      'mint': account.data.mint,
+      'amount': account.data.amount,
+      'remaining_amount': account.data.remainingAmount,
+      'last_reset': account.data.lastReset,
+      'period': account.data.period,
+      'members': account.data.members,
+      'destinations': account.data.destinations,
+    });
   }
 }
 

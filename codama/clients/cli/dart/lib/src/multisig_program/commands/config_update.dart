@@ -14,8 +14,16 @@ final class ConfigUpdateCommand extends Command<void> {
       ..addOption('treasury', mandatory: true, help: "treasury")
       ..addFlag('set_creation_fee', help: "setCreationFee")
       ..addOption('creation_fee', mandatory: true, help: "creationFee")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('program_config', mandatory: false, help: "The program_config account [default: derived]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'program_config',
+        mandatory: false,
+        help: "The program_config account [default: derived]",
+      );
   }
 
   @override
@@ -34,12 +42,15 @@ final class ConfigUpdateCommand extends Command<void> {
     final programConfig = (results['program_config'] as String?) != null
         ? pubkey('--program-config', results['program_config']! as String)
         : (await findProgramConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+            programAddress: context.programAddress,
+          )).$1;
     final setTreasuryValue = results['set_treasury'] as bool? ?? false;
     final treasuryValue = pubkey('--treasury', results['treasury']! as String);
     final setCreationFeeValue = results['set_creation_fee'] as bool? ?? false;
-    final creationFeeValue = bigInteger('--creation-fee', results['creation_fee']! as String);
+    final creationFeeValue = bigInteger(
+      '--creation-fee',
+      results['creation_fee']! as String,
+    );
     final instruction = getConfigUpdateInstruction(
       programAddress: context.programAddress,
       authority: authority,

@@ -15,8 +15,16 @@ final class ConfigInitializeCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('treasury', mandatory: true, help: "treasury")
       ..addOption('creation_fee', mandatory: true, help: "creationFee")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('program_config', mandatory: false, help: "The program_config account [default: derived]");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'program_config',
+        mandatory: false,
+        help: "The program_config account [default: derived]",
+      );
   }
 
   @override
@@ -35,11 +43,14 @@ final class ConfigInitializeCommand extends Command<void> {
     final programConfig = (results['program_config'] as String?) != null
         ? pubkey('--program-config', results['program_config']! as String)
         : (await findProgramConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final treasuryValue = pubkey('--treasury', results['treasury']! as String);
-    final creationFeeValue = bigInteger('--creation-fee', results['creation_fee']! as String);
+    final creationFeeValue = bigInteger(
+      '--creation-fee',
+      results['creation_fee']! as String,
+    );
     final instruction = getConfigInitializeInstruction(
       programAddress: context.programAddress,
       authority: authority,

@@ -12,9 +12,18 @@ final class VaultExecuteCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
+      ..addOption(
+        'member',
+        mandatory: false,
+        help: "The member account [default: payer]",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption('message_accounts', mandatory: true, help: "The message's account keys, in message order. Accounts the message");
+      ..addOption(
+        'message_accounts',
+        mandatory: true,
+        help:
+            "The message's account keys, in message order. Accounts the message",
+      );
   }
 
   @override
@@ -33,7 +42,10 @@ final class VaultExecuteCommand extends Command<void> {
         ? pubkey('--member', results['member']! as String)
         : context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
-    final messageAccounts = pubkey('--message-accounts', results['message_accounts']! as String);
+    final messageAccounts = pubkey(
+      '--message-accounts',
+      results['message_accounts']! as String,
+    );
 
     final instruction = getVaultExecuteInstruction(
       programAddress: context.programAddress,

@@ -11,8 +11,16 @@ final class SetRewardIndexCommand extends Command<void> {
   SetRewardIndexCommand() {
     argParser
       ..addOption('new_index', mandatory: true, help: "newIndex")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
-      ..addOption('pool_state', mandatory: true, help: "The pool_state account");
+      ..addOption(
+        'admin',
+        mandatory: false,
+        help: "The admin account [default: payer]",
+      )
+      ..addOption(
+        'pool_state',
+        mandatory: true,
+        help: "The pool_state account",
+      );
   }
 
   @override
@@ -29,7 +37,10 @@ final class SetRewardIndexCommand extends Command<void> {
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
-    final newIndexValue = bigInteger('--new-index', results['new_index']! as String);
+    final newIndexValue = bigInteger(
+      '--new-index',
+      results['new_index']! as String,
+    );
     final instruction = getSetRewardIndexInstruction(
       programAddress: context.programAddress,
       admin: admin,

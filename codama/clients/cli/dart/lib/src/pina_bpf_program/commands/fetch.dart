@@ -6,15 +6,18 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/pina_bpf_program.dart';
 
 final class FetchStateCommand extends Command<void> {
   FetchStateCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -38,14 +41,9 @@ final class FetchStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeState(encoded);
-    printFields(
-      context.json,
-      'state',
-      address,
-      <String, Object?>{
-        'bump': account.data.bump,
-      },
-    );
+    printFields(context.json, 'state', address, <String, Object?>{
+      'bump': account.data.bump,
+    });
   }
 }
 

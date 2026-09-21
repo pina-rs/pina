@@ -10,9 +10,17 @@ import 'package:pina_codama_clients/role_registry_program.dart';
 final class RotateAdminCommand extends Command<void> {
   RotateAdminCommand() {
     argParser
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
+      ..addOption(
+        'admin',
+        mandatory: false,
+        help: "The admin account [default: payer]",
+      )
       ..addOption('new_admin', mandatory: true, help: "The new_admin account")
-      ..addOption('registry_config', mandatory: true, help: "The registry_config account");
+      ..addOption(
+        'registry_config',
+        mandatory: true,
+        help: "The registry_config account",
+      );
   }
 
   @override
@@ -29,7 +37,10 @@ final class RotateAdminCommand extends Command<void> {
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
     final newAdmin = pubkey('--new-admin', results['new_admin']! as String);
-    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
+    final registryConfig = pubkey(
+      '--registry-config',
+      results['registry_config']! as String,
+    );
 
     final instruction = getRotateAdminInstruction(
       programAddress: context.programAddress,

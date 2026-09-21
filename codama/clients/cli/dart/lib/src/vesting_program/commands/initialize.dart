@@ -17,12 +17,28 @@ final class InitializeCommand extends Command<void> {
       ..addOption('cliff_ts', mandatory: true, help: "cliffTs")
       ..addOption('end_ts', mandatory: true, help: "endTs")
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
-      ..addOption('beneficiary', mandatory: true, help: "The beneficiary account")
+      ..addOption(
+        'admin',
+        mandatory: false,
+        help: "The admin account [default: payer]",
+      )
+      ..addOption(
+        'beneficiary',
+        mandatory: true,
+        help: "The beneficiary account",
+      )
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption('vesting_state', mandatory: false, help: "The vesting_state account [default: derived]")
+      ..addOption(
+        'vesting_state',
+        mandatory: false,
+        help: "The vesting_state account [default: derived]",
+      )
       ..addOption('vault', mandatory: true, help: "The vault account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -38,19 +54,38 @@ final class InitializeCommand extends Command<void> {
     final admin = (results['admin'] as String?) != null
         ? pubkey('--admin', results['admin']! as String)
         : context.payerAddress;
-    final beneficiary = pubkey('--beneficiary', results['beneficiary']! as String);
+    final beneficiary = pubkey(
+      '--beneficiary',
+      results['beneficiary']! as String,
+    );
     final mint = pubkey('--mint', results['mint']! as String);
     final vestingState = (results['vesting_state'] as String?) != null
         ? pubkey('--vesting-state', results['vesting_state']! as String)
         : (await findVestingPda(
-          seeds: VestingSeeds(admin: admin, beneficiary: beneficiary, mint: mint),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: VestingSeeds(
+              admin: admin,
+              beneficiary: beneficiary,
+              mint: mint,
+            ),
+            programAddress: context.programAddress,
+          )).$1;
     final vault = pubkey('--vault', results['vault']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
-    final totalAmountValue = bigInteger('--total-amount', results['total_amount']! as String);
-    final startTsValue = bigInteger('--start-ts', results['start_ts']! as String);
-    final cliffTsValue = bigInteger('--cliff-ts', results['cliff_ts']! as String);
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
+    final totalAmountValue = bigInteger(
+      '--total-amount',
+      results['total_amount']! as String,
+    );
+    final startTsValue = bigInteger(
+      '--start-ts',
+      results['start_ts']! as String,
+    );
+    final cliffTsValue = bigInteger(
+      '--cliff-ts',
+      results['cliff_ts']! as String,
+    );
     final endTsValue = bigInteger('--end-ts', results['end_ts']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
@@ -60,7 +95,9 @@ final class InitializeCommand extends Command<void> {
       mint: mint,
       vestingState: vestingState,
       vault: vault,
-      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      associatedTokenProgram: Address(
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+      ),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
       totalAmount: totalAmountValue,

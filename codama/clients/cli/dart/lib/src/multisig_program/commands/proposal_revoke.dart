@@ -12,7 +12,11 @@ final class ProposalRevokeCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
+      ..addOption(
+        'member',
+        mandatory: false,
+        help: "The member account [default: payer]",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 

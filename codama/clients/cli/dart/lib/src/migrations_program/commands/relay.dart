@@ -13,11 +13,23 @@ final class RelayCommand extends Command<void> {
   RelayCommand() {
     argParser
       ..addOption('value', mandatory: true, help: "value")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption('migration_payer', mandatory: false, help: "The migration_payer account [default: payer]")
-      ..addOption('migration_program', mandatory: true, help: "The migration_program account");
+      ..addOption(
+        'migration_payer',
+        mandatory: false,
+        help: "The migration_payer account [default: payer]",
+      )
+      ..addOption(
+        'migration_program',
+        mandatory: true,
+        help: "The migration_program account",
+      );
   }
 
   @override
@@ -38,7 +50,10 @@ final class RelayCommand extends Command<void> {
     final migrationPayer = (results['migration_payer'] as String?) != null
         ? pubkey('--migration-payer', results['migration_payer']! as String)
         : context.payerAddress;
-    final migrationProgram = pubkey('--migration-program', results['migration_program']! as String);
+    final migrationProgram = pubkey(
+      '--migration-program',
+      results['migration_program']! as String,
+    );
     final valueValue = bigInteger('--value', results['value']! as String);
     final instruction = getRelayInstruction(
       programAddress: context.programAddress,

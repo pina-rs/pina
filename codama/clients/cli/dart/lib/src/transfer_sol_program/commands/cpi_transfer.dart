@@ -13,15 +13,25 @@ final class CpiTransferCommand extends Command<void> {
   CpiTransferCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption('sender', mandatory: false, help: "The sender. Must be a signer and writable (lamports will be debited) [default: payer]")
-      ..addOption('recipient', mandatory: true, help: "The recipient. Must be writable (lamports will be credited)");
+      ..addOption(
+        'sender',
+        mandatory: false,
+        help:
+            "The sender. Must be a signer and writable (lamports will be debited) [default: payer]",
+      )
+      ..addOption(
+        'recipient',
+        mandatory: true,
+        help: "The recipient. Must be writable (lamports will be credited)",
+      );
   }
 
   @override
   String get name => 'cpi_transfer';
 
   @override
-  String get description => "Instruction data for `CpiTransfer`.  Layout: ```text | offset | size | field         | |--------|------|---------------| | 0      | 1    | discriminator | | 1      | 8    | amount (u64)  | ```";
+  String get description =>
+      "Instruction data for `CpiTransfer`.  Layout: ```text | offset | size | field         | |--------|------|---------------| | 0      | 1    | discriminator | | 1      | 8    | amount (u64)  | ```";
 
   @override
   Future<void> run() async {
