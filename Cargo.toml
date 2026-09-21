@@ -379,11 +379,3 @@ tabs-in-doc-comments = "allow"
 too_many_lines = "allow"
 wildcard_dependencies = "deny"
 wildcard_imports = "allow"
-
-# Rust release builds wrap silently on integer overflow by default, and the
-# examples build for SBF through this profile. Every value-bearing path in
-# this workspace already uses checked arithmetic; this setting is the
-# workspace-wide backstop for the paths that do not (the Cetus class).
-# Derived programs should copy it into their own root manifest.
-[profile.release]
-overflow-checks = true
