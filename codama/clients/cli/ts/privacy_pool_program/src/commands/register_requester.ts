@@ -20,7 +20,6 @@ export const registerRequesterCommand = registerGlobals(
 	.description("registerRequester")
 	.requiredOption("--requester <requester>", "requester")
 	.requiredOption("--max-tier <maxTier>", "maxTier")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.requiredOption(
 		"--requester-registry <requesterRegistry>",

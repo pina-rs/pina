@@ -41,15 +41,9 @@ pub struct MultisigImportArgs {
 	/// The `program_config` account
 	#[arg(long)]
 	program_config: String,
-	/// The `create_key` account [default: payer]
-	#[arg(long)]
-	create_key: Option<String>,
 	/// The `multisig` account [default: derived]
 	#[arg(long)]
 	multisig: Option<String>,
-	/// The `rent_payer` account [default: payer]
-	#[arg(long)]
-	rent_payer: Option<String>,
 	/// Treasury that collects the creation fee; absent when the fee is zero
 	#[arg(long)]
 	treasury: String,
@@ -67,10 +61,7 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 		None => context.payer_pubkey(),
 	};
 	let program_config = CliContext::pubkey("--program_config", &args.program_config)?;
-	let create_key = match &args.create_key {
-		Some(value) => CliContext::pubkey("--create_key", value)?,
-		None => context.payer_pubkey(),
-	};
+	let create_key = context.payer_pubkey();
 	let multisig = match &args.multisig {
 		Some(value) => CliContext::pubkey("--multisig", value)?,
 		None => {
@@ -81,10 +72,7 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 			.0
 		}
 	};
-	let rent_payer = match &args.rent_payer {
-		Some(value) => CliContext::pubkey("--rent_payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let rent_payer = context.payer_pubkey();
 	let treasury = CliContext::pubkey("--treasury", &args.treasury)?;
 	let data = MultisigImportInstructionData::new(|data| {
 		data.bump = args.bump;

@@ -19,7 +19,6 @@ export const setRewardIndexCommand = registerGlobals(
 )
 	.description("setRewardIndex")
 	.requiredOption("--new-index <newIndex>", "newIndex")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

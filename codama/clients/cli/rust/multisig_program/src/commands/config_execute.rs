@@ -24,12 +24,6 @@ pub struct ConfigExecuteArgs {
 	/// The `proposal` account
 	#[arg(long)]
 	proposal: String,
-	/// The `member` account [default: payer]
-	#[arg(long)]
-	member: Option<String>,
-	/// The `rent_payer` account [default: payer]
-	#[arg(long)]
-	rent_payer: Option<String>,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -41,14 +35,8 @@ pub struct ConfigExecuteArgs {
 pub(crate) fn run(context: &CliContext, args: ConfigExecuteArgs) -> Result<(), CliError> {
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
 	let proposal = CliContext::pubkey("--proposal", &args.proposal)?;
-	let member = match &args.member {
-		Some(value) => CliContext::pubkey("--member", value)?,
-		None => context.payer_pubkey(),
-	};
-	let rent_payer = match &args.rent_payer {
-		Some(value) => CliContext::pubkey("--rent_payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let member = context.payer_pubkey();
+	let rent_payer = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let spending_limit_accounts =
 		CliContext::pubkey("--spending_limit_accounts", &args.spending_limit_accounts)?;

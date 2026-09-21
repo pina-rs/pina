@@ -23,7 +23,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findFloatDataAccountPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchFloatDataAccount(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(

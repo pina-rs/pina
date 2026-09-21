@@ -29,19 +29,9 @@ final class MultisigCreateCommand extends Command<void> {
         help: "The program_config account",
       )
       ..addOption(
-        'create_key',
-        mandatory: false,
-        help: "The create_key account [default: payer]",
-      )
-      ..addOption(
         'multisig',
         mandatory: false,
         help: "The multisig account [default: derived]",
-      )
-      ..addOption(
-        'rent_payer',
-        mandatory: false,
-        help: "The rent_payer account [default: payer]",
       )
       ..addOption(
         'treasury',
@@ -70,18 +60,14 @@ final class MultisigCreateCommand extends Command<void> {
       '--program-config',
       results['program_config']! as String,
     );
-    final createKey = (results['create_key'] as String?) != null
-        ? pubkey('--create-key', results['create_key']! as String)
-        : context.payerAddress;
+    final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
             seeds: MultisigSeeds(createKey: createKey),
             programAddress: context.programAddress,
           )).$1;
-    final rentPayer = (results['rent_payer'] as String?) != null
-        ? pubkey('--rent-payer', results['rent_payer']! as String)
-        : context.payerAddress;
+    final rentPayer = context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
     final memberAccounts = pubkey(
       '--member-accounts',

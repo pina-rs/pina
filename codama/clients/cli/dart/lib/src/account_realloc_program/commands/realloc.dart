@@ -13,12 +13,6 @@ final class ReallocCommand extends Command<void> {
   ReallocCommand() {
     argParser
       ..addOption('len', mandatory: true, help: "len")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "The sample authority. It pays rent on growth and receives excess rent on [default: payer]",
-      )
       ..addOption('sample', mandatory: true, help: "The sample account");
   }
 
@@ -33,9 +27,7 @@ final class ReallocCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final sample = pubkey('--sample', results['sample']! as String);
     final lenValue = integer('--len', results['len']! as String);
     final instruction = getReallocInstruction(

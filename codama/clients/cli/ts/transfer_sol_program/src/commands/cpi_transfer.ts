@@ -19,10 +19,6 @@ export const cpiTransferCommand = registerGlobals(new Command("cpi_transfer"))
 		"Instruction data for `CpiTransfer`.\n\nLayout:\n```text\n| offset | size | field         |\n|--------|------|---------------|\n| 0      | 1    | discriminator |\n| 1      | 8    | amount (u64)  |\n```",
 	)
 	.requiredOption("--amount <amount>", "amount")
-	.option(
-		"--sender <sender>",
-		"The sender. Must be a signer and writable (lamports will be debited) [default: payer]",
-	)
 	.requiredOption(
 		"--recipient <recipient>",
 		"The recipient. Must be writable (lamports will be credited)",

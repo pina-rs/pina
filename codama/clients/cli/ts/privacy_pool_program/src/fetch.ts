@@ -14,8 +14,15 @@ import {
 	fetchPoolVault,
 	fetchRequesterRegistry,
 	fetchVerifyingKeyAccount,
+	findCustodianRegistryPda,
+	findDisclosureLogPda,
 	findDisclosureRequestPda,
+	findMerkleTreePda,
 	findNoteCommitmentPda,
+	findNullifierSetPda,
+	findPoolConfigPda,
+	findPoolVaultPda,
+	findRequesterRegistryPda,
 	findVerifyingKeyAccountPda,
 } from "./client";
 import {
@@ -37,7 +44,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findPoolConfigPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchPoolConfig(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -58,7 +69,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findPoolVaultPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchPoolVault(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -79,7 +94,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findMerkleTreePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchMerkleTree(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -98,7 +117,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findNullifierSetPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchNullifierSet(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -119,7 +142,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findCustodianRegistryPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchCustodianRegistry(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -140,7 +167,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findRequesterRegistryPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchRequesterRegistry(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -213,7 +244,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findDisclosureLogPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchDisclosureLog(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(

@@ -22,11 +22,6 @@ final class SetVerificationKeyCommand extends Command<void> {
       ..addOption('ic2', mandatory: true, help: "ic2")
       ..addOption('ic3', mandatory: true, help: "ic3")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -53,9 +48,7 @@ final class SetVerificationKeyCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

@@ -22,9 +22,6 @@ pub struct InitializeArgs {
 	bump: u8,
 	#[arg(long)]
 	digest: String,
-	/// The `owner` account [default: payer]
-	#[arg(long)]
-	owner: Option<String>,
 	/// The `todo` account [default: derived]
 	#[arg(long)]
 	todo: Option<String>,
@@ -32,10 +29,7 @@ pub struct InitializeArgs {
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
 	let digest = CliContext::bytes::<32>("--digest", &args.digest)?;
-	let owner = match &args.owner {
-		Some(value) => CliContext::pubkey("--owner", value)?,
-		None => context.payer_pubkey(),
-	};
+	let owner = context.payer_pubkey();
 	let todo = match &args.todo {
 		Some(value) => CliContext::pubkey("--todo", value)?,
 		None => {

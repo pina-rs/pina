@@ -29,12 +29,6 @@ final class TransferCommand extends Command<void> {
         help: "The pool_config account",
       )
       ..addOption(
-        'payer',
-        mandatory: false,
-        help:
-            "Funds the successor note's rent. Transfers are anonymous with respect [default: payer]",
-      )
-      ..addOption(
         'merkle_tree',
         mandatory: true,
         help: "The merkle_tree account",
@@ -70,9 +64,7 @@ final class TransferCommand extends Command<void> {
       '--pool-config',
       results['pool_config']! as String,
     );
-    final payer = (results['payer'] as String?) != null
-        ? pubkey('--payer', results['payer']! as String)
-        : context.payerAddress;
+    final payer = context.payerAddress;
     final merkleTree = pubkey(
       '--merkle-tree',
       results['merkle_tree']! as String,

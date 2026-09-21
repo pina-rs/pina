@@ -19,19 +19,13 @@ use crate::context::CliError;
 pub struct SetRewardIndexArgs {
 	#[arg(long)]
 	new_index: u64,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `pool_state` account
 	#[arg(long)]
 	pool_state: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: SetRewardIndexArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
 	let data = SetRewardIndexInstructionData::new(|data| {
 		data.new_index.set(args.new_index);

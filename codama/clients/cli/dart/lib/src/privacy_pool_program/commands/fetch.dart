@@ -30,7 +30,9 @@ final class FetchPoolConfigCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -71,7 +73,9 @@ final class FetchPoolVaultCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -107,7 +111,9 @@ final class FetchMerkleTreeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -146,7 +152,11 @@ final class FetchNullifierSetCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findNullifierSetPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -184,7 +194,11 @@ final class FetchCustodianRegistryCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findCustodianRegistryPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -221,7 +235,11 @@ final class FetchRequesterRegistryCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findRequesterRegistryPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -373,7 +391,11 @@ final class FetchDisclosureLogCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findDisclosureLogPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -449,6 +471,19 @@ final class FetchVerifyingKeyAccountCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchPoolConfigCommand());
+    addSubcommand(FetchPoolVaultCommand());
+    addSubcommand(FetchMerkleTreeCommand());
+    addSubcommand(FetchNullifierSetCommand());
+    addSubcommand(FetchCustodianRegistryCommand());
+    addSubcommand(FetchRequesterRegistryCommand());
+    addSubcommand(FetchNoteCommitmentCommand());
+    addSubcommand(FetchDisclosureRequestCommand());
+    addSubcommand(FetchDisclosureLogCommand());
+    addSubcommand(FetchVerifyingKeyAccountCommand());
+  }
+
   @override
   String get name => 'fetch';
 

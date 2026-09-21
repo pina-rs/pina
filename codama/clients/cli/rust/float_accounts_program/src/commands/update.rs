@@ -24,17 +24,11 @@ pub struct UpdateArgs {
 	/// The `account` account
 	#[arg(long)]
 	account: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError> {
 	let account = CliContext::pubkey("--account", &args.account)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let data = UpdateInstructionData::new(|data| {
 		data.data_f32.set(args.data_f32);
 		data.data_f64.set(args.data_f64);

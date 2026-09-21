@@ -30,7 +30,9 @@ final class FetchOracleStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findOracleStatePda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -49,6 +51,10 @@ final class FetchOracleStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchOracleStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

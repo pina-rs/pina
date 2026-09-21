@@ -18,10 +18,6 @@ export const removeTagCommand = registerGlobals(new Command("remove_tag"))
 	.description("Instruction data for `RemoveTag`. Removes the tag at `index`.")
 	.requiredOption("--index <index>", "index")
 	.option(
-		"--authority <authority>",
-		"The profile's authority. Must sign to prove ownership [default: payer]",
-	)
-	.option(
 		"--profile <profile>",
 		"The profile PDA account (must already exist and be writable) [default: derived]",
 	)

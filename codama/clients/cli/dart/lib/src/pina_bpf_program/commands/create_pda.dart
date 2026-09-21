@@ -14,11 +14,6 @@ final class CreatePdaCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption(
-        'payer',
-        mandatory: false,
-        help: "The payer account [default: payer]",
-      )
-      ..addOption(
         'state',
         mandatory: false,
         help: "The state account [default: derived]",
@@ -35,9 +30,7 @@ final class CreatePdaCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final payer = (results['payer'] as String?) != null
-        ? pubkey('--payer', results['payer']! as String)
-        : context.payerAddress;
+    final payer = context.payerAddress;
     final state = (results['state'] as String?) != null
         ? pubkey('--state', results['state']! as String)
         : (await findStatePda(programAddress: context.programAddress)).$1;

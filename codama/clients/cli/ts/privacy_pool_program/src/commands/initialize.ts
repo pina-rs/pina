@@ -24,7 +24,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--requesters-bump <requestersBump>", "requestersBump")
 	.requiredOption("--log-bump <logBump>", "logBump")
 	.requiredOption("--custodians <custodians>", "custodians")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",

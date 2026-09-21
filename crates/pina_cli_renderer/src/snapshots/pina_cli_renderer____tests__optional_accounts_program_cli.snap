@@ -69,19 +69,13 @@ use solana_sdk::pubkey::Pubkey;
 pub struct InitArgs {
 	#[arg(long)]
 	bump: u8,
-	/// Pays for account creation and seeds the store PDA [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The store PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
 	store: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = match &args.store {
 		Some(value) => CliContext::pubkey("--store", value)?,
 		None => Pubkey::find_program_address(
@@ -126,27 +120,15 @@ use fixture_client::instructions::InspectInstructionData;
 
 #[derive(Debug, Args)]
 pub struct InspectArgs {
-	/// The transaction fee payer; always required [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// When present, must be the caller's store PDA
 	#[arg(long)]
 	store: String,
-	/// When present, must have signed the transaction [default: payer]
-	#[arg(long)]
-	witness: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InspectArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = CliContext::pubkey("--store", &args.store)?;
-	let witness = match &args.witness {
-		Some(value) => CliContext::pubkey("--witness", value)?,
-		None => context.payer_pubkey(),
-	};
+	let witness = context.payer_pubkey();
 	let data = InspectInstructionData::new(|_data| {})
 	.map_err(|_| CliError::InvalidData {
 		message: "instruction data rejected the provided arguments".to_string(),
@@ -202,19 +184,13 @@ use fixture_client::instructions::NoteInstructionData;
 
 #[derive(Debug, Args)]
 pub struct NoteArgs {
-	/// The transaction fee payer; always required [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// An arbitrary readonly account attached as context
 	#[arg(long)]
 	note: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: NoteArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let note = CliContext::pubkey("--note", &args.note)?;
 	let data = NoteInstructionData::new(|_data| {})
 	.map_err(|_| CliError::InvalidData {
@@ -249,19 +225,13 @@ use fixture_client::instructions::TouchInstructionData;
 
 #[derive(Debug, Args)]
 pub struct TouchArgs {
-	/// The store's authority. Must sign [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// When present, the counter inside is incremented by one
 	#[arg(long)]
 	store: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: TouchArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = CliContext::pubkey("--store", &args.store)?;
 	let data = TouchInstructionData::new(|_data| {})
 	.map_err(|_| CliError::InvalidData {

@@ -14,12 +14,6 @@ final class InitCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "Pays for account creation and seeds the store PDA [default: payer]",
-      )
-      ..addOption(
         'store',
         mandatory: false,
         help:
@@ -37,9 +31,7 @@ final class InitCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final store = (results['store'] as String?) != null
         ? pubkey('--store', results['store']! as String)
         : (await findStorePda(

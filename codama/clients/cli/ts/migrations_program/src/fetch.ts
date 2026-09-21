@@ -23,7 +23,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findStatePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchState(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -42,7 +46,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findManualStatePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchManualState(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
@@ -61,7 +69,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findCompactStatePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchCompactState(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(

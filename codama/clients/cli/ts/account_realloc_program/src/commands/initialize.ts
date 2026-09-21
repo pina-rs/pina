@@ -18,10 +18,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("Creates the per-authority sample PDA.")
 	.requiredOption("--bump <bump>", "bump")
 	.option(
-		"--authority <authority>",
-		"Funds creation and becomes the sample's resize authority [default: payer]",
-	)
-	.option(
 		"--sample <sample>",
 		'Empty PDA derived from `[b"sample", authority]` [default: derived]',
 	)

@@ -16,11 +16,6 @@ final class CheckPolicyCommand extends Command<void> {
       ..addOption('memo', mandatory: true, help: "memo")
       ..addOption('approvals', mandatory: true, help: "approvals")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'policy',
         mandatory: false,
         help: "The policy account [default: derived]",
@@ -43,9 +38,7 @@ final class CheckPolicyCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final policy = (results['policy'] as String?) != null
         ? pubkey('--policy', results['policy']! as String)
         : (await findPolicyPda(

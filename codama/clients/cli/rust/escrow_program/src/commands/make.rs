@@ -26,9 +26,6 @@ pub struct MakeArgs {
 	amount_b: u64,
 	#[arg(long)]
 	bump: u8,
-	/// The `maker` account [default: payer]
-	#[arg(long)]
-	maker: Option<String>,
 	/// The `mint_a` account
 	#[arg(long)]
 	mint_a: String,
@@ -50,10 +47,7 @@ pub struct MakeArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: MakeArgs) -> Result<(), CliError> {
-	let maker = match &args.maker {
-		Some(value) => CliContext::pubkey("--maker", value)?,
-		None => context.payer_pubkey(),
-	};
+	let maker = context.payer_pubkey();
 	let mint_a = CliContext::pubkey("--mint_a", &args.mint_a)?;
 	let mint_b = CliContext::pubkey("--mint_b", &args.mint_b)?;
 	let maker_ata_a = CliContext::pubkey("--maker_ata_a", &args.maker_ata_a)?;

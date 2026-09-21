@@ -12,12 +12,6 @@ final class DirectTransferCommand extends Command<void> {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
       ..addOption(
-        'sender',
-        mandatory: false,
-        help:
-            "The sender. Must be owned by this program, writable, and a signer [default: payer]",
-      )
-      ..addOption(
         'recipient',
         mandatory: true,
         help: "The recipient. Must be writable",
@@ -35,9 +29,7 @@ final class DirectTransferCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final sender = (results['sender'] as String?) != null
-        ? pubkey('--sender', results['sender']! as String)
-        : context.payerAddress;
+    final sender = context.payerAddress;
     final recipient = pubkey('--recipient', results['recipient']! as String);
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final instruction = getDirectTransferInstruction(

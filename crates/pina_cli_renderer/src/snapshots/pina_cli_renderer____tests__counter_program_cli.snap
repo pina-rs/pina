@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli_renderer/src/__tests.rs
-assertion_line: 50
 expression: "render_fixture_files(\"counter_program\")"
 ---
 ==== Cargo.toml ====
@@ -68,19 +67,13 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct IncrementArgs {
-	/// The counter's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The counter PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	counter: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: IncrementArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let counter = match &args.counter {
 		Some(value) => CliContext::pubkey("--counter", value)?,
 		None => Pubkey::find_program_address(
@@ -125,19 +118,13 @@ use solana_sdk::pubkey::Pubkey;
 pub struct InitializeArgs {
 	#[arg(long)]
 	bump: u8,
-	/// The wallet creating the counter. Pays for account creation and becomes the authority whose address seeds the PDA [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The counter PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
 	counter: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let counter = match &args.counter {
 		Some(value) => CliContext::pubkey("--counter", value)?,
 		None => Pubkey::find_program_address(

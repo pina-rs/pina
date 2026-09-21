@@ -20,9 +20,6 @@ use crate::context::CliError;
 pub struct OpenPositionArgs {
 	#[arg(long)]
 	bump: u8,
-	/// The `user` account [default: payer]
-	#[arg(long)]
-	user: Option<String>,
 	/// The `pool_state` account
 	#[arg(long)]
 	pool_state: String,
@@ -32,10 +29,7 @@ pub struct OpenPositionArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: OpenPositionArgs) -> Result<(), CliError> {
-	let user = match &args.user {
-		Some(value) => CliContext::pubkey("--user", value)?,
-		None => context.payer_pubkey(),
-	};
+	let user = context.payer_pubkey();
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
 	let position_state = CliContext::pubkey("--position_state", &args.position_state)?;
 	let data = OpenPositionInstructionData::new(|data| {

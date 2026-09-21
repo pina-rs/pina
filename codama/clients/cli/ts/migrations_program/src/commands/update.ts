@@ -18,13 +18,8 @@ export const updateCommand = registerGlobals(new Command("update"))
 	.description("update")
 	.requiredOption("--value <value>", "value")
 	.requiredOption("--memo <memo>", "memo")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--referrer <referrer>", "The `referrer` account")
 	.requiredOption("--state <state>", "The `state` account")
-	.option(
-		"--migration-payer <migrationPayer>",
-		"The `migration_payer` account [default: payer]",
-	)
 	.requiredOption(
 		"--system-program <systemProgram>",
 		"The `system_program` account",

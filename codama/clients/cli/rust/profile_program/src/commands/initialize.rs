@@ -24,19 +24,13 @@ pub struct InitializeArgs {
 	name: String,
 	#[arg(long)]
 	bio: String,
-	/// The wallet creating the profile. Pays for account creation and becomes the authority whose address seeds the PDA [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => {

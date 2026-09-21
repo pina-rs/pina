@@ -18,7 +18,6 @@ export const deactivateRoleCommand = registerGlobals(
 	new Command("deactivate_role"),
 )
 	.description("deactivateRole")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption(
 		"--registry-config <registryConfig>",
 		"The `registry_config` account",

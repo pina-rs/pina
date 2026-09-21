@@ -18,19 +18,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ToggleCompletedArgs {
-	/// The `owner` account [default: payer]
-	#[arg(long)]
-	owner: Option<String>,
 	/// The `todo` account [default: derived]
 	#[arg(long)]
 	todo: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: ToggleCompletedArgs) -> Result<(), CliError> {
-	let owner = match &args.owner {
-		Some(value) => CliContext::pubkey("--owner", value)?,
-		None => context.payer_pubkey(),
-	};
+	let owner = context.payer_pubkey();
 	let todo = match &args.todo {
 		Some(value) => CliContext::pubkey("--todo", value)?,
 		None => {

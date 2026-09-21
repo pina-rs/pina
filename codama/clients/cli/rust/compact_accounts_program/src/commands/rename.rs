@@ -22,9 +22,6 @@ pub struct RenameArgs {
 	title_len: u8,
 	#[arg(long)]
 	title: String,
-	/// Funds title growth and receives rent refunded by title shrinkage [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `journal` account [default: derived]
 	#[arg(long)]
 	journal: Option<String>,
@@ -32,10 +29,7 @@ pub struct RenameArgs {
 
 pub(crate) fn run(context: &CliContext, args: RenameArgs) -> Result<(), CliError> {
 	let title = CliContext::bytes::<24>("--title", &args.title)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let journal = match &args.journal {
 		Some(value) => CliContext::pubkey("--journal", value)?,
 		None => {

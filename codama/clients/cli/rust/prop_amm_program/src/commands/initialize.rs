@@ -17,24 +17,11 @@ use crate::context::CliContext;
 use crate::context::CliError;
 
 #[derive(Debug, Args)]
-pub struct InitializeArgs {
-	/// The `payer` account [default: payer]
-	#[arg(long)]
-	payer: Option<String>,
-	/// The `oracle` account [default: payer]
-	#[arg(long)]
-	oracle: Option<String>,
-}
+pub struct InitializeArgs {}
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let payer = match &args.payer {
-		Some(value) => CliContext::pubkey("--payer", value)?,
-		None => context.payer_pubkey(),
-	};
-	let oracle = match &args.oracle {
-		Some(value) => CliContext::pubkey("--oracle", value)?,
-		None => context.payer_pubkey(),
-	};
+	let payer = context.payer_pubkey();
+	let oracle = context.payer_pubkey();
 	let data = InitializeInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
 			message: "instruction data rejected the provided arguments".to_string(),

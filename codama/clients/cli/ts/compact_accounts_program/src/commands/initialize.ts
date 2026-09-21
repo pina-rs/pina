@@ -20,10 +20,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--entry-count <entryCount>", "entryCount")
 	.requiredOption("--marker-count <markerCount>", "markerCount")
 	.option(
-		"--authority <authority>",
-		"Funds rent and becomes the journal authority [default: payer]",
-	)
-	.option(
 		"--journal <journal>",
 		"Empty canonical journal PDA [default: derived]",
 	)

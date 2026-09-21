@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct ReallocArgs {
 	#[arg(long)]
 	len: u16,
-	/// The sample authority. It pays rent on growth and receives excess rent on shrink, so it must be writable as well as a signer [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `sample` account
 	#[arg(long)]
 	sample: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: ReallocArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let sample = CliContext::pubkey("--sample", &args.sample)?;
 	let data = ReallocInstructionData::new(|data| {
 		data.len.set(args.len);

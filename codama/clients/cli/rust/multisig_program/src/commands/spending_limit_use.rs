@@ -27,9 +27,6 @@ pub struct SpendingLimitUseArgs {
 	/// The `spending_limit` account
 	#[arg(long)]
 	spending_limit: String,
-	/// The `member` account [default: payer]
-	#[arg(long)]
-	member: Option<String>,
 	/// The vault PDA: SOL source or SPL transfer authority
 	#[arg(long)]
 	vault: String,
@@ -56,10 +53,7 @@ pub struct SpendingLimitUseArgs {
 pub(crate) fn run(context: &CliContext, args: SpendingLimitUseArgs) -> Result<(), CliError> {
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
 	let spending_limit = CliContext::pubkey("--spending_limit", &args.spending_limit)?;
-	let member = match &args.member {
-		Some(value) => CliContext::pubkey("--member", value)?,
-		None => context.payer_pubkey(),
-	};
+	let member = context.payer_pubkey();
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
 	let destination = CliContext::pubkey("--destination", &args.destination)?;
 	let clock = CliContext::pubkey("--clock", &args.clock)?;

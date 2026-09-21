@@ -18,10 +18,6 @@ export const helloCommand = registerGlobals(new Command("hello"))
 	.description(
 		"The `#[instruction]` attribute macro generates:\n\n- A discriminator field as the first byte of the struct.\n- `HasDiscriminator` implementation linking this struct to\n`HelloInstruction::Hello`.\n- A generated `PinaPod` view plus checked `initialize` and `try_from_bytes`\nhelpers.\n\n`HelloInstructionData` has no payload fields — only the discriminator byte\nis needed to identify the instruction.",
 	)
-	.option(
-		"--user <user>",
-		"The user invoking the program. Must be a signer so we can trust the [default: payer]",
-	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

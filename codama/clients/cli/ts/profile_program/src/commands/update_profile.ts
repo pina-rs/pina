@@ -23,10 +23,6 @@ export const updateProfileCommand = registerGlobals(
 	.requiredOption("--name <name>", "name")
 	.requiredOption("--bio <bio>", "bio")
 	.option(
-		"--authority <authority>",
-		"The profile's authority. Must sign to prove ownership [default: payer]",
-	)
-	.option(
 		"--profile <profile>",
 		"The profile PDA account (must already exist and be writable) [default: derived]",
 	)

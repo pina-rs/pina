@@ -19,10 +19,6 @@ export const incrementCommand = registerGlobals(new Command("increment"))
 		"Instruction data for `Increment`. No extra payload beyond the\ndiscriminator byte.",
 	)
 	.option(
-		"--authority <authority>",
-		"The counter's authority. Must sign to prove ownership [default: payer]",
-	)
-	.option(
 		"--counter <counter>",
 		"The counter PDA account (must already exist and be writable) [default: derived]",
 	)

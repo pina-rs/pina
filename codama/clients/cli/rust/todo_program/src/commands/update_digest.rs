@@ -20,9 +20,6 @@ use crate::context::CliError;
 pub struct UpdateDigestArgs {
 	#[arg(long)]
 	digest: String,
-	/// The `owner` account [default: payer]
-	#[arg(long)]
-	owner: Option<String>,
 	/// The `todo` account [default: derived]
 	#[arg(long)]
 	todo: Option<String>,
@@ -30,10 +27,7 @@ pub struct UpdateDigestArgs {
 
 pub(crate) fn run(context: &CliContext, args: UpdateDigestArgs) -> Result<(), CliError> {
 	let digest = CliContext::bytes::<32>("--digest", &args.digest)?;
-	let owner = match &args.owner {
-		Some(value) => CliContext::pubkey("--owner", value)?,
-		None => context.payer_pubkey(),
-	};
+	let owner = context.payer_pubkey();
 	let todo = match &args.todo {
 		Some(value) => CliContext::pubkey("--todo", value)?,
 		None => {

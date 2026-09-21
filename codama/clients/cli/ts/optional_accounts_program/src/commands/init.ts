@@ -18,10 +18,6 @@ export const initCommand = registerGlobals(new Command("init"))
 	.description("init")
 	.requiredOption("--bump <bump>", "bump")
 	.option(
-		"--authority <authority>",
-		"Pays for account creation and seeds the store PDA [default: payer]",
-	)
-	.option(
 		"--store <store>",
 		"The store PDA account (must be empty — not yet created) [default: derived]",
 	)

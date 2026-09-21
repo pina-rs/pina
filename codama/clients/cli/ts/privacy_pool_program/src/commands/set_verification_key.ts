@@ -29,7 +29,6 @@ export const setVerificationKeyCommand = registerGlobals(
 	.requiredOption("--ic1 <ic1>", "ic1")
 	.requiredOption("--ic2 <ic2>", "ic2")
 	.requiredOption("--ic3 <ic3>", "ic3")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.requiredOption(
 		"--verifying-key-account <verifyingKeyAccount>",

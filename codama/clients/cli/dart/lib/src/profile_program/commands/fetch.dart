@@ -61,6 +61,10 @@ final class FetchProfileStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchProfileStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct CreatePdaArgs {
 	#[arg(long)]
 	bump: u8,
-	/// The `payer` account [default: payer]
-	#[arg(long)]
-	payer: Option<String>,
 	/// The `state` account [default: derived]
 	#[arg(long)]
 	state: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: CreatePdaArgs) -> Result<(), CliError> {
-	let payer = match &args.payer {
-		Some(value) => CliContext::pubkey("--payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let payer = context.payer_pubkey();
 	let state = match &args.state {
 		Some(value) => CliContext::pubkey("--state", value)?,
 		None => Pubkey::find_program_address(&["state".as_bytes()], &context.program_address).0,

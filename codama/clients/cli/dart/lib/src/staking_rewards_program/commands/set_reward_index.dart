@@ -12,11 +12,6 @@ final class SetRewardIndexCommand extends Command<void> {
     argParser
       ..addOption('new_index', mandatory: true, help: "newIndex")
       ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
-      ..addOption(
         'pool_state',
         mandatory: true,
         help: "The pool_state account",
@@ -33,9 +28,7 @@ final class SetRewardIndexCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
     final newIndexValue = bigInteger(
       '--new-index',

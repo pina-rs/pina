@@ -18,9 +18,6 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ClaimArgs {
-	/// The `user` account [default: payer]
-	#[arg(long)]
-	user: Option<String>,
 	/// The `reward_mint` account
 	#[arg(long)]
 	reward_mint: String,
@@ -42,10 +39,7 @@ pub struct ClaimArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError> {
-	let user = match &args.user {
-		Some(value) => CliContext::pubkey("--user", value)?,
-		None => context.payer_pubkey(),
-	};
+	let user = context.payer_pubkey();
 	let reward_mint = CliContext::pubkey("--reward_mint", &args.reward_mint)?;
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
 	let position_state = CliContext::pubkey("--position_state", &args.position_state)?;

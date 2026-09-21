@@ -16,8 +16,6 @@ import {
 
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
-	.option("--payer <payer>", "The `payer` account [default: payer]")
-	.option("--oracle <oracle>", "The `oracle` account [default: payer]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

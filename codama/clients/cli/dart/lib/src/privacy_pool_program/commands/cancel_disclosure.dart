@@ -12,11 +12,6 @@ final class CancelDisclosureCommand extends Command<void> {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
       ..addOption(
-        'requester',
-        mandatory: false,
-        help: "The requester account [default: payer]",
-      )
-      ..addOption(
         'disclosure_request',
         mandatory: true,
         help: "The disclosure_request account",
@@ -33,9 +28,7 @@ final class CancelDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final requester = (results['requester'] as String?) != null
-        ? pubkey('--requester', results['requester']! as String)
-        : context.payerAddress;
+    final requester = context.payerAddress;
     final disclosureRequest = pubkey(
       '--disclosure-request',
       results['disclosure_request']! as String,

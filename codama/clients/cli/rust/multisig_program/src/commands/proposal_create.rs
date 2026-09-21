@@ -44,12 +44,6 @@ pub struct ProposalCreateArgs {
 	/// The `proposal` account
 	#[arg(long)]
 	proposal: String,
-	/// The `creator` account [default: payer]
-	#[arg(long)]
-	creator: Option<String>,
-	/// The `rent_payer` account [default: payer]
-	#[arg(long)]
-	rent_payer: Option<String>,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -61,14 +55,8 @@ pub(crate) fn run(context: &CliContext, args: ProposalCreateArgs) -> Result<(), 
 	let actions = CliContext::bytes::<128>("--actions", &args.actions)?;
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
 	let proposal = CliContext::pubkey("--proposal", &args.proposal)?;
-	let creator = match &args.creator {
-		Some(value) => CliContext::pubkey("--creator", value)?,
-		None => context.payer_pubkey(),
-	};
-	let rent_payer = match &args.rent_payer {
-		Some(value) => CliContext::pubkey("--rent_payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let creator = context.payer_pubkey();
+	let rent_payer = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ProposalCreateInstructionData::new(|data| {
 		data.bump = args.bump;

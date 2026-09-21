@@ -24,19 +24,13 @@ pub struct InitializeArgs {
 	entry_count: u8,
 	#[arg(long)]
 	marker_count: u8,
-	/// Funds rent and becomes the journal authority [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// Empty canonical journal PDA [default: derived]
 	#[arg(long)]
 	journal: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let journal = match &args.journal {
 		Some(value) => CliContext::pubkey("--journal", value)?,
 		None => {

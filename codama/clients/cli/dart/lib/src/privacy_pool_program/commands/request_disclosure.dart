@@ -18,11 +18,6 @@ final class RequestDisclosureCommand extends Command<void> {
       ..addOption('notice', mandatory: true, help: "notice")
       ..addOption('legal_basis_hash', mandatory: true, help: "legalBasisHash")
       ..addOption(
-        'requester',
-        mandatory: false,
-        help: "The requester account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -60,9 +55,7 @@ final class RequestDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final requester = (results['requester'] as String?) != null
-        ? pubkey('--requester', results['requester']! as String)
-        : context.payerAddress;
+    final requester = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

@@ -30,7 +30,11 @@ final class FetchFloatDataAccountCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findFloatDataAccountPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -50,6 +54,10 @@ final class FetchFloatDataAccountCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchFloatDataAccountCommand());
+  }
+
   @override
   String get name => 'fetch';
 

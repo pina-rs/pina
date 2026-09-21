@@ -9,17 +9,11 @@ import 'package:pina_codama_clients/todo_program.dart';
 
 final class ToggleCompletedCommand extends Command<void> {
   ToggleCompletedCommand() {
-    argParser
-      ..addOption(
-        'owner',
-        mandatory: false,
-        help: "The owner account [default: payer]",
-      )
-      ..addOption(
-        'todo',
-        mandatory: false,
-        help: "The todo account [default: derived]",
-      );
+    argParser..addOption(
+      'todo',
+      mandatory: false,
+      help: "The todo account [default: derived]",
+    );
   }
 
   @override
@@ -32,9 +26,7 @@ final class ToggleCompletedCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final owner = (results['owner'] as String?) != null
-        ? pubkey('--owner', results['owner']! as String)
-        : context.payerAddress;
+    final owner = context.payerAddress;
     final todo = (results['todo'] as String?) != null
         ? pubkey('--todo', results['todo']! as String)
         : (await findTodoPda(

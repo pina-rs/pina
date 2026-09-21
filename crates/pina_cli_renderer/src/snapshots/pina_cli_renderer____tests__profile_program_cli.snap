@@ -69,19 +69,13 @@ use solana_sdk::pubkey::Pubkey;
 pub struct AddTagArgs {
 	#[arg(long)]
 	tag: u64,
-	/// The profile's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: AddTagArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => Pubkey::find_program_address(
@@ -132,19 +126,13 @@ pub struct InitializeArgs {
 	name: String,
 	#[arg(long)]
 	bio: String,
-	/// The wallet creating the profile. Pays for account creation and becomes the authority whose address seeds the PDA [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => Pubkey::find_program_address(
@@ -223,19 +211,13 @@ use solana_sdk::pubkey::Pubkey;
 pub struct RemoveTagArgs {
 	#[arg(long)]
 	index: u64,
-	/// The profile's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: RemoveTagArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => Pubkey::find_program_address(
@@ -284,19 +266,13 @@ pub struct UpdateProfileArgs {
 	name: String,
 	#[arg(long)]
 	bio: String,
-	/// The profile's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateProfileArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => Pubkey::find_program_address(

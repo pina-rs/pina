@@ -14,12 +14,6 @@ final class InitializeCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "The wallet creating the counter. Pays for account creation and becomes [default: payer]",
-      )
-      ..addOption(
         'counter',
         mandatory: false,
         help:
@@ -38,9 +32,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final counter = (results['counter'] as String?) != null
         ? pubkey('--counter', results['counter']! as String)
         : (await findCounterPda(

@@ -26,19 +26,13 @@ pub struct InitializePolicyArgs {
 	maximum: u64,
 	#[arg(long)]
 	required_approvals: u8,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `policy` account [default: derived]
 	#[arg(long)]
 	policy: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializePolicyArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let policy = match &args.policy {
 		Some(value) => CliContext::pubkey("--policy", value)?,
 		None => {

@@ -28,10 +28,6 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.option(
-		"--payer <payer>",
-		"Funds the successor note's rent. Transfers are anonymous with respect [default: payer]",
-	)
 	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
 	.requiredOption(
 		"--nullifier-set <nullifierSet>",

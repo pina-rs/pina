@@ -19,7 +19,6 @@ export const resolveChallengeCommand = registerGlobals(
 )
 	.description("resolveChallenge")
 	.requiredOption("--approve <approve>", "approve")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",

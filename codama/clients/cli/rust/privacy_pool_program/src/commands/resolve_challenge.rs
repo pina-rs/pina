@@ -19,9 +19,6 @@ use crate::context::CliError;
 pub struct ResolveChallengeArgs {
 	#[arg(long)]
 	approve: u8,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -31,10 +28,7 @@ pub struct ResolveChallengeArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: ResolveChallengeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let data = ResolveChallengeInstructionData::new(|data| {

@@ -64,6 +64,10 @@ final class FetchJournalCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchJournalCommand());
+  }
+
   @override
   String get name => 'fetch';
 

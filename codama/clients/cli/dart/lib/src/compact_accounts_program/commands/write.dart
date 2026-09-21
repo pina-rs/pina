@@ -13,12 +13,6 @@ final class WriteCommand extends Command<void> {
       ..addOption('index', mandatory: true, help: "index")
       ..addOption('value', mandatory: true, help: "value")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "Funds growth if a future write patch changes the encoded length [default: payer]",
-      )
-      ..addOption(
         'journal',
         mandatory: false,
         help: "The journal account [default: derived]",
@@ -35,9 +29,7 @@ final class WriteCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(

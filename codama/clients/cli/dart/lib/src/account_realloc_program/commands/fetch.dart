@@ -59,6 +59,10 @@ final class FetchSampleCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchSampleCommand());
+  }
+
   @override
   String get name => 'fetch';
 

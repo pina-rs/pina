@@ -25,7 +25,6 @@ export const initializePolicyCommand = registerGlobals(
 		"--required-approvals <requiredApprovals>",
 		"requiredApprovals",
 	)
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.option("--policy <policy>", "The `policy` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

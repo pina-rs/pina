@@ -12,11 +12,6 @@ final class ApproveDisclosureCommand extends Command<void> {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
       ..addOption(
-        'custodian',
-        mandatory: false,
-        help: "The custodian account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -49,9 +44,7 @@ final class ApproveDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final custodian = (results['custodian'] as String?) != null
-        ? pubkey('--custodian', results['custodian']! as String)
-        : context.payerAddress;
+    final custodian = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

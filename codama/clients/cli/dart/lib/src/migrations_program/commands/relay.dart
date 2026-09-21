@@ -13,18 +13,8 @@ final class RelayCommand extends Command<void> {
   RelayCommand() {
     argParser
       ..addOption('value', mandatory: true, help: "value")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption(
-        'migration_payer',
-        mandatory: false,
-        help: "The migration_payer account [default: payer]",
-      )
       ..addOption(
         'migration_program',
         mandatory: true,
@@ -42,14 +32,10 @@ final class RelayCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final referrer = pubkey('--referrer', results['referrer']! as String);
     final state = pubkey('--state', results['state']! as String);
-    final migrationPayer = (results['migration_payer'] as String?) != null
-        ? pubkey('--migration-payer', results['migration_payer']! as String)
-        : context.payerAddress;
+    final migrationPayer = context.payerAddress;
     final migrationProgram = pubkey(
       '--migration-program',
       results['migration_program']! as String,

@@ -22,19 +22,13 @@ pub struct WriteArgs {
 	index: u8,
 	#[arg(long)]
 	value: u64,
-	/// Funds growth if a future write patch changes the encoded length [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `journal` account [default: derived]
 	#[arg(long)]
 	journal: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: WriteArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let journal = match &args.journal {
 		Some(value) => CliContext::pubkey("--journal", value)?,
 		None => {

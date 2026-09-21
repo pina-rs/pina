@@ -22,19 +22,13 @@ pub struct UpdateProfileArgs {
 	name: String,
 	#[arg(long)]
 	bio: String,
-	/// The profile's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	profile: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateProfileArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let profile = match &args.profile {
 		Some(value) => CliContext::pubkey("--profile", value)?,
 		None => {

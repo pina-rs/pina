@@ -12,11 +12,6 @@ final class SetCustodiansCommand extends Command<void> {
     argParser
       ..addOption('custodians', mandatory: true, help: "custodians")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -38,9 +33,7 @@ final class SetCustodiansCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

@@ -30,9 +30,6 @@ pub struct DepositArgs {
 	envelope: String,
 	#[arg(long)]
 	shares: String,
-	/// The `depositor` account [default: payer]
-	#[arg(long)]
-	depositor: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -52,10 +49,7 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 	let view_pubkey = CliContext::bytes::<32>("--view_pubkey", &args.view_pubkey)?;
 	let envelope = CliContext::bytes::<128>("--envelope", &args.envelope)?;
 	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
-	let depositor = match &args.depositor {
-		Some(value) => CliContext::pubkey("--depositor", value)?,
-		None => context.payer_pubkey(),
-	};
+	let depositor = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let pool_vault = CliContext::pubkey("--pool_vault", &args.pool_vault)?;
 	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;

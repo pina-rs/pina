@@ -19,7 +19,6 @@ export const checkPolicyCommand = registerGlobals(new Command("check_policy"))
 	.requiredOption("--amount <amount>", "amount")
 	.requiredOption("--memo <memo>", "memo")
 	.requiredOption("--approvals <approvals>", "approvals")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.option("--policy <policy>", "The `policy` account [default: derived]")
 	.requiredOption(
 		"--audit <audit>",

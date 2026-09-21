@@ -13,11 +13,6 @@ final class RegisterRequesterCommand extends Command<void> {
       ..addOption('requester', mandatory: true, help: "requester")
       ..addOption('max_tier', mandatory: true, help: "maxTier")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -39,9 +34,7 @@ final class RegisterRequesterCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

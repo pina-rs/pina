@@ -9,17 +9,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class NoteCommand extends Command<void> {
   NoteCommand() {
-    argParser
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The transaction fee payer; always required [default: payer]",
-      )
-      ..addOption(
-        'note',
-        mandatory: true,
-        help: "An arbitrary readonly account attached as context",
-      );
+    argParser..addOption(
+      'note',
+      mandatory: true,
+      help: "An arbitrary readonly account attached as context",
+    );
   }
 
   @override
@@ -32,9 +26,7 @@ final class NoteCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final note = pubkey('--note', results['note']! as String);
 
     final instruction = getNoteInstruction(

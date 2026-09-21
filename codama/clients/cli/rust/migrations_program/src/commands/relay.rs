@@ -20,34 +20,22 @@ use crate::context::CliError;
 pub struct RelayArgs {
 	#[arg(long)]
 	value: u64,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `referrer` account
 	#[arg(long)]
 	referrer: String,
 	/// The `state` account
 	#[arg(long)]
 	state: String,
-	/// The `migration_payer` account [default: payer]
-	#[arg(long)]
-	migration_payer: Option<String>,
 	/// The `migration_program` account
 	#[arg(long)]
 	migration_program: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: RelayArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let referrer = CliContext::pubkey("--referrer", &args.referrer)?;
 	let state = CliContext::pubkey("--state", &args.state)?;
-	let migration_payer = match &args.migration_payer {
-		Some(value) => CliContext::pubkey("--migration_payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let migration_payer = context.payer_pubkey();
 	let migration_program = CliContext::pubkey("--migration_program", &args.migration_program)?;
 	let data = RelayInstructionData::new(|data| {
 		data.value.set(args.value);

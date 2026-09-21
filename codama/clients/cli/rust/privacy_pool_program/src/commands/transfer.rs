@@ -43,9 +43,6 @@ pub struct TransferArgs {
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
-	/// Funds the successor note's rent. Transfers are anonymous with respect to the spent note, not to fees: this example has no relayer, so the submitting wallet signs and pays. Production routes this through a relayer so even this linkage disappears [default: payer]
-	#[arg(long)]
-	payer: Option<String>,
 	/// The `merkle_tree` account
 	#[arg(long)]
 	merkle_tree: String,
@@ -71,10 +68,7 @@ pub(crate) fn run(context: &CliContext, args: TransferArgs) -> Result<(), CliErr
 	let proof_b = CliContext::bytes::<128>("--proof_b", &args.proof_b)?;
 	let proof_c = CliContext::bytes::<64>("--proof_c", &args.proof_c)?;
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
-	let payer = match &args.payer {
-		Some(value) => CliContext::pubkey("--payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let payer = context.payer_pubkey();
 	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;
 	let nullifier_set = CliContext::pubkey("--nullifier_set", &args.nullifier_set)?;
 	let verifying_key_account =

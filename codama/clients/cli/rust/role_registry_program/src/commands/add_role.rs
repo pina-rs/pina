@@ -24,9 +24,6 @@ pub struct AddRoleArgs {
 	permissions: u64,
 	#[arg(long)]
 	bump: u8,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `grantee` account
 	#[arg(long)]
 	grantee: String,
@@ -39,10 +36,7 @@ pub struct AddRoleArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: AddRoleArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let grantee = CliContext::pubkey("--grantee", &args.grantee)?;
 	let registry_config = CliContext::pubkey("--registry_config", &args.registry_config)?;
 	let role_entry = CliContext::pubkey("--role_entry", &args.role_entry)?;

@@ -39,9 +39,6 @@ pub struct SetVerificationKeyArgs {
 	ic2: String,
 	#[arg(long)]
 	ic3: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -62,10 +59,7 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 	let ic1 = CliContext::bytes::<64>("--ic1", &args.ic1)?;
 	let ic2 = CliContext::bytes::<64>("--ic2", &args.ic2)?;
 	let ic3 = CliContext::bytes::<64>("--ic3", &args.ic3)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let verifying_key_account =
 		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;

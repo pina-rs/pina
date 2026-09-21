@@ -19,9 +19,6 @@ use crate::context::CliError;
 pub struct SetCustodiansArgs {
 	#[arg(long)]
 	custodians: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -32,10 +29,7 @@ pub struct SetCustodiansArgs {
 
 pub(crate) fn run(context: &CliContext, args: SetCustodiansArgs) -> Result<(), CliError> {
 	let custodians = CliContext::bytes::<96>("--custodians", &args.custodians)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let custodian_registry = CliContext::pubkey("--custodian_registry", &args.custodian_registry)?;
 	let data = SetCustodiansInstructionData::new(|data| {

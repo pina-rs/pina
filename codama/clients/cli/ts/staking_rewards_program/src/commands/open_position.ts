@@ -17,7 +17,6 @@ import {
 export const openPositionCommand = registerGlobals(new Command("open_position"))
 	.description("openPosition")
 	.requiredOption("--bump <bump>", "bump")
-	.option("--user <user>", "The `user` account [default: payer]")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption(
 		"--position-state <positionState>",

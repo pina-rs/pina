@@ -20,7 +20,6 @@ export const forwardRotateWithSignerCommand = registerGlobals(
 	.description("forwardRotateWithSigner")
 	.requiredOption("--new-authority <newAuthority>", "newAuthority")
 	.requiredOption("--oracle <oracle>", "The `oracle` account")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption(
 		"--prop-amm-program <propAmmProgram>",
 		"The `prop_amm_program` account",

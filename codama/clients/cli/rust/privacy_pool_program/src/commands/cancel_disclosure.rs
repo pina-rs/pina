@@ -19,19 +19,13 @@ use crate::context::CliError;
 pub struct CancelDisclosureArgs {
 	#[arg(long)]
 	reserved: u8,
-	/// The `requester` account [default: payer]
-	#[arg(long)]
-	requester: Option<String>,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: CancelDisclosureArgs) -> Result<(), CliError> {
-	let requester = match &args.requester {
-		Some(value) => CliContext::pubkey("--requester", value)?,
-		None => context.payer_pubkey(),
-	};
+	let requester = context.payer_pubkey();
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let data = CancelDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;

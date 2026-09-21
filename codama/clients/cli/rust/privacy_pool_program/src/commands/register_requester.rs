@@ -21,9 +21,6 @@ pub struct RegisterRequesterArgs {
 	requester: String,
 	#[arg(long)]
 	max_tier: u8,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -34,10 +31,7 @@ pub struct RegisterRequesterArgs {
 
 pub(crate) fn run(context: &CliContext, args: RegisterRequesterArgs) -> Result<(), CliError> {
 	let requester = CliContext::pubkey("--requester", &args.requester)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let requester_registry = CliContext::pubkey("--requester_registry", &args.requester_registry)?;
 	let data = RegisterRequesterInstructionData::new(|data| {

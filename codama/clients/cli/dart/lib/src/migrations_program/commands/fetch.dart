@@ -30,7 +30,9 @@ final class FetchStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findStatePda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -68,7 +70,9 @@ final class FetchManualStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findManualStatePda(programAddress: context.programAddress)).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -103,7 +107,11 @@ final class FetchCompactStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findCompactStatePda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -122,6 +130,12 @@ final class FetchCompactStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchStateCommand());
+    addSubcommand(FetchManualStateCommand());
+    addSubcommand(FetchCompactStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

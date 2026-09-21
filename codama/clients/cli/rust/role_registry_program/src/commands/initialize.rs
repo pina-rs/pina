@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct InitializeArgs {
 	#[arg(long)]
 	bump: u8,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `registry_config` account [default: derived]
 	#[arg(long)]
 	registry_config: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let registry_config = match &args.registry_config {
 		Some(value) => CliContext::pubkey("--registry_config", value)?,
 		None => {

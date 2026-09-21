@@ -16,17 +16,9 @@ import {
 
 export const inspectCommand = registerGlobals(new Command("inspect"))
 	.description("inspect")
-	.option(
-		"--authority <authority>",
-		"The transaction fee payer; always required [default: payer]",
-	)
 	.requiredOption(
 		"--store <store>",
 		"When present, must be the caller's store PDA",
-	)
-	.option(
-		"--witness <witness>",
-		"When present, must have signed the transaction [default: payer]",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);

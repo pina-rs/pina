@@ -18,10 +18,6 @@ export const writeCommand = registerGlobals(new Command("write"))
 	.description("write")
 	.requiredOption("--index <index>", "index")
 	.requiredOption("--value <value>", "value")
-	.option(
-		"--authority <authority>",
-		"Funds growth if a future write patch changes the encoded length [default: payer]",
-	)
 	.option("--journal <journal>", "The `journal` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

@@ -61,6 +61,10 @@ final class FetchEscrowStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchEscrowStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

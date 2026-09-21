@@ -21,11 +21,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('log_bump', mandatory: true, help: "logBump")
       ..addOption('custodians', mandatory: true, help: "custodians")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: false,
         help: "The pool_config account [default: derived]",
@@ -72,9 +67,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
         : (await findPoolConfigPda(programAddress: context.programAddress)).$1;

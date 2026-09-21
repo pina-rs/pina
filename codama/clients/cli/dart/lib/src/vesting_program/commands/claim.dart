@@ -13,11 +13,6 @@ final class ClaimCommand extends Command<void> {
   ClaimCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption(
-        'beneficiary',
-        mandatory: false,
-        help: "The beneficiary account [default: payer]",
-      )
       ..addOption('mint', mandatory: true, help: "The mint account")
       ..addOption(
         'vesting_state',
@@ -48,9 +43,7 @@ final class ClaimCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final beneficiary = (results['beneficiary'] as String?) != null
-        ? pubkey('--beneficiary', results['beneficiary']! as String)
-        : context.payerAddress;
+    final beneficiary = context.payerAddress;
     final mint = pubkey('--mint', results['mint']! as String);
     final vestingState = pubkey(
       '--vesting-state',

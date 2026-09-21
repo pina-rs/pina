@@ -19,10 +19,6 @@ export const reallocCommand = registerGlobals(new Command("realloc"))
 		"Resizes the complete account-data buffer to `len` bytes.\n\n`len` must equal `Sample::projected_bytes` for an active value count.",
 	)
 	.requiredOption("--len <len>", "len")
-	.option(
-		"--authority <authority>",
-		"The sample authority. It pays rent on growth and receives excess rent on [default: payer]",
-	)
 	.requiredOption("--sample <sample>", "The `sample` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

@@ -16,17 +16,10 @@ use crate::context::CliContext;
 use crate::context::CliError;
 
 #[derive(Debug, Args)]
-pub struct HelloArgs {
-	/// The user invoking the program. Must be a signer so we can trust the address is authentic [default: payer]
-	#[arg(long)]
-	user: Option<String>,
-}
+pub struct HelloArgs {}
 
 pub(crate) fn run(context: &CliContext, args: HelloArgs) -> Result<(), CliError> {
-	let user = match &args.user {
-		Some(value) => CliContext::pubkey("--user", value)?,
-		None => context.payer_pubkey(),
-	};
+	let user = context.payer_pubkey();
 	let data = HelloInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
 			message: "instruction data rejected the provided arguments".to_string(),

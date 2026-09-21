@@ -25,7 +25,6 @@ export const requestDisclosureCommand = registerGlobals(
 	.requiredOption("--notice-len <noticeLen>", "noticeLen")
 	.requiredOption("--notice <notice>", "notice")
 	.requiredOption("--legal-basis-hash <legalBasisHash>", "legalBasisHash")
-	.option("--requester <requester>", "The `requester` account [default: payer]")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.requiredOption(
 		"--requester-registry <requesterRegistry>",

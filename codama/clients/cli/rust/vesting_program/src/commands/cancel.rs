@@ -18,9 +18,6 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct CancelArgs {
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `mint` account
 	#[arg(long)]
 	mint: String,
@@ -39,10 +36,7 @@ pub struct CancelArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let vesting_state = CliContext::pubkey("--vesting_state", &args.vesting_state)?;
 	let admin_ata = CliContext::pubkey("--admin_ata", &args.admin_ata)?;

@@ -13,11 +13,6 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
       ..addOption('new_authority', mandatory: true, help: "newAuthority")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'prop_amm_program',
         mandatory: true,
         help: "The prop_amm_program account",
@@ -35,9 +30,7 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final oracle = pubkey('--oracle', results['oracle']! as String);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final propAmmProgram = pubkey(
       '--prop-amm-program',
       results['prop_amm_program']! as String,

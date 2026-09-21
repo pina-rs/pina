@@ -17,27 +17,15 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct InspectArgs {
-	/// The transaction fee payer; always required [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// When present, must be the caller's store PDA
 	#[arg(long)]
 	store: String,
-	/// When present, must have signed the transaction [default: payer]
-	#[arg(long)]
-	witness: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InspectArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = CliContext::pubkey("--store", &args.store)?;
-	let witness = match &args.witness {
-		Some(value) => CliContext::pubkey("--witness", value)?,
-		None => context.payer_pubkey(),
-	};
+	let witness = context.payer_pubkey();
 	let data = InspectInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
 			message: "instruction data rejected the provided arguments".to_string(),

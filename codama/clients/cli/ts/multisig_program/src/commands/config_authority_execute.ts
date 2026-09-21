@@ -21,11 +21,6 @@ export const configAuthorityExecuteCommand = registerGlobals(
 	.requiredOption("--actions-len <actionsLen>", "actionsLen")
 	.requiredOption("--actions <actions>", "actions")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
-	.option(
-		"--rent-payer <rentPayer>",
-		"The `rent_payer` account [default: payer]",
-	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.requiredOption(
 		"--spending-limit-accounts <spendingLimitAccounts>",

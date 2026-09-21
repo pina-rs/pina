@@ -43,15 +43,7 @@ export const multisigImportCommand = registerGlobals(
 		"--program-config <programConfig>",
 		"The `program_config` account",
 	)
-	.option(
-		"--create-key <createKey>",
-		"The `create_key` account [default: payer]",
-	)
 	.option("--multisig <multisig>", "The `multisig` account [default: derived]")
-	.option(
-		"--rent-payer <rentPayer>",
-		"The `rent_payer` account [default: payer]",
-	)
 	.requiredOption(
 		"--treasury <treasury>",
 		"Treasury that collects the creation fee; absent when the fee is zero",

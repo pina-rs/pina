@@ -19,11 +19,6 @@ final class DepositCommand extends Command<void> {
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('shares', mandatory: true, help: "shares")
       ..addOption(
-        'depositor',
-        mandatory: false,
-        help: "The depositor account [default: payer]",
-      )
-      ..addOption(
         'pool_config',
         mandatory: true,
         help: "The pool_config account",
@@ -51,9 +46,7 @@ final class DepositCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final depositor = (results['depositor'] as String?) != null
-        ? pubkey('--depositor', results['depositor']! as String)
-        : context.payerAddress;
+    final depositor = context.payerAddress;
     final poolConfig = pubkey(
       '--pool-config',
       results['pool_config']! as String,

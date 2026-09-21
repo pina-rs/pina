@@ -19,9 +19,6 @@ use crate::context::CliError;
 pub struct ApproveDisclosureArgs {
 	#[arg(long)]
 	reserved: u8,
-	/// The `custodian` account [default: payer]
-	#[arg(long)]
-	custodian: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -40,10 +37,7 @@ pub struct ApproveDisclosureArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: ApproveDisclosureArgs) -> Result<(), CliError> {
-	let custodian = match &args.custodian {
-		Some(value) => CliContext::pubkey("--custodian", value)?,
-		None => context.payer_pubkey(),
-	};
+	let custodian = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let custodian_registry = CliContext::pubkey("--custodian_registry", &args.custodian_registry)?;
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;

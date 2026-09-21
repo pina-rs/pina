@@ -17,19 +17,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct TouchArgs {
-	/// The store's authority. Must sign [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// When present, the counter inside is incremented by one
 	#[arg(long)]
 	store: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: TouchArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = CliContext::pubkey("--store", &args.store)?;
 	let data = TouchInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {

@@ -17,9 +17,6 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct DeactivateRoleArgs {
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `registry_config` account
 	#[arg(long)]
 	registry_config: String,
@@ -29,10 +26,7 @@ pub struct DeactivateRoleArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: DeactivateRoleArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let registry_config = CliContext::pubkey("--registry_config", &args.registry_config)?;
 	let role_entry = CliContext::pubkey("--role_entry", &args.role_entry)?;
 	let data = DeactivateRoleInstructionData::new(|_data| {}).map_err(|_| {

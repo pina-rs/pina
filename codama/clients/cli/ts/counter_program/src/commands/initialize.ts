@@ -20,10 +20,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	)
 	.requiredOption("--bump <bump>", "bump")
 	.option(
-		"--authority <authority>",
-		"The wallet creating the counter. Pays for account creation and becomes [default: payer]",
-	)
-	.option(
 		"--counter <counter>",
 		"The counter PDA account (must be empty — not yet created) [default: derived]",
 	)

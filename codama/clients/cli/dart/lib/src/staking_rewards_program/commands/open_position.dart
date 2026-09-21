@@ -13,11 +13,6 @@ final class OpenPositionCommand extends Command<void> {
   OpenPositionCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'user',
-        mandatory: false,
-        help: "The user account [default: payer]",
-      )
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
       ..addOption(
         'position_state',
@@ -36,9 +31,7 @@ final class OpenPositionCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final user = (results['user'] as String?) != null
-        ? pubkey('--user', results['user']! as String)
-        : context.payerAddress;
+    final user = context.payerAddress;
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
     final positionState = pubkey(
       '--position-state',

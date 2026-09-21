@@ -34,9 +34,6 @@ pub struct InitializeArgs {
 	log_bump: u8,
 	#[arg(long)]
 	custodians: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `pool_config` account [default: derived]
 	#[arg(long)]
 	pool_config: Option<String>,
@@ -62,10 +59,7 @@ pub struct InitializeArgs {
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
 	let custodians = CliContext::bytes::<96>("--custodians", &args.custodians)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
 		None => {

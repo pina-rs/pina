@@ -14,12 +14,7 @@ final class CreateCommand extends Command<void> {
     argParser
       ..addOption('data_f32', mandatory: true, help: "dataF32")
       ..addOption('data_f64', mandatory: true, help: "dataF64")
-      ..addOption('account', mandatory: true, help: "The account account")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      );
+      ..addOption('account', mandatory: true, help: "The account account");
   }
 
   @override
@@ -33,9 +28,7 @@ final class CreateCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final account = pubkey('--account', results['account']! as String);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final dataF32Value = integer('--data-f32', results['data_f32']! as String);
     final dataF64Value = bigInteger(
       '--data-f64',

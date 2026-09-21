@@ -13,11 +13,6 @@ final class DepositCommand extends Command<void> {
   DepositCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption(
-        'user',
-        mandatory: false,
-        help: "The user account [default: payer]",
-      )
       ..addOption('stake_mint', mandatory: true, help: "The stake_mint account")
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
       ..addOption(
@@ -52,9 +47,7 @@ final class DepositCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final user = (results['user'] as String?) != null
-        ? pubkey('--user', results['user']! as String)
-        : context.payerAddress;
+    final user = context.payerAddress;
     final stakeMint = pubkey('--stake-mint', results['stake_mint']! as String);
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
     final positionState = pubkey(

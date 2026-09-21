@@ -28,9 +28,6 @@ pub struct InitializeArgs {
 	end_ts: u64,
 	#[arg(long)]
 	bump: u8,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `beneficiary` account
 	#[arg(long)]
 	beneficiary: String,
@@ -49,10 +46,7 @@ pub struct InitializeArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let beneficiary = CliContext::pubkey("--beneficiary", &args.beneficiary)?;
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let vesting_state = match &args.vesting_state {

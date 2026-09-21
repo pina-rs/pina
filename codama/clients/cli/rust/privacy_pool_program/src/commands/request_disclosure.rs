@@ -31,9 +31,6 @@ pub struct RequestDisclosureArgs {
 	notice: String,
 	#[arg(long)]
 	legal_basis_hash: String,
-	/// The `requester` account [default: payer]
-	#[arg(long)]
-	requester: Option<String>,
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
@@ -58,10 +55,7 @@ pub(crate) fn run(context: &CliContext, args: RequestDisclosureArgs) -> Result<(
 	let commitment = CliContext::bytes::<32>("--commitment", &args.commitment)?;
 	let notice = CliContext::bytes::<96>("--notice", &args.notice)?;
 	let legal_basis_hash = CliContext::bytes::<32>("--legal_basis_hash", &args.legal_basis_hash)?;
-	let requester = match &args.requester {
-		Some(value) => CliContext::pubkey("--requester", value)?,
-		None => context.payer_pubkey(),
-	};
+	let requester = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let requester_registry = CliContext::pubkey("--requester_registry", &args.requester_registry)?;
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;

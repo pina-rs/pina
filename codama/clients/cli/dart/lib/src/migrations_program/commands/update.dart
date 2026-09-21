@@ -12,18 +12,8 @@ final class UpdateCommand extends Command<void> {
     argParser
       ..addOption('value', mandatory: true, help: "value")
       ..addOption('memo', mandatory: true, help: "memo")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption(
-        'migration_payer',
-        mandatory: false,
-        help: "The migration_payer account [default: payer]",
-      )
       ..addOption(
         'system_program',
         mandatory: true,
@@ -51,14 +41,10 @@ final class UpdateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final referrer = pubkey('--referrer', results['referrer']! as String);
     final state = pubkey('--state', results['state']! as String);
-    final migrationPayer = (results['migration_payer'] as String?) != null
-        ? pubkey('--migration-payer', results['migration_payer']! as String)
-        : context.payerAddress;
+    final migrationPayer = context.payerAddress;
     final systemProgram = pubkey(
       '--system-program',
       results['system_program']! as String,

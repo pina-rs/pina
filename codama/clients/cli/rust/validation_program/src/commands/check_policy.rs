@@ -24,9 +24,6 @@ pub struct CheckPolicyArgs {
 	memo: String,
 	#[arg(long)]
 	approvals: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `policy` account [default: derived]
 	#[arg(long)]
 	policy: Option<String>,
@@ -37,10 +34,7 @@ pub struct CheckPolicyArgs {
 
 pub(crate) fn run(context: &CliContext, args: CheckPolicyArgs) -> Result<(), CliError> {
 	let approvals = CliContext::byte_vec("--approvals", &args.approvals)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let policy = match &args.policy {
 		Some(value) => CliContext::pubkey("--policy", value)?,
 		None => {
