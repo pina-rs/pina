@@ -105,17 +105,21 @@ pub(crate) fn expand(
 	let mut seed_field_inits = Vec::new();
 	let mut seed_slice_exprs = Vec::new();
 	let mut seed_slice_exprs_with_bump = Vec::new();
-	let mut seed_constants = Vec::new();
 	let mut has_borrowed_seed = false;
 
 	for seed in &args.seeds {
 		match seed {
 			PdaSeedArg::Constant(value) => {
 				let lit = syn::LitByteStr::new(value, proc_macro2::Span::call_site());
-				seed_constants.push(quote!(#lit));
+				// Constants enter the ordered slice lists at their declared
+				// position: the derived address must match the declaration
+				// order the IDL publishes, so clients derive the same address.
+				seed_slice_exprs.push(quote!(#lit));
+				seed_slice_exprs_with_bump.push(quote!(#lit));
 			}
 			PdaSeedArg::ConstantRef(path) => {
-				seed_constants.push(quote!(#path));
+				seed_slice_exprs.push(quote!(#path));
+				seed_slice_exprs_with_bump.push(quote!(#path));
 			}
 			PdaSeedArg::Variable { name, ty } => {
 				has_borrowed_seed |= ty.borrows();
@@ -515,7 +519,7 @@ pub(crate) fn expand(
 		impl<'a> #seeds_name<'a> {
 			/// The seeds as byte slices, without the bump seed.
 			pub fn as_slices(&self) -> [&[u8]; #seed_count] {
-				[#(#seed_constants,)* #(#seed_slice_exprs,)*]
+				[#(#seed_slice_exprs,)*]
 			}
 
 			/// Append the bump seed to the seeds.
@@ -530,7 +534,7 @@ pub(crate) fn expand(
 		impl<'a> #seeds_with_bump_name<'a> {
 			/// The seeds as byte slices, including the bump seed.
 			pub fn as_slices(&self) -> [&[u8]; #seed_count_with_bump] {
-				[#(#seed_constants,)* #(#seed_slice_exprs_with_bump,)* &self._bump]
+				[#(#seed_slice_exprs_with_bump,)* &self._bump]
 			}
 
 			/// The seeds as Pinocchio CPI seed values, including the bump seed.

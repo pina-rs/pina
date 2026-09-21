@@ -36,6 +36,7 @@ fn unique_address(counter: u64) -> Address {
 pub enum TestAccountType {
 	TestState = 1,
 	CounterState = 2,
+	InterleavedState = 3,
 }
 
 /// On-chain state exercising every supported seed type.
@@ -85,6 +86,24 @@ pub struct CounterState {
 	pub bump: u8,
 }
 
+/// A PDA whose byte-string constants interleave with its variable seeds.
+///
+/// Declared order is an address contract: `[b"a", owner, b"b", nonce]` and
+/// `[b"a", b"b", owner, nonce]` derive different addresses, so the generated
+/// slice list has to preserve the declaration rather than grouping constants
+/// first.
+#[account(crate = ::pina, discriminator = TestAccountType, variant = InterleavedState)]
+#[pda(
+	crate = ::pina,
+	seeds = [b"interleaved", owner: Address, b"middle", nonce: u64, b"tail"],
+	bump = bump,
+)]
+pub struct InterleavedState {
+	pub owner: Address,
+	pub nonce: u64,
+	pub bump: u8,
+}
+
 /// A signer PDA whose derivation has no variable seeds.
 #[pda(crate = ::pina, seeds = [b"authority"])]
 pub struct AuthorityState {}
@@ -130,6 +149,64 @@ fn seeds_as_slices_matches_manual_seed_bytes() {
 	assert_eq!(slices[4], &[0xAB; 8]);
 	assert_eq!(slices[5], &7u16.to_le_bytes());
 	assert_eq!(slices[6], &99u32.to_le_bytes());
+}
+
+#[test]
+fn interleaved_constants_keep_their_declared_position() {
+	let owner = unique_address(31);
+	let seeds = InterleavedState::seeds(&owner, 9);
+
+	let slices = seeds.as_slices();
+	assert_eq!(
+		slices.len(),
+		5,
+		"every declared seed contributes exactly one slice"
+	);
+	assert_eq!(slices[0], b"interleaved", "the first constant stays first");
+	assert_eq!(slices[1], owner.as_ref(), "the variable stays second");
+	assert_eq!(
+		slices[2], b"middle",
+		"a constant between variables stays between them"
+	);
+	assert_eq!(
+		slices[3],
+		&9u64.to_le_bytes(),
+		"the trailing variable is last"
+	);
+	assert_eq!(slices[4], b"tail", "the trailing constant is last");
+}
+
+#[test]
+fn interleaved_constants_change_the_derived_address() {
+	// The regression guard: grouping constants first would derive this
+	// address instead of the declared-order one.
+	let owner = unique_address(32);
+	let declared = InterleavedState::try_find_pda(&owner, 9, &TEST_PROGRAM_ID)
+		.expect("declared order derives");
+	let grouped: &[&[u8]] = &[
+		b"interleaved",
+		b"middle",
+		b"tail",
+		owner.as_ref(),
+		&9u64.to_le_bytes(),
+	];
+	let grouped_address = try_find_program_address(grouped, &TEST_PROGRAM_ID)
+		.expect("grouped order derives")
+		.0;
+
+	assert_ne!(
+		declared.0, grouped_address,
+		"the fixture must be able to distinguish the two orderings"
+	);
+	assert_eq!(
+		declared.0,
+		try_find_program_address(
+			&InterleavedState::seeds(&owner, 9).as_slices(),
+			&TEST_PROGRAM_ID
+		)
+		.expect("declared order derives")
+		.0
+	);
 }
 
 #[test]
