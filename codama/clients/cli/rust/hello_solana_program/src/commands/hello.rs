@@ -18,7 +18,7 @@ use crate::context::CliError;
 #[derive(Debug, Args)]
 pub struct HelloArgs {}
 
-pub(crate) fn run(context: &CliContext, args: HelloArgs) -> Result<(), CliError> {
+pub(crate) fn run(context: &CliContext, _args: HelloArgs) -> Result<(), CliError> {
 	let user = context.payer_pubkey();
 	let data = HelloInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {

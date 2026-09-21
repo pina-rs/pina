@@ -143,6 +143,7 @@ const int multisigProgramErrorSpendingLimitRequiresProposal = 0x20; // 32
 const Map<int, String> _multisigProgramErrorMessages = {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
   multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
@@ -210,6 +211,8 @@ const Map<int, String> _multisigProgramErrorMessages = {
   multisigProgramErrorSpendingLimitRequiresProposal:
       'A spending-limit action moves vault funds and requires a governed',
 =======
+=======
+>>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
     multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
     multisigProgramErrorUnauthorized: 'The member lacks the permission the instruction requires.',
     multisigProgramErrorInvalidThreshold: 'The threshold is zero or exceeds the number of voting members.',
@@ -242,9 +245,12 @@ const Map<int, String> _multisigProgramErrorMessages = {
     multisigProgramErrorInvalidProposalKind: 'The proposal kind does not match the instruction.',
     multisigProgramErrorMissingRentPayer: 'A spending limit action needs its rent payer and system program.',
     multisigProgramErrorProposalExpired: 'The proposal\'s recorded lifetime has elapsed.',
+<<<<<<< HEAD
 >>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
 };
 
 /// Get the error message for a MultisigProgram program error code.

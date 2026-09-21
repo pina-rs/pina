@@ -11,16 +11,8 @@ final class ResolveChallengeCommand extends Command<void> {
   ResolveChallengeCommand() {
     argParser
       ..addOption('approve', mandatory: true, help: "approve")
-      ..addOption(
-        'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
-      )
-      ..addOption(
-        'disclosure_request',
-        mandatory: true,
-        help: "The disclosure_request account",
-      );
+      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
+      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account");
   }
 
   @override
@@ -34,14 +26,8 @@ final class ResolveChallengeCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
-    final disclosureRequest = pubkey(
-      '--disclosure-request',
-      results['disclosure_request']! as String,
-    );
+    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
+    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
     final approveValue = integer('--approve', results['approve']! as String);
     final instruction = getResolveChallengeInstruction(
       programAddress: context.programAddress,

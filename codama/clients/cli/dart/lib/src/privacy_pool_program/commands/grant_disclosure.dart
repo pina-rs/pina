@@ -11,16 +11,8 @@ final class GrantDisclosureCommand extends Command<void> {
   GrantDisclosureCommand() {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
-      ..addOption(
-        'disclosure_request',
-        mandatory: true,
-        help: "The disclosure_request account",
-      )
-      ..addOption(
-        'note_commitment',
-        mandatory: true,
-        help: "The note_commitment account",
-      )
+      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
+      ..addOption('note_commitment', mandatory: true, help: "The note_commitment account")
       ..addOption('viewer', mandatory: true, help: "The viewer account");
   }
 
@@ -34,14 +26,8 @@ final class GrantDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final disclosureRequest = pubkey(
-      '--disclosure-request',
-      results['disclosure_request']! as String,
-    );
-    final noteCommitment = pubkey(
-      '--note-commitment',
-      results['note_commitment']! as String,
-    );
+    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
+    final noteCommitment = pubkey('--note-commitment', results['note_commitment']! as String);
     final viewer = pubkey('--viewer', results['viewer']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getGrantDisclosureInstruction(

@@ -12,11 +12,7 @@ final class ProposalCloseCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption(
-        'rent_collector',
-        mandatory: true,
-        help: "The rent_collector account",
-      );
+      ..addOption('rent_collector', mandatory: true, help: "The rent_collector account");
   }
 
   @override
@@ -31,10 +27,7 @@ final class ProposalCloseCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
     final proposal = pubkey('--proposal', results['proposal']! as String);
-    final rentCollector = pubkey(
-      '--rent-collector',
-      results['rent_collector']! as String,
-    );
+    final rentCollector = pubkey('--rent-collector', results['rent_collector']! as String);
 
     final instruction = getProposalCloseInstruction(
       programAddress: context.programAddress,

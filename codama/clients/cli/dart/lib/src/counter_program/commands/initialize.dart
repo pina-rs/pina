@@ -13,20 +13,14 @@ final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'counter',
-        mandatory: false,
-        help:
-            "The counter PDA account (must be empty — not yet created) [default: derived]",
-      );
+      ..addOption('counter', mandatory: false, help: "The counter PDA account (must be empty — not yet created) [default: derived]");
   }
 
   @override
   String get name => 'initialize';
 
   @override
-  String get description =>
-      "Instruction data for `Initialize`.  Contains the PDA bump seed so the client can pass a pre-computed bump (avoids the cost of `find_program_address` on-chain).";
+  String get description => "Instruction data for `Initialize`.  Contains the PDA bump seed so the client can pass a pre-computed bump (avoids the cost of `find_program_address` on-chain).";
 
   @override
   Future<void> run() async {
@@ -36,9 +30,9 @@ final class InitializeCommand extends Command<void> {
     final counter = (results['counter'] as String?) != null
         ? pubkey('--counter', results['counter']! as String)
         : (await findCounterPda(
-            seeds: CounterSeeds(authority: authority),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: CounterSeeds(authority: authority),
+          programAddress: context.programAddress,
+        )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

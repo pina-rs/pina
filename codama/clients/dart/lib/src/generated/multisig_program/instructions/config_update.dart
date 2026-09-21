@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class ConfigUpdateInstructionData {
   const ConfigUpdateInstructionData({
@@ -18,8 +20,9 @@ class ConfigUpdateInstructionData {
     required this.treasury,
     required this.setCreationFee,
     required this.creationFee,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -63,16 +66,23 @@ Decoder<ConfigUpdateInstructionData> getConfigUpdateInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'configUpdate instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'configUpdate instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (ConfigUpdateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -80,10 +90,10 @@ Decoder<ConfigUpdateInstructionData> getConfigUpdateInstructionDataDecoder() {
 
     return (
       ConfigUpdateInstructionData(
-        setTreasury: map['setTreasury']! as bool,
-        treasury: map['treasury']! as Address,
-        setCreationFee: map['setCreationFee']! as bool,
-        creationFee: map['creationFee']! as BigInt,
+      setTreasury: map['setTreasury']! as bool,
+      treasury: map['treasury']! as Address,
+      setCreationFee: map['setCreationFee']! as bool,
+      creationFee: map['creationFee']! as BigInt,
       ),
       newOffset,
     );
@@ -109,12 +119,8 @@ Decoder<ConfigUpdateInstructionData> getConfigUpdateInstructionDataDecoder() {
   };
 }
 
-Codec<ConfigUpdateInstructionData, ConfigUpdateInstructionData>
-getConfigUpdateInstructionDataCodec() {
-  return combineCodec(
-    getConfigUpdateInstructionDataEncoder(),
-    getConfigUpdateInstructionDataDecoder(),
-  );
+Codec<ConfigUpdateInstructionData, ConfigUpdateInstructionData> getConfigUpdateInstructionDataCodec() {
+  return combineCodec(getConfigUpdateInstructionDataEncoder(), getConfigUpdateInstructionDataDecoder());
 }
 
 /// Creates a [ConfigUpdate] instruction.
@@ -128,25 +134,23 @@ Instruction getConfigUpdateInstruction({
   required BigInt creationFee,
 }) {
   final instructionData = ConfigUpdateInstructionData(
-    setTreasury: setTreasury,
-    treasury: treasury,
-    setCreationFee: setCreationFee,
-    creationFee: creationFee,
+      setTreasury: setTreasury,
+      treasury: treasury,
+      setCreationFee: setCreationFee,
+      creationFee: creationFee,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
-      AccountMeta(address: programConfig, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    AccountMeta(address: programConfig, role: AccountRole.writable),
     ],
     data: getConfigUpdateInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [ConfigUpdate] instruction from raw instruction data.
-ConfigUpdateInstructionData parseConfigUpdateInstruction(
-  Instruction instruction,
-) {
+ConfigUpdateInstructionData parseConfigUpdateInstruction(Instruction instruction) {
   return getConfigUpdateInstructionDataDecoder().decode(instruction.data!);
 }

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,10 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class SetCustodiansInstructionData {
-  const SetCustodiansInstructionData({required this.custodians})
-    : discriminator = 2,
+  const SetCustodiansInstructionData({
+    required this.custodians,
+  }) :
+      discriminator = 2,
       migrationVersion = 0;
 
   final int discriminator;
@@ -26,10 +30,7 @@ Encoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
-    (
-      'custodians',
-      fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false),
-    ),
+    ('custodians', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
   ]);
 
   return transformEncoder(
@@ -50,26 +51,32 @@ Decoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'setCustodians instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'setCustodians instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
-  (SetCustodiansInstructionData, int) readTopLevel(
-    Uint8List bytes,
-    int offset,
-  ) {
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+  (SetCustodiansInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(
+      getU8Encoder().encode(2),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      SetCustodiansInstructionData(custodians: map['custodians']! as Uint8List),
+      SetCustodiansInstructionData(
+      custodians: map['custodians']! as Uint8List,
+      ),
       newOffset,
     );
   }
@@ -94,12 +101,8 @@ Decoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataDecoder() {
   };
 }
 
-Codec<SetCustodiansInstructionData, SetCustodiansInstructionData>
-getSetCustodiansInstructionDataCodec() {
-  return combineCodec(
-    getSetCustodiansInstructionDataEncoder(),
-    getSetCustodiansInstructionDataDecoder(),
-  );
+Codec<SetCustodiansInstructionData, SetCustodiansInstructionData> getSetCustodiansInstructionDataCodec() {
+  return combineCodec(getSetCustodiansInstructionDataEncoder(), getSetCustodiansInstructionDataDecoder());
 }
 
 /// Creates a [SetCustodians] instruction.
@@ -110,22 +113,22 @@ Instruction getSetCustodiansInstruction({
   required Address custodianRegistry,
   required Uint8List custodians,
 }) {
-  final instructionData = SetCustodiansInstructionData(custodians: custodians);
+  final instructionData = SetCustodiansInstructionData(
+      custodians: custodians,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
-      AccountMeta(address: poolConfig, role: AccountRole.readonly),
-      AccountMeta(address: custodianRegistry, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    AccountMeta(address: poolConfig, role: AccountRole.readonly),
+    AccountMeta(address: custodianRegistry, role: AccountRole.writable),
     ],
     data: getSetCustodiansInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [SetCustodians] instruction from raw instruction data.
-SetCustodiansInstructionData parseSetCustodiansInstruction(
-  Instruction instruction,
-) {
+SetCustodiansInstructionData parseSetCustodiansInstruction(Instruction instruction) {
   return getSetCustodiansInstructionDataDecoder().decode(instruction.data!);
 }

@@ -403,7 +403,15 @@ fn emit_instruction(instruction: &InstructionModel, client_crate: &str) -> Strin
 			("@@PASCAL@@", instruction.pascal.clone()),
 			(
 				"@@ARGS@@",
-				if instruction.args.is_empty() && instruction.accounts.is_empty() {
+				if instruction.args.is_empty()
+					&& instruction.accounts.iter().all(|account| {
+						matches!(
+							account.resolution,
+							Resolution::Constant(_) | Resolution::Payer
+						)
+					}) {
+					// Every account resolves without touching the parsed
+					// flags, so the generated Args struct is empty.
 					"_args".to_string()
 				} else {
 					"args".to_string()

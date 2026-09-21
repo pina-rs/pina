@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,13 +12,17 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the MultisigProgram program.
-const multisigProgramProgramAddress = Address(
-  '5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc',
-);
+const multisigProgramProgramAddress = Address('5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc');
 
 /// Known accounts for the MultisigProgram program.
-enum MultisigProgramAccount { programConfig, multisig, proposal, spendingLimit }
+enum MultisigProgramAccount {
+  programConfig,
+  multisig,
+  proposal,
+  spendingLimit,
+}
 
 /// Known instructions for the MultisigProgram program.
 enum MultisigProgramInstruction {
@@ -39,72 +44,62 @@ enum MultisigProgramInstruction {
 }
 
 /// Identifies the type of a MultisigProgram instruction.
-MultisigProgramInstruction identifyMultisigProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+MultisigProgramInstruction identifyMultisigProgramInstruction(
+  Uint8List data,
+) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.configInitialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.configUpdate;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.multisigCreate;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.multisigImport;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalCreate;
   }
-  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalActivate;
   }
-  if (containsBytes(data, getU8Encoder().encode(6), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(6), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalApprove;
   }
-  if (containsBytes(data, getU8Encoder().encode(7), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(7), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalReject;
   }
-  if (containsBytes(data, getU8Encoder().encode(8), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(8), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalRevoke;
   }
-  if (containsBytes(data, getU8Encoder().encode(9), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(9), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalCancel;
   }
-  if (containsBytes(data, getU8Encoder().encode(10), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(10), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.vaultExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(11), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(11), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.configExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(12), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(12), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.configAuthorityExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(13), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(13), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.spendingLimitUse;
   }
-  if (containsBytes(data, getU8Encoder().encode(14), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(14), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return MultisigProgramInstruction.proposalClose;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'multisigProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'multisigProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the MultisigProgram program.
@@ -117,7 +112,7 @@ sealed class ParsedMultisigProgramInstruction {
 /// A parsed ConfigInitialize instruction.
 final class ParsedConfigInitialize extends ParsedMultisigProgramInstruction {
   const ParsedConfigInitialize({required this.data})
-    : super(MultisigProgramInstruction.configInitialize);
+      : super(MultisigProgramInstruction.configInitialize);
 
   final ConfigInitializeInstructionData data;
 }
@@ -125,7 +120,7 @@ final class ParsedConfigInitialize extends ParsedMultisigProgramInstruction {
 /// A parsed ConfigUpdate instruction.
 final class ParsedConfigUpdate extends ParsedMultisigProgramInstruction {
   const ParsedConfigUpdate({required this.data})
-    : super(MultisigProgramInstruction.configUpdate);
+      : super(MultisigProgramInstruction.configUpdate);
 
   final ConfigUpdateInstructionData data;
 }
@@ -133,7 +128,7 @@ final class ParsedConfigUpdate extends ParsedMultisigProgramInstruction {
 /// A parsed MultisigCreate instruction.
 final class ParsedMultisigCreate extends ParsedMultisigProgramInstruction {
   const ParsedMultisigCreate({required this.data})
-    : super(MultisigProgramInstruction.multisigCreate);
+      : super(MultisigProgramInstruction.multisigCreate);
 
   final MultisigCreateInstructionData data;
 }
@@ -141,7 +136,7 @@ final class ParsedMultisigCreate extends ParsedMultisigProgramInstruction {
 /// A parsed MultisigImport instruction.
 final class ParsedMultisigImport extends ParsedMultisigProgramInstruction {
   const ParsedMultisigImport({required this.data})
-    : super(MultisigProgramInstruction.multisigImport);
+      : super(MultisigProgramInstruction.multisigImport);
 
   final MultisigImportInstructionData data;
 }
@@ -149,7 +144,7 @@ final class ParsedMultisigImport extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalCreate instruction.
 final class ParsedProposalCreate extends ParsedMultisigProgramInstruction {
   const ParsedProposalCreate({required this.data})
-    : super(MultisigProgramInstruction.proposalCreate);
+      : super(MultisigProgramInstruction.proposalCreate);
 
   final ProposalCreateInstructionData data;
 }
@@ -157,7 +152,7 @@ final class ParsedProposalCreate extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalActivate instruction.
 final class ParsedProposalActivate extends ParsedMultisigProgramInstruction {
   const ParsedProposalActivate({required this.data})
-    : super(MultisigProgramInstruction.proposalActivate);
+      : super(MultisigProgramInstruction.proposalActivate);
 
   final ProposalActivateInstructionData data;
 }
@@ -165,7 +160,7 @@ final class ParsedProposalActivate extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalApprove instruction.
 final class ParsedProposalApprove extends ParsedMultisigProgramInstruction {
   const ParsedProposalApprove({required this.data})
-    : super(MultisigProgramInstruction.proposalApprove);
+      : super(MultisigProgramInstruction.proposalApprove);
 
   final ProposalApproveInstructionData data;
 }
@@ -173,7 +168,7 @@ final class ParsedProposalApprove extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalReject instruction.
 final class ParsedProposalReject extends ParsedMultisigProgramInstruction {
   const ParsedProposalReject({required this.data})
-    : super(MultisigProgramInstruction.proposalReject);
+      : super(MultisigProgramInstruction.proposalReject);
 
   final ProposalRejectInstructionData data;
 }
@@ -181,7 +176,7 @@ final class ParsedProposalReject extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalRevoke instruction.
 final class ParsedProposalRevoke extends ParsedMultisigProgramInstruction {
   const ParsedProposalRevoke({required this.data})
-    : super(MultisigProgramInstruction.proposalRevoke);
+      : super(MultisigProgramInstruction.proposalRevoke);
 
   final ProposalRevokeInstructionData data;
 }
@@ -189,7 +184,7 @@ final class ParsedProposalRevoke extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalCancel instruction.
 final class ParsedProposalCancel extends ParsedMultisigProgramInstruction {
   const ParsedProposalCancel({required this.data})
-    : super(MultisigProgramInstruction.proposalCancel);
+      : super(MultisigProgramInstruction.proposalCancel);
 
   final ProposalCancelInstructionData data;
 }
@@ -197,7 +192,7 @@ final class ParsedProposalCancel extends ParsedMultisigProgramInstruction {
 /// A parsed VaultExecute instruction.
 final class ParsedVaultExecute extends ParsedMultisigProgramInstruction {
   const ParsedVaultExecute({required this.data})
-    : super(MultisigProgramInstruction.vaultExecute);
+      : super(MultisigProgramInstruction.vaultExecute);
 
   final VaultExecuteInstructionData data;
 }
@@ -205,16 +200,15 @@ final class ParsedVaultExecute extends ParsedMultisigProgramInstruction {
 /// A parsed ConfigExecute instruction.
 final class ParsedConfigExecute extends ParsedMultisigProgramInstruction {
   const ParsedConfigExecute({required this.data})
-    : super(MultisigProgramInstruction.configExecute);
+      : super(MultisigProgramInstruction.configExecute);
 
   final ConfigExecuteInstructionData data;
 }
 
 /// A parsed ConfigAuthorityExecute instruction.
-final class ParsedConfigAuthorityExecute
-    extends ParsedMultisigProgramInstruction {
+final class ParsedConfigAuthorityExecute extends ParsedMultisigProgramInstruction {
   const ParsedConfigAuthorityExecute({required this.data})
-    : super(MultisigProgramInstruction.configAuthorityExecute);
+      : super(MultisigProgramInstruction.configAuthorityExecute);
 
   final ConfigAuthorityExecuteInstructionData data;
 }
@@ -222,7 +216,7 @@ final class ParsedConfigAuthorityExecute
 /// A parsed SpendingLimitUse instruction.
 final class ParsedSpendingLimitUse extends ParsedMultisigProgramInstruction {
   const ParsedSpendingLimitUse({required this.data})
-    : super(MultisigProgramInstruction.spendingLimitUse);
+      : super(MultisigProgramInstruction.spendingLimitUse);
 
   final SpendingLimitUseInstructionData data;
 }
@@ -230,7 +224,7 @@ final class ParsedSpendingLimitUse extends ParsedMultisigProgramInstruction {
 /// A parsed ProposalClose instruction.
 final class ParsedProposalClose extends ParsedMultisigProgramInstruction {
   const ParsedProposalClose({required this.data})
-    : super(MultisigProgramInstruction.proposalClose);
+      : super(MultisigProgramInstruction.proposalClose);
 
   final ProposalCloseInstructionData data;
 }
@@ -278,10 +272,9 @@ ParsedMultisigProgramInstruction parseMultisigProgramInstruction(
     MultisigProgramInstruction.configExecute => ParsedConfigExecute(
       data: parseConfigExecuteInstruction(instruction),
     ),
-    MultisigProgramInstruction.configAuthorityExecute =>
-      ParsedConfigAuthorityExecute(
-        data: parseConfigAuthorityExecuteInstruction(instruction),
-      ),
+    MultisigProgramInstruction.configAuthorityExecute => ParsedConfigAuthorityExecute(
+      data: parseConfigAuthorityExecuteInstruction(instruction),
+    ),
     MultisigProgramInstruction.spendingLimitUse => ParsedSpendingLimitUse(
       data: parseSpendingLimitUseInstruction(instruction),
     ),

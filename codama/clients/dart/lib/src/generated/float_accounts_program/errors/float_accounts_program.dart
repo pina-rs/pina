@@ -13,10 +13,8 @@ const int floatAccountsProgramErrorNonFiniteFloat = 0x1; // 1
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _floatAccountsProgramErrorMessages = {
-  floatAccountsProgramErrorAuthorityMismatch:
-      'The signer is not the authority recorded on the account.',
-  floatAccountsProgramErrorNonFiniteFloat:
-      'A float payload is NaN or infinite; only finite values are stored.',
+    floatAccountsProgramErrorAuthorityMismatch: 'The signer is not the authority recorded on the account.',
+    floatAccountsProgramErrorNonFiniteFloat: 'A float payload is NaN or infinite; only finite values are stored.',
 };
 
 /// Get the error message for a FloatAccountsProgram program error code.

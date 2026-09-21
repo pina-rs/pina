@@ -9,11 +9,8 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class NoteCommand extends Command<void> {
   NoteCommand() {
-    argParser..addOption(
-      'note',
-      mandatory: true,
-      help: "An arbitrary readonly account attached as context",
-    );
+    argParser
+      ..addOption('note', mandatory: true, help: "An arbitrary readonly account attached as context");
   }
 
   @override

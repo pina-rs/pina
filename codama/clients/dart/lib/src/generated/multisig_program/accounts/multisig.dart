@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
+
 
 @immutable
 class Multisig {
@@ -26,8 +28,9 @@ class Multisig {
     required this.staleTransactionIndex,
     required this.memberRoster,
     required this.memberPermissions,
-  }) : discriminator = 2,
-       migrationVersion = 0;
+  }) :
+      discriminator = 2,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -63,26 +66,12 @@ class Multisig {
           memberPermissions == other.memberPermissions;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    createKey,
-    configAuthority,
-    rentCollector,
-    threshold,
-    timelock,
-    ttl,
-    transactionIndex,
-    staleTransactionIndex,
-    memberRoster,
-    memberPermissions,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, createKey, configAuthority, rentCollector, threshold, timelock, ttl, transactionIndex, staleTransactionIndex, memberRoster, memberPermissions);
 
   @override
-  String toString() =>
-      'Multisig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, createKey: $createKey, configAuthority: $configAuthority, rentCollector: $rentCollector, threshold: $threshold, timelock: $timelock, ttl: $ttl, transactionIndex: $transactionIndex, staleTransactionIndex: $staleTransactionIndex, memberRoster: $memberRoster, memberPermissions: $memberPermissions)';
+  String toString() => 'Multisig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, createKey: $createKey, configAuthority: $configAuthority, rentCollector: $rentCollector, threshold: $threshold, timelock: $timelock, ttl: $ttl, transactionIndex: $transactionIndex, staleTransactionIndex: $staleTransactionIndex, memberRoster: $memberRoster, memberPermissions: $memberPermissions)';
 }
+
 
 Encoder<Multisig> getMultisigEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -97,45 +86,8 @@ Encoder<Multisig> getMultisigEncoder() {
     ('ttl', getU32Encoder()),
     ('transactionIndex', getU64Encoder()),
     ('staleTransactionIndex', getU64Encoder()),
-    (
-      'memberRoster',
-      offsetEncoder(
-        getPinaPodBoundedArrayEncoder(
-          getArrayEncoder(
-            transformEncoder(getU8Encoder(), (int value) => value),
-            size: PrefixedArraySize(
-              offsetEncoder(
-                offsetEncoder(
-                  getU16Encoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
-                ),
-                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-              ),
-            ),
-          ),
-          512,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 3),
-      ),
-    ),
-    (
-      'memberPermissions',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU8Encoder(), (int value) => value),
-          size: PrefixedArraySize(
-            offsetEncoder(
-              offsetEncoder(
-                getU8Encoder(),
-                OffsetConfig(preOffset: (scope) => 127),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        16,
-      ),
-    ),
+    ('memberRoster', offsetEncoder(getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 125)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 512), OffsetConfig(preOffset: (scope) => scope.preOffset + 3))),
+    ('memberPermissions', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 127)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 16)),
   ]);
 
   return transformEncoder(
@@ -171,77 +123,25 @@ Decoder<Multisig> getMultisigDecoder() {
     ('ttl', getU32Decoder()),
     ('transactionIndex', getU64Decoder()),
     ('staleTransactionIndex', getU64Decoder()),
-    (
-      'memberRoster',
-      offsetDecoder(
-        getPinaPodBoundedArrayDecoder(
-          getArrayDecoder(
-            getU8Decoder(),
-            size: PrefixedArraySize(
-              offsetDecoder(
-                offsetDecoder(
-                  getU16Decoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
-                ),
-                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-              ),
-            ),
-          ),
-          getPinaPodBoundedCountDecoder(
-            offsetDecoder(
-              offsetDecoder(
-                getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 125),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-            512,
-          ),
-          512,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 3),
-      ),
-    ),
-    (
-      'memberPermissions',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU8Decoder(),
-          size: PrefixedArraySize(
-            offsetDecoder(
-              offsetDecoder(
-                getU8Decoder(),
-                OffsetConfig(preOffset: (scope) => 127),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        getPinaPodBoundedCountDecoder(
-          offsetDecoder(
-            offsetDecoder(
-              getU8Decoder(),
-              OffsetConfig(preOffset: (scope) => 127),
-            ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-          ),
-          16,
-        ),
-        16,
-      ),
-    ),
+    ('memberRoster', offsetDecoder(getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 125)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 125)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 512), 512), OffsetConfig(preOffset: (scope) => scope.preOffset + 3))),
+    ('memberPermissions', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 127)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 127)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 16), 16)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'multisig account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'multisig account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Multisig, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(2),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -254,33 +154,34 @@ Decoder<Multisig> getMultisigDecoder() {
 
     return (
       Multisig(
-        bump: map['bump']! as int,
-        createKey: map['createKey']! as Address,
-        configAuthority: map['configAuthority']! as Address,
-        rentCollector: map['rentCollector']! as Address,
-        threshold: map['threshold']! as int,
-        timelock: map['timelock']! as int,
-        ttl: map['ttl']! as int,
-        transactionIndex: map['transactionIndex']! as BigInt,
-        staleTransactionIndex: map['staleTransactionIndex']! as BigInt,
-        memberRoster: map['memberRoster']! as List<int>,
-        memberPermissions: map['memberPermissions']! as List<int>,
+      bump: map['bump']! as int,
+      createKey: map['createKey']! as Address,
+      configAuthority: map['configAuthority']! as Address,
+      rentCollector: map['rentCollector']! as Address,
+      threshold: map['threshold']! as int,
+      timelock: map['timelock']! as int,
+      ttl: map['ttl']! as int,
+      transactionIndex: map['transactionIndex']! as BigInt,
+      staleTransactionIndex: map['staleTransactionIndex']! as BigInt,
+      memberRoster: map['memberRoster']! as List<int>,
+      memberPermissions: map['memberPermissions']! as List<int>,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<Multisig>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<Multisig>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<Multisig>(
         read: readTopLevel,
@@ -305,11 +206,11 @@ const int multisigMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool multisigNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 2) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 2) {
+		return false;
+	}
+	return data[1] < 0;
 }

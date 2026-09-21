@@ -19,7 +19,7 @@ use crate::context::CliError;
 #[derive(Debug, Args)]
 pub struct InitializeArgs {}
 
-pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
+pub(crate) fn run(context: &CliContext, _args: InitializeArgs) -> Result<(), CliError> {
 	let payer = context.payer_pubkey();
 	let oracle = context.payer_pubkey();
 	let data = InitializeInstructionData::new(|_data| {}).map_err(|_| {

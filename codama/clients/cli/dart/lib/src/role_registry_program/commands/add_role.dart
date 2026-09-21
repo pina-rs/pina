@@ -16,16 +16,8 @@ final class AddRoleCommand extends Command<void> {
       ..addOption('permissions', mandatory: true, help: "permissions")
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('grantee', mandatory: true, help: "The grantee account")
-      ..addOption(
-        'registry_config',
-        mandatory: true,
-        help: "The registry_config account",
-      )
-      ..addOption(
-        'role_entry',
-        mandatory: true,
-        help: "The role_entry account",
-      );
+      ..addOption('registry_config', mandatory: true, help: "The registry_config account")
+      ..addOption('role_entry', mandatory: true, help: "The role_entry account");
   }
 
   @override
@@ -40,16 +32,10 @@ final class AddRoleCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final admin = context.payerAddress;
     final grantee = pubkey('--grantee', results['grantee']! as String);
-    final registryConfig = pubkey(
-      '--registry-config',
-      results['registry_config']! as String,
-    );
+    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
     final roleEntry = pubkey('--role-entry', results['role_entry']! as String);
     final roleIdValue = bigInteger('--role-id', results['role_id']! as String);
-    final permissionsValue = bigInteger(
-      '--permissions',
-      results['permissions']! as String,
-    );
+    final permissionsValue = bigInteger('--permissions', results['permissions']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getAddRoleInstruction(
       programAddress: context.programAddress,

@@ -14,15 +14,12 @@ final class MultisigImportCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('legacy_program', mandatory: true, help: "legacyProgram")
-      ..addOption(
-        'legacy_discriminator',
-        mandatory: true,
-        help: "legacyDiscriminator",
-      )
+      ..addOption('legacy_discriminator', mandatory: true, help: "legacyDiscriminator")
       ..addFlag('set_config_authority', help: "setConfigAuthority")
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
       ..addFlag('set_rent_collector', help: "setRentCollector")
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
@@ -59,13 +56,18 @@ final class MultisigImportCommand extends Command<void> {
       );
 <<<<<<< HEAD
 =======
+=======
+>>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
       ..addOption('legacy_multisig', mandatory: true, help: "The legacy_multisig account")
       ..addOption('program_config', mandatory: true, help: "The program_config account")
       ..addOption('multisig', mandatory: false, help: "The multisig account [default: derived]")
       ..addOption('treasury', mandatory: true, help: "Treasury that collects the creation fee; absent when the fee is zero");
+<<<<<<< HEAD
 >>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
   }
 
   @override
@@ -78,6 +80,7 @@ final class MultisigImportCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
@@ -103,36 +106,26 @@ final class MultisigImportCommand extends Command<void> {
 >>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+    final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
+    final programConfig = pubkey('--program-config', results['program_config']! as String);
+>>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
     final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
-            seeds: MultisigSeeds(createKey: createKey),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: MultisigSeeds(createKey: createKey),
+          programAddress: context.programAddress,
+        )).$1;
     final rentPayer = context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
-    final legacyProgramValue = pubkey(
-      '--legacy-program',
-      results['legacy_program']! as String,
-    );
-    final legacyDiscriminatorValue = base58Bytes(
-      '--legacy-discriminator',
-      results['legacy_discriminator']! as String,
-    );
-    final setConfigAuthorityValue =
-        results['set_config_authority'] as bool? ?? false;
-    final configAuthorityValue = pubkey(
-      '--config-authority',
-      results['config_authority']! as String,
-    );
-    final setRentCollectorValue =
-        results['set_rent_collector'] as bool? ?? false;
-    final rentCollectorValue = pubkey(
-      '--rent-collector',
-      results['rent_collector']! as String,
-    );
+    final legacyProgramValue = pubkey('--legacy-program', results['legacy_program']! as String);
+    final legacyDiscriminatorValue = base58Bytes('--legacy-discriminator', results['legacy_discriminator']! as String);
+    final setConfigAuthorityValue = results['set_config_authority'] as bool? ?? false;
+    final configAuthorityValue = pubkey('--config-authority', results['config_authority']! as String);
+    final setRentCollectorValue = results['set_rent_collector'] as bool? ?? false;
+    final rentCollectorValue = pubkey('--rent-collector', results['rent_collector']! as String);
     final instruction = getMultisigImportInstruction(
       programAddress: context.programAddress,
       legacyMultisig: legacyMultisig,

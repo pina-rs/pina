@@ -13,12 +13,7 @@ final class InitCommand extends Command<void> {
   InitCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'store',
-        mandatory: false,
-        help:
-            "The store PDA account (must be empty — not yet created) [default: derived]",
-      );
+      ..addOption('store', mandatory: false, help: "The store PDA account (must be empty — not yet created) [default: derived]");
   }
 
   @override
@@ -35,9 +30,9 @@ final class InitCommand extends Command<void> {
     final store = (results['store'] as String?) != null
         ? pubkey('--store', results['store']! as String)
         : (await findStorePda(
-            seeds: StoreSeeds(authority: authority),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: StoreSeeds(authority: authority),
+          programAddress: context.programAddress,
+        )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitInstruction(
       programAddress: context.programAddress,
