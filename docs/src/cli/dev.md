@@ -33,7 +33,7 @@ Surfpool itself defaults to a mainnet datasource. Pina does not inherit that net
 
 An explicit `--rpc-url` must use HTTP or HTTPS and include a host. Pina rejects user information, query parameters, fragments, and control characters. Surfpool receives every accepted URL as a child-process argument, where local process inspection can reveal it. Never put a credential or other secret anywhere in the URL, including an otherwise valid host or path. Prefer a named `--network` or a credential-free endpoint.
 
-Pina requires Surfpool 1.5.0 or newer because its delegated watch and artifact flags are tested against that contract. See the official [Surfpool CLI reference](https://docs.surfpool.run/toolchain/cli).
+Pina requires Surfpool 1.5.0 or newer because its delegated `--watch`, `--artifacts-path`, and `--runbook` flags are tested against that contract. Pina's own workspace pins and exercises Surfpool 1.6.0. See the official [Surfpool CLI reference](https://docs.surfpool.run/toolchain/cli).
 
 ## Options
 

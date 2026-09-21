@@ -43,6 +43,7 @@ pub use solana_signer::Signer;
 use solana_transaction::Transaction;
 use solana_transaction::versioned::VersionedTransaction;
 pub use solana_transaction_error::TransactionError;
+use surfpool_sdk::BlockProductionMode;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 use surfpool_sdk::cheatcodes::builders::SetAccount;
@@ -775,9 +776,17 @@ impl OfflineSurfnet {
 	///
 	/// Returns an error when Surfpool cannot allocate ports or start its runtime.
 	pub async fn start() -> Result<Self, TestError> {
+		// Surfpool 1.6.0's SDK default is `BlockProductionMode::Transaction`,
+		// but on an embedded offline instance that mode never confirms a
+		// submitted transaction: the client's confirmation loop spins
+		// indefinitely on `getSignatureStatuses`. `Clock` produces blocks on a
+		// timer and confirms normally. Reported upstream in
+		// <https://github.com/solana-foundation/surfpool/issues/814>; drop this
+		// override once the transaction-triggered path is fixed.
 		let inner = Surfnet::builder()
 			.offline(true)
 			.payer(Keypair::new_from_array(TEST_PAYER_SEED))
+			.block_production_mode(BlockProductionMode::Clock)
 			.start()
 			.await
 			.map_err(|error| test_error("start offline Surfpool", error))?;

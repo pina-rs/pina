@@ -242,7 +242,7 @@ http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
 macrotest = { default-features = false, version = "^1.2" }
-mollusk-svm = { default-features = false, version = "0.14.0" }
+mollusk-svm = { default-features = false, version = "0.15.1" }
 # Emits the normalized CLI-surface snapshot release automation diffs.
 monochange_snapshot = { default-features = false, version = "0.1.0" }
 num-derive = { version = "^0.5", default-features = false }
@@ -252,7 +252,11 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.19.0" }
-pinapod = { version = "0.4.0", default-features = false, features = ["solana-address", "solana-program-error"] }
+# 0.4.2 reorders the generated `commit()` ahead of the inline writes and turns
+# the length check that followed into a returned error, so a legitimate compact
+# write can fail and the `pina_root` expansion snapshots no longer match. Hold
+# the 0.4.1 patch release until pina-rs/pinapod#36 is resolved.
+pinapod = { version = "=0.4.1", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
