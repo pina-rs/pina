@@ -345,12 +345,12 @@ fn setup_pool() -> Pool {
 	world.run(
 		&mollusk,
 		&set_vkey_ix(VK_SLOT_WITHDRAW, &prover::serialize_vk(&withdraw_vk)),
-		&[],
+		&[Check::success()],
 	);
 	world.run(
 		&mollusk,
 		&set_vkey_ix(VK_SLOT_TRANSFER, &prover::serialize_vk(&transfer_vk)),
-		&[],
+		&[Check::success()],
 	);
 
 	Pool {
