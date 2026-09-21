@@ -11,9 +11,21 @@ final class SetCustodiansCommand extends Command<void> {
   SetCustodiansCommand() {
     argParser
       ..addOption('custodians', mandatory: true, help: "custodians")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
-      ..addOption('custodian_registry', mandatory: true, help: "The custodian_registry account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
+      ..addOption(
+        'custodian_registry',
+        mandatory: true,
+        help: "The custodian_registry account",
+      );
   }
 
   @override
@@ -29,9 +41,18 @@ final class SetCustodiansCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
-    final custodianRegistry = pubkey('--custodian-registry', results['custodian_registry']! as String);
-    final custodiansValue = base58Bytes('--custodians', results['custodians']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
+    final custodianRegistry = pubkey(
+      '--custodian-registry',
+      results['custodian_registry']! as String,
+    );
+    final custodiansValue = base58Bytes(
+      '--custodians',
+      results['custodians']! as String,
+    );
     final instruction = getSetCustodiansInstruction(
       programAddress: context.programAddress,
       authority: authority,

@@ -18,11 +18,27 @@ final class DepositCommand extends Command<void> {
       ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('shares', mandatory: true, help: "shares")
-      ..addOption('depositor', mandatory: false, help: "The depositor account [default: payer]")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
+      ..addOption(
+        'depositor',
+        mandatory: false,
+        help: "The depositor account [default: payer]",
+      )
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
       ..addOption('pool_vault', mandatory: true, help: "The pool_vault account")
-      ..addOption('merkle_tree', mandatory: true, help: "The merkle_tree account")
-      ..addOption('note_commitment', mandatory: true, help: "The note_commitment account");
+      ..addOption(
+        'merkle_tree',
+        mandatory: true,
+        help: "The merkle_tree account",
+      )
+      ..addOption(
+        'note_commitment',
+        mandatory: true,
+        help: "The note_commitment account",
+      );
   }
 
   @override
@@ -38,15 +54,36 @@ final class DepositCommand extends Command<void> {
     final depositor = (results['depositor'] as String?) != null
         ? pubkey('--depositor', results['depositor']! as String)
         : context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
     final poolVault = pubkey('--pool-vault', results['pool_vault']! as String);
-    final merkleTree = pubkey('--merkle-tree', results['merkle_tree']! as String);
-    final noteCommitment = pubkey('--note-commitment', results['note_commitment']! as String);
+    final merkleTree = pubkey(
+      '--merkle-tree',
+      results['merkle_tree']! as String,
+    );
+    final noteCommitment = pubkey(
+      '--note-commitment',
+      results['note_commitment']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
-    final commitmentValue = base58Bytes('--commitment', results['commitment']! as String);
-    final viewPubkeyValue = base58Bytes('--view-pubkey', results['view_pubkey']! as String);
-    final envelopeLenValue = integer('--envelope-len', results['envelope_len']! as String);
-    final envelopeValue = base58Bytes('--envelope', results['envelope']! as String);
+    final commitmentValue = base58Bytes(
+      '--commitment',
+      results['commitment']! as String,
+    );
+    final viewPubkeyValue = base58Bytes(
+      '--view-pubkey',
+      results['view_pubkey']! as String,
+    );
+    final envelopeLenValue = integer(
+      '--envelope-len',
+      results['envelope_len']! as String,
+    );
+    final envelopeValue = base58Bytes(
+      '--envelope',
+      results['envelope']! as String,
+    );
     final sharesValue = base58Bytes('--shares', results['shares']! as String);
     final instruction = getDepositInstruction(
       programAddress: context.programAddress,

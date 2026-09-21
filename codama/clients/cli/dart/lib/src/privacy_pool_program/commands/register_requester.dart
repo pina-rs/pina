@@ -12,9 +12,21 @@ final class RegisterRequesterCommand extends Command<void> {
     argParser
       ..addOption('requester', mandatory: true, help: "requester")
       ..addOption('max_tier', mandatory: true, help: "maxTier")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
-      ..addOption('requester_registry', mandatory: true, help: "The requester_registry account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
+      ..addOption(
+        'requester_registry',
+        mandatory: true,
+        help: "The requester_registry account",
+      );
   }
 
   @override
@@ -30,9 +42,18 @@ final class RegisterRequesterCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
-    final requesterRegistry = pubkey('--requester-registry', results['requester_registry']! as String);
-    final requesterValue = pubkey('--requester', results['requester']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
+    final requesterRegistry = pubkey(
+      '--requester-registry',
+      results['requester_registry']! as String,
+    );
+    final requesterValue = pubkey(
+      '--requester',
+      results['requester']! as String,
+    );
     final maxTierValue = integer('--max-tier', results['max_tier']! as String);
     final instruction = getRegisterRequesterInstruction(
       programAddress: context.programAddress,

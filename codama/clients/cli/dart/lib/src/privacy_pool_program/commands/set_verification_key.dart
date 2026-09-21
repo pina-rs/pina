@@ -21,10 +21,26 @@ final class SetVerificationKeyCommand extends Command<void> {
       ..addOption('ic1', mandatory: true, help: "ic1")
       ..addOption('ic2', mandatory: true, help: "ic2")
       ..addOption('ic3', mandatory: true, help: "ic3")
-      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
-      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account")
-      ..addOption('system_program', mandatory: true, help: "The system_program account");
+      ..addOption(
+        'authority',
+        mandatory: false,
+        help: "The authority account [default: payer]",
+      )
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
+      ..addOption(
+        'verifying_key_account',
+        mandatory: true,
+        help: "The verifying_key_account account",
+      )
+      ..addOption(
+        'system_program',
+        mandatory: true,
+        help: "The system_program account",
+      );
   }
 
   @override
@@ -40,16 +56,34 @@ final class SetVerificationKeyCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
-    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
-    final systemProgram = pubkey('--system-program', results['system_program']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
+    final verifyingKeyAccount = pubkey(
+      '--verifying-key-account',
+      results['verifying_key_account']! as String,
+    );
+    final systemProgram = pubkey(
+      '--system-program',
+      results['system_program']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final slotValue = integer('--slot', results['slot']! as String);
     final icLenValue = integer('--ic-len', results['ic_len']! as String);
-    final alphaG1Value = base58Bytes('--alpha-g1', results['alpha_g1']! as String);
+    final alphaG1Value = base58Bytes(
+      '--alpha-g1',
+      results['alpha_g1']! as String,
+    );
     final betaG2Value = base58Bytes('--beta-g2', results['beta_g2']! as String);
-    final gammaG2Value = base58Bytes('--gamma-g2', results['gamma_g2']! as String);
-    final deltaG2Value = base58Bytes('--delta-g2', results['delta_g2']! as String);
+    final gammaG2Value = base58Bytes(
+      '--gamma-g2',
+      results['gamma_g2']! as String,
+    );
+    final deltaG2Value = base58Bytes(
+      '--delta-g2',
+      results['delta_g2']! as String,
+    );
     final ic0Value = base58Bytes('--ic0', results['ic0']! as String);
     final ic1Value = base58Bytes('--ic1', results['ic1']! as String);
     final ic2Value = base58Bytes('--ic2', results['ic2']! as String);
