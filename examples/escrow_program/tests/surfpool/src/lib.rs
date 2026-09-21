@@ -246,6 +246,38 @@ fn take_instruction(
 	)
 }
 
+/// `Cancel` takes an empty payload: maker, mint_a, maker_ata_a, escrow, vault,
+/// then the token, associated-token, and system programs.
+fn cancel_instruction(
+	program: &ProgramTest,
+	maker: &Pubkey,
+	mint_a: &Pubkey,
+	maker_ata_a: &Pubkey,
+	escrow: &Pubkey,
+	vault: &Pubkey,
+	maker_writable: bool,
+) -> pina_test::Instruction {
+	let maker_meta = if maker_writable {
+		AccountMeta::new(*maker, true)
+	} else {
+		AccountMeta::new_readonly(*maker, true)
+	};
+
+	program.instruction(
+		&[EscrowInstruction::Cancel as u8, 0u8],
+		vec![
+			maker_meta,
+			AccountMeta::new_readonly(*mint_a, false),
+			AccountMeta::new(*maker_ata_a, false),
+			AccountMeta::new(*escrow, false),
+			AccountMeta::new(*vault, false),
+			AccountMeta::new_readonly(token_program_id(), false),
+			AccountMeta::new_readonly(ata_program_id(), false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
+		],
+	)
+}
+
 /// Escrow layout: discriminator + migration version + maker 32 + mint_a 32 +
 /// mint_b 32 + amount_a 8 + amount_b 8 + seed 8 + bump. `tests/abi_layout.rs`
 /// pins the same envelope geometry.
@@ -697,6 +729,369 @@ fn make_tolerates_a_precreated_empty_vault() {
 			"escrow closed after Take"
 		);
 		assert!(program.account(&vault).is_err(), "vault closed after Take");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The maker's abort path: `Cancel` refunds the full vault balance to the
+/// maker and closes both the vault and the escrow, returning all rent to the
+/// maker.
+#[test]
+#[ignore = "run with pina test"]
+fn cancel_refunds_the_maker_and_closes_the_escrow() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([31; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		// The maker is deliberately not the transaction payer so its lamport
+		// balance isolates the escrow rent it pays and gets back.
+		let maker = Keypair::new_from_array([32; 32]);
+		program.fund(&maker.pubkey(), FUND).expect("fund maker");
+		let maker_pubkey = maker.pubkey();
+
+		let mint_a_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 33)
+			.expect("provision mint A");
+		let mint_b_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 34)
+			.expect("provision mint B");
+
+		let maker_ata_a = ata_of(&maker_pubkey, &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&program.payer(),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+
+		let seed = 41u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker_pubkey, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		// The vault account did not exist before `Make`: its rent is part of
+		// what `Cancel` must return.
+		assert!(
+			program.account(&vault).is_err(),
+			"the vault does not exist before Make"
+		);
+		let maker_balance_before = program
+			.account(&maker_pubkey)
+			.expect("maker account before Make")
+			.lamports;
+
+		program
+			.send_with_signers(
+				make_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					seed,
+					bump,
+					OFFER_A,
+					OFFER_B,
+				),
+				&[&maker],
+			)
+			.expect("execute Make");
+		assert_eq!(
+			token_amount(&program.account(&maker_ata_a).expect("maker token A ATA")),
+			MINTED_A - OFFER_A,
+			"Make moved the offered token A into the vault"
+		);
+
+		program
+			.send_with_signers(
+				cancel_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					true,
+				),
+				&[&maker],
+			)
+			.expect("execute Cancel");
+
+		assert_eq!(
+			token_amount(&program.account(&maker_ata_a).expect("maker token A ATA")),
+			MINTED_A,
+			"Cancel refunded the full vault balance"
+		);
+		assert!(
+			program.account(&escrow).is_err(),
+			"escrow closed after Cancel"
+		);
+		assert!(
+			program.account(&vault).is_err(),
+			"vault closed after Cancel"
+		);
+		// Both the vault rent and the escrow rent came back to the maker.
+		let maker_balance_after = program
+			.account(&maker_pubkey)
+			.expect("maker account after Cancel")
+			.lamports;
+		assert!(
+			maker_balance_after + 20_000 >= maker_balance_before,
+			"Cancel returned the escrow and vault rent to the maker: before \
+			 {maker_balance_before}, after {maker_balance_after}"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Only the recorded maker may abort an offer: a stranger's `Cancel` is
+/// refused and the escrow survives intact.
+#[test]
+#[ignore = "run with pina test"]
+fn cancel_rejects_a_stranger() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([35; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let maker = Keypair::new_from_array([36; 32]);
+		program.fund(&maker.pubkey(), FUND).expect("fund maker");
+		let maker_pubkey = maker.pubkey();
+		let stranger = Keypair::new_from_array([37; 32]);
+		program
+			.fund(&stranger.pubkey(), FUND)
+			.expect("fund stranger");
+
+		let mint_a_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 38)
+			.expect("provision mint A");
+		let mint_b_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 39)
+			.expect("provision mint B");
+
+		let maker_ata_a = ata_of(&maker_pubkey, &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&program.payer(),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+
+		let seed = 42u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker_pubkey, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		program
+			.send_with_signers(
+				make_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					seed,
+					bump,
+					OFFER_A,
+					OFFER_B,
+				),
+				&[&maker],
+			)
+			.expect("execute Make");
+
+		// The stranger signs its own Cancel, so the refusal comes from the
+		// recorded-maker check rather than from a missing signature. Its own
+		// ATA is presented as the refund destination.
+		let stranger_ata_a = ata_of(&stranger.pubkey(), &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&program.payer(),
+			&stranger.pubkey(),
+			&mint_a_pubkey,
+			None,
+			0,
+		)
+		.expect("stranger token A ATA");
+
+		let error = program
+			.send_with_signers(
+				cancel_instruction(
+					&program,
+					&stranger.pubkey(),
+					&mint_a_pubkey,
+					&stranger_ata_a,
+					&escrow,
+					&vault,
+					true,
+				),
+				&[&stranger],
+			)
+			.expect_err("a stranger must not cancel the maker's offer");
+		assert!(
+			error.transaction_error().is_some(),
+			"the stranger's Cancel must be a transaction failure: {error:?}"
+		);
+
+		// The escrow is untouched: only the recorded maker may abort.
+		assert_escrow(
+			&program
+				.account(&escrow)
+				.expect("escrow survives a refused Cancel"),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			&mint_b_pubkey,
+			OFFER_A,
+			OFFER_B,
+			seed,
+			bump,
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&vault)
+					.expect("vault survives a refused Cancel")
+			),
+			OFFER_A,
+			"the vault still holds the escrowed token A"
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&stranger_ata_a)
+					.expect("stranger token A ATA")
+			),
+			0,
+			"the stranger received nothing"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// `Cancel` credits the maker three times — the refunded token A, the vault
+/// rent, and the escrow rent — so a read-only maker must be refused instead of
+/// reaching the close CPIs.
+#[test]
+#[ignore = "run with pina test"]
+fn cancel_requires_a_writable_maker() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([43; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let maker = Keypair::new_from_array([44; 32]);
+		program.fund(&maker.pubkey(), FUND).expect("fund maker");
+		let maker_pubkey = maker.pubkey();
+
+		let mint_a_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 45)
+			.expect("provision mint A");
+		let mint_b_pubkey = provision_mint(&program, &program.payer(), &mint_authority, 46)
+			.expect("provision mint B");
+
+		let maker_ata_a = ata_of(&maker_pubkey, &mint_a_pubkey);
+		provision_ata(
+			&program,
+			&program.payer(),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			Some(&mint_authority),
+			MINTED_A,
+		)
+		.expect("maker token A ATA");
+
+		let seed = 43u64;
+		let (escrow, bump) = escrow_pda(&program_id, &maker_pubkey, seed);
+		let vault = ata_of(&escrow, &mint_a_pubkey);
+
+		program
+			.send_with_signers(
+				make_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&mint_b_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					seed,
+					bump,
+					OFFER_A,
+					OFFER_B,
+				),
+				&[&maker],
+			)
+			.expect("execute Make");
+
+		let error = program
+			.send_with_signers(
+				cancel_instruction(
+					&program,
+					&maker_pubkey,
+					&mint_a_pubkey,
+					&maker_ata_a,
+					&escrow,
+					&vault,
+					false,
+				),
+				&[&maker],
+			)
+			.expect_err("a read-only maker cannot receive the closed rent");
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::InvalidAccountData
+			)),
+			"a read-only maker is refused before any token moves"
+		);
+
+		// The failed Cancel left the escrow and vault intact.
+		assert_escrow(
+			&program
+				.account(&escrow)
+				.expect("escrow survives a rejected Cancel"),
+			&maker_pubkey,
+			&mint_a_pubkey,
+			&mint_b_pubkey,
+			OFFER_A,
+			OFFER_B,
+			seed,
+			bump,
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&vault)
+					.expect("vault survives a rejected Cancel")
+			),
+			OFFER_A,
+			"the vault still holds the escrowed token A"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});
