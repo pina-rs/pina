@@ -54,6 +54,7 @@ extern crate rustc_driver;
 extern crate rustc_lint;
 extern crate rustc_session;
 
+pub(crate) mod collisions;
 mod diagnostics;
 pub mod lints;
 mod macros;
