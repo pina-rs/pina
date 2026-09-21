@@ -184,34 +184,29 @@ jobs:
         # has no timeout). The measure script terminates an individual batch
         # after 30 minutes; this bounds the whole step for hangs the watchdog
         # does not cover instead of consuming the job budget below.
+        #
+        # The two measurements run one after the other rather than side by
+        # side. Surfpool's SDK picks its port by binding `127.0.0.1:0` and
+        # then dropping the listener before rebinding it, so concurrent
+        # surfnets can collide on a port and one client ends up talking to the
+        # other's instance; that surfaced as transaction-construction failures
+        # in tests that pass on their own. The measured compute units are read
+        # from a fresh instance per batch either way, so serializing changes
+        # nothing about the figures.
         timeout-minutes: 45
         run: |
-          set +e
           node ./scripts/measure-example-compute-units.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/target/performance-build/instructions/base" \
             "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
-            --allow-incomplete &
-          base_pid=$!
+            --allow-incomplete
 
           node ./scripts/measure-example-compute-units.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/performance-build/instructions/head" \
-            "${{ github.workspace }}/target/performance/instructions/runtime-head.json" &
-          head_pid=$!
-
-          base_status=0
-          head_status=0
-          wait "$base_pid" || base_status=$?
-          wait "$head_pid" || head_status=$?
-          set -e
-
-          if [ "$base_status" -ne 0 ]; then
-            exit "$base_status"
-          fi
-          exit "$head_status"
+            "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare instruction reports
