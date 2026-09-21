@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -13,14 +12,10 @@ import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class UpdateProfileInstructionData {
-  const UpdateProfileInstructionData({
-    required this.name,
-    required this.bio,
-  }) :
-      discriminator = 1,
+  const UpdateProfileInstructionData({required this.name, required this.bio})
+    : discriminator = 1,
       migrationVersion = 0;
 
   final int discriminator;
@@ -33,8 +28,22 @@ Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
-    ('name', fixEncoderSize(addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()), 33, allowTruncation: false)),
-    ('bio', fixEncoderSize(addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()), 129, allowTruncation: false)),
+    (
+      'name',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        33,
+        allowTruncation: false,
+      ),
+    ),
+    (
+      'bio',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        129,
+        allowTruncation: false,
+      ),
+    ),
   ]);
 
   return transformEncoder(
@@ -52,28 +61,36 @@ Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
-    ('name', fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 33)),
-    ('bio', fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 129)),
+    (
+      'name',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        33,
+      ),
+    ),
+    (
+      'bio',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        129,
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'updateProfile instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'updateProfile instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (UpdateProfileInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+  (UpdateProfileInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -81,8 +98,8 @@ Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
 
     return (
       UpdateProfileInstructionData(
-      name: map['name']! as String,
-      bio: map['bio']! as String,
+        name: map['name']! as String,
+        bio: map['bio']! as String,
       ),
       newOffset,
     );
@@ -108,8 +125,12 @@ Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
   };
 }
 
-Codec<UpdateProfileInstructionData, UpdateProfileInstructionData> getUpdateProfileInstructionDataCodec() {
-  return combineCodec(getUpdateProfileInstructionDataEncoder(), getUpdateProfileInstructionDataDecoder());
+Codec<UpdateProfileInstructionData, UpdateProfileInstructionData>
+getUpdateProfileInstructionDataCodec() {
+  return combineCodec(
+    getUpdateProfileInstructionDataEncoder(),
+    getUpdateProfileInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [UpdateProfile] instruction.
@@ -120,22 +141,21 @@ Instruction getUpdateProfileInstruction({
   required String name,
   required String bio,
 }) {
-  final instructionData = UpdateProfileInstructionData(
-      name: name,
-      bio: bio,
-  );
+  final instructionData = UpdateProfileInstructionData(name: name, bio: bio);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.readonlySigner),
-    AccountMeta(address: profile, role: AccountRole.writable),
+      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: profile, role: AccountRole.writable),
     ],
     data: getUpdateProfileInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [UpdateProfile] instruction from raw instruction data.
-UpdateProfileInstructionData parseUpdateProfileInstruction(Instruction instruction) {
+UpdateProfileInstructionData parseUpdateProfileInstruction(
+  Instruction instruction,
+) {
   return getUpdateProfileInstructionDataDecoder().decode(instruction.data!);
 }

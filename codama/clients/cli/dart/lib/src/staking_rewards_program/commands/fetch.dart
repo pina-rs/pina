@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/staking_rewards_program.dart';
@@ -16,7 +17,11 @@ final class FetchPoolStateCommand extends Command<void> {
     argParser
       ..addOption('address', help: 'Account address; overrides PDA derivation.')
       ..addOption('stake_mint', mandatory: true, help: "PDA seed `stake_mint`.")
-      ..addOption('reward_mint', mandatory: true, help: "PDA seed `reward_mint`.");
+      ..addOption(
+        'reward_mint',
+        mandatory: true,
+        help: "PDA seed `reward_mint`.",
+      );
   }
 
   @override
@@ -29,8 +34,14 @@ final class FetchPoolStateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final stakeMintValue = pubkey('--stake-mint', results['stake_mint']! as String);
-    final rewardMintValue = pubkey('--reward-mint', results['reward_mint']! as String);
+    final stakeMintValue = pubkey(
+      '--stake-mint',
+      results['stake_mint']! as String,
+    );
+    final rewardMintValue = pubkey(
+      '--reward-mint',
+      results['reward_mint']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findPoolPda(
@@ -50,20 +61,15 @@ final class FetchPoolStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodePoolState(encoded);
-    printFields(
-      context.json,
-      'pool-state',
-      address,
-      <String, Object?>{
-        'admin': account.data.admin,
-        'stake_mint': account.data.stakeMint,
-        'reward_mint': account.data.rewardMint,
-        'total_staked': account.data.totalStaked,
-        'reward_index': account.data.rewardIndex,
-        'paused': account.data.paused,
-        'bump': account.data.bump,
-      },
-    );
+    printFields(context.json, 'pool-state', address, <String, Object?>{
+      'admin': account.data.admin,
+      'stake_mint': account.data.stakeMint,
+      'reward_mint': account.data.rewardMint,
+      'total_staked': account.data.totalStaked,
+      'reward_index': account.data.rewardIndex,
+      'paused': account.data.paused,
+      'bump': account.data.bump,
+    });
   }
 }
 
@@ -90,10 +96,7 @@ final class FetchPositionStateCommand extends Command<void> {
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findPositionPda(
-            seeds: PositionSeeds(
-              pool: poolValue,
-              owner: ownerValue,
-            ),
+            seeds: PositionSeeds(pool: poolValue, owner: ownerValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -106,19 +109,14 @@ final class FetchPositionStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodePositionState(encoded);
-    printFields(
-      context.json,
-      'position-state',
-      address,
-      <String, Object?>{
-        'pool': account.data.pool,
-        'owner': account.data.owner,
-        'staked_amount': account.data.stakedAmount,
-        'reward_debt': account.data.rewardDebt,
-        'pending_rewards': account.data.pendingRewards,
-        'bump': account.data.bump,
-      },
-    );
+    printFields(context.json, 'position-state', address, <String, Object?>{
+      'pool': account.data.pool,
+      'owner': account.data.owner,
+      'staked_amount': account.data.stakedAmount,
+      'reward_debt': account.data.rewardDebt,
+      'pending_rewards': account.data.pendingRewards,
+      'bump': account.data.bump,
+    });
   }
 }
 

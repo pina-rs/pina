@@ -21,10 +21,14 @@ const int accountReallocProgramErrorAuthorityMismatch = 0xbcb; // 3019
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _accountReallocProgramErrorMessages = {
-    accountReallocProgramErrorAccountReallocExceedsLimit: 'The requested growth exceeds the runtime\'s per-instruction realloc limit.',
-    accountReallocProgramErrorAccountDuplicateReallocs: 'The same account was passed to more than one realloc slot.',
-    accountReallocProgramErrorAccountDataTooSmall: 'The account is smaller than the data the instruction writes.',
-    accountReallocProgramErrorAuthorityMismatch: 'The signer is not the authority recorded on the account.',
+  accountReallocProgramErrorAccountReallocExceedsLimit:
+      'The requested growth exceeds the runtime\'s per-instruction realloc limit.',
+  accountReallocProgramErrorAccountDuplicateReallocs:
+      'The same account was passed to more than one realloc slot.',
+  accountReallocProgramErrorAccountDataTooSmall:
+      'The account is smaller than the data the instruction writes.',
+  accountReallocProgramErrorAuthorityMismatch:
+      'The signer is not the authority recorded on the account.',
 };
 
 /// Get the error message for a AccountReallocProgram program error code.

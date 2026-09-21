@@ -14,11 +14,31 @@ final class InitializePoolCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('stake_mint', mandatory: true, help: "The stake_mint account")
-      ..addOption('reward_mint', mandatory: true, help: "The reward_mint account")
-      ..addOption('pool_state', mandatory: false, help: "The pool_state account [default: derived]")
-      ..addOption('stake_vault', mandatory: true, help: "The stake_vault account")
-      ..addOption('reward_vault', mandatory: true, help: "The reward_vault account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'reward_mint',
+        mandatory: true,
+        help: "The reward_mint account",
+      )
+      ..addOption(
+        'pool_state',
+        mandatory: false,
+        help: "The pool_state account [default: derived]",
+      )
+      ..addOption(
+        'stake_vault',
+        mandatory: true,
+        help: "The stake_vault account",
+      )
+      ..addOption(
+        'reward_vault',
+        mandatory: true,
+        help: "The reward_vault account",
+      )
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -33,16 +53,28 @@ final class InitializePoolCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final admin = context.payerAddress;
     final stakeMint = pubkey('--stake-mint', results['stake_mint']! as String);
-    final rewardMint = pubkey('--reward-mint', results['reward_mint']! as String);
+    final rewardMint = pubkey(
+      '--reward-mint',
+      results['reward_mint']! as String,
+    );
     final poolState = (results['pool_state'] as String?) != null
         ? pubkey('--pool-state', results['pool_state']! as String)
         : (await findPoolPda(
-          seeds: PoolSeeds(stakeMint: stakeMint, rewardMint: rewardMint),
-          programAddress: context.programAddress,
-        )).$1;
-    final stakeVault = pubkey('--stake-vault', results['stake_vault']! as String);
-    final rewardVault = pubkey('--reward-vault', results['reward_vault']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+            seeds: PoolSeeds(stakeMint: stakeMint, rewardMint: rewardMint),
+            programAddress: context.programAddress,
+          )).$1;
+    final stakeVault = pubkey(
+      '--stake-vault',
+      results['stake_vault']! as String,
+    );
+    final rewardVault = pubkey(
+      '--reward-vault',
+      results['reward_vault']! as String,
+    );
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializePoolInstruction(
       programAddress: context.programAddress,
@@ -52,7 +84,9 @@ final class InitializePoolCommand extends Command<void> {
       poolState: poolState,
       stakeVault: stakeVault,
       rewardVault: rewardVault,
-      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      associatedTokenProgram: Address(
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+      ),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
       bump: bumpValue,

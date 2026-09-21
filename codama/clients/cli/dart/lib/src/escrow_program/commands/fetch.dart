@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/escrow_program.dart';
@@ -34,10 +35,7 @@ final class FetchEscrowStateCommand extends Command<void> {
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await findEscrowPda(
-            seeds: EscrowSeeds(
-              maker: makerValue,
-              seed: seedValue,
-            ),
+            seeds: EscrowSeeds(maker: makerValue, seed: seedValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -50,20 +48,15 @@ final class FetchEscrowStateCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeEscrowState(encoded);
-    printFields(
-      context.json,
-      'escrow-state',
-      address,
-      <String, Object?>{
-        'maker': account.data.maker,
-        'mint_a': account.data.mintA,
-        'mint_b': account.data.mintB,
-        'amount_a': account.data.amountA,
-        'amount_b': account.data.amountB,
-        'seed': account.data.seed,
-        'bump': account.data.bump,
-      },
-    );
+    printFields(context.json, 'escrow-state', address, <String, Object?>{
+      'maker': account.data.maker,
+      'mint_a': account.data.mintA,
+      'mint_b': account.data.mintB,
+      'amount_a': account.data.amountA,
+      'amount_b': account.data.amountB,
+      'seed': account.data.seed,
+      'bump': account.data.bump,
+    });
   }
 }
 

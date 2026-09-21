@@ -1,18 +1,12 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
-
 import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 
-
 @immutable
 class PositionSeeds {
-  const PositionSeeds({
-    required this.pool,
-    required this.owner,
-  });
+  const PositionSeeds({required this.pool, required this.owner});
 
   final Address pool;
   final Address owner;
