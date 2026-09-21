@@ -2351,17 +2351,38 @@ mod __pinapod_compact_CompactState {
             let __tail = data
                 .get(__tail_offset..__tail_end)
                 .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
+            __tail_offset = __tail_end;
             let __elems = unsafe {
                 core::slice::from_raw_parts(
                     __tail.as_ptr() as *const <u64 as pina::pinapod::ZcField>::Pod,
                     __values_len,
                 )
             };
-            for __elem in __elems {
-                <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
-                    __elem,
-                )?;
+            <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_slice(
+                __elems,
+            )?;
+            Ok(())
+        }
+        fn validate_layout(data: &[u8]) -> Result<(), pina::pinapod::PinaPodError> {
+            Self::validate_storage_len(data.len())?;
+            let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
+            let mut __tail_offset = core::mem::size_of::<CompactStateHeader>();
+            let __values_len = __pinapod_decode_prefix(&__hdr.__values_len)?;
+            if __values_len > 4 {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
+            let __elem_size = core::mem::size_of::<
+                <u64 as pina::pinapod::ZcField>::Pod,
+            >();
+            if __elem_size == 0 {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
+            }
+            let __byte_len = __values_len
+                * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            let __tail_end = __tail_offset + __byte_len;
+            let __tail = data
+                .get(__tail_offset..__tail_end)
+                .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
             __tail_offset = __tail_end;
             Ok(())
         }
@@ -2557,6 +2578,7 @@ mod __pinapod_compact_CompactState {
             self.try_projected_size().unwrap_or(usize::MAX)
         }
         pub fn commit(&mut self) -> Result<usize, pina::pinapod::PinaPodError> {
+            pina::pinapod::traits::commit_entry_validate::<CompactState>(self.data)?;
             let __old_off_values: usize = core::mem::size_of::<CompactStateHeader>();
             let __new_off_values: usize = core::mem::size_of::<CompactStateHeader>();
             let __old_len_values: usize = {
@@ -2710,11 +2732,9 @@ mod __pinapod_compact_CompactState {
                 if core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>() == 0 {
                     return Err(pina::pinapod::PinaPodError::InvalidLength);
                 }
-                for item in value {
-                    <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
-                        item,
-                    )?;
-                }
+                <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_slice(
+                    value,
+                )?;
             }
             Ok(())
         }
@@ -2773,22 +2793,8 @@ mod __pinapod_compact_CompactState {
             if let Some(value) = self.bump {
                 *writer.bump_mut() = value;
             }
-            if true {
-                {
-                    match (&encoded_len, &expected_len) {
-                        (left_val, right_val) => {
-                            if !(*left_val == *right_val) {
-                                let kind = ::core::panicking::AssertKind::Eq;
-                                ::core::panicking::assert_failed(
-                                    kind,
-                                    &*left_val,
-                                    &*right_val,
-                                    ::core::option::Option::None,
-                                );
-                            }
-                        }
-                    }
-                };
+            if encoded_len != expected_len {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
             Ok(encoded_len)
         }
@@ -2811,34 +2817,20 @@ mod __pinapod_compact_CompactState {
                         value.len(),
                     ));
                 }
-                let encoded_len = writer.commit()?;
                 if let Some(value) = self.authority {
                     *writer.authority_mut() = value;
                 }
                 if let Some(value) = self.bump {
                     *writer.bump_mut() = value;
                 }
+                let encoded_len = writer.commit()?;
                 encoded_len
             };
             <CompactState as pina::pinapod::PinaPodCompact>::validate(
                 &data[..encoded_len],
             )?;
-            if true {
-                {
-                    match (&encoded_len, &expected_len) {
-                        (left_val, right_val) => {
-                            if !(*left_val == *right_val) {
-                                let kind = ::core::panicking::AssertKind::Eq;
-                                ::core::panicking::assert_failed(
-                                    kind,
-                                    &*left_val,
-                                    &*right_val,
-                                    ::core::option::Option::None,
-                                );
-                            }
-                        }
-                    }
-                };
+            if encoded_len != expected_len {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
             Ok(encoded_len)
         }

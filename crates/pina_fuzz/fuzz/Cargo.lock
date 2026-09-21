@@ -406,9 +406,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6874fdffa2bac55ecea40a23521b1811ee497cfe2770e647ee8fdc6d9c60920a"
+checksum = "f4c309cbe981e5203c605b9ea8132fe69b70e6e7a3318fe07e709eeb61b5fa93"
 dependencies = [
  "pinapod-derive",
  "solana-address",
@@ -417,9 +417,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ca35c58e18fd7a4603c7ae7718602613ad6592c957d65dc51cafa8f9d4c849"
+checksum = "2be5850aa7a0cd1eecd6c5750eb99ded3dac6e0d62d37619b96e334369de7e1f"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
