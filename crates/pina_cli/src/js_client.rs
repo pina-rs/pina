@@ -1371,6 +1371,37 @@ const decoder = getStructDecoder([
 	}
 
 	#[test]
+	fn migrate_module_type_arguments_carry_no_trailing_comma() {
+		let plan = MigrationPlan {
+			accounts: vec![MigratableAccount {
+				camel: "profileState".to_owned(),
+				shouting: "PROFILE_STATE".to_owned(),
+				discriminator: vec![1],
+				version: 0,
+				version_bytes: 1,
+			}],
+			reserved_discriminator: vec![255],
+		};
+
+		let module = js_migrate_instruction_module("profile_program", &plan);
+
+		// A comma directly before a closing type-argument bracket is a TS1009
+		// syntax error that only dprint's lenient parser repairs downstream;
+		// the raw generator output must already be valid TypeScript.
+		assert!(
+			!module.contains(",\n\t>,"),
+			"trailing comma in a type argument list:\n{module}"
+		);
+		assert!(module.contains(concat!(
+			"input: MigrateInput<\n",
+			"\t\tTAccountPayer,\n",
+			"\t\tTAccountSystemProgram,\n",
+			"\t\tTAccountProfileState\n",
+			"\t>,"
+		)));
+	}
+
+	#[test]
 	fn leaves_non_codec_sources_unchanged() {
 		let source = "export const value = 1;\n";
 		assert_eq!(harden_codec_source(source), source);
@@ -1760,16 +1791,19 @@ fn js_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> String 
 		})
 		.collect::<Vec<_>>()
 		.join("\n");
+	// Type argument lists (the `Foo<A, B>` use sites below) reject a trailing
+	// comma in TypeScript, unlike the declaration lists above; dprint only
+	// repairs this after the fact, so emit the dprint shape directly.
 	let input_argument_names = slots
 		.iter()
 		.map(|(camel, _)| {
 			format!(
-				"\t\tTAccount{},",
+				"\t\tTAccount{}",
 				crate::client_migrations::pascal_case(camel)
 			)
 		})
 		.collect::<Vec<_>>()
-		.join("\n");
+		.join(",\n");
 	let instruction_accounts = slots
 		.iter()
 		.map(|(camel, role)| {

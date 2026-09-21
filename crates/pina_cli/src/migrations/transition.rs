@@ -1,16 +1,17 @@
 //! Generation and verification of migration transition sources.
 
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+use pina_abi::CompactTailKind;
 use pina_abi::ContractHistory;
 use pina_abi::ContractIdentity;
 use pina_abi::ContractKind;
 use pina_abi::DataSchema;
 use pina_abi::LayoutKind;
 use pina_abi::MigrationVersionType;
+use pina_abi::PhysicalLayout;
 use pina_abi::ProcessContract;
 use pina_abi::ProcessTransition;
 use pina_abi::PublicationLedger;
@@ -20,9 +21,9 @@ use pina_abi::TransitionMode;
 
 use super::CreateMigrationsOutput;
 use super::MigrationError;
-use super::diff::MoveDirection;
-use super::diff::automatic_direction;
-use super::diff::transition_mode;
+use super::diff::MovePlan;
+use super::diff::SourceIntent;
+use super::diff::automatic_move_plan;
 use super::remedy::ACCOUNT_GROWTH_REMEDY;
 use super::remedy::LAMPORT_BUDGET_REMEDY;
 use super::storage::write_atomic;
@@ -32,6 +33,8 @@ use crate::project::Project;
 pub(super) struct TransitionRequest<'a> {
 	pub(super) identity: &'a ContractIdentity,
 	pub(super) rust_name: &'a str,
+	/// The version as it is stored on the wire. Byte offsets and source sizes
+	/// come from here, never from the developer's renamed reading of it.
 	pub(super) source: &'a SchemaVersion,
 	/// Version number of `source`: the index of the version this transition
 	/// leaves.
@@ -41,7 +44,9 @@ pub(super) struct TransitionRequest<'a> {
 	/// Each entry carries its own version number, which the version index no
 	/// longer stores.
 	pub(super) stale_ladder: &'a [(u32, &'a SchemaVersion)],
-	pub(super) renames: Vec<pina_abi::RenameMapping>,
+	/// The developer's resolved reading of which stored field becomes which, and
+	/// which stored bytes are deliberately discarded or converted by hand.
+	pub(super) intent: SourceIntent,
 	pub(super) destination_version: u32,
 	pub(super) destination: &'a DataSchema,
 	pub(super) destination_process: Option<&'a ProcessContract>,
@@ -59,7 +64,7 @@ pub(super) fn create_transition(
 		source,
 		source_version,
 		stale_ladder,
-		renames,
+		intent,
 		destination_version,
 		destination,
 		destination_process,
@@ -73,20 +78,28 @@ pub(super) fn create_transition(
 		source.process.as_ref(),
 		destination_process,
 	)?;
-	let mode = transition_mode(&source.schema, destination);
+	// One proof decides both the recorded mode and the emitted bytes, so a
+	// transition can never be labelled automatic while writing movement its own
+	// plan never justified. The proof already refuses developer-owned
+	// conversions, so its verdict is the mode.
+	let plan = automatic_move_plan(&source.schema, &intent, destination);
+	let mode = if plan.is_some() {
+		TransitionMode::Automatic
+	} else {
+		TransitionMode::Manual
+	};
 	let path = transition_path(project, identity, source_version, destination_version);
-	let generated = match mode {
-		TransitionMode::Automatic => {
+	let generated = match (&mode, &plan) {
+		(TransitionMode::Automatic, Some(plan)) => {
 			automatic_transition_source(
 				identity,
 				project.migration_version_type,
-				source,
 				source_version,
 				destination_version,
-				destination,
+				plan,
 			)
 		}
-		TransitionMode::Manual => {
+		_ => {
 			manual_transition_source(
 				identity,
 				project.migration_version_type,
@@ -94,6 +107,7 @@ pub(super) fn create_transition(
 				source_version,
 				destination_version,
 				destination,
+				&intent.renames,
 			)?
 		}
 	};
@@ -124,7 +138,7 @@ pub(super) fn create_transition(
 	let implementation_sha256 = Some(hash_transition_file(&path)?);
 	Ok(Transition {
 		mode,
-		renames,
+		renames: intent.renames,
 		implementation_sha256,
 	})
 }
@@ -378,47 +392,25 @@ pub(super) fn process_transition(
 	}
 }
 
+/// Render an automatic transition from its proof.
+///
+/// The plan already carries payload-relative offsets, so this is a pure
+/// translation into source: header bytes are added, moves are emitted in the
+/// plan's own order, and zero fills come last so they cannot be overwritten by a
+/// later copy.
 pub(super) fn automatic_transition_source(
 	identity: &ContractIdentity,
 	version_type: MigrationVersionType,
-	source: &SchemaVersion,
 	source_version: u32,
 	destination_version: u32,
-	destination: &DataSchema,
+	plan: &MovePlan,
 ) -> String {
-	let discriminator_bytes = usize::from(identity.discriminator_bytes);
-	let header = discriminator_bytes + version_type.bytes();
-	let source_size = header + source.schema.fixed_payload_size().unwrap_or(0);
-	let destination_size = header + destination.fixed_payload_size().unwrap_or(0);
+	let header = usize::from(identity.discriminator_bytes) + version_type.bytes();
+	let source_size = header + plan.source_size;
+	let destination_size = header + plan.destination_size;
 	let working_size = source_size.max(destination_size);
-	let source_offsets = source.schema.fixed_field_offsets().unwrap_or_default();
-	let destination_offsets = destination.fixed_field_offsets().unwrap_or_default();
-	let source_types = source
-		.schema
-		.fields
-		.iter()
-		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
-		.collect::<BTreeMap<_, _>>();
-	let direction = automatic_direction(&source.schema, destination)
-		.expect("automatic transition must have a safe move direction");
-	let mut mapped = destination
-		.fields
-		.iter()
-		.filter_map(|field| {
-			if source_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
-				return None;
-			}
-			let &(source_offset, size) = source_offsets.get(&field.name)?;
-			let &(destination_offset, _) = destination_offsets.get(&field.name)?;
-			Some((source_offset, destination_offset, size))
-		})
-		.collect::<Vec<_>>();
-	match direction {
-		MoveDirection::Forward => mapped.sort_by_key(|(source, ..)| *source),
-		MoveDirection::Backward => mapped.sort_by_key(|(source, ..)| std::cmp::Reverse(*source)),
-	}
 	let mut moves = String::new();
-	for (source_offset, destination_offset, size) in mapped {
+	for (source_offset, destination_offset, size) in plan.ordered_moves() {
 		let source_start = header + source_offset;
 		let source_end = source_start + size;
 		let destination_start = header + destination_offset;
@@ -427,17 +419,8 @@ pub(super) fn automatic_transition_source(
 			"\tdata.copy_within({source_start}..{source_end}, {destination_start});"
 		);
 	}
-	let source_names = source_types.keys().copied().collect::<Vec<_>>();
 	let mut zeroes = String::new();
-	for field in &destination.fields {
-		if source_names.contains(&field.name.as_str())
-			&& source_types.get(field.name.as_str()) == Some(&field.rust_type.as_str())
-		{
-			continue;
-		}
-		let &(destination_offset, size) = destination_offsets
-			.get(&field.name)
-			.expect("fixed layout offsets contain every destination field");
+	for (destination_offset, size) in &plan.zero_fills {
 		let start = header + destination_offset;
 		let end = start + size;
 		let _ = writeln!(zeroes, "\tdata[{start}..{end}].fill(0);");
@@ -453,6 +436,207 @@ pub(super) fn automatic_transition_source(
 	)
 }
 
+/// One field's byte footprint in a manual-transition offset comment.
+struct OffsetRow {
+	/// Destination name: the name a developer reads in the new schema. A
+	/// renamed field appears once, under its new name, with both ranges.
+	name: String,
+	/// `offset..end` in the stored payload, or `-` when the field is new.
+	stored: Option<String>,
+	/// `offset..end` in the destination payload, or `-` when removed.
+	destination: Option<String>,
+	/// What changed for this field, at a glance.
+	note: String,
+}
+
+/// One field's own footprint in one schema: `(name, range, tail note)`.
+///
+/// The range is where the field physically lives in that schema's payload.
+/// Compact tails add a note because their active length is decided by the
+/// stored prefix bytes rather than the schema.
+///
+/// A schema the grammar rejects yields no rows. `DataSchema::try_new` proves the
+/// grammar at construction, so both schemas reaching the generator have a
+/// physical layout.
+fn own_rows(schema: &DataSchema) -> Vec<(String, String, String)> {
+	let Ok(layout) = schema.physical() else {
+		return Vec::new();
+	};
+	// `physical_layout` walks the declared fields in order, so both layouts are
+	// already in declaration order — which is also the physical byte order — and
+	// no re-sequencing is needed.
+	let fields = match layout {
+		PhysicalLayout::Fixed { fields, .. } => {
+			return fields
+				.into_iter()
+				.map(|field| {
+					(
+						field.name,
+						format!("{}..{}", field.offset, field.offset + field.size),
+						String::new(),
+					)
+				})
+				.collect();
+		}
+		PhysicalLayout::Compact { fields, .. } => fields,
+	};
+	fields
+		.into_iter()
+		.map(|field| {
+			let range = |end: u64| format!("{}..{end}", field.header_offset);
+			let Some(tail) = &field.tail else {
+				return (
+					field.name,
+					range(field.header_offset + field.header_size),
+					String::new(),
+				);
+			};
+			let kind = match tail.kind {
+				CompactTailKind::String => "string",
+				CompactTailKind::Vector => "vector",
+			};
+			let mut note = format!("{kind} prefix, capacity {}", tail.capacity);
+			if tail.element_size > 1 {
+				note = format!("{note}, {}-byte elements", tail.element_size);
+			}
+			if tail.optional {
+				note.push_str(", optional");
+			}
+			(
+				field.name,
+				range(field.header_offset + u64::from(tail.prefix_bytes)),
+				note,
+			)
+		})
+		.collect()
+}
+
+/// Render the payload-offset comment for a manual transition.
+///
+/// Every row shows a field's stored range beside its destination range, so a
+/// developer sees at a glance which bytes each field occupies and which offsets
+/// move. Rows appear in stored order first, then added fields in destination
+/// order. A field only in the destination marks the bytes the conversion must
+/// initialize; one only in the stored schema marks bytes the conversion must
+/// read before overwriting. Ranges are payload relative — the discriminator and
+/// version envelope occupy the leading bytes of `data`, so indices into `data`
+/// shift by the header width.
+pub(super) fn layout_comment(
+	source: &DataSchema,
+	destination: &DataSchema,
+	renames: &[pina_abi::RenameMapping],
+) -> String {
+	let stored_rows = own_rows(source);
+	let destination_rows = own_rows(destination);
+	// A renamed field's bytes live under the stored name, so pairing resolves
+	// through the recorded rename: one row shows both ranges under the new
+	// name the developer reads in the destination schema.
+	let destination_name = |stored: &str| -> String {
+		renames
+			.iter()
+			.find(|mapping| mapping.from == stored)
+			.map_or_else(|| stored.to_owned(), |mapping| mapping.to.clone())
+	};
+	let mut paired: Vec<OffsetRow> = Vec::new();
+	let mut seen = std::collections::BTreeSet::new();
+	for (name, range, note) in &stored_rows {
+		let target = destination_name(name);
+		seen.insert(target.clone());
+		let Some((_, destination_range, destination_note)) = destination_rows
+			.iter()
+			.find(|(candidate, ..)| *candidate == target)
+		else {
+			paired.push(OffsetRow {
+				name: target,
+				stored: Some(range.clone()),
+				destination: None,
+				note: "removed".to_owned(),
+			});
+			continue;
+		};
+		paired.push(OffsetRow {
+			name: target,
+			stored: Some(range.clone()),
+			destination: Some(destination_range.clone()),
+			// A compact field's note describes the layout it belongs to, and the
+			// conversion writes the destination's shape: a `String<12>` grown to
+			// `String<20>` must be written at capacity 20, so the destination's
+			// note wins where it has one.
+			note: if destination_note.is_empty() {
+				note.clone()
+			} else {
+				destination_note.clone()
+			},
+		});
+	}
+	for (name, range, note) in &destination_rows {
+		if seen.contains(name) {
+			continue;
+		}
+		paired.push(OffsetRow {
+			name: name.clone(),
+			stored: None,
+			destination: Some(range.clone()),
+			note: if note.is_empty() {
+				"added".to_owned()
+			} else {
+				note.clone()
+			},
+		});
+	}
+
+	let name_width = paired
+		.iter()
+		.map(|row| row.name.chars().count())
+		.chain(std::iter::once("field".len()))
+		.max()
+		.unwrap_or(0);
+	let stored_width = paired
+		.iter()
+		.map(|row| row.stored.as_deref().map_or(1, str::len))
+		.chain(std::iter::once("stored".len()))
+		.max()
+		.unwrap_or(0);
+	let destination_width = paired
+		.iter()
+		.map(|row| row.destination.as_deref().map_or(1, str::len))
+		.chain(std::iter::once("destination".len()))
+		.max()
+		.unwrap_or(0);
+
+	// The header and every row flow through the same padding, so the columns
+	// line up whatever the longest field name or range is.
+	let render_row = |name: &str, stored: &str, destination: &str, note: &str| {
+		let note = if note.is_empty() {
+			String::new()
+		} else {
+			format!("  ({note})")
+		};
+		// Rows without a note carry trailing padding otherwise; trim it so the
+		// comment stays clean at any column width.
+		format!(
+			"// {name:<name_width$}  {stored:<stored_width$}  \
+			 {destination:<destination_width$}{note}\n",
+		)
+		.trim_end()
+		.to_owned()
+			+ "\n"
+	};
+	let mut comment = format!(
+		"// Payload offsets, relative to the version envelope header:\n{}",
+		render_row("field", "stored", "destination", ""),
+	);
+	for row in &paired {
+		comment.push_str(&render_row(
+			&row.name,
+			row.stored.as_deref().unwrap_or("-"),
+			row.destination.as_deref().unwrap_or("-"),
+			&row.note,
+		));
+	}
+	comment
+}
+
 pub(super) fn manual_transition_source(
 	identity: &ContractIdentity,
 	version_type: MigrationVersionType,
@@ -460,6 +644,7 @@ pub(super) fn manual_transition_source(
 	source_version: u32,
 	destination_version: u32,
 	destination: &DataSchema,
+	renames: &[pina_abi::RenameMapping],
 ) -> Result<String, MigrationError> {
 	let header = usize::from(identity.discriminator_bytes) + version_type.bytes();
 	let source_size = source.schema.fixed_payload_size().map(|size| header + size);
@@ -541,11 +726,12 @@ pub(super) fn manual_transition_source(
 			)
 		}
 	};
+	let offsets = layout_comment(&source.schema, destination, renames);
 	Ok(format!(
 		"// Manual adjacent ABI migration generated by `pina migrations create`.\n// Source \
 		 version: {source_version} ({source_description} bytes)\n// Destination version: \
 		 {destination_version} ({destination_description} bytes)\n// TODO(pina-manual-migration): \
-		 {requirement}.\n{sizing}\n{migrate}",
+		 {requirement}.\n{offsets}\n{sizing}\n{migrate}",
 	))
 }
 

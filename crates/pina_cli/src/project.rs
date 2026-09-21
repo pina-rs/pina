@@ -198,6 +198,8 @@ pub struct MigrationsAnswersConfig {
 	/// Persisted data-dropping acknowledgements.
 	#[serde(alias = "assume-removed")]
 	pub assume_removed: Vec<String>,
+	/// Added fields whose conversion is written by hand rather than generated.
+	pub manual: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
