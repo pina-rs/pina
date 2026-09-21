@@ -20,28 +20,7 @@ const escrowProgramProgramAddress = Address(
 enum EscrowProgramAccount { escrowState }
 
 /// Known instructions for the EscrowProgram program.
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 enum EscrowProgramInstruction { make, take, cancel }
-=======
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-enum EscrowProgramInstruction {
-  make,
-  take,
-}
-<<<<<<< HEAD
->>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
-=======
-enum EscrowProgramInstruction { make, take }
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-=======
-enum EscrowProgramInstruction { make, take }
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
 
 /// Identifies the type of a EscrowProgram instruction.
 EscrowProgramInstruction identifyEscrowProgramInstruction(Uint8List data) {

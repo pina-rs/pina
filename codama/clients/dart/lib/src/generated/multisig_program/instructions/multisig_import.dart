@@ -175,18 +175,8 @@ Instruction getMultisigImportInstruction({
   return Instruction(
     programAddress: programAddress,
     accounts: [
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
       AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
       AccountMeta(address: legacyCreateKey, role: AccountRole.readonlySigner),
-=======
-      AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
-      AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
       AccountMeta(address: programConfig, role: AccountRole.readonly),
       AccountMeta(address: createKey, role: AccountRole.readonlySigner),
       AccountMeta(address: multisig, role: AccountRole.writable),
@@ -196,26 +186,6 @@ Instruction getMultisigImportInstruction({
         AccountMeta(address: treasury, role: AccountRole.writable)
       else
         AccountMeta(address: programAddress, role: AccountRole.readonly),
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-    AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
-    AccountMeta(address: programConfig, role: AccountRole.readonly),
-    AccountMeta(address: createKey, role: AccountRole.readonlySigner),
-    AccountMeta(address: multisig, role: AccountRole.writable),
-    AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
-    if (treasury != null) AccountMeta(address: treasury, role: AccountRole.writable) else AccountMeta(address: programAddress, role: AccountRole.readonly),
-<<<<<<< HEAD
->>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     ],
     data: getMultisigImportInstructionDataEncoder().encode(instructionData),
   );

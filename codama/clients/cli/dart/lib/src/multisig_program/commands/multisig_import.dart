@@ -23,32 +23,12 @@ final class MultisigImportCommand extends Command<void> {
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
       ..addFlag('set_rent_collector', help: "setRentCollector")
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
       ..addOption(
         'legacy_multisig',
         mandatory: true,
         help: "The legacy_multisig account",
       )
       ..addOption(
-<<<<<<< HEAD
-<<<<<<< HEAD
-        'legacy_create_key',
-        mandatory: false,
-        help:
-            "The legacy multisig's `create_key`: its holder authorizes the import, [default: payer]",
-      )
-      ..addOption(
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
         'program_config',
         mandatory: true,
         help: "The program_config account",
@@ -64,23 +44,6 @@ final class MultisigImportCommand extends Command<void> {
         help:
             "Treasury that collects the creation fee; absent when the fee is zero",
       );
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-      ..addOption('legacy_multisig', mandatory: true, help: "The legacy_multisig account")
-      ..addOption('program_config', mandatory: true, help: "The program_config account")
-      ..addOption('multisig', mandatory: false, help: "The multisig account [default: derived]")
-      ..addOption('treasury', mandatory: true, help: "Treasury that collects the creation fee; absent when the fee is zero");
-<<<<<<< HEAD
->>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
   }
 
   @override
@@ -93,45 +56,15 @@ final class MultisigImportCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     final legacyMultisig = pubkey(
       '--legacy-multisig',
       results['legacy_multisig']! as String,
     );
-<<<<<<< HEAD
-<<<<<<< HEAD
-    final legacyCreateKey = (results['legacy_create_key'] as String?) != null
-        ? pubkey('--legacy-create-key', results['legacy_create_key']! as String)
-        : context.payerAddress;
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
+    final legacyCreateKey = context.payerAddress;
     final programConfig = pubkey(
       '--program-config',
       results['program_config']! as String,
     );
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
-    final programConfig = pubkey('--program-config', results['program_config']! as String);
->>>>>>> fd704011 (fix(clients): only derive fetch addresses for accounts with PDA seeds)
-=======
->>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
-=======
-    final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
-    final programConfig = pubkey('--program-config', results['program_config']! as String);
->>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
-=======
->>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
