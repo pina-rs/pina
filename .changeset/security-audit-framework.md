@@ -1,6 +1,7 @@
 ---
 pina_macros: feat
 pina_lints: feat
+pina: fix
 ---
 
 # Close the shadow-PDA and discriminator-collision gaps

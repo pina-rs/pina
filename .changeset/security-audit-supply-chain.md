@@ -1,5 +1,5 @@
 ---
-pina_cli: none
+pina_cli: fix
 ---
 
 # Document the lint-driver origin overrides as operator-only
