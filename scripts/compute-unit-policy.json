@@ -52,7 +52,7 @@
 		"float_accounts_program/update": 283,
 		"hello_solana_program/hello": 223,
 		"migrations_program/relay": 5680,
-		"multisig_program/configAuthorityExecute": 4947,
+		"multisig_program/configAuthorityExecute": 4993,
 		"multisig_program/configExecute": 15251,
 		"multisig_program/proposalActivate": 4622,
 		"multisig_program/proposalApprove": 4683,
