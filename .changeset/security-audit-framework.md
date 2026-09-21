@@ -5,6 +5,15 @@ pina: fix
 pina_root: none
 pina_cli_renderer: none
 pina_abi: none
+pina_codama_nodes: none
+pina_codama_renderer: none
+pina_codama_renderer_cli: none
+pina_codama_renderer_cpi: none
+pina_cpi_renderer: none
+pina_profile: none
+pina_sdk_ids: none
+pina_skill: none
+pina_test: none
 ---
 
 # Close the shadow-PDA and discriminator-collision gaps
