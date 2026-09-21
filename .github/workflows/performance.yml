@@ -149,7 +149,10 @@ jobs:
   instruction-compute:
     name: instruction compute units
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 60
+    # Budgets cover the whole job: setup, the base and head runtime builds, and
+    # two measurements that run one after the other. The step below owns most of
+    # this; the margin over it leaves room for the builds that precede it.
+    timeout-minutes: 100
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
@@ -185,6 +188,11 @@ jobs:
         # after 30 minutes; this bounds the whole step for hangs the watchdog
         # does not cover instead of consuming the job budget below.
         #
+        # The budget covers both measurements because they run in sequence, so
+        # it is roughly twice what one measurement needs. A head timeout fails
+        # the step and `bash -e` then skips the comparison, which is why this
+        # sits well above the observed runtime rather than close to it.
+        #
         # Each measurement pairs a test workspace with that same workspace's
         # ELFs. The base run therefore drives the base worktree's own surfpool
         # suites against the base artifacts rather than running the head's
@@ -199,7 +207,7 @@ jobs:
         # a port and one client ends up talking to the other's instance. The
         # figures come from a fresh instance per batch either way, so
         # serializing changes nothing about what is measured.
-        timeout-minutes: 45
+        timeout-minutes: 90
         run: |
           node "${{ github.workspace }}/scripts/measure-example-compute-units.ts" \
             "${{ github.workspace }}/../pina-performance-base" \
