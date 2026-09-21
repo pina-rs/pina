@@ -4247,8 +4247,12 @@ fn persisted_and_flag_manual_answers_fail_closed_on_contradiction() {
 	)
 	.expect_err("a persisted removal cannot coexist with a manual conversion");
 	assert!(
-		rejection.contains("contradicts the persisted removal"),
+		rejection.contains("contradicts the persisted removal of `name` in pina.toml"),
 		"{rejection}"
+	);
+	assert!(
+		!rejection.contains('\t'),
+		"continuation padding must not reach the message: {rejection:?}"
 	);
 
 	// And the reverse: a flag removal against a persisted manual conversion.
@@ -4265,8 +4269,11 @@ fn persisted_and_flag_manual_answers_fail_closed_on_contradiction() {
 		false,
 	)
 	.expect_err("a persisted manual conversion cannot coexist with a removal");
+	// The rendered sentence must read cleanly: the fragment says "manual
+	// conversion" (not "manual conversion for") and no continuation padding
+	// leaks into the message.
 	assert!(
-		rejection.contains("contradicts the persisted manual conversion"),
+		rejection.contains("contradicts the persisted manual conversion in pina.toml"),
 		"{rejection}"
 	);
 
@@ -4673,4 +4680,32 @@ fn offset_comment_skips_a_schema_the_grammar_rejects() {
 		"the header and column row remain: {header_only}"
 	);
 	assert!(!header_only.contains("value"), "{header_only}");
+}
+
+/// A paired compact row describes the shape the conversion writes, not the one
+/// it reads. Growing `String<12>` to `String<20>` keeps the stored range beside
+/// the destination's, and the note must name the capacity the developer has to
+/// write — the stored capacity would be a lie about the destination layout.
+#[test]
+fn offset_comment_prefers_the_destination_capacity_on_a_paired_row() {
+	let stored = schema(LayoutKind::Compact, &[("title", "String<12>")]);
+	let destination = schema(LayoutKind::Compact, &[("title", "String<20>")]);
+	let comment = layout_comment(&stored, &destination, &[]);
+	assert!(
+		comment.contains("(string prefix, capacity 20)"),
+		"the destination capacity is the one to write: {comment}"
+	);
+	assert!(
+		!comment.contains("capacity 12"),
+		"the stored capacity must not be offered as the destination shape: {comment}"
+	);
+
+	// A paired fixed row has a note on neither side, so none is fabricated.
+	let fixed_stored = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let fixed_destination = schema(LayoutKind::Fixed, &[("value", "u32"), ("added", "u8")]);
+	let fixed_comment = layout_comment(&fixed_stored, &fixed_destination, &[]);
+	assert!(
+		!fixed_comment.contains("(string prefix"),
+		"fixed rows carry no compact note: {fixed_comment}"
+	);
 }

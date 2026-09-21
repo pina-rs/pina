@@ -542,7 +542,7 @@ pub(super) fn layout_comment(
 	for (name, range, note) in &stored_rows {
 		let target = destination_name(name);
 		seen.insert(target.clone());
-		let Some((_, destination_range, _)) = destination_rows
+		let Some((_, destination_range, destination_note)) = destination_rows
 			.iter()
 			.find(|(candidate, ..)| *candidate == target)
 		else {
@@ -558,10 +558,14 @@ pub(super) fn layout_comment(
 			name: target,
 			stored: Some(range.clone()),
 			destination: Some(destination_range.clone()),
-			note: if note.is_empty() {
-				String::new()
-			} else {
+			// A compact field's note describes the layout it belongs to, and the
+			// conversion writes the destination's shape: a `String<12>` grown to
+			// `String<20>` must be written at capacity 20, so the destination's
+			// note wins where it has one.
+			note: if destination_note.is_empty() {
 				note.clone()
+			} else {
+				destination_note.clone()
 			},
 		});
 	}

@@ -144,8 +144,6 @@ pina migrations create --rename first_name:name --assume-removed last_name --man
 
 `--manual` is also the way to make a rename whose type changed legal: a generated rename copies bytes verbatim and so requires identical types, while `--manual` records that you own the interpretation. The answer is recorded, so repeated `create` runs keep generating the manual draft rather than re-deriving an automatic transition over your body.
 
-`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `create` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
-
 Answers that contradict each other fail closed rather than picking a winner, whichever source they came from: a field cannot be both renamed and discarded, and a manual conversion cannot also discard the stored bytes it reads.
 
 ## Resolve a manual transition

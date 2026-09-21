@@ -138,7 +138,7 @@ impl MigrationAnswers {
 			// Both persisted answers claim this field's bytes, so a flag removal
 			// disagrees with either one for the same reason.
 			let conflict = if answers.manual.contains(field) {
-				Some("manual conversion for".to_owned())
+				Some("manual conversion".to_owned())
 			} else {
 				answers
 					.renames
@@ -172,7 +172,7 @@ impl MigrationAnswers {
 		for field in &flag_answers.manual {
 			if answers.removed.contains(field.as_str()) {
 				return Err(format!(
-					"`--manual {field}` contradicts the persisted removal of `{field}` in 					 \
+					"`--manual {field}` contradicts the persisted removal of `{field}` in \
 					 pina.toml; update one of them"
 				));
 			}
