@@ -563,11 +563,10 @@ mod tests {
 			to: "points".to_owned(),
 		}];
 
-		let moves = field_moves(&source, &destination, &renames)
-			.unwrap_or_else(|| panic!("a rename must have a byte mapping"));
+		let moves = field_moves(&source, &destination, &renames);
 		assert_eq!(
 			moves,
-			[
+			Some(vec![
 				EventFieldMove {
 					source_offset: 0,
 					destination_offset: 0,
@@ -578,21 +577,20 @@ mod tests {
 					destination_offset: 2,
 					size: 8,
 				},
-			],
+			]),
 			"both fields move; the renamed one pairs with its stored bytes",
 		);
 
 		// Without the rename the same diff is not an automatic pairing at all,
 		// because no stored field is named `points`.
-		let unrenamed = field_moves(&source, &destination, &[])
-			.unwrap_or_else(|| panic!("the unrenamed diff still moves the shared field"));
+		let unrenamed = field_moves(&source, &destination, &[]);
 		assert_eq!(
 			unrenamed,
-			[EventFieldMove {
+			Some(vec![EventFieldMove {
 				source_offset: 0,
 				destination_offset: 0,
 				size: 2,
-			}],
+			}]),
 		);
 	}
 

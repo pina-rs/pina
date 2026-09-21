@@ -3911,6 +3911,10 @@ fn manual_answers_generate_an_editable_transition_for_a_rename() {
 		BTreeSet::from(["points".to_owned()]),
 		"the manual answer survives into the recorded intent"
 	);
+	// A version with no recorded transition — the initial draft — carries no
+	// intent at all, so the first hop is diffed from scratch.
+	let fresh = recorded_intent(None);
+	assert!(fresh.manual.is_empty() && fresh.renames.is_empty() && !fresh.force_manual);
 
 	let generated = std::fs::read_to_string(
 		fixture
@@ -4264,6 +4268,28 @@ fn persisted_and_flag_manual_answers_fail_closed_on_contradiction() {
 	assert!(
 		rejection.contains("contradicts the persisted manual conversion"),
 		"{rejection}"
+	);
+
+	// A flag removal for a field no persisted answer mentions is not a
+	// contradiction at all: it layers cleanly and answers the question.
+	let unrelated = crate::project::MigrationsAnswersConfig {
+		rename: vec!["first_name:name".to_owned()],
+		assume_removed: Vec::new(),
+		manual: Vec::new(),
+	};
+	let layered = MigrationAnswers::from_layers_with_manual(
+		&unrelated,
+		&[],
+		&["last_name".to_owned()],
+		&[],
+		false,
+	)
+	.unwrap_or_else(|error| panic!("an unrelated removal is not a contradiction: {error}"));
+	assert!(layered.removed.contains("last_name"));
+	assert_eq!(
+		layered.renames.get("first_name").map(String::as_str),
+		Some("name"),
+		"the persisted rename survives alongside the new removal"
 	);
 }
 

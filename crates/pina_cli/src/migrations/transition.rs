@@ -455,37 +455,35 @@ struct OffsetRow {
 /// Compact tails add a note because their active length is decided by the
 /// stored prefix bytes rather than the schema.
 fn own_rows(schema: &DataSchema) -> Vec<(String, String, String)> {
-	// Both layouts keep declaration order: `fixed_field_offsets` returns a map
-	// keyed by name, so rows are re-sequenced by the schema's own field order,
-	// which is also the physical order of the bytes.
-	let declared_order = |rows: &mut Vec<(String, String, String)>| {
-		let mut sorted = Vec::with_capacity(rows.len());
-		for field in &schema.fields {
-			if let Some(position) = rows.iter().position(|(name, ..)| name == &field.name) {
-				sorted.push(rows.remove(position));
-			}
+	// Both schemas come from a manifest that was validated when it was written,
+	// so one without a physical layout cannot reach the generator.
+	let layout = schema
+		.physical()
+		.unwrap_or_else(|error| panic!("manifest schemas always have a physical layout: {error}"));
+	// `physical()` reports both layouts in declaration order, which is also the
+	// physical order of the bytes, so the rows need no re-sequencing.
+	let fields = match layout {
+		PhysicalLayout::Fixed { fields, .. } => {
+			return fields
+				.into_iter()
+				.map(|field| {
+					(
+						field.name,
+						format!("{}..{}", field.offset, field.offset + field.size),
+						String::new(),
+					)
+				})
+				.collect();
 		}
-		*rows = sorted;
-	};
-	let Ok(PhysicalLayout::Compact { fields, .. }) = schema.physical() else {
-		let mut rows: Vec<(String, String, String)> = schema
-			.fixed_field_offsets()
-			.unwrap_or_default()
-			.into_iter()
-			.map(|(name, (offset, size))| {
-				(name, format!("{offset}..{}", offset + size), String::new())
-			})
-			.collect();
-		declared_order(&mut rows);
-		return rows;
+		PhysicalLayout::Compact { fields, .. } => fields,
 	};
 	fields
-		.iter()
+		.into_iter()
 		.map(|field| {
 			let range = |end: u64| format!("{}..{end}", field.header_offset);
 			let Some(tail) = &field.tail else {
 				return (
-					field.name.clone(),
+					field.name,
 					range(field.header_offset + field.header_size),
 					String::new(),
 				);
@@ -502,7 +500,7 @@ fn own_rows(schema: &DataSchema) -> Vec<(String, String, String)> {
 				note.push_str(", optional");
 			}
 			(
-				field.name.clone(),
+				field.name,
 				range(field.header_offset + u64::from(tail.prefix_bytes)),
 				note,
 			)
