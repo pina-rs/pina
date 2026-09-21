@@ -671,6 +671,7 @@ const expectedPrograms = <String>[
   'multisig_program',
   'optional_accounts_program',
   'pina_bpf_program',
+  'privacy_pool_program',
   'profile_program',
   'prop_amm_program',
   'role_registry_program',
