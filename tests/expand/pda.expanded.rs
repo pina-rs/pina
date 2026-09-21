@@ -1572,7 +1572,7 @@ impl InterleavedSeedState {
 impl<'a> InterleavedSeedStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
     pub fn as_slices(&self) -> [&[u8]; 3usize] {
-        [b"prefix", b"suffix", self.user.as_ref()]
+        [b"prefix", self.user.as_ref(), b"suffix"]
     }
     /// Append the bump seed to the seeds.
     pub fn with_bump(&self, bump: u8) -> InterleavedSeedStateSeedsWithBump<'a> {
@@ -1585,7 +1585,7 @@ impl<'a> InterleavedSeedStateSeeds<'a> {
 impl<'a> InterleavedSeedStateSeedsWithBump<'a> {
     /// The seeds as byte slices, including the bump seed.
     pub fn as_slices(&self) -> [&[u8]; 4usize] {
-        [b"prefix", b"suffix", self.inner.user.as_ref(), &self._bump]
+        [b"prefix", self.inner.user.as_ref(), b"suffix", &self._bump]
     }
     /// The seeds as Pinocchio CPI seed values, including the bump seed.
     pub fn as_seed_array(&self) -> [pina::Seed<'_>; 4usize] {
