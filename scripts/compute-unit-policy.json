@@ -24,6 +24,7 @@
 		"deltaPercent": 10.0
 	},
 	"approvedTotals": {
+		"escrow_program": 7914,
 		"staking_rewards_program": 8399,
 		"vesting_program": 6177
 	},
