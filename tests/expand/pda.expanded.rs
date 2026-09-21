@@ -2379,6 +2379,7 @@ mod __pinapod_compact_CompactState {
             self.try_projected_size().unwrap_or(usize::MAX)
         }
         pub fn commit(&mut self) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(self.data)?;
             let __old_off_values: usize = core::mem::size_of::<CompactStateHeader>();
             let __new_off_values: usize = core::mem::size_of::<CompactStateHeader>();
             let __old_len_values: usize = {
@@ -2595,22 +2596,8 @@ mod __pinapod_compact_CompactState {
             if let Some(value) = self.bump {
                 *writer.bump_mut() = value;
             }
-            if true {
-                {
-                    match (&encoded_len, &expected_len) {
-                        (left_val, right_val) => {
-                            if !(*left_val == *right_val) {
-                                let kind = ::core::panicking::AssertKind::Eq;
-                                ::core::panicking::assert_failed(
-                                    kind,
-                                    &*left_val,
-                                    &*right_val,
-                                    ::core::option::Option::None,
-                                );
-                            }
-                        }
-                    }
-                };
+            if encoded_len != expected_len {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
             Ok(encoded_len)
         }
@@ -2633,34 +2620,20 @@ mod __pinapod_compact_CompactState {
                         value.len(),
                     ));
                 }
-                let encoded_len = writer.commit()?;
                 if let Some(value) = self.authority {
                     *writer.authority_mut() = value;
                 }
                 if let Some(value) = self.bump {
                     *writer.bump_mut() = value;
                 }
+                let encoded_len = writer.commit()?;
                 encoded_len
             };
             <CompactState as pina::pinapod::PinaPodCompact>::validate(
                 &data[..encoded_len],
             )?;
-            if true {
-                {
-                    match (&encoded_len, &expected_len) {
-                        (left_val, right_val) => {
-                            if !(*left_val == *right_val) {
-                                let kind = ::core::panicking::AssertKind::Eq;
-                                ::core::panicking::assert_failed(
-                                    kind,
-                                    &*left_val,
-                                    &*right_val,
-                                    ::core::option::Option::None,
-                                );
-                            }
-                        }
-                    }
-                };
+            if encoded_len != expected_len {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
             Ok(encoded_len)
         }
