@@ -4637,3 +4637,40 @@ fn manual_stub_embeds_the_offset_comment() {
 	);
 	assert!(generated.contains("// value  0..8    0..4"), "{generated}");
 }
+
+/// A hand-built schema the grammar rejects has no physical layout, so it
+/// contributes no offset rows instead of failing the comment. `try_new` refuses
+/// such a schema, which is why the generator's own schemas always carry one.
+#[test]
+fn offset_comment_skips_a_schema_the_grammar_rejects() {
+	let unphysical = DataSchema {
+		layout: LayoutKind::Fixed,
+		fields: vec![FieldSchema {
+			name: "value".to_owned(),
+			rust_type: "NotAType".to_owned(),
+		}],
+		codec: pina_abi::DataCodec::PinaPodV2,
+	};
+	assert!(
+		unphysical.physical().is_err(),
+		"the fixture must be a schema the grammar rejects"
+	);
+
+	let valid = schema(LayoutKind::Fixed, &[("value", "u64")]);
+	let comment = layout_comment(&unphysical, &valid, &[]);
+	// The stored side contributes nothing, so the destination field reads as an
+	// addition that the conversion must initialize.
+	assert!(
+		comment.contains("value"),
+		"the destination rows still render: {comment}"
+	);
+	// With neither side physical there are no rows at all, so only the header
+	// and its column labels remain.
+	let header_only = layout_comment(&unphysical, &unphysical, &[]);
+	assert_eq!(
+		header_only.lines().count(),
+		2,
+		"the header and column row remain: {header_only}"
+	);
+	assert!(!header_only.contains("value"), "{header_only}");
+}

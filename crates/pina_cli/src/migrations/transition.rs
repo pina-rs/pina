@@ -454,14 +454,17 @@ struct OffsetRow {
 /// The range is where the field physically lives in that schema's payload.
 /// Compact tails add a note because their active length is decided by the
 /// stored prefix bytes rather than the schema.
+///
+/// A schema the grammar rejects yields no rows. `DataSchema::try_new` proves the
+/// grammar at construction, so both schemas reaching the generator have a
+/// physical layout.
 fn own_rows(schema: &DataSchema) -> Vec<(String, String, String)> {
-	// Both schemas come from a manifest that was validated when it was written,
-	// so one without a physical layout cannot reach the generator.
-	let layout = schema
-		.physical()
-		.unwrap_or_else(|error| panic!("manifest schemas always have a physical layout: {error}"));
-	// `physical()` reports both layouts in declaration order, which is also the
-	// physical order of the bytes, so the rows need no re-sequencing.
+	let Ok(layout) = schema.physical() else {
+		return Vec::new();
+	};
+	// `physical_layout` walks the declared fields in order, so both layouts are
+	// already in declaration order — which is also the physical byte order — and
+	// no re-sequencing is needed.
 	let fields = match layout {
 		PhysicalLayout::Fixed { fields, .. } => {
 			return fields
