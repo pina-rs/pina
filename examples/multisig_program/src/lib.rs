@@ -82,6 +82,15 @@ const SEED_SPENDING_LIMIT: &[u8] = b"spending-limit";
 const SEED_VAULT: &[u8] = b"vault";
 const SEED_EPHEMERAL_SIGNER: &[u8] = b"ephemeral-signer";
 
+/// Seed prefix a legacy multisig PDA is derived with, under the legacy
+/// program, from the legacy `create_key`. An import only accepts the account
+/// at that exact address, and the holder of the legacy `create_key` must
+/// sign the import — together those two checks make a fabricated account
+/// with a borrowed roster unimportable. Programs adapting this example to a
+/// real legacy deployment must set this prefix to the one their legacy
+/// program actually derives with.
+const SEED_LEGACY_MULTISIG: &[u8] = b"multisig";
+
 /// Maximum members per multisig. The vote masks are `u32`, so the cap keeps
 /// one bit per member with room to spare; the fixed create-instruction
 /// roster also has to share one transaction packet with the account list,
@@ -230,6 +239,9 @@ pub enum MultisigError {
 	MissingRentPayer = 30,
 	/// The proposal's recorded lifetime has elapsed.
 	ProposalExpired = 31,
+	/// A spending-limit action moves vault funds and requires a governed
+	/// proposal, not the instant config-authority path.
+	SpendingLimitRequiresProposal = 32,
 }
 
 // ---------------------------------------------------------------------------
@@ -1512,6 +1524,10 @@ pub struct MultisigCreateAccounts<'a> {
 #[derive(Accounts)]
 pub struct MultisigImportAccounts<'a> {
 	pub legacy_multisig: &'a AccountView,
+	/// The legacy multisig's `create_key`: its holder authorizes the import,
+	/// which is what stops a fabricated legacy account from adopting a roster
+	/// of keys that never consented.
+	pub legacy_create_key: &'a AccountView,
 	pub program_config: &'a AccountView,
 	pub create_key: &'a AccountView,
 	pub multisig: &'a mut AccountView,
@@ -2078,9 +2094,28 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = MultisigImportIx::try_from_bytes(data)?;
 
+		self.legacy_create_key.assert_signer()?;
 		self.legacy_multisig.assert_owner(&args.legacy_program)?;
 		let legacy_data = self.legacy_multisig.try_borrow()?;
 		let legacy = LegacyMultisig::parse(&legacy_data, &args.legacy_discriminator)?;
+
+		// Provenance: the legacy account must be the PDA its own parsed
+		// `create_key` derives under the legacy program, and the holder of
+		// that key must sign the import. Without the address binding any
+		// account of any program with matching bytes would import; without
+		// the signature a fabricated account could adopt a roster of keys
+		// that never consented to the migration.
+		self.legacy_create_key.assert_address(&legacy.create_key)?;
+		let legacy_seeds: &[&[u8]] = &[SEED_LEGACY_MULTISIG, legacy.create_key.as_ref()];
+		let Some((legacy_expected, _legacy_bump)) =
+			try_find_program_address(legacy_seeds, &args.legacy_program)
+		else {
+			return Err(MultisigError::InvalidLegacyMultisig.into());
+		};
+		if self.legacy_multisig.address() != &legacy_expected {
+			return Err(MultisigError::InvalidLegacyMultisig.into());
+		}
+		drop(legacy_data);
 
 		self.create_key.assert_signer()?;
 		self.rent_payer.assert_signer()?.assert_writable()?;
@@ -2729,6 +2764,16 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 				if protected.contains(view.address()) {
 					return Err(MultisigError::ProtectedAccount.into());
 				}
+				// Every writable non-signer this program owns is governed
+				// state — other proposals, spending limits, the program
+				// config — so a vault message can never write it. That
+				// blocks nested execution of another proposal and mid-message
+				// mutation of a spending limit through a CPI. The vault and
+				// ephemeral signers are program-owned too, but they are
+				// signer accounts by construction and excluded here.
+				if !message.is_signer_index(account_index) && view.owner() == &ID {
+					return Err(MultisigError::ProtectedAccount.into());
+				}
 			}
 			if message.is_signer_index(account_index)
 				&& view.address() != &vault_key
@@ -2964,6 +3009,17 @@ impl<'a> ProcessAccountInfos<'a> for ConfigAuthorityExecuteAccounts<'a> {
 		}
 		let actions_bytes = &args.actions[..actions_len];
 		validate_actions(actions_bytes)?;
+		// Spending limits move vault funds, so creating one stays behind the
+		// threshold and timelock of a governed proposal even in controlled
+		// mode: without this, the config authority could grant itself an
+		// allowance and drain the vault with no consensus at all. The
+		// authority manages configuration; custody is what the members hold.
+		for_each_action(actions_bytes, |action| {
+			if matches!(action, ConfigActionView::AddSpendingLimit { .. }) {
+				return Err(MultisigError::SpendingLimitRequiresProposal.into());
+			}
+			Ok(())
+		})?;
 
 		self.authority.assert_signer()?;
 		self.rent_payer.assert_signer()?.assert_writable()?;

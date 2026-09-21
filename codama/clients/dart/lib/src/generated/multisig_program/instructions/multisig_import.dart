@@ -147,6 +147,7 @@ getMultisigImportInstructionDataCodec() {
 Instruction getMultisigImportInstruction({
   required Address programAddress,
   required Address legacyMultisig,
+  required Address legacyCreateKey,
   required Address programConfig,
   required Address createKey,
   required Address multisig,
@@ -175,6 +176,7 @@ Instruction getMultisigImportInstruction({
     programAddress: programAddress,
     accounts: [
       AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
+      AccountMeta(address: legacyCreateKey, role: AccountRole.readonlySigner),
       AccountMeta(address: programConfig, role: AccountRole.readonly),
       AccountMeta(address: createKey, role: AccountRole.readonlySigner),
       AccountMeta(address: multisig, role: AccountRole.writable),

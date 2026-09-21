@@ -283,6 +283,92 @@
 					"transition": null
 				}
 			]
+		},
+		"instruction:1:03": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "CancelInstruction",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "maker",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "mint_a",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "maker_ata_a",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "escrow",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "escrow"
+							},
+							{
+								"name": "vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "token_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "associated_token_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
 		}
 	}
 }

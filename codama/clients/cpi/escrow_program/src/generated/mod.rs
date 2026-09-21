@@ -16,4 +16,4 @@ pub use instructions::*;
 pub use programs::*;
 
 /// Number of instructions rendered for the `escrowProgram` program.
-pub const INSTRUCTION_COUNT: usize = 2;
+pub const INSTRUCTION_COUNT: usize = 3;

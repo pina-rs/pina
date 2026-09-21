@@ -3,6 +3,10 @@
 	"lints": [
 		{ "name": "deny_account_borrows_across_cpi", "level": "deny" },
 		{
+			"name": "deny_colliding_account_discriminators",
+			"level": "deny"
+		},
+		{
 			"name": "deny_heap_allocations_in_onchain_instruction_handlers",
 			"level": "warn"
 		},

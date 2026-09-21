@@ -121,10 +121,12 @@ fn initialize_records_the_payer_as_authority() {
 	});
 }
 
-/// The hardcoded update authority can always update the price.
+/// The oracle's recorded authority can update the price. At initialize that is
+/// the payer, and the gate stays narrow: a key that is neither the static
+/// updater nor the recorded authority is still refused.
 #[test]
 #[ignore = "run with pina test"]
-fn update_requires_the_update_authority() {
+fn update_requires_the_recorded_or_the_static_authority() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
@@ -141,19 +143,49 @@ fn update_requires_the_update_authority() {
 			)
 			.expect("execute Initialize");
 
-		let update = update_instruction(&program, &oracle.pubkey(), &payer, 99);
+		// `payer` is the stored authority, so its update is accepted.
+		program
+			.send_instruction(update_instruction(&program, &oracle.pubkey(), &payer, 99))
+			.expect("the recorded oracle authority may update");
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			&account.data[34..42],
+			&99_u64.to_le_bytes(),
+			"the recorded authority wrote the new price on-chain"
+		);
+		drop(account);
+
+		// A stranger — neither the stored authority nor the static updater —
+		// is still refused, so the stored-authority branch does not widen the
+		// gate to everyone.
+		let stranger = Keypair::new_from_array([4; 32]);
+		program
+			.fund(&stranger.pubkey(), 1_000_000_000)
+			.expect("fund stranger");
 		let error = program
-			.send_instruction(update)
-			.expect_err("only the static update authority may update");
-		assert_eq!(error.operation(), "execute program instruction");
-		eprintln!("unauthorized update error: {}", error.message());
+			.send_with_signers(
+				update_instruction(&program, &oracle.pubkey(), &stranger.pubkey(), 123),
+				&[&stranger],
+			)
+			.expect_err("a stranger may not update");
+		pina_test::assert_custom_error(
+			&error,
+			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
+		);
+		// The refused update wrote nothing.
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			&account.data[34..42],
+			&99_u64.to_le_bytes(),
+			"a refused update leaves the price untouched"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});
 }
 
 /// Rotate hands the oracle authority to another wallet, which then owns
-/// accounting, though the STATIC update gate still applies to `Update`.
+/// accounting — including the price updates the rotation implies.
 #[test]
 #[ignore = "run with pina test"]
 fn rotate_hands_over_the_oracle_authority() {
@@ -202,6 +234,44 @@ fn rotate_hands_over_the_oracle_authority() {
 			account.data[2..34],
 			new_authority.pubkey().to_bytes(),
 			"the oracle authority is rotated on-chain"
+		);
+		drop(account);
+
+		// The rotated-in authority now publishes prices: rotation grants the
+		// capability it implies rather than being cosmetic.
+		program
+			.send_with_signers(
+				update_instruction(&program, &oracle.pubkey(), &new_authority.pubkey(), 4_242),
+				&[&new_authority],
+			)
+			.expect("the rotated-in authority publishes a price");
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			&account.data[34..42],
+			&4_242_u64.to_le_bytes(),
+			"the rotated-in authority wrote the new price on-chain"
+		);
+		drop(account);
+
+		// The key it replaced is no longer the stored authority and is not the
+		// static updater, so it has no update capability left.
+		let error = program
+			.send_instruction(update_instruction(
+				&program,
+				&oracle.pubkey(),
+				&payer,
+				1_111,
+			))
+			.expect_err("the rotated-away authority may no longer update");
+		pina_test::assert_custom_error(
+			&error,
+			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
+		);
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			&account.data[34..42],
+			&4_242_u64.to_le_bytes(),
+			"the rotated-away key wrote nothing"
 		);
 
 		program.stop().expect("stop isolated program test");

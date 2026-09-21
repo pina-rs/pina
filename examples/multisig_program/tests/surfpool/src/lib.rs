@@ -125,6 +125,41 @@ fn spending_limit_pda(multisig: &Pubkey, create_key: &Pubkey) -> (Pubkey, u8) {
 	)
 }
 
+/// Fixed legacy-migration identity, so the import journeys stay deterministic.
+fn legacy_create_key() -> Keypair {
+	Keypair::new_from_array([0x1E; 32])
+}
+
+/// The legacy multisig PDA under the program that owns the legacy account,
+/// mirroring the `SEED_LEGACY_MULTISIG` seeds the import handler derives with.
+/// The Surfpool journeys install the legacy fixture under this program's own ID
+/// because the state cheatcode cannot create foreign-owned accounts.
+fn legacy_pda(legacy_create_key: &Pubkey) -> (Pubkey, u8) {
+	Pubkey::find_program_address(&[b"multisig", legacy_create_key.as_ref()], &program_id())
+}
+
+/// Classic Anchor-layout legacy multisig bytes with `create_key` and the three
+/// fixed members, matching what the import handler parses.
+fn legacy_multisig_bytes(create_key: &Pubkey, members: &[Pubkey; 3]) -> Vec<u8> {
+	let mut legacy = Vec::new();
+	legacy.extend_from_slice(&[0x11_u8; 8]); // discriminator
+	legacy.extend_from_slice(create_key.as_ref());
+	legacy.extend_from_slice(&[0_u8; 32]); // autonomous config authority
+	legacy.extend_from_slice(&2_u16.to_le_bytes()); // threshold
+	legacy.extend_from_slice(&0_u32.to_le_bytes()); // time lock
+	legacy.extend_from_slice(&7_u64.to_le_bytes());
+	legacy.extend_from_slice(&7_u64.to_le_bytes());
+	legacy.push(0); // rent_collector: None
+	legacy.extend_from_slice(&[0_u8; 32]);
+	legacy.push(255); // bump
+	legacy.extend_from_slice(&3_u32.to_le_bytes()); // member count
+	for member in members {
+		legacy.extend_from_slice(member.as_ref());
+		legacy.push(PERMISSIONS_ALL);
+	}
+	legacy
+}
+
 fn sorted_members() -> [Pubkey; 3] {
 	let mut keys = [
 		member_a().pubkey(),
@@ -784,6 +819,10 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 		program
 			.fund(&payer.pubkey(), FUND)
 			.unwrap_or_else(|error| panic!("fund payer: {error:?}"));
+		let legacy_create_key = legacy_create_key();
+		program
+			.fund(&legacy_create_key.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund legacy create key: {error:?}"));
 		let members = sorted_members();
 
 		// Classic-layout bytes, owned by this program because the state
@@ -791,23 +830,8 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 		// import at a different expected owner must trip the owner check
 		// before anything is parsed. The happy-path import runs in the
 		// Mollusk suite, which can install a foreign-owned fixture.
-		let legacy_key = Pubkey::new_from_array([0x1E; 32]);
-		let mut legacy = Vec::new();
-		legacy.extend_from_slice(&[0x11_u8; 8]);
-		legacy.extend_from_slice(&[0x11; 32]);
-		legacy.extend_from_slice(&[0_u8; 32]);
-		legacy.extend_from_slice(&2_u16.to_le_bytes());
-		legacy.extend_from_slice(&0_u32.to_le_bytes());
-		legacy.extend_from_slice(&7_u64.to_le_bytes());
-		legacy.extend_from_slice(&7_u64.to_le_bytes());
-		legacy.push(0);
-		legacy.extend_from_slice(&[0_u8; 32]);
-		legacy.push(255);
-		legacy.extend_from_slice(&3_u32.to_le_bytes());
-		for member in &members {
-			legacy.extend_from_slice(member.as_ref());
-			legacy.push(PERMISSIONS_ALL);
-		}
+		let (legacy_key, _) = legacy_pda(&legacy_create_key.pubkey());
+		let legacy = legacy_multisig_bytes(&legacy_create_key.pubkey(), &members);
 		install_account(&program, &legacy_key, &pid, legacy, 1);
 
 		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
@@ -831,6 +855,7 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 					&import_ix,
 					vec![
 						AccountMeta::new_readonly(legacy_key, false),
+						AccountMeta::new_readonly(legacy_create_key.pubkey(), true),
 						AccountMeta::new_readonly(program_config_pda().0, false),
 						AccountMeta::new_readonly(create.pubkey(), true),
 						AccountMeta::new(multisig_key, false),
@@ -839,7 +864,7 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 						AccountMeta::new_readonly(pid, false),
 					],
 				),
-				&[&create, &payer],
+				&[&create, &legacy_create_key, &payer],
 			)
 			.expect_err("a foreign-owned account must not import");
 		assert!(
@@ -852,6 +877,309 @@ fn imports_reject_a_legacy_account_with_a_mismatched_owner() {
 			),
 			"expected InvalidAccountOwner, got: {error:?}"
 		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// The import's provenance binding, on the real runtime: the legacy
+/// `create_key` holder must sign the import, so a fabricated legacy account
+/// cannot adopt a roster of keys that never consented.
+#[test]
+#[ignore = "run with pina test"]
+fn imports_reject_an_unsigned_legacy_create_key() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let payer = member_a();
+		let members = sorted_members();
+		let legacy_create_key = legacy_create_key();
+		// The account sits at the derived legacy PDA and names `legacy_create_key`
+		// in its bytes, so only the missing signature can fail the import.
+		let (legacy_key, _) = legacy_pda(&legacy_create_key.pubkey());
+		let legacy = legacy_multisig_bytes(&legacy_create_key.pubkey(), &members);
+		install_account(&program, &legacy_key, &pid, legacy, 1);
+
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let mut import_ix = vec![0_u8; MultisigImportIx::SIZE];
+		MultisigImportIx::initialize(&mut import_ix, |ix| {
+			ix.bump = multisig_bump;
+			ix.legacy_program = pina_address(&pid);
+			ix.legacy_discriminator = [0x11; 8];
+			ix.set_config_authority = false.into();
+			ix.config_authority = Address::default();
+			ix.set_rent_collector = false.into();
+			ix.rent_collector = Address::default();
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode import: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&import_ix,
+					vec![
+						AccountMeta::new_readonly(legacy_key, false),
+						// Deliberately NOT a signer.
+						AccountMeta::new_readonly(legacy_create_key.pubkey(), false),
+						AccountMeta::new_readonly(program_config_pda().0, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(payer.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+					],
+				),
+				&[&create, &payer],
+			)
+			.expect_err("an unsigned legacy create key must not import");
+		assert!(
+			matches!(
+				error.transaction_error(),
+				Some(TransactionError::InstructionError(
+					_,
+					InstructionError::MissingRequiredSignature
+				))
+			),
+			"expected MissingRequiredSignature, got: {error:?}"
+		);
+		assert!(
+			program.account(&multisig_key).is_err(),
+			"a refused import must not create the multisig"
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// A fabricated legacy account parked away from the derived legacy PDA is
+/// refused even with the `create_key` signer present: without the address
+/// binding a byte-perfect imitation would import a stranger's roster.
+#[test]
+#[ignore = "run with pina test"]
+fn imports_reject_a_legacy_account_outside_its_derived_pda() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let payer = member_a();
+		let legacy_create_key = legacy_create_key();
+		program
+			.fund(&legacy_create_key.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund legacy create key: {error:?}"));
+		let members = sorted_members();
+
+		// Same bytes as a genuine legacy account, but installed at an arbitrary
+		// address rather than the PDA the parsed `create_key` derives.
+		let fabricated = Pubkey::new_from_array([0xFA; 32]);
+		assert_ne!(
+			fabricated,
+			legacy_pda(&legacy_create_key.pubkey()).0,
+			"the fabricated account must sit away from the derived legacy PDA"
+		);
+		let legacy = legacy_multisig_bytes(&legacy_create_key.pubkey(), &members);
+		install_account(&program, &fabricated, &pid, legacy, 1);
+
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let mut import_ix = vec![0_u8; MultisigImportIx::SIZE];
+		MultisigImportIx::initialize(&mut import_ix, |ix| {
+			ix.bump = multisig_bump;
+			ix.legacy_program = pina_address(&pid);
+			ix.legacy_discriminator = [0x11; 8];
+			ix.set_config_authority = false.into();
+			ix.config_authority = Address::default();
+			ix.set_rent_collector = false.into();
+			ix.rent_collector = Address::default();
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode import: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&import_ix,
+					vec![
+						AccountMeta::new_readonly(fabricated, false),
+						AccountMeta::new_readonly(legacy_create_key.pubkey(), true),
+						AccountMeta::new_readonly(program_config_pda().0, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(payer.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+					],
+				),
+				&[&create, &legacy_create_key, &payer],
+			)
+			.expect_err("a fabricated legacy account must not import");
+		pina_test::assert_custom_error(&error, MultisigError::InvalidLegacyMultisig as u32);
+		assert!(
+			program.account(&multisig_key).is_err(),
+			"a refused import must not create the multisig"
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// The config authority manages configuration, but custody stays with the
+/// members: a spending-limit grant moves vault funds, so the instant authority
+/// path refuses it and the grant needs a governed proposal instead.
+#[test]
+#[ignore = "run with pina test"]
+fn config_authority_execute_refuses_a_spending_limit_grant() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let create = create_key();
+		let members = sorted_members();
+		install_program_config(&program, &config_authority().pubkey());
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+
+		// A controlled multisig: `authority` may act directly, which is exactly
+		// the path that must not be able to mint itself an allowance.
+		let authority = Keypair::new_from_array([0xEE; 32]);
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let mut controlled_ix = vec![0_u8; MultisigCreateIx::SIZE];
+		MultisigCreateIx::initialize(&mut controlled_ix, |ix| {
+			ix.bump = multisig_bump;
+			ix.threshold.set(2);
+			ix.timelock.set(0);
+			ix.ttl.set(0);
+			for slot in ix.member_permissions.iter_mut().take(members.len()) {
+				*slot = PERMISSIONS_ALL;
+			}
+			ix.config_authority = pina_address(&authority.pubkey());
+			ix.rent_collector = Address::default();
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode controlled multisig create: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&controlled_ix,
+					vec![
+						AccountMeta::new_readonly(program_config_pda().0, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create controlled multisig: {error:?}"));
+
+		// A well-formed AddSpendingLimit action granting the authority's own
+		// key an allowance, so only the action kind can fail the call.
+		let limit_create_key = Pubkey::new_from_array([0x83; 32]);
+		let mut actions = vec![1_u8, ACTION_ADD_SPENDING_LIMIT];
+		actions.extend_from_slice(limit_create_key.as_ref());
+		actions.push(0_u8); // vault index
+		actions.extend_from_slice(Address::default().as_ref()); // SOL
+		actions.extend_from_slice(&1_000_u64.to_le_bytes());
+		actions.push(PERIOD_DAY);
+		actions.push(1_u8); // members
+		actions.extend_from_slice(authority.pubkey().as_ref());
+		actions.push(0_u8); // destinations: unrestricted
+
+		let mut authority_ix = vec![0_u8; ConfigAuthorityExecuteIx::SIZE];
+		ConfigAuthorityExecuteIx::initialize(&mut authority_ix, |ix| {
+			ix.actions_len.set(actions.len() as u16);
+			ix.actions[..actions.len()].copy_from_slice(&actions);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode authority execute: {error:?}"));
+
+		let (limit_key, _) = spending_limit_pda(&multisig_key, &limit_create_key);
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&authority_ix,
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new_readonly(authority.pubkey(), true),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(limit_key, false),
+					],
+				),
+				&[&authority, &funder],
+			)
+			.expect_err("the authority path must not grant a spending limit");
+		pina_test::assert_custom_error(&error, MultisigError::SpendingLimitRequiresProposal as u32);
+		assert!(
+			program.account(&limit_key).is_err(),
+			"the refused grant must not create the limit account"
+		);
+
+		// The same authority still executes the configuration actions it owns,
+		// so the refusal is scoped to custody rather than to the instruction.
+		let mut timelock_actions = vec![1_u8, ACTION_SET_TIME_LOCK];
+		timelock_actions.extend_from_slice(&3600_u32.to_le_bytes());
+		let mut allowed_ix = vec![0_u8; ConfigAuthorityExecuteIx::SIZE];
+		ConfigAuthorityExecuteIx::initialize(&mut allowed_ix, |ix| {
+			ix.actions_len.set(timelock_actions.len() as u16);
+			ix.actions[..timelock_actions.len()].copy_from_slice(&timelock_actions);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode authority execute: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&allowed_ix,
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new_readonly(authority.pubkey(), true),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&authority, &funder],
+			)
+			.unwrap_or_else(|error| panic!("authority-execute the timelock change: {error:?}"));
+		let multisig_account = program
+			.account(&multisig_key)
+			.unwrap_or_else(|error| panic!("multisig exists: {error:?}"));
+		let state = Multisig::try_from_bytes(&multisig_account.data)
+			.unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(state.timelock.get(), 3600);
 
 		program
 			.stop()

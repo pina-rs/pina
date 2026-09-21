@@ -387,60 +387,69 @@ async function main(): Promise<number> {
 		};
 	}
 
-	const recordFiles = await Promise.all(
-		batches.map(async (batch, batchIndex) => {
-			const benchmarkManifest = join(
-				dirname(outputFile),
-				`${basename(outputFile)}.batch-${batchIndex + 1}.manifest.json`,
-			);
-			writeFileSync(
-				benchmarkManifest,
-				`${JSON.stringify(batch.manifest, null, 2)}\n`,
-				"utf8",
-			);
-			const recordFile = join(
-				dirname(outputFile),
-				`${basename(outputFile)}.batch-${batchIndex + 1}.jsonl`,
-			);
-			rmSync(recordFile, { force: true });
-			process.stdout.write(
-				`Measuring instruction CU batch ${batchIndex + 1}/${batches.length}: ${
-					batch.programs.map((program) => program.name).join(", ")
-				}\n`,
-			);
-			const status = await commandAsync(
-				"cargo",
-				[
-					"test",
-					"--no-fail-fast",
-					"--locked",
-					...batch.programs.flatMap((program) => ["-p", program.testPackage]),
-					"--lib",
-					"--",
-					"--ignored",
-					"--nocapture",
-					"--test-threads=1",
-				],
-				{
-					cwd: harnessWorkspace,
-					env: {
-						...process.env,
-						PINA_CU_MANIFEST: benchmarkManifest,
-						PINA_CU_RECORD_FILE: recordFile,
-					},
-					timeoutMinutes: BATCH_TIMEOUT_MINUTES,
+	// Batches run one at a time. Surfpool's SDK asks the kernel for a free
+	// port by binding `127.0.0.1:0`, reading the assigned port, and dropping
+	// the listener before the surfnet rebinds it (`surfpool-sdk`'s
+	// `get_free_port`). Two batches starting concurrently can therefore be
+	// handed the same port, and the loser's client talks to the winner's
+	// surfnet: the symptoms are transaction-construction failures like
+	// "account has not been marked as writable" in tests that pass on their
+	// own, differing from run to run. Serializing removes the race, and the
+	// batches have to share one machine's CPU regardless.
+	const recordFiles: string[] = [];
+
+	for (const [batchIndex, batch] of batches.entries()) {
+		const benchmarkManifest = join(
+			dirname(outputFile),
+			`${basename(outputFile)}.batch-${batchIndex + 1}.manifest.json`,
+		);
+		writeFileSync(
+			benchmarkManifest,
+			`${JSON.stringify(batch.manifest, null, 2)}\n`,
+			"utf8",
+		);
+		const recordFile = join(
+			dirname(outputFile),
+			`${basename(outputFile)}.batch-${batchIndex + 1}.jsonl`,
+		);
+		rmSync(recordFile, { force: true });
+		process.stdout.write(
+			`Measuring instruction CU batch ${batchIndex + 1}/${batches.length}: ${
+				batch.programs.map((program) => program.name).join(", ")
+			}\n`,
+		);
+		const status = await commandAsync(
+			"cargo",
+			[
+				"test",
+				"--no-fail-fast",
+				"--locked",
+				...batch.programs.flatMap((program) => ["-p", program.testPackage]),
+				"--lib",
+				"--",
+				"--ignored",
+				"--nocapture",
+				"--test-threads=1",
+			],
+			{
+				cwd: harnessWorkspace,
+				env: {
+					...process.env,
+					PINA_CU_MANIFEST: benchmarkManifest,
+					PINA_CU_RECORD_FILE: recordFile,
 				},
+				timeoutMinutes: BATCH_TIMEOUT_MINUTES,
+			},
+		);
+
+		if (status !== 0) {
+			testFailures.push(
+				`Surfpool batch ${batchIndex + 1} exited with ${status}`,
 			);
+		}
 
-			if (status !== 0) {
-				testFailures.push(
-					`Surfpool batch ${batchIndex + 1} exited with ${status}`,
-				);
-			}
-
-			return recordFile;
-		}),
-	);
+		recordFiles.push(recordFile);
+	}
 
 	const samples = recordFiles.flatMap(readSamples);
 	const samplesByCase = new Map<string, number[]>();

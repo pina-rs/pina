@@ -416,6 +416,7 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		29 => Some("InvalidProposalKind"),
 		30 => Some("MissingRentPayer"),
 		31 => Some("ProposalExpired"),
+		32 => Some("SpendingLimitRequiresProposal"),
 		_ => None,
 	}
 }

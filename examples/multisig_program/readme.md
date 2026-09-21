@@ -21,6 +21,10 @@ An ambitious, production-shaped multisig wallet built with pina: permissioned me
 - Token-2022 transfer paths and spl-associated-token account creation.
 - Funds held by a legacy vault stay under the legacy program's control after an import.
 
+### Deployment note
+
+`ConfigInitialize` is permissionless and first-writer-wins: whoever initializes the global program config first becomes its authority and sets the treasury and creation fee. A deployment that intends to charge a creation fee must initialize the config in the same transaction the upgrade lands — before a sniper's transaction can claim the singleton (the Audius init-front-run class). `ConfigAuthorityExecute` also refuses `AddSpendingLimit` actions: creating an allowance moves vault funds, which stays behind threshold and timelock even in controlled mode. Removing a member through governance removes their spending rights immediately, but a spending limit created before the removal stays on-chain until it is removed.
+
 See [Production Readiness](../../docs/src/production-readiness.md) before adapting this example for an asset-bearing program.
 
 ## Run

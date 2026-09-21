@@ -149,7 +149,10 @@ jobs:
   instruction-compute:
     name: instruction compute units
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 60
+    # Budgets cover the whole job: setup, the base and head runtime builds, and
+    # two measurements that run one after the other. The step below owns most of
+    # this; the margin over it leaves room for the builds that precede it.
+    timeout-minutes: 100
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
@@ -184,34 +187,40 @@ jobs:
         # has no timeout). The measure script terminates an individual batch
         # after 30 minutes; this bounds the whole step for hangs the watchdog
         # does not cover instead of consuming the job budget below.
-        timeout-minutes: 45
+        #
+        # The budget covers both measurements because they run in sequence, so
+        # it is roughly twice what one measurement needs. A head timeout fails
+        # the step and `bash -e` then skips the comparison, which is why this
+        # sits well above the observed runtime rather than close to it.
+        #
+        # Each measurement pairs a test workspace with that same workspace's
+        # ELFs. The base run therefore drives the base worktree's own surfpool
+        # suites against the base artifacts rather than running the head's
+        # tests against them: a pull request that adds a test asserting new
+        # behavior cannot pass against the old program, and with `--allow-
+        # incomplete` that only silences the exit code — the failures still
+        # abort the base batch and leave its cases missing.
+        #
+        # The two measurements also run one after the other. Surfpool's SDK
+        # picks its port by binding `127.0.0.1:0` and then dropping the
+        # listener before rebinding it, so concurrent surfnets can collide on
+        # a port and one client ends up talking to the other's instance. The
+        # figures come from a fresh instance per batch either way, so
+        # serializing changes nothing about what is measured.
+        timeout-minutes: 90
         run: |
-          set +e
-          node ./scripts/measure-example-compute-units.ts \
-            "${{ github.workspace }}" \
+          node "${{ github.workspace }}/scripts/measure-example-compute-units.ts" \
+            "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/target/performance-build/instructions/base" \
             "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
-            --allow-incomplete &
-          base_pid=$!
+            --allow-incomplete
 
           node ./scripts/measure-example-compute-units.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/performance-build/instructions/head" \
-            "${{ github.workspace }}/target/performance/instructions/runtime-head.json" &
-          head_pid=$!
-
-          base_status=0
-          head_status=0
-          wait "$base_pid" || base_status=$?
-          wait "$head_pid" || head_status=$?
-          set -e
-
-          if [ "$base_status" -ne 0 ]; then
-            exit "$base_status"
-          fi
-          exit "$head_status"
+            "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare instruction reports

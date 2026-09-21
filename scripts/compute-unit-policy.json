@@ -24,6 +24,7 @@
 		"deltaPercent": 10.0
 	},
 	"approvedTotals": {
+		"escrow_program": 7914,
 		"staking_rewards_program": 8399,
 		"vesting_program": 6177
 	},
@@ -42,8 +43,8 @@
 		"duplicate_mutable_accounts_program/allowsDuplicateMutable": 103,
 		"duplicate_mutable_accounts_program/allowsDuplicateReadonly": 107,
 		"duplicate_mutable_accounts_program/failsDuplicateMutable": 143,
-		"escrow_program/make": 37070,
-		"escrow_program/take": 32351,
+		"escrow_program/make": 37073,
+		"escrow_program/take": 32354,
 		"events_program/initialize": 309,
 		"events_program/testEvent": 309,
 		"events_program/testEventCpi": 308,
@@ -51,7 +52,7 @@
 		"float_accounts_program/update": 283,
 		"hello_solana_program/hello": 223,
 		"migrations_program/relay": 5680,
-		"multisig_program/configAuthorityExecute": 4947,
+		"multisig_program/configAuthorityExecute": 4993,
 		"multisig_program/configExecute": 15251,
 		"multisig_program/proposalActivate": 4622,
 		"multisig_program/proposalApprove": 4683,
@@ -60,12 +61,12 @@
 		"multisig_program/proposalReject": 4671,
 		"multisig_program/proposalRevoke": 4669,
 		"multisig_program/spendingLimitUse": 7975,
-		"multisig_program/vaultExecute": 8590,
+		"multisig_program/vaultExecute": 8599,
 		"optional_accounts_program/inspect": 360,
 		"optional_accounts_program/note": 285,
 		"optional_accounts_program/touch": 1948,
 		"prop_amm_program/initialize": 1716,
-		"prop_amm_program/update": 311,
+		"prop_amm_program/update": 313,
 		"role_registry_program/addRole": 3933,
 		"role_registry_program/deactivateRole": 463,
 		"role_registry_program/rotateAdmin": 353,
@@ -82,7 +83,8 @@
 		"token_loader_cu_program/legacy_ata_wrong_address": 7638,
 		"token_loader_cu_program/token_2022_ata_success": 3224,
 		"vesting_program/cancel": 29281,
-		"vesting_program/claim": 22206
+		"vesting_program/claim": 22206,
+		"multisig_program/multisigImport": 4049
 	},
 	"runtimeExpectedOutcomes": {
 		"token_loader_cu_program/explicit_owner_assert_then_load": true,

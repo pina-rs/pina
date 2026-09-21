@@ -4,4 +4,5 @@
 
 export 'make.dart';
 export 'take.dart';
+export 'cancel.dart';
 export 'fetch.dart';

@@ -396,6 +396,62 @@ impl CounterState {
         }
         Ok(state)
     }
+    /**Load and validate `CounterState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda<'account>(
+        account: &'account pina::AccountView,
+        authority: &pina::Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::Ref<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority);
+        let Some((expected_address, canonical_bump)) = pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    /**Mutably load and validate `CounterState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda_mut` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda_mut<'account>(
+        account: &'account mut pina::AccountView,
+        authority: &pina::Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::RefMut<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority);
+        let Some((expected_address, canonical_bump)) = pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> CounterStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -1007,6 +1063,72 @@ impl AllSeedState {
             program_id,
         )?;
         if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    /**Load and validate `AllSeedState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda<'account>(
+        account: &'account ::pina::AccountView,
+        authority: &::pina::Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height);
+        let Some((expected_address, canonical_bump)) = ::pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    /**Mutably load and validate `AllSeedState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda_mut` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        authority: &::pina::Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height);
+        let Some((expected_address, canonical_bump)) = ::pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
@@ -1704,6 +1826,62 @@ impl TodoState {
             program_id,
         )?;
         if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    /**Load and validate `TodoState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda<'account>(
+        account: &'account ::pina::AccountView,
+        owner: &::pina::Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner);
+        let Some((expected_address, canonical_bump)) = ::pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    /**Mutably load and validate `TodoState`, its canonical PDA address, and its stored `bump` in one pass.
+
+Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the fixed-account counterpart of `with_checked_pda`, and the only fixed-account loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `load_pda_mut` performs.
+
+Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.*/
+    #[inline(always)]
+    pub fn load_checked_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        owner: &::pina::Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner);
+        let Some((expected_address, canonical_bump)) = ::pina::try_find_program_address(
+            &seeds.as_slices(),
+            program_id,
+        ) else {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        };
+        if account_address != expected_address || state.bump != canonical_bump {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)

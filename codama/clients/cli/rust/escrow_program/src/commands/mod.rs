@@ -8,8 +8,10 @@
 	clippy::too_many_arguments
 )]
 
+pub mod cancel;
 pub mod make;
 pub mod take;
 
+pub use cancel::CancelArgs;
 pub use make::MakeArgs;
 pub use take::TakeArgs;

@@ -68,6 +68,7 @@ export function getMultisigImportDiscriminator2Bytes(): ReadonlyUint8Array {
 export type MultisigImportInstruction<
 	TProgram extends string = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 	TAccountLegacyMultisig extends string | AccountMeta<string> = string,
+	TAccountLegacyCreateKey extends string | AccountMeta<string> = string,
 	TAccountProgramConfig extends string | AccountMeta<string> = string,
 	TAccountCreateKey extends string | AccountMeta<string> = string,
 	TAccountMultisig extends string | AccountMeta<string> = string,
@@ -84,6 +85,10 @@ export type MultisigImportInstruction<
 			TAccountLegacyMultisig extends string
 				? ReadonlyAccount<TAccountLegacyMultisig>
 				: TAccountLegacyMultisig,
+			TAccountLegacyCreateKey extends string ?
+					& ReadonlySignerAccount<TAccountLegacyCreateKey>
+					& AccountSignerMeta<TAccountLegacyCreateKey>
+				: TAccountLegacyCreateKey,
 			TAccountProgramConfig extends string
 				? ReadonlyAccount<TAccountProgramConfig>
 				: TAccountProgramConfig,
@@ -181,6 +186,7 @@ export function getMultisigImportInstructionDataCodec(): FixedSizeCodec<
 
 export type MultisigImportAsyncInput<
 	TAccountLegacyMultisig extends string = string,
+	TAccountLegacyCreateKey extends string = string,
 	TAccountProgramConfig extends string = string,
 	TAccountCreateKey extends string = string,
 	TAccountMultisig extends string = string,
@@ -189,6 +195,12 @@ export type MultisigImportAsyncInput<
 	TAccountTreasury extends string = string,
 > = {
 	legacyMultisig: Address<TAccountLegacyMultisig>;
+	/**
+	 * The legacy multisig's `create_key`: its holder authorizes the import,
+	 * which is what stops a fabricated legacy account from adopting a roster
+	 * of keys that never consented.
+	 */
+	legacyCreateKey: TransactionSigner<TAccountLegacyCreateKey>;
 	programConfig: Address<TAccountProgramConfig>;
 	createKey: TransactionSigner<TAccountCreateKey>;
 	multisig?: Address<TAccountMultisig>;
@@ -207,6 +219,7 @@ export type MultisigImportAsyncInput<
 
 export async function getMultisigImportInstructionAsync<
 	TAccountLegacyMultisig extends string,
+	TAccountLegacyCreateKey extends string,
 	TAccountProgramConfig extends string,
 	TAccountCreateKey extends string,
 	TAccountMultisig extends string,
@@ -217,6 +230,7 @@ export async function getMultisigImportInstructionAsync<
 >(
 	input: MultisigImportAsyncInput<
 		TAccountLegacyMultisig,
+		TAccountLegacyCreateKey,
 		TAccountProgramConfig,
 		TAccountCreateKey,
 		TAccountMultisig,
@@ -229,6 +243,7 @@ export async function getMultisigImportInstructionAsync<
 	MultisigImportInstruction<
 		TProgramAddress,
 		TAccountLegacyMultisig,
+		TAccountLegacyCreateKey,
 		TAccountProgramConfig,
 		TAccountCreateKey,
 		TAccountMultisig,
@@ -244,6 +259,10 @@ export async function getMultisigImportInstructionAsync<
 	// Original accounts.
 	const originalAccounts = {
 		legacyMultisig: { value: input.legacyMultisig ?? null, isWritable: false },
+		legacyCreateKey: {
+			value: input.legacyCreateKey ?? null,
+			isWritable: false,
+		},
 		programConfig: { value: input.programConfig ?? null, isWritable: false },
 		createKey: { value: input.createKey ?? null, isWritable: false },
 		multisig: { value: input.multisig ?? null, isWritable: true },
@@ -279,6 +298,7 @@ export async function getMultisigImportInstructionAsync<
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("legacyMultisig", accounts.legacyMultisig),
+			getAccountMeta("legacyCreateKey", accounts.legacyCreateKey),
 			getAccountMeta("programConfig", accounts.programConfig),
 			getAccountMeta("createKey", accounts.createKey),
 			getAccountMeta("multisig", accounts.multisig),
@@ -293,6 +313,7 @@ export async function getMultisigImportInstructionAsync<
 	} as MultisigImportInstruction<
 		TProgramAddress,
 		TAccountLegacyMultisig,
+		TAccountLegacyCreateKey,
 		TAccountProgramConfig,
 		TAccountCreateKey,
 		TAccountMultisig,
@@ -304,6 +325,7 @@ export async function getMultisigImportInstructionAsync<
 
 export type MultisigImportInput<
 	TAccountLegacyMultisig extends string = string,
+	TAccountLegacyCreateKey extends string = string,
 	TAccountProgramConfig extends string = string,
 	TAccountCreateKey extends string = string,
 	TAccountMultisig extends string = string,
@@ -312,6 +334,12 @@ export type MultisigImportInput<
 	TAccountTreasury extends string = string,
 > = {
 	legacyMultisig: Address<TAccountLegacyMultisig>;
+	/**
+	 * The legacy multisig's `create_key`: its holder authorizes the import,
+	 * which is what stops a fabricated legacy account from adopting a roster
+	 * of keys that never consented.
+	 */
+	legacyCreateKey: TransactionSigner<TAccountLegacyCreateKey>;
 	programConfig: Address<TAccountProgramConfig>;
 	createKey: TransactionSigner<TAccountCreateKey>;
 	multisig: Address<TAccountMultisig>;
@@ -330,6 +358,7 @@ export type MultisigImportInput<
 
 export function getMultisigImportInstruction<
 	TAccountLegacyMultisig extends string,
+	TAccountLegacyCreateKey extends string,
 	TAccountProgramConfig extends string,
 	TAccountCreateKey extends string,
 	TAccountMultisig extends string,
@@ -340,6 +369,7 @@ export function getMultisigImportInstruction<
 >(
 	input: MultisigImportInput<
 		TAccountLegacyMultisig,
+		TAccountLegacyCreateKey,
 		TAccountProgramConfig,
 		TAccountCreateKey,
 		TAccountMultisig,
@@ -351,6 +381,7 @@ export function getMultisigImportInstruction<
 ): MultisigImportInstruction<
 	TProgramAddress,
 	TAccountLegacyMultisig,
+	TAccountLegacyCreateKey,
 	TAccountProgramConfig,
 	TAccountCreateKey,
 	TAccountMultisig,
@@ -365,6 +396,10 @@ export function getMultisigImportInstruction<
 	// Original accounts.
 	const originalAccounts = {
 		legacyMultisig: { value: input.legacyMultisig ?? null, isWritable: false },
+		legacyCreateKey: {
+			value: input.legacyCreateKey ?? null,
+			isWritable: false,
+		},
 		programConfig: { value: input.programConfig ?? null, isWritable: false },
 		createKey: { value: input.createKey ?? null, isWritable: false },
 		multisig: { value: input.multisig ?? null, isWritable: true },
@@ -392,6 +427,7 @@ export function getMultisigImportInstruction<
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("legacyMultisig", accounts.legacyMultisig),
+			getAccountMeta("legacyCreateKey", accounts.legacyCreateKey),
 			getAccountMeta("programConfig", accounts.programConfig),
 			getAccountMeta("createKey", accounts.createKey),
 			getAccountMeta("multisig", accounts.multisig),
@@ -406,6 +442,7 @@ export function getMultisigImportInstruction<
 	} as MultisigImportInstruction<
 		TProgramAddress,
 		TAccountLegacyMultisig,
+		TAccountLegacyCreateKey,
 		TAccountProgramConfig,
 		TAccountCreateKey,
 		TAccountMultisig,
@@ -422,13 +459,19 @@ export type ParsedMultisigImportInstruction<
 	programAddress: Address<TProgram>;
 	accounts: {
 		legacyMultisig: TAccountMetas[0];
-		programConfig: TAccountMetas[1];
-		createKey: TAccountMetas[2];
-		multisig: TAccountMetas[3];
-		rentPayer: TAccountMetas[4];
-		systemProgram: TAccountMetas[5];
+		/**
+		 * The legacy multisig's `create_key`: its holder authorizes the import,
+		 * which is what stops a fabricated legacy account from adopting a roster
+		 * of keys that never consented.
+		 */
+		legacyCreateKey: TAccountMetas[1];
+		programConfig: TAccountMetas[2];
+		createKey: TAccountMetas[3];
+		multisig: TAccountMetas[4];
+		rentPayer: TAccountMetas[5];
+		systemProgram: TAccountMetas[6];
 		/** Treasury that collects the creation fee; absent when the fee is zero. */
-		treasury?: TAccountMetas[6] | undefined;
+		treasury?: TAccountMetas[7] | undefined;
 	};
 	data: MultisigImportInstructionData;
 };
@@ -442,12 +485,12 @@ export function parseMultisigImportInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMultisigImportInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 8) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 8,
 			},
 		);
 	}
@@ -467,6 +510,7 @@ export function parseMultisigImportInstruction<
 		programAddress: instruction.programAddress,
 		accounts: {
 			legacyMultisig: getNextAccount(),
+			legacyCreateKey: getNextAccount(),
 			programConfig: getNextAccount(),
 			createKey: getNextAccount(),
 			multisig: getNextAccount(),

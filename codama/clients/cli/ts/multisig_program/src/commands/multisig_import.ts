@@ -35,6 +35,10 @@ export const multisigImportCommand = registerGlobals(
 		"--legacy-multisig <legacyMultisig>",
 		"The `legacy_multisig` account",
 	)
+	.option(
+		"--legacy-create-key <legacyCreateKey>",
+		"The legacy multisig's `create_key`: its holder authorizes the import, [default: payer]",
+	)
 	.requiredOption(
 		"--program-config <programConfig>",
 		"The `program_config` account",
@@ -66,6 +70,7 @@ export const multisigImportCommand = registerGlobals(
 			setRentCollector: options.setRentCollector,
 			rentCollector: pubkey("--rent-collector", options.rentCollector),
 			legacyMultisig: pubkey("--legacy-multisig", options.legacyMultisig),
+			legacyCreateKey: context.payer,
 			programConfig: pubkey("--program-config", options.programConfig),
 			createKey: context.payer,
 			multisig: options.multisig === undefined
