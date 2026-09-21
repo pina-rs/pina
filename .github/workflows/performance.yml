@@ -185,18 +185,24 @@ jobs:
         # after 30 minutes; this bounds the whole step for hangs the watchdog
         # does not cover instead of consuming the job budget below.
         #
-        # The two measurements run one after the other rather than side by
-        # side. Surfpool's SDK picks its port by binding `127.0.0.1:0` and
-        # then dropping the listener before rebinding it, so concurrent
-        # surfnets can collide on a port and one client ends up talking to the
-        # other's instance; that surfaced as transaction-construction failures
-        # in tests that pass on their own. The measured compute units are read
-        # from a fresh instance per batch either way, so serializing changes
-        # nothing about the figures.
+        # Each measurement pairs a test workspace with that same workspace's
+        # ELFs. The base run therefore drives the base worktree's own surfpool
+        # suites against the base artifacts rather than running the head's
+        # tests against them: a pull request that adds a test asserting new
+        # behavior cannot pass against the old program, and with `--allow-
+        # incomplete` that only silences the exit code — the failures still
+        # abort the base batch and leave its cases missing.
+        #
+        # The two measurements also run one after the other. Surfpool's SDK
+        # picks its port by binding `127.0.0.1:0` and then dropping the
+        # listener before rebinding it, so concurrent surfnets can collide on
+        # a port and one client ends up talking to the other's instance. The
+        # figures come from a fresh instance per batch either way, so
+        # serializing changes nothing about what is measured.
         timeout-minutes: 45
         run: |
-          node ./scripts/measure-example-compute-units.ts \
-            "${{ github.workspace }}" \
+          node "${{ github.workspace }}/scripts/measure-example-compute-units.ts" \
+            "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/target/performance-build/instructions/base" \
             "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
