@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class DepositInstructionData {
   const DepositInstructionData({
@@ -22,9 +20,8 @@ class DepositInstructionData {
     required this.envelopeLen,
     required this.envelope,
     required this.shares,
-  }) :
-      discriminator = 4,
-      migrationVersion = 0;
+  }) : discriminator = 4,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -41,10 +38,19 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
-    ('commitment', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('viewPubkey', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'commitment',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'viewPubkey',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('envelopeLen', getU8Encoder()),
-    ('envelope', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
+    (
+      'envelope',
+      fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false),
+    ),
     ('shares', fixEncoderSize(getBytesEncoder(), 144, allowTruncation: false)),
   ]);
 
@@ -76,23 +82,16 @@ Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'deposit instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'deposit instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (DepositInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(4),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -100,12 +99,12 @@ Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
 
     return (
       DepositInstructionData(
-      bump: map['bump']! as int,
-      commitment: map['commitment']! as Uint8List,
-      viewPubkey: map['viewPubkey']! as Uint8List,
-      envelopeLen: map['envelopeLen']! as int,
-      envelope: map['envelope']! as Uint8List,
-      shares: map['shares']! as Uint8List,
+        bump: map['bump']! as int,
+        commitment: map['commitment']! as Uint8List,
+        viewPubkey: map['viewPubkey']! as Uint8List,
+        envelopeLen: map['envelopeLen']! as int,
+        envelope: map['envelope']! as Uint8List,
+        shares: map['shares']! as Uint8List,
       ),
       newOffset,
     );
@@ -131,8 +130,12 @@ Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
   };
 }
 
-Codec<DepositInstructionData, DepositInstructionData> getDepositInstructionDataCodec() {
-  return combineCodec(getDepositInstructionDataEncoder(), getDepositInstructionDataDecoder());
+Codec<DepositInstructionData, DepositInstructionData>
+getDepositInstructionDataCodec() {
+  return combineCodec(
+    getDepositInstructionDataEncoder(),
+    getDepositInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Deposit] instruction.
@@ -152,23 +155,23 @@ Instruction getDepositInstruction({
   required Uint8List shares,
 }) {
   final instructionData = DepositInstructionData(
-      bump: bump,
-      commitment: commitment,
-      viewPubkey: viewPubkey,
-      envelopeLen: envelopeLen,
-      envelope: envelope,
-      shares: shares,
+    bump: bump,
+    commitment: commitment,
+    viewPubkey: viewPubkey,
+    envelopeLen: envelopeLen,
+    envelope: envelope,
+    shares: shares,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: depositor, role: AccountRole.writableSigner),
-    AccountMeta(address: poolConfig, role: AccountRole.writable),
-    AccountMeta(address: poolVault, role: AccountRole.writable),
-    AccountMeta(address: merkleTree, role: AccountRole.writable),
-    AccountMeta(address: noteCommitment, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: depositor, role: AccountRole.writableSigner),
+      AccountMeta(address: poolConfig, role: AccountRole.writable),
+      AccountMeta(address: poolVault, role: AccountRole.writable),
+      AccountMeta(address: merkleTree, role: AccountRole.writable),
+      AccountMeta(address: noteCommitment, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getDepositInstructionDataEncoder().encode(instructionData),
   );

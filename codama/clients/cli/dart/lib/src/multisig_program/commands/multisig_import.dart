@@ -14,7 +14,11 @@ final class MultisigImportCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('legacy_program', mandatory: true, help: "legacyProgram")
-      ..addOption('legacy_discriminator', mandatory: true, help: "legacyDiscriminator")
+      ..addOption(
+        'legacy_discriminator',
+        mandatory: true,
+        help: "legacyDiscriminator",
+      )
       ..addFlag('set_config_authority', help: "setConfigAuthority")
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
       ..addFlag('set_rent_collector', help: "setRentCollector")
@@ -22,14 +26,18 @@ final class MultisigImportCommand extends Command<void> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
       ..addOption(
         'legacy_multisig',
         mandatory: true,
         help: "The legacy_multisig account",
       )
       ..addOption(
+<<<<<<< HEAD
 <<<<<<< HEAD
         'legacy_create_key',
         mandatory: false,
@@ -39,6 +47,8 @@ final class MultisigImportCommand extends Command<void> {
       ..addOption(
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
         'program_config',
         mandatory: true,
         help: "The program_config account",
@@ -55,6 +65,7 @@ final class MultisigImportCommand extends Command<void> {
             "Treasury that collects the creation fee; absent when the fee is zero",
       );
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
@@ -68,6 +79,8 @@ final class MultisigImportCommand extends Command<void> {
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
 =======
 >>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
   }
 
   @override
@@ -83,22 +96,29 @@ final class MultisigImportCommand extends Command<void> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     final legacyMultisig = pubkey(
       '--legacy-multisig',
       results['legacy_multisig']! as String,
     );
+<<<<<<< HEAD
 <<<<<<< HEAD
     final legacyCreateKey = (results['legacy_create_key'] as String?) != null
         ? pubkey('--legacy-create-key', results['legacy_create_key']! as String)
         : context.payerAddress;
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     final programConfig = pubkey(
       '--program-config',
       results['program_config']! as String,
     );
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
     final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
@@ -110,22 +130,38 @@ final class MultisigImportCommand extends Command<void> {
     final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
     final programConfig = pubkey('--program-config', results['program_config']! as String);
 >>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
     final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
-          seeds: MultisigSeeds(createKey: createKey),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: MultisigSeeds(createKey: createKey),
+            programAddress: context.programAddress,
+          )).$1;
     final rentPayer = context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
-    final legacyProgramValue = pubkey('--legacy-program', results['legacy_program']! as String);
-    final legacyDiscriminatorValue = base58Bytes('--legacy-discriminator', results['legacy_discriminator']! as String);
-    final setConfigAuthorityValue = results['set_config_authority'] as bool? ?? false;
-    final configAuthorityValue = pubkey('--config-authority', results['config_authority']! as String);
-    final setRentCollectorValue = results['set_rent_collector'] as bool? ?? false;
-    final rentCollectorValue = pubkey('--rent-collector', results['rent_collector']! as String);
+    final legacyProgramValue = pubkey(
+      '--legacy-program',
+      results['legacy_program']! as String,
+    );
+    final legacyDiscriminatorValue = base58Bytes(
+      '--legacy-discriminator',
+      results['legacy_discriminator']! as String,
+    );
+    final setConfigAuthorityValue =
+        results['set_config_authority'] as bool? ?? false;
+    final configAuthorityValue = pubkey(
+      '--config-authority',
+      results['config_authority']! as String,
+    );
+    final setRentCollectorValue =
+        results['set_rent_collector'] as bool? ?? false;
+    final rentCollectorValue = pubkey(
+      '--rent-collector',
+      results['rent_collector']! as String,
+    );
     final instruction = getMultisigImportInstruction(
       programAddress: context.programAddress,
       legacyMultisig: legacyMultisig,

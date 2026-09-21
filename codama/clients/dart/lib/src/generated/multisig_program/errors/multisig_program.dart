@@ -144,8 +144,11 @@ const Map<int, String> _multisigProgramErrorMessages = {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
   multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
   multisigProgramErrorUnauthorized:
       'The member lacks the permission the instruction requires.',
@@ -208,6 +211,7 @@ const Map<int, String> _multisigProgramErrorMessages = {
   multisigProgramErrorProposalExpired:
       'The proposal\'s recorded lifetime has elapsed.',
 <<<<<<< HEAD
+<<<<<<< HEAD
   multisigProgramErrorSpendingLimitRequiresProposal:
       'A spending-limit action moves vault funds and requires a governed',
 =======
@@ -251,6 +255,8 @@ const Map<int, String> _multisigProgramErrorMessages = {
 >>>>>>> ae778b5e (style(clients): apply dart format to the regenerated CLI commands)
 =======
 >>>>>>> c8cccef0 (fix(clients): bind _args when every account resolves without flags)
+=======
+>>>>>>> b66c425d (style(clients): apply dart format to the regenerated dart libraries)
 };
 
 /// Get the error message for a MultisigProgram program error code.

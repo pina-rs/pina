@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
-
 
 @immutable
 class SpendingLimit {
@@ -29,9 +27,8 @@ class SpendingLimit {
     required this.period,
     required this.members,
     required this.destinations,
-  }) :
-      discriminator = 4,
-      migrationVersion = 0;
+  }) : discriminator = 4,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -69,12 +66,27 @@ class SpendingLimit {
           destinations == other.destinations;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, bump, multisig, createKey, vaultIndex, vaultBump, mint, amount, remainingAmount, lastReset, period, members, destinations);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    bump,
+    multisig,
+    createKey,
+    vaultIndex,
+    vaultBump,
+    mint,
+    amount,
+    remainingAmount,
+    lastReset,
+    period,
+    members,
+    destinations,
+  );
 
   @override
-  String toString() => 'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, vaultBump: $vaultBump, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, members: $members, destinations: $destinations)';
+  String toString() =>
+      'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, vaultBump: $vaultBump, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, members: $members, destinations: $destinations)';
 }
-
 
 Encoder<SpendingLimit> getSpendingLimitEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -90,8 +102,45 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
     ('remainingAmount', getU64Encoder()),
     ('lastReset', getI64Encoder()),
     ('period', getU8Encoder()),
-    ('members', offsetEncoder(getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 126)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 512), OffsetConfig(preOffset: (scope) => scope.preOffset + 4))),
-    ('destinations', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 128)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 256)),
+    (
+      'members',
+      offsetEncoder(
+        getPinaPodBoundedArrayEncoder(
+          getArrayEncoder(
+            transformEncoder(getU8Encoder(), (int value) => value),
+            size: PrefixedArraySize(
+              offsetEncoder(
+                offsetEncoder(
+                  getU16Encoder(),
+                  OffsetConfig(preOffset: (scope) => 126),
+                ),
+                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+              ),
+            ),
+          ),
+          512,
+        ),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+      ),
+    ),
+    (
+      'destinations',
+      getPinaPodBoundedArrayEncoder(
+        getArrayEncoder(
+          transformEncoder(getU8Encoder(), (int value) => value),
+          size: PrefixedArraySize(
+            offsetEncoder(
+              offsetEncoder(
+                getU16Encoder(),
+                OffsetConfig(preOffset: (scope) => 128),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        256,
+      ),
+    ),
   ]);
 
   return transformEncoder(
@@ -129,25 +178,77 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
     ('remainingAmount', getU64Decoder()),
     ('lastReset', getI64Decoder()),
     ('period', getU8Decoder()),
-    ('members', offsetDecoder(getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 126)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 126)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 512), 512), OffsetConfig(preOffset: (scope) => scope.preOffset + 4))),
-    ('destinations', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 128)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 128)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 256), 256)),
+    (
+      'members',
+      offsetDecoder(
+        getPinaPodBoundedArrayDecoder(
+          getArrayDecoder(
+            getU8Decoder(),
+            size: PrefixedArraySize(
+              offsetDecoder(
+                offsetDecoder(
+                  getU16Decoder(),
+                  OffsetConfig(preOffset: (scope) => 126),
+                ),
+                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+              ),
+            ),
+          ),
+          getPinaPodBoundedCountDecoder(
+            offsetDecoder(
+              offsetDecoder(
+                getU16Decoder(),
+                OffsetConfig(preOffset: (scope) => 126),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+            512,
+          ),
+          512,
+        ),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+      ),
+    ),
+    (
+      'destinations',
+      getPinaPodBoundedArrayDecoder(
+        getArrayDecoder(
+          getU8Decoder(),
+          size: PrefixedArraySize(
+            offsetDecoder(
+              offsetDecoder(
+                getU16Decoder(),
+                OffsetConfig(preOffset: (scope) => 128),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        getPinaPodBoundedCountDecoder(
+          offsetDecoder(
+            offsetDecoder(
+              getU16Decoder(),
+              OffsetConfig(preOffset: (scope) => 128),
+            ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+          256,
+        ),
+        256,
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'spendingLimit account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'spendingLimit account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (SpendingLimit, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(4),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -160,35 +261,34 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
 
     return (
       SpendingLimit(
-      bump: map['bump']! as int,
-      multisig: map['multisig']! as Address,
-      createKey: map['createKey']! as Address,
-      vaultIndex: map['vaultIndex']! as int,
-      vaultBump: map['vaultBump']! as int,
-      mint: map['mint']! as Address,
-      amount: map['amount']! as BigInt,
-      remainingAmount: map['remainingAmount']! as BigInt,
-      lastReset: map['lastReset']! as BigInt,
-      period: map['period']! as int,
-      members: map['members']! as List<int>,
-      destinations: map['destinations']! as List<int>,
+        bump: map['bump']! as int,
+        multisig: map['multisig']! as Address,
+        createKey: map['createKey']! as Address,
+        vaultIndex: map['vaultIndex']! as int,
+        vaultBump: map['vaultBump']! as int,
+        mint: map['mint']! as Address,
+        amount: map['amount']! as BigInt,
+        remainingAmount: map['remainingAmount']! as BigInt,
+        lastReset: map['lastReset']! as BigInt,
+        period: map['period']! as int,
+        members: map['members']! as List<int>,
+        destinations: map['destinations']! as List<int>,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() =>
-      FixedSizeDecoder<SpendingLimit>(
-        fixedSize: structDecoder.fixedSize,
-        read: (bytes, offset) {
-          final bytesLength = bytes.length - offset;
-          if (bytesLength < structDecoder.fixedSize) {
-            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-          }
-          return readTopLevel(bytes, offset);
-        },
-      ),
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<SpendingLimit>(
+      fixedSize: structDecoder.fixedSize,
+      read: (bytes, offset) {
+        final bytesLength = bytes.length - offset;
+        if (bytesLength < structDecoder.fixedSize) {
+          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+        }
+        return readTopLevel(bytes, offset);
+      },
+    ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<SpendingLimit>(
         read: readTopLevel,
@@ -213,11 +313,11 @@ const int spendingLimitMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool spendingLimitNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 4) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 4) {
+    return false;
+  }
+  return data[1] < 0;
 }

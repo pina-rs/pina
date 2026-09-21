@@ -6,13 +6,13 @@ import 'dart:typed_data';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-import '../programs/optional_accounts_program.dart' show optionalAccountsProgramProgramAddress;
+import '../programs/optional_accounts_program.dart'
+    show optionalAccountsProgramProgramAddress;
 
 /// Discriminator reserved by Pina for the framework `Migrate` instruction.
 const migrateDiscriminator = 255;
 
-Uint8List getMigrateDiscriminatorBytes() =>
-    Uint8List.fromList(const [255]);
+Uint8List getMigrateDiscriminatorBytes() => Uint8List.fromList(const [255]);
 
 /// Creates the framework-owned `Migrate` instruction: it runs the program's
 /// on-demand account migrations on their own, so the payer authorizes exactly
@@ -30,13 +30,17 @@ Instruction getMigrateInstruction({
   Address? systemProgram,
   Address? storeState,
 }) {
-  final resolvedProgram = programAddress ?? optionalAccountsProgramProgramAddress;
+  final resolvedProgram =
+      programAddress ?? optionalAccountsProgramProgramAddress;
   final metas = <AccountMeta>[
     AccountMeta(
       address: payer ?? resolvedProgram,
       role: payer == null ? AccountRole.readonly : AccountRole.writableSigner,
     ),
-    AccountMeta(address: systemProgram ?? resolvedProgram, role: AccountRole.readonly),
+    AccountMeta(
+      address: systemProgram ?? resolvedProgram,
+      role: AccountRole.readonly,
+    ),
     AccountMeta(
       address: storeState ?? resolvedProgram,
       role: storeState == null ? AccountRole.readonly : AccountRole.writable,

@@ -15,7 +15,11 @@ final class InitializeCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('entry_count', mandatory: true, help: "entryCount")
       ..addOption('marker_count', mandatory: true, help: "markerCount")
-      ..addOption('journal', mandatory: false, help: "Empty canonical journal PDA [default: derived]");
+      ..addOption(
+        'journal',
+        mandatory: false,
+        help: "Empty canonical journal PDA [default: derived]",
+      );
   }
 
   @override
@@ -32,12 +36,18 @@ final class InitializeCommand extends Command<void> {
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(
-          seeds: JournalSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: JournalSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
-    final entryCountValue = integer('--entry-count', results['entry_count']! as String);
-    final markerCountValue = integer('--marker-count', results['marker_count']! as String);
+    final entryCountValue = integer(
+      '--entry-count',
+      results['entry_count']! as String,
+    );
+    final markerCountValue = integer(
+      '--marker-count',
+      results['marker_count']! as String,
+    );
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,
       authority: authority,

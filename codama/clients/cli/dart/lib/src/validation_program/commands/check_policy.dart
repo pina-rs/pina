@@ -15,8 +15,17 @@ final class CheckPolicyCommand extends Command<void> {
       ..addOption('amount', mandatory: true, help: "amount")
       ..addOption('memo', mandatory: true, help: "memo")
       ..addOption('approvals', mandatory: true, help: "approvals")
-      ..addOption('policy', mandatory: false, help: "The policy account [default: derived]")
-      ..addOption('audit', mandatory: true, help: "A shared account may still require the transaction's writable flag");
+      ..addOption(
+        'policy',
+        mandatory: false,
+        help: "The policy account [default: derived]",
+      )
+      ..addOption(
+        'audit',
+        mandatory: true,
+        help:
+            "A shared account may still require the transaction's writable flag",
+      );
   }
 
   @override
@@ -33,13 +42,16 @@ final class CheckPolicyCommand extends Command<void> {
     final policy = (results['policy'] as String?) != null
         ? pubkey('--policy', results['policy']! as String)
         : (await findPolicyPda(
-          seeds: PolicySeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: PolicySeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final audit = pubkey('--audit', results['audit']! as String);
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final memoValue = results['memo']! as String;
-    final approvalsValue = base58Bytes('--approvals', results['approvals']! as String);
+    final approvalsValue = base58Bytes(
+      '--approvals',
+      results['approvals']! as String,
+    );
     final instruction = getCheckPolicyInstruction(
       programAddress: context.programAddress,
       authority: authority,
