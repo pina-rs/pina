@@ -22,7 +22,6 @@ use rustc_middle::ty::TyKind;
 use rustc_middle::ty::UintTy;
 use rustc_span::Span;
 
-use crate::collisions::Collision;
 use crate::collisions::resolve_collisions;
 use crate::diagnostics;
 
