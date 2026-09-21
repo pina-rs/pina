@@ -15,6 +15,10 @@ pub const MULTISIG_IMPORT_MIGRATION_VERSION: u8 = 0u8;
 #[derive(Clone, Debug)]
 pub struct MultisigImport {
 	pub legacy_multisig: solana_pubkey::Pubkey,
+	/// The legacy multisig's `create_key`: its holder authorizes the import,
+	/// which is what stops a fabricated legacy account from adopting a roster
+	/// of keys that never consented.
+	pub legacy_create_key: solana_pubkey::Pubkey,
 	pub program_config: solana_pubkey::Pubkey,
 	pub create_key: solana_pubkey::Pubkey,
 	pub multisig: solana_pubkey::Pubkey,
@@ -27,12 +31,14 @@ pub struct MultisigImport {
 impl MultisigImport {
 	pub fn new(
 		legacy_multisig: solana_pubkey::Pubkey,
+		legacy_create_key: solana_pubkey::Pubkey,
 		program_config: solana_pubkey::Pubkey,
 		create_key: solana_pubkey::Pubkey,
 		rent_payer: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			legacy_multisig,
+			legacy_create_key,
 			program_config,
 			create_key,
 			multisig: solana_pubkey::Pubkey::find_program_address(
@@ -59,10 +65,14 @@ impl MultisigImport {
 		data: MultisigImportInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.legacy_multisig,
 			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.legacy_create_key,
+			true,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.program_config,

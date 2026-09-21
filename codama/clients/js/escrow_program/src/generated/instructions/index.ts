@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./cancel";
 export * from "./make";
 export * from "./migrate";
 export * from "./take";

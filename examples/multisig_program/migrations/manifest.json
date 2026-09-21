@@ -562,6 +562,14 @@
 								"pda": null
 							},
 							{
+								"name": "legacy_create_key",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "program_config",
 								"writable": false,
 								"signer": false,

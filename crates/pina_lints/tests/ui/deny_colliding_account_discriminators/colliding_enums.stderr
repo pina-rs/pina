@@ -1,0 +1,30 @@
+error: account discriminator value 31 (1 byte) is also claimed by AdminRegistry
+  --> $DIR/colliding_enums.rs:32:1
+   |
+LL | / impl pina::HasDiscriminator for VaultLedger {
+LL | |     type Type = VaultKind;
+LL | |
+LL | |     const VALUE: VaultKind = VaultKind::Vault;
+LL | |     //~^ ERROR: account discriminator value 31 (1 byte) is also claimed by AdminRegistry
+LL | | }
+   | |_^
+   |
+   = note: two account types that share a discriminator value and a serialized width pass every typed loader check (owner, discriminator, exact size), so either account deserializes as the other: the type-cosplay class
+   = help: give every account type across every discriminator enum a unique value; one enum for all accounts of a program makes this impossible by construction
+   = note: `#[deny(deny_colliding_account_discriminators)]` on by default
+
+error: account discriminator value 31 (1 byte) is also claimed by VaultLedger
+  --> $DIR/colliding_enums.rs:41:1
+   |
+LL | / impl pina::HasDiscriminator for AdminRegistry {
+LL | |     type Type = RegistryKind;
+LL | |
+LL | |     const VALUE: RegistryKind = RegistryKind::Registry;
+LL | |     //~^ ERROR: account discriminator value 31 (1 byte) is also claimed by VaultLedger
+LL | | }
+   | |_^
+   |
+   = note: two account types that share a discriminator value and a serialized width pass every typed loader check (owner, discriminator, exact size), so either account deserializes as the other: the type-cosplay class
+   = help: give every account type across every discriminator enum a unique value; one enum for all accounts of a program makes this impossible by construction
+
+error: aborting due to 2 previous errors

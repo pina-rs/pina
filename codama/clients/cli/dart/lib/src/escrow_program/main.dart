@@ -39,5 +39,6 @@ CommandRunner<void> buildRunner() {
     )
     ..addCommand(MakeCommand())
     ..addCommand(TakeCommand())
+    ..addCommand(CancelCommand())
     ..addCommand(FetchCommand());
 }

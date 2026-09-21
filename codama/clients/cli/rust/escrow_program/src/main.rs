@@ -63,6 +63,8 @@ enum Command {
 	Make(commands::MakeArgs),
 
 	Take(commands::TakeArgs),
+
+	Cancel(commands::CancelArgs),
 	/// Fetch and decode a program account.
 	#[command(subcommand)]
 	Fetch(fetch::Command),
@@ -92,6 +94,7 @@ fn run(cli: Cli) -> Result<(), context::CliError> {
 	match cli.command {
 		Command::Make(args) => commands::make::run(&context, args),
 		Command::Take(args) => commands::take::run(&context, args),
+		Command::Cancel(args) => commands::cancel::run(&context, args),
 		Command::Fetch(command) => fetch::run(&context, command),
 	}
 }

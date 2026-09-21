@@ -26,6 +26,13 @@ pub struct MultisigImport<'account, 'argument> {
 	/// Required privileges: read-only.
 	pub legacy_multisig: &'account AccountView,
 
+	/// CPI account `legacyCreateKey`.
+	/// The legacy multisig's `create_key`: its holder authorizes the import,
+	/// which is what stops a fabricated legacy account from adopting a roster
+	/// of keys that never consented.
+	/// Required privileges: read-only and signer.
+	pub legacy_create_key: &'account AccountView,
+
 	/// CPI account `programConfig`.
 	/// Required privileges: read-only.
 	pub program_config: &'account AccountView,
@@ -116,8 +123,9 @@ impl<'account, 'argument> MultisigImport<'account, 'argument> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 7] = [
+		let accounts: [CpiHandle<'_>; 8] = [
 			CpiHandle::readonly(self.legacy_multisig),
+			CpiHandle::readonly_signer(self.legacy_create_key),
 			CpiHandle::readonly(self.program_config),
 			CpiHandle::readonly_signer(self.create_key),
 			CpiHandle::writable(self.multisig)?,

@@ -46,6 +46,21 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		           the check without ending the borrow, so the runtime failure returns.",
 	},
 	LintExplanation {
+		name: "deny_colliding_account_discriminators",
+		default_level: "deny",
+		contract: "Every account type's `HasDiscriminator::VALUE` carries a numeric value no \
+		           other account type in the program also claims at the same discriminator width.",
+		rationale: "Pina discriminators are author-chosen integers, and rustc only rejects \
+		            duplicates within one enum. Two account types behind different enums that \
+		            agree on the value and the serialized width pass every typed loader check — \
+		            owner, discriminator, exact size — so either account deserializes as the \
+		            other: the sealevel-attacks type-cosplay class.",
+		blessing: "There is no sound exception; two account types at one value is a latent \
+		           vulnerability. Give the colliding variant a fresh value (wire values are part \
+		           of the ABI, so ship it as a migration), or consolidate all accounts behind one \
+		           discriminator enum, where rustc makes the collision impossible.",
+	},
+	LintExplanation {
 		name: "deny_heap_allocations_in_onchain_instruction_handlers",
 		default_level: "warn",
 		contract: "Avoid heap allocation in instruction handlers.",

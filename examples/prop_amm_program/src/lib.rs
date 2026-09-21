@@ -113,8 +113,12 @@ fn oracle_size() -> usize {
 	OracleState::SIZE
 }
 
-fn assert_update_authority(authority: AccountView) -> ProgramResult {
-	if authority.address() == &UPDATE_AUTHORITY {
+fn assert_update_authority(authority: AccountView, oracle_authority: &Address) -> ProgramResult {
+	// Either the benchmark's static updater key or the oracle's own stored
+	// authority may publish a price. Without the stored-authority branch
+	// `RotateAuthority` would be cosmetic: the rotated key could never do
+	// the one thing rotation implies.
+	if authority.address() == &UPDATE_AUTHORITY || authority.address() == oracle_authority {
 		return Ok(());
 	}
 
@@ -170,7 +174,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		// `UnauthorizedUpdateAuthority`, which would send integrators chasing
 		// the wrong key.
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
-		assert_update_authority(*self.authority)?;
+		assert_update_authority(*self.authority, &oracle.authority)?;
 		oracle.price = args.new_price;
 
 		Ok(())

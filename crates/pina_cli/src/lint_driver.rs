@@ -56,6 +56,11 @@ pub const PINA_LINT_DRIVER_PATH: &str = "PINA_LINT_DRIVER_PATH";
 ///
 /// The CLI's own tests and the release pipeline use it to fetch from a
 /// specific release; nothing needs to set it for normal use.
+///
+/// Operator-only: the release, repository, and base-URL overrides redirect
+/// the download *and* its checksum together, so they are a trusted-origin
+/// control, not a convenience knob. Setting them in a shared environment
+/// means whatever serves the override can choose which binary runs.
 pub const PINA_LINT_DRIVER_RELEASE: &str = "PINA_LINT_DRIVER_RELEASE";
 
 /// Environment variable overriding the GitHub repository hosting releases.

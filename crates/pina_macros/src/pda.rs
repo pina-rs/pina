@@ -105,21 +105,17 @@ pub(crate) fn expand(
 	let mut seed_field_inits = Vec::new();
 	let mut seed_slice_exprs = Vec::new();
 	let mut seed_slice_exprs_with_bump = Vec::new();
+	let mut seed_constants = Vec::new();
 	let mut has_borrowed_seed = false;
 
 	for seed in &args.seeds {
 		match seed {
 			PdaSeedArg::Constant(value) => {
 				let lit = syn::LitByteStr::new(value, proc_macro2::Span::call_site());
-				// Constants enter the ordered slice lists at their declared
-				// position: the derived address must match the declaration
-				// order the IDL publishes, so clients derive the same address.
-				seed_slice_exprs.push(quote!(#lit));
-				seed_slice_exprs_with_bump.push(quote!(#lit));
+				seed_constants.push(quote!(#lit));
 			}
 			PdaSeedArg::ConstantRef(path) => {
-				seed_slice_exprs.push(quote!(#path));
-				seed_slice_exprs_with_bump.push(quote!(#path));
+				seed_constants.push(quote!(#path));
 			}
 			PdaSeedArg::Variable { name, ty } => {
 				has_borrowed_seed |= ty.borrows();
@@ -226,6 +222,28 @@ pub(crate) fn expand(
 				"Mutably load and validate `{struct_name}` and its stored-bump PDA address in one \
 				 pass."
 			);
+			let checked_doc = format!(
+				"Load and validate `{struct_name}`, its canonical PDA address, and its stored \
+				 `{bump_field}` in one pass.\n\nSearches the seeds for the canonical bump and \
+				 rejects both an account at any other address and a stored `{bump_field}` that is \
+				 not that canonical bump. This is the fixed-account counterpart of \
+				 `with_checked_pda`, and the only fixed-account loader that rejects a shadow \
+				 account created at a noncanonical bump. The search costs more compute than the \
+				 single derivation `load_pda` performs.\n\nUse this method when an untrusted \
+				 caller chooses which account the handler loads, or when the program must be \
+				 certain that exactly one address exists for the seeds."
+			);
+			let checked_mut_doc = format!(
+				"Mutably load and validate `{struct_name}`, its canonical PDA address, and its \
+				 stored `{bump_field}` in one pass.\n\nSearches the seeds for the canonical bump \
+				 and rejects both an account at any other address and a stored `{bump_field}` \
+				 that is not that canonical bump. This is the fixed-account counterpart of \
+				 `with_checked_pda`, and the only fixed-account loader that rejects a shadow \
+				 account created at a noncanonical bump. The search costs more compute than the \
+				 single derivation `load_pda_mut` performs.\n\nUse this method when an untrusted \
+				 caller chooses which account the handler loads, or when the program must be \
+				 certain that exactly one address exists for the seeds."
+			);
 			quote! {
 				#[doc = #load_doc]
 				#[inline(always)]
@@ -269,6 +287,58 @@ pub(crate) fn expand(
 						program_id,
 					)?;
 					if account_address != expected_address {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					}
+
+					Ok(state)
+				}
+
+				#[doc = #checked_doc]
+				#[inline(always)]
+				pub fn load_checked_pda<'account>(
+					account: &'account #crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+				) -> ::core::result::Result<
+					#crate_path::Ref<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
+					#crate_path::ProgramError,
+				> {
+					let account_address = *account.address();
+					let state = #crate_path::AsAccount::as_account::<Self>(account, program_id)?;
+					let seeds = Self::seeds(#(#seed_param_names,)*);
+					let Some((expected_address, canonical_bump)) = #crate_path::try_find_program_address(
+						&seeds.as_slices(),
+						program_id,
+					) else {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					};
+					if account_address != expected_address || state.#bump_field != canonical_bump {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					}
+
+					Ok(state)
+				}
+
+				#[doc = #checked_mut_doc]
+				#[inline(always)]
+				pub fn load_checked_pda_mut<'account>(
+					account: &'account mut #crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+				) -> ::core::result::Result<
+					#crate_path::RefMut<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
+					#crate_path::ProgramError,
+				> {
+					let account_address = *account.address();
+					let state = #crate_path::AsAccount::as_account_mut::<Self>(account, program_id)?;
+					let seeds = Self::seeds(#(#seed_param_names,)*);
+					let Some((expected_address, canonical_bump)) = #crate_path::try_find_program_address(
+						&seeds.as_slices(),
+						program_id,
+					) else {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					};
+					if account_address != expected_address || state.#bump_field != canonical_bump {
 						return Err(#crate_path::ProgramError::InvalidSeeds);
 					}
 
@@ -445,7 +515,7 @@ pub(crate) fn expand(
 		impl<'a> #seeds_name<'a> {
 			/// The seeds as byte slices, without the bump seed.
 			pub fn as_slices(&self) -> [&[u8]; #seed_count] {
-				[#(#seed_slice_exprs,)*]
+				[#(#seed_constants,)* #(#seed_slice_exprs,)*]
 			}
 
 			/// Append the bump seed to the seeds.
@@ -460,7 +530,7 @@ pub(crate) fn expand(
 		impl<'a> #seeds_with_bump_name<'a> {
 			/// The seeds as byte slices, including the bump seed.
 			pub fn as_slices(&self) -> [&[u8]; #seed_count_with_bump] {
-				[#(#seed_slice_exprs_with_bump,)* &self._bump]
+				[#(#seed_constants,)* #(#seed_slice_exprs_with_bump,)* &self._bump]
 			}
 
 			/// The seeds as Pinocchio CPI seed values, including the bump seed.

@@ -144,6 +144,11 @@ pub enum MultisigProgramError {
 	/// 31 - The proposal's recorded lifetime has elapsed.
 	#[error("The proposal's recorded lifetime has elapsed.")]
 	ProposalExpired = 0x1F,
+	/// A spending-limit action moves vault funds and requires a governed
+	/// proposal, not the instant config-authority path.
+	/// 32 - A spending-limit action moves vault funds and requires a governed
+	#[error("A spending-limit action moves vault funds and requires a governed")]
+	SpendingLimitRequiresProposal = 0x20,
 }
 
 impl From<MultisigProgramError> for solana_program_error::ProgramError {

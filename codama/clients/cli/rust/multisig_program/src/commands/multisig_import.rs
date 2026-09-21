@@ -35,6 +35,9 @@ pub struct MultisigImportArgs {
 	/// The `legacy_multisig` account
 	#[arg(long)]
 	legacy_multisig: String,
+	/// The legacy multisig's `create_key`: its holder authorizes the import, which is what stops a fabricated legacy account from adopting a roster of keys that never consented [default: payer]
+	#[arg(long)]
+	legacy_create_key: Option<String>,
 	/// The `program_config` account
 	#[arg(long)]
 	program_config: String,
@@ -59,6 +62,10 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 	let config_authority = CliContext::pubkey("--config_authority", &args.config_authority)?;
 	let rent_collector = CliContext::pubkey("--rent_collector", &args.rent_collector)?;
 	let legacy_multisig = CliContext::pubkey("--legacy_multisig", &args.legacy_multisig)?;
+	let legacy_create_key = match &args.legacy_create_key {
+		Some(value) => CliContext::pubkey("--legacy_create_key", value)?,
+		None => context.payer_pubkey(),
+	};
 	let program_config = CliContext::pubkey("--program_config", &args.program_config)?;
 	let create_key = match &args.create_key {
 		Some(value) => CliContext::pubkey("--create_key", value)?,
@@ -96,6 +103,7 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 
 	let accounts = MultisigImport {
 		legacy_multisig,
+		legacy_create_key,
 		program_config,
 		create_key,
 		multisig,

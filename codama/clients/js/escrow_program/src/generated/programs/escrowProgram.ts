@@ -38,9 +38,13 @@ import {
 	getEscrowStateCodec,
 } from "../accounts";
 import {
+	type CancelInput,
+	getCancelInstruction,
 	getMakeInstruction,
 	getTakeInstruction,
 	type MakeInput,
+	parseCancelInstruction,
+	type ParsedCancelInstruction,
 	type ParsedMakeInstruction,
 	type ParsedTakeInstruction,
 	parseMakeInstruction,
@@ -77,6 +81,7 @@ export function identifyEscrowProgramAccount(
 export enum EscrowProgramInstruction {
 	Make,
 	Take,
+	Cancel,
 }
 
 export function identifyEscrowProgramInstruction(
@@ -91,6 +96,10 @@ export function identifyEscrowProgramInstruction(
 		containsBytes(data, getU8Encoder().encode(2), 0) &&
 		containsBytes(data, getU8Encoder().encode(0), 1)
 	) return EscrowProgramInstruction.Take;
+	if (
+		containsBytes(data, getU8Encoder().encode(3), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return EscrowProgramInstruction.Cancel;
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "escrowProgram" },
@@ -103,7 +112,9 @@ export type ParsedEscrowProgramInstruction<
 	| { instructionType: EscrowProgramInstruction.Make }
 		& ParsedMakeInstruction<TProgram>
 	| { instructionType: EscrowProgramInstruction.Take }
-		& ParsedTakeInstruction<TProgram>;
+		& ParsedTakeInstruction<TProgram>
+	| { instructionType: EscrowProgramInstruction.Cancel }
+		& ParsedCancelInstruction<TProgram>;
 
 export function parseEscrowProgramInstruction<TProgram extends string>(
 	instruction:
@@ -124,6 +135,13 @@ export function parseEscrowProgramInstruction<TProgram extends string>(
 			return {
 				instructionType: EscrowProgramInstruction.Take,
 				...parseTakeInstruction(instruction),
+			};
+		}
+		case EscrowProgramInstruction.Cancel: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: EscrowProgramInstruction.Cancel,
+				...parseCancelInstruction(instruction),
 			};
 		}
 		default:
@@ -159,6 +177,9 @@ export type EscrowProgramPluginInstructions = {
 	take: (
 		input: TakeInput,
 	) => ReturnType<typeof getTakeInstruction> & SelfPlanAndSendFunctions;
+	cancel: (
+		input: CancelInput,
+	) => ReturnType<typeof getCancelInstruction> & SelfPlanAndSendFunctions;
 };
 
 export type EscrowProgramPluginPdas = { escrow: typeof findEscrowPda };
@@ -184,6 +205,8 @@ export function escrowProgramProgram() {
 						addSelfPlanAndSendFunctions(client, getMakeInstruction(input)),
 					take: (input) =>
 						addSelfPlanAndSendFunctions(client, getTakeInstruction(input)),
+					cancel: (input) =>
+						addSelfPlanAndSendFunctions(client, getCancelInstruction(input)),
 				},
 				pdas: { escrow: findEscrowPda },
 				identifyAccount: identifyEscrowProgramAccount,

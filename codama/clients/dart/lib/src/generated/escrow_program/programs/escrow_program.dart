@@ -20,7 +20,7 @@ const escrowProgramProgramAddress = Address(
 enum EscrowProgramAccount { escrowState }
 
 /// Known instructions for the EscrowProgram program.
-enum EscrowProgramInstruction { make, take }
+enum EscrowProgramInstruction { make, take, cancel }
 
 /// Identifies the type of a EscrowProgram instruction.
 EscrowProgramInstruction identifyEscrowProgramInstruction(Uint8List data) {
@@ -31,6 +31,10 @@ EscrowProgramInstruction identifyEscrowProgramInstruction(Uint8List data) {
   if (containsBytes(data, getU8Encoder().encode(2), 0) &&
       containsBytes(data, getU8Encoder().encode(0), 1)) {
     return EscrowProgramInstruction.take;
+  }
+  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
+      containsBytes(data, getU8Encoder().encode(0), 1)) {
+    return EscrowProgramInstruction.cancel;
   }
 
   throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
@@ -60,6 +64,14 @@ final class ParsedTake extends ParsedEscrowProgramInstruction {
   final TakeInstructionData data;
 }
 
+/// A parsed Cancel instruction.
+final class ParsedCancel extends ParsedEscrowProgramInstruction {
+  const ParsedCancel({required this.data})
+    : super(EscrowProgramInstruction.cancel);
+
+  final CancelInstructionData data;
+}
+
 /// Parses a EscrowProgram instruction.
 ParsedEscrowProgramInstruction parseEscrowProgramInstruction(
   Instruction instruction,
@@ -72,6 +84,9 @@ ParsedEscrowProgramInstruction parseEscrowProgramInstruction(
     ),
     EscrowProgramInstruction.take => ParsedTake(
       data: parseTakeInstruction(instruction),
+    ),
+    EscrowProgramInstruction.cancel => ParsedCancel(
+      data: parseCancelInstruction(instruction),
     ),
   };
 }
