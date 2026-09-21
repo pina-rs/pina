@@ -16,11 +16,7 @@ final class ProposalCreateCommand extends Command<void> {
       ..addOption('kind', mandatory: true, help: "kind")
       ..addOption('vault_index', mandatory: true, help: "vaultIndex")
       ..addOption('vault_bump', mandatory: true, help: "vaultBump")
-      ..addOption(
-        'ephemeral_signers',
-        mandatory: true,
-        help: "ephemeralSigners",
-      )
+      ..addOption('ephemeral_signers', mandatory: true, help: "ephemeralSigners")
       ..addOption('ephemeral_bumps', mandatory: true, help: "ephemeralBumps")
       ..addOption('message_len', mandatory: true, help: "messageLen")
       ..addOption('message', mandatory: true, help: "message")
@@ -28,16 +24,8 @@ final class ProposalCreateCommand extends Command<void> {
       ..addOption('actions', mandatory: true, help: "actions")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption(
-        'creator',
-        mandatory: false,
-        help: "The creator account [default: payer]",
-      )
-      ..addOption(
-        'rent_payer',
-        mandatory: false,
-        help: "The rent_payer account [default: payer]",
-      )
+      ..addOption('creator', mandatory: false, help: "The creator account [default: payer]")
+      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -62,38 +50,14 @@ final class ProposalCreateCommand extends Command<void> {
     final clock = pubkey('--clock', results['clock']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final kindValue = integer('--kind', results['kind']! as String);
-    final vaultIndexValue = integer(
-      '--vault-index',
-      results['vault_index']! as String,
-    );
-    final vaultBumpValue = integer(
-      '--vault-bump',
-      results['vault_bump']! as String,
-    );
-    final ephemeralSignersValue = integer(
-      '--ephemeral-signers',
-      results['ephemeral_signers']! as String,
-    );
-    final ephemeralBumpsValue = base58Bytes(
-      '--ephemeral-bumps',
-      results['ephemeral_bumps']! as String,
-    );
-    final messageLenValue = integer(
-      '--message-len',
-      results['message_len']! as String,
-    );
-    final messageValue = base58Bytes(
-      '--message',
-      results['message']! as String,
-    );
-    final actionsLenValue = integer(
-      '--actions-len',
-      results['actions_len']! as String,
-    );
-    final actionsValue = base58Bytes(
-      '--actions',
-      results['actions']! as String,
-    );
+    final vaultIndexValue = integer('--vault-index', results['vault_index']! as String);
+    final vaultBumpValue = integer('--vault-bump', results['vault_bump']! as String);
+    final ephemeralSignersValue = integer('--ephemeral-signers', results['ephemeral_signers']! as String);
+    final ephemeralBumpsValue = base58Bytes('--ephemeral-bumps', results['ephemeral_bumps']! as String);
+    final messageLenValue = integer('--message-len', results['message_len']! as String);
+    final messageValue = base58Bytes('--message', results['message']! as String);
+    final actionsLenValue = integer('--actions-len', results['actions_len']! as String);
+    final actionsValue = base58Bytes('--actions', results['actions']! as String);
     final instruction = getProposalCreateInstruction(
       programAddress: context.programAddress,
       multisig: multisig,

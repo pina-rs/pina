@@ -1,0 +1,92 @@
+[package]
+name = "privacy_pool_program"
+version = "0.0.0"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish = false
+readme.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+# Host-only proving toolkit: circuits, trusted setup, proof serialization.
+# Never compiled into the SBF artifact.
+prover = [
+	"dep:ark-bn254",
+	"dep:ark-ec",
+	"dep:ark-ff",
+	"dep:ark-groth16",
+	"dep:ark-r1cs-std",
+	"dep:ark-snark",
+	"dep:ark-relations",
+	"dep:ark-serialize",
+	"dep:ark-std",
+	"dep:light-poseidon",
+	"dep:rand",
+]
+bpf-entrypoint = []
+
+[dependencies]
+pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs"] }
+
+[dependencies.ark-bn254]
+workspace = true
+optional = true
+
+[dependencies.ark-ec]
+workspace = true
+optional = true
+
+[dependencies.ark-ff]
+workspace = true
+optional = true
+
+[dependencies.ark-groth16]
+workspace = true
+optional = true
+
+[dependencies.ark-r1cs-std]
+workspace = true
+optional = true
+
+[dependencies.ark-snark]
+workspace = true
+optional = true
+
+[dependencies.ark-relations]
+workspace = true
+optional = true
+
+[dependencies.ark-serialize]
+workspace = true
+optional = true
+
+[dependencies.ark-std]
+workspace = true
+optional = true
+
+[dependencies.light-poseidon]
+workspace = true
+optional = true
+
+[dependencies.rand]
+workspace = true
+optional = true
+
+[dev-dependencies]
+ark-bn254 = { workspace = true, default-features = true }
+ark-ec = { workspace = true, default-features = true }
+ark-ff = { workspace = true, default-features = true }
+light-poseidon = { workspace = true, default-features = true }
+mollusk-svm = { workspace = true, default-features = true }
+solana-account = { workspace = true, default-features = true }
+solana-instruction = { workspace = true, default-features = true }
+solana-pubkey = { workspace = true, default-features = true }
+solana-sdk-ids = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,21 @@
+{
+	"name": "privacy-pool-program-cli",
+	"version": "0.1.0",
+	"description": "Command-line interface for privacyPoolProgram",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"privacy-pool-program-cli": "./src/main.ts"
+	},
+	"scripts": {
+		"start": "tsx src/main.ts"
+	},
+	"dependencies": {
+		"@solana/kit": "^8.0.0",
+		"commander": "^15.0.0"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.0",
+		"typescript": "^5.9.0"
+	}
+}

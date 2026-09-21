@@ -12,11 +12,7 @@ final class RotateAuthorityCommand extends Command<void> {
     argParser
       ..addOption('new_authority', mandatory: true, help: "newAuthority")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      );
+      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]");
   }
 
   @override
@@ -33,10 +29,7 @@ final class RotateAuthorityCommand extends Command<void> {
     final authority = (results['authority'] as String?) != null
         ? pubkey('--authority', results['authority']! as String)
         : context.payerAddress;
-    final newAuthorityValue = pubkey(
-      '--new-authority',
-      results['new_authority']! as String,
-    );
+    final newAuthorityValue = pubkey('--new-authority', results['new_authority']! as String);
     final instruction = getRotateAuthorityInstruction(
       programAddress: context.programAddress,
       oracle: oracle,
