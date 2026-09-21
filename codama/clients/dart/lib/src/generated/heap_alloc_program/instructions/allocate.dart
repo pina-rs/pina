@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,10 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class AllocateInstructionData {
-  const AllocateInstructionData({required this.value})
-    : discriminator = 0,
+  const AllocateInstructionData({
+    required this.value,
+  }) :
+      discriminator = 0,
       migrationVersion = 0;
 
   final int discriminator;
@@ -47,22 +51,34 @@ Decoder<AllocateInstructionData> getAllocateInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'allocate instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'allocate instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (AllocateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (AllocateInstructionData(value: map['value']! as BigInt), newOffset);
+    return (
+      AllocateInstructionData(
+      value: map['value']! as BigInt,
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -85,12 +101,8 @@ Decoder<AllocateInstructionData> getAllocateInstructionDataDecoder() {
   };
 }
 
-Codec<AllocateInstructionData, AllocateInstructionData>
-getAllocateInstructionDataCodec() {
-  return combineCodec(
-    getAllocateInstructionDataEncoder(),
-    getAllocateInstructionDataDecoder(),
-  );
+Codec<AllocateInstructionData, AllocateInstructionData> getAllocateInstructionDataCodec() {
+  return combineCodec(getAllocateInstructionDataEncoder(), getAllocateInstructionDataDecoder());
 }
 
 /// Creates a [Allocate] instruction.
@@ -99,11 +111,15 @@ Instruction getAllocateInstruction({
 
   required BigInt value,
 }) {
-  final instructionData = AllocateInstructionData(value: value);
+  final instructionData = AllocateInstructionData(
+      value: value,
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getAllocateInstructionDataEncoder().encode(instructionData),
   );
 }

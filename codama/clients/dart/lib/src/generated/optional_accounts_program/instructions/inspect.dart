@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,12 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class InspectInstructionData {
-  const InspectInstructionData() : discriminator = 2, migrationVersion = 0;
+  const InspectInstructionData() :
+      discriminator = 2,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -41,22 +45,34 @@ Decoder<InspectInstructionData> getInspectInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'inspect instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'inspect instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (InspectInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(2),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (InspectInstructionData(), newOffset);
+    return (
+      InspectInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -79,12 +95,8 @@ Decoder<InspectInstructionData> getInspectInstructionDataDecoder() {
   };
 }
 
-Codec<InspectInstructionData, InspectInstructionData>
-getInspectInstructionDataCodec() {
-  return combineCodec(
-    getInspectInstructionDataEncoder(),
-    getInspectInstructionDataDecoder(),
-  );
+Codec<InspectInstructionData, InspectInstructionData> getInspectInstructionDataCodec() {
+  return combineCodec(getInspectInstructionDataEncoder(), getInspectInstructionDataDecoder());
 }
 
 /// Creates a [Inspect] instruction.
@@ -93,21 +105,18 @@ Instruction getInspectInstruction({
   required Address authority,
   Address? store,
   Address? witness,
+
 }) {
-  final instructionData = InspectInstructionData();
+  final instructionData = InspectInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
-      if (store != null)
-        AccountMeta(address: store, role: AccountRole.readonly)
-      else
-        AccountMeta(address: programAddress, role: AccountRole.readonly),
-      if (witness != null)
-        AccountMeta(address: witness, role: AccountRole.readonlySigner)
-      else
-        AccountMeta(address: programAddress, role: AccountRole.readonly),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    if (store != null) AccountMeta(address: store, role: AccountRole.readonly) else AccountMeta(address: programAddress, role: AccountRole.readonly),
+    if (witness != null) AccountMeta(address: witness, role: AccountRole.readonlySigner) else AccountMeta(address: programAddress, role: AccountRole.readonly),
     ],
     data: getInspectInstructionDataEncoder().encode(instructionData),
   );

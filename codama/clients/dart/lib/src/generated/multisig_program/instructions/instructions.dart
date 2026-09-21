@@ -17,3 +17,4 @@ export 'proposal_reject.dart';
 export 'proposal_revoke.dart';
 export 'spending_limit_use.dart';
 export 'vault_execute.dart';
+

@@ -17,27 +17,11 @@ final class WithdrawCommand extends Command<void> {
       ..addOption('proof_a', mandatory: true, help: "proofA")
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")
-      ..addOption(
-        'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
-      )
+      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
       ..addOption('pool_vault', mandatory: true, help: "The pool_vault account")
-      ..addOption(
-        'merkle_tree',
-        mandatory: true,
-        help: "The merkle_tree account",
-      )
-      ..addOption(
-        'nullifier_set',
-        mandatory: true,
-        help: "The nullifier_set account",
-      )
-      ..addOption(
-        'verifying_key_account',
-        mandatory: true,
-        help: "The verifying_key_account account",
-      )
+      ..addOption('merkle_tree', mandatory: true, help: "The merkle_tree account")
+      ..addOption('nullifier_set', mandatory: true, help: "The nullifier_set account")
+      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account")
       ..addOption('recipient', mandatory: true, help: "The recipient account");
   }
 
@@ -51,28 +35,13 @@ final class WithdrawCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
+    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
     final poolVault = pubkey('--pool-vault', results['pool_vault']! as String);
-    final merkleTree = pubkey(
-      '--merkle-tree',
-      results['merkle_tree']! as String,
-    );
-    final nullifierSet = pubkey(
-      '--nullifier-set',
-      results['nullifier_set']! as String,
-    );
-    final verifyingKeyAccount = pubkey(
-      '--verifying-key-account',
-      results['verifying_key_account']! as String,
-    );
+    final merkleTree = pubkey('--merkle-tree', results['merkle_tree']! as String);
+    final nullifierSet = pubkey('--nullifier-set', results['nullifier_set']! as String);
+    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
     final recipient = pubkey('--recipient', results['recipient']! as String);
-    final nullifierValue = base58Bytes(
-      '--nullifier',
-      results['nullifier']! as String,
-    );
+    final nullifierValue = base58Bytes('--nullifier', results['nullifier']! as String);
     final rootValue = base58Bytes('--root', results['root']! as String);
     final proofAValue = base58Bytes('--proof-a', results['proof_a']! as String);
     final proofBValue = base58Bytes('--proof-b', results['proof_b']! as String);

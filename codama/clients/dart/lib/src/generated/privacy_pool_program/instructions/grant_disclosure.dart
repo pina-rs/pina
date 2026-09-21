@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,10 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class GrantDisclosureInstructionData {
-  const GrantDisclosureInstructionData({required this.reserved})
-    : discriminator = 8,
+  const GrantDisclosureInstructionData({
+    required this.reserved,
+  }) :
+      discriminator = 8,
       migrationVersion = 0;
 
   final int discriminator;
@@ -22,8 +26,7 @@ class GrantDisclosureInstructionData {
   final int reserved;
 }
 
-Encoder<GrantDisclosureInstructionData>
-getGrantDisclosureInstructionDataEncoder() {
+Encoder<GrantDisclosureInstructionData> getGrantDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
@@ -40,8 +43,7 @@ getGrantDisclosureInstructionDataEncoder() {
   );
 }
 
-Decoder<GrantDisclosureInstructionData>
-getGrantDisclosureInstructionDataDecoder() {
+Decoder<GrantDisclosureInstructionData> getGrantDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
@@ -49,26 +51,32 @@ getGrantDisclosureInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'grantDisclosure instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'grantDisclosure instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
-  (GrantDisclosureInstructionData, int) readTopLevel(
-    Uint8List bytes,
-    int offset,
-  ) {
-    getConstantDecoder(getU8Encoder().encode(8)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+  (GrantDisclosureInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(
+      getU8Encoder().encode(8),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      GrantDisclosureInstructionData(reserved: map['reserved']! as int),
+      GrantDisclosureInstructionData(
+      reserved: map['reserved']! as int,
+      ),
       newOffset,
     );
   }
@@ -93,12 +101,8 @@ getGrantDisclosureInstructionDataDecoder() {
   };
 }
 
-Codec<GrantDisclosureInstructionData, GrantDisclosureInstructionData>
-getGrantDisclosureInstructionDataCodec() {
-  return combineCodec(
-    getGrantDisclosureInstructionDataEncoder(),
-    getGrantDisclosureInstructionDataDecoder(),
-  );
+Codec<GrantDisclosureInstructionData, GrantDisclosureInstructionData> getGrantDisclosureInstructionDataCodec() {
+  return combineCodec(getGrantDisclosureInstructionDataEncoder(), getGrantDisclosureInstructionDataDecoder());
 }
 
 /// Creates a [GrantDisclosure] instruction.
@@ -109,22 +113,22 @@ Instruction getGrantDisclosureInstruction({
   required Address viewer,
   required int reserved,
 }) {
-  final instructionData = GrantDisclosureInstructionData(reserved: reserved);
+  final instructionData = GrantDisclosureInstructionData(
+      reserved: reserved,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: disclosureRequest, role: AccountRole.writable),
-      AccountMeta(address: noteCommitment, role: AccountRole.readonly),
-      AccountMeta(address: viewer, role: AccountRole.readonly),
+    AccountMeta(address: disclosureRequest, role: AccountRole.writable),
+    AccountMeta(address: noteCommitment, role: AccountRole.readonly),
+    AccountMeta(address: viewer, role: AccountRole.readonly),
     ],
     data: getGrantDisclosureInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [GrantDisclosure] instruction from raw instruction data.
-GrantDisclosureInstructionData parseGrantDisclosureInstruction(
-  Instruction instruction,
-) {
+GrantDisclosureInstructionData parseGrantDisclosureInstruction(Instruction instruction) {
   return getGrantDisclosureInstructionDataDecoder().decode(instruction.data!);
 }

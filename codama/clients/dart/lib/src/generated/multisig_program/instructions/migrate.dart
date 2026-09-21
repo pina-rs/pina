@@ -11,7 +11,8 @@ import '../programs/multisig_program.dart' show multisigProgramProgramAddress;
 /// Discriminator reserved by Pina for the framework `Migrate` instruction.
 const migrateDiscriminator = 255;
 
-Uint8List getMigrateDiscriminatorBytes() => Uint8List.fromList(const [255]);
+Uint8List getMigrateDiscriminatorBytes() =>
+    Uint8List.fromList(const [255]);
 
 /// Creates the framework-owned `Migrate` instruction: it runs the program's
 /// on-demand account migrations on their own, so the payer authorizes exactly
@@ -38,10 +39,7 @@ Instruction getMigrateInstruction({
       address: payer ?? resolvedProgram,
       role: payer == null ? AccountRole.readonly : AccountRole.writableSigner,
     ),
-    AccountMeta(
-      address: systemProgram ?? resolvedProgram,
-      role: AccountRole.readonly,
-    ),
+    AccountMeta(address: systemProgram ?? resolvedProgram, role: AccountRole.readonly),
     AccountMeta(
       address: programConfig ?? resolvedProgram,
       role: programConfig == null ? AccountRole.readonly : AccountRole.writable,
@@ -59,14 +57,7 @@ Instruction getMigrateInstruction({
       role: spendingLimit == null ? AccountRole.readonly : AccountRole.writable,
     ),
   ];
-  final provided = [
-    payer,
-    systemProgram,
-    programConfig,
-    multisig,
-    proposal,
-    spendingLimit,
-  ];
+  final provided = [payer, systemProgram, programConfig, multisig, proposal, spendingLimit];
   var last = -1;
   for (var index = 0; index < provided.length; index++) {
     if (provided[index] != null) {

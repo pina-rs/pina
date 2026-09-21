@@ -14,11 +14,7 @@ final class InitializeCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('digest', mandatory: true, help: "digest")
-      ..addOption(
-        'todo',
-        mandatory: false,
-        help: "The todo account [default: derived]",
-      );
+      ..addOption('todo', mandatory: false, help: "The todo account [default: derived]");
   }
 
   @override
@@ -35,9 +31,9 @@ final class InitializeCommand extends Command<void> {
     final todo = (results['todo'] as String?) != null
         ? pubkey('--todo', results['todo']! as String)
         : (await findTodoPda(
-            seeds: TodoSeeds(owner: owner),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: TodoSeeds(owner: owner),
+          programAddress: context.programAddress,
+        )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final digestValue = base58Bytes('--digest', results['digest']! as String);
     final instruction = getInitializeInstruction(

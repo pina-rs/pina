@@ -471,17 +471,25 @@ function renderFetch(model: CliModel): string {
 				seedNames.push(seed.camel);
 			}
 
-			const derivation = (account.seeds ?? []).some((seed) => !seed.constant)
+			// Only accounts backed by a PDA node can be derived; plain accounts
+			// keep requiring an explicit --address.
+			const hasPdaSeeds = (account.seeds ?? []).length > 0;
+			const hasVariableSeeds = (account.seeds ?? []).some(
+				(seed) => !seed.constant,
+			);
+			const derivation = hasVariableSeeds
 				? `${seedLocals.join("\n")}
 					const address = options.address ??
 						(await find${account.pdaPascal ?? account.pascal}Pda({ ${
 					seedNames.join(", ")
 				} }, { programAddress: context.programAddress }))[0];`
-				: `const address = options.address === undefined
+				: hasPdaSeeds
+				? `const address = options.address === undefined
 						? (await find${account.pdaPascal ?? account.pascal}Pda({
 							programAddress: context.programAddress,
 						}))[0]
-						: pubkey("--address", options.address as string);`;
+						: pubkey("--address", options.address as string);`
+				: `const address = pubkey("--address", options.address as string);`;
 
 			return `\t\t.addCommand(
 				registerGlobals(new Command("${kebab(account.snake)}"))

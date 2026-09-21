@@ -632,6 +632,9 @@ function renderFetchCommand(model: CliModel, clientBarrel: string): string {
 				)
 				.join("\n");
 
+			// Only accounts backed by a PDA node can be derived; plain accounts
+			// keep requiring an explicit --address.
+			const hasPdaSeeds = (account.seeds ?? []).length > 0;
 			const derivation = variableSeeds.length > 0
 				? `${seedValues}
     final address = (results['address'] as String?) != null
@@ -646,11 +649,13 @@ ${
             ),
             programAddress: context.programAddress,
           )).$1;`
-				: `    final address = (results['address'] as String?) != null
+				: hasPdaSeeds
+				? `    final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await find${account.pdaPascal ?? account.pascal}Pda(
             programAddress: context.programAddress,
-          )).$1;`;
+          )).$1;`
+				: `    final address = pubkey('--address', results['address']! as String);`;
 
 			const fieldEntries = account.fields
 				.map((field) =>

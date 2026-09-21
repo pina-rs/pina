@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -10,6 +11,7 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class PolicyState {
   const PolicyState({
@@ -17,8 +19,9 @@ class PolicyState {
     required this.minimum,
     required this.maximum,
     required this.requiredApprovals,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -40,19 +43,12 @@ class PolicyState {
           requiredApprovals == other.requiredApprovals;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    minimum,
-    maximum,
-    requiredApprovals,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, minimum, maximum, requiredApprovals);
 
   @override
-  String toString() =>
-      'PolicyState(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, minimum: $minimum, maximum: $maximum, requiredApprovals: $requiredApprovals)';
+  String toString() => 'PolicyState(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, minimum: $minimum, maximum: $maximum, requiredApprovals: $requiredApprovals)';
 }
+
 
 Encoder<PolicyState> getPolicyStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -88,15 +84,20 @@ Decoder<PolicyState> getPolicyStateDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'policyState account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'policyState account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (PolicyState, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -109,26 +110,27 @@ Decoder<PolicyState> getPolicyStateDecoder() {
 
     return (
       PolicyState(
-        bump: map['bump']! as int,
-        minimum: map['minimum']! as BigInt,
-        maximum: map['maximum']! as BigInt,
-        requiredApprovals: map['requiredApprovals']! as int,
+      bump: map['bump']! as int,
+      minimum: map['minimum']! as BigInt,
+      maximum: map['maximum']! as BigInt,
+      requiredApprovals: map['requiredApprovals']! as int,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<PolicyState>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<PolicyState>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<PolicyState>(
         read: readTopLevel,
@@ -153,11 +155,11 @@ const int policyStateMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool policyStateNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 1) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 1) {
+		return false;
+	}
+	return data[1] < 0;
 }

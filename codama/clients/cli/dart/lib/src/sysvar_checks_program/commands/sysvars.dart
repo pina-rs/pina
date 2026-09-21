@@ -12,11 +12,7 @@ final class SysvarsCommand extends Command<void> {
     argParser
       ..addOption('clock', mandatory: true, help: "The clock account")
       ..addOption('rent', mandatory: true, help: "The rent account")
-      ..addOption(
-        'stake_history',
-        mandatory: true,
-        help: "The stake_history account",
-      );
+      ..addOption('stake_history', mandatory: true, help: "The stake_history account");
   }
 
   @override
@@ -31,10 +27,7 @@ final class SysvarsCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final clock = pubkey('--clock', results['clock']! as String);
     final rent = pubkey('--rent', results['rent']! as String);
-    final stakeHistory = pubkey(
-      '--stake-history',
-      results['stake_history']! as String,
-    );
+    final stakeHistory = pubkey('--stake-history', results['stake_history']! as String);
 
     final instruction = getSysvarsInstruction(
       programAddress: context.programAddress,

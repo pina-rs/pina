@@ -35,19 +35,14 @@ const int customErrorsProgramErrorValueLessOrEqual = 0x17f1; // 6129
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _customErrorsProgramErrorMessages = {
-  customErrorsProgramErrorHello: 'A plain custom error.',
-  customErrorsProgramErrorHelloNoMsg: '',
-  customErrorsProgramErrorHelloNext: 'A distinct code with its own message.',
-  customErrorsProgramErrorHelloCustom:
-      'A custom error carrying caller-supplied context.',
-  customErrorsProgramErrorValueMismatch:
-      'Two values were expected to differ and did not.',
-  customErrorsProgramErrorValueMatch:
-      'Two values were expected to be equal and were not.',
-  customErrorsProgramErrorValueLess:
-      'The compared value was not less than the bound.',
-  customErrorsProgramErrorValueLessOrEqual:
-      'The compared value was not less than or equal to the bound.',
+    customErrorsProgramErrorHello: 'A plain custom error.',
+    customErrorsProgramErrorHelloNoMsg: '',
+    customErrorsProgramErrorHelloNext: 'A distinct code with its own message.',
+    customErrorsProgramErrorHelloCustom: 'A custom error carrying caller-supplied context.',
+    customErrorsProgramErrorValueMismatch: 'Two values were expected to differ and did not.',
+    customErrorsProgramErrorValueMatch: 'Two values were expected to be equal and were not.',
+    customErrorsProgramErrorValueLess: 'The compared value was not less than the bound.',
+    customErrorsProgramErrorValueLessOrEqual: 'The compared value was not less than or equal to the bound.',
 };
 
 /// Get the error message for a CustomErrorsProgram program error code.
