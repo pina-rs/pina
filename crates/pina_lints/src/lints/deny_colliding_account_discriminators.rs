@@ -71,6 +71,58 @@ struct Entry {
 	value: u128,
 }
 
+/// One reported collision: the type that claims a value, the value and width
+/// it claims, and the other account types that claim the same pair.
+#[derive(Debug, PartialEq, Eq)]
+struct Collision<'a> {
+	type_name: &'a str,
+	width: u64,
+	value: u128,
+	others: String,
+}
+
+/// Resolve which account types collide on `(width, value)`.
+///
+/// Pure so it can be tested on the host: the lint pass itself only runs
+/// inside the bundled driver, which the coverage job cannot instrument.
+/// Only types that implement pina's account traits are considered — events
+/// share the `HasDiscriminator` shape but live in the log namespace, so a
+/// value shared with an event is not a type-cosplay path.
+fn resolve_collisions<'a>(
+	discriminators: &'a [(&'a str, u64, u128)],
+	account_types: &[&str],
+) -> Vec<Collision<'a>> {
+	let mut claims: BTreeMap<(u64, u128), Vec<&'a str>> = BTreeMap::new();
+	for (type_name, width, value) in discriminators {
+		if !account_types.contains(type_name) {
+			continue;
+		}
+		claims.entry((*width, *value)).or_default().push(type_name);
+	}
+
+	let mut collisions = Vec::new();
+	for ((width, value), group) in claims {
+		if group.len() < 2 {
+			continue;
+		}
+		for type_name in &group {
+			let others = group
+				.iter()
+				.filter(|candidate| *candidate != type_name)
+				.copied()
+				.collect::<Vec<_>>()
+				.join(", ");
+			collisions.push(Collision {
+				type_name,
+				width,
+				value,
+				others,
+			});
+		}
+	}
+	collisions
+}
+
 #[derive(Default)]
 pub struct DenyCollidingAccountDiscriminators {
 	entries: Vec<Entry>,
@@ -201,49 +253,116 @@ impl<'tcx> LateLintPass<'tcx> for DenyCollidingAccountDiscriminators {
 	}
 
 	fn check_crate_post(&mut self, cx: &LateContext<'tcx>) {
-		// (width, value) -> the account types that claim it. Same-enum
-		// duplicates cannot appear: rustc rejects them at the enum.
-		let mut claims: BTreeMap<(u64, u128), Vec<&Entry>> = BTreeMap::new();
-		for entry in &self.entries {
-			if !self.account_types.contains(&entry.type_name) {
-				continue;
-			}
-			claims
-				.entry((entry.width, entry.value))
-				.or_default()
-				.push(entry);
-		}
+		let discriminators: Vec<(&str, u64, u128)> = self
+			.entries
+			.iter()
+			.map(|entry| (entry.type_name.as_str(), entry.width, entry.value))
+			.collect();
+		let account_types: Vec<&str> = self.account_types.iter().map(String::as_str).collect();
+		let collisions = resolve_collisions(&discriminators, &account_types);
+		let spans: BTreeMap<&str, Span> = self
+			.entries
+			.iter()
+			.map(|entry| (entry.type_name.as_str(), entry.span))
+			.collect();
 
-		for ((width, value), group) in claims {
-			if group.len() < 2 {
+		for collision in collisions {
+			let Some(span) = spans.get(collision.type_name) else {
 				continue;
-			}
-			for entry in &group {
-				let others = group
-					.iter()
-					.filter(|candidate| candidate.type_name != entry.type_name)
-					.map(|candidate| candidate.type_name.as_str())
-					.collect::<Vec<_>>()
-					.join(", ");
-				diagnostics::emit(cx, DENY_COLLIDING_ACCOUNT_DISCRIMINATORS, |diag| {
-					diag.span(entry.span);
-					diag.primary_message(format!(
-						"account discriminator value {value} ({width} byte{plural}) is also \
-						 claimed by {others}",
-						plural = if width == 1 { "" } else { "s" },
-					));
-					diag.note(
-						"two account types that share a discriminator value and a serialized \
-						 width pass every typed loader check (owner, discriminator, exact size), \
-						 so either account deserializes as the other: the type-cosplay class",
-					);
-					diag.help(
-						"give every account type across every discriminator enum a unique value; \
-						 one enum for all accounts of a program makes this impossible by \
-						 construction",
-					);
-				});
-			}
+			};
+			diagnostics::emit(cx, DENY_COLLIDING_ACCOUNT_DISCRIMINATORS, |diag| {
+				diag.span(*span);
+				diag.primary_message(format!(
+					"account discriminator value {value} ({width} byte{plural}) is also claimed \
+					 by {others}",
+					value = collision.value,
+					width = collision.width,
+					others = collision.others,
+					plural = if collision.width == 1 { "" } else { "s" },
+				));
+				diag.note(
+					"two account types that share a discriminator value and a serialized width \
+					 pass every typed loader check (owner, discriminator, exact size), so either \
+					 account deserializes as the other: the type-cosplay class",
+				);
+				diag.help(
+					"give every account type across every discriminator enum a unique value; one \
+					 enum for all accounts of a program makes this impossible by construction",
+				);
+			});
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn colliding_values_report_each_type_with_its_counterpart() {
+		let discriminators = [("VaultLedger", 1, 31), ("AdminRegistry", 1, 31)];
+
+		let collisions = resolve_collisions(&discriminators, &["VaultLedger", "AdminRegistry"]);
+
+		assert_eq!(
+			collisions,
+			vec![
+				Collision {
+					type_name: "VaultLedger",
+					width: 1,
+					value: 31,
+					others: "AdminRegistry".to_owned(),
+				},
+				Collision {
+					type_name: "AdminRegistry",
+					width: 1,
+					value: 31,
+					others: "VaultLedger".to_owned(),
+				},
+			]
+		);
+	}
+
+	#[test]
+	fn distinct_values_do_not_collide() {
+		let discriminators = [("VaultLedger", 1, 31), ("AdminRegistry", 1, 32)];
+
+		let collisions = resolve_collisions(&discriminators, &["VaultLedger", "AdminRegistry"]);
+
+		assert!(collisions.is_empty());
+	}
+
+	#[test]
+	fn differing_widths_do_not_collide() {
+		// The width is part of the serialized layout, so a u8 31 and a u16 31
+		// are different account shapes rather than a substitution.
+		let discriminators = [("VaultLedger", 1, 31), ("AdminRegistry", 2, 31)];
+
+		let collisions = resolve_collisions(&discriminators, &["VaultLedger", "AdminRegistry"]);
+
+		assert!(collisions.is_empty());
+	}
+
+	#[test]
+	fn values_shared_with_non_account_types_do_not_collide() {
+		// Events carry `HasDiscriminator` too, but they are logged rather than
+		// deserialized, so a shared value is not a cosplay path.
+		let discriminators = [("ProgramConfig", 1, 1), ("ProposalStatusEvent", 1, 1)];
+
+		let collisions = resolve_collisions(&discriminators, &["ProgramConfig"]);
+
+		assert!(collisions.is_empty());
+	}
+
+	#[test]
+	fn three_way_collisions_name_every_other_type() {
+		let discriminators = [("A", 1, 7), ("B", 1, 7), ("C", 1, 7)];
+
+		let collisions = resolve_collisions(&discriminators, &["A", "B", "C"]);
+
+		assert_eq!(collisions.len(), 3);
+		assert_eq!(collisions[0].others, "B, C");
+		assert_eq!(collisions[1].others, "A, C");
+		assert_eq!(collisions[2].others, "A, B");
 	}
 }
