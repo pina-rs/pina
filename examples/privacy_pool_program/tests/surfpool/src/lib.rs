@@ -20,13 +20,19 @@ use pina_test::Pubkey;
 use pina_test::Signer;
 use program_under_test::Address;
 use program_under_test::ApproveDisclosureIx;
+use program_under_test::CancelDisclosureIx;
+use program_under_test::ChallengeDisclosureIx;
 use program_under_test::DEPOSIT_LAMPORTS;
 use program_under_test::DepositIx;
 use program_under_test::GrantDisclosureIx;
 use program_under_test::InitializeIx;
+use program_under_test::RegisterRequesterIx;
 use program_under_test::RequestDisclosureIx;
+use program_under_test::ResolveChallengeIx;
+use program_under_test::SetCustodiansIx;
 use program_under_test::SetVerificationKeyIx;
 use program_under_test::TREE_NODES;
+use program_under_test::TransferIx;
 use program_under_test::VK_SLOT_TRANSFER;
 use program_under_test::VK_SLOT_WITHDRAW;
 use program_under_test::WithdrawIx;
@@ -527,6 +533,262 @@ fn tier_zero_disclosure_requires_consent_and_logs_execution() {
 		assert_eq!(&account.data[43..75], &commitment[..]);
 		assert_eq!(account.data[75], program_under_test::TIER_CONSENT);
 	});
+}
+
+/// Exercise every remaining instruction so the benchmark harness sees a
+/// sample for each IDL discriminator: `transfer`, `setCustodians`,
+/// `registerRequester`, `challengeDisclosure`, `resolveChallenge`, and
+/// `cancelDisclosure`.
+#[test]
+#[ignore = "run with pina test"]
+fn every_instruction_discriminator_is_exercised() {
+	let _guard = journey_guard();
+	pina_test::run(async {
+		let (program, secrets, commitment, _) = start_pool().await;
+		let pid = program_id();
+
+		// registerRequester (3): the authority registers a tier-1 entity.
+		let requester = requester();
+		program
+			.fund(&requester.pubkey(), 1_000_000_000)
+			.unwrap_or_else(|error| panic!("fund requester: {error:?}"));
+		let mut register = vec![0_u8; RegisterRequesterIx::SIZE];
+		RegisterRequesterIx::initialize(&mut register, |ix| {
+			ix.requester = pina_address(&requester.pubkey());
+			ix.max_tier = program_under_test::TIER_COMPELLED;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode register: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&register,
+					vec![
+						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(requesters_pda().0, false),
+					],
+				),
+				&[&authority()],
+			)
+			.unwrap_or_else(|error| panic!("register requester: {error:?}"));
+
+		// setCustodians (2): rotate the committee to three fresh keys.
+		let replacement = [
+			Keypair::new_from_array([0xD1; 32]),
+			Keypair::new_from_array([0xD2; 32]),
+			Keypair::new_from_array([0xD3; 32]),
+		];
+		let mut rotate = vec![0_u8; SetCustodiansIx::SIZE];
+		SetCustodiansIx::initialize(&mut rotate, |ix| {
+			let mut committee = [0_u8; 96];
+			for (slot, key) in replacement.iter().enumerate() {
+				committee[slot * 32..(slot + 1) * 32].copy_from_slice(key.pubkey().as_ref());
+			}
+			ix.custodians = committee;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode set custodians: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&rotate,
+					vec![
+						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(custodians_pda().0, false),
+					],
+				),
+				&[&authority()],
+			)
+			.unwrap_or_else(|error| panic!("set custodians: {error:?}"));
+
+		// transfer (6): spend the deposited note into a fresh commitment.
+		let tree = tree_pda().0;
+		let account = program
+			.account(&tree)
+			.unwrap_or_else(|error| panic!("fetch tree: {error:?}"));
+		let nodes = account.data[TREE_NODES_AT..TREE_NODES_AT + TREE_NODES * 32].to_vec();
+		let mut root = [0_u8; 32];
+		root.copy_from_slice(&nodes[(TREE_NODES - 1) * 32..]);
+		let nullifier = nullifier_bytes(&secrets);
+		let successor = prover::note_secrets(0xAB);
+		let (path_elements, path_indices) = prover::build_witness(&nodes, 0);
+		let (transfer_pk, _) = prover::seeded_setup(true, 0x2222);
+		let circuit = prover::SpendCircuit {
+			root: prover::fr_from_le(&root).unwrap(),
+			nullifier: prover::fr_from_le(&nullifier).unwrap(),
+			output_commitment: Some(prover::fr_from_le(&commitment_bytes(&successor)).unwrap()),
+			amount: prover::amount_field(),
+			witness: Some(prover::SpendWitness {
+				spent: secrets,
+				path_elements,
+				path_indices,
+				successor: Some(successor),
+			}),
+		};
+		let wire = prover::serialize_proof(&prover::prove_spend(&transfer_pk, circuit, 0xCD));
+		let (note_key, note_bump) = note_pda(&commitment_bytes(&successor));
+		let mut transfer = vec![0_u8; TransferIx::SIZE];
+		TransferIx::initialize(&mut transfer, |ix| {
+			ix.bump = note_bump;
+			ix.nullifier = nullifier;
+			ix.root = root;
+			ix.new_commitment = commitment_bytes(&successor);
+			ix.new_view_pubkey = [0x0B; 32];
+			ix.envelope_len = 128;
+			ix.envelope = core::array::from_fn(|index| 0x40 ^ index as u8);
+			ix.shares = core::array::from_fn(|index| 0x80 ^ index as u8);
+			ix.proof_a = wire.a;
+			ix.proof_b = wire.b;
+			ix.proof_c = wire.c;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode transfer: {error:?}"));
+		let payer = Keypair::new_from_array([0xF1; 32]);
+		program
+			.fund(&payer.pubkey(), 1_000_000_000)
+			.unwrap_or_else(|error| panic!("fund payer: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&transfer,
+					vec![
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(payer.pubkey(), true),
+						AccountMeta::new(tree, false),
+						AccountMeta::new(nullifiers_pda().0, false),
+						AccountMeta::new_readonly(vkey_pda(VK_SLOT_TRANSFER).0, false),
+						AccountMeta::new(note_key, false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&payer],
+			)
+			.unwrap_or_else(|error| panic!("transfer: {error:?}"));
+
+		// cancelDisclosure (12): the requester withdraws a pending request.
+		let (cancel_request_key, cancel_bump) = request_pda(&requester.pubkey(), 5);
+		file_request(
+			&program,
+			&requester,
+			cancel_bump,
+			5,
+			program_under_test::TIER_COMPELLED,
+		)
+		.await;
+		let mut cancel = vec![0_u8; CancelDisclosureIx::SIZE];
+		CancelDisclosureIx::initialize(&mut cancel, |_| Ok(()))
+			.unwrap_or_else(|error| panic!("encode cancel: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&cancel,
+					vec![
+						AccountMeta::new_readonly(requester.pubkey(), true),
+						AccountMeta::new(cancel_request_key, false),
+					],
+				),
+				&[&requester],
+			)
+			.unwrap_or_else(|error| panic!("cancel disclosure: {error:?}"));
+
+		// challengeDisclosure (9) then resolveChallenge (10): a tier-1
+		// request is challenged inside its window and resolved.
+		let (challenge_request_key, challenge_bump) = request_pda(&requester.pubkey(), 6);
+		file_request(
+			&program,
+			&requester,
+			challenge_bump,
+			6,
+			program_under_test::TIER_VERIFIED,
+		)
+		.await;
+		let viewer = view_key();
+		let mut challenge = vec![0_u8; ChallengeDisclosureIx::SIZE];
+		ChallengeDisclosureIx::initialize(&mut challenge, |_| Ok(()))
+			.unwrap_or_else(|error| panic!("encode challenge: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&challenge,
+					vec![
+						AccountMeta::new(challenge_request_key, false),
+						AccountMeta::new_readonly(note_pda(&commitment).0, false),
+						AccountMeta::new_readonly(viewer.pubkey(), true),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&viewer],
+			)
+			.unwrap_or_else(|error| panic!("challenge disclosure: {error:?}"));
+
+		let mut resolve = vec![0_u8; ResolveChallengeIx::SIZE];
+		ResolveChallengeIx::initialize(&mut resolve, |ix| {
+			ix.approve = 1;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode resolve: {error:?}"));
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&resolve,
+					vec![
+						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(challenge_request_key, false),
+					],
+				),
+				&[&authority()],
+			)
+			.unwrap_or_else(|error| panic!("resolve challenge: {error:?}"));
+	});
+}
+
+/// File one disclosure request with an opaque notice.
+async fn file_request(program: &ProgramTest, requester: &Keypair, bump: u8, nonce: u64, tier: u8) {
+	let mut request = vec![0_u8; RequestDisclosureIx::SIZE];
+	RequestDisclosureIx::initialize(&mut request, |ix| {
+		ix.bump = bump;
+		ix.nonce.set(nonce);
+		ix.tier = tier;
+		ix.commitment = commitment_of_deposit();
+		ix.notice_len = 96;
+		ix.notice = core::array::from_fn(|index| 0xC0 ^ index as u8);
+		ix.legal_basis_hash = [0x77; 32];
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("encode request: {error:?}"));
+	let (request_key, _) = request_pda(&requester.pubkey(), nonce);
+	program
+		.send_with_signers(
+			Instruction::new_with_bytes(
+				program_id(),
+				&request,
+				vec![
+					AccountMeta::new(requester.pubkey(), true),
+					AccountMeta::new_readonly(config_pda().0, false),
+					AccountMeta::new_readonly(requesters_pda().0, false),
+					AccountMeta::new_readonly(note_pda(&commitment_of_deposit()).0, false),
+					AccountMeta::new(request_key, false),
+					AccountMeta::new_readonly(system(), false),
+					AccountMeta::new_readonly(clock(), false),
+				],
+			),
+			&[requester],
+		)
+		.unwrap_or_else(|error| panic!("file disclosure request: {error:?}"));
+}
+
+/// The commitment the fixed deposit seeds, recomputed from the same seed.
+fn commitment_of_deposit() -> [u8; 32] {
+	commitment_bytes(&prover::note_secrets(0x88))
 }
 
 fn clock() -> Pubkey {
