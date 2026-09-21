@@ -49,6 +49,7 @@ const EXAMPLE_PROGRAMS = [
 	"multisig_program",
 	"optional_accounts_program",
 	"pina_bpf_program",
+	"privacy_pool_program",
 	"profile_program",
 	"prop_amm_program",
 	"role_registry_program",
@@ -514,6 +515,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		programError: "NotEnoughAccountKeys",
 	},
 	pina_bpf_program: { instruction: "hello", accounts: "none" },
+	privacy_pool_program: {
+		instruction: "initialize",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	profile_program: {
 		instruction: "initialize",
 		accounts: "none",
