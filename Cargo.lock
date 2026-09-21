@@ -6494,9 +6494,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.4.2"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91723ce2ebdab7f907ba82f1bdaf326b4fc2e6a78a9ffae3364719b0b280b0f1"
+checksum = "6874fdffa2bac55ecea40a23521b1811ee497cfe2770e647ee8fdc6d9c60920a"
 dependencies = [
  "fixed",
  "pinapod-derive",
@@ -6506,9 +6506,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.4.2"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3e004f043cf82d2645b653fd97d59c8eaec9597c7557086d7693f83476b136"
+checksum = "76ca35c58e18fd7a4603c7ae7718602613ad6592c957d65dc51cafa8f9d4c849"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
