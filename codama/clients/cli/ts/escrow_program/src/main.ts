@@ -3,6 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
+import { cancelCommand } from "./commands/cancel.ts";
 import { makeCommand } from "./commands/make.ts";
 import { takeCommand } from "./commands/take.ts";
 import { registerGlobals } from "./context.ts";
@@ -14,5 +15,6 @@ const program = registerGlobals(new Command())
 	.description("Command-line interface for escrowProgram");
 program.addCommand(makeCommand);
 program.addCommand(takeCommand);
+program.addCommand(cancelCommand);
 program.addCommand(fetchCommand);
 program.parseAsync(process.argv);

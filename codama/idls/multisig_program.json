@@ -1436,6 +1436,18 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "legacyCreateKey",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The legacy multisig's `create_key`: its holder authorizes the import,",
+							"which is what stops a fabricated legacy account from adopting a roster",
+							"of keys that never consented."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "programConfig",
 						"isWritable": false,
 						"isSigner": false,
@@ -3561,6 +3573,16 @@
 				"message": "The proposal's recorded lifetime has elapsed.",
 				"docs": [
 					"The proposal's recorded lifetime has elapsed."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "spendingLimitRequiresProposal",
+				"code": 32,
+				"message": "A spending-limit action moves vault funds and requires a governed",
+				"docs": [
+					"A spending-limit action moves vault funds and requires a governed",
+					"proposal, not the instant config-authority path."
 				]
 			}
 		]

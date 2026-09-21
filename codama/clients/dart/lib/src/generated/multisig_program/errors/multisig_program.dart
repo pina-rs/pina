@@ -134,6 +134,11 @@ const int multisigProgramErrorMissingRentPayer = 0x1e; // 30
 /// Message: "The proposal's recorded lifetime has elapsed."
 const int multisigProgramErrorProposalExpired = 0x1f; // 31
 
+/// A spending-limit action moves vault funds and requires a governed
+/// proposal, not the instant config-authority path.
+/// Message: "A spending-limit action moves vault funds and requires a governed"
+const int multisigProgramErrorSpendingLimitRequiresProposal = 0x20; // 32
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _multisigProgramErrorMessages = {
   multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
@@ -197,6 +202,8 @@ const Map<int, String> _multisigProgramErrorMessages = {
       'A spending limit action needs its rent payer and system program.',
   multisigProgramErrorProposalExpired:
       'The proposal\'s recorded lifetime has elapsed.',
+  multisigProgramErrorSpendingLimitRequiresProposal:
+      'A spending-limit action moves vault funds and requires a governed',
 };
 
 /// Get the error message for a MultisigProgram program error code.

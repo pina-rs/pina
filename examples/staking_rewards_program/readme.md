@@ -24,6 +24,8 @@ The `tests/surfpool` suite funds both vaults through real mints and asserts the 
 - Reward funding schedules, emissions curves, and solvency guarantees: the authority decides when and by how much the index moves, and a claim fails if the reward vault cannot cover it.
 - Pause administration, position closure, pool shutdown, and recovery policy.
 
+- Pool-creation policy: initialization is permissionless per `(stake_mint, reward_mint)` pair and the first initializer becomes the pool admin (who controls `SetRewardIndex`). If you announce a pool ahead of deploying, initialize it in the same transaction as the announcement lands, or front-run your own users — the first-initializer capture is the Audius init-front-run class.
+
 See the book's [Production Readiness](../../docs/src/production-readiness.md) checklist for the invariants and adversarial tests a real staking program needs.
 
 ## Run

@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 8ffa0bfda9f14ab1dd2f2f60a4542b107ae72a5d1f2263c3f457b67c205f6ef8
+// manifest-sha256: 9f88e004670a59632833f50f6e8bf1cd8f2d8f6f842c6ccc52ae10793746fcd6
 // program-id: 4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT
 // version_type: u8
 
@@ -91,6 +91,35 @@ pub mod instruction_1_02 {
 	pub const KEY: &str = "instruction:1:02";
 	/// Rust type name as declared in the program.
 	pub const RUST_NAME: &str = "TakeInstruction";
+	/// Current schema version.
+	pub const VERSION: u32 = 0;
+	/// Schema hash recorded for this version.
+	pub const SCHEMA_SHA256: &str = "4d30c5a987a69cde3f10c23b93498ead2a16de2576027c1cf287e3813769bdc3";
+	/// Width of the discriminator in bytes.
+	pub const DISCRIMINATOR_BYTES: usize = 1;
+	/// Byte offset of the migration version field.
+	pub const VERSION_OFFSET: usize = 1;
+	/// Width of the migration version field in bytes.
+	pub const VERSION_BYTES: usize = 1;
+	/// Bytes occupied by the discriminator and version envelope together.
+	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	/// Payload size in bytes, excluding the envelope header.
+	pub const PAYLOAD_SIZE: usize = 0;
+	/// Total encoded size in bytes, including the envelope header.
+	pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;
+	/// Manifest payload size; must agree with `PAYLOAD_SIZE`.
+	pub const MANIFEST_PAYLOAD_SIZE: usize = 0;
+	/// `(name, absolute_offset, size)` in encoded bytes.
+	pub const FIELDS: &[(&str, usize, usize)] = &[
+	];
+}
+
+/// ABI layout for the `CancelInstruction` instruction.
+pub mod instruction_1_03 {
+	/// Manifest contract key.
+	pub const KEY: &str = "instruction:1:03";
+	/// Rust type name as declared in the program.
+	pub const RUST_NAME: &str = "CancelInstruction";
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.

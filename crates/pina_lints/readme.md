@@ -56,6 +56,7 @@ Lint levels are configured in the project's `pina.toml` under the `[lints]` tabl
 ```toml
 [lints]
 deny_heap_allocations_in_onchain_instruction_handlers = "deny"
+deny_colliding_account_discriminators = "deny"
 require_explicit_discriminators_and_seed_namespaces = "allow"
 ```
 
@@ -75,6 +76,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `deny_unchecked_remaining_mut`                          | deny  | Direct mutable remaining accounts reject aliases    |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
+| `deny_colliding_account_discriminators`                 | deny  | Account discriminator values stay globally unique   |
 | `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
 | `require_consistent_token_program`                      | deny  | Token validation and CPI share one program identity |
 | `require_explicit_token_2022_extension_policy`          | deny  | Token-2022 extensions are explicitly allow-listed   |

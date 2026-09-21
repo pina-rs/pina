@@ -277,8 +277,11 @@ fn update_accepts_global_update_authority() {
 	assert_eq!(oracle_state.authority.as_ref(), payer.as_ref());
 }
 
+/// The oracle's own recorded authority may publish a price, so
+/// `RotateAuthority` grants a real capability instead of a cosmetic one. The
+/// initializer is that authority until it rotates away.
 #[test]
-fn update_rejects_wrong_update_authority() {
+fn update_accepts_the_stored_oracle_authority() {
 	let Some(mollusk) = try_create_mollusk() else {
 		eprintln!("{SKIP_MSG}");
 		return;
@@ -291,9 +294,10 @@ fn update_rejects_wrong_update_authority() {
 		.get_account(&oracle)
 		.expect("oracle account should exist after initialize");
 
+	// `payer` is the stored authority recorded at initialize.
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&update_ix_data(9_999),
+		&update_ix_data(4_242),
 		vec![
 			AccountMeta::new(oracle, false),
 			AccountMeta::new_readonly(payer, true),
@@ -305,8 +309,140 @@ fn update_rejects_wrong_update_authority() {
 		(payer, system_account(1_000_000_000)),
 	];
 
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	let updated_oracle = result
+		.get_account(&oracle)
+		.expect("oracle account should remain after update");
+	let oracle_state = read_oracle(updated_oracle);
+
+	assert_eq!(oracle_state.price.get(), 4_242);
+	assert_eq!(
+		oracle_state.authority.as_ref(),
+		payer.as_ref(),
+		"an authority update must not disturb the recorded authority"
+	);
+}
+
+/// A key that is neither the static updater nor the oracle's recorded
+/// authority is still refused, so the new stored-authority branch does not
+/// widen the gate to everyone.
+#[test]
+fn update_rejects_a_stranger() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let payer = Pubkey::new_unique();
+	let oracle = Pubkey::new_unique();
+	let stranger = Pubkey::new_unique();
+	assert_ne!(
+		stranger, payer,
+		"the stranger must not be the stored authority"
+	);
+	let initialize_result = initialize_oracle(&mollusk, &payer, &oracle);
+	let oracle_account = initialize_result
+		.get_account(&oracle)
+		.expect("oracle account should exist after initialize");
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&update_ix_data(9_999),
+		vec![
+			AccountMeta::new(oracle, false),
+			AccountMeta::new_readonly(stranger, true),
+		],
+	);
+
+	let accounts = vec![
+		(oracle, oracle_account.clone()),
+		(stranger, system_account(1_000_000_000)),
+	];
+
 	mollusk.process_and_validate_instruction(
 		&instruction,
+		&accounts,
+		&[Check::err(PropAmmError::UnauthorizedUpdateAuthority.into())],
+	);
+}
+
+/// After a rotation the rotated-in key is the stored authority and publishes
+/// prices, while the key it replaced — and a stranger — are refused.
+#[test]
+fn update_after_rotation_honours_the_new_authority() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let payer = Pubkey::new_unique();
+	let oracle = Pubkey::new_unique();
+	let new_authority = Pubkey::new_unique();
+	assert_ne!(new_authority, payer);
+	assert_ne!(new_authority, update_authority_pubkey());
+	let initialize_result = initialize_oracle(&mollusk, &payer, &oracle);
+	let oracle_account = initialize_result
+		.get_account(&oracle)
+		.expect("oracle account should exist after initialize");
+
+	// Rotate: `payer` (the current stored authority) hands over to
+	// `new_authority`.
+	let rotate = Instruction::new_with_bytes(
+		program_id(),
+		&rotate_authority_ix_data(&new_authority),
+		vec![
+			AccountMeta::new(oracle, false),
+			AccountMeta::new_readonly(payer, true),
+		],
+	);
+	let accounts = vec![
+		(oracle, oracle_account.clone()),
+		(payer, system_account(1_000_000_000)),
+	];
+	let result = mollusk.process_and_validate_instruction(&rotate, &accounts, &[Check::success()]);
+	let rotated_oracle = result
+		.get_account(&oracle)
+		.expect("oracle account should remain after rotate");
+	let oracle_state = read_oracle(rotated_oracle);
+	assert_eq!(oracle_state.authority.as_ref(), new_authority.as_ref());
+
+	// The rotated-in authority publishes a price: this is the capability
+	// rotation implies and the reason the stored-authority branch exists.
+	let update = Instruction::new_with_bytes(
+		program_id(),
+		&update_ix_data(7_777),
+		vec![
+			AccountMeta::new(oracle, false),
+			AccountMeta::new_readonly(new_authority, true),
+		],
+	);
+	let accounts = vec![
+		(oracle, rotated_oracle.clone()),
+		(new_authority, system_account(1_000_000_000)),
+	];
+	let result = mollusk.process_and_validate_instruction(&update, &accounts, &[Check::success()]);
+	let updated_oracle = result
+		.get_account(&oracle)
+		.expect("oracle account should remain after update");
+	assert_eq!(read_oracle(updated_oracle).price.get(), 7_777);
+
+	// The key it replaced is no longer the stored authority and is not the
+	// static updater, so it must not publish any more.
+	let stale = Instruction::new_with_bytes(
+		program_id(),
+		&update_ix_data(1_111),
+		vec![
+			AccountMeta::new(oracle, false),
+			AccountMeta::new_readonly(payer, true),
+		],
+	);
+	let accounts = vec![
+		(oracle, updated_oracle.clone()),
+		(payer, system_account(1_000_000_000)),
+	];
+	mollusk.process_and_validate_instruction(
+		&stale,
 		&accounts,
 		&[Check::err(PropAmmError::UnauthorizedUpdateAuthority.into())],
 	);

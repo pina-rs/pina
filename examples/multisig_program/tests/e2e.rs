@@ -195,6 +195,15 @@ fn spending_limit_pda(multisig: &Pubkey, create_key: &Pubkey) -> (Pubkey, u8) {
 	)
 }
 
+/// The legacy multisig PDA under the legacy program, mirroring the
+/// `SEED_LEGACY_MULTISIG` seeds the import handler derives with.
+fn legacy_multisig_pda(legacy_create_key: &Pubkey) -> (Pubkey, u8) {
+	Pubkey::find_program_address(
+		&[b"multisig", legacy_create_key.as_ref()],
+		&legacy_program_id(),
+	)
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -536,13 +545,17 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 	let rent_payer = key(18);
 	let (multisig_key, bump) = multisig_pda(&create_key);
 	let (config_key, config_bump) = program_config_pda();
-	let legacy_key = key(19);
+	let legacy_create_key = key(19);
+	// The legacy account only imports from the address its own parsed
+	// `create_key` derives under the legacy program, so the fixture has to sit
+	// exactly there.
+	let (legacy_key, _legacy_bump) = legacy_multisig_pda(&legacy_create_key);
 	let members = sorted_member_keys();
 
 	// Hand-build a multisig account in the classic Anchor layout.
 	let mut legacy = Vec::new();
 	legacy.extend_from_slice(&legacy_discriminator());
-	legacy.extend_from_slice(&[9_u8; 32]); // create_key
+	legacy.extend_from_slice(legacy_create_key.as_ref()); // create_key
 	legacy.extend_from_slice(&[0_u8; 32]); // autonomous config authority
 	legacy.extend_from_slice(&2_u16.to_le_bytes());
 	legacy.extend_from_slice(&0_u32.to_le_bytes());
@@ -575,6 +588,7 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 		&data,
 		vec![
 			AccountMeta::new_readonly(legacy_key, false),
+			AccountMeta::new_readonly(legacy_create_key, true),
 			AccountMeta::new_readonly(config_key, false),
 			AccountMeta::new_readonly(create_key, true),
 			AccountMeta::new(multisig_key, false),
@@ -601,6 +615,7 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 	world.add(multisig_key, Account::default());
 	world.add(create_key, system_account(RENT_LAMPORTS));
 	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	world.add(legacy_create_key, system_account(RENT_LAMPORTS));
 	for member in &members {
 		world.add(*member, system_account(RENT_LAMPORTS));
 	}
@@ -619,6 +634,166 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 	assert_eq!(roster.1, 3);
 	assert_eq!(roster.0[2], pina_address(&members[2]));
 	assert_eq!(state.create_key, pina_address(&create_key));
+}
+
+/// The import world for the rejection tests: a valid legacy account whose
+/// parsed `create_key` is `legacy_create_key`, installed at
+/// `legacy_account_key`, with the instruction's second account pointed at
+/// `signer_key` (flagged as a signer exactly when `signer_flag`).
+///
+/// Returns the mollusk, the world, the ready instruction, and the multisig PDA
+/// the import would create.
+fn import_world(
+	legacy_account_key: Pubkey,
+	legacy_create_key: Pubkey,
+	signer_key: Pubkey,
+	signer_flag: bool,
+) -> (Mollusk, World, Instruction, Pubkey) {
+	let mollusk = create_mollusk();
+	let create_key = key(17);
+	let rent_payer = key(18);
+	let (multisig_key, bump) = multisig_pda(&create_key);
+	let (config_key, config_bump) = program_config_pda();
+	let members = sorted_member_keys();
+
+	let mut legacy = Vec::new();
+	legacy.extend_from_slice(&legacy_discriminator());
+	legacy.extend_from_slice(legacy_create_key.as_ref());
+	legacy.extend_from_slice(&[0_u8; 32]);
+	legacy.extend_from_slice(&2_u16.to_le_bytes());
+	legacy.extend_from_slice(&0_u32.to_le_bytes());
+	legacy.extend_from_slice(&5_u64.to_le_bytes());
+	legacy.extend_from_slice(&5_u64.to_le_bytes());
+	legacy.push(0);
+	legacy.extend_from_slice(&[0_u8; 32]);
+	legacy.push(255);
+	legacy.extend_from_slice(&3_u32.to_le_bytes());
+	for member in &members {
+		legacy.extend_from_slice(member.as_ref());
+		legacy.push(PERMISSIONS_ALL);
+	}
+
+	let mut data = vec![0_u8; multisig_program::MultisigImportIx::SIZE];
+	multisig_program::MultisigImportIx::initialize(&mut data, |ix| {
+		ix.bump = bump;
+		ix.legacy_program = pina_address(&legacy_program_id());
+		ix.legacy_discriminator = legacy_discriminator();
+		ix.set_config_authority = false.into();
+		ix.config_authority = Address::default();
+		ix.set_rent_collector = false.into();
+		ix.rent_collector = Address::default();
+		Ok(())
+	})
+	.unwrap();
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&data,
+		vec![
+			AccountMeta::new_readonly(legacy_account_key, false),
+			AccountMeta::new_readonly(signer_key, signer_flag),
+			AccountMeta::new_readonly(config_key, false),
+			AccountMeta::new_readonly(create_key, true),
+			AccountMeta::new(multisig_key, false),
+			AccountMeta::new(rent_payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			AccountMeta::new_readonly(program_id(), false), // no treasury
+		],
+	);
+
+	let mut world = World::new();
+	world.add(
+		legacy_account_key,
+		Account {
+			lamports: 1,
+			data: legacy,
+			owner: legacy_program_id(),
+			executable: false,
+			rent_epoch: 0,
+		},
+	);
+	world.add(
+		config_key,
+		stored_account(program_config_data(&key(1), &key(2), 0, config_bump), 1),
+	);
+	world.add(multisig_key, Account::default());
+	world.add(create_key, system_account(RENT_LAMPORTS));
+	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	world.add(signer_key, system_account(RENT_LAMPORTS));
+	for member in &members {
+		world.add(*member, system_account(RENT_LAMPORTS));
+	}
+	world.add(
+		solana_sdk_ids::system_program::id(),
+		keyed_account_for_system_program().1,
+	);
+
+	(mollusk, world, instruction, multisig_key)
+}
+
+/// A fabricated legacy account parked at an arbitrary address cannot import,
+/// even with a byte-perfect Anchor layout and a real signer for the
+/// `create_key` it names: the address binding is what makes provenance
+/// meaningful, since otherwise anyone could mint an account that names a
+/// stranger's roster of keys.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn multisig_import_rejects_a_legacy_account_outside_its_derived_pda() {
+	let legacy_create_key = key(19);
+	let fabricated = key(20);
+	assert_ne!(
+		fabricated,
+		legacy_multisig_pda(&legacy_create_key).0,
+		"the fixture must sit away from the derived legacy PDA"
+	);
+	let (mollusk, mut world, instruction, _) =
+		import_world(fabricated, legacy_create_key, legacy_create_key, true);
+
+	world.run(
+		&mollusk,
+		&instruction,
+		&[Check::err(MultisigError::InvalidLegacyMultisig.into())],
+	);
+}
+
+/// An account sitting at the derived legacy PDA still fails when the account
+/// presented as `legacy_create_key` is not the key the legacy account parsed:
+/// the signer is bound to the parsed field, not to a free-floating argument.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn multisig_import_rejects_a_legacy_create_key_that_is_not_the_parsed_one() {
+	let parsed_create_key = key(19);
+	let (legacy_pda, _) = legacy_multisig_pda(&parsed_create_key);
+	let stranger = key(21);
+	assert_ne!(stranger, parsed_create_key);
+	// The account sits at the PDA for `parsed_create_key` (so the address
+	// binding would hold) but the instruction presents `stranger` as the
+	// signer, which the field-level address check refuses.
+	let (mollusk, mut world, instruction, _) =
+		import_world(legacy_pda, parsed_create_key, stranger, true);
+
+	world.run(
+		&mollusk,
+		&instruction,
+		&[Check::err(pina::ProgramError::InvalidAccountData)],
+	);
+}
+
+/// The legacy `create_key` holder must sign: without that signature a
+/// fabricated account could adopt a roster of keys that never consented.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn multisig_import_rejects_an_unsigned_legacy_create_key() {
+	let legacy_create_key = key(19);
+	let (legacy_pda, _) = legacy_multisig_pda(&legacy_create_key);
+	let (mollusk, mut world, instruction, _) =
+		import_world(legacy_pda, legacy_create_key, legacy_create_key, false);
+
+	world.run(
+		&mollusk,
+		&instruction,
+		&[Check::err(pina::ProgramError::MissingRequiredSignature)],
+	);
 }
 
 /// Shared fixture for the proposal lifecycle tests: a three-member,
@@ -1161,4 +1336,205 @@ fn proposal_close_refunds_the_rent_collector() {
 
 	assert_eq!(account(&result, &collector).lamports, RENT_LAMPORTS);
 	assert_eq!(account(&result, &proposal_key).lamports, 0);
+}
+
+/// Spend-limit actions stay behind a governed proposal: the config authority
+/// manages configuration, but custody is what the members hold, so the
+/// instant authority path must refuse `AddSpendingLimit` instead of letting
+/// the authority grant itself an allowance and drain the vault.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn config_authority_execute_rejects_add_spending_limit() {
+	let now = 1_700_000_000;
+	let mut mollusk = create_mollusk();
+	mollusk.sysvars.clock.unix_timestamp = now;
+
+	let create_key = key(21);
+	let authority = key(80);
+	let rent_payer = key(81);
+	let members = sorted_member_keys();
+	let (multisig_key, multisig_bump) = multisig_pda(&create_key);
+
+	// A fully-formed AddSpendingLimit action: the rejection must come from the
+	// action kind, not from a malformed stream.
+	let limit_create_key = key(82);
+	let mut actions = vec![1_u8, multisig_program::ACTION_ADD_SPENDING_LIMIT];
+	actions.extend_from_slice(limit_create_key.as_ref());
+	actions.push(0_u8); // vault index
+	actions.extend_from_slice(Address::default().as_ref()); // SOL
+	actions.extend_from_slice(&1_000_u64.to_le_bytes());
+	actions.push(PERIOD_DAY);
+	actions.push(1_u8); // members
+	actions.extend_from_slice(members[0].as_ref());
+	actions.push(0_u8); // destinations: unrestricted
+
+	let mut multisig = multisig_data(&create_key, 2, 0, 0, &members, multisig_bump, 0);
+	Multisig::update(
+		&mut multisig,
+		&MultisigPatch::new().config_authority(pina_address(&authority)),
+	)
+	.unwrap_or_else(|error| panic!("install the config authority: {error:?}"));
+
+	let mut data = vec![0_u8; multisig_program::ConfigAuthorityExecuteIx::SIZE];
+	multisig_program::ConfigAuthorityExecuteIx::initialize(&mut data, |ix| {
+		ix.actions_len.set(actions.len() as u16);
+		ix.actions[..actions.len()].copy_from_slice(&actions);
+		Ok(())
+	})
+	.unwrap();
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&data,
+		vec![
+			AccountMeta::new(multisig_key, false),
+			AccountMeta::new_readonly(authority, true),
+			AccountMeta::new(rent_payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			clock_meta(),
+		],
+	);
+
+	let mut world = World::new();
+	world.add(multisig_key, stored_account(multisig, RENT_LAMPORTS));
+	world.add(authority, system_account(RENT_LAMPORTS));
+	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	let (clock_key, clock_account) = mollusk.sysvars.keyed_account_for_clock_sysvar();
+	world.add(clock_key, clock_account);
+	let (system_key, system_account) = keyed_account_for_system_program();
+	world.add(system_key, system_account);
+
+	world.run(
+		&mollusk,
+		&instruction,
+		&[Check::err(
+			MultisigError::SpendingLimitRequiresProposal.into(),
+		)],
+	);
+
+	// The same authority still executes the configuration actions it owns, so
+	// the refusal is scoped to custody rather than to the instruction.
+	let mut timelock_actions = vec![1_u8, multisig_program::ACTION_SET_TIME_LOCK];
+	timelock_actions.extend_from_slice(&3600_u32.to_le_bytes());
+	let mut allowed = vec![0_u8; multisig_program::ConfigAuthorityExecuteIx::SIZE];
+	multisig_program::ConfigAuthorityExecuteIx::initialize(&mut allowed, |ix| {
+		ix.actions_len.set(timelock_actions.len() as u16);
+		ix.actions[..timelock_actions.len()].copy_from_slice(&timelock_actions);
+		Ok(())
+	})
+	.unwrap();
+	let allowed_instruction = Instruction::new_with_bytes(
+		program_id(),
+		&allowed,
+		vec![
+			AccountMeta::new(multisig_key, false),
+			AccountMeta::new_readonly(authority, true),
+			AccountMeta::new(rent_payer, true),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			clock_meta(),
+		],
+	);
+	let result = world.run(&mollusk, &allowed_instruction, &[Check::success()]);
+	let stored = account(&result, &multisig_key);
+	let state = Multisig::try_from_bytes(stored.data.as_slice())
+		.unwrap_or_else(|error| panic!("decode configured multisig: {error:?}"));
+	assert_eq!(state.timelock.get(), 3600);
+}
+
+/// A vault message may never write program-owned state it does not sign for.
+/// A spending-limit account is writable, not a message signer, and owned by
+/// this program, so a proposal that names it must be refused rather than let
+/// a single approved transfer mutate another governed object mid-message.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn vault_execute_rejects_a_program_owned_writable_non_signer() {
+	let now = 1_700_000_000;
+	let (mollusk, mut world, multisig_key, proposal_key, members, proposal_bump) =
+		lifecycle_world(now, None);
+
+	// A real spending-limit account: program-owned, writable, and named by the
+	// message as a plain (non-signer) writable account.
+	let (vault_key, _vault_bump) = vault_pda(&multisig_key, 0);
+	let limit_create_key = key(50);
+	let (limit_key, limit_bump) = spending_limit_pda(&multisig_key, &limit_create_key);
+	let mut member_addresses = [Address::default(); 16];
+	for (position, member) in members.iter().enumerate() {
+		member_addresses[position] = pina_address(member);
+	}
+	let space = SpendingLimit::projected_bytes(3 * 32, 0).unwrap();
+	let mut limit_account = vec![0_u8; space];
+	SpendingLimit::initialize(
+		&mut limit_account,
+		&SpendingLimitPatch::new()
+			.bump(limit_bump)
+			.multisig(pina_address(&multisig_key))
+			.create_key(pina_address(&limit_create_key))
+			.vault_index(0)
+			.vault_bump(vault_pda(&multisig_key, 0).1)
+			.mint(Address::default())
+			.amount(100)
+			.remaining_amount(0)
+			.last_reset(now)
+			.period(PERIOD_DAY)
+			.replace_members(&flatten_fixture_roster(&member_addresses[..3])[..3 * 32]),
+	)
+	.unwrap();
+	world.add(limit_key, stored_account(limit_account, RENT_LAMPORTS));
+	world.add(vault_key, system_account(VAULT_LAMPORTS));
+
+	// The message declares the vault as its writable signer and the limit as a
+	// writable non-signer, then targets the limit with a system transfer: the
+	// account is writable, not a message signer, and owned by this program.
+	let message = encode_message_fixture(
+		&[vault_key, limit_key, solana_sdk_ids::system_program::id()],
+		&[(2, &[1], &system_transfer_data(0))],
+	);
+	world.add(
+		proposal_key,
+		stored_account(
+			proposal_data(
+				&multisig_key,
+				&members[0],
+				1,
+				KIND_VAULT,
+				STATUS_APPROVED,
+				now - 1,
+				Some(&message),
+				None,
+				proposal_bump,
+			),
+			RENT_LAMPORTS,
+		),
+	);
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&empty_ix_data(MultisigInstruction::VaultExecute as u8),
+		vec![
+			AccountMeta::new_readonly(multisig_key, false),
+			AccountMeta::new(proposal_key, false),
+			AccountMeta::new_readonly(members[2], true),
+			clock_meta(),
+			AccountMeta::new(vault_key, false),
+			AccountMeta::new(limit_key, false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+	world.run(
+		&mollusk,
+		&instruction,
+		&[Check::err(MultisigError::ProtectedAccount.into())],
+	);
+
+	// The program-owned account is untouched and the proposal still holds its
+	// approval: a refused execution rolls back whole.
+	let stored = world.get(&proposal_key);
+	let state = Proposal::try_from_bytes(stored.data.as_slice())
+		.unwrap_or_else(|error| panic!("decode refused proposal: {error:?}"));
+	assert_eq!(state.status, STATUS_APPROVED);
+	assert_eq!(
+		world.get(&limit_key).data[0],
+		MultisigAccountType::SpendingLimit as u8,
+		"the limit state is intact"
+	);
 }

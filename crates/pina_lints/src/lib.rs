@@ -54,6 +54,7 @@ extern crate rustc_driver;
 extern crate rustc_lint;
 extern crate rustc_session;
 
+pub(crate) mod collisions;
 mod diagnostics;
 pub mod lints;
 mod macros;
@@ -75,6 +76,7 @@ pub const DYLINT_VERSION: &str = "0.1.0";
 /// Every lint in this crate, in catalog (alphabetical) order.
 pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
+	lints::deny_colliding_account_discriminators::DENY_COLLIDING_ACCOUNT_DISCRIMINATORS,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 	lints::deny_unchecked_remaining_mut::DENY_UNCHECKED_REMAINING_MUT,
 	lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
@@ -99,6 +101,7 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 /// Names of every lint in this crate, in catalog (alphabetical) order.
 pub const LINT_NAMES: &[&str] = &[
 	"deny_account_borrows_across_cpi",
+	"deny_colliding_account_discriminators",
 	"deny_heap_allocations_in_onchain_instruction_handlers",
 	"deny_unchecked_remaining_mut",
 	"deny_unused_account_borrow_guards",
@@ -179,6 +182,16 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 			]);
 			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(lints::deny_account_borrows_across_cpi::DenyAccountBorrowsAcrossCpi)
+			}));
+		}
+		"deny_colliding_account_discriminators" => {
+			lint_store.register_lints(&[
+				lints::deny_colliding_account_discriminators::DENY_COLLIDING_ACCOUNT_DISCRIMINATORS,
+			]);
+			lint_store.register_late_lint_pass(Box::new(|_| {
+				Box::new(
+					lints::deny_colliding_account_discriminators::DenyCollidingAccountDiscriminators::default(),
+				)
 			}));
 		}
 		"deny_heap_allocations_in_onchain_instruction_handlers" => {

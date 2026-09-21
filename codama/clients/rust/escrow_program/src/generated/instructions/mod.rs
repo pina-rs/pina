@@ -8,10 +8,12 @@
 	clippy::too_many_arguments
 )]
 
+pub(crate) mod r#cancel;
 pub(crate) mod r#make;
 pub(crate) mod r#migrate;
 pub(crate) mod r#take;
 
+pub use self::r#cancel::*;
 pub use self::r#make::*;
 pub use self::r#migrate::*;
 pub use self::r#take::*;

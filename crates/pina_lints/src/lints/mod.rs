@@ -11,6 +11,7 @@
 //! The lints are registered together by [`crate::register_all_lints`].
 
 pub mod deny_account_borrows_across_cpi;
+pub mod deny_colliding_account_discriminators;
 pub mod deny_heap_allocations_in_onchain_instruction_handlers;
 pub mod deny_unchecked_remaining_mut;
 pub mod deny_unused_account_borrow_guards;

@@ -6,6 +6,9 @@
 //! 2. **Take** — the taker sends token B to the maker's ATA, then the vault
 //!    releases token A to the taker's ATA. The escrow is closed and rent is
 //!    returned to the maker.
+//! 3. **Cancel** — the maker aborts the offer before a taker appears: the
+//!    vault returns the full token A balance to the maker's ATA, then the
+//!    vault and the escrow close and both rents return to the maker.
 
 #![allow(missing_docs)]
 #![allow(clippy::inline_always)]
@@ -36,6 +39,7 @@ pub mod entrypoint {
 pub enum EscrowInstruction {
 	Make = 1,
 	Take = 2,
+	Cancel = 3,
 }
 
 #[discriminator]
@@ -81,6 +85,9 @@ pub struct MakeInstruction {
 
 #[instruction(discriminator = EscrowInstruction::Take)]
 pub struct TakeInstruction {}
+
+#[instruction(discriminator = EscrowInstruction::Cancel)]
+pub struct CancelInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct MakeAccounts<'a> {
@@ -402,6 +409,113 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 	}
 }
 
+#[derive(Accounts, Debug)]
+pub struct CancelAccounts<'a> {
+	pub maker: &'a mut AccountView,
+	pub mint_a: &'a AccountView,
+	pub maker_ata_a: &'a AccountView,
+	pub escrow: &'a mut AccountView,
+	pub vault: &'a AccountView,
+	pub token_program: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
+	pub system_program: &'a AccountView,
+}
+
+impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		// Parse instruction data
+		let _ = CancelInstruction::try_from_bytes(data)?;
+
+		// Validate program accounts
+		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let token_program = *self.token_program.address();
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
+		self.system_program.assert_address(&system::ID)?;
+
+		// Validate the maker. It signs the cancellation and is credited three
+		// times — the refunded token A, the vault close rent, and the escrow
+		// close rent — so it must be writable. The `&mut AccountView` field
+		// already requires that at parse time; the explicit assert keeps the
+		// requirement in the handler and reports the framework's own error if
+		// the field type ever becomes shared.
+		self.maker.assert_signer()?.assert_writable()?;
+
+		// Validate escrow state
+		self.escrow.assert_not_empty()?;
+
+		let (maker, mint_a, seed, bump) = {
+			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
+			(escrow.maker, escrow.mint_a, escrow.seed, escrow.bump)
+		};
+
+		// Verify the escrow is the PDA for the maker and seed, using the
+		// stored bump field (avoids re-deriving the canonical bump on-chain).
+		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
+
+		// Only the recorded maker may abort its own offer, and the mint must be
+		// the one the offer escrowed.
+		self.maker.assert_address(&maker)?;
+		self.mint_a.assert_address(&mint_a)?;
+		let mint_a = self
+			.mint_a
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
+		let decimals_a = mint_a.decimals();
+		drop(mint_a);
+
+		// Validate vault and maker ATA
+		self.vault.assert_not_empty()?.assert_writable()?;
+		let vault_amount = self
+			.vault
+			.as_associated_token_account(
+				self.escrow.address(),
+				self.mint_a.address(),
+				&token_program,
+			)?
+			.amount();
+		// The address check lives in the `CreateIdempotent` CPI below: the
+		// associated token program derives the same seeds and rejects a mismatch
+		// with `InvalidSeeds` before its idempotent branch.
+		self.maker_ata_a.assert_writable()?;
+
+		// Create the maker's token A account if needed
+		associated_token_account::instructions::CreateIdempotent {
+			funding_account: self.maker,
+			account: self.maker_ata_a,
+			wallet: self.maker,
+			mint: self.mint_a,
+			system_program: self.system_program,
+			token_program: self.token_program,
+		}
+		.invoke()?;
+
+		// Prepare escrow signer for vault operations
+		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed)).with_bump(bump);
+		let escrow_signer = escrow_seeds.to_signer();
+		let signers = [escrow_signer.as_signer()];
+
+		// Refund the full vault balance to the maker
+		token::instructions::TransferChecked::new(
+			self.vault,
+			self.mint_a,
+			self.maker_ata_a,
+			self.escrow,
+			vault_amount,
+			decimals_a,
+		)
+		.invoke_signed_with_program(&signers, &token_program)?;
+
+		// Close vault account
+		token::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
+			.invoke_signed_with_program(&signers, &token_program)?;
+
+		// Clear the raw backing bytes while closing; typed zero-copy views never
+		// expose inactive storage for blanket mutation.
+		self.escrow.close_account_zeroed(&ID, self.maker)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -410,6 +524,7 @@ mod tests {
 	fn instruction_discriminators_are_stable() {
 		assert_eq!(EscrowInstruction::Make as u8, 1);
 		assert_eq!(EscrowInstruction::Take as u8, 2);
+		assert_eq!(EscrowInstruction::Cancel as u8, 3);
 	}
 
 	#[test]

@@ -87,6 +87,11 @@ export const MULTISIG_PROGRAM_ERROR__INVALID_PROPOSAL_KIND = 0x1d; // 29
 export const MULTISIG_PROGRAM_ERROR__MISSING_RENT_PAYER = 0x1e; // 30
 /** The proposal's recorded lifetime has elapsed. */
 export const MULTISIG_PROGRAM_ERROR__PROPOSAL_EXPIRED = 0x1f; // 31
+/**
+ * A spending-limit action moves vault funds and requires a governed
+ * proposal, not the instant config-authority path.
+ */
+export const MULTISIG_PROGRAM_ERROR__SPENDING_LIMIT_REQUIRES_PROPOSAL = 0x20; // 32
 
 export type MultisigProgramError =
 	| typeof MULTISIG_PROGRAM_ERROR__ALREADY_VOTED
@@ -115,6 +120,7 @@ export type MultisigProgramError =
 	| typeof MULTISIG_PROGRAM_ERROR__PROPOSAL_EXPIRED
 	| typeof MULTISIG_PROGRAM_ERROR__PROTECTED_ACCOUNT
 	| typeof MULTISIG_PROGRAM_ERROR__SPENDING_LIMIT_EXCEEDED
+	| typeof MULTISIG_PROGRAM_ERROR__SPENDING_LIMIT_REQUIRES_PROPOSAL
 	| typeof MULTISIG_PROGRAM_ERROR__STALE_PROPOSAL
 	| typeof MULTISIG_PROGRAM_ERROR__TIME_LOCK_EXCEEDS_MAX_ALLOWED
 	| typeof MULTISIG_PROGRAM_ERROR__TIME_LOCK_NOT_RELEASED
@@ -179,6 +185,8 @@ if (process.env["NODE_ENV"] !== "production") {
 			`A message instruction wants to write a program-owned account the`,
 		[MULTISIG_PROGRAM_ERROR__SPENDING_LIMIT_EXCEEDED]:
 			`The spending limit is exhausted for this period.`,
+		[MULTISIG_PROGRAM_ERROR__SPENDING_LIMIT_REQUIRES_PROPOSAL]:
+			`A spending-limit action moves vault funds and requires a governed`,
 		[MULTISIG_PROGRAM_ERROR__STALE_PROPOSAL]:
 			`The proposal predates the last consensus change and is stale.`,
 		[MULTISIG_PROGRAM_ERROR__TIME_LOCK_EXCEEDS_MAX_ALLOWED]:

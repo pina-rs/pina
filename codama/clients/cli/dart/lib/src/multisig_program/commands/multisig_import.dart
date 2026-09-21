@@ -29,6 +29,12 @@ final class MultisigImportCommand extends Command<void> {
         help: "The legacy_multisig account",
       )
       ..addOption(
+        'legacy_create_key',
+        mandatory: false,
+        help:
+            "The legacy multisig's `create_key`: its holder authorizes the import, [default: payer]",
+      )
+      ..addOption(
         'program_config',
         mandatory: true,
         help: "The program_config account",
@@ -70,6 +76,9 @@ final class MultisigImportCommand extends Command<void> {
       '--legacy-multisig',
       results['legacy_multisig']! as String,
     );
+    final legacyCreateKey = (results['legacy_create_key'] as String?) != null
+        ? pubkey('--legacy-create-key', results['legacy_create_key']! as String)
+        : context.payerAddress;
     final programConfig = pubkey(
       '--program-config',
       results['program_config']! as String,
@@ -111,6 +120,7 @@ final class MultisigImportCommand extends Command<void> {
     final instruction = getMultisigImportInstruction(
       programAddress: context.programAddress,
       legacyMultisig: legacyMultisig,
+      legacyCreateKey: legacyCreateKey,
       programConfig: programConfig,
       createKey: createKey,
       multisig: multisig,

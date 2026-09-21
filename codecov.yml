@@ -7,6 +7,14 @@ ignore:
   - "crates/pina_test"
   - "pina_root"
   - "examples"
+  # Lint passes read rustc's internal data structures through the
+  # `rustc_private` APIs, so their bodies only ever execute inside the bundled
+  # `pina_lint_driver` — codecov cannot instrument a process it does not link.
+  # `crates/pina_lints/tests/ui` compiles every fixture through that driver
+  # and compares the diagnostics byte for byte, and each lint's decision logic
+  # is factored into a host-tested module (`crates/pina_lints/src/collisions.rs`
+  # is at 100%), so this excludes only the rustc-glue layer.
+  - "crates/pina_lints/src/lints"
 
 coverage:
   status:

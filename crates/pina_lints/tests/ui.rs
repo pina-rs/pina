@@ -51,6 +51,11 @@ fn ui_deny_heap_allocations_in_onchain_instruction_handlers() {
 }
 
 #[test]
+fn ui_deny_colliding_account_discriminators() {
+	run_ui_tests("deny_colliding_account_discriminators");
+}
+
+#[test]
 fn ui_deny_unchecked_remaining_mut() {
 	run_ui_tests("deny_unchecked_remaining_mut");
 }
