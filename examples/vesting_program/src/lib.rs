@@ -286,12 +286,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_associated_token_address(
-				self.vesting_state.address(),
-				self.mint.address(),
-				self.token_program.address(),
-			)?;
+			.assert_owners(&SPL_PROGRAM_IDS)?;
 		// The address check lives in the `CreateIdempotent` CPI below: the
 		// associated token program derives the same seeds and rejects a mismatch
 		// with `InvalidSeeds` before its idempotent branch.
@@ -359,9 +354,11 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		if next_claimed > vested {
 			return Err(VestingError::ClaimTooLarge.into());
 		}
-		// The vault is the schedule's funding source; a release it cannot cover
-		// is the schedule's own error to report rather than a raw token-program
-		// failure. This mirrors how `Cancel` reads the refund balance.
+		// The payout is signed by the schedule, so the source must provably be
+		// the schedule's own vault: this load derives the associated token
+		// address and rejects a mismatch, which is the check that stops the
+		// schedule's signature from draining a caller-supplied account. It is
+		// the vault's only derivation on this path.
 		let vault_balance = self
 			.vault
 			.as_associated_token_account(
@@ -429,12 +426,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_associated_token_address(
-				self.vesting_state.address(),
-				self.mint.address(),
-				self.token_program.address(),
-			)?;
+			.assert_owners(&SPL_PROGRAM_IDS)?;
 		// The address check lives in the `CreateIdempotent` CPI below: the
 		// associated token program derives the same seeds and rejects a mismatch
 		// with `InvalidSeeds` before its idempotent branch.
@@ -464,8 +456,13 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			return Err(VestingError::AlreadyCancelled.into());
 		}
 
-		// Read the balance the vault must return before marking the schedule
-		// cancelled, so a later failure cannot leave it flagged as refunded.
+		// The refund is signed by the schedule, so the source must provably be
+		// the schedule's own vault: this load derives the associated token
+		// address and rejects a mismatch, which is the check that stops the
+		// schedule's signature from draining a caller-supplied account. It is
+		// the vault's only derivation on this path. It also reads the balance
+		// the vault must return before the schedule is marked cancelled, so a
+		// later failure cannot leave it flagged as refunded.
 		let remaining = self
 			.vault
 			.as_associated_token_account(

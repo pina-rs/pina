@@ -297,12 +297,11 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
+		// The address check for token B lives in the `CreateIdempotent` CPI
+		// below: the associated token program derives the same seeds and
+		// rejects a mismatch with `InvalidSeeds` before its idempotent branch,
+		// so deriving it here as well would pay a second canonical search.
 		self.taker_ata_b.assert_writable()?;
-		drop(self.taker_ata_b.as_associated_token_account(
-			self.taker.address(),
-			self.mint_b.address(),
-			&token_program,
-		)?);
 
 		// Validate escrow state
 		self.escrow.assert_not_empty()?;
