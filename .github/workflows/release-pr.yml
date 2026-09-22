@@ -253,7 +253,7 @@ jobs:
           fi
 
           for tag in "${release_tags[@]}"; do
-            if [[ "$tag" != v* ]]; then
+            if [[ "$tag" != v* && "$tag" != abi/v* ]]; then
               echo "::error::Refusing to dispatch unexpected release tag '$tag'." >&2
               exit 1
             fi
