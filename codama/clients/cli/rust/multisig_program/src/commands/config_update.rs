@@ -26,9 +26,6 @@ pub struct ConfigUpdateArgs {
 	set_creation_fee: bool,
 	#[arg(long)]
 	creation_fee: u64,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `program_config` account [default: derived]
 	#[arg(long)]
 	program_config: Option<String>,
@@ -36,10 +33,7 @@ pub struct ConfigUpdateArgs {
 
 pub(crate) fn run(context: &CliContext, args: ConfigUpdateArgs) -> Result<(), CliError> {
 	let treasury = CliContext::pubkey("--treasury", &args.treasury)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let program_config = match &args.program_config {
 		Some(value) => CliContext::pubkey("--program_config", value)?,
 		None => {

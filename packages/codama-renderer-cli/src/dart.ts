@@ -442,9 +442,10 @@ function accountLocals(instruction: InstructionModel): string {
 			case "constant":
 				continue;
 			case "payer":
-				locals.push(
-					`    final ${account.camel} = ${override}context.payerAddress;`,
-				);
+				// The CLI signs with exactly one keypair, so a payer-resolution
+				// account must be the loaded payer itself; an override would
+				// produce an unsigned signer and fail at runtime.
+				locals.push(`    final ${account.camel} = context.payerAddress;`);
 				break;
 			case "pda": {
 				const seedList = (account.resolution.seeds ?? [])
@@ -490,9 +491,13 @@ function factoryParams(instruction: InstructionModel): string {
 }
 
 function usesResults(instruction: InstructionModel): boolean {
+	// Payer-resolution accounts resolve to the loaded payer without touching
+	// command results, so only the remaining resolutions read `argResults`.
 	return (
 		instruction.accounts.some(
-			(account) => account.resolution.resolution !== "constant",
+			(account) =>
+				account.resolution.resolution === "pda" ||
+				account.resolution.resolution === "required",
 		) || instruction.args.length > 0
 	);
 }
@@ -515,14 +520,19 @@ function optionAdders(instruction: InstructionModel): string {
 		);
 	}
 	for (const account of instruction.accounts) {
-		if (account.resolution.resolution === "constant") {
+		if (
+			account.resolution.resolution === "constant" ||
+			account.resolution.resolution === "payer"
+		) {
+			// Constant accounts are pinned by the IDL. A payer-resolution
+			// account must be the loaded payer itself: the CLI signs with
+			// exactly one keypair, so an override option would produce an
+			// unsigned signer and fail at runtime.
 			continue;
 		}
 		const mandatory = account.resolution.resolution === "required";
 		const hint = account.resolution.resolution === "pda"
 			? " [default: derived]"
-			: account.resolution.resolution === "payer"
-			? " [default: payer]"
 			: "";
 		const help =
 			(account.docs[0]?.split("\n")[0] ?? `The ${account.snake} account.`)
@@ -622,23 +632,28 @@ function renderFetchCommand(model: CliModel, clientBarrel: string): string {
 				)
 				.join("\n");
 
+			// Only accounts backed by a PDA node can be derived; plain accounts
+			// keep requiring an explicit --address.
+			const hasPdaSeeds = (account.seeds ?? []).length > 0;
 			const derivation = variableSeeds.length > 0
 				? `${seedValues}
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
         : (await find${account.pdaPascal ?? account.pascal}Pda(
+            seeds: ${account.pdaPascal ?? account.pascal}Seeds(
 ${
-					variableSeeds.length > 0
-						? `            seeds: ${account.pdaPascal ?? account.pascal}Seeds(
-${
-							variableSeeds.map((seed) =>
-								`              ${seed.camel}: ${seed.camel}Value`
-							).join(",\n")
-						},
+					variableSeeds.map((seed) =>
+						`              ${seed.camel}: ${seed.camel}Value`
+					).join(",\n")
+				},
             ),
-`
-						: ""
-				}            programAddress: context.programAddress,
+            programAddress: context.programAddress,
+          )).$1;`
+				: hasPdaSeeds
+				? `    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await find${account.pdaPascal ?? account.pascal}Pda(
+            programAddress: context.programAddress,
           )).$1;`
 				: `    final address = pubkey('--address', results['address']! as String);`;
 
@@ -703,6 +718,14 @@ import '${clientBarrel}';
 
 ${commands}
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+${
+		model.accounts
+			.map((account) => `    addSubcommand(Fetch${account.pascal}Command());`)
+			.join("\n")
+	}
+  }
+
   @override
   String get name => 'fetch';
 

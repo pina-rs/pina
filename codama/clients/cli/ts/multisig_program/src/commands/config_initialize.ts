@@ -21,7 +21,6 @@ export const configInitializeCommand = registerGlobals(
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--treasury <treasury>", "treasury")
 	.requiredOption("--creation-fee <creationFee>", "creationFee")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.option(
 		"--program-config <programConfig>",
 		"The `program_config` account [default: derived]",

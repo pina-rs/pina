@@ -17,19 +17,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ValidateExternalProgramArgs {
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `external_program` account
 	#[arg(long)]
 	external_program: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: ValidateExternalProgramArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let external_program = CliContext::pubkey("--external_program", &args.external_program)?;
 	let data = ValidateExternalProgramInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {

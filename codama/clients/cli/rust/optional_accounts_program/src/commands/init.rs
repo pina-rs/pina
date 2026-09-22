@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct InitArgs {
 	#[arg(long)]
 	bump: u8,
-	/// Pays for account creation and seeds the store PDA [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The store PDA account (must be empty — not yet created) [default: derived]
 	#[arg(long)]
 	store: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let store = match &args.store {
 		Some(value) => CliContext::pubkey("--store", value)?,
 		None => {

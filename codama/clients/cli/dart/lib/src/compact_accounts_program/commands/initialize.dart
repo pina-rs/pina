@@ -16,11 +16,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('entry_count', mandatory: true, help: "entryCount")
       ..addOption('marker_count', mandatory: true, help: "markerCount")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "Funds rent and becomes the journal authority [default: payer]",
-      )
-      ..addOption(
         'journal',
         mandatory: false,
         help: "Empty canonical journal PDA [default: derived]",
@@ -37,9 +32,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(

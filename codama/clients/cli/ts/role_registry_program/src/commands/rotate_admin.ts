@@ -16,7 +16,6 @@ import {
 
 export const rotateAdminCommand = registerGlobals(new Command("rotate_admin"))
 	.description("rotateAdmin")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--new-admin <newAdmin>", "The `new_admin` account")
 	.requiredOption(
 		"--registry-config <registryConfig>",

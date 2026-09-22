@@ -19,7 +19,6 @@ export const realloc2Command = registerGlobals(new Command("realloc2"))
 		"Exercises Anchor's duplicate-reallocation guard.\n\nBoth sample accounts must be the same canonical PDA for the signer, so the\ninstruction always rejects with `AccountDuplicateReallocs` before any\naccount is resized. It is intentionally not a two-target mutation API.",
 	)
 	.requiredOption("--len <len>", "len")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--sample1 <sample1>", "The `sample1` account")
 	.requiredOption("--sample2 <sample2>", "The `sample2` account")
 	.action(async (options) => {

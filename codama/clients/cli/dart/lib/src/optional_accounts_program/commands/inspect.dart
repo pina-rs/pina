@@ -9,22 +9,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class InspectCommand extends Command<void> {
   InspectCommand() {
-    argParser
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The transaction fee payer; always required [default: payer]",
-      )
-      ..addOption(
-        'store',
-        mandatory: true,
-        help: "When present, must be the caller's store PDA",
-      )
-      ..addOption(
-        'witness',
-        mandatory: false,
-        help: "When present, must have signed the transaction [default: payer]",
-      );
+    argParser..addOption(
+      'store',
+      mandatory: true,
+      help: "When present, must be the caller's store PDA",
+    );
   }
 
   @override
@@ -37,13 +26,9 @@ final class InspectCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final store = pubkey('--store', results['store']! as String);
-    final witness = (results['witness'] as String?) != null
-        ? pubkey('--witness', results['witness']! as String)
-        : context.payerAddress;
+    final witness = context.payerAddress;
 
     final instruction = getInspectInstruction(
       programAddress: context.programAddress,

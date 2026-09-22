@@ -17,7 +17,6 @@ import {
 export const createPdaCommand = registerGlobals(new Command("create_pda"))
 	.description("createPda")
 	.requiredOption("--bump <bump>", "bump")
-	.option("--payer <payer>", "The `payer` account [default: payer]")
 	.option("--state <state>", "The `state` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

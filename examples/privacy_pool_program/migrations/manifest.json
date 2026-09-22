@@ -1,0 +1,1453 @@
+{
+	"abiVersion": "0.20",
+	"programId": "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "PoolConfig",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "custodian_threshold",
+								"rustType": "u16"
+							},
+							{
+								"name": "challenge_window_secs",
+								"rustType": "u32"
+							},
+							{
+								"name": "deposit_lamports",
+								"rustType": "u64"
+							},
+							{
+								"name": "total_deposits",
+								"rustType": "u64"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:02": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "PoolVault",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:03": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "MerkleTree",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "next_leaf_index",
+								"rustType": "u64"
+							},
+							{
+								"name": "nodes",
+								"rustType": "[u8; 8160]"
+							},
+							{
+								"name": "roots_len",
+								"rustType": "u16"
+							},
+							{
+								"name": "roots",
+								"rustType": "[u8; 256]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:04": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "04"
+			},
+			"rustName": "NullifierSet",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "count",
+								"rustType": "u64"
+							},
+							{
+								"name": "nullifiers",
+								"rustType": "[u8; 4096]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:05": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "05"
+			},
+			"rustName": "CustodianRegistry",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "custodians",
+								"rustType": "[u8; 96]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:06": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "06"
+			},
+			"rustName": "RequesterRegistry",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "count",
+								"rustType": "u8"
+							},
+							{
+								"name": "keys",
+								"rustType": "[u8; 512]"
+							},
+							{
+								"name": "max_tiers",
+								"rustType": "[u8; 16]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:07": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "07"
+			},
+			"rustName": "DisclosureLog",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "count",
+								"rustType": "u64"
+							},
+							{
+								"name": "entries",
+								"rustType": "[u8; 3072]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:08": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "08"
+			},
+			"rustName": "NoteCommitment",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:09": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "09"
+			},
+			"rustName": "DisclosureRequest",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "requester",
+								"rustType": "Address"
+							},
+							{
+								"name": "nonce",
+								"rustType": "u64"
+							},
+							{
+								"name": "tier",
+								"rustType": "u8"
+							},
+							{
+								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "notice_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "notice",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "legal_basis_hash",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "created_at",
+								"rustType": "u64"
+							},
+							{
+								"name": "challenge_deadline",
+								"rustType": "u64"
+							},
+							{
+								"name": "status",
+								"rustType": "u8"
+							},
+							{
+								"name": "granted",
+								"rustType": "u8"
+							},
+							{
+								"name": "approvals",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"account:1:0a": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0a"
+			},
+			"rustName": "VerifyingKeyAccount",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "slot",
+								"rustType": "u8"
+							},
+							{
+								"name": "alpha_g1",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "beta_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "gamma_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "delta_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "ic_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "ic0",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic1",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic2",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic3",
+								"rustType": "[u8; 64]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "InitializeIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "config_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "vault_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "tree_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifiers_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "custodians_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "requesters_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "log_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "custodians",
+								"rustType": "[u8; 96]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "pool_config"
+							},
+							{
+								"name": "pool_vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "pool_vault"
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "merkle_tree"
+							},
+							{
+								"name": "nullifier_set",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "nullifier_set"
+							},
+							{
+								"name": "custodian_registry",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "custodian_registry"
+							},
+							{
+								"name": "requester_registry",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "requester_registry"
+							},
+							{
+								"name": "disclosure_log",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "disclosure_log"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:01": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "SetVerificationKeyIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "slot",
+								"rustType": "u8"
+							},
+							{
+								"name": "ic_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "alpha_g1",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "beta_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "gamma_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "delta_g2",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "ic0",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic1",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic2",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "ic3",
+								"rustType": "[u8; 64]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "verifying_key_account",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "verifying_key_account"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:02": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "SetCustodiansIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "custodians",
+								"rustType": "[u8; 96]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "custodian_registry",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:03": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "RegisterRequesterIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "requester",
+								"rustType": "Address"
+							},
+							{
+								"name": "max_tier",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "requester_registry",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:04": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "04"
+			},
+			"rustName": "DepositIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "depositor",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "note_commitment",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "note_commitment"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:05": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "05"
+			},
+			"rustName": "WithdrawIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "nullifier",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "root",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "proof_a",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "proof_b",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "proof_c",
+								"rustType": "[u8; 64]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_vault",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "merkle_tree",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "nullifier_set",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "verifying_key_account",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "recipient",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:06": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "06"
+			},
+			"rustName": "TransferIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "root",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "new_commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "new_view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
+							},
+							{
+								"name": "proof_a",
+								"rustType": "[u8; 64]"
+							},
+							{
+								"name": "proof_b",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "proof_c",
+								"rustType": "[u8; 64]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "payer",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "nullifier_set",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "verifying_key_account",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "note_commitment",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "note_commitment"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": "publicKey:11111111111111111111111111111111",
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:07": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "07"
+			},
+			"rustName": "RequestDisclosureIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nonce",
+								"rustType": "u64"
+							},
+							{
+								"name": "tier",
+								"rustType": "u8"
+							},
+							{
+								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "notice_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "notice",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "legal_basis_hash",
+								"rustType": "[u8; 32]"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "requester",
+								"writable": true,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "requester_registry",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "note_commitment",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "note_commitment"
+							},
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": "disclosure_request"
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:08": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "08"
+			},
+			"rustName": "GrantDisclosureIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "reserved",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "note_commitment",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "viewer",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:09": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "09"
+			},
+			"rustName": "ChallengeDisclosureIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "reserved",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "note_commitment",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "viewer",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0a": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0a"
+			},
+			"rustName": "ResolveChallengeIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "approve",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0b": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0b"
+			},
+			"rustName": "ApproveDisclosureIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "reserved",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "custodian",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "pool_config",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "custodian_registry",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "disclosure_log",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		},
+		"instruction:1:0c": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "0c"
+			},
+			"rustName": "CancelDisclosureIx",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "reserved",
+								"rustType": "u8"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "requester",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "disclosure_request",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"transition": null
+				}
+			]
+		}
+	}
+}

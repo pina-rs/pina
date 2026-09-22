@@ -16,12 +16,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('name', mandatory: true, help: "name")
       ..addOption('bio', mandatory: true, help: "bio")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "The wallet creating the profile. Pays for account creation and becomes [default: payer]",
-      )
-      ..addOption(
         'profile',
         mandatory: false,
         help:
@@ -40,9 +34,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final profile = (results['profile'] as String?) != null
         ? pubkey('--profile', results['profile']! as String)
         : (await findProfilePda(

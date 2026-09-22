@@ -102,6 +102,11 @@ final class FetchRoleEntryCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchRegistryConfigCommand());
+    addSubcommand(FetchRoleEntryCommand());
+  }
+
   @override
   String get name => 'fetch';
 

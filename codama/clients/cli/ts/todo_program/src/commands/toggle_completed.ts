@@ -18,7 +18,6 @@ export const toggleCompletedCommand = registerGlobals(
 	new Command("toggle_completed"),
 )
 	.description("toggleCompleted")
-	.option("--owner <owner>", "The `owner` account [default: payer]")
 	.option("--todo <todo>", "The `todo` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

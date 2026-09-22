@@ -121,6 +121,11 @@ final class FetchPositionStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchPoolStateCommand());
+    addSubcommand(FetchPositionStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

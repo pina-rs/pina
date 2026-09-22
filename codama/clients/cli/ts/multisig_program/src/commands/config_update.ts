@@ -20,7 +20,6 @@ export const configUpdateCommand = registerGlobals(new Command("config_update"))
 	.requiredOption("--treasury <treasury>", "treasury")
 	.requiredOption("--set-creation-fee <setCreationFee>", "setCreationFee")
 	.requiredOption("--creation-fee <creationFee>", "creationFee")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.option(
 		"--program-config <programConfig>",
 		"The `program_config` account [default: derived]",

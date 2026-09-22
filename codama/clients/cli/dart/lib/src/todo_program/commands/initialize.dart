@@ -15,11 +15,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('digest', mandatory: true, help: "digest")
       ..addOption(
-        'owner',
-        mandatory: false,
-        help: "The owner account [default: payer]",
-      )
-      ..addOption(
         'todo',
         mandatory: false,
         help: "The todo account [default: derived]",
@@ -36,9 +31,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final owner = (results['owner'] as String?) != null
-        ? pubkey('--owner', results['owner']! as String)
-        : context.payerAddress;
+    final owner = context.payerAddress;
     final todo = (results['todo'] as String?) != null
         ? pubkey('--todo', results['todo']! as String)
         : (await findTodoPda(

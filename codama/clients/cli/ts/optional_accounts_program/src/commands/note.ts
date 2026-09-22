@@ -16,10 +16,6 @@ import {
 
 export const noteCommand = registerGlobals(new Command("note"))
 	.description("note")
-	.option(
-		"--authority <authority>",
-		"The transaction fee payer; always required [default: payer]",
-	)
 	.requiredOption(
 		"--note <note>",
 		"An arbitrary readonly account attached as context",

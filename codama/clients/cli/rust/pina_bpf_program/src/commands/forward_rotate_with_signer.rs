@@ -22,9 +22,6 @@ pub struct ForwardRotateWithSignerArgs {
 	/// The `oracle` account
 	#[arg(long)]
 	oracle: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `prop_amm_program` account
 	#[arg(long)]
 	prop_amm_program: String,
@@ -33,10 +30,7 @@ pub struct ForwardRotateWithSignerArgs {
 pub(crate) fn run(context: &CliContext, args: ForwardRotateWithSignerArgs) -> Result<(), CliError> {
 	let new_authority = CliContext::pubkey("--new_authority", &args.new_authority)?;
 	let oracle = CliContext::pubkey("--oracle", &args.oracle)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let prop_amm_program = CliContext::pubkey("--prop_amm_program", &args.prop_amm_program)?;
 	let data = ForwardRotateWithSignerInstructionData::new(|data| {
 		data.new_authority = new_authority;

@@ -9,17 +9,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class TouchCommand extends Command<void> {
   TouchCommand() {
-    argParser
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The store's authority. Must sign [default: payer]",
-      )
-      ..addOption(
-        'store',
-        mandatory: true,
-        help: "When present, the counter inside is incremented by one",
-      );
+    argParser..addOption(
+      'store',
+      mandatory: true,
+      help: "When present, the counter inside is incremented by one",
+    );
   }
 
   @override
@@ -32,9 +26,7 @@ final class TouchCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final store = pubkey('--store', results['store']! as String);
 
     final instruction = getTouchInstruction(

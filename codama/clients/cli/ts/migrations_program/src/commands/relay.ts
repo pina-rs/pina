@@ -17,13 +17,8 @@ import {
 export const relayCommand = registerGlobals(new Command("relay"))
 	.description("relay")
 	.requiredOption("--value <value>", "value")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--referrer <referrer>", "The `referrer` account")
 	.requiredOption("--state <state>", "The `state` account")
-	.option(
-		"--migration-payer <migrationPayer>",
-		"The `migration_payer` account [default: payer]",
-	)
 	.requiredOption(
 		"--migration-program <migrationProgram>",
 		"The `migration_program` account",

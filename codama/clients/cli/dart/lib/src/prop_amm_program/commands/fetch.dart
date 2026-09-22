@@ -49,6 +49,10 @@ final class FetchOracleStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchOracleStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

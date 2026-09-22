@@ -15,11 +15,6 @@ final class AddRoleCommand extends Command<void> {
       ..addOption('role_id', mandatory: true, help: "roleId")
       ..addOption('permissions', mandatory: true, help: "permissions")
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
       ..addOption('grantee', mandatory: true, help: "The grantee account")
       ..addOption(
         'registry_config',
@@ -43,9 +38,7 @@ final class AddRoleCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final grantee = pubkey('--grantee', results['grantee']! as String);
     final registryConfig = pubkey(
       '--registry-config',

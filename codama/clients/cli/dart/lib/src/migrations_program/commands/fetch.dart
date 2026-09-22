@@ -122,6 +122,12 @@ final class FetchCompactStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchStateCommand());
+    addSubcommand(FetchManualStateCommand());
+    addSubcommand(FetchCompactStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

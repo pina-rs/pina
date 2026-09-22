@@ -18,10 +18,6 @@ export const addTagCommand = registerGlobals(new Command("add_tag"))
 	.description("Instruction data for `AddTag`. Appends a tag to the profile.")
 	.requiredOption("--tag <tag>", "tag")
 	.option(
-		"--authority <authority>",
-		"The profile's authority. Must sign to prove ownership [default: payer]",
-	)
-	.option(
 		"--profile <profile>",
 		"The profile PDA account (must already exist and be writable) [default: derived]",
 	)

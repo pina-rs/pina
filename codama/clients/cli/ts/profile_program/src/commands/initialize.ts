@@ -22,10 +22,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--name <name>", "name")
 	.requiredOption("--bio <bio>", "bio")
 	.option(
-		"--authority <authority>",
-		"The wallet creating the profile. Pays for account creation and becomes [default: payer]",
-	)
-	.option(
 		"--profile <profile>",
 		"The profile PDA account (must be empty — not yet created) [default: derived]",
 	)

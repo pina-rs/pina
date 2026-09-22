@@ -21,10 +21,6 @@ export const directTransferCommand = registerGlobals(
 		"Instruction data for `DirectTransfer`.\n\nSame layout as `CpiTransferInstruction` but with a different discriminator\nbyte.",
 	)
 	.requiredOption("--amount <amount>", "amount")
-	.option(
-		"--sender <sender>",
-		"The sender. Must be owned by this program, writable, and a signer [default: payer]",
-	)
 	.requiredOption("--recipient <recipient>", "The recipient. Must be writable")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

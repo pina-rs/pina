@@ -18,7 +18,6 @@ export const validateExternalProgramCommand = registerGlobals(
 	new Command("validate_external_program"),
 )
 	.description("validateExternalProgram")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption(
 		"--external-program <externalProgram>",
 		"The `external_program` account",

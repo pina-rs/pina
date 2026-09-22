@@ -18,7 +18,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--digest <digest>", "digest")
-	.option("--owner <owner>", "The `owner` account [default: payer]")
 	.option("--todo <todo>", "The `todo` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

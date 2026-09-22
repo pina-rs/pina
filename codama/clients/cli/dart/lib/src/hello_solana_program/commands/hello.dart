@@ -9,12 +9,7 @@ import 'package:pina_codama_clients/hello_solana_program.dart';
 
 final class HelloCommand extends Command<void> {
   HelloCommand() {
-    argParser..addOption(
-      'user',
-      mandatory: false,
-      help:
-          "The user invoking the program. Must be a signer so we can trust the [default: payer]",
-    );
+    argParser;
   }
 
   @override
@@ -26,11 +21,8 @@ final class HelloCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-    final results = argResults!;
     final context = await createContext(globalResults!);
-    final user = (results['user'] as String?) != null
-        ? pubkey('--user', results['user']! as String)
-        : context.payerAddress;
+    final user = context.payerAddress;
 
     final instruction = getHelloInstruction(
       programAddress: context.programAddress,

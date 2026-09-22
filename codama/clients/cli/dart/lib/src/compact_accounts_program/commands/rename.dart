@@ -15,12 +15,6 @@ final class RenameCommand extends Command<void> {
       ..addOption('title_len', mandatory: true, help: "titleLen")
       ..addOption('title', mandatory: true, help: "title")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "Funds title growth and receives rent refunded by title shrinkage [default: payer]",
-      )
-      ..addOption(
         'journal',
         mandatory: false,
         help: "The journal account [default: derived]",
@@ -37,9 +31,7 @@ final class RenameCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final journal = (results['journal'] as String?) != null
         ? pubkey('--journal', results['journal']! as String)
         : (await findJournalPda(

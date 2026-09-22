@@ -19,7 +19,6 @@ export const addRoleCommand = registerGlobals(new Command("add_role"))
 	.requiredOption("--role-id <roleId>", "roleId")
 	.requiredOption("--permissions <permissions>", "permissions")
 	.requiredOption("--bump <bump>", "bump")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--grantee <grantee>", "The `grantee` account")
 	.requiredOption(
 		"--registry-config <registryConfig>",

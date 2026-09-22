@@ -15,11 +15,6 @@ final class ConfigUpdateCommand extends Command<void> {
       ..addFlag('set_creation_fee', help: "setCreationFee")
       ..addOption('creation_fee', mandatory: true, help: "creationFee")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help: "The authority account [default: payer]",
-      )
-      ..addOption(
         'program_config',
         mandatory: false,
         help: "The program_config account [default: derived]",
@@ -36,9 +31,7 @@ final class ConfigUpdateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final programConfig = (results['program_config'] as String?) != null
         ? pubkey('--program-config', results['program_config']! as String)
         : (await findProgramConfigPda(

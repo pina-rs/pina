@@ -58,6 +58,10 @@ final class FetchStoreStateCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchStoreStateCommand());
+  }
+
   @override
   String get name => 'fetch';
 

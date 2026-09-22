@@ -21,18 +21,12 @@ pub struct UpdateArgs {
 	value: u64,
 	#[arg(long)]
 	memo: u16,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `referrer` account
 	#[arg(long)]
 	referrer: String,
 	/// The `state` account
 	#[arg(long)]
 	state: String,
-	/// The `migration_payer` account [default: payer]
-	#[arg(long)]
-	migration_payer: Option<String>,
 	/// The `system_program` account
 	#[arg(long)]
 	system_program: String,
@@ -45,16 +39,10 @@ pub struct UpdateArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let referrer = CliContext::pubkey("--referrer", &args.referrer)?;
 	let state = CliContext::pubkey("--state", &args.state)?;
-	let migration_payer = match &args.migration_payer {
-		Some(value) => CliContext::pubkey("--migration_payer", value)?,
-		None => context.payer_pubkey(),
-	};
+	let migration_payer = context.payer_pubkey();
 	let system_program = CliContext::pubkey("--system_program", &args.system_program)?;
 	let manual_state = CliContext::pubkey("--manual_state", &args.manual_state)?;
 	let compact_state = CliContext::pubkey("--compact_state", &args.compact_state)?;

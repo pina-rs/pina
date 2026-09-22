@@ -20,9 +20,6 @@ use crate::context::CliError;
 pub struct InitializePoolArgs {
 	#[arg(long)]
 	bump: u8,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `stake_mint` account
 	#[arg(long)]
 	stake_mint: String,
@@ -44,10 +41,7 @@ pub struct InitializePoolArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializePoolArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let stake_mint = CliContext::pubkey("--stake_mint", &args.stake_mint)?;
 	let reward_mint = CliContext::pubkey("--reward_mint", &args.reward_mint)?;
 	let pool_state = match &args.pool_state {

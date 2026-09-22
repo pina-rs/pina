@@ -13,12 +13,6 @@ final class UpdateProfileCommand extends Command<void> {
       ..addOption('name', mandatory: true, help: "name")
       ..addOption('bio', mandatory: true, help: "bio")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "The profile's authority. Must sign to prove ownership [default: payer]",
-      )
-      ..addOption(
         'profile',
         mandatory: false,
         help:
@@ -37,9 +31,7 @@ final class UpdateProfileCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final profile = (results['profile'] as String?) != null
         ? pubkey('--profile', results['profile']! as String)
         : (await findProfilePda(

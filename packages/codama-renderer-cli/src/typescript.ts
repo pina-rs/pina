@@ -352,14 +352,19 @@ function renderCommand(instruction: InstructionModel): string {
 	}
 
 	for (const account of instruction.accounts) {
-		if (account.resolution.resolution === "constant") {
+		if (
+			account.resolution.resolution === "constant" ||
+			account.resolution.resolution === "payer"
+		) {
+			// Constant accounts are pinned by the IDL. A payer-resolution
+			// account must be the loaded payer itself: the CLI signs with
+			// exactly one keypair, so an override option would produce an
+			// unsigned signer and fail at runtime.
 			continue;
 		}
 		const required = account.resolution.resolution === "required";
 		const hint = account.resolution.resolution === "pda"
 			? " [default: derived]"
-			: account.resolution.resolution === "payer"
-			? " [default: payer]"
 			: "";
 		const description =
 			(docLines(account.docs)[0] ?? `The \`${account.snake}\` account.`)
@@ -466,13 +471,25 @@ function renderFetch(model: CliModel): string {
 				seedNames.push(seed.camel);
 			}
 
-			const derivation = (account.seeds ?? []).some((seed) => !seed.constant)
+			// Only accounts backed by a PDA node can be derived; plain accounts
+			// keep requiring an explicit --address.
+			const hasPdaSeeds = (account.seeds ?? []).length > 0;
+			const hasVariableSeeds = (account.seeds ?? []).some(
+				(seed) => !seed.constant,
+			);
+			const derivation = hasVariableSeeds
 				? `${seedLocals.join("\n")}
 					const address = options.address ??
 						(await find${account.pdaPascal ?? account.pascal}Pda({ ${
 					seedNames.join(", ")
 				} }, { programAddress: context.programAddress }))[0];`
-				: `\t\t\t\t\tconst address = pubkey("--address", options.address as string);`;
+				: hasPdaSeeds
+				? `const address = options.address === undefined
+						? (await find${account.pdaPascal ?? account.pascal}Pda({
+							programAddress: context.programAddress,
+						}))[0]
+						: pubkey("--address", options.address as string);`
+				: `const address = pubkey("--address", options.address as string);`;
 
 			return `\t\t.addCommand(
 				registerGlobals(new Command("${kebab(account.snake)}"))
@@ -496,7 +513,7 @@ ${derivation}
 		.join("\n");
 
 	const findImports = model.accounts
-		.filter((account) => (account.seeds ?? []).some((seed) => !seed.constant))
+		.filter((account) => (account.seeds ?? []).length > 0)
 		.map((account) => `\tfind${account.pdaPascal ?? account.pascal}Pda,`)
 		.join("\n");
 	const fetchImports = model.accounts

@@ -18,10 +18,6 @@ export const resizeCommand = registerGlobals(new Command("resize"))
 	.description("resize")
 	.requiredOption("--entry-count <entryCount>", "entryCount")
 	.requiredOption("--marker-count <markerCount>", "markerCount")
-	.option(
-		"--authority <authority>",
-		"Funds growth and receives the rent refund from shrinking [default: payer]",
-	)
 	.option("--journal <journal>", "The `journal` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

@@ -292,13 +292,19 @@ fn emit_instruction(instruction: &InstructionModel, client_crate: &str) -> Strin
 	}
 
 	for account in &instruction.accounts {
-		if matches!(account.resolution, Resolution::Constant(_)) {
+		if matches!(
+			account.resolution,
+			Resolution::Constant(_) | Resolution::Payer
+		) {
+			// Constant accounts are pinned by the IDL. A payer-resolution
+			// account must be the loaded payer itself: the CLI signs with
+			// exactly one keypair, so an override option would produce an
+			// unsigned signer and fail at runtime.
 			continue;
 		}
 		let hint = match account.resolution {
 			Resolution::Pda { .. } => " [default: derived]",
-			Resolution::Payer => " [default: payer]",
-			Resolution::Required | Resolution::Constant(_) => "",
+			Resolution::Payer | Resolution::Required | Resolution::Constant(_) => "",
 		};
 		let docs = if account.docs.is_empty() {
 			format!("The `{}` account.", account.snake)
@@ -347,9 +353,7 @@ fn emit_instruction(instruction: &InstructionModel, client_crate: &str) -> Strin
 			Resolution::Constant(_) => {}
 			Resolution::Payer => {
 				locals.push_str(&format!(
-					"\tlet {name} = match &args.{name} {{\n\t\tSome(value) => \
-					 CliContext::pubkey(\"--{name}\", value)?,\n\t\tNone => \
-					 context.payer_pubkey(),\n\t}};\n",
+					"\tlet {name} = context.payer_pubkey();\n",
 					name = account.snake
 				));
 			}
@@ -399,7 +403,15 @@ fn emit_instruction(instruction: &InstructionModel, client_crate: &str) -> Strin
 			("@@PASCAL@@", instruction.pascal.clone()),
 			(
 				"@@ARGS@@",
-				if instruction.args.is_empty() && instruction.accounts.is_empty() {
+				if instruction.args.is_empty()
+					&& instruction.accounts.iter().all(|account| {
+						matches!(
+							account.resolution,
+							Resolution::Constant(_) | Resolution::Payer
+						)
+					}) {
+					// Every account resolves without touching the parsed
+					// flags, so the generated Args struct is empty.
 					"_args".to_string()
 				} else {
 					"args".to_string()

@@ -23,9 +23,6 @@ pub struct VaultExecuteArgs {
 	/// The `proposal` account
 	#[arg(long)]
 	proposal: String,
-	/// The `member` account [default: payer]
-	#[arg(long)]
-	member: Option<String>,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -37,10 +34,7 @@ pub struct VaultExecuteArgs {
 pub(crate) fn run(context: &CliContext, args: VaultExecuteArgs) -> Result<(), CliError> {
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
 	let proposal = CliContext::pubkey("--proposal", &args.proposal)?;
-	let member = match &args.member {
-		Some(value) => CliContext::pubkey("--member", value)?,
-		None => context.payer_pubkey(),
-	};
+	let member = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let message_accounts = CliContext::pubkey("--message_accounts", &args.message_accounts)?;
 	let data = VaultExecuteInstructionData::new(|_data| {}).map_err(|_| {

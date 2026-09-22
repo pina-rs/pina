@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct InitializeArgs {
 	#[arg(long)]
 	bump: u8,
-	/// Funds creation and becomes the sample's resize authority [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// Empty PDA derived from `[b"sample", authority]` [default: derived]
 	#[arg(long)]
 	sample: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let sample = match &args.sample {
 		Some(value) => CliContext::pubkey("--sample", value)?,
 		None => {

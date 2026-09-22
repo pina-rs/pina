@@ -16,10 +16,6 @@ import {
 
 export const touchCommand = registerGlobals(new Command("touch"))
 	.description("touch")
-	.option(
-		"--authority <authority>",
-		"The store's authority. Must sign [default: payer]",
-	)
 	.requiredOption(
 		"--store <store>",
 		"When present, the counter inside is incremented by one",

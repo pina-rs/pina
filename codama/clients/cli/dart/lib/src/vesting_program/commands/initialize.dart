@@ -18,11 +18,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('end_ts', mandatory: true, help: "endTs")
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
-      ..addOption(
         'beneficiary',
         mandatory: true,
         help: "The beneficiary account",
@@ -51,9 +46,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final beneficiary = pubkey(
       '--beneficiary',
       results['beneficiary']! as String,

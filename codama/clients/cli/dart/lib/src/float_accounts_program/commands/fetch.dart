@@ -50,6 +50,10 @@ final class FetchFloatDataAccountCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchFloatDataAccountCommand());
+  }
+
   @override
   String get name => 'fetch';
 

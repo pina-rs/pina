@@ -18,10 +18,6 @@ export const renameCommand = registerGlobals(new Command("rename"))
 	.description("rename")
 	.requiredOption("--title-len <titleLen>", "titleLen")
 	.requiredOption("--title <title>", "title")
-	.option(
-		"--authority <authority>",
-		"Funds title growth and receives rent refunded by title shrinkage [default: payer]",
-	)
 	.option("--journal <journal>", "The `journal` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

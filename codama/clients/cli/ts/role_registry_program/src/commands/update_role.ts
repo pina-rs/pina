@@ -17,7 +17,6 @@ import {
 export const updateRoleCommand = registerGlobals(new Command("update_role"))
 	.description("updateRole")
 	.requiredOption("--permissions <permissions>", "permissions")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption(
 		"--registry-config <registryConfig>",
 		"The `registry_config` account",

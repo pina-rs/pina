@@ -20,11 +20,6 @@ export const configExecuteCommand = registerGlobals(
 	.description("configExecute")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
 	.requiredOption("--proposal <proposal>", "The `proposal` account")
-	.option("--member <member>", "The `member` account [default: payer]")
-	.option(
-		"--rent-payer <rentPayer>",
-		"The `rent_payer` account [default: payer]",
-	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.requiredOption(
 		"--spending-limit-accounts <spendingLimitAccounts>",

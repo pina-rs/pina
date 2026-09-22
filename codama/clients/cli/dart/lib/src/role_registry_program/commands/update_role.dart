@@ -12,11 +12,6 @@ final class UpdateRoleCommand extends Command<void> {
     argParser
       ..addOption('permissions', mandatory: true, help: "permissions")
       ..addOption(
-        'admin',
-        mandatory: false,
-        help: "The admin account [default: payer]",
-      )
-      ..addOption(
         'registry_config',
         mandatory: true,
         help: "The registry_config account",
@@ -38,9 +33,7 @@ final class UpdateRoleCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final registryConfig = pubkey(
       '--registry-config',
       results['registry_config']! as String,

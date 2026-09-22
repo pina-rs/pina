@@ -22,17 +22,11 @@ pub struct UpdateArgs {
 	/// The `oracle` account
 	#[arg(long)]
 	oracle: String,
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError> {
 	let oracle = CliContext::pubkey("--oracle", &args.oracle)?;
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let data = UpdateInstructionData::new(|data| {
 		data.new_price.set(args.new_price);
 	})

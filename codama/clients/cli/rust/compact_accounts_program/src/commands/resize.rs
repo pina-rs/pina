@@ -22,19 +22,13 @@ pub struct ResizeArgs {
 	entry_count: u8,
 	#[arg(long)]
 	marker_count: u8,
-	/// Funds growth and receives the rent refund from shrinking [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `journal` account [default: derived]
 	#[arg(long)]
 	journal: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: ResizeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let journal = match &args.journal {
 		Some(value) => CliContext::pubkey("--journal", value)?,
 		None => {

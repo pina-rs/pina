@@ -20,7 +20,6 @@ export const rotateAuthorityCommand = registerGlobals(
 	.description("rotateAuthority")
 	.requiredOption("--new-authority <newAuthority>", "newAuthority")
 	.requiredOption("--oracle <oracle>", "The `oracle` account")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

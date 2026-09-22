@@ -17,7 +17,6 @@ import {
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
 	.requiredOption("--bump <bump>", "bump")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.option(
 		"--registry-config <registryConfig>",
 		"The `registry_config` account [default: derived]",

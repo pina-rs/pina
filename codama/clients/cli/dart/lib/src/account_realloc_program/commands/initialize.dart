@@ -14,12 +14,6 @@ final class InitializeCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "Funds creation and becomes the sample's resize authority [default: payer]",
-      )
-      ..addOption(
         'sample',
         mandatory: false,
         help:
@@ -37,9 +31,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final sample = (results['sample'] as String?) != null
         ? pubkey('--sample', results['sample']! as String)
         : (await findSamplePda(

@@ -19,7 +19,6 @@ export const createCommand = registerGlobals(new Command("create"))
 	.requiredOption("--data-f32 <dataF32>", "dataF32")
 	.requiredOption("--data-f64 <dataF64>", "dataF64")
 	.requiredOption("--account <account>", "The `account` account")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

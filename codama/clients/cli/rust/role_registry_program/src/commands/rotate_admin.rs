@@ -17,9 +17,6 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RotateAdminArgs {
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `new_admin` account
 	#[arg(long)]
 	new_admin: String,
@@ -29,10 +26,7 @@ pub struct RotateAdminArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: RotateAdminArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let new_admin = CliContext::pubkey("--new_admin", &args.new_admin)?;
 	let registry_config = CliContext::pubkey("--registry_config", &args.registry_config)?;
 	let data = RotateAdminInstructionData::new(|_data| {}).map_err(|_| {

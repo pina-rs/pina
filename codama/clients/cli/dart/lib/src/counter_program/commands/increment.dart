@@ -9,19 +9,12 @@ import 'package:pina_codama_clients/counter_program.dart';
 
 final class IncrementCommand extends Command<void> {
   IncrementCommand() {
-    argParser
-      ..addOption(
-        'authority',
-        mandatory: false,
-        help:
-            "The counter's authority. Must sign to prove ownership [default: payer]",
-      )
-      ..addOption(
-        'counter',
-        mandatory: false,
-        help:
-            "The counter PDA account (must already exist and be writable) [default: derived]",
-      );
+    argParser..addOption(
+      'counter',
+      mandatory: false,
+      help:
+          "The counter PDA account (must already exist and be writable) [default: derived]",
+    );
   }
 
   @override
@@ -35,9 +28,7 @@ final class IncrementCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final authority = (results['authority'] as String?) != null
-        ? pubkey('--authority', results['authority']! as String)
-        : context.payerAddress;
+    final authority = context.payerAddress;
     final counter = (results['counter'] as String?) != null
         ? pubkey('--counter', results['counter']! as String)
         : (await findCounterPda(

@@ -18,19 +18,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct IncrementArgs {
-	/// The counter's authority. Must sign to prove ownership [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The counter PDA account (must already exist and be writable) [default: derived]
 	#[arg(long)]
 	counter: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: IncrementArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let counter = match &args.counter {
 		Some(value) => CliContext::pubkey("--counter", value)?,
 		None => {

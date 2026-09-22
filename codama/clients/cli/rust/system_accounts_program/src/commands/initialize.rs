@@ -17,19 +17,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct InitializeArgs {
-	/// The `authority` account [default: payer]
-	#[arg(long)]
-	authority: Option<String>,
 	/// The `wallet` account
 	#[arg(long)]
 	wallet: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
-	let authority = match &args.authority {
-		Some(value) => CliContext::pubkey("--authority", value)?,
-		None => context.payer_pubkey(),
-	};
+	let authority = context.payer_pubkey();
 	let wallet = CliContext::pubkey("--wallet", &args.wallet)?;
 	let data = InitializeInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {

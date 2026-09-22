@@ -19,11 +19,6 @@ final class SpendingLimitUseCommand extends Command<void> {
         help: "The spending_limit account",
       )
       ..addOption(
-        'member',
-        mandatory: false,
-        help: "The member account [default: payer]",
-      )
-      ..addOption(
         'vault',
         mandatory: true,
         help: "The vault PDA: SOL source or SPL transfer authority",
@@ -67,9 +62,7 @@ final class SpendingLimitUseCommand extends Command<void> {
       '--spending-limit',
       results['spending_limit']! as String,
     );
-    final member = (results['member'] as String?) != null
-        ? pubkey('--member', results['member']! as String)
-        : context.payerAddress;
+    final member = context.payerAddress;
     final vault = pubkey('--vault', results['vault']! as String);
     final destination = pubkey(
       '--destination',

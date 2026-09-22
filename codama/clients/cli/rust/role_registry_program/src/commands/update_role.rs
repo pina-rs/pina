@@ -19,9 +19,6 @@ use crate::context::CliError;
 pub struct UpdateRoleArgs {
 	#[arg(long)]
 	permissions: u64,
-	/// The `admin` account [default: payer]
-	#[arg(long)]
-	admin: Option<String>,
 	/// The `registry_config` account
 	#[arg(long)]
 	registry_config: String,
@@ -31,10 +28,7 @@ pub struct UpdateRoleArgs {
 }
 
 pub(crate) fn run(context: &CliContext, args: UpdateRoleArgs) -> Result<(), CliError> {
-	let admin = match &args.admin {
-		Some(value) => CliContext::pubkey("--admin", value)?,
-		None => context.payer_pubkey(),
-	};
+	let admin = context.payer_pubkey();
 	let registry_config = CliContext::pubkey("--registry_config", &args.registry_config)?;
 	let role_entry = CliContext::pubkey("--role_entry", &args.role_entry)?;
 	let data = UpdateRoleInstructionData::new(|data| {

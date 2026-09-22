@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { fetchState } from "./client";
+import { fetchState, findStatePda } from "./client";
 import {
 	bigInteger,
 	CliContext,
@@ -23,7 +23,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findStatePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchState(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(

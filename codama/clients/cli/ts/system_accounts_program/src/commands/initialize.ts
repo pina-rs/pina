@@ -16,7 +16,6 @@ import {
 
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
-	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.requiredOption("--wallet <wallet>", "The `wallet` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

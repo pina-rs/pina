@@ -20,19 +20,13 @@ use crate::context::CliError;
 pub struct CpiTransferArgs {
 	#[arg(long)]
 	amount: u64,
-	/// The sender. Must be a signer and writable (lamports will be debited) [default: payer]
-	#[arg(long)]
-	sender: Option<String>,
 	/// The recipient. Must be writable (lamports will be credited)
 	#[arg(long)]
 	recipient: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: CpiTransferArgs) -> Result<(), CliError> {
-	let sender = match &args.sender {
-		Some(value) => CliContext::pubkey("--sender", value)?,
-		None => context.payer_pubkey(),
-	};
+	let sender = context.payer_pubkey();
 	let recipient = CliContext::pubkey("--recipient", &args.recipient)?;
 	let data = CpiTransferInstructionData::new(|data| {
 		data.amount.set(args.amount);
