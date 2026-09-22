@@ -452,6 +452,13 @@ pub trait AccountInfoValidation {
 		Self: Sized;
 	/// Assert that the account address matches the associated token address
 	/// derived from `wallet`, `mint`, and `token_program`.
+	///
+	/// This performs a canonical associated-token-address search, which costs
+	/// on the order of a thousand compute units and grows with how far the
+	/// address's canonical bump sits below 255. When the caller also needs the
+	/// parsed account, use [`AsTokenAccount::as_associated_token_account`]
+	/// instead: it derives the same address and returns the view, so the
+	/// search is paid once rather than once per call.
 	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
 		self,
@@ -925,6 +932,11 @@ pub trait AsTokenAccount {
 	/// runtime owner, and the mint and current token authority stored in account
 	/// data. An account whose authority was reassigned remains at its original ATA
 	/// address but is not accepted as canonical for the original wallet.
+	///
+	/// The address check performs one canonical associated-token-address search,
+	/// so derive the address once per account per instruction: a handler that
+	/// also calls [`AccountInfoValidation::assert_associated_token_address`]
+	/// with the same wallet, mint, and token program pays the search twice.
 	///
 	/// This loader does not require the account to be initialized or unfrozen and
 	/// does not restrict delegates, close authority, or Token-2022 extensions.
