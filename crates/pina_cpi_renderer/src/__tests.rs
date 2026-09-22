@@ -284,7 +284,14 @@ fn scaffold_declares_pina_from_the_configured_source() {
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 	let manifest = fs::read_to_string(published_dir.join("Cargo.toml"))
 		.unwrap_or_else(|error| panic!("reads: {error}"));
-	let expected = format!("pina = {{ version = \"0.19\", default-features = false }}");
+	// Derive the pinned line the same way the scaffold does, so a release
+	// version bump cannot leave this assertion behind.
+	let release_line = env!("CARGO_PKG_VERSION")
+		.split('.')
+		.take(2)
+		.collect::<Vec<_>>()
+		.join(".");
+	let expected = format!("pina = {{ version = \"{release_line}\", default-features = false }}");
 	assert!(
 		manifest.contains(&expected),
 		"published scaffold must pin the release line, got:\n{manifest}"
