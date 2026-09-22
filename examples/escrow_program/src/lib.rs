@@ -297,6 +297,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
+		// The taker's payment source must be the taker's canonical associated
+		// token account for mint B, and this load is its only canonical pin:
+		// the `CreateIdempotent` CPI below derives the *maker's* ATA, and the
+		// `TransferChecked` CPI only proves the signer is authorized on
+		// whichever account it receives. Without this check a taker could
+		// fund the payment from any mint-B account they control rather than
+		// the published account layout. The same shape is pinned by an
+		// adversarial Surfpool test (`take_rejects_a_noncanonical_taker_...`).
 		self.taker_ata_b.assert_writable()?;
 		drop(self.taker_ata_b.as_associated_token_account(
 			self.taker.address(),

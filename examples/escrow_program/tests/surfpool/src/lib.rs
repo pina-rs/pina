@@ -22,6 +22,8 @@ const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const ATA_PROGRAM: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 const MINT_SPACE: u64 = 82;
+/// SPL token account data length.
+const TOKEN_ACCOUNT_SPACE: u64 = 165;
 const DECIMALS: u8 = 6;
 const FUND: u64 = 1_000_000_000;
 const MINTED_A: u64 = 100_000_000;
@@ -31,6 +33,10 @@ const TAKER_OFFER: u64 = 30_000_000;
 
 fn token_program_id() -> Pubkey {
 	Pubkey::from_str_const(TOKEN_PROGRAM)
+}
+
+fn rent_sysvar_id() -> Pubkey {
+	Pubkey::from_str_const("SysvarRent111111111111111111111111111111111")
 }
 
 fn ata_program_id() -> Pubkey {
@@ -1384,6 +1390,320 @@ fn take_requires_a_writable_maker() {
 			token_amount(&program.account(&taker_ata_b).expect("taker token B ATA")),
 			TAKER_OFFER,
 			"the taker paid nothing"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A shared prefix for the adversarial `Take` cases: provision both mints,
+/// the maker's and taker's accounts, and an open escrow to attack.
+struct OpenEscrow {
+	program_id: Pubkey,
+	mint_a: Pubkey,
+	mint_b: Pubkey,
+	taker: Keypair,
+	taker_ata_a: Pubkey,
+	taker_ata_b: Pubkey,
+	maker: Pubkey,
+	maker_ata_b: Pubkey,
+	escrow: Pubkey,
+	vault: Pubkey,
+	seed: u64,
+	bump: u8,
+}
+
+fn open_escrow(program: &mut ProgramTest) -> OpenEscrow {
+	let mint_authority = Keypair::new_from_array([2; 32]);
+	program
+		.fund(&mint_authority.pubkey(), FUND)
+		.expect("fund mint authority");
+
+	let maker = program.payer();
+	let mint_a = provision_mint(program, &maker, &mint_authority, 3).expect("provision mint A");
+	let mint_b = provision_mint(program, &maker, &mint_authority, 4).expect("provision mint B");
+
+	let taker = Keypair::new_from_array([5; 32]);
+	program.fund(&taker.pubkey(), FUND).expect("fund taker");
+
+	let maker_ata_a = ata_of(&maker, &mint_a);
+	let taker_ata_a = ata_of(&taker.pubkey(), &mint_a);
+	let taker_ata_b = ata_of(&taker.pubkey(), &mint_b);
+	let maker_ata_b = ata_of(&maker, &mint_b);
+
+	provision_ata(
+		program,
+		&maker,
+		&maker,
+		&mint_a,
+		Some(&mint_authority),
+		MINTED_A,
+	)
+	.expect("maker token A ATA");
+	provision_ata(program, &maker, &taker.pubkey(), &mint_a, None, 0).expect("taker token A ATA");
+	provision_ata(
+		program,
+		&maker,
+		&taker.pubkey(),
+		&mint_b,
+		Some(&mint_authority),
+		TAKER_OFFER,
+	)
+	.expect("taker token B ATA");
+
+	let seed = 1u64;
+	let program_id = Pubkey::new_from_array(ID.to_bytes());
+	let (escrow, bump) = escrow_pda(&program_id, &maker, seed);
+	let vault = ata_of(&escrow, &mint_a);
+
+	program
+		.send_instruction(make_instruction(
+			program,
+			&maker,
+			&mint_a,
+			&mint_b,
+			&maker_ata_a,
+			&escrow,
+			&vault,
+			seed,
+			bump,
+			OFFER_A,
+			OFFER_B,
+		))
+		.expect("execute Make");
+
+	OpenEscrow {
+		program_id,
+		mint_a,
+		mint_b,
+		taker,
+		taker_ata_a,
+		taker_ata_b,
+		maker,
+		maker_ata_b,
+		escrow,
+		vault,
+		seed,
+		bump,
+	}
+}
+
+/// The taker's token-B payment must leave the taker's canonical associated
+/// token account: a foreign token-B account the taker cannot sign for is
+/// rejected before any transfer, close, or escrow mutation.
+#[test]
+#[ignore = "run with pina test"]
+fn take_rejects_a_foreign_taker_token_b_account() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let opened = open_escrow(&mut program);
+
+		// A funded token-B account belonging to a third wallet: the address
+		// is not the taker's associated token account, and the taker cannot
+		// authorize a debit from it.
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		let stranger = Keypair::new_from_array([9; 32]);
+		let stranger_ata_b = provision_ata(
+			&program,
+			&opened.maker,
+			&stranger.pubkey(),
+			&opened.mint_b,
+			Some(&mint_authority),
+			TAKER_OFFER,
+		)
+		.expect("stranger token B ATA");
+
+		let error = program
+			.send_with_signers(
+				take_instruction(
+					&program,
+					&opened.taker.pubkey(),
+					&opened.mint_a,
+					&opened.mint_b,
+					&opened.taker_ata_a,
+					&stranger_ata_b,
+					&opened.maker,
+					&opened.maker_ata_b,
+					&opened.escrow,
+					&opened.vault,
+					true,
+				),
+				&[&opened.taker],
+			)
+			.expect_err("a foreign token B account must not fund the payment");
+
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::InvalidSeeds
+			)),
+			"the canonical address check rejects the foreign account"
+		);
+
+		assert_escrow(
+			&program
+				.account(&opened.escrow)
+				.expect("escrow survives a rejected Take"),
+			&opened.maker,
+			&opened.mint_a,
+			&opened.mint_b,
+			OFFER_A,
+			OFFER_B,
+			opened.seed,
+			opened.bump,
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&opened.vault)
+					.expect("vault survives a rejected Take")
+			),
+			OFFER_A,
+			"the vault still holds the escrowed token A"
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&stranger_ata_b)
+					.expect("stranger token B ATA")
+			),
+			TAKER_OFFER,
+			"the stranger's balance is untouched"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// A non-canonical token-B account the taker *does* control (an auxiliary
+/// account initialized directly rather than derived) must not fund the
+/// payment either: `Take` pins the source to the taker's canonical associated
+/// token account, so the escrow's accounting matches the published account
+/// layout even when the taker would gladly pay from elsewhere.
+#[test]
+#[ignore = "run with pina test"]
+fn take_rejects_a_noncanonical_taker_token_b_account() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let opened = open_escrow(&mut program);
+
+		// An auxiliary token-B account owned by the taker: initialized with a
+		// raw SPL `InitializeAccount` (tag 1) at a vanity address, so it is a
+		// fully valid account the taker can sign for — but it is not the
+		// taker's associated token account for mint B.
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		let auxiliary = Keypair::new_from_array([9; 32]);
+		let create = create_account_instruction(
+			&program,
+			&opened.maker,
+			&auxiliary.pubkey(),
+			rent_minimum(TOKEN_ACCOUNT_SPACE),
+			TOKEN_ACCOUNT_SPACE,
+			&token_program_id(),
+		);
+		program
+			.send_with_signers(create, &[&auxiliary])
+			.expect("create the auxiliary token account");
+		// SPL `InitializeAccount` = tag 1: account, mint, owner.
+		let initialize = Instruction::new_with_bytes(
+			token_program_id(),
+			&[1u8],
+			vec![
+				AccountMeta::new(auxiliary.pubkey(), false),
+				AccountMeta::new_readonly(opened.mint_b, false),
+				AccountMeta::new_readonly(opened.taker.pubkey(), false),
+				AccountMeta::new_readonly(rent_sysvar_id(), false),
+			],
+		);
+		program
+			.send_instruction(initialize)
+			.expect("initialize the auxiliary token account");
+		mint_into(
+			&program,
+			&opened.mint_b,
+			&auxiliary.pubkey(),
+			&mint_authority,
+			TAKER_OFFER,
+		)
+		.expect("fund the auxiliary token account");
+
+		let error = program
+			.send_with_signers(
+				take_instruction(
+					&program,
+					&opened.taker.pubkey(),
+					&opened.mint_a,
+					&opened.mint_b,
+					&opened.taker_ata_a,
+					&auxiliary.pubkey(),
+					&opened.maker,
+					&opened.maker_ata_b,
+					&opened.escrow,
+					&opened.vault,
+					true,
+				),
+				&[&opened.taker],
+			)
+			.expect_err("a non-canonical source must not fund the payment");
+
+		assert_eq!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				0,
+				pina_test::InstructionError::InvalidSeeds
+			)),
+			"the canonical address check pins the taker's payment source"
+		);
+
+		// The escrow is untouched end to end: no token moved from anywhere,
+		// and the escrow and vault survive for a legitimate retry.
+		assert_escrow(
+			&program
+				.account(&opened.escrow)
+				.expect("escrow survives a rejected Take"),
+			&opened.maker,
+			&opened.mint_a,
+			&opened.mint_b,
+			OFFER_A,
+			OFFER_B,
+			opened.seed,
+			opened.bump,
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&opened.vault)
+					.expect("vault survives a rejected Take")
+			),
+			OFFER_A,
+			"the vault still holds the escrowed token A"
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&auxiliary.pubkey())
+					.expect("auxiliary token account")
+			),
+			TAKER_OFFER,
+			"the auxiliary account the taker controls was not debited"
+		);
+		assert_eq!(
+			token_amount(
+				&program
+					.account(&opened.taker_ata_b)
+					.expect("taker token B ATA")
+			),
+			TAKER_OFFER,
+			"the taker's canonical account was not debited either"
 		);
 
 		program.stop().expect("stop isolated program test");
