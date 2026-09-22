@@ -11,10 +11,7 @@ A tiered-disclosure privacy pool: a shielded-pool payments program whose disting
 <br>
 
 - **Runtime-crypto integration.** Poseidon commitments go through the `sol_poseidon` syscall and Groth16 proofs verify through the `sol_alt_bn128_group_op` pairing selector, both behind a contained, heavily documented syscall boundary. A full spend — tree read, nullifier scan, four-pairing Groth16 check, payout — fits in one transaction at a fraction of the compute budget.
-- **Generated CLI surface.** The committed TypeScript, Dart, and Rust CLIs
-  derive fixed-seed PDA addresses when `--address` is omitted, and
-  payer-resolution accounts always resolve to the loaded payer keypair —
-  the only key these CLIs can sign with.
+- **Generated CLI surface.** The committed TypeScript, Dart, and Rust CLIs derive fixed-seed PDA addresses when `--address` is omitted, and payer-resolution accounts always resolve to the loaded payer keypair — the only key these CLIs can sign with.
 - **Real end-to-end zero knowledge.** The `prover` feature carries the host-side toolkit: an in-circuit Poseidon gadget built from the same circom x5 parameter tables the syscall implements, a spend circuit, a seeded trusted setup, and the big-endian wire codec. The tests generate real Groth16 proofs and push them through the SBF artifact — no mocks.
 - **The tiered disclosure state machine.** Three tiers — consent, verified (challenge window), and compelled — with a custodian quorum, an authority-resolvable challenge path, and an append-only public log whose entries are written by the same instruction that executes a disclosure.
 - **Heap opt-in.** `nostd_entrypoint_alloc!` installs the bump allocator; the verifier's scratch buffers are heap-backed while all account state stays fixed-layout.
