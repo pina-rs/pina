@@ -256,6 +256,43 @@ fn scaffold_falls_back_to_the_snake_cased_program_name() {
 }
 
 #[test]
+fn scaffold_declares_pina_from_the_configured_source() {
+	let root = load_fixture_root("vesting_program");
+
+	// The default targets a workspace member, which inherits `pina` from the
+	// workspace. Pinning a registry version here instead would put a second
+	// `pina` in the dependency graph and make `cargo kani -p pina` ambiguous.
+	let workspace_dir = unique_temp_dir("pina-cpi-renderer-dep-workspace");
+	render_root_node(&root, &workspace_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
+	let manifest = fs::read_to_string(workspace_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	assert!(
+		manifest.contains("pina = { workspace = true }"),
+		"workspace scaffold must inherit pina, got:\n{manifest}"
+	);
+	fs::remove_dir_all(&workspace_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+
+	// A standalone crate has no workspace to inherit from, so it pins the
+	// renderer's own release line.
+	let published_dir = unique_temp_dir("pina-cpi-renderer-dep-published");
+	let published = RenderConfig {
+		scaffold_dependency: ScaffoldDependency::Published,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &published_dir, &published)
+		.unwrap_or_else(|error| panic!("renders: {error}"));
+	let manifest = fs::read_to_string(published_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	let expected = format!("pina = {{ version = \"0.19\", default-features = false }}");
+	assert!(
+		manifest.contains(&expected),
+		"published scaffold must pin the release line, got:\n{manifest}"
+	);
+	fs::remove_dir_all(&published_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+}
+
+#[test]
 fn scaffold_never_overwrites_consumer_files() {
 	let root = load_fixture_root("vesting_program");
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-pinned");

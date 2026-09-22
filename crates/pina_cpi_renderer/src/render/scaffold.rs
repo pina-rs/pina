@@ -13,6 +13,7 @@ use cap_std::fs::OpenOptions;
 
 use super::helpers::rust_string_literal;
 use super::helpers::snake;
+use crate::ScaffoldDependency;
 use crate::error::RenderError;
 use crate::error::Result;
 
@@ -33,6 +34,7 @@ pub(crate) fn ensure_crate_scaffold(
 	program_name: &str,
 	package_name: Option<&str>,
 	generated_folder: &Path,
+	dependency: ScaffoldDependency,
 ) -> Result<()> {
 	ensure_relative_directory(crate_dir, crate_path, Path::new("src"))?;
 
@@ -57,6 +59,21 @@ pub(crate) fn ensure_crate_scaffold(
 		Some(name) => format!("{name}_cpi"),
 		None => format!("{}_cpi", snake(program_name)),
 	};
+	let dependency_line = match dependency {
+		ScaffoldDependency::Workspace => "pina = { workspace = true }".to_string(),
+		// A standalone crate has no workspace to inherit from, so pin the
+		// renderer's own release line.
+		ScaffoldDependency::Published => {
+			format!(
+				"pina = {{ version = \"{}\", default-features = false }}",
+				env!("CARGO_PKG_VERSION")
+					.split('.')
+					.take(2)
+					.collect::<Vec<_>>()
+					.join(".")
+			)
+		}
+	};
 	let cargo_toml = [
 		"[package]".to_string(),
 		format!("name = \"{crate_name}\""),
@@ -65,7 +82,7 @@ pub(crate) fn ensure_crate_scaffold(
 		"publish = false".to_string(),
 		String::new(),
 		"[dependencies]".to_string(),
-		"pina = { version = \"0.17\", default-features = false }".to_string(),
+		dependency_line,
 		String::new(),
 	]
 	.join("\n");
