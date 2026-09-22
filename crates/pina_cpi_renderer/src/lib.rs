@@ -70,6 +70,22 @@ mod render;
 #[cfg(test)]
 mod __tests;
 
+/// How the scaffolded crate's `pina` dependency is declared.
+///
+/// The two callers need different answers and only one can be right: a
+/// workspace member inherits the workspace dependency, while a standalone
+/// crate generated from a foreign IDL has no workspace to inherit from and
+/// must pin a published version.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ScaffoldDependency {
+	/// `pina = { workspace = true }`, for crates inside this workspace.
+	#[default]
+	Workspace,
+	/// `pina = { version = "<major.minor>", default-features = false }`,
+	/// pinned to the renderer's own release line, for standalone crates.
+	Published,
+}
+
 #[derive(Clone, Debug)]
 pub struct RenderConfig {
 	pub delete_folder_before_rendering: bool,
@@ -83,6 +99,8 @@ pub struct RenderConfig {
 	pub package_name: Option<String>,
 	pub mode: RenderMode,
 	pub scaffold: bool,
+	/// How the scaffold declares its `pina` dependency.
+	pub scaffold_dependency: ScaffoldDependency,
 	/// Skip instructions this renderer cannot express instead of failing.
 	///
 	/// When false (the default), an unsupported instruction fails the whole
@@ -100,6 +118,7 @@ impl Default for RenderConfig {
 			package_name: None,
 			mode: RenderMode::Auto,
 			scaffold: true,
+			scaffold_dependency: ScaffoldDependency::default(),
 			skip_unsupported_instructions: false,
 		}
 	}
@@ -166,6 +185,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			root.program.name.as_ref(),
 			config.package_name.as_deref(),
 			&config.generated_folder,
+			config.scaffold_dependency,
 		)?;
 	}
 

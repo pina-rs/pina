@@ -16,6 +16,7 @@ use pina_codama_renderer::RenderMode as RustRenderMode;
 use pina_codama_renderer::render_idl_file;
 use pina_cpi_renderer::RenderConfig as CpiRenderConfig;
 use pina_cpi_renderer::RenderMode as CpiRenderMode;
+use pina_cpi_renderer::ScaffoldDependency as CpiScaffoldDependency;
 use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
 use crate::dart_client::harden_generated_dart_clients;
@@ -563,6 +564,11 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				mode: cpi_render_mode(settings.mode),
 				scaffold: settings.scaffold,
 				package_name: plan.cpi_package_names.get(example).cloned(),
+				// Generated example crates are workspace members, so they
+				// inherit `pina` from the workspace like every other member.
+				// Pinning a registry version here would add a second `pina`
+				// to the graph and break `cargo kani -p pina`.
+				scaffold_dependency: CpiScaffoldDependency::Workspace,
 				..CpiRenderConfig::default()
 			};
 			render_cpi_client(idl_path, &crate_dir, &render_config)?;

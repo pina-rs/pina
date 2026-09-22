@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 use pina_cpi_renderer::RenderConfig;
 use pina_cpi_renderer::RenderMode;
+use pina_cpi_renderer::ScaffoldDependency;
 use serde_json::Value;
 
 use crate::error::CodamaError;
@@ -164,6 +165,10 @@ pub fn import_idl(options: &ImportOptions) -> Result<ImportOutcome, ImportError>
 		mode: render_mode(options.mode),
 		package_name: Some(options.name.clone()),
 		skip_unsupported_instructions: options.skip_unsupported_instructions,
+		// Imported foreign programs live in the caller's own project, which
+		// has no `pina` workspace entry to inherit, so the scaffold pins the
+		// published release line instead.
+		scaffold_dependency: ScaffoldDependency::Published,
 		..RenderConfig::default()
 	};
 
@@ -637,6 +642,7 @@ mod coverage {
 	#[test]
 	fn converts_every_generation_mode() {
 		use pina_cpi_renderer::RenderMode;
+		use pina_cpi_renderer::ScaffoldDependency;
 
 		assert!(matches!(
 			render_mode(GenerationMode::Auto),

@@ -9,6 +9,7 @@ use std::process::Command;
 use codama_nodes::RootNode;
 use pina_cpi_renderer::RenderConfig;
 use pina_cpi_renderer::RenderMode;
+use pina_cpi_renderer::ScaffoldDependency;
 use serde_json::Value;
 
 use crate::codama::validate_render_target;
@@ -378,6 +379,10 @@ fn render_cpi_root(
 		mode: cpi_render_mode(mode),
 		scaffold,
 		skip_unsupported_instructions,
+		// `pina cpi` targets a caller's own project, which has no `pina`
+		// workspace entry to inherit, so the scaffold pins the published
+		// release line instead.
+		scaffold_dependency: ScaffoldDependency::Published,
 		..RenderConfig::default()
 	};
 	pina_cpi_renderer::render_root_node(root, output, &config).map_err(|source| {
