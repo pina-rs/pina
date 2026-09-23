@@ -171,6 +171,21 @@ in
 
     ${pkgs.git}/bin/git config --local --unset-all core.hooksPath 2>/dev/null || true
 
+    # `git push` opens the SSH connection and completes the ref advertisement
+    # before it runs the pre-push hook, so the connection sits idle for the
+    # whole gate. GitHub closes a connection idle for six minutes, and the
+    # lint:push gate runs longer than that: the push then dies with exit 141
+    # (SIGPIPE) after the gate has already passed, and nothing is pushed.
+    # Keepalives hold the connection open across the gate. Only set this when
+    # the checkout has no ssh command of its own, so a custom identity or
+    # ProxyCommand is never replaced.
+    if [ -z "$(${pkgs.git}/bin/git config --local --get core.sshCommand)" ]; then
+      ${pkgs.git}/bin/git config --local core.sshCommand \
+        "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=30"
+    else
+      echo 1>&2 "NOTE: core.sshCommand is set locally; add -o ServerAliveInterval=15 -o ServerAliveCountMax=30 so the pre-push gate cannot outlive the connection."
+    fi
+
     GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-commit
     GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-push
   '';
