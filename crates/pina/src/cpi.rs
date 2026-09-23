@@ -39,8 +39,6 @@ use crate::PinaCompactPatch;
 use crate::PinaCompactStoredBump;
 use crate::PinaPodError;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
-use crate::PinaPodPatch;
-#[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaProgramError;
 use crate::ProgramResult;
 
@@ -1740,14 +1738,11 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 			.assert_owner(self.program_id)?;
 		let target_size = {
 			let data = self.account.try_borrow()?;
-			T::validate_size(data.len())?;
-
-			if !T::matches_discriminator(&data) {
-				return Err(ProgramError::InvalidAccountData);
-			}
-
-			PinaPodPatch::updated_len(self.patch.as_pina_patch(), &data)
-				.map_err(|_| ProgramError::InvalidAccountData)?
+			// The generated preflight enforces the storage length, the
+			// discriminator, and the migration envelope; the raw patch
+			// preflight below it would accept a stale envelope's bytes as the
+			// current layout and compute the wrong target size for them.
+			T::updated_len(&data, self.patch.as_pina_patch())?
 		};
 		T::validate_size(target_size)?;
 
@@ -1764,17 +1759,13 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 
 		let encoded_len = {
 			let mut data = self.account.try_borrow_mut()?;
-			#[cfg(feature = "validation")]
-			{
-				T::update(&mut data, self.patch.as_pina_patch())?
-			}
-			#[cfg(not(feature = "validation"))]
-			{
-				let encoded_len = PinaPodPatch::update(self.patch.as_pina_patch(), &mut data)
-					.map_err(|_| ProgramError::InvalidAccountData)?;
-				T::write_discriminator(&mut data);
-				encoded_len
-			}
+			// `T::update` is the generated writer: it enforces the storage
+			// length, the discriminator, and the migration envelope before
+			// patching, and writes the current version afterwards. Only the
+			// application-level re-validation it appends is feature-gated, so
+			// routing every build through it keeps a stale envelope from being
+			// patched as if it were the current layout.
+			T::update(&mut data, self.patch.as_pina_patch())?
 		};
 		debug_assert_eq!(encoded_len, target_size);
 

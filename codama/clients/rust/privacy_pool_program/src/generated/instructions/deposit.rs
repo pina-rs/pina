@@ -26,14 +26,17 @@ impl Deposit {
 	pub fn new(
 		depositor: solana_pubkey::Pubkey,
 		pool_config: solana_pubkey::Pubkey,
-		pool_vault: solana_pubkey::Pubkey,
 		merkle_tree: solana_pubkey::Pubkey,
 		note_commitment: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			depositor,
 			pool_config,
-			pool_vault,
+			pool_vault: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-vault".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			merkle_tree,
 			note_commitment,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),

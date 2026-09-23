@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getWithdrawInstruction } from "../client";
+import { getWithdrawInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -22,7 +22,10 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption("--pool-vault <poolVault>", "The `pool_vault` account")
+	.option(
+		"--pool-vault <poolVault>",
+		"The `pool_vault` account [default: derived]",
+	)
 	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
 	.requiredOption(
 		"--nullifier-set <nullifierSet>",
@@ -42,7 +45,9 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 			proofB: base58("--proof-b", options.proofB),
 			proofC: base58("--proof-c", options.proofC),
 			poolConfig: pubkey("--pool-config", options.poolConfig),
-			poolVault: pubkey("--pool-vault", options.poolVault),
+			poolVault: options.poolVault === undefined
+				? undefined
+				: pubkey("--pool-vault", options.poolVault),
 			merkleTree: pubkey("--merkle-tree", options.merkleTree),
 			nullifierSet: pubkey("--nullifier-set", options.nullifierSet),
 			verifyingKeyAccount: pubkey(
@@ -51,7 +56,7 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 			),
 			recipient: pubkey("--recipient", options.recipient),
 		};
-		const instruction = getWithdrawInstruction(
+		const instruction = await getWithdrawInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

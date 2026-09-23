@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getDepositInstruction } from "../client";
+import { getDepositInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -23,7 +23,10 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 	.requiredOption("--envelope <envelope>", "envelope")
 	.requiredOption("--shares <shares>", "shares")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption("--pool-vault <poolVault>", "The `pool_vault` account")
+	.option(
+		"--pool-vault <poolVault>",
+		"The `pool_vault` account [default: derived]",
+	)
 	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
 	.requiredOption(
 		"--note-commitment <noteCommitment>",
@@ -40,11 +43,13 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 			shares: base58("--shares", options.shares),
 			depositor: context.payer,
 			poolConfig: pubkey("--pool-config", options.poolConfig),
-			poolVault: pubkey("--pool-vault", options.poolVault),
+			poolVault: options.poolVault === undefined
+				? undefined
+				: pubkey("--pool-vault", options.poolVault),
 			merkleTree: pubkey("--merkle-tree", options.merkleTree),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 		};
-		const instruction = getDepositInstruction(
+		const instruction = await getDepositInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
