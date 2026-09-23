@@ -13,8 +13,10 @@ const int propAmmProgramErrorUnauthorizedOracleAuthority = 0x1; // 1
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _propAmmProgramErrorMessages = {
-    propAmmProgramErrorUnauthorizedUpdateAuthority: 'The signer cannot update the pool\'s oracle price.',
-    propAmmProgramErrorUnauthorizedOracleAuthority: 'The signer cannot publish a new oracle price.',
+  propAmmProgramErrorUnauthorizedUpdateAuthority:
+      'The signer cannot update the pool\'s oracle price.',
+  propAmmProgramErrorUnauthorizedOracleAuthority:
+      'The signer cannot publish a new oracle price.',
 };
 
 /// Get the error message for a PropAmmProgram program error code.

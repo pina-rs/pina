@@ -13,10 +13,18 @@ final class CancelCommand extends Command<void> {
   CancelCommand() {
     argParser
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
-      ..addOption('maker_ata_a', mandatory: true, help: "The maker_ata_a account")
+      ..addOption(
+        'maker_ata_a',
+        mandatory: true,
+        help: "The maker_ata_a account",
+      )
       ..addOption('escrow', mandatory: true, help: "The escrow account")
       ..addOption('vault', mandatory: true, help: "The vault account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -31,10 +39,16 @@ final class CancelCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final maker = context.payerAddress;
     final mintA = pubkey('--mint-a', results['mint_a']! as String);
-    final makerAtaA = pubkey('--maker-ata-a', results['maker_ata_a']! as String);
+    final makerAtaA = pubkey(
+      '--maker-ata-a',
+      results['maker_ata_a']! as String,
+    );
     final escrow = pubkey('--escrow', results['escrow']! as String);
     final vault = pubkey('--vault', results['vault']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
 
     final instruction = getCancelInstruction(
       programAddress: context.programAddress,
@@ -44,7 +58,9 @@ final class CancelCommand extends Command<void> {
       escrow: escrow,
       vault: vault,
       tokenProgram: tokenProgram,
-      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      associatedTokenProgram: Address(
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+      ),
       systemProgram: Address('11111111111111111111111111111111'),
     );
     await context.send([instruction]);

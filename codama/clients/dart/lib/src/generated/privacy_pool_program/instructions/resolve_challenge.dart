@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,13 +11,10 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class ResolveChallengeInstructionData {
-  const ResolveChallengeInstructionData({
-    required this.approve,
-  }) :
-      discriminator = 10,
+  const ResolveChallengeInstructionData({required this.approve})
+    : discriminator = 10,
       migrationVersion = 0;
 
   final int discriminator;
@@ -26,7 +22,8 @@ class ResolveChallengeInstructionData {
   final int approve;
 }
 
-Encoder<ResolveChallengeInstructionData> getResolveChallengeInstructionDataEncoder() {
+Encoder<ResolveChallengeInstructionData>
+getResolveChallengeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
@@ -43,7 +40,8 @@ Encoder<ResolveChallengeInstructionData> getResolveChallengeInstructionDataEncod
   );
 }
 
-Decoder<ResolveChallengeInstructionData> getResolveChallengeInstructionDataDecoder() {
+Decoder<ResolveChallengeInstructionData>
+getResolveChallengeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
@@ -51,32 +49,26 @@ Decoder<ResolveChallengeInstructionData> getResolveChallengeInstructionDataDecod
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'resolveChallenge instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'resolveChallenge instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (ResolveChallengeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(10),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+  (ResolveChallengeInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(10)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      ResolveChallengeInstructionData(
-      approve: map['approve']! as int,
-      ),
+      ResolveChallengeInstructionData(approve: map['approve']! as int),
       newOffset,
     );
   }
@@ -101,8 +93,12 @@ Decoder<ResolveChallengeInstructionData> getResolveChallengeInstructionDataDecod
   };
 }
 
-Codec<ResolveChallengeInstructionData, ResolveChallengeInstructionData> getResolveChallengeInstructionDataCodec() {
-  return combineCodec(getResolveChallengeInstructionDataEncoder(), getResolveChallengeInstructionDataDecoder());
+Codec<ResolveChallengeInstructionData, ResolveChallengeInstructionData>
+getResolveChallengeInstructionDataCodec() {
+  return combineCodec(
+    getResolveChallengeInstructionDataEncoder(),
+    getResolveChallengeInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [ResolveChallenge] instruction.
@@ -113,22 +109,22 @@ Instruction getResolveChallengeInstruction({
   required Address disclosureRequest,
   required int approve,
 }) {
-  final instructionData = ResolveChallengeInstructionData(
-      approve: approve,
-  );
+  final instructionData = ResolveChallengeInstructionData(approve: approve);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.readonlySigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: disclosureRequest, role: AccountRole.writable),
+      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: disclosureRequest, role: AccountRole.writable),
     ],
     data: getResolveChallengeInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [ResolveChallenge] instruction from raw instruction data.
-ResolveChallengeInstructionData parseResolveChallengeInstruction(Instruction instruction) {
+ResolveChallengeInstructionData parseResolveChallengeInstruction(
+  Instruction instruction,
+) {
   return getResolveChallengeInstructionDataDecoder().decode(instruction.data!);
 }

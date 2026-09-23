@@ -26,7 +26,10 @@ final class UpdateCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final oracle = pubkey('--oracle', results['oracle']! as String);
     final authority = context.payerAddress;
-    final newPriceValue = bigInteger('--new-price', results['new_price']! as String);
+    final newPriceValue = bigInteger(
+      '--new-price',
+      results['new_price']! as String,
+    );
     final instruction = getUpdateInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

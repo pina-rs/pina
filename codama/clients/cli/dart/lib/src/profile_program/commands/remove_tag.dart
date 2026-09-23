@@ -11,14 +11,20 @@ final class RemoveTagCommand extends Command<void> {
   RemoveTagCommand() {
     argParser
       ..addOption('index', mandatory: true, help: "index")
-      ..addOption('profile', mandatory: false, help: "The profile PDA account (must already exist and be writable) [default: derived]");
+      ..addOption(
+        'profile',
+        mandatory: false,
+        help:
+            "The profile PDA account (must already exist and be writable) [default: derived]",
+      );
   }
 
   @override
   String get name => 'remove_tag';
 
   @override
-  String get description => "Instruction data for `RemoveTag`. Removes the tag at `index`.";
+  String get description =>
+      "Instruction data for `RemoveTag`. Removes the tag at `index`.";
 
   @override
   Future<void> run() async {
@@ -28,9 +34,9 @@ final class RemoveTagCommand extends Command<void> {
     final profile = (results['profile'] as String?) != null
         ? pubkey('--profile', results['profile']! as String)
         : (await findProfilePda(
-          seeds: ProfileSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: ProfileSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final indexValue = bigInteger('--index', results['index']! as String);
     final instruction = getRemoveTagInstruction(
       programAddress: context.programAddress,

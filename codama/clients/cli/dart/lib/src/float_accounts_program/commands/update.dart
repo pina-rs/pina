@@ -28,7 +28,10 @@ final class UpdateCommand extends Command<void> {
     final account = pubkey('--account', results['account']! as String);
     final authority = context.payerAddress;
     final dataF32Value = integer('--data-f32', results['data_f32']! as String);
-    final dataF64Value = bigInteger('--data-f64', results['data_f64']! as String);
+    final dataF64Value = bigInteger(
+      '--data-f64',
+      results['data_f64']! as String,
+    );
     final instruction = getUpdateInstruction(
       programAddress: context.programAddress,
       account: account,

@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,14 +11,10 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class FillInstructionData {
-  const FillInstructionData({
-    required this.bytes,
-    required this.fill,
-  }) :
-      discriminator = 1,
+  const FillInstructionData({required this.bytes, required this.fill})
+    : discriminator = 1,
       migrationVersion = 0;
 
   final int discriminator;
@@ -56,23 +51,16 @@ Decoder<FillInstructionData> getFillInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'fill instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'fill instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (FillInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -80,8 +68,8 @@ Decoder<FillInstructionData> getFillInstructionDataDecoder() {
 
     return (
       FillInstructionData(
-      bytes: map['bytes']! as int,
-      fill: map['fill']! as int,
+        bytes: map['bytes']! as int,
+        fill: map['fill']! as int,
       ),
       newOffset,
     );
@@ -108,7 +96,10 @@ Decoder<FillInstructionData> getFillInstructionDataDecoder() {
 }
 
 Codec<FillInstructionData, FillInstructionData> getFillInstructionDataCodec() {
-  return combineCodec(getFillInstructionDataEncoder(), getFillInstructionDataDecoder());
+  return combineCodec(
+    getFillInstructionDataEncoder(),
+    getFillInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Fill] instruction.
@@ -118,16 +109,11 @@ Instruction getFillInstruction({
   required int bytes,
   required int fill,
 }) {
-  final instructionData = FillInstructionData(
-      bytes: bytes,
-      fill: fill,
-  );
+  final instructionData = FillInstructionData(bytes: bytes, fill: fill);
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [
-
-    ],
+    accounts: [],
     data: getFillInstructionDataEncoder().encode(instructionData),
   );
 }
