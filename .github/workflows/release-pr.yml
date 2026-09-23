@@ -251,6 +251,24 @@ jobs:
             exit 1
           fi
 
+          # Hold the dispatch until every tag is visible on the remote: the
+          # tag step pushed them moments ago, and a workflow_dispatch ref
+          # that has not propagated yet fails the whole publish.
+          for tag in "${release_tags[@]}"; do
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null 2>&1; then
+                echo "Tag $tag is visible on the remote."
+                break
+              fi
+              if [ "$attempt" -eq 12 ]; then
+                echo "::error::Tag $tag was not visible on the remote after waiting." >&2
+                exit 1
+              fi
+              echo "Tag $tag is not visible on the remote yet; retrying in 5 seconds..."
+              sleep 5
+            done
+          done
+
           for tag in "${release_tags[@]}"; do
             if [[ "$tag" != v* && "$tag" != abi/v* ]]; then
               echo "::error::Refusing to dispatch unexpected release tag '$tag'." >&2
