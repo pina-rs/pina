@@ -13,30 +13,12 @@ final class CancelCommand extends Command<void> {
   CancelCommand() {
     argParser
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption(
-        'vesting_state',
-        mandatory: true,
-        help: "The vesting_state account",
-      )
+      ..addOption('vesting_state', mandatory: true, help: "The vesting_state account")
       ..addOption('admin_ata', mandatory: true, help: "The admin_ata account")
       ..addOption('vault', mandatory: true, help: "The vault account")
-      ..addOption(
-        'token_program',
-        mandatory: true,
-        help: "The token_program account",
-      )
-      ..addOption(
-        'clock',
-        mandatory: true,
-        help:
-            "Clock for the vested-entitlement settlement: cancellation must not",
-      )
-      ..addOption(
-        'beneficiary_ata',
-        mandatory: true,
-        help:
-            "The beneficiary's ATA: the vested-but-unclaimed amount settles here",
-      );
+      ..addOption('token_program', mandatory: true, help: "The token_program account")
+      ..addOption('clock', mandatory: true, help: "Clock for the vested-entitlement settlement: cancellation must not")
+      ..addOption('beneficiary_ata', mandatory: true, help: "The beneficiary's ATA: the vested-but-unclaimed amount settles here");
   }
 
   @override
@@ -51,21 +33,12 @@ final class CancelCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final admin = context.payerAddress;
     final mint = pubkey('--mint', results['mint']! as String);
-    final vestingState = pubkey(
-      '--vesting-state',
-      results['vesting_state']! as String,
-    );
+    final vestingState = pubkey('--vesting-state', results['vesting_state']! as String);
     final adminAta = pubkey('--admin-ata', results['admin_ata']! as String);
     final vault = pubkey('--vault', results['vault']! as String);
-    final tokenProgram = pubkey(
-      '--token-program',
-      results['token_program']! as String,
-    );
+    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
     final clock = pubkey('--clock', results['clock']! as String);
-    final beneficiaryAta = pubkey(
-      '--beneficiary-ata',
-      results['beneficiary_ata']! as String,
-    );
+    final beneficiaryAta = pubkey('--beneficiary-ata', results['beneficiary_ata']! as String);
 
     final instruction = getCancelInstruction(
       programAddress: context.programAddress,
@@ -74,9 +47,7 @@ final class CancelCommand extends Command<void> {
       vestingState: vestingState,
       adminAta: adminAta,
       vault: vault,
-      associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-      ),
+      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
       clock: clock,

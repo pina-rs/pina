@@ -69,6 +69,9 @@ pub enum VestingError {
 	CliffNotReached = 3,
 	/// The vault holds fewer tokens than the claim must release.
 	InsufficientVaultBalance = 4,
+	/// The Cancel settlement destination is not a token account for this
+	/// mint owned by the beneficiary.
+	InvalidBeneficiaryAta = 5,
 }
 
 #[discriminator]
@@ -310,10 +313,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// collateralized. SPL rejects zero-amount transfers, and a zero-total
 		// schedule is rejected by `validate_schedule` above.
 		let total_amount = args.total_amount.get();
-		let vault_before = self
-			.vault
-			.as_token_account_for_program(self.token_program.address())?
-			.amount();
 		token::instructions::TransferChecked::new(
 			self.admin_ata,
 			self.mint,
@@ -324,18 +323,16 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		)
 		.invoke_with_program(self.token_program.address())?;
 
-		// Collateralize against the observed vault delta, not the requested
-		// amount: a partial delivery would otherwise let the schedule promise
-		// more than it holds. The vault was created empty in this same
-		// instruction, so the delta must equal the full allocation.
-		let vault_after = self
+		// Collateralize against the observed post-transfer balance, not the
+		// requested amount: a partial delivery would otherwise let the
+		// schedule promise more than it holds. The vault was asserted empty
+		// above and created in this same instruction, so the balance itself
+		// is the observed delta and must equal the full allocation.
+		let vault_balance = self
 			.vault
 			.as_token_account_for_program(self.token_program.address())?
 			.amount();
-		let received = vault_after
-			.checked_sub(vault_before)
-			.ok_or(ProgramError::ArithmeticOverflow)?;
-		if received != total_amount {
+		if vault_balance != total_amount {
 			return Err(VestingError::InsufficientVaultBalance.into());
 		}
 
@@ -607,15 +604,25 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			.ok_or(ProgramError::ArithmeticOverflow)?
 			.min(remaining);
 		if owed > 0 {
-			// The beneficiary's ATA must already exist for the settlement:
-			// Cancel is admin-signed, so there is no beneficiary wallet here
-			// to fund an idempotent create. A beneficiary who wants their
-			// vested payout keeps an ATA ready — the same account Claim pays
-			// into.
-			self.beneficiary_ata
-				.assert_not_empty()?
-				.assert_writable()?
-				.assert_owners(&SPL_PROGRAM_IDS)?;
+			// The settlement must land in an account the beneficiary controls
+			// for this mint: reading the token account's stored owner and mint
+			// binds the destination without a canonical ATA derivation. A
+			// token account for the right mint owned by anyone else — or an
+			// account for a different mint — is refused, so the admin cannot
+			// redirect the entitlement.
+			let (is_beneficiary_owned, is_right_mint) = {
+				let destination = self
+					.beneficiary_ata
+					.as_token_account_for_program(self.token_program.address())?;
+				(
+					destination.owner() == &beneficiary,
+					destination.mint() == &mint,
+				)
+			};
+			if !is_beneficiary_owned || !is_right_mint {
+				return Err(VestingError::InvalidBeneficiaryAta.into());
+			}
+			self.beneficiary_ata.assert_writable()?;
 
 			token::instructions::TransferChecked::new(
 				self.vault,

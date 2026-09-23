@@ -790,6 +790,16 @@
 				"docs": [
 					"The vault holds fewer tokens than the claim must release."
 				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidBeneficiaryAta",
+				"code": 5,
+				"message": "The Cancel settlement destination is not a token account for this",
+				"docs": [
+					"The Cancel settlement destination is not a token account for this",
+					"mint owned by the beneficiary."
+				]
 			}
 		]
 	}
