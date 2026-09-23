@@ -217,7 +217,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "vesting"
+								"pda": null
 							},
 							{
 								"name": "beneficiary_ata",
@@ -311,7 +311,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "vesting"
+								"pda": null
 							},
 							{
 								"name": "admin_ata",

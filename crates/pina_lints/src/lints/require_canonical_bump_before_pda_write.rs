@@ -23,6 +23,13 @@ crate::declare_late_lint! {
 	/// invocation. `CreateProgramAccountWithUncheckedBump` deliberately does
 	/// not: it checks that the supplied bump derives the account's address, so
 	/// use it only where several addresses per seed namespace are acceptable.
+	///
+	/// `assert_stored_bump()` is the generated counterpart of
+	/// `assert_seeds()`: it accepts a bump the handler already parsed from the
+	/// same account, avoiding the re-parse `assert_seeds()` performs. The
+	/// bump argument must resolve to that account's parsed state; a bump from
+	/// instruction data or a different account fails this lint, because the
+	/// stored-bump name would then be a claim the code does not make.
 	pub REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE,
 	Deny,
 	"explicit PDA bumps must be proven canonical before use"
@@ -45,8 +52,36 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(cx, body);
+		let mut facts = shared::collect_function_facts(cx, body);
+		let mut reassigned = std::collections::HashSet::new();
+		record_tuple_pattern_aliases(body, &mut facts.aliases, &mut reassigned);
 		for (index, call) in facts.calls.iter().enumerate() {
+			if call.method == "assert_stored_bump" {
+				// The generated method names its own contract: `stored_bump`
+				// must be a value the handler parsed from this same account.
+				// Enforce the name rather than trusting it: the bump argument
+				// must resolve (through aliases) to a field read of the
+				// account, and that read must follow a parse of it.
+				if stored_bump_provenance_ok(&facts, call, &reassigned) {
+					continue;
+				}
+
+				diagnostics::emit(cx, REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE, |diag| {
+					diag.span(call.span);
+					diag.primary_message(
+						"assert_stored_bump was given a bump that was not parsed from the account",
+					);
+					diag.help(
+						"read the bump from the account's own state — for example capture it in \
+						 the same `as_account`/`with_compact_account` parse that produced the \
+						 other fields being validated — or use `assert_seeds()`, which performs \
+						 that parse itself",
+					);
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
+				});
+				continue;
+			}
+
 			if call.method != "assert_seeds_with_bump" {
 				continue;
 			}
@@ -76,4 +111,173 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 			});
 		}
 	}
+}
+
+/// Resolve the `stored_bump` argument's provenance through alias chains.
+///
+/// The argument is acceptable only when its canonical identity is a field
+/// read whose base resolves to the account being validated — the shape
+/// `account.<field>` that a parse of that account produces. Method-call
+/// chains collapse to their receiver in the identity, so
+/// `account.as_account()?.bump` records as `account.bump`. A field read of
+/// anything else — `args.bump`, another account, a constant — fails.
+fn stored_bump_provenance_ok(
+	facts: &shared::FunctionFacts,
+	call: &shared::CallInfo,
+	reassigned: &std::collections::HashSet<rustc_hir::HirId>,
+) -> bool {
+	// `assert_stored_bump(account, stored_bump, .., program_id)` — the bump is
+	// the second positional argument, the account the first.
+	let Some(account_identity) = call.args.first().and_then(Option::as_deref) else {
+		return false;
+	};
+
+	// Walk the bump argument's alias chain. Accept when the current identity
+	// is a field read whose base names the account — compared as a whole,
+	// because the account expression can itself be dotted (`ctx.account`) —
+	// or when the chain bottomed out at the account expression itself, the
+	// scoped-parse shape `let state = account.as_account()?; ... state.bump`.
+	// Any binding reassigned after its alias was recorded fails: the alias
+	// describes the value at binding time, not the one at the call.
+	let mut identity = call.args.get(1).and_then(Option::as_deref);
+	let mut binding = call.arg_bindings.get(1).copied().flatten();
+	let mut visited = std::collections::HashSet::new();
+	loop {
+		if let Some(value) = identity {
+			if value == account_identity {
+				return true;
+			}
+			// A field read of the account itself: `account.bump` where
+			// `account` is the complete account expression.
+			if let Some(rest) = value
+				.strip_prefix(account_identity)
+				.and_then(|suffix| suffix.strip_prefix('.'))
+				&& !rest.is_empty()
+				&& !rest.contains('.')
+			{
+				return true;
+			}
+		}
+
+		let Some(current) = binding else {
+			return false;
+		};
+		if !visited.insert(current) || reassigned.contains(&current) {
+			return false;
+		};
+		let Some(alias) = facts.aliases.get(&current) else {
+			return false;
+		};
+		identity = Some(alias.identity.as_str());
+		binding = alias.binding;
+	}
+}
+
+/// Resolve the local binding a field read was taken from.
+///
+/// `expression_local_binding` does not descend through field accesses, but a
+/// tuple element like `state.bump` names the binding `state` — the hop this
+/// lint's provenance walk follows from the field back to the account.
+fn field_base_local_binding(expr: &rustc_hir::Expr<'_>) -> Option<rustc_hir::HirId> {
+	match expr.kind {
+		rustc_hir::ExprKind::Field(base, _) => shared::expression_local_binding(base),
+		_ => shared::expression_local_binding(expr),
+	}
+}
+
+/// Collect alias provenance for tuple destructures into `aliases`, and the
+/// set of bindings reassigned after their `let` into `reassigned`.
+///
+/// The shared collector records a `let` binding's alias only for plain
+/// binding patterns, so a field captured by position (`let (maker, bump) = {
+/// let state = account.as_account()?; (state.maker, state.bump) };`) would
+/// lose the provenance this lint needs. This pass walks the same body and
+/// maps each tuple binding to the identity of the element at its position —
+/// including through the scoped-block initializer the idiom uses, and
+/// accounting for a `..` rest pattern, whose position in HIR is held outside
+/// the subpattern slice and must shift every later binding's element index.
+/// Non-binding patterns (`_`, nested tuples) contribute nothing, and a
+/// non-tuple initializer records nothing: the pattern cannot have
+/// destructured it, so no alias would be sound.
+///
+/// An assignment to an already-bound local (`bump = args.bump;`) leaves the
+/// recorded alias describing the binding-time value, so the binding is
+/// recorded here as reassigned and the provenance walk refuses to resolve
+/// through it.
+fn record_tuple_pattern_aliases(
+	body: &rustc_hir::Body<'_>,
+	aliases: &mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+	reassigned: &mut std::collections::HashSet<rustc_hir::HirId>,
+) {
+	struct TupleAliases<'map> {
+		aliases: &'map mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+		reassigned: &'map mut std::collections::HashSet<rustc_hir::HirId>,
+	}
+
+	impl<'hir> rustc_hir::intravisit::Visitor<'hir> for TupleAliases<'hir> {
+		fn visit_expr(&mut self, expr: &'hir rustc_hir::Expr<'hir>) {
+			if let rustc_hir::ExprKind::Assign(lhs, ..) = expr.kind
+				&& let Some(binding) =
+					field_base_local_binding(lhs).or_else(|| shared::expression_local_binding(lhs))
+			{
+				self.reassigned.insert(binding);
+			}
+			rustc_hir::intravisit::walk_expr(self, expr);
+		}
+
+		fn visit_stmt(&mut self, stmt: &'hir rustc_hir::Stmt<'hir>) {
+			if let rustc_hir::StmtKind::Let(local) = stmt.kind
+				&& let Some(init) = local.init
+				&& let rustc_hir::PatKind::Tuple(pat_elements, rest_position) = local.pat.kind
+			{
+				let mut tail = init;
+				while let rustc_hir::ExprKind::Block(block, _) = tail.kind {
+					match block.expr {
+						Some(next) => tail = next,
+						None => break,
+					}
+				}
+				// `DotDotPos` holds the rest position outside the subpattern
+				// slice; `None` means there is no `..` at all.
+				let rest_position = rest_position.as_opt_usize();
+				if let rustc_hir::ExprKind::Tup(init_elements) = tail.kind
+					&& pat_elements.len() + usize::from(rest_position.is_some())
+						== init_elements.len()
+				{
+					for (pattern_index, pattern) in pat_elements.iter().enumerate() {
+						// A rest pattern consumes one element at its position,
+						// shifting every later subpattern's element by one.
+						let element_index = match rest_position {
+							Some(rest) if pattern_index >= rest => pattern_index + 1,
+							_ => pattern_index,
+						};
+						let Some(element) = init_elements.get(element_index) else {
+							continue;
+						};
+						let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind else {
+							continue;
+						};
+						if let Some(identity) = shared::expression_identity(element) {
+							self.aliases.insert(
+								binding,
+								shared::AliasInfo {
+									identity,
+									binding: field_base_local_binding(element),
+								},
+							);
+						}
+					}
+				}
+			}
+			rustc_hir::intravisit::walk_stmt(self, stmt);
+		}
+	}
+
+	rustc_hir::intravisit::walk_body(
+		&mut TupleAliases {
+			aliases,
+			reassigned,
+		},
+		body,
+	);
 }
