@@ -49,6 +49,18 @@ pub struct Cancel<'account> {
 	/// Required privileges: read-only.
 	pub token_program: &'account AccountView,
 
+	/// CPI account `clock`.
+	/// Clock for the vested-entitlement settlement: cancellation must not
+	/// confiscate what the linear curve has already released.
+	/// Required privileges: read-only.
+	pub clock: &'account AccountView,
+
+	/// CPI account `beneficiaryAta`.
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
+	/// before any remainder returns to the administrator.
+	/// Required privileges: read-only.
+	pub beneficiary_ata: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `cancel`.
 	pub ix: CancelIx,
 }
@@ -85,7 +97,7 @@ impl<'account> Cancel<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 8] = [
+		let accounts: [CpiHandle<'_>; 10] = [
 			CpiHandle::writable_signer(self.admin)?,
 			CpiHandle::readonly(self.mint),
 			CpiHandle::writable(self.vesting_state)?,
@@ -94,6 +106,8 @@ impl<'account> Cancel<'account> {
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
+			CpiHandle::readonly(self.clock),
+			CpiHandle::readonly(self.beneficiary_ata),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
