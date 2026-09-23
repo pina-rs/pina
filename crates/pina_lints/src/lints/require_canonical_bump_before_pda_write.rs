@@ -52,7 +52,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(cx, body);
+		let mut facts = shared::collect_function_facts(cx, body);
+		record_tuple_pattern_aliases(body, &mut facts.aliases);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if call.method == "assert_stored_bump" {
 				// The generated method names its own contract: `stored_bump`
@@ -163,4 +164,72 @@ fn stored_bump_provenance_ok(facts: &shared::FunctionFacts, call: &shared::CallI
 		identity = Some(alias.identity.as_str());
 		binding = alias.binding;
 	}
+}
+
+/// Resolve the local binding a field read was taken from.
+///
+/// `expression_local_binding` does not descend through field accesses, but a
+/// tuple element like `state.bump` names the binding `state` — the hop this
+/// lint's provenance walk follows from the field back to the account.
+fn field_base_local_binding(expr: &rustc_hir::Expr<'_>) -> Option<rustc_hir::HirId> {
+	match expr.kind {
+		rustc_hir::ExprKind::Field(base, _) => shared::expression_local_binding(base),
+		_ => shared::expression_local_binding(expr),
+	}
+}
+
+/// Collect alias provenance for tuple destructures into `aliases`.
+///
+/// The shared collector records a `let` binding's alias only for plain
+/// binding patterns, so a field captured by position (`let (maker, bump) = {
+/// let state = account.as_account()?; (state.maker, state.bump) };`) would
+/// lose the provenance this lint needs. This pass walks the same body and
+/// maps each tuple binding to the identity of the element at its position —
+/// including through the scoped-block initializer the idiom uses. Non-binding
+/// patterns (`_`, nested tuples) contribute nothing, and a non-tuple
+/// initializer records nothing: the pattern cannot have destructured it, so
+/// no alias would be sound.
+fn record_tuple_pattern_aliases(
+	body: &rustc_hir::Body<'_>,
+	aliases: &mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+) {
+	struct TupleAliases<'map> {
+		aliases: &'map mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+	}
+
+	impl<'hir> rustc_hir::intravisit::Visitor<'hir> for TupleAliases<'hir> {
+		fn visit_stmt(&mut self, stmt: &'hir rustc_hir::Stmt<'hir>) {
+			if let rustc_hir::StmtKind::Let(local) = stmt.kind
+				&& let Some(init) = local.init
+				&& let rustc_hir::PatKind::Tuple(pat_elements, _) = local.pat.kind
+			{
+				let mut tail = init;
+				while let rustc_hir::ExprKind::Block(block, _) = tail.kind {
+					match block.expr {
+						Some(next) => tail = next,
+						None => break,
+					}
+				}
+				if let rustc_hir::ExprKind::Tup(init_elements) = tail.kind {
+					for (pattern, element) in pat_elements.iter().zip(init_elements) {
+						let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind else {
+							continue;
+						};
+						if let Some(identity) = shared::expression_identity(element) {
+							self.aliases.insert(
+								binding,
+								shared::AliasInfo {
+									identity,
+									binding: field_base_local_binding(element),
+								},
+							);
+						}
+					}
+				}
+			}
+			rustc_hir::intravisit::walk_stmt(self, stmt);
+		}
+	}
+
+	rustc_hir::intravisit::walk_body(&mut TupleAliases { aliases }, body);
 }

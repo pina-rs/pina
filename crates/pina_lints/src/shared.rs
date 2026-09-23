@@ -238,7 +238,6 @@ pub fn expression_local_binding(expr: &Expr<'_>) -> Option<HirId> {
 		| ExprKind::AddrOf(_, _, inner)
 		| ExprKind::Index(inner, ..) => expression_local_binding(inner),
 		ExprKind::Block(block, _) => block.expr.and_then(expression_local_binding),
-		ExprKind::Field(base, _) => expression_local_binding(base),
 		ExprKind::Call(callee, args) => {
 			args.first()
 				.and_then(|argument| expression_local_binding(argument))
@@ -303,14 +302,6 @@ fn collect_from_block(
 							},
 						);
 					}
-					// A tuple destructure maps each binding to its positional
-					// element's identity, so a field captured in a tuple (the
-					// common "parse once, capture several fields" shape)
-					// keeps alias provenance instead of losing it. The walk
-					// lives with its consuming lint: it only ever executes
-					// inside the lint driver, whose rustc-glue layer
-					// `codecov.yml` already classifies.
-					crate::lints::record_tuple_pattern_aliases(init, local.pat, &mut facts.aliases);
 					collect_from_expr(
 						cx,
 						init,

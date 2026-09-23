@@ -15,15 +15,6 @@ ignore:
   # is factored into a host-tested module (`crates/pina_lints/src/collisions.rs`
   # is at 100%), so this excludes only the rustc-glue layer.
   - "crates/pina_lints/src/lints"
-  # `crates/pina_lints/src/shared.rs` hosts the collector those lints walk the
-  # HIR with: `collect_function_facts` and its `collect_from_*` helpers take
-  # `LateContext`/`Expr` values that exist only inside the driver process, so
-  # their bodies are the same rustc-glue class as the lint passes. The
-  # pure-string helpers the collector shares with host tests
-  # (`expression_identity` and friends) stay reachable; the HIR-walking
-  # region has never been covered by the instrumented run — the
-  # `tests/ui` fixtures are the behavioral gate for it.
-  - "crates/pina_lints/src/shared.rs"
 
 coverage:
   status:
