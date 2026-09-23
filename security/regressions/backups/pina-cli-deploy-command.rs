@@ -93,7 +93,7 @@ impl ProjectFixture {
 			),
 		)
 		.unwrap_or_else(|error| panic!("write migration source: {error}"));
-		pina_cli::migrations::create_migrations(&self.root)
+		pina_cli::migrations::make_migrations(&self.root)
 			.unwrap_or_else(|error| panic!("create migration snapshot: {error}"));
 	}
 }

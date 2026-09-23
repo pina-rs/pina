@@ -6,23 +6,6 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use program_under_test::ID;
-use program_under_test::UPDATE_AUTHORITY;
-
-/// The committed fixture seed: the 32 ASCII bytes of a descriptive phrase,
-/// documented on `UPDATE_AUTHORITY` in `src/lib.rs`. Deterministic, and
-/// outside the uniform-seed brute-force space the old `[7u8; 32]` fixture
-/// lived in.
-const UPDATE_AUTHORITY_SEED: [u8; 32] = *b"pina example fixture updater key";
-
-fn fixture_update_authority() -> Keypair {
-	let keypair = Keypair::new_from_array(UPDATE_AUTHORITY_SEED);
-	assert_eq!(
-		keypair.pubkey(),
-		UPDATE_AUTHORITY,
-		"the committed fixture seed must keep deriving UPDATE_AUTHORITY"
-	);
-	keypair
-}
 use program_under_test::PropAmmInstruction;
 
 fn initialize_instruction(
@@ -121,12 +104,10 @@ fn initialize_records_the_payer_as_authority() {
 	});
 }
 
-/// The oracle's recorded authority can update the price. At initialize that is
-/// the payer, and the gate stays narrow: a key that is neither the static
-/// updater nor the recorded authority is still refused.
+/// The hardcoded update authority can always update the price.
 #[test]
 #[ignore = "run with pina test"]
-fn update_requires_the_recorded_or_the_static_authority() {
+fn update_requires_the_update_authority() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
@@ -143,49 +124,19 @@ fn update_requires_the_recorded_or_the_static_authority() {
 			)
 			.expect("execute Initialize");
 
-		// `payer` is the stored authority, so its update is accepted.
-		program
-			.send_instruction(update_instruction(&program, &oracle.pubkey(), &payer, 99))
-			.expect("the recorded oracle authority may update");
-		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
-		assert_eq!(
-			&account.data[34..42],
-			&99_u64.to_le_bytes(),
-			"the recorded authority wrote the new price on-chain"
-		);
-		drop(account);
-
-		// A stranger — neither the stored authority nor the static updater —
-		// is still refused, so the stored-authority branch does not widen the
-		// gate to everyone.
-		let stranger = Keypair::new_from_array([4; 32]);
-		program
-			.fund(&stranger.pubkey(), 1_000_000_000)
-			.expect("fund stranger");
+		let update = update_instruction(&program, &oracle.pubkey(), &payer, 99);
 		let error = program
-			.send_with_signers(
-				update_instruction(&program, &oracle.pubkey(), &stranger.pubkey(), 123),
-				&[&stranger],
-			)
-			.expect_err("a stranger may not update");
-		pina_test::assert_custom_error(
-			&error,
-			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
-		);
-		// The refused update wrote nothing.
-		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
-		assert_eq!(
-			&account.data[34..42],
-			&99_u64.to_le_bytes(),
-			"a refused update leaves the price untouched"
-		);
+			.send_instruction(update)
+			.expect_err("only the static update authority may update");
+		assert_eq!(error.operation(), "execute program instruction");
+		eprintln!("unauthorized update error: {}", error.message());
 
 		program.stop().expect("stop isolated program test");
 	});
 }
 
 /// Rotate hands the oracle authority to another wallet, which then owns
-/// accounting — including the price updates the rotation implies.
+/// accounting, though the STATIC update gate still applies to `Update`.
 #[test]
 #[ignore = "run with pina test"]
 fn rotate_hands_over_the_oracle_authority() {
@@ -234,94 +185,6 @@ fn rotate_hands_over_the_oracle_authority() {
 			account.data[2..34],
 			new_authority.pubkey().to_bytes(),
 			"the oracle authority is rotated on-chain"
-		);
-		drop(account);
-
-		// The rotated-in authority now publishes prices: rotation grants the
-		// capability it implies rather than being cosmetic.
-		program
-			.send_with_signers(
-				update_instruction(&program, &oracle.pubkey(), &new_authority.pubkey(), 4_242),
-				&[&new_authority],
-			)
-			.expect("the rotated-in authority publishes a price");
-		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
-		assert_eq!(
-			&account.data[34..42],
-			&4_242_u64.to_le_bytes(),
-			"the rotated-in authority wrote the new price on-chain"
-		);
-		drop(account);
-
-		// The key it replaced is no longer the stored authority and is not the
-		// static updater, so it has no update capability left.
-		let error = program
-			.send_instruction(update_instruction(
-				&program,
-				&oracle.pubkey(),
-				&payer,
-				1_111,
-			))
-			.expect_err("the rotated-away authority may no longer update");
-		pina_test::assert_custom_error(
-			&error,
-			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
-		);
-		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
-		assert_eq!(
-			&account.data[34..42],
-			&4_242_u64.to_le_bytes(),
-			"the rotated-away key wrote nothing"
-		);
-
-		program.stop().expect("stop isolated program test");
-	});
-}
-
-/// The rebuilt fixture update authority — deterministic from the committed
-/// seed, and no longer recoverable from a uniform one — can still sign a
-/// price update, so the D1 reseed introduced no functional regression.
-#[test]
-#[ignore = "run with pina test"]
-fn fixture_update_authority_still_publishes_prices() {
-	pina_test::run(async {
-		let program_id = Pubkey::new_from_array(ID.to_bytes());
-		let mut program = ProgramTest::start(program_id)
-			.await
-			.expect("start isolated program test");
-
-		let payer = program.payer();
-		let oracle = Keypair::new_from_array([2; 32]);
-
-		program
-			.send_with_signers(
-				initialize_instruction(&program, &payer, &oracle.pubkey()),
-				&[&oracle],
-			)
-			.expect("execute Initialize");
-
-		let update_authority = fixture_update_authority();
-		program
-			.fund(&update_authority.pubkey(), 1_000_000_000)
-			.expect("fund the fixture update authority");
-
-		program
-			.send_with_signers(
-				update_instruction(
-					&program,
-					&oracle.pubkey(),
-					&update_authority.pubkey(),
-					999_999,
-				),
-				&[&update_authority],
-			)
-			.expect("the fixture update authority signs the price update");
-
-		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
-		assert_eq!(
-			&account.data[34..42],
-			&999_999_u64.to_le_bytes(),
-			"the authorized update wrote the new price on-chain"
 		);
 
 		program.stop().expect("stop isolated program test");

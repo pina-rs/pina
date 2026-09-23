@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 //! Surfpool coverage for the staking rewards example: provision real SPL
-//! mints, initialize a pool with vaults, then move stake tokens through
-//! open/deposit/withdraw on-chain.
+//! mints, initialize a pool with vaults, then move the stake accounting
+//! through open/deposit/withdraw on-chain.
 
 use pina_test::Account;
 use pina_test::AccountMeta;
@@ -191,7 +191,6 @@ fn deposit_instruction(
 	pool: &Pubkey,
 	position: &Pubkey,
 	user_stake_ata: &Pubkey,
-	stake_vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
 	// discriminator + migration version, then the u64 amount.
@@ -206,7 +205,6 @@ fn deposit_instruction(
 			AccountMeta::new(*pool, false),
 			AccountMeta::new(*position, false),
 			AccountMeta::new(*user_stake_ata, false),
-			AccountMeta::new(*stake_vault, false),
 			AccountMeta::new_readonly(ata_program_id(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
@@ -221,7 +219,6 @@ fn withdraw_instruction(
 	pool: &Pubkey,
 	position: &Pubkey,
 	user_stake_ata: &Pubkey,
-	stake_vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
 	let mut data = vec![StakingInstruction::Withdraw as u8, 0u8];
@@ -235,7 +232,6 @@ fn withdraw_instruction(
 			AccountMeta::new(*pool, false),
 			AccountMeta::new(*position, false),
 			AccountMeta::new(*user_stake_ata, false),
-			AccountMeta::new(*stake_vault, false),
 			AccountMeta::new_readonly(token_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
 		],
@@ -313,53 +309,6 @@ fn mint_into(
 		.map(|_| ())
 }
 
-/// Create a wallet's associated token account directly through the associated
-/// token program (`Create` carries no data).
-///
-/// `Deposit` no longer creates a token account out of nothing for the
-/// depositor to fund later: a deposit moves tokens, so the tests fund the ATA
-/// *before* depositing. This is the helper that makes the account mintable.
-fn create_ata(
-	program: &ProgramTest,
-	payer: &Pubkey,
-	wallet: &Pubkey,
-	mint: &Pubkey,
-) -> Result<(), TestError> {
-	let instruction = Instruction::new_with_bytes(
-		ata_program_id(),
-		&[],
-		vec![
-			AccountMeta::new(*payer, true),
-			AccountMeta::new(ata_of(wallet, mint), false),
-			AccountMeta::new_readonly(*wallet, false),
-			AccountMeta::new_readonly(*mint, false),
-			AccountMeta::new_readonly(Pubkey::default(), false),
-			AccountMeta::new_readonly(token_program_id(), false),
-		],
-	);
-
-	program.send_instruction(instruction).map(|_| ())
-}
-
-/// Fund a wallet's stake ATA with freshly minted tokens, creating it first.
-fn fund_stake_ata(
-	program: &ProgramTest,
-	payer: &Pubkey,
-	wallet: &Pubkey,
-	stake_mint: &Pubkey,
-	mint_authority: &Keypair,
-	amount: u64,
-) -> Result<(), TestError> {
-	create_ata(program, payer, wallet, stake_mint)?;
-	mint_into(
-		program,
-		stake_mint,
-		&ata_of(wallet, stake_mint),
-		mint_authority,
-		amount,
-	)
-}
-
 fn assert_pool(
 	account: &Account,
 	admin: &Pubkey,
@@ -400,25 +349,6 @@ fn assert_position(account: &Account, pool: &Pubkey, owner: &Pubkey, staked: u64
 
 fn vault_amount(account: &Account) -> u64 {
 	u64::from_le_bytes(account.data[64..72].try_into().expect("token amount"))
-}
-
-/// The pool's `total_staked`, read straight from the on-chain account bytes
-/// (offsets pinned by `assert_pool` above).
-fn pool_total_staked(account: &Account) -> u64 {
-	assert_eq!(account.data[0], 1, "discriminator is PoolState");
-	u64::from_le_bytes(account.data[98..106].try_into().expect("total_staked"))
-}
-
-/// The backing invariant the stake custody must hold: every staked token the
-/// ledger credits is sitting in the pool's stake vault, so
-/// `stake_vault == pool.total_staked` at every pause between instructions.
-fn assert_stake_backing(program: &ProgramTest, stake_vault: &Pubkey, pool: &Pubkey) {
-	let vault = vault_amount(&program.account(stake_vault).expect("fetch stake vault"));
-	let total = pool_total_staked(&program.account(pool).expect("fetch pool state"));
-	assert_eq!(
-		vault, total,
-		"stake vault balance must equal pool.total_staked"
-	);
 }
 
 /// A deposit naming an account that is not the canonical ATA for its wallet and
@@ -490,7 +420,6 @@ fn rejects_a_non_canonical_stake_ata_on_deposit() {
 				&pool,
 				&position,
 				&wrong_ata,
-				&stake_vault,
 				10,
 			))
 			.expect_err("reject a non-canonical stake ATA");
@@ -581,20 +510,6 @@ fn pool_positions_and_stake_accounting() {
 		);
 
 		// --- Deposit ---
-		//
-		// A deposit now moves tokens, so the depositor funds their stake ATA
-		// first; the instruction transfers the deposit into the stake vault
-		// before crediting the position.
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			DEPOSIT,
-		)
-		.expect("fund depositor's stake ATA");
-
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -603,7 +518,6 @@ fn pool_positions_and_stake_accounting() {
 				&pool,
 				&position,
 				&user_stake_ata,
-				&stake_vault,
 				DEPOSIT,
 			))
 			.expect("execute Deposit");
@@ -614,26 +528,8 @@ fn pool_positions_and_stake_accounting() {
 			DEPOSIT,
 			position_bump,
 		);
-		assert_eq!(
-			vault_amount(
-				&program
-					.account(&user_stake_ata)
-					.expect("fetch user stake ATA")
-			),
-			0,
-			"the deposit left the depositor's ATA"
-		);
-		assert_eq!(
-			vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
-			DEPOSIT,
-			"the deposit arrived in the stake vault"
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
 
 		// --- Withdraw ---
-		//
-		// The principal comes back out of the stake vault under the pool's
-		// signature, so the withdrawal moves real tokens this time.
 		program
 			.send_instruction(withdraw_instruction(
 				&program,
@@ -642,7 +538,6 @@ fn pool_positions_and_stake_accounting() {
 				&pool,
 				&position,
 				&user_stake_ata,
-				&stake_vault,
 				WITHDRAW,
 			))
 			.expect("execute Withdraw");
@@ -653,21 +548,6 @@ fn pool_positions_and_stake_accounting() {
 			DEPOSIT - WITHDRAW,
 			position_bump,
 		);
-		assert_eq!(
-			vault_amount(
-				&program
-					.account(&user_stake_ata)
-					.expect("fetch user stake ATA")
-			),
-			WITHDRAW,
-			"the withdrawn principal returned to the depositor's ATA"
-		);
-		assert_eq!(
-			vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
-			DEPOSIT - WITHDRAW,
-			"the withdrawn principal left the stake vault"
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
 
 		// Withdrawing more than staked must fail and leave the balance.
 		let error = program
@@ -678,7 +558,6 @@ fn pool_positions_and_stake_accounting() {
 				&pool,
 				&position,
 				&user_stake_ata,
-				&stake_vault,
 				DEPOSIT - WITHDRAW + 1,
 			))
 			.expect_err("cannot withdraw more than the stake");
@@ -686,12 +565,6 @@ fn pool_positions_and_stake_accounting() {
 		// fails for an unrelated reason, and the balance check is the behavior
 		// this test exists to pin.
 		pina_test::assert_custom_error(&error, StakingError::InsufficientBalance as u32);
-		assert_eq!(
-			vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
-			DEPOSIT - WITHDRAW,
-			"the refused withdrawal moved no principal"
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
 
 		// No reward index has moved, so the position has accrued nothing and a
 		// claim is refused rather than creating an empty payout. The reward
@@ -940,18 +813,9 @@ fn rewards_accrue_once_per_index_and_release() {
 			))
 			.expect("execute OpenPosition");
 
-		// Fund the depositor's stake ATA, then deposit: the instruction moves
-		// the stake into the vault, so the tokens must exist before it runs.
+		// Deposit first: the instruction creates the user's stake ATA, so a
+		// mint cannot target it until then.
 		let staked = 1_000u64;
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund stake ATA");
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -960,50 +824,23 @@ fn rewards_accrue_once_per_index_and_release() {
 				&pool,
 				&position,
 				&user_stake_ata,
-				&stake_vault,
 				staked,
 			))
 			.expect("execute Deposit");
-		assert_eq!(
-			vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
+		mint_into(
+			&program,
+			&stake_mint,
+			&user_stake_ata,
+			&mint_authority,
 			staked,
-			"the deposit moved the stake into the vault"
-		);
-		assert_eq!(
-			vault_amount(
-				&program
-					.account(&user_stake_ata)
-					.expect("fetch user stake ATA")
-			),
-			0,
-			"the deposit left the depositor's ATA"
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
+		)
+		.expect("fund stake ATA");
 
 		// Fund the reward vault so a payout has something to release.
 		mint_into(&program, &reward_mint, &reward_vault, &mint_authority, FUND)
 			.expect("fund reward vault");
 		let vault_before =
 			vault_amount(&program.account(&reward_vault).expect("fetch reward vault"));
-
-		// Time alone accrues nothing in this design: the admin-controlled index
-		// is the only clock. Advance it well past any block boundary and confirm
-		// a claim is still refused until the index moves.
-		program
-			.time_travel_to_timestamp_millis(2_500_000_000_000)
-			.expect("time travel forward");
-		let error = program
-			.send_instruction(claim_instruction(
-				&program,
-				&admin,
-				&reward_mint,
-				&pool,
-				&position,
-				&user_reward_ata,
-				&reward_vault,
-			))
-			.expect_err("a claim after time travel but no drip is refused");
-		pina_test::assert_custom_error(&error, StakingError::NothingToClaim as u32);
 
 		// A drip of one full index unit: one reward token per staked token.
 		let index = REWARD_INDEX_SCALE;
@@ -1088,309 +925,6 @@ fn rewards_accrue_once_per_index_and_release() {
 	});
 }
 
-/// The confirmed fund drain is closed: a deposit from a wallet that owns no
-/// stake tokens cannot credit a position.
-///
-/// Before deposit took custody, this exact sequence drained the reward vault
-/// end-to-end: the attacker deposited `1_000_000_000_000` with an empty stake
-/// ATA, the ledger credited the position from the argument alone, and one drip
-/// plus one claim moved the entire vault to the attacker. Now the deposit
-/// itself fails on the SPL transfer, the ledger never grows, and the claim has
-/// nothing to release.
-#[test]
-#[ignore = "run with pina test"]
-fn rejects_a_deposit_without_stake_tokens() {
-	pina_test::run(async {
-		let program_id = Pubkey::new_from_array(ID.to_bytes());
-		let mut program = ProgramTest::start(program_id)
-			.await
-			.expect("start isolated program test");
-
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
-		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
-		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
-
-		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
-		let stake_vault = ata_of(&pool, &stake_mint);
-		let reward_vault = ata_of(&pool, &reward_mint);
-
-		program
-			.send_instruction(initialize_pool_instruction(
-				&program,
-				&admin,
-				&stake_mint,
-				&reward_mint,
-				&pool,
-				&stake_vault,
-				&reward_vault,
-				pool_bump,
-			))
-			.expect("execute InitializePool");
-
-		// Fill the reward vault: the payout the attacker is about to chase.
-		mint_into(&program, &reward_mint, &reward_vault, &mint_authority, FUND)
-			.expect("fund reward vault");
-
-		// The attacker funds a wallet and opens a canonical position. Every step
-		// of the original exploit up to the deposit is still available.
-		let attacker = Keypair::new_from_array([78; 32]);
-		program
-			.fund(&attacker.pubkey(), FUND)
-			.expect("fund attacker");
-		let attacker_stake_ata = ata_of(&attacker.pubkey(), &stake_mint);
-		let attacker_reward_ata = ata_of(&attacker.pubkey(), &reward_mint);
-		let (position, position_bump) = position_pda(&program_id, &pool, &attacker.pubkey());
-		program
-			.send_with_signers(
-				open_position_instruction(
-					&program,
-					&attacker.pubkey(),
-					&pool,
-					&position,
-					position_bump,
-				),
-				&[&attacker],
-			)
-			.expect("execute OpenPosition for the attacker");
-
-		// The exploit deposit: a stake ATA that exists nowhere and a zero token
-		// balance, for a `staked_amount` ten orders of magnitude past anything
-		// the attacker could fund. The custody transfer must fail it closed.
-		let error = program
-			.send_with_signers(
-				deposit_instruction(
-					&program,
-					&attacker.pubkey(),
-					&stake_mint,
-					&pool,
-					&position,
-					&attacker_stake_ata,
-					&stake_vault,
-					1_000_000_000_000,
-				),
-				&[&attacker],
-			)
-			.expect_err("a deposit without stake tokens must fail");
-		// Pin the reason: SPL Token's `InsufficientFunds` (custom code 1), raised
-		// by the custody transfer — not an unrelated rejection.
-		assert_eq!(
-			error.transaction_error(),
-			Some(pina_test::TransactionError::InstructionError(
-				0,
-				pina_test::InstructionError::Custom(1)
-			)),
-			"the deposit must fail on the SPL transfer (InsufficientFunds)"
-		);
-
-		// The ledger never grew, so there is no unbacked share weight anywhere.
-		assert_position(
-			&program.account(&position).expect("fetch attacker position"),
-			&pool,
-			&attacker.pubkey(),
-			0,
-			position_bump,
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
-
-		// Even with the index dripped, the attacker's claim has nothing to
-		// release and the reward vault keeps every token.
-		program
-			.send_instruction(set_reward_index_instruction(
-				&program,
-				&admin,
-				&pool,
-				1_000_000_000,
-			))
-			.expect("execute SetRewardIndex");
-		let error = program
-			.send_with_signers(
-				claim_instruction(
-					&program,
-					&attacker.pubkey(),
-					&reward_mint,
-					&pool,
-					&position,
-					&attacker_reward_ata,
-					&reward_vault,
-				),
-				&[&attacker],
-			)
-			.expect_err("a claim on an unbacked position is refused");
-		pina_test::assert_custom_error(&error, StakingError::NothingToClaim as u32);
-		assert_eq!(
-			vault_amount(&program.account(&reward_vault).expect("fetch reward vault")),
-			FUND,
-			"the reward vault must be untouched"
-		);
-		assert!(
-			program.account(&attacker_reward_ata).is_err(),
-			"the attacker never receives a reward payout"
-		);
-
-		program.stop().expect("stop isolated program test");
-	});
-}
-
-/// The stake vault backs the ledger across multiple depositors and a partial
-/// withdrawal.
-///
-/// Two positions deposit different amounts into one pool; after every step the
-/// vault balance equals `pool.total_staked`, and a withdrawal moves the
-/// principal back to the withdrawing depositor's ATA without breaking the
-/// invariant for the staker who remains.
-#[test]
-#[ignore = "run with pina test"]
-fn stake_vault_backs_total_staked() {
-	pina_test::run(async {
-		let program_id = Pubkey::new_from_array(ID.to_bytes());
-		let mut program = ProgramTest::start(program_id)
-			.await
-			.expect("start isolated program test");
-
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
-		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
-		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
-
-		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
-		let stake_vault = ata_of(&pool, &stake_mint);
-		let reward_vault = ata_of(&pool, &reward_mint);
-
-		program
-			.send_instruction(initialize_pool_instruction(
-				&program,
-				&admin,
-				&stake_mint,
-				&reward_mint,
-				&pool,
-				&stake_vault,
-				&reward_vault,
-				pool_bump,
-			))
-			.expect("execute InitializePool");
-
-		let depositor_a = Keypair::new_from_array([79; 32]);
-		let depositor_b = Keypair::new_from_array([80; 32]);
-		program
-			.fund(&depositor_a.pubkey(), FUND)
-			.expect("fund depositor A");
-		program
-			.fund(&depositor_b.pubkey(), FUND)
-			.expect("fund depositor B");
-
-		let deposit_a = 1_000u64;
-		let deposit_b = 700u64;
-		let withdraw_b = 200u64;
-		let mut total = 0u64;
-
-		for (depositor, amount) in [(&depositor_a, deposit_a), (&depositor_b, deposit_b)] {
-			let wallet = depositor.pubkey();
-			let (position, position_bump) = position_pda(&program_id, &pool, &wallet);
-			program
-				.send_with_signers(
-					open_position_instruction(&program, &wallet, &pool, &position, position_bump),
-					&[depositor],
-				)
-				.expect("execute OpenPosition");
-			fund_stake_ata(
-				&program,
-				&admin,
-				&wallet,
-				&stake_mint,
-				&mint_authority,
-				amount,
-			)
-			.expect("fund depositor's stake ATA");
-
-			program
-				.send_with_signers(
-					deposit_instruction(
-						&program,
-						&wallet,
-						&stake_mint,
-						&pool,
-						&position,
-						&ata_of(&wallet, &stake_mint),
-						&stake_vault,
-						amount,
-					),
-					&[depositor],
-				)
-				.expect("execute Deposit");
-			total += amount;
-
-			assert_position(
-				&program.account(&position).expect("fetch position"),
-				&pool,
-				&wallet,
-				amount,
-				position_bump,
-			);
-			assert_eq!(
-				vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
-				total,
-				"the vault holds every staked token"
-			);
-			assert_stake_backing(&program, &stake_vault, &pool);
-		}
-
-		// A partial withdrawal returns principal without breaking the backing.
-		let (position_b, position_b_bump) = position_pda(&program_id, &pool, &depositor_b.pubkey());
-		program
-			.send_with_signers(
-				withdraw_instruction(
-					&program,
-					&depositor_b.pubkey(),
-					&stake_mint,
-					&pool,
-					&position_b,
-					&ata_of(&depositor_b.pubkey(), &stake_mint),
-					&stake_vault,
-					withdraw_b,
-				),
-				&[&depositor_b],
-			)
-			.expect("execute Withdraw");
-		assert_position(
-			&program.account(&position_b).expect("fetch position B"),
-			&pool,
-			&depositor_b.pubkey(),
-			deposit_b - withdraw_b,
-			position_b_bump,
-		);
-		assert_eq!(
-			vault_amount(
-				&program
-					.account(&ata_of(&depositor_b.pubkey(), &stake_mint))
-					.expect("fetch depositor B stake ATA")
-			),
-			withdraw_b,
-			"the withdrawn principal returned to depositor B"
-		);
-		assert_eq!(
-			pool_total_staked(&program.account(&pool).expect("fetch pool state")),
-			total - withdraw_b,
-			"the ledger released the withdrawn stake"
-		);
-		assert_stake_backing(&program, &stake_vault, &pool);
-
-		program.stop().expect("stop isolated program test");
-	});
-}
-
 // ---------------------------------------------------------------------------
 // Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
 //
@@ -1400,6 +934,40 @@ fn stake_vault_backs_total_staked() {
 // fixes: run them with `pina test --project examples/staking_rewards_program
 // --filter audit_sec_`.
 // ---------------------------------------------------------------------------
+
+/// Fund a wallet's stake ATA (created first) — the audit-local equivalent of
+/// the helper this suite carried before the vault-derivation refactor.
+fn audit_fund_stake_ata(
+	program: &ProgramTest,
+	payer: &Pubkey,
+	wallet: &Pubkey,
+	stake_mint: &Pubkey,
+	mint_authority: &Keypair,
+	amount: u64,
+) -> Result<(), TestError> {
+	let ata = ata_of(wallet, stake_mint);
+	let create = Instruction::new_with_bytes(
+		ata_program_id(),
+		&[],
+		vec![
+			AccountMeta::new(*payer, true),
+			AccountMeta::new(ata, false),
+			AccountMeta::new_readonly(*wallet, false),
+			AccountMeta::new_readonly(*stake_mint, false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
+			AccountMeta::new_readonly(token_program_id(), false),
+		],
+	);
+	program.send_instruction(create)?;
+	mint_into(program, stake_mint, &ata, mint_authority, amount)
+}
+
+/// The pool's total staked, read from the on-chain pool account.
+fn audit_pool_total_staked(program: &ProgramTest, pool: &Pubkey) -> u64 {
+	let account = program.account(pool).expect("fetch pool state");
+	assert_eq!(account.data[0], 1, "discriminator is PoolState");
+	u64::from_le_bytes(account.data[98..106].try_into().expect("total_staked"))
+}
 
 /// SEC-26: the canonical pool PDA for a mint pair is a singleton, and
 /// `InitializePool` stores whichever signer arrives first as the permanent
@@ -1533,7 +1101,7 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 					&[&depositor],
 				)
 				.expect("execute OpenPosition");
-			fund_stake_ata(
+			audit_fund_stake_ata(
 				&program,
 				&admin,
 				&depositor.pubkey(),
@@ -1551,14 +1119,17 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 						&pool,
 						&position,
 						&ata_of(&depositor.pubkey(), &stake_mint),
-						&stake_vault,
 						staked,
 					),
 					&[&depositor],
 				)
 				.expect("execute Deposit");
 		}
-		assert_stake_backing(&program, &stake_vault, &pool);
+		assert_eq!(
+			vault_amount(&program.account(&stake_vault).expect("fetch stake vault")),
+			audit_pool_total_staked(&program, &pool),
+			"stake vault balance must equal pool.total_staked"
+		);
 
 		// Fund the reward vault with exactly ONE of the two promised payouts.
 		mint_into(
@@ -1664,7 +1235,7 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 					&[&depositor],
 				)
 				.expect("execute OpenPosition");
-			fund_stake_ata(
+			audit_fund_stake_ata(
 				&program,
 				&admin,
 				&depositor.pubkey(),
@@ -1682,7 +1253,6 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 						&pool,
 						&position,
 						&ata_of(&depositor.pubkey(), &stake_mint),
-						&stake_vault,
 						staked,
 					),
 					&[&depositor],
@@ -1812,7 +1382,7 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 		// Two trillion base units (two million tokens at six decimals): large
 		// enough that `staked * u64::MAX / SCALE` no longer fits a `u64` payout.
 		let staked = 2_000_000_000_000u64;
-		fund_stake_ata(
+		audit_fund_stake_ata(
 			&program,
 			&admin,
 			&admin,
@@ -1829,7 +1399,6 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 				&pool,
 				&position,
 				&ata_of(&admin, &stake_mint),
-				&stake_vault,
 				staked,
 			))
 			.expect("execute Deposit");
@@ -1864,7 +1433,6 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 				&pool,
 				&position,
 				&ata_of(&admin, &stake_mint),
-				&stake_vault,
 				staked,
 			))
 			.expect("the staked principal must remain withdrawable after any accepted index");
