@@ -1671,6 +1671,7 @@ pub struct ProposalCloseAccounts<'a> {
 ///
 /// `changed` in the working state marks that a consensus parameter moved and
 /// prior proposals must be invalidated.
+#[allow(clippy::too_many_arguments)]
 fn apply_config_actions(
 	multisig_key: &Address,
 	working: &mut MultisigWorkingState,

@@ -307,6 +307,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// collateralized. SPL rejects zero-amount transfers, and a zero-total
 		// schedule is rejected by `validate_schedule` above.
 		let total_amount = args.total_amount.get();
+		let vault_before = self
+			.vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
 		token::instructions::TransferChecked::new(
 			self.admin_ata,
 			self.mint,
@@ -316,6 +320,21 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			mint_decimals,
 		)
 		.invoke_with_program(self.token_program.address())?;
+
+		// Collateralize against the observed vault delta, not the requested
+		// amount: a partial delivery would otherwise let the schedule promise
+		// more than it holds. The vault was created empty in this same
+		// instruction, so the delta must equal the full allocation.
+		let vault_after = self
+			.vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
+		let received = vault_after
+			.checked_sub(vault_before)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		if received != total_amount {
+			return Err(VestingError::InsufficientVaultBalance.into());
+		}
 
 		Ok(())
 	}
@@ -577,7 +596,13 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		let (total_amount, start_ts, _cliff_ts, end_ts, claimed_amount) = schedule;
 		let now = sysvars::clock::Clock::from_account_view(self.clock)?.unix_timestamp;
 		let vested = vested_amount(total_amount, start_ts, end_ts, now)?;
-		let owed = vested.saturating_sub(claimed_amount).min(remaining);
+		// `claimed_amount` never exceeds what vested at the claim's own
+		// timestamp, so this subtraction cannot underflow; a violation is
+		// corrupt state and fails loudly rather than silently settling zero.
+		let owed = vested
+			.checked_sub(claimed_amount)
+			.ok_or(ProgramError::ArithmeticOverflow)?
+			.min(remaining);
 		if owed > 0 {
 			// The beneficiary's ATA must already exist for the settlement:
 			// Cancel is admin-signed, so there is no beneficiary wallet here

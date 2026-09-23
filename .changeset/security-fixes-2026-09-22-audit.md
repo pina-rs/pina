@@ -1,9 +1,9 @@
 ---
-pina: patch
-pina_cli: patch
+pina: fix
+pina_cli: fix
 ---
 
-# Close the live 2026-09-22 audit findings in the runtime and CLI
+# Close live 2026-09-22 audit findings: runtime and CLI
 
 `UpdateResizableAccount` now routes every feature combination through the generated account-level update contract, so a compact update on a stale migration envelope is refused — and the envelope advanced — even without the `validation` feature. The preflight-versus-commit length agreement is a release-mode error instead of a compiled-out `debug_assert`. `pinapod` is now exact-pinned (`=0.4.3`) like `fixed`, since its generated layouts are the wire contract.
 

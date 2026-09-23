@@ -805,10 +805,12 @@ impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
 		// own reward debt only shrinks what it is still owed), computed in
 		// `u128` where `u64 * u64` always fits.
 		let total_staked = pool_state.total_staked.get();
-		let liability = u128::from(total_staked)
+		let scaled = u128::from(total_staked)
 			.checked_mul(u128::from(new_index))
-			.ok_or(ProgramError::ArithmeticOverflow)?
-			/ u128::from(REWARD_INDEX_SCALE);
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		let liability = scaled
+			.checked_div(u128::from(REWARD_INDEX_SCALE))
+			.ok_or(ProgramError::ArithmeticOverflow)?;
 
 		// Gate one — representability: a liability no `u64` payout can hold
 		// freezes the affected positions at their next checkpoint (deposit,
