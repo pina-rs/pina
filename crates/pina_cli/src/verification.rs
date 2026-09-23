@@ -1472,10 +1472,8 @@ fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
 	if signature_count == 0 || signature_count > 16 {
 		return Err(());
 	}
-	let mut cursor = 1 + usize::from(versioned);
-	cursor = cursor
-		.checked_add(signature_count.checked_mul(64).ok_or(())?)
-		.ok_or(())?;
+	// `signature_count <= 16` bounds this product well inside `usize`.
+	let mut cursor = 1 + usize::from(versioned) + signature_count * 64;
 	if bytes.len() < cursor + 3 {
 		return Err(());
 	}
@@ -1528,8 +1526,9 @@ fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
 			return Err(());
 		}
 		let data_len = message[offset] as usize;
-		offset = offset.checked_add(1).ok_or(())?;
-		offset = offset.checked_add(data_len).ok_or(())?;
+		// `data_len <= 255`, so neither add can overflow a `usize` offset that
+		// already lies within the message.
+		offset += 1 + data_len;
 		if offset > message.len() {
 			return Err(());
 		}
@@ -2420,8 +2419,63 @@ mod tests {
 		bad_program_index[base(1).len() - 3] = 9;
 		assert!(validate_transaction_wire(&bad_program_index).is_err());
 
-		// Truncated instruction tail.
-		assert!(validate_transaction_wire(&base(1)[..base(1).len() - 1]).is_err());
+		// Truncated right after the signatures.
+		assert!(validate_transaction_wire(&base(1)[..65]).is_err());
+
+		// Truncated inside or right after the account table.
+		assert!(validate_transaction_wire(&base(1)[..80]).is_err());
+
+		// Truncated mid-blockhash.
+		assert!(validate_transaction_wire(&base(1)[..160]).is_err());
+
+		// Instruction header present but the data-length byte missing.
+		assert!(validate_transaction_wire(&base(1)[..168]).is_err());
+
+		// Versioned with the maximum signature count, truncated right after
+		// the signature list: the header-plus-accounts minimum cannot be met.
+		let mut many_sigs: Vec<u8> = vec![0x80, 16];
+		many_sigs.resize(2 + 16 * 64, 3);
+		assert!(validate_transaction_wire(&many_sigs).is_err());
+
+		// The same payload with a single message byte: the header needs three.
+		many_sigs.resize(2 + 16 * 64 + 3, 0);
+		many_sigs[2 + 16 * 64] = 1; // one required signature; account count missing
+		assert!(validate_transaction_wire(&many_sigs).is_err());
+
+		// An instruction whose account-index list overruns the message: the
+		// program index and the account count are present but the data length
+		// byte is missing. The table declares five accounts so three indices
+		// pass the count check, and only the first index byte is present.
+		let mut overrun_indices = base(1);
+		overrun_indices[68] = 5; // five accounts in the table
+		let tail = overrun_indices.len() - 4; // icount, progidx, accts_len, data_len
+		overrun_indices[tail] = 1; // one instruction
+		overrun_indices[tail + 1] = 0; // program id = account 0
+		overrun_indices[tail + 2] = 3; // three account indices...
+		overrun_indices[tail + 3] = 0; // ...of which only this one exists
+		// Grow the key table to five keys so the blockhash lands at the right
+		// offset, then drop the data-length byte.
+		let mut grown = vec![0u8; 96];
+		grown[..64].copy_from_slice(&overrun_indices[69..133]);
+		overrun_indices.splice(69..133, grown.iter().cloned());
+		overrun_indices.truncate(tail + 4);
+		assert!(validate_transaction_wire(&overrun_indices).is_err());
+
+		// An instruction that declares one account index but whose data
+		// length byte is missing: the message ends right after the account
+		// index, so the data-length read finds nothing.
+		let mut missing_data_len = base(1);
+		missing_data_len[165] = 1; // one instruction
+		missing_data_len[166] = 0; // program id = account 0
+		missing_data_len[167] = 1; // one account index
+		missing_data_len[168] = 0; // the index byte (data length absent)
+		assert!(validate_transaction_wire(&missing_data_len).is_err());
+
+		// An instruction whose declared data length overruns the message.
+		let mut overrun = base(1);
+		let data_len_index = overrun.len() - 1;
+		overrun[data_len_index] = 50;
+		assert!(validate_transaction_wire(&overrun).is_err());
 	}
 
 	#[test]
