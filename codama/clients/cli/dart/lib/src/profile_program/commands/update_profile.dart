@@ -12,20 +12,14 @@ final class UpdateProfileCommand extends Command<void> {
     argParser
       ..addOption('name', mandatory: true, help: "name")
       ..addOption('bio', mandatory: true, help: "bio")
-      ..addOption(
-        'profile',
-        mandatory: false,
-        help:
-            "The profile PDA account (must already exist and be writable) [default: derived]",
-      );
+      ..addOption('profile', mandatory: false, help: "The profile PDA account (must already exist and be writable) [default: derived]");
   }
 
   @override
   String get name => 'update_profile';
 
   @override
-  String get description =>
-      "Instruction data for `UpdateProfile`. Replaces both name and bio.";
+  String get description => "Instruction data for `UpdateProfile`. Replaces both name and bio.";
 
   @override
   Future<void> run() async {
@@ -35,9 +29,9 @@ final class UpdateProfileCommand extends Command<void> {
     final profile = (results['profile'] as String?) != null
         ? pubkey('--profile', results['profile']! as String)
         : (await findProfilePda(
-            seeds: ProfileSeeds(authority: authority),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: ProfileSeeds(authority: authority),
+          programAddress: context.programAddress,
+        )).$1;
     final nameValue = results['name']! as String;
     final bioValue = results['bio']! as String;
     final instruction = getUpdateProfileInstruction(

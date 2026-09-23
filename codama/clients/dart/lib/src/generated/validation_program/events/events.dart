@@ -12,9 +12,7 @@ import 'policy_checked.dart';
 /// Unrelated lines and programs are skipped. A log that names an event but
 /// carries an unknown, future, or non-projectable version throws instead of
 /// being silently dropped.
-List<ValidationProgramEvent> parseValidationProgramEventsFromLogs(
-  List<String> logs,
-) {
+List<ValidationProgramEvent> parseValidationProgramEventsFromLogs(List<String> logs) {
   final discovered = <ValidationProgramEvent>[];
   for (final log in logs) {
     final policyChecked = parsePolicyCheckedEventFromLog(log);

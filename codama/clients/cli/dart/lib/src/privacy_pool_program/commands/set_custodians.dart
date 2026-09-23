@@ -11,16 +11,8 @@ final class SetCustodiansCommand extends Command<void> {
   SetCustodiansCommand() {
     argParser
       ..addOption('custodians', mandatory: true, help: "custodians")
-      ..addOption(
-        'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
-      )
-      ..addOption(
-        'custodian_registry',
-        mandatory: true,
-        help: "The custodian_registry account",
-      );
+      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
+      ..addOption('custodian_registry', mandatory: true, help: "The custodian_registry account");
   }
 
   @override
@@ -34,18 +26,9 @@ final class SetCustodiansCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
-    final custodianRegistry = pubkey(
-      '--custodian-registry',
-      results['custodian_registry']! as String,
-    );
-    final custodiansValue = base58Bytes(
-      '--custodians',
-      results['custodians']! as String,
-    );
+    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
+    final custodianRegistry = pubkey('--custodian-registry', results['custodian_registry']! as String);
+    final custodiansValue = base58Bytes('--custodians', results['custodians']! as String);
     final instruction = getSetCustodiansInstruction(
       programAddress: context.programAddress,
       authority: authority,

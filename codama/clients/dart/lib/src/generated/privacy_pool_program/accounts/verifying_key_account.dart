@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -9,6 +10,7 @@ import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
+
 
 @immutable
 class VerifyingKeyAccount {
@@ -24,8 +26,9 @@ class VerifyingKeyAccount {
     required this.ic1,
     required this.ic2,
     required this.ic3,
-  }) : discriminator = 10,
-       migrationVersion = 0;
+  }) :
+      discriminator = 10,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -61,26 +64,12 @@ class VerifyingKeyAccount {
           ic3 == other.ic3;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    slot,
-    alphaG1,
-    betaG2,
-    gammaG2,
-    deltaG2,
-    icLen,
-    ic0,
-    ic1,
-    ic2,
-    ic3,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, slot, alphaG1, betaG2, gammaG2, deltaG2, icLen, ic0, ic1, ic2, ic3);
 
   @override
-  String toString() =>
-      'VerifyingKeyAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, slot: $slot, alphaG1: $alphaG1, betaG2: $betaG2, gammaG2: $gammaG2, deltaG2: $deltaG2, icLen: $icLen, ic0: $ic0, ic1: $ic1, ic2: $ic2, ic3: $ic3)';
+  String toString() => 'VerifyingKeyAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, slot: $slot, alphaG1: $alphaG1, betaG2: $betaG2, gammaG2: $gammaG2, deltaG2: $deltaG2, icLen: $icLen, ic0: $ic0, ic1: $ic1, ic2: $ic2, ic3: $ic3)';
 }
+
 
 Encoder<VerifyingKeyAccount> getVerifyingKeyAccountEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -137,15 +126,20 @@ Decoder<VerifyingKeyAccount> getVerifyingKeyAccountDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'verifyingKeyAccount account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'verifyingKeyAccount account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (VerifyingKeyAccount, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(10)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(10),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -158,17 +152,17 @@ Decoder<VerifyingKeyAccount> getVerifyingKeyAccountDecoder() {
 
     return (
       VerifyingKeyAccount(
-        bump: map['bump']! as int,
-        slot: map['slot']! as int,
-        alphaG1: map['alphaG1']! as Uint8List,
-        betaG2: map['betaG2']! as Uint8List,
-        gammaG2: map['gammaG2']! as Uint8List,
-        deltaG2: map['deltaG2']! as Uint8List,
-        icLen: map['icLen']! as int,
-        ic0: map['ic0']! as Uint8List,
-        ic1: map['ic1']! as Uint8List,
-        ic2: map['ic2']! as Uint8List,
-        ic3: map['ic3']! as Uint8List,
+      bump: map['bump']! as int,
+      slot: map['slot']! as int,
+      alphaG1: map['alphaG1']! as Uint8List,
+      betaG2: map['betaG2']! as Uint8List,
+      gammaG2: map['gammaG2']! as Uint8List,
+      deltaG2: map['deltaG2']! as Uint8List,
+      icLen: map['icLen']! as int,
+      ic0: map['ic0']! as Uint8List,
+      ic1: map['ic1']! as Uint8List,
+      ic2: map['ic2']! as Uint8List,
+      ic3: map['ic3']! as Uint8List,
       ),
       newOffset,
     );
@@ -195,15 +189,10 @@ Decoder<VerifyingKeyAccount> getVerifyingKeyAccountDecoder() {
 }
 
 Codec<VerifyingKeyAccount, VerifyingKeyAccount> getVerifyingKeyAccountCodec() {
-  return combineCodec(
-    getVerifyingKeyAccountEncoder(),
-    getVerifyingKeyAccountDecoder(),
-  );
+  return combineCodec(getVerifyingKeyAccountEncoder(), getVerifyingKeyAccountDecoder());
 }
 
-Account<VerifyingKeyAccount> decodeVerifyingKeyAccount(
-  EncodedAccount encodedAccount,
-) {
+Account<VerifyingKeyAccount> decodeVerifyingKeyAccount(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getVerifyingKeyAccountDecoder());
 }
 
@@ -215,11 +204,11 @@ const int verifyingKeyAccountMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool verifyingKeyAccountNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 10) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 10) {
+		return false;
+	}
+	return data[1] < 0;
 }

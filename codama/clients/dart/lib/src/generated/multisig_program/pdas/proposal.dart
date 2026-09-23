@@ -1,13 +1,19 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
+
 import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 
+
 @immutable
 class ProposalSeeds {
-  const ProposalSeeds({required this.multisig, required this.index});
+  const ProposalSeeds({
+    required this.multisig,
+    required this.index,
+  });
 
   final Address multisig;
   final BigInt index;

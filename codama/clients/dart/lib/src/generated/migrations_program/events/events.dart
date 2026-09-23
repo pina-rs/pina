@@ -12,9 +12,7 @@ import 'value_changed_event.dart';
 /// Unrelated lines and programs are skipped. A log that names an event but
 /// carries an unknown, future, or non-projectable version throws instead of
 /// being silently dropped.
-List<MigrationsProgramEvent> parseMigrationsProgramEventsFromLogs(
-  List<String> logs,
-) {
+List<MigrationsProgramEvent> parseMigrationsProgramEventsFromLogs(List<String> logs) {
   final discovered = <MigrationsProgramEvent>[];
   for (final log in logs) {
     final valueChangedEvent = parseValueChangedEventEventFromLog(log);

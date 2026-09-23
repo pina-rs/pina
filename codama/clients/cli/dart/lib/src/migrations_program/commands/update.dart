@@ -14,21 +14,9 @@ final class UpdateCommand extends Command<void> {
       ..addOption('memo', mandatory: true, help: "memo")
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption(
-        'system_program',
-        mandatory: true,
-        help: "The system_program account",
-      )
-      ..addOption(
-        'manual_state',
-        mandatory: true,
-        help: "The manual_state account",
-      )
-      ..addOption(
-        'compact_state',
-        mandatory: true,
-        help: "The compact_state account",
-      );
+      ..addOption('system_program', mandatory: true, help: "The system_program account")
+      ..addOption('manual_state', mandatory: true, help: "The manual_state account")
+      ..addOption('compact_state', mandatory: true, help: "The compact_state account");
   }
 
   @override
@@ -45,18 +33,9 @@ final class UpdateCommand extends Command<void> {
     final referrer = pubkey('--referrer', results['referrer']! as String);
     final state = pubkey('--state', results['state']! as String);
     final migrationPayer = context.payerAddress;
-    final systemProgram = pubkey(
-      '--system-program',
-      results['system_program']! as String,
-    );
-    final manualState = pubkey(
-      '--manual-state',
-      results['manual_state']! as String,
-    );
-    final compactState = pubkey(
-      '--compact-state',
-      results['compact_state']! as String,
-    );
+    final systemProgram = pubkey('--system-program', results['system_program']! as String);
+    final manualState = pubkey('--manual-state', results['manual_state']! as String);
+    final compactState = pubkey('--compact-state', results['compact_state']! as String);
     final valueValue = bigInteger('--value', results['value']! as String);
     final memoValue = integer('--memo', results['memo']! as String);
     final instruction = getUpdateInstruction(

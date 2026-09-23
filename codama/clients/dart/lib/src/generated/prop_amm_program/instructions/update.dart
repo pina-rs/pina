@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,10 +12,13 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class UpdateInstructionData {
-  const UpdateInstructionData({required this.newPrice})
-    : discriminator = 1,
+  const UpdateInstructionData({
+    required this.newPrice,
+  }) :
+      discriminator = 1,
       migrationVersion = 0;
 
   final int discriminator;
@@ -47,23 +51,32 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'update instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'update instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (UpdateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      UpdateInstructionData(newPrice: map['newPrice']! as BigInt),
+      UpdateInstructionData(
+      newPrice: map['newPrice']! as BigInt,
+      ),
       newOffset,
     );
   }
@@ -88,12 +101,8 @@ Decoder<UpdateInstructionData> getUpdateInstructionDataDecoder() {
   };
 }
 
-Codec<UpdateInstructionData, UpdateInstructionData>
-getUpdateInstructionDataCodec() {
-  return combineCodec(
-    getUpdateInstructionDataEncoder(),
-    getUpdateInstructionDataDecoder(),
-  );
+Codec<UpdateInstructionData, UpdateInstructionData> getUpdateInstructionDataCodec() {
+  return combineCodec(getUpdateInstructionDataEncoder(), getUpdateInstructionDataDecoder());
 }
 
 /// Creates a [Update] instruction.
@@ -103,13 +112,15 @@ Instruction getUpdateInstruction({
   required Address authority,
   required BigInt newPrice,
 }) {
-  final instructionData = UpdateInstructionData(newPrice: newPrice);
+  final instructionData = UpdateInstructionData(
+      newPrice: newPrice,
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: oracle, role: AccountRole.writable),
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+    AccountMeta(address: oracle, role: AccountRole.writable),
+    AccountMeta(address: authority, role: AccountRole.readonlySigner),
     ],
     data: getUpdateInstructionDataEncoder().encode(instructionData),
   );

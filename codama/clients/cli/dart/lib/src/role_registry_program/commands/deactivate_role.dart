@@ -10,16 +10,8 @@ import 'package:pina_codama_clients/role_registry_program.dart';
 final class DeactivateRoleCommand extends Command<void> {
   DeactivateRoleCommand() {
     argParser
-      ..addOption(
-        'registry_config',
-        mandatory: true,
-        help: "The registry_config account",
-      )
-      ..addOption(
-        'role_entry',
-        mandatory: true,
-        help: "The role_entry account",
-      );
+      ..addOption('registry_config', mandatory: true, help: "The registry_config account")
+      ..addOption('role_entry', mandatory: true, help: "The role_entry account");
   }
 
   @override
@@ -33,10 +25,7 @@ final class DeactivateRoleCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final admin = context.payerAddress;
-    final registryConfig = pubkey(
-      '--registry-config',
-      results['registry_config']! as String,
-    );
+    final registryConfig = pubkey('--registry-config', results['registry_config']! as String);
     final roleEntry = pubkey('--role-entry', results['role_entry']! as String);
 
     final instruction = getDeactivateRoleInstruction(

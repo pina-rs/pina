@@ -12,22 +12,9 @@ final class SetRewardIndexCommand extends Command<void> {
     argParser
       ..addOption('new_index', mandatory: true, help: "newIndex")
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
-      ..addOption(
-        'reward_mint',
-        mandatory: true,
-        help: "The pool's reward mint, for validating the vault binding",
-      )
-      ..addOption(
-        'token_program',
-        mandatory: true,
-        help: "The token program that owns the reward mint and vault",
-      )
-      ..addOption(
-        'reward_vault',
-        mandatory: true,
-        help:
-            "The pool's canonical reward vault. An index update is a promise to pay:",
-      );
+      ..addOption('reward_mint', mandatory: true, help: "The pool's reward mint, for validating the vault binding")
+      ..addOption('token_program', mandatory: true, help: "The token program that owns the reward mint and vault")
+      ..addOption('reward_vault', mandatory: true, help: "The pool's canonical reward vault. An index update is a promise to pay:");
   }
 
   @override
@@ -42,22 +29,10 @@ final class SetRewardIndexCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final admin = context.payerAddress;
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
-    final rewardMint = pubkey(
-      '--reward-mint',
-      results['reward_mint']! as String,
-    );
-    final tokenProgram = pubkey(
-      '--token-program',
-      results['token_program']! as String,
-    );
-    final rewardVault = pubkey(
-      '--reward-vault',
-      results['reward_vault']! as String,
-    );
-    final newIndexValue = bigInteger(
-      '--new-index',
-      results['new_index']! as String,
-    );
+    final rewardMint = pubkey('--reward-mint', results['reward_mint']! as String);
+    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+    final rewardVault = pubkey('--reward-vault', results['reward_vault']! as String);
+    final newIndexValue = bigInteger('--new-index', results['new_index']! as String);
     final instruction = getSetRewardIndexInstruction(
       programAddress: context.programAddress,
       admin: admin,
