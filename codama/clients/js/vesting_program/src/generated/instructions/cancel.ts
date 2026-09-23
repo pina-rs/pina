@@ -97,7 +97,7 @@ export type CancelInstruction<
 			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
 				: TAccountClock,
 			TAccountBeneficiaryAta extends string
-				? ReadonlyAccount<TAccountBeneficiaryAta>
+				? WritableAccount<TAccountBeneficiaryAta>
 				: TAccountBeneficiaryAta,
 			...TRemainingAccounts,
 		]
@@ -171,7 +171,8 @@ export type CancelInput<
 	clock: Address<TAccountClock>;
 	/**
 	 * The beneficiary's ATA: the vested-but-unclaimed amount settles here
-	 * before any remainder returns to the administrator.
+	 * before any remainder returns to the administrator. It is mutable
+	 * because the settlement transfer credits it.
 	 */
 	beneficiaryAta: Address<TAccountBeneficiaryAta>;
 };
@@ -233,7 +234,7 @@ export function getCancelInstruction<
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 		clock: { value: input.clock ?? null, isWritable: false },
-		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: false },
+		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -306,7 +307,8 @@ export type ParsedCancelInstruction<
 		clock: TAccountMetas[8];
 		/**
 		 * The beneficiary's ATA: the vested-but-unclaimed amount settles here
-		 * before any remainder returns to the administrator.
+		 * before any remainder returns to the administrator. It is mutable
+		 * because the settlement transfer credits it.
 		 */
 		beneficiaryAta: TAccountMetas[9];
 	};

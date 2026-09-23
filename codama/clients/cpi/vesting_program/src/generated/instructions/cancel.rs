@@ -61,8 +61,9 @@ pub struct Cancel<'account> {
 
 	/// CPI account `beneficiaryAta`.
 	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
-	/// before any remainder returns to the administrator.
-	/// Required privileges: read-only.
+	/// before any remainder returns to the administrator. It is mutable
+	/// because the settlement transfer credits it.
+	/// Required privileges: writable.
 	pub beneficiary_ata: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `cancel`.
@@ -111,7 +112,7 @@ impl<'account> Cancel<'account> {
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.clock),
-			CpiHandle::readonly(self.beneficiary_ata),
+			CpiHandle::writable(self.beneficiary_ata)?,
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

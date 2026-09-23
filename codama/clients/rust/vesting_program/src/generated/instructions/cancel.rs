@@ -26,7 +26,8 @@ pub struct Cancel {
 	/// confiscate what the linear curve has already released.
 	pub clock: solana_pubkey::Pubkey,
 	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
-	/// before any remainder returns to the administrator.
+	/// before any remainder returns to the administrator. It is mutable
+	/// because the settlement transfer credits it.
 	pub beneficiary_ata: solana_pubkey::Pubkey,
 }
 
@@ -93,7 +94,7 @@ impl Cancel {
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.clock, false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.beneficiary_ata,
 			false,
 		));

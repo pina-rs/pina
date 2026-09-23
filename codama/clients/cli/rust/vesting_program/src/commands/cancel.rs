@@ -36,7 +36,7 @@ pub struct CancelArgs {
 	/// Clock for the vested-entitlement settlement: cancellation must not confiscate what the linear curve has already released
 	#[arg(long)]
 	clock: String,
-	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here before any remainder returns to the administrator
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here before any remainder returns to the administrator. It is mutable because the settlement transfer credits it
 	#[arg(long)]
 	beneficiary_ata: String,
 }

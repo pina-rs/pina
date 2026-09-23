@@ -130,7 +130,7 @@ Instruction getCancelInstruction({
     AccountMeta(address: systemProgram, role: AccountRole.readonly),
     AccountMeta(address: tokenProgram, role: AccountRole.readonly),
     AccountMeta(address: clock, role: AccountRole.readonly),
-    AccountMeta(address: beneficiaryAta, role: AccountRole.readonly),
+    AccountMeta(address: beneficiaryAta, role: AccountRole.writable),
     ],
     data: getCancelInstructionDataEncoder().encode(instructionData),
   );

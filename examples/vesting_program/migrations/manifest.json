@@ -371,7 +371,7 @@
 							},
 							{
 								"name": "beneficiary_ata",
-								"writable": false,
+								"writable": true,
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,

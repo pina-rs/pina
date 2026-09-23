@@ -629,12 +629,13 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "beneficiaryAta",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false,
 						"docs": [
 							"The beneficiary's ATA: the vested-but-unclaimed amount settles here",
-							"before any remainder returns to the administrator."
+							"before any remainder returns to the administrator. It is mutable",
+							"because the settlement transfer credits it."
 						]
 					}
 				],

@@ -159,8 +159,9 @@ pub struct CancelAccounts<'a> {
 	/// confiscate what the linear curve has already released.
 	pub clock: &'a AccountView,
 	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
-	/// before any remainder returns to the administrator.
-	pub beneficiary_ata: &'a AccountView,
+	/// before any remainder returns to the administrator. It is mutable
+	/// because the settlement transfer credits it.
+	pub beneficiary_ata: &'a mut AccountView,
 }
 
 /// Seed prefix for vesting PDAs.
@@ -613,6 +614,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			// into.
 			self.beneficiary_ata
 				.assert_not_empty()?
+				.assert_writable()?
 				.assert_owners(&SPL_PROGRAM_IDS)?;
 
 			token::instructions::TransferChecked::new(
