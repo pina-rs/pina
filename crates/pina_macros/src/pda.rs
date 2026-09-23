@@ -549,9 +549,51 @@ pub(crate) fn expand(
 		}
 	};
 
+	// `CreateCompactProgramAccountWithBump` reads the stored bump back out of
+	// the committed data so it can reject a patch that stores a different one.
+	// Only a compact account has the compact creation builder and the loader
+	// pair the check protects.
+	let stored_bump_impl = match (args.bump.as_ref(), is_compact) {
+		(Some(bump_field), true) => {
+			// The encoded header is the discriminator, the migration version,
+			// the inline fields in declaration order, then the tail length
+			// prefixes. The account macro rejects any inline field after a
+			// dynamic one, so every field declared before the bump — an inline
+			// `u8` — is inline, and each one's header footprint is exactly its
+			// pod type, the same mapping the compact derive stores. The sum
+			// therefore folds to the bump field's byte offset at compile time.
+			let offset_sum = named_fields
+				.iter()
+				.take_while(|field| field.ident.as_ref() != Some(bump_field))
+				.map(|field| {
+					let ty = &field.ty;
+					quote! {
+						+ ::core::mem::size_of::<<#ty as #crate_path::ZcField>::Pod>()
+					}
+				});
+			Some(quote! {
+				impl #crate_path::PinaCompactStoredBump for #struct_name {
+					fn stored_bump(
+						data: &[u8],
+					) -> ::core::result::Result<u8, #crate_path::ProgramError> {
+						const OFFSET: usize = 0 #(#offset_sum)*;
+						// A single byte load rather than a validation pass:
+						// creation compares the byte the patch just wrote, it
+						// does not need the layout re-proven.
+						data.get(OFFSET)
+							.copied()
+							.ok_or(#crate_path::ProgramError::InvalidAccountData)
+					}
+				}
+			})
+		}
+		_ => None,
+	};
+
 	quote! {
 		#item_struct
 		#address_identity_proof
 		#generated
+		#stored_bump_impl
 	}
 }

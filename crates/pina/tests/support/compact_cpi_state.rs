@@ -5,6 +5,7 @@ use crate::Vec;
 pub enum TestCompactKind {
 	TestCompactState = 9,
 	ValidatedTestCompactState = 10,
+	TestCompactBumpState = 11,
 }
 
 #[crate::account(
@@ -17,6 +18,22 @@ pub struct TestCompactState {
 	pub value: u8,
 	pub items: Vec<u64, 4>,
 }
+
+#[crate::account(
+	crate = crate,
+	discriminator = TestCompactKind::TestCompactBumpState,
+	compact
+)]
+#[crate::pda(crate = crate, seeds = [SEED_TEST_COMPACT_BUMP], bump = bump)]
+#[allow(dead_code)]
+pub struct TestCompactBumpState {
+	pub value: u8,
+	pub bump: u8,
+	pub items: Vec<u64, 2>,
+}
+
+/// Seed prefix for [`TestCompactBumpState`] PDAs.
+pub const SEED_TEST_COMPACT_BUMP: &[u8] = b"test-compact-bump";
 
 #[cfg(feature = "validation")]
 #[crate::account(
