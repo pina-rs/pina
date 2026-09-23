@@ -307,34 +307,21 @@ fn collect_from_block(
 					// element's identity, so a field captured in a tuple (the
 					// common "parse once, capture several fields" shape)
 					// keeps alias provenance instead of losing it. The
-					// initializer is unwrapped through blocks, because the
-					// idiom wraps the parse in a scoped block.
+					// walker lives with its consuming lint: it only ever
+					// executes inside the lint driver, whose rustc-glue
+					// layer `codecov.yml` already classifies.
 					if let rustc_hir::PatKind::Tuple(pat_elements, _) = local.pat.kind {
-						let mut initializer = init;
-						while let ExprKind::Block(block, _) = initializer.kind {
-							let Some(tail) = block.expr else {
-								break;
-							};
-							initializer = tail;
-						}
-						if let ExprKind::Tup(init_elements) = initializer.kind
-							&& pat_elements.len() == init_elements.len()
+						for (binding, element) in
+							crate::lints::tuple_pattern_aliases(init, pat_elements)
 						{
-							for (pattern, element) in pat_elements.iter().zip(init_elements) {
-								let rustc_hir::PatKind::Binding(_, binding, _ident, _) =
-									pattern.kind
-								else {
-									continue;
-								};
-								if let Some(identity) = expression_identity(element) {
-									facts.aliases.insert(
-										binding,
-										AliasInfo {
-											identity,
-											binding: expression_local_binding(element),
-										},
-									);
-								}
+							if let Some(identity) = expression_identity(element) {
+								facts.aliases.insert(
+									binding,
+									AliasInfo {
+										identity,
+										binding: expression_local_binding(element),
+									},
+								);
 							}
 						}
 					}
