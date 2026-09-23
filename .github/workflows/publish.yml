@@ -127,7 +127,7 @@ jobs:
       - resolve_revision
     if: >-
       github.repository_owner == 'pina-rs' &&
-      (startsWith(inputs.tag || github.ref_name, 'v') || startsWith(inputs.tag || github.ref_name, 'abi/v'))
+      startsWith(inputs.tag || github.ref_name, 'v')
     # Upload native archives to the draft release and attest their provenance.
     permissions:
       attestations: write # Record provenance for the native CLI archives.
@@ -316,7 +316,7 @@ jobs:
       needs.resolve_revision.result == 'success' &&
       needs.upload_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
-      (startsWith(inputs.tag || github.ref_name, 'v') || startsWith(inputs.tag || github.ref_name, 'abi/v')) &&
+      startsWith(inputs.tag || github.ref_name, 'v') &&
       (inputs.dry_run != true)
     needs:
       - resolve_revision
@@ -408,7 +408,7 @@ jobs:
       needs.resolve_revision.result == 'success' &&
       needs.attest_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
-      (startsWith(inputs.tag || github.ref_name, 'v') || startsWith(inputs.tag || github.ref_name, 'abi/v')) &&
+      startsWith(inputs.tag || github.ref_name, 'v') &&
       (inputs.dry_run != true)
     runs-on: ubuntu-latest
     timeout-minutes: 90
