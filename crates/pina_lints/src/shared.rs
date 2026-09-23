@@ -306,25 +306,11 @@ fn collect_from_block(
 					// A tuple destructure maps each binding to its positional
 					// element's identity, so a field captured in a tuple (the
 					// common "parse once, capture several fields" shape)
-					// keeps alias provenance instead of losing it. The
-					// walker lives with its consuming lint: it only ever
-					// executes inside the lint driver, whose rustc-glue
-					// layer `codecov.yml` already classifies.
-					if let rustc_hir::PatKind::Tuple(pat_elements, _) = local.pat.kind {
-						for (binding, element) in
-							crate::lints::tuple_pattern_aliases(init, pat_elements)
-						{
-							if let Some(identity) = expression_identity(element) {
-								facts.aliases.insert(
-									binding,
-									AliasInfo {
-										identity,
-										binding: expression_local_binding(element),
-									},
-								);
-							}
-						}
-					}
+					// keeps alias provenance instead of losing it. The walk
+					// lives with its consuming lint: it only ever executes
+					// inside the lint driver, whose rustc-glue layer
+					// `codecov.yml` already classifies.
+					crate::lints::record_tuple_pattern_aliases(init, local.pat, &mut facts.aliases);
 					collect_from_expr(
 						cx,
 						init,

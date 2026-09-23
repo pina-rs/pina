@@ -32,45 +32,51 @@ pub mod require_type_assert_before_zero_copy_cast;
 pub mod require_writable_before_account_resize;
 pub mod require_zeroed_before_close;
 
-/// Unwrap a tuple-pattern initializer to its positional alias pairs.
+/// Record tuple-destructure alias provenance into `aliases`.
 ///
-/// The "parse once, capture several fields" idiom wraps the parse in a scoped
-/// block (`let (maker, bump) = { let state = account.as_account()?; … };`), so
-/// the tuple the pattern destructures is the block's tail expression. Each
-/// plain binding pairs with the identity of the element at its position;
-/// non-binding patterns (`_`, nested tuples) contribute nothing. This runs
-/// only inside the lint driver, whose rustc-glue layer `codecov.yml`
+/// The "parse once, capture several fields" idiom wraps the parse in a
+/// scoped block (`let (maker, bump) = { let state = account.as_account()?; …
+/// };`), so the tuple the pattern destructures is the block's tail
+/// expression. Each plain binding is mapped to the identity of the element at
+/// its position; non-binding patterns (`_`, nested tuples) contribute
+/// nothing, and a non-tuple initializer records nothing (the pattern cannot
+/// have destructured it, so no alias would be sound).
+///
+/// This runs only inside the lint driver, the rustc-glue layer `codecov.yml`
 /// classifies: the UI fixtures in
 /// `tests/ui/require_canonical_bump_before_pda_write/` exercise both the
 /// plain-binding and skipped-element shapes byte for byte.
-pub(crate) fn tuple_pattern_aliases<'hir>(
-	initializer: &'hir Expr<'hir>,
-	pat_elements: &'hir [rustc_hir::Pat<'hir>],
-) -> impl Iterator<Item = (rustc_hir::HirId, &'hir Expr<'hir>)> + 'hir {
+pub(crate) fn record_tuple_pattern_aliases(
+	initializer: &Expr<'_>,
+	pattern: &rustc_hir::Pat<'_>,
+	aliases: &mut std::collections::HashMap<rustc_hir::HirId, crate::shared::AliasInfo>,
+) {
+	let rustc_hir::PatKind::Tuple(pat_elements, _) = pattern.kind else {
+		return;
+	};
 	let mut tail = initializer;
 	while let ExprKind::Block(block, _) = tail.kind {
 		match block.expr {
 			Some(next) => tail = next,
-			None => break,
+			None => return,
 		}
 	}
-	match tail.kind {
-		ExprKind::Tup(init_elements) => {
-			pat_elements
-				.iter()
-				.zip(init_elements)
-				.filter_map(|(pattern, element)| {
-					match pattern.kind {
-						rustc_hir::PatKind::Binding(_, binding, ..) => Some((binding, element)),
-						_ => None,
-					}
-				})
-				.collect::<Vec<_>>()
-				.into_iter()
+	let ExprKind::Tup(init_elements) = tail.kind else {
+		return;
+	};
+	for (pattern, element) in pat_elements.iter().zip(init_elements) {
+		let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind else {
+			continue;
+		};
+		if let Some(identity) = crate::shared::expression_identity(element) {
+			aliases.insert(
+				binding,
+				crate::shared::AliasInfo {
+					identity,
+					binding: crate::shared::expression_local_binding(element),
+				},
+			);
 		}
-		// The initializer is not a tuple (or the block diverges), so the
-		// pattern cannot have destructured it; no alias would be sound.
-		_ => Vec::new().into_iter(),
 	}
 }
 
