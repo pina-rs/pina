@@ -1473,7 +1473,7 @@ fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
 		return Err(());
 	}
 	// `signature_count <= 16` bounds this product well inside `usize`.
-	let mut cursor = 1 + usize::from(versioned) + signature_count * 64;
+	let cursor = 1 + usize::from(versioned) + signature_count * 64;
 	if bytes.len() < cursor + 3 {
 		return Err(());
 	}
