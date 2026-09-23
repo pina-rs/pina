@@ -130,8 +130,7 @@ jobs:
           # exact tree being released.
           release_branch="monochange/release/release"
           tag="$(monochange step release-record --from "$release_branch" --format json \
-            | jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' \
-            | head -1)"
+            | jq -r '[.record.release_targets[] | select(.tag == true)] | sort_by(.tag_name | startswith("v") | not) | first | .tag_name')"
           if [ -z "$tag" ]; then
             echo "::error::Could not determine the release tag for the dry run." >&2
             exit 1
@@ -257,10 +256,19 @@ jobs:
               echo "::error::Refusing to dispatch unexpected release tag '$tag'." >&2
               exit 1
             fi
-            gh workflow run publish.yml \
-              --repo "$GITHUB_REPOSITORY" \
-              --ref "$tag" \
-              --field "tag=$tag"
+            if [[ "$tag" == abi/* ]]; then
+              # Namespaced lines publish through the primary dispatch, whose
+              # `publish-packages --all` covers every package in the record.
+              # Their releases carry no binaries, so publishing them only
+              # flips the draft; the archive action cannot build a tag
+              # containing a slash.
+              gh release edit "$tag" --draft=false --repo "$GITHUB_REPOSITORY"
+            else
+              gh workflow run publish.yml \
+                --repo "$GITHUB_REPOSITORY" \
+                --ref "$tag" \
+                --field "tag=$tag"
+            fi
           done
         shell: devenv shell -- bash -e {0}
 
