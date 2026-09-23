@@ -864,6 +864,82 @@ fn claim_wrong_beneficiary_fails() {
 // ---------------------------------------------------------------------------
 
 #[test]
+/// SEC-28 binding check: the Cancel settlement must land in a token account
+/// the beneficiary owns for the schedule's mint. An admin-named account they
+/// own themselves is refused, so the entitlement cannot be redirected.
+#[test]
+fn cancel_rejects_a_settlement_destination_outside_the_beneficiary() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let admin = Pubkey::new_unique();
+	let beneficiary = Pubkey::new_unique();
+	let mint = Pubkey::new_unique();
+	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
+	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
+	let beneficiary_ata = derive_ata(&beneficiary, &mint);
+	let decoy_ata = derive_ata(&admin, &mint); // same owner as admin_ata
+	let (clock_key, clock_account) = clock_sysvar_account(&mollusk, 400); // mid-window
+
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&cancel_ix_data(),
+		cancel_account_metas(
+			&admin,
+			&mint,
+			&vesting_pda,
+			&admin_ata,
+			&vault,
+			&clock_key,
+			&beneficiary_ata,
+		),
+	);
+
+	let accounts = vec![
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(mint, initialized_mint_account(6, 1_000_000)),
+		(
+			vesting_pda,
+			vesting_state_account(
+				&admin,
+				&beneficiary,
+				&mint,
+				1_000_000,
+				0,
+				100,
+				200,
+				300,
+				false,
+				bump,
+				lamports,
+			),
+		),
+		(vault, token_account(&mint, &vesting_pda, 1_000_000)),
+		(admin_ata, token_account(&mint, &admin, 0)),
+		// The metas name the real beneficiary ATA, but its stored owner is the
+		// admin: the address alone must not vouch for the destination.
+		(beneficiary_ata, token_account(&mint, &admin, 0)),
+		(clock_key, clock_account),
+		associated_token_program_account(),
+		mollusk_svm::program::keyed_account_for_system_program(),
+		token_program_account(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(VestingError::InvalidBeneficiaryAta.into())],
+	);
+}
+
 /// SEC-30 (audit regression): `Initialize` must reject a Token-2022 mint
 /// carrying extensions. Every value-exit path rejects extended mints
 /// (`assert_no_extensions`), so accepting one here would create a schedule
