@@ -247,7 +247,10 @@ jobs:
           bin: pina
           manifest-path: crates/pina_cli/Cargo.toml
           profile: release
-          ref: ${{ needs.resolve_revision.outputs.sha }}
+          # The action derives its upload target from this ref and refuses a
+          # bare SHA outside a dry run, so it gets the tag itself; resolve_revision
+          # has already proven the tag points at the validated commit.
+          ref: ${{ inputs.checkout_ref || format('refs/tags/{0}', env.RELEASE_TAG) }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
           include: ${{ matrix.lint_driver == true && (endsWith(matrix.target, '-windows-msvc') && format('target/{0}/release/pina_lint_driver.exe', matrix.target) || format('target/{0}/release/pina_lint_driver', matrix.target)) || '' }}
