@@ -15,6 +15,7 @@ use serde::Serialize;
 
 use crate::keys::inspect_program_id;
 use crate::keys::read_keypair_program_id;
+use crate::lint_driver::DriverOrigin;
 use crate::project::ClientLanguage;
 use crate::project::Project;
 
@@ -117,6 +118,10 @@ pub struct LintDriverDiagnostic {
 	/// How that driver would be obtained, absent when nothing resolved.
 	pub resolved_origin: Option<String>,
 
+	/// The toolchain the resolved driver was built for, absent when unknown
+	/// or when no driver resolved.
+	pub resolved_toolchain: Option<String>,
+
 	/// Per-user cache directory searched for a negotiated driver.
 	pub cache_directory: Option<PathBuf>,
 
@@ -201,7 +206,7 @@ impl DoctorReport {
 		let _ = writeln!(output, "  active toolchain: {}", escape_controls(active));
 		let _ = writeln!(
 			output,
-			"  expected toolchain: {}",
+			"  shipped-lint toolchain: {}",
 			escape_controls(&lint_driver.expected_toolchain)
 		);
 		match (&lint_driver.resolved_driver, &lint_driver.resolved_origin) {
@@ -217,6 +222,13 @@ impl DoctorReport {
 			_ => {
 				let _ = writeln!(output, "  driver: unavailable");
 			}
+		}
+		if let Some(toolchain) = &lint_driver.resolved_toolchain {
+			let _ = writeln!(
+				output,
+				"  resolved toolchain: {}",
+				escape_controls(toolchain)
+			);
 		}
 		if let Some(cache) = &lint_driver.cache_directory {
 			let cache = cache.to_string_lossy();
@@ -417,9 +429,13 @@ fn diagnose_lint_driver(
 	// cache, bundle, and download. A download would mutate the cache, so only
 	// the non-mutating half is reported here.
 	let resolved = resolve_without_download(project_root);
+	let resolved_toolchain = resolved_toolchain_for(
+		resolved.as_ref().map(|(_, origin)| *origin),
+		active_toolchain.as_deref(),
+	);
 
 	let (resolved_driver, resolved_origin, remedy) = if let Some((path, origin)) = resolved {
-		(Some(path), Some(origin.to_owned()), None)
+		(Some(path), Some(origin.as_str().to_owned()), None)
 	} else {
 		// An override that does not name an executable is the most confusing
 		// state, because the user believes they already configured a driver.
@@ -464,6 +480,7 @@ fn diagnose_lint_driver(
 		expected_toolchain,
 		resolved_driver,
 		resolved_origin,
+		resolved_toolchain,
 		cache_directory,
 		bundled_driver,
 		bundled_driver_exists,
@@ -477,11 +494,34 @@ fn diagnose_lint_driver(
 /// exist on disk. A download is intentionally excluded: `pina doctor` reports
 /// state rather than changing it, and the remedy line names the command that
 /// performs the download.
-fn resolve_without_download(project_root: &Path) -> Option<(PathBuf, &'static str)> {
+fn resolve_without_download(project_root: &Path) -> Option<(PathBuf, DriverOrigin)> {
 	crate::lint_driver::resolve_existing(project_root)
 		.ok()
 		.flatten()
-		.map(|driver| (driver.path, driver.origin.as_str()))
+		.map(|driver| (driver.path, driver.origin))
+}
+
+/// Report the toolchain the resolved driver was built for.
+///
+/// A driver only loads against the compiler revision it was built with, so
+/// the honest answer depends on how the driver was obtained. A cached,
+/// downloaded, or source-built driver was produced for the active toolchain
+/// by construction, a bundled driver was built for the nightly Pina's
+/// shipped lints target even though the load probe proved it compatible
+/// with the active compiler, and an override names an arbitrary local build
+/// whose toolchain the CLI cannot know. Nothing resolved means there is no
+/// toolchain to report.
+fn resolved_toolchain_for(
+	origin: Option<DriverOrigin>,
+	active_toolchain: Option<&str>,
+) -> Option<String> {
+	match origin {
+		Some(DriverOrigin::Cache | DriverOrigin::Downloaded | DriverOrigin::BuiltFromSource) => {
+			active_toolchain.map(str::to_owned)
+		}
+		Some(DriverOrigin::Bundled) => Some(crate::lint_driver::LINT_DRIVER_TOOLCHAIN.to_owned()),
+		Some(DriverOrigin::Override) | None => None,
+	}
 }
 
 #[derive(Clone, Copy)]
@@ -1051,6 +1091,7 @@ mod tests {
 			expected_toolchain: "nightly-2026-02-20".to_owned(),
 			resolved_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
 			resolved_origin: Some("bundled".to_owned()),
+			resolved_toolchain: Some("nightly-2026-02-20".to_owned()),
 			cache_directory: Some(PathBuf::from("/cache/pina/lint-driver/0.18.0")),
 			bundled_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
 			bundled_driver_exists: true,
@@ -1105,11 +1146,11 @@ mod tests {
 			 11111111111111111111111111111111\nArtifact: /project/target/deploy/counter.so \
 			 (missing)\nKeypair: /project/target/deploy/counter-keypair.json (found)\nLint \
 			 driver:\n  active toolchain: 1.95.0-nightly (aarch64-apple-darwin 7f99507f5, \
-			 2026-02-19)\n  expected toolchain: nightly-2026-02-20\n  driver: \
-			 /cli/pina_lint_driver (bundled)\n  cache: /cache/pina/lint-driver/0.18.0\n  bundled: \
-			 /cli/pina_lint_driver (found)\nTools:\n  cargo (required): cargo 1.89.0\n  surfpool \
-			 (optional): missing\nChecks:\n  [warn] project.artifact: missing\nFindings:\n  - \
-			 build the program\nStatus: warning\n"
+			 2026-02-19)\n  shipped-lint toolchain: nightly-2026-02-20\n  driver: \
+			 /cli/pina_lint_driver (bundled)\n  resolved toolchain: nightly-2026-02-20\n  cache: \
+			 /cache/pina/lint-driver/0.18.0\n  bundled: /cli/pina_lint_driver (found)\nTools:\n  \
+			 cargo (required): cargo 1.89.0\n  surfpool (optional): missing\nChecks:\n  [warn] \
+			 project.artifact: missing\nFindings:\n  - build the program\nStatus: warning\n"
 		);
 	}
 
@@ -1124,6 +1165,7 @@ mod tests {
 				expected_toolchain: "nightly-2026-02-20".to_owned(),
 				resolved_driver: None,
 				resolved_origin: None,
+				resolved_toolchain: None,
 				cache_directory: None,
 				bundled_driver: Some(PathBuf::from("/cli/pina_lint_driver")),
 				bundled_driver_exists: false,
@@ -1139,7 +1181,7 @@ mod tests {
 		assert!(text.contains("driver: unavailable"), "{text}");
 		assert!(text.contains("active toolchain: 1.96.0-nightly"), "{text}");
 		assert!(
-			text.contains("expected toolchain: nightly-2026-02-20"),
+			text.contains("shipped-lint toolchain: nightly-2026-02-20"),
 			"{text}"
 		);
 		assert!(
@@ -1154,12 +1196,80 @@ mod tests {
 			!text.contains("cache:"),
 			"an unavailable cache directory is omitted rather than shown empty: {text}"
 		);
+		assert!(
+			!text.contains("resolved toolchain:"),
+			"an unresolved driver has no toolchain to report: {text}"
+		);
 
 		// An unresolved driver is reported in JSON without inventing a path.
 		report.status = DoctorStatus::Warning;
 		let json = serde_json::to_value(&report).expect("serialize the report");
 		assert!(json["lintDriver"]["resolvedDriver"].is_null());
+		assert!(json["lintDriver"]["resolvedToolchain"].is_null());
 		assert_eq!(json["lintDriver"]["bundledDriverExists"], false);
+	}
+
+	/// The regression behind issue #458: a driver negotiated for the active
+	/// toolchain must not make the diagnostic look pinned to the shipped
+	/// nightly. Cached, downloaded, and source-built drivers all exist for the
+	/// active revision by construction, so that is the toolchain to report.
+	#[test]
+	fn a_negotiated_driver_reports_the_active_toolchain_not_the_shipped_pin() {
+		const SHIPPED: &str = "nightly-2026-02-20";
+		let september = "1.96.0-nightly (host 8a1061806, 2026-09-01)";
+
+		for origin in [
+			DriverOrigin::Cache,
+			DriverOrigin::Downloaded,
+			DriverOrigin::BuiltFromSource,
+		] {
+			let resolved = resolved_toolchain_for(Some(origin), Some(september));
+			assert_eq!(
+				resolved.as_deref(),
+				Some(september),
+				"{origin:?} must report the active toolchain"
+			);
+			assert_ne!(
+				resolved.as_deref(),
+				Some(SHIPPED),
+				"a negotiated driver must not look pinned to the shipped nightly"
+			);
+		}
+
+		// Without an identified active toolchain there is nothing honest to
+		// report for a negotiated driver.
+		assert_eq!(
+			resolved_toolchain_for(Some(DriverOrigin::Cache), None),
+			None
+		);
+	}
+
+	/// A bundled driver was built for the shipped nightly even though the load
+	/// probe proved it compatible with the active compiler — that difference is
+	/// the honest answer. An override names an arbitrary local build, and no
+	/// resolution at all leaves nothing to report.
+	#[test]
+	fn bundled_drivers_report_the_shipped_nightly_and_unknowns_stay_absent() {
+		let active = "1.96.0-nightly (host 8a1061806, 2026-09-01)";
+
+		assert_eq!(
+			resolved_toolchain_for(Some(DriverOrigin::Bundled), Some(active)),
+			Some(crate::lint_driver::LINT_DRIVER_TOOLCHAIN.to_owned())
+		);
+		assert_eq!(
+			resolved_toolchain_for(Some(DriverOrigin::Bundled), None),
+			Some(crate::lint_driver::LINT_DRIVER_TOOLCHAIN.to_owned())
+		);
+		assert_eq!(
+			resolved_toolchain_for(Some(DriverOrigin::Override), Some(active)),
+			None,
+			"an override's toolchain is unknowable"
+		);
+		assert_eq!(
+			resolved_toolchain_for(None, Some(active)),
+			None,
+			"nothing resolved, so there is no toolchain to report"
+		);
 	}
 
 	#[test]
@@ -1209,6 +1319,17 @@ mod tests {
 		assert!(text.contains("finding\\ttext"));
 		assert_eq!(json["project"]["packageName"], "counter\rname");
 		assert_eq!(json["checks"][0]["message"], "message\rtext");
+
+		// The fixture resolves a bundled driver, so its own toolchain is the
+		// shipped nightly, reported beside the unchanged expectedToolchain key.
+		assert_eq!(
+			json["lintDriver"]["expectedToolchain"],
+			"nightly-2026-02-20"
+		);
+		assert_eq!(
+			json["lintDriver"]["resolvedToolchain"],
+			"nightly-2026-02-20"
+		);
 	}
 
 	#[test]
