@@ -238,6 +238,7 @@ pub fn expression_local_binding(expr: &Expr<'_>) -> Option<HirId> {
 		| ExprKind::AddrOf(_, _, inner)
 		| ExprKind::Index(inner, ..) => expression_local_binding(inner),
 		ExprKind::Block(block, _) => block.expr.and_then(expression_local_binding),
+		ExprKind::Field(base, _) => expression_local_binding(base),
 		ExprKind::Call(callee, args) => {
 			args.first()
 				.and_then(|argument| expression_local_binding(argument))
@@ -301,6 +302,41 @@ fn collect_from_block(
 								binding: expression_local_binding(init),
 							},
 						);
+					}
+					// A tuple destructure maps each binding to its positional
+					// element's identity, so a field captured in a tuple (the
+					// common "parse once, capture several fields" shape)
+					// keeps alias provenance instead of losing it. The
+					// initializer is unwrapped through blocks, because the
+					// idiom wraps the parse in a scoped block.
+					if let rustc_hir::PatKind::Tuple(pat_elements, _) = local.pat.kind {
+						let mut initializer = init;
+						while let ExprKind::Block(block, _) = initializer.kind {
+							let Some(tail) = block.expr else {
+								break;
+							};
+							initializer = tail;
+						}
+						if let ExprKind::Tup(init_elements) = initializer.kind
+							&& pat_elements.len() == init_elements.len()
+						{
+							for (pattern, element) in pat_elements.iter().zip(init_elements) {
+								let rustc_hir::PatKind::Binding(_, binding, _ident, _) =
+									pattern.kind
+								else {
+									continue;
+								};
+								if let Some(identity) = expression_identity(element) {
+									facts.aliases.insert(
+										binding,
+										AliasInfo {
+											identity,
+											binding: expression_local_binding(element),
+										},
+									);
+								}
+							}
+						}
 					}
 					collect_from_expr(
 						cx,

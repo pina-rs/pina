@@ -524,6 +524,92 @@ fn assert_seeds_rejects_wrong_seed_value() {
 }
 
 #[test]
+fn assert_stored_bump_accepts_the_parsed_bump() {
+	let authority = unique_address(60);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let test_account = build_account_view(pda, &state_bytes);
+	let account = test_account.view;
+	let result = TestState::assert_stored_bump(
+		&account,
+		bump,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	);
+
+	assert!(
+		result.is_ok(),
+		"expected assert_stored_bump to accept the bump parsed from the account: {result:?}"
+	);
+}
+
+#[test]
+fn assert_stored_bump_rejects_a_mismatched_bump() {
+	let authority = unique_address(61);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let _ = bump;
+
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let test_account = build_account_view(pda, &state_bytes);
+	let account = test_account.view;
+
+	// A bump that is not the one these seeds derive cannot pass: the check
+	// compares the derived address, so any other value fails.
+	let result = TestState::assert_stored_bump(
+		&account,
+		bump.wrapping_add(1),
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	);
+
+	assert!(
+		result.is_err(),
+		"expected assert_stored_bump to reject a bump that does not derive the address"
+	);
+}
+
+#[test]
+fn assert_stored_bump_rejects_a_wrong_address() {
+	let authority = unique_address(62);
+	let (_pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+
+	let state_bytes = build_test_state_bytes(authority, bump);
+
+	// Valid data at a foreign address must fail even with the right bump
+	// value: the account's actual address is what the check compares.
+	let wrong_address = unique_address(63);
+	let test_account = build_account_view(wrong_address, &state_bytes);
+	let account = test_account.view;
+	let result = TestState::assert_stored_bump(
+		&account,
+		bump,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	);
+
+	assert!(
+		result.is_err(),
+		"expected assert_stored_bump to reject a wrong address"
+	);
+}
+
+#[test]
 fn load_pda_returns_a_validated_typed_guard() {
 	let authority = unique_address(17);
 	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);

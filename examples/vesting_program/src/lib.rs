@@ -324,9 +324,16 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			)
 		};
 		// Verify the vesting state is the PDA for the admin, beneficiary, and
-		// mint, using the stored bump field (avoids re-deriving the canonical
-		// bump on-chain).
-		VestingState::assert_seeds(self.vesting_state, &admin, &beneficiary, &mint, &ID)?;
+		// mint. The parse above already captured `bump`, so this performs the
+		// identical single-derivation check without re-parsing the account.
+		VestingState::assert_stored_bump(
+			self.vesting_state,
+			bump,
+			&admin,
+			&beneficiary,
+			&mint,
+			&ID,
+		)?;
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
@@ -448,9 +455,16 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		};
 
 		// Verify the vesting state is the PDA for the admin, beneficiary, and
-		// mint, using the stored bump field (avoids re-deriving the canonical
-		// bump on-chain).
-		VestingState::assert_seeds(self.vesting_state, &admin, &beneficiary, &mint, &ID)?;
+		// mint. The parse above already captured `bump`, so this performs the
+		// identical single-derivation check without re-parsing the account.
+		VestingState::assert_stored_bump(
+			self.vesting_state,
+			bump,
+			&admin,
+			&beneficiary,
+			&mint,
+			&ID,
+		)?;
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());

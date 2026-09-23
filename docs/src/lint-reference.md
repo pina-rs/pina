@@ -117,11 +117,11 @@ Default level: `deny`
 
 Default level: `deny`
 
-**Contract.** Prove a PDA bump is canonical with `assert_canonical_bump()` before accepting a PDA through `assert_seeds_with_bump()`.
+**Contract.** Prove a PDA bump is canonical with `assert_canonical_bump()` before accepting a PDA through `assert_seeds_with_bump()`. `assert_stored_bump()` is the generated counterpart of `assert_seeds()`: it reuses a bump the handler parsed from the same account, and this lint requires that provenance.
 
-**Why this matters.** A program-derived address has one canonical bump. Accepting any valid bump lets one seed namespace resolve to several addresses, breaking the uniqueness the seeds were chosen to provide.
+**Why this matters.** A program-derived address has one canonical bump. Accepting any valid bump lets one seed namespace resolve to several addresses, breaking the uniqueness the seeds were chosen to provide. `assert_stored_bump()` names the one legitimate source for an explicit bump — the account's own stored field, read in this instruction — so the provenance is checked rather than assumed.
 
-**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump`, which names the decision. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
+**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump`, which names the decision. `assert_stored_bump()` passes only when its bump argument resolves to a parse of the same account; a bump from instruction data or a different account fails. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
 
 ## require_canonical_instruction_dispatch_for_idl
 

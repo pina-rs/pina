@@ -217,6 +217,44 @@ pub(crate) fn expand(
 			}
 		}
 	});
+
+	// The `assert_stored_bump` variant (only when a bump field is declared):
+	// identical validation to `assert_seeds`, but the caller supplies a bump
+	// value it already read from `account`'s `{bump_field}` field in this
+	// instruction, so the method does not re-parse the account for it. The
+	// provenance contract is the method's name: `stored_bump` must originate
+	// from `account` itself, never from instruction data or another account.
+	let assert_stored_bump = args.bump.as_ref().map(|bump_field| {
+		let doc = format!(
+			"Assert that `account` is the PDA for the given seeds, using `stored_bump`: a \
+			 `{bump_field}` value the caller already read from `account` in this \
+			 instruction.\n\nThis performs the identical single-derivation check as \
+			 [`Self::assert_seeds`], without re-parsing `account` to read `{bump_field}` again. \
+			 The caller must have obtained `stored_bump` from `account`'s own `{bump_field}` \
+			 field — for example from the same `as_account`/`with_compact_account` parse that \
+			 produced the other fields it is validating against. Passing a bump from any other \
+			 source (instruction data, a different account) forfeits the stored-bump guarantee \
+			 this method exists to name, and the `require_canonical_bump_before_pda_write` lint \
+			 rejects such call sites."
+		);
+		quote! {
+			#[doc = #doc]
+			pub fn assert_stored_bump(
+				account: &#crate_path::AccountView,
+				stored_bump: u8,
+				#(#find_seed_params,)*
+				program_id: &#crate_path::Address,
+			) -> ::core::result::Result<(), #crate_path::ProgramError> {
+				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(stored_bump);
+				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
+					account,
+					&seeds.as_slices(),
+					program_id,
+				)
+				.map(|_| ())
+			}
+		}
+	});
 	let load_pda = args.bump.as_ref().and_then(|bump_field| {
 		(has_account_representation && !is_compact).then(|| {
 			let load_doc = format!(
@@ -512,6 +550,7 @@ pub(crate) fn expand(
 			}
 
 			#assert_seeds
+			#assert_stored_bump
 			#load_pda
 			#with_pda
 		}
