@@ -244,7 +244,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "escrow"
+								"pda": null
 							},
 							{
 								"name": "vault",
@@ -330,7 +330,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "escrow"
+								"pda": null
 							},
 							{
 								"name": "vault",
