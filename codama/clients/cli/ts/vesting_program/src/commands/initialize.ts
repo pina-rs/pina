@@ -21,7 +21,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--cliff-ts <cliffTs>", "cliffTs")
 	.requiredOption("--end-ts <endTs>", "endTs")
 	.requiredOption("--bump <bump>", "bump")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--beneficiary <beneficiary>", "The `beneficiary` account")
 	.requiredOption("--mint <mint>", "The `mint` account")
 	.option(

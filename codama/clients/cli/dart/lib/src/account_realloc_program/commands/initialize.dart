@@ -13,12 +13,7 @@ final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'sample',
-        mandatory: false,
-        help:
-            "Empty PDA derived from `[b\"sample\", authority]` [default: derived]",
-      );
+      ..addOption('sample', mandatory: false, help: "Empty PDA derived from `[b\"sample\", authority]` [default: derived]");
   }
 
   @override
@@ -35,9 +30,9 @@ final class InitializeCommand extends Command<void> {
     final sample = (results['sample'] as String?) != null
         ? pubkey('--sample', results['sample']! as String)
         : (await findSamplePda(
-            seeds: SampleSeeds(authority: authority),
-            programAddress: context.programAddress,
-          )).$1;
+          seeds: SampleSeeds(authority: authority),
+          programAddress: context.programAddress,
+        )).$1;
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

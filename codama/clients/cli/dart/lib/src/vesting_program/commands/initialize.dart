@@ -17,7 +17,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('cliff_ts', mandatory: true, help: "cliffTs")
       ..addOption('end_ts', mandatory: true, help: "endTs")
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
       ..addOption('beneficiary', mandatory: true, help: "The beneficiary account")
       ..addOption('mint', mandatory: true, help: "The mint account")
       ..addOption('vesting_state', mandatory: false, help: "The vesting_state account [default: derived]")
@@ -36,9 +35,7 @@ final class InitializeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final beneficiary = pubkey('--beneficiary', results['beneficiary']! as String);
     final mint = pubkey('--mint', results['mint']! as String);
     final vestingState = (results['vesting_state'] as String?) != null

@@ -12,7 +12,6 @@ final class VaultExecuteCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
       ..addOption('clock', mandatory: true, help: "The clock account")
       ..addOption('message_accounts', mandatory: true, help: "The message's account keys, in message order. Accounts the message");
   }
@@ -29,9 +28,7 @@ final class VaultExecuteCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
     final proposal = pubkey('--proposal', results['proposal']! as String);
-    final member = (results['member'] as String?) != null
-        ? pubkey('--member', results['member']! as String)
-        : context.payerAddress;
+    final member = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
     final messageAccounts = pubkey('--message-accounts', results['message_accounts']! as String);
 

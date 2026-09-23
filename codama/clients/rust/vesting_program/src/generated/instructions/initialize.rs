@@ -21,7 +21,8 @@ pub struct Initialize {
 	pub vault: solana_pubkey::Pubkey,
 	/// The admin's source ATA: a schedule becomes active only by moving its
 	/// whole allocation into the vault in this same instruction, so a
-	/// valid-looking schedule can never promise value it does not hold.
+	/// valid-looking schedule can never promise value it does not hold. It is
+	/// mutable because the transfer debits it.
 	pub admin_ata: solana_pubkey::Pubkey,
 	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
@@ -85,10 +86,7 @@ impl Initialize {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.admin_ata,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.admin_ata, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.associated_token_program,
 			false,

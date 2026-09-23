@@ -12,7 +12,6 @@ import 'package:pina_codama_clients/escrow_program.dart';
 final class TakeCommand extends Command<void> {
   TakeCommand() {
     argParser
-      ..addOption('taker', mandatory: false, help: "The taker account [default: payer]")
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
       ..addOption('mint_b', mandatory: true, help: "The mint_b account")
       ..addOption('taker_ata_a', mandatory: true, help: "The taker_ata_a account")
@@ -34,9 +33,7 @@ final class TakeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final taker = (results['taker'] as String?) != null
-        ? pubkey('--taker', results['taker']! as String)
-        : context.payerAddress;
+    final taker = context.payerAddress;
     final mintA = pubkey('--mint-a', results['mint_a']! as String);
     final mintB = pubkey('--mint-b', results['mint_b']! as String);
     final takerAtaA = pubkey('--taker-ata-a', results['taker_ata_a']! as String);

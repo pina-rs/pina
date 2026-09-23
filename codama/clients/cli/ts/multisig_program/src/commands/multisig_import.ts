@@ -35,23 +35,11 @@ export const multisigImportCommand = registerGlobals(
 		"--legacy-multisig <legacyMultisig>",
 		"The `legacy_multisig` account",
 	)
-	.option(
-		"--legacy-create-key <legacyCreateKey>",
-		"The legacy multisig's `create_key`: its holder authorizes the import, [default: payer]",
-	)
 	.requiredOption(
 		"--program-config <programConfig>",
 		"The `program_config` account",
 	)
-	.option(
-		"--create-key <createKey>",
-		"The `create_key` account [default: payer]",
-	)
 	.option("--multisig <multisig>", "The `multisig` account [default: derived]")
-	.option(
-		"--rent-payer <rentPayer>",
-		"The `rent_payer` account [default: payer]",
-	)
 	.requiredOption(
 		"--treasury <treasury>",
 		"Treasury that collects the creation fee; absent when the fee is zero",

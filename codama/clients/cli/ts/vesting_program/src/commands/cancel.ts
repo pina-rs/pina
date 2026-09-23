@@ -16,7 +16,6 @@ import {
 
 export const cancelCommand = registerGlobals(new Command("cancel"))
 	.description("cancel")
-	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--mint <mint>", "The `mint` account")
 	.requiredOption(
 		"--vesting-state <vestingState>",

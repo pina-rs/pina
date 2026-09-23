@@ -163,7 +163,7 @@ Instruction getInitializeInstruction({
     AccountMeta(address: mint, role: AccountRole.readonly),
     AccountMeta(address: vestingState, role: AccountRole.writable),
     AccountMeta(address: vault, role: AccountRole.writable),
-    AccountMeta(address: adminAta, role: AccountRole.readonly),
+    AccountMeta(address: adminAta, role: AccountRole.writable),
     AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
     AccountMeta(address: systemProgram, role: AccountRole.readonly),
     AccountMeta(address: tokenProgram, role: AccountRole.readonly),

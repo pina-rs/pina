@@ -12,7 +12,6 @@ import 'package:pina_codama_clients/vesting_program.dart';
 final class CancelCommand extends Command<void> {
   CancelCommand() {
     argParser
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
       ..addOption('mint', mandatory: true, help: "The mint account")
       ..addOption('vesting_state', mandatory: true, help: "The vesting_state account")
       ..addOption('admin_ata', mandatory: true, help: "The admin_ata account")
@@ -32,9 +31,7 @@ final class CancelCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final mint = pubkey('--mint', results['mint']! as String);
     final vestingState = pubkey('--vesting-state', results['vesting_state']! as String);
     final adminAta = pubkey('--admin-ata', results['admin_ata']! as String);

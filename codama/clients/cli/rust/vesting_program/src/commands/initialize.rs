@@ -40,7 +40,7 @@ pub struct InitializeArgs {
 	/// The `vault` account
 	#[arg(long)]
 	vault: String,
-	/// The admin's source ATA: a schedule becomes active only by moving its whole allocation into the vault in this same instruction, so a valid-looking schedule can never promise value it does not hold
+	/// The admin's source ATA: a schedule becomes active only by moving its whole allocation into the vault in this same instruction, so a valid-looking schedule can never promise value it does not hold. It is mutable because the transfer debits it
 	#[arg(long)]
 	admin_ata: String,
 	/// The `token_program` account

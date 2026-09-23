@@ -14,7 +14,6 @@ final class SpendingLimitUseCommand extends Command<void> {
       ..addOption('decimals', mandatory: true, help: "decimals")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('spending_limit', mandatory: true, help: "The spending_limit account")
-      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
       ..addOption('vault', mandatory: true, help: "The vault PDA: SOL source or SPL transfer authority")
       ..addOption('destination', mandatory: true, help: "SOL destination, or the destination token account for SPL")
       ..addOption('clock', mandatory: true, help: "The clock account")
@@ -36,9 +35,7 @@ final class SpendingLimitUseCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
     final spendingLimit = pubkey('--spending-limit', results['spending_limit']! as String);
-    final member = (results['member'] as String?) != null
-        ? pubkey('--member', results['member']! as String)
-        : context.payerAddress;
+    final member = context.payerAddress;
     final vault = pubkey('--vault', results['vault']! as String);
     final destination = pubkey('--destination', results['destination']! as String);
     final clock = pubkey('--clock', results['clock']! as String);

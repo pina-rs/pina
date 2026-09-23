@@ -11,7 +11,6 @@ final class SetRewardIndexCommand extends Command<void> {
   SetRewardIndexCommand() {
     argParser
       ..addOption('new_index', mandatory: true, help: "newIndex")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
       ..addOption('reward_mint', mandatory: true, help: "The pool's reward mint, for validating the vault binding")
       ..addOption('token_program', mandatory: true, help: "The token program that owns the reward mint and vault")
@@ -28,9 +27,7 @@ final class SetRewardIndexCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
     final rewardMint = pubkey('--reward-mint', results['reward_mint']! as String);
     final tokenProgram = pubkey('--token-program', results['token_program']! as String);

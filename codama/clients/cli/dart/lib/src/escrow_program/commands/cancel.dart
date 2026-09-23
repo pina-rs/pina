@@ -12,7 +12,6 @@ import 'package:pina_codama_clients/escrow_program.dart';
 final class CancelCommand extends Command<void> {
   CancelCommand() {
     argParser
-      ..addOption('maker', mandatory: false, help: "The maker account [default: payer]")
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
       ..addOption('maker_ata_a', mandatory: true, help: "The maker_ata_a account")
       ..addOption('escrow', mandatory: true, help: "The escrow account")
@@ -30,9 +29,7 @@ final class CancelCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final maker = (results['maker'] as String?) != null
-        ? pubkey('--maker', results['maker']! as String)
-        : context.payerAddress;
+    final maker = context.payerAddress;
     final mintA = pubkey('--mint-a', results['mint_a']! as String);
     final makerAtaA = pubkey('--maker-ata-a', results['maker_ata_a']! as String);
     final escrow = pubkey('--escrow', results['escrow']! as String);

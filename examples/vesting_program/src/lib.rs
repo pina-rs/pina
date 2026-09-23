@@ -124,8 +124,9 @@ pub struct InitializeAccounts<'a> {
 	pub vault: &'a AccountView,
 	/// The admin's source ATA: a schedule becomes active only by moving its
 	/// whole allocation into the vault in this same instruction, so a
-	/// valid-looking schedule can never promise value it does not hold.
-	pub admin_ata: &'a AccountView,
+	/// valid-looking schedule can never promise value it does not hold. It is
+	/// mutable because the transfer debits it.
+	pub admin_ata: &'a mut AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -258,6 +259,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// transaction and rolls the created state back.
 		self.admin_ata
 			.assert_not_empty()?
+			.assert_writable()?
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_associated_token_address(
 				&admin_address,

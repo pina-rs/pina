@@ -16,7 +16,6 @@ import {
 
 export const cancelCommand = registerGlobals(new Command("cancel"))
 	.description("cancel")
-	.option("--maker <maker>", "The `maker` account [default: payer]")
 	.requiredOption("--mint-a <mintA>", "The `mint_a` account")
 	.requiredOption("--maker-ata-a <makerAtaA>", "The `maker_ata_a` account")
 	.requiredOption("--escrow <escrow>", "The `escrow` account")

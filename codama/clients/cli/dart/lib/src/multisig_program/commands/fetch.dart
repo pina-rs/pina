@@ -27,7 +27,11 @@ final class FetchProgramConfigCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final address = pubkey('--address', results['address']! as String);
+    final address = (results['address'] as String?) != null
+        ? pubkey('--address', results['address']! as String)
+        : (await findProgramConfigPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -235,6 +239,13 @@ final class FetchSpendingLimitCommand extends Command<void> {
 }
 
 final class FetchCommand extends Command<void> {
+  FetchCommand() {
+    addSubcommand(FetchProgramConfigCommand());
+    addSubcommand(FetchMultisigCommand());
+    addSubcommand(FetchProposalCommand());
+    addSubcommand(FetchSpendingLimitCommand());
+  }
+
   @override
   String get name => 'fetch';
 

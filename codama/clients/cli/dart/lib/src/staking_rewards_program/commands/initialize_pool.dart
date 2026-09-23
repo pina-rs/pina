@@ -13,7 +13,6 @@ final class InitializePoolCommand extends Command<void> {
   InitializePoolCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('admin', mandatory: false, help: "The admin account [default: payer]")
       ..addOption('stake_mint', mandatory: true, help: "The stake_mint account")
       ..addOption('reward_mint', mandatory: true, help: "The reward_mint account")
       ..addOption('pool_state', mandatory: false, help: "The pool_state account [default: derived]")
@@ -32,9 +31,7 @@ final class InitializePoolCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final admin = (results['admin'] as String?) != null
-        ? pubkey('--admin', results['admin']! as String)
-        : context.payerAddress;
+    final admin = context.payerAddress;
     final stakeMint = pubkey('--stake-mint', results['stake_mint']! as String);
     final rewardMint = pubkey('--reward-mint', results['reward_mint']! as String);
     final poolState = (results['pool_state'] as String?) != null

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -11,31 +12,34 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
+
 /// The address of the TransferSolProgram program.
-const transferSolProgramProgramAddress = Address(
-  'BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG',
-);
+const transferSolProgramProgramAddress = Address('BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG');
 
 /// Known instructions for the TransferSolProgram program.
-enum TransferSolProgramInstruction { cpiTransfer, directTransfer }
+enum TransferSolProgramInstruction {
+  cpiTransfer,
+  directTransfer,
+}
 
 /// Identifies the type of a TransferSolProgram instruction.
 TransferSolProgramInstruction identifyTransferSolProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return TransferSolProgramInstruction.cpiTransfer;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) {
     return TransferSolProgramInstruction.directTransfer;
   }
 
-  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
-    'instructionData': data,
-    'programName': 'transferSolProgram',
-  });
+  throw SolanaError(
+    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
+    {
+      'instructionData': data,
+      'programName': 'transferSolProgram',
+    },
+  );
 }
 
 /// A parsed instruction from the TransferSolProgram program.
@@ -48,7 +52,7 @@ sealed class ParsedTransferSolProgramInstruction {
 /// A parsed CpiTransfer instruction.
 final class ParsedCpiTransfer extends ParsedTransferSolProgramInstruction {
   const ParsedCpiTransfer({required this.data})
-    : super(TransferSolProgramInstruction.cpiTransfer);
+      : super(TransferSolProgramInstruction.cpiTransfer);
 
   final CpiTransferInstructionData data;
 }
@@ -56,7 +60,7 @@ final class ParsedCpiTransfer extends ParsedTransferSolProgramInstruction {
 /// A parsed DirectTransfer instruction.
 final class ParsedDirectTransfer extends ParsedTransferSolProgramInstruction {
   const ParsedDirectTransfer({required this.data})
-    : super(TransferSolProgramInstruction.directTransfer);
+      : super(TransferSolProgramInstruction.directTransfer);
 
   final DirectTransferInstructionData data;
 }

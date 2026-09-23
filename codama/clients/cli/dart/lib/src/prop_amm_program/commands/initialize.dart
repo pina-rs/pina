@@ -12,8 +12,7 @@ import 'package:pina_codama_clients/prop_amm_program.dart';
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
-      ..addOption('payer', mandatory: false, help: "The payer account [default: payer]")
-      ..addOption('oracle', mandatory: false, help: "The oracle account [default: payer]");
+;
   }
 
   @override
@@ -24,14 +23,10 @@ final class InitializeCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-    final results = argResults!;
+
     final context = await createContext(globalResults!);
-    final payer = (results['payer'] as String?) != null
-        ? pubkey('--payer', results['payer']! as String)
-        : context.payerAddress;
-    final oracle = (results['oracle'] as String?) != null
-        ? pubkey('--oracle', results['oracle']! as String)
-        : context.payerAddress;
+    final payer = context.payerAddress;
+    final oracle = context.payerAddress;
 
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,

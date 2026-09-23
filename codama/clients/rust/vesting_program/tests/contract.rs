@@ -37,10 +37,11 @@ fn vesting_program_client_has_expected_contract_shape() {
 	)
 	.0;
 	let vault = Pubkey::new_unique();
+	let admin_ata = Pubkey::new_unique();
 	let token_program = Pubkey::new_unique();
 	let associated_token_program = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-	let initialize = Initialize::new(admin, beneficiary, mint, vault, token_program);
+	let initialize = Initialize::new(admin, beneficiary, mint, vault, admin_ata, token_program);
 	let init_payload = InitializeInstructionData::new(|data| {
 		data.total_amount.set(1_000);
 		data.start_ts.set(200);
@@ -51,11 +52,12 @@ fn vesting_program_client_has_expected_contract_shape() {
 	.unwrap();
 	let init_ix = initialize.instruction(init_payload);
 	assert_eq!(init_ix.program_id, program_id);
-	assert_eq!(init_ix.accounts.len(), 8);
+	assert_eq!(init_ix.accounts.len(), 9);
 	assert_eq!(init_ix.accounts[0], AccountMeta::new(admin, true));
 	assert_eq!(init_ix.accounts[3], AccountMeta::new(vesting_state, false));
+	assert_eq!(init_ix.accounts[5], AccountMeta::new(admin_ata, false));
 	assert_eq!(
-		init_ix.accounts[5],
+		init_ix.accounts[6],
 		AccountMeta::new_readonly(associated_token_program, false)
 	);
 	let mut expected_init = vec![0, 0];
@@ -89,6 +91,7 @@ fn vesting_program_client_has_expected_contract_shape() {
 	assert_eq!(parsed_state.total_amount.get(), 1_000);
 
 	let clock = Pubkey::new_unique();
+	let beneficiary_ata = Pubkey::new_unique();
 	let claim = Claim::new(
 		beneficiary,
 		mint,
@@ -114,11 +117,19 @@ fn vesting_program_client_has_expected_contract_shape() {
 	expected_claim.extend_from_slice(&10u64.to_le_bytes());
 	assert_eq!(claim_ix.data, expected_claim);
 
-	let admin_ata = Pubkey::new_unique();
-	let cancel = Cancel::new(admin, mint, vesting_state, admin_ata, vault, token_program);
+	let cancel = Cancel::new(
+		admin,
+		mint,
+		vesting_state,
+		admin_ata,
+		vault,
+		clock,
+		beneficiary_ata,
+		token_program,
+	);
 	let cancel_payload = CancelInstructionData::new(|_| {}).unwrap();
 	let cancel_ix = cancel.instruction(cancel_payload);
-	assert_eq!(cancel_ix.accounts.len(), 8);
+	assert_eq!(cancel_ix.accounts.len(), 10);
 	assert_eq!(cancel_ix.accounts[3], AccountMeta::new(admin_ata, false));
 	assert_eq!(cancel_ix.data, vec![2, 0]);
 }

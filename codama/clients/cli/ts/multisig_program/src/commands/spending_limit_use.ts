@@ -25,7 +25,6 @@ export const spendingLimitUseCommand = registerGlobals(
 		"--spending-limit <spendingLimit>",
 		"The `spending_limit` account",
 	)
-	.option("--member <member>", "The `member` account [default: payer]")
 	.requiredOption(
 		"--vault <vault>",
 		"The vault PDA: SOL source or SPL transfer authority",

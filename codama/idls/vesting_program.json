@@ -247,13 +247,14 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "adminAta",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false,
 						"docs": [
 							"The admin's source ATA: a schedule becomes active only by moving its",
 							"whole allocation into the vault in this same instruction, so a",
-							"valid-looking schedule can never promise value it does not hold."
+							"valid-looking schedule can never promise value it does not hold. It is",
+							"mutable because the transfer debits it."
 						]
 					},
 					{

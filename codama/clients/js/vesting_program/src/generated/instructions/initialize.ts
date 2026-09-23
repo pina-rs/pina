@@ -88,7 +88,7 @@ export type InitializeInstruction<
 				: TAccountVestingState,
 			TAccountVault extends string ? WritableAccount<TAccountVault>
 				: TAccountVault,
-			TAccountAdminAta extends string ? ReadonlyAccount<TAccountAdminAta>
+			TAccountAdminAta extends string ? WritableAccount<TAccountAdminAta>
 				: TAccountAdminAta,
 			TAccountAssociatedTokenProgram extends string
 				? ReadonlyAccount<TAccountAssociatedTokenProgram>
@@ -184,7 +184,8 @@ export type InitializeAsyncInput<
 	/**
 	 * The admin's source ATA: a schedule becomes active only by moving its
 	 * whole allocation into the vault in this same instruction, so a
-	 * valid-looking schedule can never promise value it does not hold.
+	 * valid-looking schedule can never promise value it does not hold. It is
+	 * mutable because the transfer debits it.
 	 */
 	adminAta: Address<TAccountAdminAta>;
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
@@ -246,7 +247,7 @@ export async function getInitializeInstructionAsync<
 		mint: { value: input.mint ?? null, isWritable: false },
 		vestingState: { value: input.vestingState ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
-		adminAta: { value: input.adminAta ?? null, isWritable: false },
+		adminAta: { value: input.adminAta ?? null, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isWritable: false,
@@ -342,7 +343,8 @@ export type InitializeInput<
 	/**
 	 * The admin's source ATA: a schedule becomes active only by moving its
 	 * whole allocation into the vault in this same instruction, so a
-	 * valid-looking schedule can never promise value it does not hold.
+	 * valid-looking schedule can never promise value it does not hold. It is
+	 * mutable because the transfer debits it.
 	 */
 	adminAta: Address<TAccountAdminAta>;
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
@@ -402,7 +404,7 @@ export function getInitializeInstruction<
 		mint: { value: input.mint ?? null, isWritable: false },
 		vestingState: { value: input.vestingState ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
-		adminAta: { value: input.adminAta ?? null, isWritable: false },
+		adminAta: { value: input.adminAta ?? null, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isWritable: false,
@@ -477,7 +479,8 @@ export type ParsedInitializeInstruction<
 		/**
 		 * The admin's source ATA: a schedule becomes active only by moving its
 		 * whole allocation into the vault in this same instruction, so a
-		 * valid-looking schedule can never promise value it does not hold.
+		 * valid-looking schedule can never promise value it does not hold. It is
+		 * mutable because the transfer debits it.
 		 */
 		adminAta: TAccountMetas[5];
 		associatedTokenProgram: TAccountMetas[6];

@@ -24,8 +24,6 @@ final class ProposalCreateCommand extends Command<void> {
       ..addOption('actions', mandatory: true, help: "actions")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
-      ..addOption('creator', mandatory: false, help: "The creator account [default: payer]")
-      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -41,12 +39,8 @@ final class ProposalCreateCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
     final proposal = pubkey('--proposal', results['proposal']! as String);
-    final creator = (results['creator'] as String?) != null
-        ? pubkey('--creator', results['creator']! as String)
-        : context.payerAddress;
-    final rentPayer = (results['rent_payer'] as String?) != null
-        ? pubkey('--rent-payer', results['rent_payer']! as String)
-        : context.payerAddress;
+    final creator = context.payerAddress;
+    final rentPayer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final kindValue = integer('--kind', results['kind']! as String);

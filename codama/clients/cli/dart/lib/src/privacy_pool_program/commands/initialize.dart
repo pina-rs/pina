@@ -20,41 +20,13 @@ final class InitializeCommand extends Command<void> {
       ..addOption('requesters_bump', mandatory: true, help: "requestersBump")
       ..addOption('log_bump', mandatory: true, help: "logBump")
       ..addOption('custodians', mandatory: true, help: "custodians")
-      ..addOption(
-        'pool_config',
-        mandatory: false,
-        help: "The pool_config account [default: derived]",
-      )
-      ..addOption(
-        'pool_vault',
-        mandatory: false,
-        help: "The pool_vault account [default: derived]",
-      )
-      ..addOption(
-        'merkle_tree',
-        mandatory: false,
-        help: "The merkle_tree account [default: derived]",
-      )
-      ..addOption(
-        'nullifier_set',
-        mandatory: false,
-        help: "The nullifier_set account [default: derived]",
-      )
-      ..addOption(
-        'custodian_registry',
-        mandatory: false,
-        help: "The custodian_registry account [default: derived]",
-      )
-      ..addOption(
-        'requester_registry',
-        mandatory: false,
-        help: "The requester_registry account [default: derived]",
-      )
-      ..addOption(
-        'disclosure_log',
-        mandatory: false,
-        help: "The disclosure_log account [default: derived]",
-      );
+      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
+      ..addOption('pool_vault', mandatory: false, help: "The pool_vault account [default: derived]")
+      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]")
+      ..addOption('nullifier_set', mandatory: false, help: "The nullifier_set account [default: derived]")
+      ..addOption('custodian_registry', mandatory: false, help: "The custodian_registry account [default: derived]")
+      ..addOption('requester_registry', mandatory: false, help: "The requester_registry account [default: derived]")
+      ..addOption('disclosure_log', mandatory: false, help: "The disclosure_log account [default: derived]");
   }
 
   @override
@@ -70,68 +42,47 @@ final class InitializeCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
+        : (await findPoolConfigPda(
+          programAddress: context.programAddress,
+        )).$1;
     final poolVault = (results['pool_vault'] as String?) != null
         ? pubkey('--pool-vault', results['pool_vault']! as String)
-        : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
+        : (await findPoolVaultPda(
+          programAddress: context.programAddress,
+        )).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
+        : (await findMerkleTreePda(
+          programAddress: context.programAddress,
+        )).$1;
     final nullifierSet = (results['nullifier_set'] as String?) != null
         ? pubkey('--nullifier-set', results['nullifier_set']! as String)
         : (await findNullifierSetPda(
-            programAddress: context.programAddress,
-          )).$1;
+          programAddress: context.programAddress,
+        )).$1;
     final custodianRegistry = (results['custodian_registry'] as String?) != null
-        ? pubkey(
-            '--custodian-registry',
-            results['custodian_registry']! as String,
-          )
+        ? pubkey('--custodian-registry', results['custodian_registry']! as String)
         : (await findCustodianRegistryPda(
-            programAddress: context.programAddress,
-          )).$1;
+          programAddress: context.programAddress,
+        )).$1;
     final requesterRegistry = (results['requester_registry'] as String?) != null
-        ? pubkey(
-            '--requester-registry',
-            results['requester_registry']! as String,
-          )
+        ? pubkey('--requester-registry', results['requester_registry']! as String)
         : (await findRequesterRegistryPda(
-            programAddress: context.programAddress,
-          )).$1;
+          programAddress: context.programAddress,
+        )).$1;
     final disclosureLog = (results['disclosure_log'] as String?) != null
         ? pubkey('--disclosure-log', results['disclosure_log']! as String)
         : (await findDisclosureLogPda(
-            programAddress: context.programAddress,
-          )).$1;
-    final configBumpValue = integer(
-      '--config-bump',
-      results['config_bump']! as String,
-    );
-    final vaultBumpValue = integer(
-      '--vault-bump',
-      results['vault_bump']! as String,
-    );
-    final treeBumpValue = integer(
-      '--tree-bump',
-      results['tree_bump']! as String,
-    );
-    final nullifiersBumpValue = integer(
-      '--nullifiers-bump',
-      results['nullifiers_bump']! as String,
-    );
-    final custodiansBumpValue = integer(
-      '--custodians-bump',
-      results['custodians_bump']! as String,
-    );
-    final requestersBumpValue = integer(
-      '--requesters-bump',
-      results['requesters_bump']! as String,
-    );
+          programAddress: context.programAddress,
+        )).$1;
+    final configBumpValue = integer('--config-bump', results['config_bump']! as String);
+    final vaultBumpValue = integer('--vault-bump', results['vault_bump']! as String);
+    final treeBumpValue = integer('--tree-bump', results['tree_bump']! as String);
+    final nullifiersBumpValue = integer('--nullifiers-bump', results['nullifiers_bump']! as String);
+    final custodiansBumpValue = integer('--custodians-bump', results['custodians_bump']! as String);
+    final requestersBumpValue = integer('--requesters-bump', results['requesters_bump']! as String);
     final logBumpValue = integer('--log-bump', results['log_bump']! as String);
-    final custodiansValue = base58Bytes(
-      '--custodians',
-      results['custodians']! as String,
-    );
+    final custodiansValue = base58Bytes('--custodians', results['custodians']! as String);
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,
       authority: authority,

@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,12 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class RotateAdminInstructionData {
-  const RotateAdminInstructionData() : discriminator = 4, migrationVersion = 0;
+  const RotateAdminInstructionData() :
+      discriminator = 4,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -41,22 +45,34 @@ Decoder<RotateAdminInstructionData> getRotateAdminInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'rotateAdmin instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'rotateAdmin instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (RotateAdminInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(4),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (RotateAdminInstructionData(), newOffset);
+    return (
+      RotateAdminInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -79,12 +95,8 @@ Decoder<RotateAdminInstructionData> getRotateAdminInstructionDataDecoder() {
   };
 }
 
-Codec<RotateAdminInstructionData, RotateAdminInstructionData>
-getRotateAdminInstructionDataCodec() {
-  return combineCodec(
-    getRotateAdminInstructionDataEncoder(),
-    getRotateAdminInstructionDataDecoder(),
-  );
+Codec<RotateAdminInstructionData, RotateAdminInstructionData> getRotateAdminInstructionDataCodec() {
+  return combineCodec(getRotateAdminInstructionDataEncoder(), getRotateAdminInstructionDataDecoder());
 }
 
 /// Creates a [RotateAdmin] instruction.
@@ -93,23 +105,24 @@ Instruction getRotateAdminInstruction({
   required Address admin,
   required Address newAdmin,
   required Address registryConfig,
+
 }) {
-  final instructionData = RotateAdminInstructionData();
+  final instructionData = RotateAdminInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: admin, role: AccountRole.readonlySigner),
-      AccountMeta(address: newAdmin, role: AccountRole.readonly),
-      AccountMeta(address: registryConfig, role: AccountRole.writable),
+    AccountMeta(address: admin, role: AccountRole.readonlySigner),
+    AccountMeta(address: newAdmin, role: AccountRole.readonly),
+    AccountMeta(address: registryConfig, role: AccountRole.writable),
     ],
     data: getRotateAdminInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [RotateAdmin] instruction from raw instruction data.
-RotateAdminInstructionData parseRotateAdminInstruction(
-  Instruction instruction,
-) {
+RotateAdminInstructionData parseRotateAdminInstruction(Instruction instruction) {
   return getRotateAdminInstructionDataDecoder().decode(instruction.data!);
 }

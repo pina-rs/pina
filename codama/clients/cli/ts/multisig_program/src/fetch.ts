@@ -9,6 +9,7 @@ import {
 	fetchProposal,
 	fetchSpendingLimit,
 	findMultisigPda,
+	findProgramConfigPda,
 	findProposalPda,
 	findSpendingLimitPda,
 } from "./client";
@@ -33,7 +34,11 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			)
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = pubkey("--address", options.address as string);
+				const address = options.address === undefined
+					? (await findProgramConfigPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
 				const account = await fetchProgramConfig(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(

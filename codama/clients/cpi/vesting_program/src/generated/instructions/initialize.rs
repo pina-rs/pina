@@ -44,8 +44,9 @@ pub struct Initialize<'account> {
 	/// CPI account `adminAta`.
 	/// The admin's source ATA: a schedule becomes active only by moving its
 	/// whole allocation into the vault in this same instruction, so a
-	/// valid-looking schedule can never promise value it does not hold.
-	/// Required privileges: read-only.
+	/// valid-looking schedule can never promise value it does not hold. It is
+	/// mutable because the transfer debits it.
+	/// Required privileges: writable.
 	pub admin_ata: &'account AccountView,
 
 	/// CPI account `associatedTokenProgram`.
@@ -122,7 +123,7 @@ impl<'account> Initialize<'account> {
 			CpiHandle::readonly(self.mint),
 			CpiHandle::writable(self.vesting_state)?,
 			CpiHandle::writable(self.vault)?,
-			CpiHandle::readonly(self.admin_ata),
+			CpiHandle::writable(self.admin_ata)?,
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),

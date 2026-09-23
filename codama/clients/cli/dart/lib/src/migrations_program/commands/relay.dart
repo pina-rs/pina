@@ -15,11 +15,7 @@ final class RelayCommand extends Command<void> {
       ..addOption('value', mandatory: true, help: "value")
       ..addOption('referrer', mandatory: true, help: "The referrer account")
       ..addOption('state', mandatory: true, help: "The state account")
-      ..addOption(
-        'migration_program',
-        mandatory: true,
-        help: "The migration_program account",
-      );
+      ..addOption('migration_program', mandatory: true, help: "The migration_program account");
   }
 
   @override
@@ -36,10 +32,7 @@ final class RelayCommand extends Command<void> {
     final referrer = pubkey('--referrer', results['referrer']! as String);
     final state = pubkey('--state', results['state']! as String);
     final migrationPayer = context.payerAddress;
-    final migrationProgram = pubkey(
-      '--migration-program',
-      results['migration_program']! as String,
-    );
+    final migrationProgram = pubkey('--migration-program', results['migration_program']! as String);
     final valueValue = bigInteger('--value', results['value']! as String);
     final instruction = getRelayInstruction(
       programAddress: context.programAddress,

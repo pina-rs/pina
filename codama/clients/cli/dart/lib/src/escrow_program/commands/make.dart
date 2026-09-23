@@ -16,7 +16,6 @@ final class MakeCommand extends Command<void> {
       ..addOption('amount_a', mandatory: true, help: "amountA")
       ..addOption('amount_b', mandatory: true, help: "amountB")
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('maker', mandatory: false, help: "The maker account [default: payer]")
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
       ..addOption('mint_b', mandatory: true, help: "The mint_b account")
       ..addOption('maker_ata_a', mandatory: true, help: "The maker_ata_a account")
@@ -35,9 +34,7 @@ final class MakeCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final maker = (results['maker'] as String?) != null
-        ? pubkey('--maker', results['maker']! as String)
-        : context.payerAddress;
+    final maker = context.payerAddress;
     final mintA = pubkey('--mint-a', results['mint_a']! as String);
     final mintB = pubkey('--mint-b', results['mint_b']! as String);
     final makerAtaA = pubkey('--maker-ata-a', results['maker_ata_a']! as String);

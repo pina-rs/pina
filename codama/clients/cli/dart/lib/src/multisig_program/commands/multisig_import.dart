@@ -20,11 +20,8 @@ final class MultisigImportCommand extends Command<void> {
       ..addFlag('set_rent_collector', help: "setRentCollector")
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
       ..addOption('legacy_multisig', mandatory: true, help: "The legacy_multisig account")
-      ..addOption('legacy_create_key', mandatory: false, help: "The legacy multisig's `create_key`: its holder authorizes the import, [default: payer]")
       ..addOption('program_config', mandatory: true, help: "The program_config account")
-      ..addOption('create_key', mandatory: false, help: "The create_key account [default: payer]")
       ..addOption('multisig', mandatory: false, help: "The multisig account [default: derived]")
-      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
       ..addOption('treasury', mandatory: true, help: "Treasury that collects the creation fee; absent when the fee is zero");
   }
 
@@ -39,22 +36,16 @@ final class MultisigImportCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final legacyMultisig = pubkey('--legacy-multisig', results['legacy_multisig']! as String);
-    final legacyCreateKey = (results['legacy_create_key'] as String?) != null
-        ? pubkey('--legacy-create-key', results['legacy_create_key']! as String)
-        : context.payerAddress;
+    final legacyCreateKey = context.payerAddress;
     final programConfig = pubkey('--program-config', results['program_config']! as String);
-    final createKey = (results['create_key'] as String?) != null
-        ? pubkey('--create-key', results['create_key']! as String)
-        : context.payerAddress;
+    final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
           seeds: MultisigSeeds(createKey: createKey),
           programAddress: context.programAddress,
         )).$1;
-    final rentPayer = (results['rent_payer'] as String?) != null
-        ? pubkey('--rent-payer', results['rent_payer']! as String)
-        : context.payerAddress;
+    final rentPayer = context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final legacyProgramValue = pubkey('--legacy-program', results['legacy_program']! as String);
