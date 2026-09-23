@@ -1219,6 +1219,12 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
+		// The vault is data-less, so nothing else pins it: without this check a
+		// depositor could name an account they control as the pool vault, keep
+		// their lamports, and still have a spendable commitment recorded in the
+		// tree — minting notes backed by nothing and draining the honest pool as
+		// they are withdrawn.
+		PoolVault::assert_seeds(self.pool_vault, &ID)?;
 		if args.commitment == [0_u8; 32] {
 			return Err(PrivacyPoolError::ZeroCommitment.into());
 		}
@@ -1382,6 +1388,11 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 		self.recipient.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
+		// The payout is debited from `pool_vault` directly, so the vault must
+		// provably be the pool's own PDA; otherwise a caller could name an
+		// account they control and have the payout sourced from it while the
+		// real pool stays funded by unspent deposits.
+		PoolVault::assert_seeds(self.pool_vault, &ID)?;
 
 		let deposit_lamports = {
 			let config = self.pool_config.as_account::<PoolConfig>(&ID)?;

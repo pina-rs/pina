@@ -33,9 +33,9 @@ pub struct DepositArgs {
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
-	/// The `pool_vault` account
+	/// The `pool_vault` account [default: derived]
 	#[arg(long)]
-	pool_vault: String,
+	pool_vault: Option<String>,
 	/// The `merkle_tree` account
 	#[arg(long)]
 	merkle_tree: String,
@@ -51,7 +51,16 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
 	let depositor = context.payer_pubkey();
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
-	let pool_vault = CliContext::pubkey("--pool_vault", &args.pool_vault)?;
+	let pool_vault = match &args.pool_vault {
+		Some(value) => CliContext::pubkey("--pool_vault", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-vault".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let data = DepositInstructionData::new(|data| {

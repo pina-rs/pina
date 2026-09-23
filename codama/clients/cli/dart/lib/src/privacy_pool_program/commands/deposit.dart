@@ -23,7 +23,11 @@ final class DepositCommand extends Command<void> {
         mandatory: true,
         help: "The pool_config account",
       )
-      ..addOption('pool_vault', mandatory: true, help: "The pool_vault account")
+      ..addOption(
+        'pool_vault',
+        mandatory: false,
+        help: "The pool_vault account [default: derived]",
+      )
       ..addOption(
         'merkle_tree',
         mandatory: true,
@@ -51,7 +55,9 @@ final class DepositCommand extends Command<void> {
       '--pool-config',
       results['pool_config']! as String,
     );
-    final poolVault = pubkey('--pool-vault', results['pool_vault']! as String);
+    final poolVault = (results['pool_vault'] as String?) != null
+        ? pubkey('--pool-vault', results['pool_vault']! as String)
+        : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
     final merkleTree = pubkey(
       '--merkle-tree',
       results['merkle_tree']! as String,

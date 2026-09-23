@@ -798,3 +798,91 @@ fn clock() -> Pubkey {
 		155, 75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
 	])
 }
+
+/// A depositor must not be able to name an account they control as the pool
+/// vault: the vault is data-less, so only its derived address pins it. Without
+/// that check a depositor would keep their lamports while the tree still
+/// recorded a spendable commitment, minting a note backed by nothing.
+#[test]
+#[ignore = "run with pina test"]
+fn deposit_rejects_a_substituted_vault() {
+	let _guard = journey_guard();
+	pina_test::run(async {
+		let (mut program, _secrets, _commitment, _) = start_pool().await;
+		let pid = program_id();
+
+		// An attacker-owned writable account standing in for the pool vault.
+		let attacker = Keypair::new_from_array([0xAB; 32]);
+		program
+			.fund(&attacker.pubkey(), 2_000_000_000)
+			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
+
+		let dep = depositor();
+		program
+			.fund(&dep.pubkey(), 2_000_000_000)
+			.unwrap_or_else(|error| panic!("fund depositor: {error:?}"));
+		let secrets = prover::note_secrets(0x91);
+		let commitment = commitment_bytes(&secrets);
+		let (note_key, note_bump) = note_pda(&commitment);
+		let mut deposit = vec![0_u8; DepositIx::SIZE];
+		DepositIx::initialize(&mut deposit, |ix| {
+			ix.bump = note_bump;
+			ix.commitment = commitment;
+			ix.view_pubkey = view_key().pubkey().to_bytes();
+			ix.envelope_len = 128;
+			ix.envelope = core::array::from_fn(|index| index as u8);
+			ix.shares = core::array::from_fn(|index| 0xA0 ^ index as u8);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode deposit: {error:?}"));
+
+		let before = program
+			.balance(&attacker.pubkey())
+			.unwrap_or_else(|error| panic!("fetch attacker: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&deposit,
+					vec![
+						AccountMeta::new(dep.pubkey(), true),
+						AccountMeta::new(config_pda().0, false),
+						// The substituted vault.
+						AccountMeta::new(attacker.pubkey(), false),
+						AccountMeta::new(tree_pda().0, false),
+						AccountMeta::new(note_key, false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&dep],
+			)
+			.expect_err("a substituted vault must not fund a deposit");
+
+		// The rejection may surface as the owner check or the address check
+		// depending on which fires first; both are the vault identity check
+		// doing its job. What matters is that the deposit is refused, no
+		// lamports move, and no note is created.
+		assert!(
+			matches!(
+				error.transaction_error(),
+				Some(pina_test::TransactionError::InstructionError(0, _))
+			),
+			"the vault identity check rejects the substitute: {:?}",
+			error.transaction_error()
+		);
+		assert_eq!(
+			program
+				.balance(&attacker.pubkey())
+				.unwrap_or_else(|error| panic!("fetch attacker: {error:?}")),
+			before,
+			"the substituted account received nothing"
+		);
+		assert!(
+			program.account(&note_key).is_err(),
+			"a rejected deposit must not create a note"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}

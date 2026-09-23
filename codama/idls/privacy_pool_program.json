@@ -2158,7 +2158,14 @@
 						"name": "poolVault",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolVault"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2329,7 +2336,14 @@
 						"name": "poolVault",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolVault"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

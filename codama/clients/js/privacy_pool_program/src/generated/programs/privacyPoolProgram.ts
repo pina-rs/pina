@@ -68,11 +68,11 @@ import {
 	type ApproveDisclosureInput,
 	type CancelDisclosureInput,
 	type ChallengeDisclosureInput,
-	type DepositInput,
+	type DepositAsyncInput,
 	getApproveDisclosureInstruction,
 	getCancelDisclosureInstruction,
 	getChallengeDisclosureInstruction,
-	getDepositInstruction,
+	getDepositInstructionAsync,
 	getGrantDisclosureInstruction,
 	getInitializeInstructionAsync,
 	getRegisterRequesterInstruction,
@@ -81,7 +81,7 @@ import {
 	getSetCustodiansInstruction,
 	getSetVerificationKeyInstruction,
 	getTransferInstruction,
-	getWithdrawInstruction,
+	getWithdrawInstructionAsync,
 	type GrantDisclosureInput,
 	type InitializeAsyncInput,
 	parseApproveDisclosureInstruction,
@@ -116,7 +116,7 @@ import {
 	type SetCustodiansInput,
 	type SetVerificationKeyInput,
 	type TransferInput,
-	type WithdrawInput,
+	type WithdrawAsyncInput,
 } from "../instructions";
 import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
@@ -482,11 +482,13 @@ export type PrivacyPoolProgramPluginInstructions = {
 		& ReturnType<typeof getRegisterRequesterInstruction>
 		& SelfPlanAndSendFunctions;
 	deposit: (
-		input: DepositInput,
-	) => ReturnType<typeof getDepositInstruction> & SelfPlanAndSendFunctions;
+		input: DepositAsyncInput,
+	) => ReturnType<typeof getDepositInstructionAsync> & SelfPlanAndSendFunctions;
 	withdraw: (
-		input: WithdrawInput,
-	) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
+		input: WithdrawAsyncInput,
+	) =>
+		& ReturnType<typeof getWithdrawInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	transfer: (
 		input: TransferInput,
 	) => ReturnType<typeof getTransferInstruction> & SelfPlanAndSendFunctions;
@@ -597,9 +599,15 @@ export function privacyPoolProgramProgram() {
 							getRegisterRequesterInstruction(input),
 						),
 					deposit: (input) =>
-						addSelfPlanAndSendFunctions(client, getDepositInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getDepositInstructionAsync(input),
+						),
 					withdraw: (input) =>
-						addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getWithdrawInstructionAsync(input),
+						),
 					transfer: (input) =>
 						addSelfPlanAndSendFunctions(client, getTransferInstruction(input)),
 					requestDisclosure: (input) =>

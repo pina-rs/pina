@@ -38,6 +38,7 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findPoolVaultPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -156,6 +157,114 @@ export function getDepositInstructionDataCodec(): FixedSizeCodec<
 		getDepositInstructionDataEncoder(),
 		getDepositInstructionDataDecoder(),
 	);
+}
+
+export type DepositAsyncInput<
+	TAccountDepositor extends string = string,
+	TAccountPoolConfig extends string = string,
+	TAccountPoolVault extends string = string,
+	TAccountMerkleTree extends string = string,
+	TAccountNoteCommitment extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	depositor: TransactionSigner<TAccountDepositor>;
+	poolConfig: Address<TAccountPoolConfig>;
+	poolVault?: Address<TAccountPoolVault>;
+	merkleTree: Address<TAccountMerkleTree>;
+	noteCommitment: Address<TAccountNoteCommitment>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: DepositInstructionDataArgs["bump"];
+	commitment: DepositInstructionDataArgs["commitment"];
+	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
+	envelopeLen: DepositInstructionDataArgs["envelopeLen"];
+	envelope: DepositInstructionDataArgs["envelope"];
+	shares: DepositInstructionDataArgs["shares"];
+};
+
+export async function getDepositInstructionAsync<
+	TAccountDepositor extends string,
+	TAccountPoolConfig extends string,
+	TAccountPoolVault extends string,
+	TAccountMerkleTree extends string,
+	TAccountNoteCommitment extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: DepositAsyncInput<
+		TAccountDepositor,
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNoteCommitment,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	DepositInstruction<
+		TProgramAddress,
+		TAccountDepositor,
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNoteCommitment,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		depositor: { value: input.depositor ?? null, isWritable: true },
+		poolConfig: { value: input.poolConfig ?? null, isWritable: true },
+		poolVault: { value: input.poolVault ?? null, isWritable: true },
+		merkleTree: { value: input.merkleTree ?? null, isWritable: true },
+		noteCommitment: { value: input.noteCommitment ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolVault.value) {
+		accounts.poolVault.value = await findPoolVaultPda({ programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("depositor", accounts.depositor),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("poolVault", accounts.poolVault),
+			getAccountMeta("merkleTree", accounts.merkleTree),
+			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getDepositInstructionDataEncoder().encode(
+			args as DepositInstructionDataArgs,
+		),
+		programAddress,
+	} as DepositInstruction<
+		TProgramAddress,
+		TAccountDepositor,
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNoteCommitment,
+		TAccountSystemProgram
+	>);
 }
 
 export type DepositInput<

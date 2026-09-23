@@ -35,6 +35,7 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findPoolVaultPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -151,6 +152,124 @@ export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
 		getWithdrawInstructionDataEncoder(),
 		getWithdrawInstructionDataDecoder(),
 	);
+}
+
+export type WithdrawAsyncInput<
+	TAccountPoolConfig extends string = string,
+	TAccountPoolVault extends string = string,
+	TAccountMerkleTree extends string = string,
+	TAccountNullifierSet extends string = string,
+	TAccountVerifyingKeyAccount extends string = string,
+	TAccountRecipient extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	poolConfig: Address<TAccountPoolConfig>;
+	poolVault?: Address<TAccountPoolVault>;
+	merkleTree: Address<TAccountMerkleTree>;
+	nullifierSet: Address<TAccountNullifierSet>;
+	verifyingKeyAccount: Address<TAccountVerifyingKeyAccount>;
+	recipient: Address<TAccountRecipient>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	nullifier: WithdrawInstructionDataArgs["nullifier"];
+	root: WithdrawInstructionDataArgs["root"];
+	proofA: WithdrawInstructionDataArgs["proofA"];
+	proofB: WithdrawInstructionDataArgs["proofB"];
+	proofC: WithdrawInstructionDataArgs["proofC"];
+};
+
+export async function getWithdrawInstructionAsync<
+	TAccountPoolConfig extends string,
+	TAccountPoolVault extends string,
+	TAccountMerkleTree extends string,
+	TAccountNullifierSet extends string,
+	TAccountVerifyingKeyAccount extends string,
+	TAccountRecipient extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: WithdrawAsyncInput<
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNullifierSet,
+		TAccountVerifyingKeyAccount,
+		TAccountRecipient,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	WithdrawInstruction<
+		TProgramAddress,
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNullifierSet,
+		TAccountVerifyingKeyAccount,
+		TAccountRecipient,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		poolConfig: { value: input.poolConfig ?? null, isWritable: false },
+		poolVault: { value: input.poolVault ?? null, isWritable: true },
+		merkleTree: { value: input.merkleTree ?? null, isWritable: false },
+		nullifierSet: { value: input.nullifierSet ?? null, isWritable: true },
+		verifyingKeyAccount: {
+			value: input.verifyingKeyAccount ?? null,
+			isWritable: false,
+		},
+		recipient: { value: input.recipient ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolVault.value) {
+		accounts.poolVault.value = await findPoolVaultPda({ programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("poolVault", accounts.poolVault),
+			getAccountMeta("merkleTree", accounts.merkleTree),
+			getAccountMeta("nullifierSet", accounts.nullifierSet),
+			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
+			getAccountMeta("recipient", accounts.recipient),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getWithdrawInstructionDataEncoder().encode(
+			args as WithdrawInstructionDataArgs,
+		),
+		programAddress,
+	} as WithdrawInstruction<
+		TProgramAddress,
+		TAccountPoolConfig,
+		TAccountPoolVault,
+		TAccountMerkleTree,
+		TAccountNullifierSet,
+		TAccountVerifyingKeyAccount,
+		TAccountRecipient,
+		TAccountSystemProgram
+	>);
 }
 
 export type WithdrawInput<
