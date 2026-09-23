@@ -706,9 +706,16 @@ jobs:
           # Readiness and the publish dry-run must cover the same package set.
           # Monochange handles same-release dependency ordering during the real
           # publish after Cargo dry-run reports unavailable future versions.
+          # A package already at its released version (pina_abi rides its own
+          # release line, so it is `skipped_existing` in every `--all` dry run
+          # once published) has nothing to publish, and the readiness step
+          # omits exactly those, so drop the no-op entries before comparing.
           jq -s -e '
             (.[0].packages | map(.package) | sort) ==
-              (.[1].package_publish.packages | map(.package) | sort) and
+              (.[1].package_publish.packages
+                | map(select(.status != "skipped_existing"))
+                | map(.package)
+                | sort) and
               ([.[1].package_publish.summary.planned,
                 .[1].package_publish.summary.published,
                 .[1].package_publish.summary.already_exists,
