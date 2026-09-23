@@ -26,5 +26,23 @@ LL |     Vesting::assert_stored_bump(account, 255, seeds, program)
    = help: read the bump from the account's own state — for example capture it in the same `as_account`/`with_compact_account` parse that produced the other fields being validated — or use `assert_seeds()`, which performs that parse itself
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
-error: aborting due to 3 previous errors
+error: assert_stored_bump was given a bump that was not parsed from the account
+  --> $DIR/canonical_bump.rs:145:2
+   |
+LL |     Vesting::assert_stored_bump(account, bump, seeds, program)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: read the bump from the account's own state — for example capture it in the same `as_account`/`with_compact_account` parse that produced the other fields being validated — or use `assert_seeds()`, which performs that parse itself
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: assert_stored_bump was given a bump that was not parsed from the account
+  --> $DIR/canonical_bump.rs:160:2
+   |
+LL |     Vesting::assert_stored_bump(account, bump, seeds, program)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: read the bump from the account's own state — for example capture it in the same `as_account`/`with_compact_account` parse that produced the other fields being validated — or use `assert_seeds()`, which performs that parse itself
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: aborting due to 5 previous errors
 

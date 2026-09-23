@@ -115,6 +115,52 @@ fn process_stored_bump_raw_literal(
 	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
 }
 
+struct Ctx<'a> {
+	account: &'a Account,
+}
+
+/// The account expression itself is dotted, so the field read
+/// `ctx.account.as_account()?.bump` must still resolve to it: the base is
+/// compared as the complete account identity, not split on the first dot.
+fn process_stored_bump_dotted_account(
+	ctx: &Ctx<'_>,
+	seeds: &[&[u8]],
+	program: &[u8],
+) -> Result<(), ()> {
+	let bump = ctx.account.as_account()?.bump;
+	Vesting::assert_stored_bump(ctx.account, bump, seeds, program)
+}
+
+/// A rest pattern consumes an element at its own position, so `bump` binds
+/// the second element — instruction data. Pairing by subpattern index alone
+/// would misattribute the first element to it and approve an
+/// attacker-chosen bump.
+fn process_stored_bump_rest_pattern(
+	account: &Account,
+	args: &Args,
+	seeds: &[&[u8]],
+	program: &[u8],
+) -> Result<(), ()> {
+	let (.., bump) = (account.as_account()?.bump, args.bump);
+	Vesting::assert_stored_bump(account, bump, seeds, program)
+	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
+}
+
+/// The alias records the binding-time value; the assignment replaces it with
+/// instruction data before the call, so the stale alias must not bless it.
+#[allow(unused_assignments)]
+fn process_stored_bump_reassigned(
+	account: &Account,
+	args: &Args,
+	seeds: &[&[u8]],
+	program: &[u8],
+) -> Result<(), ()> {
+	let mut bump = account.as_account()?.bump;
+	bump = args.bump;
+	Vesting::assert_stored_bump(account, bump, seeds, program)
+	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
+}
+
 fn main() {}
 
 // compile-fail

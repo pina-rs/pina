@@ -53,7 +53,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 		}
 
 		let mut facts = shared::collect_function_facts(cx, body);
-		record_tuple_pattern_aliases(body, &mut facts.aliases);
+		let mut reassigned = std::collections::HashSet::new();
+		record_tuple_pattern_aliases(body, &mut facts.aliases, &mut reassigned);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if call.method == "assert_stored_bump" {
 				// The generated method names its own contract: `stored_bump`
@@ -61,7 +62,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 				// Enforce the name rather than trusting it: the bump argument
 				// must resolve (through aliases) to a field read of the
 				// account, and that read must follow a parse of it.
-				if stored_bump_provenance_ok(&facts, call) {
+				if stored_bump_provenance_ok(&facts, call, &reassigned) {
 					continue;
 				}
 
@@ -120,7 +121,11 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 /// chains collapse to their receiver in the identity, so
 /// `account.as_account()?.bump` records as `account.bump`. A field read of
 /// anything else — `args.bump`, another account, a constant — fails.
-fn stored_bump_provenance_ok(facts: &shared::FunctionFacts, call: &shared::CallInfo) -> bool {
+fn stored_bump_provenance_ok(
+	facts: &shared::FunctionFacts,
+	call: &shared::CallInfo,
+	reassigned: &std::collections::HashSet<rustc_hir::HirId>,
+) -> bool {
 	// `assert_stored_bump(account, stored_bump, .., program_id)` — the bump is
 	// the second positional argument, the account the first.
 	let Some(account_identity) = call.args.first().and_then(Option::as_deref) else {
@@ -128,34 +133,36 @@ fn stored_bump_provenance_ok(facts: &shared::FunctionFacts, call: &shared::CallI
 	};
 
 	// Walk the bump argument's alias chain. Accept when the current identity
-	// is a field read (`<base>.<field>`) whose base names the account, or
-	// whose base binding aliases back to the account — the scoped-parse
-	// shape `let state = account.as_account()?; ... state.bump`, where
-	// `state`'s alias identity collapses `account.as_account()?` to
-	// `account`.
+	// is a field read whose base names the account — compared as a whole,
+	// because the account expression can itself be dotted (`ctx.account`) —
+	// or when the chain bottomed out at the account expression itself, the
+	// scoped-parse shape `let state = account.as_account()?; ... state.bump`.
+	// Any binding reassigned after its alias was recorded fails: the alias
+	// describes the value at binding time, not the one at the call.
 	let mut identity = call.args.get(1).and_then(Option::as_deref);
 	let mut binding = call.arg_bindings.get(1).copied().flatten();
 	let mut visited = std::collections::HashSet::new();
 	loop {
 		if let Some(value) = identity {
-			// The chain bottomed out at the account expression itself — the
-			// scoped parse `let state = <account>.as_account()?` records the
-			// alias identity as the account, dotted or not.
 			if value == account_identity {
 				return true;
 			}
-			if let Some((base, rest)) = value.split_once('.') {
-				// A field read of the account itself: `account.bump`.
-				if !rest.contains('.') && base == account_identity {
-					return true;
-				}
+			// A field read of the account itself: `account.bump` where
+			// `account` is the complete account expression.
+			if let Some(rest) = value
+				.strip_prefix(account_identity)
+				.and_then(|suffix| suffix.strip_prefix('.'))
+				&& !rest.is_empty()
+				&& !rest.contains('.')
+			{
+				return true;
 			}
 		}
 
 		let Some(current) = binding else {
 			return false;
 		};
-		if !visited.insert(current) {
+		if !visited.insert(current) || reassigned.contains(&current) {
 			return false;
 		};
 		let Some(alias) = facts.aliases.get(&current) else {
@@ -178,30 +185,50 @@ fn field_base_local_binding(expr: &rustc_hir::Expr<'_>) -> Option<rustc_hir::Hir
 	}
 }
 
-/// Collect alias provenance for tuple destructures into `aliases`.
+/// Collect alias provenance for tuple destructures into `aliases`, and the
+/// set of bindings reassigned after their `let` into `reassigned`.
 ///
 /// The shared collector records a `let` binding's alias only for plain
 /// binding patterns, so a field captured by position (`let (maker, bump) = {
 /// let state = account.as_account()?; (state.maker, state.bump) };`) would
 /// lose the provenance this lint needs. This pass walks the same body and
 /// maps each tuple binding to the identity of the element at its position —
-/// including through the scoped-block initializer the idiom uses. Non-binding
-/// patterns (`_`, nested tuples) contribute nothing, and a non-tuple
-/// initializer records nothing: the pattern cannot have destructured it, so
-/// no alias would be sound.
+/// including through the scoped-block initializer the idiom uses, and
+/// accounting for a `..` rest pattern, whose position in HIR is held outside
+/// the subpattern slice and must shift every later binding's element index.
+/// Non-binding patterns (`_`, nested tuples) contribute nothing, and a
+/// non-tuple initializer records nothing: the pattern cannot have
+/// destructured it, so no alias would be sound.
+///
+/// An assignment to an already-bound local (`bump = args.bump;`) leaves the
+/// recorded alias describing the binding-time value, so the binding is
+/// recorded here as reassigned and the provenance walk refuses to resolve
+/// through it.
 fn record_tuple_pattern_aliases(
 	body: &rustc_hir::Body<'_>,
 	aliases: &mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+	reassigned: &mut std::collections::HashSet<rustc_hir::HirId>,
 ) {
 	struct TupleAliases<'map> {
 		aliases: &'map mut std::collections::HashMap<rustc_hir::HirId, shared::AliasInfo>,
+		reassigned: &'map mut std::collections::HashSet<rustc_hir::HirId>,
 	}
 
 	impl<'hir> rustc_hir::intravisit::Visitor<'hir> for TupleAliases<'hir> {
+		fn visit_expr(&mut self, expr: &'hir rustc_hir::Expr<'hir>) {
+			if let rustc_hir::ExprKind::Assign(lhs, ..) = expr.kind
+				&& let Some(binding) =
+					field_base_local_binding(lhs).or_else(|| shared::expression_local_binding(lhs))
+			{
+				self.reassigned.insert(binding);
+			}
+			rustc_hir::intravisit::walk_expr(self, expr);
+		}
+
 		fn visit_stmt(&mut self, stmt: &'hir rustc_hir::Stmt<'hir>) {
 			if let rustc_hir::StmtKind::Let(local) = stmt.kind
 				&& let Some(init) = local.init
-				&& let rustc_hir::PatKind::Tuple(pat_elements, _) = local.pat.kind
+				&& let rustc_hir::PatKind::Tuple(pat_elements, rest_position) = local.pat.kind
 			{
 				let mut tail = init;
 				while let rustc_hir::ExprKind::Block(block, _) = tail.kind {
@@ -210,8 +237,23 @@ fn record_tuple_pattern_aliases(
 						None => break,
 					}
 				}
-				if let rustc_hir::ExprKind::Tup(init_elements) = tail.kind {
-					for (pattern, element) in pat_elements.iter().zip(init_elements) {
+				// `DotDotPos` holds the rest position outside the subpattern
+				// slice; `None` means there is no `..` at all.
+				let rest_position = rest_position.as_opt_usize();
+				if let rustc_hir::ExprKind::Tup(init_elements) = tail.kind
+					&& pat_elements.len() + usize::from(rest_position.is_some())
+						== init_elements.len()
+				{
+					for (pattern_index, pattern) in pat_elements.iter().enumerate() {
+						// A rest pattern consumes one element at its position,
+						// shifting every later subpattern's element by one.
+						let element_index = match rest_position {
+							Some(rest) if pattern_index >= rest => pattern_index + 1,
+							_ => pattern_index,
+						};
+						let Some(element) = init_elements.get(element_index) else {
+							continue;
+						};
 						let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind else {
 							continue;
 						};
@@ -231,5 +273,11 @@ fn record_tuple_pattern_aliases(
 		}
 	}
 
-	rustc_hir::intravisit::walk_body(&mut TupleAliases { aliases }, body);
+	rustc_hir::intravisit::walk_body(
+		&mut TupleAliases {
+			aliases,
+			reassigned,
+		},
+		body,
+	);
 }
