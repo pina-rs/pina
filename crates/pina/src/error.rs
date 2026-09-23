@@ -110,6 +110,22 @@ pub enum PinaProgramError {
 	/// the caller accounted for silently credits the recipient short, so the
 	/// reconciliation refuses to guess which side is wrong.
 	UnverifiedTransfer = 0xFFFF_FFF1,
+	/// A compact creation patch stores a PDA bump that disagrees with the
+	/// canonical bump the creation validated.
+	///
+	/// Returned by [`crate::CreateCompactProgramAccountWithBump`] after it
+	/// committed the patch and the stored bump field does not hold the bump
+	/// the builder derived and validated. An account whose stored bump differs
+	/// from its address's canonical bump can never be loaded through the
+	/// canonical stored-bump loaders, so the creation refuses to leave it
+	/// behind and clears the account data.
+	///
+	/// # Remedy
+	///
+	/// Store the creation's bump in the patch (`patch.bump(bump)`), or use
+	/// [`crate::CreateCompactProgramAccount::invoke_with_bump`], which passes
+	/// the derived bump to the patch factory for you.
+	StoredBumpMismatch = 0xFFFF_FFF0,
 	/// Too many PDA seeds were provided.
 	SeedsTooMany = 0xFFFF_FFFD,
 	/// More account keys were provided than the instruction expects.

@@ -3066,6 +3066,14 @@ impl<'a> CompactStateSeedsWithBump<'a> {
         pina::PdaSigner::from_seed_array(self.as_seed_array())
     }
 }
+impl pina::PinaCompactStoredBump for CompactState {
+    fn stored_bump(data: &[u8]) -> ::core::result::Result<u8, pina::ProgramError> {
+        const OFFSET: usize = 0
+            + ::core::mem::size_of::<<[u8; PdaDisc::BYTES] as pina::ZcField>::Pod>()
+            + ::core::mem::size_of::<<Address as pina::ZcField>::Pod>();
+        data.get(OFFSET).copied().ok_or(pina::ProgramError::InvalidAccountData)
+    }
+}
 const _: fn(Address) -> pina::Address = |value| value;
 const _: fn() = || {
     fn assert_mapping<T: pina::ZcField<Pod = pina::Address>>() {}

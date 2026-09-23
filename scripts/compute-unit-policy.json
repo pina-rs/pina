@@ -29,8 +29,9 @@
 		"vesting_program": 6177
 	},
 	"runtimeApprovedTotals": {
-		"account_realloc_program/initialize": 3448,
+		"account_realloc_program/initialize": 3453,
 		"account_realloc_program/realloc": 4305,
+		"compact_accounts_program/initialize": 5608,
 		"compact_accounts_program/rename": 4655,
 		"counter_program/increment": 1944,
 		"counter_program/initialize": 3507,

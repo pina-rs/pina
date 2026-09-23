@@ -35,9 +35,13 @@ use crate::PinaAccount;
 use crate::PinaCompactAccount;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaCompactPatch;
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+use crate::PinaCompactStoredBump;
 use crate::PinaPodError;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaPodPatch;
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+use crate::PinaProgramError;
 use crate::ProgramResult;
 
 const MAX_CPI_SIGNERS: usize = 16;
@@ -58,6 +62,74 @@ fn canonical_pda(
 	}
 
 	Ok((address, bump))
+}
+
+/// The compact-account fields both compact creation builders carry, once
+/// their verification step has proven them.
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+struct CompactCreationTarget<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	account: &'account mut AccountView,
+
+	/// Funding account that pays the rent-exempt balance.
+	payer: &'account AccountView,
+
+	/// Program that owns and derives the PDA.
+	owner: &'address Address,
+
+	/// PDA seeds without the bump.
+	seeds: &'seeds [&'seed [u8]],
+
+	/// PDA bump already verified against `account`'s address.
+	bump: u8,
+
+	/// Initial byte length, bounded by the compact schema.
+	space: usize,
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+impl CompactCreationTarget<'_, '_, '_, '_> {
+	/// Allocates the zeroed target and commits `patch` into it.
+	///
+	/// Shared tail of both compact creation builders. A failing initialization
+	/// or verification clears the data so the target stays uninitialized.
+	/// `verify` runs on the committed bytes inside the same borrow, so a
+	/// builder with no post-commit check pays nothing for it once inlined.
+	fn allocate_and_initialize<T>(
+		&mut self,
+		patch: &T::Patch<'_>,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+		verify: impl FnOnce(&[u8]) -> ProgramResult,
+	) -> ProgramResult
+	where
+		T: PinaCompactAccount,
+	{
+		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
+		{
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
+		AllocateAccountWithNonCanonicalBump {
+			account: self.account,
+			payer: self.payer,
+			space: self.space as u64,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.invoke_signed_inner_validated(signers, rent)?;
+
+		let mut data = self.account.try_borrow_mut()?;
+		let encoded_len = T::initialize(&mut data, patch).inspect_err(|_| {
+			data.fill(0);
+		})?;
+		debug_assert!(encoded_len <= data.len());
+
+		verify(&data).inspect_err(|_| {
+			data.fill(0);
+		})
+	}
 }
 
 /// Creates a rent-exempt system account owned by another program.
@@ -789,16 +861,15 @@ impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 		let (address, bump) = canonical_pda(self.account, self.seeds, self.owner, None)?;
 		let patch = patch(bump);
 
-		CreateCompactProgramAccountWithBump {
+		CompactCreationTarget {
 			account: self.account,
 			payer: self.payer,
 			owner: self.owner,
 			seeds: self.seeds,
 			bump,
-			patch: &patch,
 			space: self.space,
 		}
-		.invoke_signed_inner_validated::<T>(signers, rent)?;
+		.allocate_and_initialize::<T>(patch.as_pina_patch(), signers, rent, |_| Ok(()))?;
 
 		Ok((address, bump))
 	}
@@ -809,6 +880,18 @@ impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 ///
 /// The builder derives the canonical PDA once and rejects a supplied bump that
 /// does not match it.
+///
+/// The patch must store the same bump. After committing the patch, the builder
+/// reads `T`'s declared bump field back and returns
+/// [`PinaProgramError::StoredBumpMismatch`] when it disagrees, clearing the
+/// account data: an account whose stored bump differs from its address's
+/// canonical bump can never be loaded through the canonical stored-bump
+/// loaders, so creating one would strand its rent. `T` declares the field
+/// through `#[pda(bump = ...)]`, which generates the
+/// [`PinaCompactStoredBump`] implementation this check requires.
+/// [`CreateCompactProgramAccount::invoke_with_bump`] threads
+/// the derived bump into a patch factory, which keeps the two connected by
+/// construction.
 ///
 /// Pina rejects a target whose storage holds any nonzero byte with
 /// `AccountAlreadyInitialized`, and clears the new account data if
@@ -839,7 +922,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 	/// Creates and initializes the compact account.
 	pub fn invoke<T>(&mut self) -> ProgramResult
 	where
-		T: PinaCompactAccount,
+		T: PinaCompactStoredBump,
 		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed::<T>(&[])
@@ -848,7 +931,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 	/// Creates and initializes the compact account with extra payer signers.
 	pub fn invoke_signed<T>(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult
 	where
-		T: PinaCompactAccount,
+		T: PinaCompactStoredBump,
 		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, None)
@@ -860,7 +943,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		rent: Option<Rent>,
 	) -> ProgramResult
 	where
-		T: PinaCompactAccount,
+		T: PinaCompactStoredBump,
 		P: PinaCompactPatch<T>,
 	{
 		self.account.assert_writable()?;
@@ -870,38 +953,49 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		self.invoke_signed_inner_validated::<T>(signers, rent)
 	}
 
+	#[cfg(test)]
+	fn invoke_signed_with_rent<T>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult
+	where
+		T: PinaCompactStoredBump,
+		P: PinaCompactPatch<T>,
+	{
+		self.invoke_signed_inner::<T>(signers, Some(rent))
+	}
+
 	fn invoke_signed_inner_validated<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
 	) -> ProgramResult
 	where
-		T: PinaCompactAccount,
+		T: PinaCompactStoredBump,
 		P: PinaCompactPatch<T>,
 	{
-		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
-		{
-			return Err(ProgramError::AccountAlreadyInitialized);
-		}
-
-		AllocateAccountWithNonCanonicalBump {
+		// The patch's stored bump is an independent value with no compile-time
+		// link to the bump this builder validated. An account that stores a
+		// different bump sits at the canonical address but can only be loaded
+		// through the bump it actually holds, so creation refuses to leave one
+		// behind and clears the data like any other failed initialization.
+		let bump = self.bump;
+		CompactCreationTarget {
 			account: self.account,
 			payer: self.payer,
-			space: self.space as u64,
 			owner: self.owner,
 			seeds: self.seeds,
 			bump: self.bump,
+			space: self.space,
 		}
-		.invoke_signed_inner_validated(signers, rent)?;
-
-		let mut data = self.account.try_borrow_mut()?;
-		let encoded_len =
-			T::initialize(&mut data, self.patch.as_pina_patch()).inspect_err(|_| {
-				data.fill(0);
-			})?;
-		debug_assert!(encoded_len <= data.len());
-
-		Ok(())
+		.allocate_and_initialize::<T>(self.patch.as_pina_patch(), signers, rent, |data| {
+			if T::stored_bump(data) == Ok(bump) {
+				Ok(())
+			} else {
+				Err(PinaProgramError::StoredBumpMismatch.into())
+			}
+		})
 	}
 }
 
@@ -2227,6 +2321,12 @@ mod tests {
 		));
 	}
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	use compact_cpi_state::SEED_TEST_COMPACT_BUMP;
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	use compact_cpi_state::TestCompactBumpState;
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	use compact_cpi_state::TestCompactBumpStatePatch;
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	use compact_cpi_state::TestCompactState;
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	use compact_cpi_state::TestCompactStatePatch;
@@ -2720,6 +2820,108 @@ mod tests {
 			stored_state.data[..initial_size]
 				.iter()
 				.all(|byte| *byte == 0)
+		);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_explicit_bump_creation_rejects_a_patch_storing_a_different_bump() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[SEED_TEST_COMPACT_BUMP];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.expect("derive compact bump test address");
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = TestCompactBumpState::HEADER_SIZE;
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		let mut state = stored_state.view();
+
+		let result = CreateCompactProgramAccountWithBump {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+			patch: TestCompactBumpStatePatch::new()
+				.value(3)
+				.bump(bump.wrapping_sub(1)),
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<TestCompactBumpState>(&[], test_rent());
+
+		assert_eq!(
+			result,
+			Err(ProgramError::Custom(
+				PinaProgramError::StoredBumpMismatch as u32
+			))
+		);
+		assert!(
+			stored_state.data[..initial_size]
+				.iter()
+				.all(|byte| *byte == 0)
+		);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_explicit_bump_creation_accepts_a_patch_storing_the_derived_bump() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[SEED_TEST_COMPACT_BUMP];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.expect("derive compact bump test address");
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = TestCompactBumpState::HEADER_SIZE;
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		let mut state = stored_state.view();
+
+		CreateCompactProgramAccountWithBump {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+			patch: TestCompactBumpStatePatch::new().value(3).bump(bump),
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<TestCompactBumpState>(&[], test_rent())
+		.expect("create compact bump PDA");
+
+		let data = state.try_borrow().expect("borrow compact state");
+		let compact = TestCompactBumpState::try_from_bytes(&data).expect("read compact state");
+		assert_eq!(compact.bump, bump);
+		assert_eq!(compact.value, 3);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_stored_bump_reads_the_header_byte_without_validating() {
+		// The read is a direct offset load, so only a slice too short to hold
+		// the header errors; the bump field always follows at least the
+		// discriminator and the `value` field, so one byte cannot reach it.
+		assert_eq!(
+			<TestCompactBumpState as PinaCompactStoredBump>::stored_bump(&[0; 1]),
+			Err(ProgramError::InvalidAccountData)
+		);
+
+		let mut storage = [0; TestCompactBumpState::HEADER_SIZE];
+		<TestCompactBumpState as PinaCompactAccount>::initialize(
+			&mut storage,
+			&TestCompactBumpStatePatch::new().value(1).bump(254),
+		)
+		.expect("initialize compact bump state");
+		assert_eq!(
+			<TestCompactBumpState as PinaCompactStoredBump>::stored_bump(&storage),
+			Ok(254)
+		);
+		// Even a cleared buffer returns the byte at the field's offset rather
+		// than re-validating the discriminator: creation only compares the
+		// value, and the data it passes was just committed by `initialize`.
+		assert_eq!(
+			<TestCompactBumpState as PinaCompactStoredBump>::stored_bump(
+				&[0; TestCompactBumpState::HEADER_SIZE]
+			),
+			Ok(0)
 		);
 	}
 

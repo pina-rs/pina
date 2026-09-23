@@ -270,6 +270,26 @@ where
 	}
 }
 
+/// A compact account whose PDA bump seed is stored in a declared field.
+///
+/// `#[pda(bump = ...)]` on a `#[account(compact)]` struct generates the
+/// implementation, which loads the declared field's byte directly from the
+/// compact header. [`crate::CreateCompactProgramAccountWithBump`] requires it
+/// so creation can reject a patch whose stored bump disagrees with the
+/// canonical bump the builder validated: an account that stores a different
+/// bump can never be loaded through the canonical stored-bump loaders, and the
+/// surplus rent it holds is stranded until the account is closed.
+#[cfg(feature = "compact")]
+pub trait PinaCompactStoredBump: PinaCompactAccount {
+	/// Load the stored bump field's byte from the compact header.
+	///
+	/// This is a direct offset read, not a validation pass: it returns
+	/// [`ProgramError::InvalidAccountData`] only when `data` is too short to
+	/// hold the header, and otherwise returns the byte at the field's offset
+	/// without checking the discriminator or the tails.
+	fn stored_bump(data: &[u8]) -> Result<u8, ProgramError>;
+}
+
 /// Validation trait for deserialized account data (e.g. `EscrowState`).
 ///
 /// Allows chaining arbitrary boolean assertions on the typed account, returning
