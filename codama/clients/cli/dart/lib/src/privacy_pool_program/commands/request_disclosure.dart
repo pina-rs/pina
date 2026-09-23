@@ -17,11 +17,31 @@ final class RequestDisclosureCommand extends Command<void> {
       ..addOption('notice_len', mandatory: true, help: "noticeLen")
       ..addOption('notice', mandatory: true, help: "notice")
       ..addOption('legal_basis_hash', mandatory: true, help: "legalBasisHash")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
-      ..addOption('requester_registry', mandatory: true, help: "The requester_registry account")
-      ..addOption('note_commitment', mandatory: true, help: "The note_commitment account")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
-      ..addOption('system_program', mandatory: true, help: "The system_program account")
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
+      ..addOption(
+        'requester_registry',
+        mandatory: true,
+        help: "The requester_registry account",
+      )
+      ..addOption(
+        'note_commitment',
+        mandatory: true,
+        help: "The note_commitment account",
+      )
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      )
+      ..addOption(
+        'system_program',
+        mandatory: true,
+        help: "The system_program account",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -36,19 +56,43 @@ final class RequestDisclosureCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final requester = context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
-    final requesterRegistry = pubkey('--requester-registry', results['requester_registry']! as String);
-    final noteCommitment = pubkey('--note-commitment', results['note_commitment']! as String);
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
-    final systemProgram = pubkey('--system-program', results['system_program']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
+    final requesterRegistry = pubkey(
+      '--requester-registry',
+      results['requester_registry']! as String,
+    );
+    final noteCommitment = pubkey(
+      '--note-commitment',
+      results['note_commitment']! as String,
+    );
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
+    final systemProgram = pubkey(
+      '--system-program',
+      results['system_program']! as String,
+    );
     final clock = pubkey('--clock', results['clock']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final nonceValue = bigInteger('--nonce', results['nonce']! as String);
     final tierValue = integer('--tier', results['tier']! as String);
-    final commitmentValue = base58Bytes('--commitment', results['commitment']! as String);
-    final noticeLenValue = integer('--notice-len', results['notice_len']! as String);
+    final commitmentValue = base58Bytes(
+      '--commitment',
+      results['commitment']! as String,
+    );
+    final noticeLenValue = integer(
+      '--notice-len',
+      results['notice_len']! as String,
+    );
     final noticeValue = base58Bytes('--notice', results['notice']! as String);
-    final legalBasisHashValue = base58Bytes('--legal-basis-hash', results['legal_basis_hash']! as String);
+    final legalBasisHashValue = base58Bytes(
+      '--legal-basis-hash',
+      results['legal_basis_hash']! as String,
+    );
     final instruction = getRequestDisclosureInstruction(
       programAddress: context.programAddress,
       requester: requester,

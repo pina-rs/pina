@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/custom_errors_program.dart';
 
 final class RequireGteCommand extends Command<void> {
   RequireGteCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +20,7 @@ final class RequireGteCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getRequireGteInstruction(
       programAddress: context.programAddress,

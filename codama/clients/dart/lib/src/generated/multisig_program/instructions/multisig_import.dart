@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class MultisigImportInstructionData {
@@ -23,9 +21,8 @@ class MultisigImportInstructionData {
     required this.configAuthority,
     required this.setRentCollector,
     required this.rentCollector,
-  }) :
-      discriminator = 3,
-      migrationVersion = 0;
+  }) : discriminator = 3,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -38,13 +35,17 @@ class MultisigImportInstructionData {
   final Address rentCollector;
 }
 
-Encoder<MultisigImportInstructionData> getMultisigImportInstructionDataEncoder() {
+Encoder<MultisigImportInstructionData>
+getMultisigImportInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('legacyProgram', getAddressEncoder()),
-    ('legacyDiscriminator', fixEncoderSize(getBytesEncoder(), 8, allowTruncation: false)),
+    (
+      'legacyDiscriminator',
+      fixEncoderSize(getBytesEncoder(), 8, allowTruncation: false),
+    ),
     ('setConfigAuthority', getBooleanEncoder()),
     ('configAuthority', getAddressEncoder()),
     ('setRentCollector', getBooleanEncoder()),
@@ -67,7 +68,8 @@ Encoder<MultisigImportInstructionData> getMultisigImportInstructionDataEncoder()
   );
 }
 
-Decoder<MultisigImportInstructionData> getMultisigImportInstructionDataDecoder() {
+Decoder<MultisigImportInstructionData>
+getMultisigImportInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
@@ -81,23 +83,19 @@ Decoder<MultisigImportInstructionData> getMultisigImportInstructionDataDecoder()
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'multisigImport instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'multisigImport instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (MultisigImportInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(3),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+  (MultisigImportInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -105,13 +103,13 @@ Decoder<MultisigImportInstructionData> getMultisigImportInstructionDataDecoder()
 
     return (
       MultisigImportInstructionData(
-      bump: map['bump']! as int,
-      legacyProgram: map['legacyProgram']! as Address,
-      legacyDiscriminator: map['legacyDiscriminator']! as Uint8List,
-      setConfigAuthority: map['setConfigAuthority']! as bool,
-      configAuthority: map['configAuthority']! as Address,
-      setRentCollector: map['setRentCollector']! as bool,
-      rentCollector: map['rentCollector']! as Address,
+        bump: map['bump']! as int,
+        legacyProgram: map['legacyProgram']! as Address,
+        legacyDiscriminator: map['legacyDiscriminator']! as Uint8List,
+        setConfigAuthority: map['setConfigAuthority']! as bool,
+        configAuthority: map['configAuthority']! as Address,
+        setRentCollector: map['setRentCollector']! as bool,
+        rentCollector: map['rentCollector']! as Address,
       ),
       newOffset,
     );
@@ -137,8 +135,12 @@ Decoder<MultisigImportInstructionData> getMultisigImportInstructionDataDecoder()
   };
 }
 
-Codec<MultisigImportInstructionData, MultisigImportInstructionData> getMultisigImportInstructionDataCodec() {
-  return combineCodec(getMultisigImportInstructionDataEncoder(), getMultisigImportInstructionDataDecoder());
+Codec<MultisigImportInstructionData, MultisigImportInstructionData>
+getMultisigImportInstructionDataCodec() {
+  return combineCodec(
+    getMultisigImportInstructionDataEncoder(),
+    getMultisigImportInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [MultisigImport] instruction.
@@ -161,32 +163,37 @@ Instruction getMultisigImportInstruction({
   required Address rentCollector,
 }) {
   final instructionData = MultisigImportInstructionData(
-      bump: bump,
-      legacyProgram: legacyProgram,
-      legacyDiscriminator: legacyDiscriminator,
-      setConfigAuthority: setConfigAuthority,
-      configAuthority: configAuthority,
-      setRentCollector: setRentCollector,
-      rentCollector: rentCollector,
+    bump: bump,
+    legacyProgram: legacyProgram,
+    legacyDiscriminator: legacyDiscriminator,
+    setConfigAuthority: setConfigAuthority,
+    configAuthority: configAuthority,
+    setRentCollector: setRentCollector,
+    rentCollector: rentCollector,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
-    AccountMeta(address: legacyCreateKey, role: AccountRole.readonlySigner),
-    AccountMeta(address: programConfig, role: AccountRole.readonly),
-    AccountMeta(address: createKey, role: AccountRole.readonlySigner),
-    AccountMeta(address: multisig, role: AccountRole.writable),
-    AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
-    if (treasury != null) AccountMeta(address: treasury, role: AccountRole.writable) else AccountMeta(address: programAddress, role: AccountRole.readonly),
+      AccountMeta(address: legacyMultisig, role: AccountRole.readonly),
+      AccountMeta(address: legacyCreateKey, role: AccountRole.readonlySigner),
+      AccountMeta(address: programConfig, role: AccountRole.readonly),
+      AccountMeta(address: createKey, role: AccountRole.readonlySigner),
+      AccountMeta(address: multisig, role: AccountRole.writable),
+      AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      if (treasury != null)
+        AccountMeta(address: treasury, role: AccountRole.writable)
+      else
+        AccountMeta(address: programAddress, role: AccountRole.readonly),
     ],
     data: getMultisigImportInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [MultisigImport] instruction from raw instruction data.
-MultisigImportInstructionData parseMultisigImportInstruction(Instruction instruction) {
+MultisigImportInstructionData parseMultisigImportInstruction(
+  Instruction instruction,
+) {
   return getMultisigImportInstructionDataDecoder().decode(instruction.data!);
 }

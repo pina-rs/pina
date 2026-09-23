@@ -6,15 +6,18 @@ import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 
 import '../context.dart';
 import 'package:pina_codama_clients/float_accounts_program.dart';
 
 final class FetchFloatDataAccountCommand extends Command<void> {
   FetchFloatDataAccountCommand() {
-    argParser
-      ..addOption('address', help: 'Account address; overrides PDA derivation.');
+    argParser..addOption(
+      'address',
+      help: 'Account address; overrides PDA derivation.',
+    );
   }
 
   @override
@@ -38,16 +41,11 @@ final class FetchFloatDataAccountCommand extends Command<void> {
       space: BigInt.from(data.length),
     );
     final account = decodeFloatDataAccount(encoded);
-    printFields(
-      context.json,
-      'float-data-account',
-      address,
-      <String, Object?>{
-        'data_f64': account.data.dataF64,
-        'data_f32': account.data.dataF32,
-        'authority': account.data.authority,
-      },
-    );
+    printFields(context.json, 'float-data-account', address, <String, Object?>{
+      'data_f64': account.data.dataF64,
+      'data_f32': account.data.dataF32,
+      'authority': account.data.authority,
+    });
   }
 }
 

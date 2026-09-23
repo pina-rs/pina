@@ -26,7 +26,10 @@ final class RotateAuthorityCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final oracle = pubkey('--oracle', results['oracle']! as String);
     final authority = context.payerAddress;
-    final newAuthorityValue = pubkey('--new-authority', results['new_authority']! as String);
+    final newAuthorityValue = pubkey(
+      '--new-authority',
+      results['new_authority']! as String,
+    );
     final instruction = getRotateAuthorityInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

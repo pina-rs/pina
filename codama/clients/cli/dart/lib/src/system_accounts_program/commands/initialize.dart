@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/system_accounts_program.dart';
 
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
-    argParser
-      ..addOption('wallet', mandatory: true, help: "The wallet account");
+    argParser..addOption('wallet', mandatory: true, help: "The wallet account");
   }
 
   @override

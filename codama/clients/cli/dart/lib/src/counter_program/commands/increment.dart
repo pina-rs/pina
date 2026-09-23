@@ -9,15 +9,20 @@ import 'package:pina_codama_clients/counter_program.dart';
 
 final class IncrementCommand extends Command<void> {
   IncrementCommand() {
-    argParser
-      ..addOption('counter', mandatory: false, help: "The counter PDA account (must already exist and be writable) [default: derived]");
+    argParser..addOption(
+      'counter',
+      mandatory: false,
+      help:
+          "The counter PDA account (must already exist and be writable) [default: derived]",
+    );
   }
 
   @override
   String get name => 'increment';
 
   @override
-  String get description => "Instruction data for `Increment`. No extra payload beyond the discriminator byte.";
+  String get description =>
+      "Instruction data for `Increment`. No extra payload beyond the discriminator byte.";
 
   @override
   Future<void> run() async {
@@ -27,9 +32,9 @@ final class IncrementCommand extends Command<void> {
     final counter = (results['counter'] as String?) != null
         ? pubkey('--counter', results['counter']! as String)
         : (await findCounterPda(
-          seeds: CounterSeeds(authority: authority),
-          programAddress: context.programAddress,
-        )).$1;
+            seeds: CounterSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
 
     final instruction = getIncrementInstruction(
       programAddress: context.programAddress,

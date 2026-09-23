@@ -101,30 +101,49 @@ const int privacyPoolProgramErrorArithmeticOverflow = 0x17; // 23
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _privacyPoolProgramErrorMessages = {
-    privacyPoolProgramErrorInvalidAuthority: 'The signer is not the pool authority.',
-    privacyPoolProgramErrorZeroCommitment: 'The commitment is the zero field element.',
-    privacyPoolProgramErrorNoteAlreadyExists: 'The note account already exists for this commitment.',
-    privacyPoolProgramErrorTreeFull: 'The Merkle tree is full.',
-    privacyPoolProgramErrorUnknownRoot: 'The submitted root is not in the recent-root ring.',
-    privacyPoolProgramErrorNullifierAlreadySpent: 'The nullifier has already been spent.',
-    privacyPoolProgramErrorNullifierSetFull: 'The nullifier set is full.',
-    privacyPoolProgramErrorProofVerificationFailed: 'The Groth16 proof failed verification.',
-    privacyPoolProgramErrorVerifyingKeyMissing: 'The verifying key slot has not been installed.',
-    privacyPoolProgramErrorInvalidVerifyingKeySlot: 'The verifying key slot identifier is invalid.',
-    privacyPoolProgramErrorInvalidCustodianSet: 'A custodian slot address is zero or duplicated.',
-    privacyPoolProgramErrorNotAcustodian: 'The signer is not a registered custodian.',
-    privacyPoolProgramErrorAlreadyApproved: 'The custodian has already approved this request.',
-    privacyPoolProgramErrorInvalidTier: 'The disclosure tier is unknown.',
-    privacyPoolProgramErrorRequesterNotEntitled: 'The requester is not registered for this tier.',
-    privacyPoolProgramErrorRequesterRegistryFull: 'The requester registry is full.',
-    privacyPoolProgramErrorNoteNotFound: 'The target note does not exist.',
-    privacyPoolProgramErrorInvalidRequestStatus: 'The request status does not allow this transition.',
-    privacyPoolProgramErrorConsentRequired: 'Consent (tier 0) has not been granted by the note\'s view key.',
-    privacyPoolProgramErrorChallengeWindowOpen: 'The tier-1 challenge window is still open.',
-    privacyPoolProgramErrorNotNoteViewer: 'Only the note\'s view key may perform this action.',
-    privacyPoolProgramErrorLogFull: 'The disclosure log is full.',
-    privacyPoolProgramErrorBufferOverflow: 'A slice operation went out of bounds.',
-    privacyPoolProgramErrorArithmeticOverflow: 'A primitive failed its own bounds check.',
+  privacyPoolProgramErrorInvalidAuthority:
+      'The signer is not the pool authority.',
+  privacyPoolProgramErrorZeroCommitment:
+      'The commitment is the zero field element.',
+  privacyPoolProgramErrorNoteAlreadyExists:
+      'The note account already exists for this commitment.',
+  privacyPoolProgramErrorTreeFull: 'The Merkle tree is full.',
+  privacyPoolProgramErrorUnknownRoot:
+      'The submitted root is not in the recent-root ring.',
+  privacyPoolProgramErrorNullifierAlreadySpent:
+      'The nullifier has already been spent.',
+  privacyPoolProgramErrorNullifierSetFull: 'The nullifier set is full.',
+  privacyPoolProgramErrorProofVerificationFailed:
+      'The Groth16 proof failed verification.',
+  privacyPoolProgramErrorVerifyingKeyMissing:
+      'The verifying key slot has not been installed.',
+  privacyPoolProgramErrorInvalidVerifyingKeySlot:
+      'The verifying key slot identifier is invalid.',
+  privacyPoolProgramErrorInvalidCustodianSet:
+      'A custodian slot address is zero or duplicated.',
+  privacyPoolProgramErrorNotAcustodian:
+      'The signer is not a registered custodian.',
+  privacyPoolProgramErrorAlreadyApproved:
+      'The custodian has already approved this request.',
+  privacyPoolProgramErrorInvalidTier: 'The disclosure tier is unknown.',
+  privacyPoolProgramErrorRequesterNotEntitled:
+      'The requester is not registered for this tier.',
+  privacyPoolProgramErrorRequesterRegistryFull:
+      'The requester registry is full.',
+  privacyPoolProgramErrorNoteNotFound: 'The target note does not exist.',
+  privacyPoolProgramErrorInvalidRequestStatus:
+      'The request status does not allow this transition.',
+  privacyPoolProgramErrorConsentRequired:
+      'Consent (tier 0) has not been granted by the note\'s view key.',
+  privacyPoolProgramErrorChallengeWindowOpen:
+      'The tier-1 challenge window is still open.',
+  privacyPoolProgramErrorNotNoteViewer:
+      'Only the note\'s view key may perform this action.',
+  privacyPoolProgramErrorLogFull: 'The disclosure log is full.',
+  privacyPoolProgramErrorBufferOverflow:
+      'A slice operation went out of bounds.',
+  privacyPoolProgramErrorArithmeticOverflow:
+      'A primitive failed its own bounds check.',
 };
 
 /// Get the error message for a PrivacyPoolProgram program error code.

@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class InitializePolicyInstructionData {
   const InitializePolicyInstructionData({
@@ -20,9 +18,8 @@ class InitializePolicyInstructionData {
     required this.minimum,
     required this.maximum,
     required this.requiredApprovals,
-  }) :
-      discriminator = 0,
-      migrationVersion = 0;
+  }) : discriminator = 0,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -32,7 +29,8 @@ class InitializePolicyInstructionData {
   final int requiredApprovals;
 }
 
-Encoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataEncoder() {
+Encoder<InitializePolicyInstructionData>
+getInitializePolicyInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
@@ -55,7 +53,8 @@ Encoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataEncod
   );
 }
 
-Decoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataDecoder() {
+Decoder<InitializePolicyInstructionData>
+getInitializePolicyInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
@@ -66,23 +65,19 @@ Decoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataDecod
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'initializePolicy instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'initializePolicy instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (InitializePolicyInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+  (InitializePolicyInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -90,10 +85,10 @@ Decoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataDecod
 
     return (
       InitializePolicyInstructionData(
-      bump: map['bump']! as int,
-      minimum: map['minimum']! as BigInt,
-      maximum: map['maximum']! as BigInt,
-      requiredApprovals: map['requiredApprovals']! as int,
+        bump: map['bump']! as int,
+        minimum: map['minimum']! as BigInt,
+        maximum: map['maximum']! as BigInt,
+        requiredApprovals: map['requiredApprovals']! as int,
       ),
       newOffset,
     );
@@ -119,8 +114,12 @@ Decoder<InitializePolicyInstructionData> getInitializePolicyInstructionDataDecod
   };
 }
 
-Codec<InitializePolicyInstructionData, InitializePolicyInstructionData> getInitializePolicyInstructionDataCodec() {
-  return combineCodec(getInitializePolicyInstructionDataEncoder(), getInitializePolicyInstructionDataDecoder());
+Codec<InitializePolicyInstructionData, InitializePolicyInstructionData>
+getInitializePolicyInstructionDataCodec() {
+  return combineCodec(
+    getInitializePolicyInstructionDataEncoder(),
+    getInitializePolicyInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [InitializePolicy] instruction.
@@ -135,24 +134,26 @@ Instruction getInitializePolicyInstruction({
   required int requiredApprovals,
 }) {
   final instructionData = InitializePolicyInstructionData(
-      bump: bump,
-      minimum: minimum,
-      maximum: maximum,
-      requiredApprovals: requiredApprovals,
+    bump: bump,
+    minimum: minimum,
+    maximum: maximum,
+    requiredApprovals: requiredApprovals,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.writableSigner),
-    AccountMeta(address: policy, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
+      AccountMeta(address: policy, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getInitializePolicyInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [InitializePolicy] instruction from raw instruction data.
-InitializePolicyInstructionData parseInitializePolicyInstruction(Instruction instruction) {
+InitializePolicyInstructionData parseInitializePolicyInstruction(
+  Instruction instruction,
+) {
   return getInitializePolicyInstructionDataDecoder().decode(instruction.data!);
 }
