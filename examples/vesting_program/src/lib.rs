@@ -312,29 +312,35 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// succeed: `total_amount` is a promise, and this is where it becomes
 		// collateralized. SPL rejects zero-amount transfers, and a zero-total
 		// schedule is rejected by `validate_schedule` above.
-		let total_amount = args.total_amount.get();
+		let vault_before = self
+			.vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
 		token::instructions::TransferChecked::new(
 			self.admin_ata,
 			self.mint,
 			self.vault,
 			self.admin,
-			total_amount,
+			args.total_amount.get(),
 			mint_decimals,
 		)
 		.invoke_with_program(self.token_program.address())?;
 
-		// Collateralize against the observed post-transfer balance, not the
-		// requested amount: a partial delivery would otherwise let the
-		// schedule promise more than it holds. The vault was asserted empty
-		// above and created in this same instruction, so the balance itself
-		// is the observed delta and must equal the full allocation.
-		let vault_balance = self
+		// The schedule records the observed vault delta, not the requested
+		// amount: with a transfer-fee mint the delivered balance could be
+		// lower than the promise, and the schedule must never claim more
+		// than it holds. The vault was asserted empty above, so the delta is
+		// exactly what landed.
+		let vault_after = self
 			.vault
 			.as_token_account_for_program(self.token_program.address())?
 			.amount();
-		if vault_balance != total_amount {
-			return Err(VestingError::InsufficientVaultBalance.into());
-		}
+		let received = vault_after
+			.checked_sub(vault_before)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
+		vesting_state.total_amount.set(received);
+		drop(vesting_state);
 
 		Ok(())
 	}
