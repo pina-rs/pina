@@ -16,6 +16,7 @@ import {
 
 export const claimCommand = registerGlobals(new Command("claim"))
 	.description("claim")
+	.option("--user <user>", "The `user` account [default: payer]")
 	.requiredOption("--reward-mint <rewardMint>", "The `reward_mint` account")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption(

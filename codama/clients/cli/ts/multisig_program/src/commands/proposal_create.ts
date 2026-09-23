@@ -30,6 +30,11 @@ export const proposalCreateCommand = registerGlobals(
 	.requiredOption("--actions <actions>", "actions")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
 	.requiredOption("--proposal <proposal>", "The `proposal` account")
+	.option("--creator <creator>", "The `creator` account [default: payer]")
+	.option(
+		"--rent-payer <rentPayer>",
+		"The `rent_payer` account [default: payer]",
+	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

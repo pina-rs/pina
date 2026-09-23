@@ -17,6 +17,10 @@ import {
 export const claimCommand = registerGlobals(new Command("claim"))
 	.description("claim")
 	.requiredOption("--amount <amount>", "amount")
+	.option(
+		"--beneficiary <beneficiary>",
+		"The `beneficiary` account [default: payer]",
+	)
 	.requiredOption("--mint <mint>", "The `mint` account")
 	.requiredOption(
 		"--vesting-state <vestingState>",

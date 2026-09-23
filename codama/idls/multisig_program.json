@@ -2506,6 +2506,19 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "rentCollector",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Refund destination for closed spending-limit accounts. When the",
+							"multisig configures a rent collector this must be that address; with",
+							"none configured any writable account fills the slot and refunds fall",
+							"back to `rent_payer`, which also funds any growth."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "spendingLimitAccounts",
 						"isWritable": true,
 						"isSigner": false,
@@ -2922,6 +2935,18 @@
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Clock for the expiry test: an expired active proposal can neither",
+							"progress nor reach a terminal status on its own, so expiry itself is a",
+							"permissionless close condition. Stale proposals close the same way."
+						]
 					}
 				],
 				"arguments": [

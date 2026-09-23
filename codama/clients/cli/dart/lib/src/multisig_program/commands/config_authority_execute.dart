@@ -15,12 +15,10 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
       ..addOption('actions_len', mandatory: true, help: "actionsLen")
       ..addOption('actions', mandatory: true, help: "actions")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
+      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]")
+      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption(
-        'spending_limit_accounts',
-        mandatory: true,
-        help: "Spending limit accounts referenced by add/remove spending-limit",
-      );
+      ..addOption('spending_limit_accounts', mandatory: true, help: "Spending limit accounts referenced by add/remove spending-limit");
   }
 
   @override
@@ -34,21 +32,16 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
-    final authority = context.payerAddress;
-    final rentPayer = context.payerAddress;
+    final authority = (results['authority'] as String?) != null
+        ? pubkey('--authority', results['authority']! as String)
+        : context.payerAddress;
+    final rentPayer = (results['rent_payer'] as String?) != null
+        ? pubkey('--rent-payer', results['rent_payer']! as String)
+        : context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
-    final spendingLimitAccounts = pubkey(
-      '--spending-limit-accounts',
-      results['spending_limit_accounts']! as String,
-    );
-    final actionsLenValue = integer(
-      '--actions-len',
-      results['actions_len']! as String,
-    );
-    final actionsValue = base58Bytes(
-      '--actions',
-      results['actions']! as String,
-    );
+    final spendingLimitAccounts = pubkey('--spending-limit-accounts', results['spending_limit_accounts']! as String);
+    final actionsLenValue = integer('--actions-len', results['actions_len']! as String);
+    final actionsValue = base58Bytes('--actions', results['actions']! as String);
     final instruction = getConfigAuthorityExecuteInstruction(
       programAddress: context.programAddress,
       multisig: multisig,

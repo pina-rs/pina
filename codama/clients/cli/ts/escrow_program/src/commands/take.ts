@@ -16,6 +16,7 @@ import {
 
 export const takeCommand = registerGlobals(new Command("take"))
 	.description("take")
+	.option("--taker <taker>", "The `taker` account [default: payer]")
 	.requiredOption("--mint-a <mintA>", "The `mint_a` account")
 	.requiredOption("--mint-b <mintB>", "The `mint_b` account")
 	.requiredOption("--taker-ata-a <takerAtaA>", "The `taker_ata_a` account")

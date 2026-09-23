@@ -1670,3 +1670,31 @@ The vesting Token-2022 extension test exists and asserts the right contract, but
 ### Working-tree incident during this session
 
 At one point every tracked file edited in this session (the four Surfpool suites and the three CLI test files) was reverted to HEAD content in a single event (all mtimes `Sep 23 00:42`), while untracked paths were untouched. The actor was not identified: `pina test` does not rewrite these files (verified by a marker experiment), and the configured git hooks only format. The tests were re-applied and re-proven afterwards. Because the cause is unknown, canonical copies of every edited test file are preserved under `security/regressions/backups/`, and the incident itself deserves investigation — a tool that silently restores tracked files mid-session can eat any contributor's work.
+
+## Remediation record (2026-09-23, `fix/audit-2026-09-22-findings`)
+
+Implemented in the `worktrees/audit-fixes` work tree on top of the exploit-regression commit; every fix's failing test from this report now passes in that tree.
+
+Fixed with their failing tests now passing:
+
+- **SEC-02/SEC-34** — `UpdateResizableAccount` always routes through the generated account-level update contract (envelope checked before any byte moves, envelope advanced after), and the preflight-versus-commit length agreement is a release-mode `InvalidAccountData` instead of a compiled-out `debug_assert`. `security/regressions/sec02-compact-no-validation` passes; `cargo test -p pina --all-features --lib` and the cpi/compact suites are green.
+- **SEC-33** — `pinapod` exact-pinned to `=0.4.3`.
+- **SEC-09 config half** — `ConfigExecute` enforces expiry like `VaultExecute` (the earlier "divergence" note: only VaultExecute carried it on this line).
+- **SEC-20** — `ConfigExecute` gained a `rent_collector` account; when the multisig configures one, closes and shrinks refund it (address-asserted), otherwise refunds alias the rent payer as before.
+- **SEC-21** — multisig creation, `SetTimeLock`, and `SetProposalTtl` reject a nonzero TTL at or below the (new or current) timelock.
+- **SEC-22** — `ProposalClose` takes the Clock and accepts terminal, expired, or stale proposals, refunding the configured collector.
+- **SEC-27** — `SetRewardIndex` takes the reward mint, token program, and canonical reward vault; the aggregate liability `total_staked * index / SCALE` (in `u128`) must fit `u64` and be covered by the vault. All three audit tests pass, plus the two pre-existing journeys.
+- **SEC-28** — `Cancel` takes the Clock and the beneficiary ATA, settles the vested-but-unclaimed entitlement to the beneficiary first, and refunds only the remainder to the admin.
+- **SEC-29** — `Initialize` takes the admin's ATA and moves the full allocation into the vault in the same instruction; the unfunded schedule can no longer exist.
+- **SEC-30** — `InitializePool` and vesting `Initialize` assert extension-free mints, matching every exit path. The executable proof is `initialize_rejects_a_token_2022_mint_with_extensions` in `tests/e2e.rs` (Mollusk installs arbitrary accounts); the Surfpool variant cannot run because its historical-account cheatcode only accepts program-owned fixtures — recorded as a harness gap.
+- **SEC-16** — import URL credentials are redacted (`…#redacted`) from the echoed source, the provenance README, and the outcome; the HTTP request keeps the full URL.
+- **SEC-18** — the exported verification payload must deserialize as a structurally valid legacy or versioned Solana transaction (bounded signature count, in-range account indices, non-empty instruction list) before anything is written. The three export unit tests now use valid wire fixtures.
+
+Deferred to decisions, with issues:
+
+- **SEC-11** — #501 (bootstrap mechanism for the multisig program config).
+- **SEC-26** — #502 (staking pool initialization trust model).
+- **SEC-12** — #503 (what on-chain evidence a deployment receipt requires).
+- **SEC-13/14/15/17/19** — #504 (CLI host-boundary hardening batch).
+
+The exploit-regression tests for SEC-11, SEC-26, and SEC-12 remain red in the tree and are the acceptance tests for those issues. All IDLs and clients for the touched examples were regenerated with `pina migrations sync`, and changesets are recorded for both batches.

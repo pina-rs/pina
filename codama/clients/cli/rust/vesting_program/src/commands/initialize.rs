@@ -40,6 +40,9 @@ pub struct InitializeArgs {
 	/// The `vault` account
 	#[arg(long)]
 	vault: String,
+	/// The admin's source ATA: a schedule becomes active only by moving its whole allocation into the vault in this same instruction, so a valid-looking schedule can never promise value it does not hold
+	#[arg(long)]
+	admin_ata: String,
 	/// The `token_program` account
 	#[arg(long)]
 	token_program: String,
@@ -65,6 +68,7 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		}
 	};
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
+	let admin_ata = CliContext::pubkey("--admin_ata", &args.admin_ata)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = InitializeInstructionData::new(|data| {
 		data.total_amount.set(args.total_amount);
@@ -85,6 +89,7 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		mint,
 		vesting_state,
 		vault,
+		admin_ata,
 		associated_token_program: Pubkey::from_str_const(
 			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 		),

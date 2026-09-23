@@ -17,6 +17,7 @@ import {
 export const depositCommand = registerGlobals(new Command("deposit"))
 	.description("deposit")
 	.requiredOption("--amount <amount>", "amount")
+	.option("--user <user>", "The `user` account [default: payer]")
 	.requiredOption("--stake-mint <stakeMint>", "The `stake_mint` account")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption(

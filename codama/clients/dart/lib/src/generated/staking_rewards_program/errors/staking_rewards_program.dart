@@ -31,22 +31,27 @@ const int stakingRewardsProgramErrorRewardIndexRegressed = 0x5; // 5
 /// Message: "The position has accrued nothing to release."
 const int stakingRewardsProgramErrorNothingToClaim = 0x6; // 6
 
+/// The reward index would create liabilities no `u64` payout can
+/// represent, freezing affected positions at their next checkpoint.
+/// Message: "The reward index would create liabilities no `u64` payout can"
+const int stakingRewardsProgramErrorRewardIndexExceedsCapacity = 0x7; // 7
+
+/// The reward index would create liabilities beyond the reward vault's
+/// balance, making equal entitlements depend on claim order.
+/// Message: "The reward index would create liabilities beyond the reward vault's"
+const int stakingRewardsProgramErrorRewardIndexExceedsReserves = 0x8; // 8
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _stakingRewardsProgramErrorMessages = {
-  stakingRewardsProgramErrorInvalidAmount:
-      'The amount is zero, or it leaves a position below the pool minimum.',
-  stakingRewardsProgramErrorPoolPaused:
-      'The pool is paused, so deposits and withdrawals are refused.',
-  stakingRewardsProgramErrorInsufficientBalance:
-      'The position holds less than the requested withdrawal.',
-  stakingRewardsProgramErrorUnauthorized:
-      'The signer is not the pool authority this instruction requires.',
-  stakingRewardsProgramErrorInvalidPool:
-      'The supplied account is not the pool this position belongs to.',
-  stakingRewardsProgramErrorRewardIndexRegressed:
-      'The supplied reward index would move rewards backwards.',
-  stakingRewardsProgramErrorNothingToClaim:
-      'The position has accrued nothing to release.',
+    stakingRewardsProgramErrorInvalidAmount: 'The amount is zero, or it leaves a position below the pool minimum.',
+    stakingRewardsProgramErrorPoolPaused: 'The pool is paused, so deposits and withdrawals are refused.',
+    stakingRewardsProgramErrorInsufficientBalance: 'The position holds less than the requested withdrawal.',
+    stakingRewardsProgramErrorUnauthorized: 'The signer is not the pool authority this instruction requires.',
+    stakingRewardsProgramErrorInvalidPool: 'The supplied account is not the pool this position belongs to.',
+    stakingRewardsProgramErrorRewardIndexRegressed: 'The supplied reward index would move rewards backwards.',
+    stakingRewardsProgramErrorNothingToClaim: 'The position has accrued nothing to release.',
+    stakingRewardsProgramErrorRewardIndexExceedsCapacity: 'The reward index would create liabilities no `u64` payout can',
+    stakingRewardsProgramErrorRewardIndexExceedsReserves: 'The reward index would create liabilities beyond the reward vault\'s',
 };
 
 /// Get the error message for a StakingRewardsProgram program error code.

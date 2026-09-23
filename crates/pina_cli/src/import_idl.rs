@@ -40,10 +40,15 @@ pub enum ImportSource {
 
 impl ImportSource {
 	/// A short, human-readable description for the provenance block.
+	///
+	/// URL credentials are redacted before the description is built: the same
+	/// string is echoed to stdout and persisted into the generated README, so
+	/// a pre-signed query parameter would otherwise leak into logs and
+	/// version control on every import.
 	fn describe(&self) -> String {
 		match self {
 			Self::File(path) => format!("file `{}`", path.display()),
-			Self::Url(url) => format!("url `{url}`"),
+			Self::Url(url) => format!("url `{}`", redact_url_credentials(url)),
 			Self::Cluster {
 				cluster,
 				program_id,
@@ -428,6 +433,18 @@ fn apply_program_id(root: &Value, program_id: &str) -> Result<codama_nodes::Root
 	);
 
 	serde_json::from_value(root).map_err(|source| ImportError::InvalidJson { source })
+}
+
+/// Strips the query and fragment from a URL for display and persistence.
+///
+/// The full URL — credentials included — still reaches the HTTP request; only
+/// the copy a human reads is redacted, and the content digest remains the
+/// durable provenance.
+fn redact_url_credentials(url: &str) -> String {
+	let cut = url.find(['?', '#']).unwrap_or(url.len());
+	let mut redacted = url[..cut].to_owned();
+	redacted.push_str("#redacted");
+	redacted
 }
 
 /// Writes the provenance README into a rendered crate.

@@ -41,6 +41,16 @@ pub enum StakingRewardsProgramError {
 	/// 6 - The position has accrued nothing to release.
 	#[error("The position has accrued nothing to release.")]
 	NothingToClaim = 0x6,
+	/// The reward index would create liabilities no `u64` payout can
+	/// represent, freezing affected positions at their next checkpoint.
+	/// 7 - The reward index would create liabilities no `u64` payout can
+	#[error("The reward index would create liabilities no `u64` payout can")]
+	RewardIndexExceedsCapacity = 0x7,
+	/// The reward index would create liabilities beyond the reward vault's
+	/// balance, making equal entitlements depend on claim order.
+	/// 8 - The reward index would create liabilities beyond the reward vault's
+	#[error("The reward index would create liabilities beyond the reward vault's")]
+	RewardIndexExceedsReserves = 0x8,
 }
 
 impl From<StakingRewardsProgramError> for solana_program_error::ProgramError {

@@ -576,6 +576,30 @@
 								"optional": false,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "reward_mint",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "token_program",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "reward_vault",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
 							}
 						]
 					},

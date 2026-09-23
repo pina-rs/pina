@@ -1,12 +1,18 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
+
 import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 
+
 @immutable
 class SpendingLimitSeeds {
-  const SpendingLimitSeeds({required this.multisig, required this.createKey});
+  const SpendingLimitSeeds({
+    required this.multisig,
+    required this.createKey,
+  });
 
   final Address multisig;
   final Address createKey;

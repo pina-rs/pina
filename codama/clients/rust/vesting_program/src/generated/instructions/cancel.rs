@@ -22,6 +22,12 @@ pub struct Cancel {
 	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
+	/// Clock for the vested-entitlement settlement: cancellation must not
+	/// confiscate what the linear curve has already released.
+	pub clock: solana_pubkey::Pubkey,
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
+	/// before any remainder returns to the administrator.
+	pub beneficiary_ata: solana_pubkey::Pubkey,
 }
 
 impl Cancel {
@@ -32,6 +38,8 @@ impl Cancel {
 		admin_ata: solana_pubkey::Pubkey,
 		vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
+		clock: solana_pubkey::Pubkey,
+		beneficiary_ata: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			admin,
@@ -44,6 +52,8 @@ impl Cancel {
 			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
+			clock,
+			beneficiary_ata,
 		}
 	}
 
@@ -57,7 +67,7 @@ impl Cancel {
 		data: CancelInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(10 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.admin, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint, false,
@@ -78,6 +88,13 @@ impl Cancel {
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.clock, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.beneficiary_ata,
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);

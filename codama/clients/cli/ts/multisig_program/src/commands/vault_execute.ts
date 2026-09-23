@@ -18,6 +18,7 @@ export const vaultExecuteCommand = registerGlobals(new Command("vault_execute"))
 	.description("vaultExecute")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
 	.requiredOption("--proposal <proposal>", "The `proposal` account")
+	.option("--member <member>", "The `member` account [default: payer]")
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.requiredOption(
 		"--message-accounts <messageAccounts>",

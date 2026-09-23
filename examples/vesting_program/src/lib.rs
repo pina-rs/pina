@@ -122,6 +122,10 @@ pub struct InitializeAccounts<'a> {
 	pub mint: &'a AccountView,
 	pub vesting_state: &'a mut AccountView,
 	pub vault: &'a AccountView,
+	/// The admin's source ATA: a schedule becomes active only by moving its
+	/// whole allocation into the vault in this same instruction, so a
+	/// valid-looking schedule can never promise value it does not hold.
+	pub admin_ata: &'a AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -150,6 +154,12 @@ pub struct CancelAccounts<'a> {
 	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
+	/// Clock for the vested-entitlement settlement: cancellation must not
+	/// confiscate what the linear curve has already released.
+	pub clock: &'a AccountView,
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
+	/// before any remainder returns to the administrator.
+	pub beneficiary_ata: &'a AccountView,
 }
 
 /// Seed prefix for vesting PDAs.
@@ -230,6 +240,31 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// rejects a mismatch with `InvalidSeeds` before it creates anything.
 		self.vault.assert_empty()?.assert_writable()?;
 
+		// SEC-30: the exit paths reject every mint extension, so the entry
+		// path must too — a configuration accepted here with no exit would
+		// lock the funded allocation forever. The check reads the mint's TLV
+		// extension header once; there is no per-transfer cost.
+		let mint_decimals = {
+			let mint = self
+				.mint
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
+			mint.decimals()
+		};
+
+		// SEC-29: the admin's source ATA funds the allocation. The transfer
+		// below makes the schedule active only once its full promised value is
+		// in the vault, in this same instruction; a shortfall fails the whole
+		// transaction and rolls the created state back.
+		self.admin_ata
+			.assert_not_empty()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				&admin_address,
+				&mint_address,
+				self.token_program.address(),
+			)?;
+
 		// The seeds bind `admin`, `beneficiary`, and `mint`, and `Initialize`
 		// requires the admin to sign, so only that admin can duplicate its own
 		// schedule. `Claim` and `Cancel` re-derive these seeds from the stored
@@ -266,6 +301,21 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			token_program: self.token_program,
 		}
 		.invoke()?;
+
+		// Move the whole allocation into the vault before the instruction can
+		// succeed: `total_amount` is a promise, and this is where it becomes
+		// collateralized. SPL rejects zero-amount transfers, and a zero-total
+		// schedule is rejected by `validate_schedule` above.
+		let total_amount = args.total_amount.get();
+		token::instructions::TransferChecked::new(
+			self.admin_ata,
+			self.mint,
+			self.vault,
+			self.admin,
+			total_amount,
+			mint_decimals,
+		)
+		.invoke_with_program(self.token_program.address())?;
 
 		Ok(())
 	}
@@ -439,7 +489,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		// with `InvalidSeeds` before its idempotent branch.
 		self.admin_ata.assert_writable()?;
 
-		let (admin, beneficiary, mint, cancelled, bump) = {
+		let (admin, beneficiary, mint, cancelled, bump, schedule) = {
 			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
 
 			self.admin.assert_address(&vesting_state.admin)?;
@@ -451,6 +501,13 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				vesting_state.mint,
 				vesting_state.cancelled.get(),
 				vesting_state.bump,
+				(
+					vesting_state.total_amount.get(),
+					vesting_state.start_ts.get(),
+					vesting_state.cliff_ts.get(),
+					vesting_state.end_ts.get(),
+					vesting_state.claimed_amount.get(),
+				),
 			)
 		};
 
@@ -511,16 +568,50 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		let signer = vesting_seeds.to_signer();
 		let signers = [signer.as_signer()];
 
-		// Return everything the beneficiary has not claimed, then close the
-		// vault so the rent follows the refund. A zero balance skips the
+		// A revocable cancellation settles the beneficiary's earned
+		// entitlement first: everything the linear curve has released minus
+		// what was already claimed belongs to the beneficiary, and only a
+		// genuinely unvested (or donated) remainder may return to the
+		// administrator. Both transfers are signed by the schedule and sourced
+		// from its validated vault above.
+		let (total_amount, start_ts, _cliff_ts, end_ts, claimed_amount) = schedule;
+		let now = sysvars::clock::Clock::from_account_view(self.clock)?.unix_timestamp;
+		let vested = vested_amount(total_amount, start_ts, end_ts, now)?;
+		let owed = vested.saturating_sub(claimed_amount).min(remaining);
+		if owed > 0 {
+			// The beneficiary's ATA must already exist for the settlement:
+			// Cancel is admin-signed, so there is no beneficiary wallet here
+			// to fund an idempotent create. A beneficiary who wants their
+			// vested payout keeps an ATA ready — the same account Claim pays
+			// into.
+			self.beneficiary_ata
+				.assert_not_empty()?
+				.assert_owners(&SPL_PROGRAM_IDS)?;
+
+			token::instructions::TransferChecked::new(
+				self.vault,
+				self.mint,
+				self.beneficiary_ata,
+				self.vesting_state,
+				owed,
+				mint_decimals,
+			)
+			.invoke_signed_with_program(&signers, self.token_program.address())?;
+		}
+
+		// Only the remainder returns to the administrator, then the vault
+		// closes so the rent follows the refund. A zero balance skips the
 		// transfer because SPL rejects a zero-amount move.
-		if remaining > 0 {
+		let remainder = remaining
+			.checked_sub(owed)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		if remainder > 0 {
 			token::instructions::TransferChecked::new(
 				self.vault,
 				self.mint,
 				self.admin_ata,
 				self.vesting_state,
-				remaining,
+				remainder,
 				mint_decimals,
 			)
 			.invoke_signed_with_program(&signers, self.token_program.address())?;

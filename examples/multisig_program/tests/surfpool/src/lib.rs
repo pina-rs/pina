@@ -628,6 +628,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 						AccountMeta::new(member_a().pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_b().pubkey(), false), // rent-collector filler
 					],
 				),
 				&[&member_c(), &member_a()],
@@ -1608,6 +1609,7 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 					AccountMeta::new_readonly(multisig_key, false),
 					AccountMeta::new(draft_key, false),
 					AccountMeta::new(collector, false),
+					AccountMeta::new_readonly(clock(), false),
 				],
 			))
 			.unwrap_or_else(|error| panic!("close the cancelled draft: {error:?}"));
@@ -1674,6 +1676,11 @@ fn execute_config_proposal(
 		AccountMeta::new(member_a().pubkey(), true),
 		AccountMeta::new_readonly(system(), false),
 		AccountMeta::new_readonly(clock(), false),
+		// Rent-collector slot: these multisigs configure none, so the refund
+		// destination aliases the rent payer and the slot is any writable
+		// account. member_b's wallet fills it without duplicating a writable
+		// rent payer.
+		AccountMeta::new(member_b().pubkey(), false),
 	];
 	metas.extend(extra_metas);
 	program
@@ -1837,6 +1844,7 @@ fn config_execute_rejects_an_expired_proposal() {
 						AccountMeta::new(member_a().pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_b().pubkey(), false), // rent-collector filler
 					],
 				),
 				&[&member_c(), &member_a()],
@@ -2856,6 +2864,7 @@ fn audit_sec_22_an_expired_proposal_can_be_closed_by_anyone() {
 						AccountMeta::new(multisig_key, false),
 						AccountMeta::new(proposal_key, false),
 						AccountMeta::new(collector.pubkey(), true),
+						AccountMeta::new_readonly(clock(), false),
 					],
 				),
 				&[&collector],
@@ -3041,10 +3050,11 @@ fn audit_sec_20_config_execution_refunds_closed_rent_to_the_configured_collector
 							AccountMeta::new(member_a().pubkey(), true),
 							AccountMeta::new_readonly(system(), false),
 							AccountMeta::new_readonly(clock(), false),
+							AccountMeta::new(collector.pubkey(), true),
 							AccountMeta::new(limit_key, false),
 						],
 					),
-					&[&member_a()],
+					&[&member_a(), &collector],
 				)
 				.unwrap_or_else(|error| panic!("execute proposal {index}: {error:?}"));
 			let executor_after = program
@@ -3212,6 +3222,7 @@ fn audit_sec_09_an_expired_config_proposal_cannot_execute() {
 						AccountMeta::new(member_c().pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_c().pubkey(), true), // rent-collector filler
 					],
 				),
 				&[&member_c()],

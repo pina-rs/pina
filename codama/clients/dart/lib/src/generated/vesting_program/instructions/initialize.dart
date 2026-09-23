@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class InitializeInstructionData {
   const InitializeInstructionData({
@@ -19,8 +21,9 @@ class InitializeInstructionData {
     required this.cliffTs,
     required this.endTs,
     required this.bump,
-  }) : discriminator = 0,
-       migrationVersion = 0;
+  }) :
+      discriminator = 0,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -68,16 +71,23 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'initialize instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'initialize instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -85,11 +95,11 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
     return (
       InitializeInstructionData(
-        totalAmount: map['totalAmount']! as BigInt,
-        startTs: map['startTs']! as BigInt,
-        cliffTs: map['cliffTs']! as BigInt,
-        endTs: map['endTs']! as BigInt,
-        bump: map['bump']! as int,
+      totalAmount: map['totalAmount']! as BigInt,
+      startTs: map['startTs']! as BigInt,
+      cliffTs: map['cliffTs']! as BigInt,
+      endTs: map['endTs']! as BigInt,
+      bump: map['bump']! as int,
       ),
       newOffset,
     );
@@ -115,12 +125,8 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   };
 }
 
-Codec<InitializeInstructionData, InitializeInstructionData>
-getInitializeInstructionDataCodec() {
-  return combineCodec(
-    getInitializeInstructionDataEncoder(),
-    getInitializeInstructionDataDecoder(),
-  );
+Codec<InitializeInstructionData, InitializeInstructionData> getInitializeInstructionDataCodec() {
+  return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
 }
 
 /// Creates a [Initialize] instruction.
@@ -131,6 +137,7 @@ Instruction getInitializeInstruction({
   required Address mint,
   required Address vestingState,
   required Address vault,
+  required Address adminAta,
   required Address associatedTokenProgram,
   required Address systemProgram,
   required Address tokenProgram,
@@ -141,24 +148,25 @@ Instruction getInitializeInstruction({
   required int bump,
 }) {
   final instructionData = InitializeInstructionData(
-    totalAmount: totalAmount,
-    startTs: startTs,
-    cliffTs: cliffTs,
-    endTs: endTs,
-    bump: bump,
+      totalAmount: totalAmount,
+      startTs: startTs,
+      cliffTs: cliffTs,
+      endTs: endTs,
+      bump: bump,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: admin, role: AccountRole.writableSigner),
-      AccountMeta(address: beneficiary, role: AccountRole.readonly),
-      AccountMeta(address: mint, role: AccountRole.readonly),
-      AccountMeta(address: vestingState, role: AccountRole.writable),
-      AccountMeta(address: vault, role: AccountRole.writable),
-      AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
-      AccountMeta(address: systemProgram, role: AccountRole.readonly),
-      AccountMeta(address: tokenProgram, role: AccountRole.readonly),
+    AccountMeta(address: admin, role: AccountRole.writableSigner),
+    AccountMeta(address: beneficiary, role: AccountRole.readonly),
+    AccountMeta(address: mint, role: AccountRole.readonly),
+    AccountMeta(address: vestingState, role: AccountRole.writable),
+    AccountMeta(address: vault, role: AccountRole.writable),
+    AccountMeta(address: adminAta, role: AccountRole.readonly),
+    AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
+    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+    AccountMeta(address: tokenProgram, role: AccountRole.readonly),
     ],
     data: getInitializeInstructionDataEncoder().encode(instructionData),
   );

@@ -17,6 +17,7 @@ import {
 export const withdrawCommand = registerGlobals(new Command("withdraw"))
 	.description("withdraw")
 	.requiredOption("--amount <amount>", "amount")
+	.option("--user <user>", "The `user` account [default: payer]")
 	.requiredOption("--stake-mint <stakeMint>", "The `stake_mint` account")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption(

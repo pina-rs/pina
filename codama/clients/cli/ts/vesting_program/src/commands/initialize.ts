@@ -21,6 +21,7 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--cliff-ts <cliffTs>", "cliffTs")
 	.requiredOption("--end-ts <endTs>", "endTs")
 	.requiredOption("--bump <bump>", "bump")
+	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--beneficiary <beneficiary>", "The `beneficiary` account")
 	.requiredOption("--mint <mint>", "The `mint` account")
 	.option(
@@ -28,6 +29,10 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		"The `vesting_state` account [default: derived]",
 	)
 	.requiredOption("--vault <vault>", "The `vault` account")
+	.requiredOption(
+		"--admin-ata <adminAta>",
+		"The admin's source ATA: a schedule becomes active only by moving its",
+	)
 	.requiredOption(
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
@@ -47,6 +52,7 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 				? undefined
 				: pubkey("--vesting-state", options.vestingState),
 			vault: pubkey("--vault", options.vault),
+			adminAta: pubkey("--admin-ata", options.adminAta),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
 		const instruction = await getInitializeInstructionAsync(

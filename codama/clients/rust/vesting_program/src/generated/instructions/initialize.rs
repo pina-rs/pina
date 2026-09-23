@@ -19,6 +19,10 @@ pub struct Initialize {
 	pub mint: solana_pubkey::Pubkey,
 	pub vesting_state: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
+	/// The admin's source ATA: a schedule becomes active only by moving its
+	/// whole allocation into the vault in this same instruction, so a
+	/// valid-looking schedule can never promise value it does not hold.
+	pub admin_ata: solana_pubkey::Pubkey,
 	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
@@ -30,6 +34,7 @@ impl Initialize {
 		beneficiary: solana_pubkey::Pubkey,
 		mint: solana_pubkey::Pubkey,
 		vault: solana_pubkey::Pubkey,
+		admin_ata: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
@@ -47,6 +52,7 @@ impl Initialize {
 			)
 			.0,
 			vault,
+			admin_ata,
 			associated_token_program: solana_pubkey::pubkey!(
 				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 			),
@@ -65,7 +71,7 @@ impl Initialize {
 		data: InitializeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.admin, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.beneficiary,
@@ -79,6 +85,10 @@ impl Initialize {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin_ata,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.associated_token_program,
 			false,

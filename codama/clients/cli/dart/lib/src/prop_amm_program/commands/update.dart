@@ -11,7 +11,8 @@ final class UpdateCommand extends Command<void> {
   UpdateCommand() {
     argParser
       ..addOption('new_price', mandatory: true, help: "newPrice")
-      ..addOption('oracle', mandatory: true, help: "The oracle account");
+      ..addOption('oracle', mandatory: true, help: "The oracle account")
+      ..addOption('authority', mandatory: false, help: "The authority account [default: payer]");
   }
 
   @override
@@ -25,11 +26,10 @@ final class UpdateCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final oracle = pubkey('--oracle', results['oracle']! as String);
-    final authority = context.payerAddress;
-    final newPriceValue = bigInteger(
-      '--new-price',
-      results['new_price']! as String,
-    );
+    final authority = (results['authority'] as String?) != null
+        ? pubkey('--authority', results['authority']! as String)
+        : context.payerAddress;
+    final newPriceValue = bigInteger('--new-price', results['new_price']! as String);
     final instruction = getUpdateInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

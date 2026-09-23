@@ -16,34 +16,15 @@ final class MultisigCreateCommand extends Command<void> {
       ..addOption('threshold', mandatory: true, help: "threshold")
       ..addOption('timelock', mandatory: true, help: "timelock")
       ..addOption('ttl', mandatory: true, help: "ttl")
-      ..addOption(
-        'member_permissions',
-        mandatory: true,
-        help: "memberPermissions",
-      )
+      ..addOption('member_permissions', mandatory: true, help: "memberPermissions")
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
-      ..addOption(
-        'program_config',
-        mandatory: true,
-        help: "The program_config account",
-      )
-      ..addOption(
-        'multisig',
-        mandatory: false,
-        help: "The multisig account [default: derived]",
-      )
-      ..addOption(
-        'treasury',
-        mandatory: true,
-        help: "Treasury that collects the creation fee; pass the program's own",
-      )
-      ..addOption(
-        'member_accounts',
-        mandatory: true,
-        help:
-            "The founding members, sorted by address; `member_permissions` indexes",
-      );
+      ..addOption('program_config', mandatory: true, help: "The program_config account")
+      ..addOption('create_key', mandatory: false, help: "The create_key account [default: payer]")
+      ..addOption('multisig', mandatory: false, help: "The multisig account [default: derived]")
+      ..addOption('rent_payer', mandatory: false, help: "The rent_payer account [default: payer]")
+      ..addOption('treasury', mandatory: true, help: "Treasury that collects the creation fee; pass the program's own")
+      ..addOption('member_accounts', mandatory: true, help: "The founding members, sorted by address; `member_permissions` indexes");
   }
 
   @override
@@ -56,42 +37,28 @@ final class MultisigCreateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final programConfig = pubkey(
-      '--program-config',
-      results['program_config']! as String,
-    );
-    final createKey = context.payerAddress;
+    final programConfig = pubkey('--program-config', results['program_config']! as String);
+    final createKey = (results['create_key'] as String?) != null
+        ? pubkey('--create-key', results['create_key']! as String)
+        : context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)
         : (await findMultisigPda(
-            seeds: MultisigSeeds(createKey: createKey),
-            programAddress: context.programAddress,
-          )).$1;
-    final rentPayer = context.payerAddress;
+          seeds: MultisigSeeds(createKey: createKey),
+          programAddress: context.programAddress,
+        )).$1;
+    final rentPayer = (results['rent_payer'] as String?) != null
+        ? pubkey('--rent-payer', results['rent_payer']! as String)
+        : context.payerAddress;
     final treasury = pubkey('--treasury', results['treasury']! as String);
-    final memberAccounts = pubkey(
-      '--member-accounts',
-      results['member_accounts']! as String,
-    );
+    final memberAccounts = pubkey('--member-accounts', results['member_accounts']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
-    final thresholdValue = integer(
-      '--threshold',
-      results['threshold']! as String,
-    );
+    final thresholdValue = integer('--threshold', results['threshold']! as String);
     final timelockValue = integer('--timelock', results['timelock']! as String);
     final ttlValue = integer('--ttl', results['ttl']! as String);
-    final memberPermissionsValue = base58Bytes(
-      '--member-permissions',
-      results['member_permissions']! as String,
-    );
-    final configAuthorityValue = pubkey(
-      '--config-authority',
-      results['config_authority']! as String,
-    );
-    final rentCollectorValue = pubkey(
-      '--rent-collector',
-      results['rent_collector']! as String,
-    );
+    final memberPermissionsValue = base58Bytes('--member-permissions', results['member_permissions']! as String);
+    final configAuthorityValue = pubkey('--config-authority', results['config_authority']! as String);
+    final rentCollectorValue = pubkey('--rent-collector', results['rent_collector']! as String);
     final instruction = getMultisigCreateInstruction(
       programAddress: context.programAddress,
       programConfig: programConfig,

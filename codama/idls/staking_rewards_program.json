@@ -1003,6 +1003,38 @@
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rewardMint",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The pool's reward mint, for validating the vault binding."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "tokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The token program that owns the reward mint and vault."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "rewardVault",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The pool's canonical reward vault. An index update is a promise to pay:",
+							"it must not create liabilities the vault cannot honor or that a",
+							"per-position accrual cannot represent."
+						]
 					}
 				],
 				"arguments": [
@@ -1206,6 +1238,26 @@
 				"message": "The position has accrued nothing to release.",
 				"docs": [
 					"The position has accrued nothing to release."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "rewardIndexExceedsCapacity",
+				"code": 7,
+				"message": "The reward index would create liabilities no `u64` payout can",
+				"docs": [
+					"The reward index would create liabilities no `u64` payout can",
+					"represent, freezing affected positions at their next checkpoint."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "rewardIndexExceedsReserves",
+				"code": 8,
+				"message": "The reward index would create liabilities beyond the reward vault's",
+				"docs": [
+					"The reward index would create liabilities beyond the reward vault's",
+					"balance, making equal entitlements depend on claim order."
 				]
 			}
 		]

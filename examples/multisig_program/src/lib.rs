@@ -1607,6 +1607,11 @@ pub struct ConfigExecuteAccounts<'a> {
 	pub rent_payer: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 	pub clock: &'a AccountView,
+	/// Refund destination for closed spending-limit accounts. When the
+	/// multisig configures a rent collector this must be that address; with
+	/// none configured any writable account fills the slot and refunds fall
+	/// back to `rent_payer`, which also funds any growth.
+	pub rent_collector: &'a mut AccountView,
 	/// Spending limit accounts referenced by add/remove spending-limit
 	/// actions, in any order.
 	#[pina(remaining)]
@@ -1651,6 +1656,10 @@ pub struct ProposalCloseAccounts<'a> {
 	pub multisig: &'a AccountView,
 	pub proposal: &'a mut AccountView,
 	pub rent_collector: &'a mut AccountView,
+	/// Clock for the expiry test: an expired active proposal can neither
+	/// progress nor reach a terminal status on its own, so expiry itself is a
+	/// permissionless close condition. Stale proposals close the same way.
+	pub clock: &'a AccountView,
 }
 
 // ---------------------------------------------------------------------------
@@ -1667,7 +1676,8 @@ fn apply_config_actions(
 	working: &mut MultisigWorkingState,
 	actions: &[u8],
 	spending_limit_accounts: &mut [AccountView],
-	rent_payer: &mut AccountView,
+	funding: &mut AccountView,
+	refunds: &mut AccountView,
 	system_program: &AccountView,
 	now: i64,
 ) -> Result<(), ProgramError> {
@@ -1712,24 +1722,29 @@ fn apply_config_actions(
 					.copy_within(position + 1..working.member_count, position);
 				working.member_count -= 1;
 				working.changed = true;
-				prune_spending_limit_roster(
-					multisig_key,
-					&key,
-					spending_limit_accounts,
-					rent_payer,
-				)?;
+				prune_spending_limit_roster(multisig_key, &key, spending_limit_accounts, refunds)?;
 			}
 			ConfigActionView::ChangeThreshold { threshold } => {
 				working.threshold = threshold;
 				working.changed = true;
 			}
 			ConfigActionView::SetTimeLock { seconds } => {
+				// The new delay must not outlive an already-accepted nonzero
+				// proposal lifetime.
+				if working.ttl != 0 && working.ttl <= seconds {
+					return Err(MultisigError::InvalidConfiguration.into());
+				}
 				working.timelock = seconds;
 				working.changed = true;
 			}
 			// A TTL change does not invalidate prior proposals: each proposal
 			// recorded its own expiry at creation.
 			ConfigActionView::SetProposalTtl { seconds } => {
+				// Mirror the creation check: a new nonzero lifetime at or
+				// below the current timelock bricks every future proposal.
+				if seconds != 0 && seconds <= working.timelock {
+					return Err(MultisigError::InvalidConfiguration.into());
+				}
 				working.ttl = seconds;
 			}
 			ConfigActionView::SetRentCollector { collector } => {
@@ -1767,7 +1782,7 @@ fn apply_config_actions(
 					SpendingLimit::projected_bytes(members_len * 32, destinations_len * 32)?;
 				CreateCompactProgramAccountWithBump {
 					account,
-					payer: &mut *rent_payer,
+					payer: &mut *funding,
 					owner: &ID,
 					seeds: &seeds.as_slices(),
 					bump,
@@ -1820,7 +1835,7 @@ fn apply_config_actions(
 				})?;
 				SpendingLimit::assert_seeds(account, multisig_key, &create_key, &ID)?;
 
-				account.close_account_zeroed(&ID, &mut *rent_payer)?;
+				account.close_account_zeroed(&ID, &mut *refunds)?;
 			}
 		}
 		Ok(())
@@ -1849,7 +1864,7 @@ fn prune_spending_limit_roster(
 	multisig_key: &Address,
 	removed: &Address,
 	spending_limit_accounts: &mut [AccountView],
-	rent_payer: &mut AccountView,
+	refunds: &mut AccountView,
 ) -> Result<(), ProgramError> {
 	for account in spending_limit_accounts.iter_mut() {
 		if account.assert_owner(&ID).is_err() {
@@ -1878,11 +1893,11 @@ fn prune_spending_limit_roster(
 		members.copy_within(position + 1..member_count, position);
 		member_count -= 1;
 		if member_count == 0 {
-			account.close_account_zeroed(&ID, &mut *rent_payer)?;
+			account.close_account_zeroed(&ID, &mut *refunds)?;
 		} else {
 			UpdateResizableAccount {
 				account,
-				rent_account: &mut *rent_payer,
+				rent_account: &mut *refunds,
 				program_id: &ID,
 				patch: SpendingLimitPatch::new().replace_members(
 					&flatten_roster::<512>(&members[..member_count])[..member_count * 32],
@@ -2046,6 +2061,13 @@ impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 			member_keys[position] = *account.address();
 		}
 		validate_members(&member_keys[..member_count], member_permissions, threshold)?;
+		// A nonzero TTL at or below the timelock expires every proposal
+		// before its post-approval execution window can open (expiry starts
+		// at creation, the delay at approval), so the configuration is born
+		// unexecutable. Reject it rather than minting dead proposals.
+		if ttl != 0 && ttl <= timelock {
+			return Err(MultisigError::InvalidConfiguration.into());
+		}
 		if timelock > MAX_TIME_LOCK {
 			return Err(MultisigError::TimeLockExceedsMaxAllowed.into());
 		}
@@ -2978,13 +3000,29 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 		}
 
 		let multisig_key = *self.multisig.address();
+		// Growth still comes from the executing member's rent payer, but the
+		// closing refunds belong to the multisig's configured rent collector:
+		// an executor must not be able to direct a governed close's rent to
+		// themselves by naming their own wallet as `rent_payer`.
+		// With no collector configured the refunds alias the funding
+		// account, preserving the historical behavior.
+		let refund_destination = if multisig.rent_collector == Address::default() {
+			*self.rent_payer
+		} else {
+			self.rent_collector
+				.assert_address(&multisig.rent_collector)?;
+			*self.rent_collector
+		};
+		let mut funding = *self.rent_payer;
+		let mut refunds = refund_destination;
 		let mut working = MultisigWorkingState::capture(&multisig);
 		apply_config_actions(
 			&multisig_key,
 			&mut working,
 			&actions[..actions_len],
 			self.spending_limit_accounts,
-			self.rent_payer,
+			&mut funding,
+			&mut refunds,
 			self.system_program,
 			now,
 		)?;
@@ -3035,12 +3073,15 @@ impl<'a> ProcessAccountInfos<'a> for ConfigAuthorityExecuteAccounts<'a> {
 		let multisig_key = *self.multisig.address();
 		let now = read_timestamp(self.clock)?;
 		let mut working = MultisigWorkingState::capture(&multisig);
+		let mut funding = *self.rent_payer;
+		let mut refunds = *self.rent_payer;
 		apply_config_actions(
 			&multisig_key,
 			&mut working,
 			actions_bytes,
 			self.spending_limit_accounts,
-			self.rent_payer,
+			&mut funding,
+			&mut refunds,
 			self.system_program,
 			now,
 		)?;
@@ -3221,10 +3262,21 @@ impl<'a> ProcessAccountInfos<'a> for ProposalCloseAccounts<'a> {
 			.assert_address(&multisig.rent_collector)?;
 
 		let proposal = ProposalSnapshot::load(self.proposal, self.multisig.address())?;
-		if !matches!(
+		let closable = matches!(
 			proposal.status,
 			STATUS_EXECUTED | STATUS_REJECTED | STATUS_CANCELLED
-		) {
+		) || {
+			// An expired nonterminal proposal can neither progress nor reach
+			// a terminal status on its own, and a stale proposal is frozen
+			// out of every effect path; without a close path their rent would
+			// be stranded forever. Both conditions are permissionless facts
+			// about the clock and the multisig's stale index, so any signer
+			// may retire the account.
+			let now = read_timestamp(self.clock)?;
+			is_expired(proposal.expires_at, now)
+				|| proposal.index <= multisig.stale_transaction_index
+		};
+		if !closable {
 			return Err(MultisigError::InvalidProposalStatus.into());
 		}
 

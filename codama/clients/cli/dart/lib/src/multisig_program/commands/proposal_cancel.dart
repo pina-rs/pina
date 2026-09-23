@@ -12,6 +12,7 @@ final class ProposalCancelCommand extends Command<void> {
     argParser
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
+      ..addOption('member', mandatory: false, help: "The member account [default: payer]")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -27,7 +28,9 @@ final class ProposalCancelCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
     final proposal = pubkey('--proposal', results['proposal']! as String);
-    final member = context.payerAddress;
+    final member = (results['member'] as String?) != null
+        ? pubkey('--member', results['member']! as String)
+        : context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
 
     final instruction = getProposalCancelInstruction(

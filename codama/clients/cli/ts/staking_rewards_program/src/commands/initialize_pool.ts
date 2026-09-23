@@ -19,6 +19,7 @@ export const initializePoolCommand = registerGlobals(
 )
 	.description("initializePool")
 	.requiredOption("--bump <bump>", "bump")
+	.option("--admin <admin>", "The `admin` account [default: payer]")
 	.requiredOption("--stake-mint <stakeMint>", "The `stake_mint` account")
 	.requiredOption("--reward-mint <rewardMint>", "The `reward_mint` account")
 	.option(

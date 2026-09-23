@@ -249,6 +249,9 @@ fn set_reward_index_instruction(
 	program: &ProgramTest,
 	admin: &Pubkey,
 	pool: &Pubkey,
+	reward_mint: &Pubkey,
+	token_program: &Pubkey,
+	reward_vault: &Pubkey,
 	new_index: u64,
 ) -> pina_test::Instruction {
 	let mut data = vec![StakingInstruction::SetRewardIndex as u8, 0u8];
@@ -259,6 +262,9 @@ fn set_reward_index_instruction(
 		vec![
 			AccountMeta::new_readonly(*admin, true),
 			AccountMeta::new(*pool, false),
+			AccountMeta::new_readonly(*reward_mint, false),
+			AccountMeta::new_readonly(*token_program, false),
+			AccountMeta::new(*reward_vault, false),
 		],
 	)
 }
@@ -1008,7 +1014,15 @@ fn rewards_accrue_once_per_index_and_release() {
 		// A drip of one full index unit: one reward token per staked token.
 		let index = REWARD_INDEX_SCALE;
 		program
-			.send_instruction(set_reward_index_instruction(&program, &admin, &pool, index))
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				index,
+			))
 			.expect("execute SetRewardIndex");
 
 		// The drip may not move rewards backwards: that is what would let a
@@ -1018,6 +1032,9 @@ fn rewards_accrue_once_per_index_and_release() {
 				&program,
 				&admin,
 				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
 				index - 1,
 			))
 			.expect_err("reject a regressed reward index");
@@ -1206,6 +1223,9 @@ fn rejects_a_deposit_without_stake_tokens() {
 				&program,
 				&admin,
 				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
 				1_000_000_000,
 			))
 			.expect("execute SetRewardIndex");
@@ -1577,6 +1597,9 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 				&program,
 				&admin,
 				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
 				REWARD_INDEX_SCALE,
 			))
 			.expect_err("an index update beyond the vault's reserves must be rejected");
@@ -1706,6 +1729,9 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 			&program,
 			&admin,
 			&pool,
+			&reward_mint,
+			&token_program_id(),
+			&reward_vault,
 			REWARD_INDEX_SCALE,
 		)) {
 			assert!(
@@ -1841,6 +1867,9 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 			&program,
 			&admin,
 			&pool,
+			&reward_mint,
+			&token_program_id(),
+			&reward_vault,
 			u64::MAX,
 		)) {
 			assert!(

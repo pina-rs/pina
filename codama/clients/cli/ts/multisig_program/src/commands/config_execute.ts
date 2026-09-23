@@ -20,7 +20,16 @@ export const configExecuteCommand = registerGlobals(
 	.description("configExecute")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
 	.requiredOption("--proposal <proposal>", "The `proposal` account")
+	.option("--member <member>", "The `member` account [default: payer]")
+	.option(
+		"--rent-payer <rentPayer>",
+		"The `rent_payer` account [default: payer]",
+	)
 	.requiredOption("--clock <clock>", "The `clock` account")
+	.requiredOption(
+		"--rent-collector <rentCollector>",
+		"Refund destination for closed spending-limit accounts. When the",
+	)
 	.requiredOption(
 		"--spending-limit-accounts <spendingLimitAccounts>",
 		"Spending limit accounts referenced by add/remove spending-limit",
@@ -33,6 +42,7 @@ export const configExecuteCommand = registerGlobals(
 			member: context.payer,
 			rentPayer: context.payer,
 			clock: pubkey("--clock", options.clock),
+			rentCollector: pubkey("--rent-collector", options.rentCollector),
 			spendingLimitAccounts: pubkey(
 				"--spending-limit-accounts",
 				options.spendingLimitAccounts,

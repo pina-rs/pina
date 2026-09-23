@@ -1428,13 +1428,112 @@ fn split_export_output(
 		}
 	})?;
 
-	if decoded.len() < 64 {
-		return Err(VerifyError::InvalidExport {
+	// Length alone accepted any payload of at least one signature's width.
+	// The export is persisted as the on-chain verification transaction, so it
+	// must actually deserialize as one: a structurally valid (versioned)
+	// Solana transaction whose every account index is in range and whose
+	// message contains at least one instruction. Anything else fails closed
+	// before a byte is written.
+	validate_transaction_wire(&decoded).map_err(|()| {
+		VerifyError::InvalidExport {
 			encoding: encoding.as_str(),
-		});
-	}
+		}
+	})?;
 
 	Ok((diagnostics.as_bytes().to_vec(), payload.to_owned()))
+}
+
+/// Validate a decoded Solana transaction envelope without deserializing keys.
+///
+/// Accepts the legacy (`0x00`) and versioned (`0x80 | version`) wire forms.
+/// The signature count, message header, account table, blockhash, and
+/// instruction list are walked with bounds checks; every account index used
+/// by an instruction must fall inside the declared account table. This is a
+/// structural check only — the caller's fake-verifier fixtures carry real
+/// transaction shapes, and semantic expectations (program ids, instruction
+/// counts) are the operator's judgement recorded alongside the export.
+fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
+	// A transaction needs at least one signature plus a minimal message.
+	if bytes.len() < 64 + 3 + 1 + 32 + 1 {
+		return Err(());
+	}
+	// Legacy transactions open with the compact-u16 signature count (high
+	// bit clear); versioned transactions open with `0x80 | version` and carry
+	// the signature count as the next byte.
+	let versioned = bytes[0] & 0x80 != 0;
+
+	// [signature count][signatures…][message], where the message starts with
+	// the version byte only in the versioned form.
+	let signature_count = if versioned {
+		bytes[1] as usize
+	} else {
+		bytes[0] as usize
+	};
+	if signature_count == 0 || signature_count > 16 {
+		return Err(());
+	}
+	let mut cursor = 1 + usize::from(versioned);
+	cursor = cursor
+		.checked_add(signature_count.checked_mul(64).ok_or(())?)
+		.ok_or(())?;
+	if bytes.len() < cursor + 3 {
+		return Err(());
+	}
+
+	let message = &bytes[cursor..];
+	let mut offset = usize::from(versioned);
+
+	// Header: required signatures, readonly signed, readonly unsigned.
+	let required_signatures = message[offset] as usize;
+	if required_signatures == 0 || required_signatures > signature_count {
+		return Err(());
+	}
+	offset += 3;
+
+	if message.len() < offset + 1 {
+		return Err(());
+	}
+	let account_count = message[offset] as usize;
+	offset += 1;
+	offset = offset
+		.checked_add(account_count.checked_mul(32).ok_or(())?)
+		.ok_or(())?;
+
+	// Recent blockhash.
+	offset = offset.checked_add(32).ok_or(())?;
+	if message.len() < offset + 1 {
+		return Err(());
+	}
+
+	// Every instruction's program and account indices must be in range.
+	let instruction_count = message[offset];
+	offset += 1;
+	if instruction_count == 0 {
+		return Err(());
+	}
+	for _ in 0..instruction_count {
+		if message.len() < offset + 3 {
+			return Err(());
+		}
+		let program_index = message[offset] as usize;
+		let accounts_len = message[offset + 1] as usize;
+		offset += 2;
+		if program_index >= account_count || accounts_len > account_count {
+			return Err(());
+		}
+		offset = offset.checked_add(accounts_len).ok_or(())?;
+		if message.len() < offset + 1 {
+			return Err(());
+		}
+		let data_len = message[offset] as usize;
+		offset = offset.checked_add(1).ok_or(())?;
+		offset = offset.checked_add(data_len).ok_or(())?;
+		if offset > message.len() {
+			return Err(());
+		}
+	}
+
+	Ok(())
 }
 
 fn write_export(path: &Path, contents: &[u8]) -> Result<(), VerifyError> {
@@ -1832,12 +1931,30 @@ mod tests {
 		assert!(submit_program(&FakeExecutor::default(), PROGRAM_ID, "invalid").is_err());
 	}
 
+	/// A structurally valid legacy transaction wire payload for export
+	/// fixtures: one 64-byte signature, a message header declaring one
+	/// required signer, two accounts, a blockhash, and one empty instruction.
+	fn valid_tx_wire(seed: u8) -> Vec<u8> {
+		let mut bytes = Vec::new();
+		bytes.push(1); // signature count
+		bytes.extend_from_slice(&[seed; 64]); // signature
+		bytes.extend_from_slice(&[1, 0, 1]); // header: 1 required, 0 ro-signed, 1 ro-unsigned
+		bytes.push(2); // two accounts
+		bytes.extend_from_slice(&[seed; 64]); // two 32-byte account keys
+		bytes.extend_from_slice(&[seed; 32]); // recent blockhash
+		bytes.push(1); // one instruction
+		bytes.push(1); // program id index
+		bytes.push(0); // no accounts
+		bytes.push(0); // no data
+		bytes
+	}
+
 	#[test]
 	fn export_writes_only_validated_payload_and_preserves_diagnostics() {
 		let temp = TempDir::new().unwrap();
 		let build_record = create_build_record(&temp);
 		let output_path = temp.path().join("transaction with spaces.txt");
-		let payload = base64::engine::general_purpose::STANDARD.encode([7_u8; 128]);
+		let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(7));
 		let upstream_output = format!("Cloning repository\nBuilding program\n{payload}\n");
 		let executor = FakeExecutor::with([
 			version(),
@@ -2011,7 +2128,7 @@ mod tests {
 		));
 
 		options.export_authority = Some(String::new());
-		let payload = bs58::encode([8_u8; 128]).into_string();
+		let payload = bs58::encode(valid_tx_wire(8)).into_string();
 		let executor = FakeExecutor::with([
 			version(),
 			output(0, format!("{}\n", record_hash()), ""),
@@ -2249,7 +2366,7 @@ mod tests {
 
 	#[test]
 	fn export_payload_validation_covers_both_encodings_and_write_errors() {
-		let base58 = bs58::encode([5_u8; 64]).into_string();
+		let base58 = bs58::encode(valid_tx_wire(5)).into_string();
 		assert_eq!(
 			split_export_output(base58.as_bytes(), ExportEncoding::Base58)
 				.unwrap()

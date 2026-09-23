@@ -18,6 +18,7 @@ export const updateCommand = registerGlobals(new Command("update"))
 	.description("update")
 	.requiredOption("--new-price <newPrice>", "newPrice")
 	.requiredOption("--oracle <oracle>", "The `oracle` account")
+	.option("--authority <authority>", "The `authority` account [default: payer]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

@@ -51,6 +51,10 @@ use vesting_program::VestingStateZc;
 /// Uses `pina::token::ID` because `solana-sdk-ids` v3 does not expose an
 /// `spl_token` module.  `Pubkey` and `pina::Address` are both re-exports of
 /// `solana_address::Address`, so the value is directly assignment-compatible.
+fn spl_token_2022_program_id() -> Pubkey {
+	Pubkey::from_str_const("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+}
+
 fn spl_token_program_id() -> Pubkey {
 	pina::token::ID
 }
@@ -328,6 +332,8 @@ fn cancel_account_metas(
 	vesting_pda: &Pubkey,
 	admin_ata: &Pubkey,
 	vault: &Pubkey,
+	clock: &Pubkey,
+	beneficiary_ata: &Pubkey,
 ) -> Vec<AccountMeta> {
 	vec![
 		AccountMeta::new(*admin, true),
@@ -338,6 +344,8 @@ fn cancel_account_metas(
 		AccountMeta::new_readonly(spl_ata_program_id(), false),
 		AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		AccountMeta::new_readonly(spl_token_program_id(), false),
+		AccountMeta::new_readonly(*clock, false),
+		AccountMeta::new(*beneficiary_ata, false),
 	]
 }
 
@@ -440,13 +448,23 @@ fn cancel_sets_cancelled_flag() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 	let admin_ata = derive_ata(&admin, &mint);
+	let beneficiary_ata = derive_ata(&beneficiary, &mint);
+	let (clock_key, clock_account) = clock_sysvar_account(&mollusk, 1_700_000_000);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
+		cancel_account_metas(
+			&admin,
+			&mint,
+			&vesting_pda,
+			&admin_ata,
+			&vault,
+			&clock_key,
+			&beneficiary_ata,
+		),
 	);
 
 	let accounts = vec![
@@ -511,13 +529,23 @@ fn cancel_already_cancelled_fails() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 	let admin_ata = derive_ata(&admin, &mint);
+	let beneficiary_ata = derive_ata(&beneficiary, &mint);
+	let (clock_key, clock_account) = clock_sysvar_account(&mollusk, 1_700_000_000);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
+		cancel_account_metas(
+			&admin,
+			&mint,
+			&vesting_pda,
+			&admin_ata,
+			&vault,
+			&clock_key,
+			&beneficiary_ata,
+		),
 	);
 
 	let accounts = vec![
@@ -569,6 +597,7 @@ fn cancel_wrong_admin_fails() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
@@ -640,6 +669,7 @@ fn claim_already_cancelled_fails() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 	let beneficiary_ata = derive_ata(&beneficiary, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
@@ -699,6 +729,7 @@ fn claim_too_large_fails() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 	let beneficiary_ata = derive_ata(&beneficiary, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
@@ -764,6 +795,7 @@ fn claim_wrong_beneficiary_fails() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 	let wrong_beneficiary_ata = derive_ata(&wrong_beneficiary, &mint);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
@@ -828,6 +860,94 @@ fn claim_wrong_beneficiary_fails() {
 // ---------------------------------------------------------------------------
 
 #[test]
+/// SEC-30 (audit regression): `Initialize` must reject a Token-2022 mint
+/// carrying extensions. Every value-exit path rejects extended mints
+/// (`assert_no_extensions`), so accepting one here would create a schedule
+/// whose funded allocation can never leave.
+#[test]
+fn initialize_rejects_a_token_2022_mint_with_extensions() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let admin = Pubkey::new_unique();
+	let beneficiary = Pubkey::new_unique();
+	let mint = Pubkey::new_unique();
+	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
+	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
+
+	// A canonical extended Token-2022 mint: 82-byte base (initialized,
+	// authority set), padding, the mint account-type byte, then the
+	// NonTransferable TLV entry (type 9, zero-length payload).
+	let mut data = vec![0u8; 171];
+	data[0..4].copy_from_slice(&1u32.to_le_bytes());
+	data[4..36].copy_from_slice(&[3u8; 32]);
+	data[36..44].copy_from_slice(&0u64.to_le_bytes());
+	data[44] = 6;
+	data[45] = 1;
+	data[46..50].copy_from_slice(&0u32.to_le_bytes());
+	data[164] = 2; // account type: mint
+	data[165..167].copy_from_slice(&9u16.to_le_bytes());
+	data[167..171].copy_from_slice(&0u32.to_le_bytes());
+	let extended_mint = Account {
+		lamports: 1_000_000_000,
+		data,
+		owner: spl_token_2022_program_id(),
+		executable: false,
+		rent_epoch: 0,
+	};
+
+	let token_2022 = Account {
+		lamports: 1,
+		data: vec![],
+		owner: solana_sdk_ids::system_program::id(),
+		executable: true,
+		rent_epoch: 0,
+	};
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&initialize_ix_data(1_000_000, 0, 0, 0, bump),
+		vec![
+			AccountMeta::new(admin, true),
+			AccountMeta::new_readonly(beneficiary, false),
+			AccountMeta::new_readonly(mint, false),
+			AccountMeta::new(vesting_pda, false),
+			AccountMeta::new(vault, false),
+			AccountMeta::new(admin_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			AccountMeta::new_readonly(spl_token_2022_program_id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(
+			beneficiary,
+			Account::new(0, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(mint, extended_mint),
+		(vesting_pda, Account::default()),
+		(vault, Account::default()),
+		(admin_ata, mock_ata_account(1_000_000)),
+		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
+		(spl_token_2022_program_id(), token_2022),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(ProgramError::InvalidAccountData)],
+	);
+}
+
 fn initialize_invalid_schedule_start_after_cliff() {
 	let Some(mollusk) = try_create_mollusk() else {
 		eprintln!("{SKIP_MSG}");
@@ -839,6 +959,7 @@ fn initialize_invalid_schedule_start_after_cliff() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	// start_ts (300) > cliff_ts (200) → InvalidSchedule
 	let instruction = Instruction::new_with_bytes(
@@ -850,6 +971,7 @@ fn initialize_invalid_schedule_start_after_cliff() {
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new(admin_ata, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
@@ -892,6 +1014,7 @@ fn initialize_invalid_schedule_cliff_after_end() {
 	let mint = Pubkey::new_unique();
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
+	let admin_ata = derive_ata(&admin, &mint);
 
 	// cliff_ts (500) > end_ts (400) → InvalidSchedule
 	let instruction = Instruction::new_with_bytes(
@@ -903,6 +1026,7 @@ fn initialize_invalid_schedule_cliff_after_end() {
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new(admin_ata, false),
 			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
@@ -954,13 +1078,23 @@ fn benchmark_cu_cancel() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 	let admin_ata = derive_ata(&admin, &mint);
+	let beneficiary_ata = derive_ata(&beneficiary, &mint);
+	let (clock_key, clock_account) = clock_sysvar_account(&mollusk, 1_700_000_000);
 
 	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&cancel_ix_data(),
-		cancel_account_metas(&admin, &mint, &vesting_pda, &admin_ata, &vault),
+		cancel_account_metas(
+			&admin,
+			&mint,
+			&vesting_pda,
+			&admin_ata,
+			&vault,
+			&clock_key,
+			&beneficiary_ata,
+		),
 	);
 
 	let accounts = vec![
