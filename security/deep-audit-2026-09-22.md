@@ -1678,7 +1678,7 @@ Implemented in the `worktrees/audit-fixes` work tree on top of the exploit-regre
 Fixed with their failing tests now passing:
 
 - **SEC-02/SEC-34** — `UpdateResizableAccount` always routes through the generated account-level update contract (envelope checked before any byte moves, envelope advanced after), and the preflight-versus-commit length agreement is a release-mode `InvalidAccountData` instead of a compiled-out `debug_assert`. `security/regressions/sec02-compact-no-validation` passes; `cargo test -p pina --all-features --lib` and the cpi/compact suites are green.
-- **SEC-33** — `pinapod` exact-pinned to `=0.4.3`.
+- **SEC-33** — `pinapod` exact-pinned to `=0.4.3`, with the re-export contract made explicit and executable: downstream consumers import `pina::pinapod` and `pina::fixed` (behind the `fixed` feature) and never add either crate directly — proven by `security/regressions/sec33-downstream-reexport`, which builds a fixed-point schema against `pina` alone. pinapod does not re-export `fixed` itself, so `pina` keeps its matching `=1.30.0` entry (the only way Cargo permits the re-export); pina-rs/pinapod#41 tracks removing it.
 - **SEC-09 config half** — `ConfigExecute` enforces expiry like `VaultExecute` (the earlier "divergence" note: only VaultExecute carried it on this line).
 - **SEC-20** — `ConfigExecute` gained a `rent_collector` account; when the multisig configures one, closes and shrinks refund it (address-asserted), otherwise refunds alias the rent payer as before.
 - **SEC-21** — multisig creation, `SetTimeLock`, and `SetProposalTtl` reject a nonzero TTL at or below the (new or current) timelock.

@@ -1,0 +1,19 @@
+[package]
+name = "sec33-downstream-reexport"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Contract regression for SEC-33 of the 2026-09-22 deep audit: a downstream
+# consumer needs only `pina` — never a direct `pinapod` or `fixed`
+# dependency — to derive fixed-point schemas. `pina` re-exports the
+# exact-pinned `pinapod = "=0.4.3"` and the matching `fixed = "=1.30.0"`,
+# so schema fields derive against the only `fixed` build pinapod's
+# `ZcField` implementations recognize.
+#
+# Deliberately NOT a workspace member, mirroring the sec02 crate: the proof
+# is that this builds against `pina` alone.
+[workspace]
+
+[dependencies]
+pina = { path = "../../../crates/pina", features = ["fixed", "floats"] }
