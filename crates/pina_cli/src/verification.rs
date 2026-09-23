@@ -1481,7 +1481,9 @@ fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
 	}
 
 	let message = &bytes[cursor..];
-	let mut offset = usize::from(versioned);
+	// The message slice starts after the version byte, so no extra offset is
+	// needed here.
+	let mut offset = 0;
 
 	// Header: required signatures, readonly signed, readonly unsigned.
 	let required_signatures = message[offset] as usize;
@@ -2362,6 +2364,64 @@ mod tests {
 			verified_relative_path("programs\\fixture").unwrap(),
 			"programs/fixture"
 		);
+	}
+
+	#[test]
+	fn transaction_wire_accepts_the_versioned_form_and_a_transfer_free_shape() {
+		// Versioned header: `0x80 | version`, then the signature count byte.
+		let mut versioned = vec![0x80, 1];
+		versioned.extend_from_slice(&[7u8; 64]);
+		versioned.extend_from_slice(&[1, 0, 1]);
+		versioned.push(2);
+		versioned.extend_from_slice(&[7u8; 64]);
+		versioned.extend_from_slice(&[7u8; 32]);
+		versioned.push(1);
+		versioned.push(1);
+		versioned.push(0);
+		versioned.push(0);
+		assert!(validate_transaction_wire(&versioned).is_ok());
+	}
+
+	#[test]
+	fn transaction_wire_rejects_structurally_broken_payloads() {
+		// Unknown header format: neither legacy-zero nor the versioned bit.
+		assert!(validate_transaction_wire(&[0x01]).is_err());
+
+		let base = |seed: u8| valid_tx_wire(seed);
+
+		// Legacy signature count of zero.
+		let mut zero_signatures = base(1);
+		zero_signatures[0] = 0;
+		assert!(validate_transaction_wire(&zero_signatures).is_err());
+
+		// Absurd signature count.
+		let mut absurd_signatures = base(1);
+		absurd_signatures[0] = 200;
+		assert!(validate_transaction_wire(&absurd_signatures).is_err());
+
+		// Truncated signature list.
+		assert!(validate_transaction_wire(&base(1)[..40]).is_err());
+
+		// Header requires more signers than signatures present.
+		let mut over_signed = base(1);
+		over_signed[65 + 0] = 2; // required signatures = 2 > 1 signature
+		assert!(validate_transaction_wire(&over_signed).is_err());
+
+		// Truncated account table.
+		assert!(validate_transaction_wire(&base(1)[..70]).is_err());
+
+		// Instruction count of zero.
+		let mut no_instructions = base(1);
+		no_instructions[165] = 0;
+		assert!(validate_transaction_wire(&no_instructions).is_err());
+
+		// Program id index beyond the account table.
+		let mut bad_program_index = base(1);
+		bad_program_index[base(1).len() - 3] = 9;
+		assert!(validate_transaction_wire(&bad_program_index).is_err());
+
+		// Truncated instruction tail.
+		assert!(validate_transaction_wire(&base(1)[..base(1).len() - 1]).is_err());
 	}
 
 	#[test]
