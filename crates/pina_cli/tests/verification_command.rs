@@ -216,6 +216,24 @@ fn non_interactive_record_refuses_before_spawning_verifier() {
 	assert!(String::from_utf8_lossy(&output.stderr).contains("requires confirmation"));
 }
 
+/// A structurally valid legacy transaction wire payload for export fixtures:
+/// one 64-byte signature, a message header declaring one required signer, two
+/// accounts, a blockhash, and one empty instruction.
+fn valid_tx_wire(seed: u8) -> Vec<u8> {
+	let mut bytes = Vec::new();
+	bytes.push(1); // signature count (compact-u16, high bit clear)
+	bytes.extend_from_slice(&[seed; 64]); // signature
+	bytes.extend_from_slice(&[1, 0, 1]); // header: 1 required, 0 ro-signed, 1 ro-unsigned
+	bytes.push(2); // two accounts
+	bytes.extend_from_slice(&[seed; 64]); // two 32-byte account keys
+	bytes.extend_from_slice(&[seed; 32]); // recent blockhash
+	bytes.push(1); // one instruction
+	bytes.push(1); // program id index
+	bytes.push(0); // no accounts
+	bytes.push(0); // no data
+	bytes
+}
+
 #[test]
 fn record_export_submit_and_status_use_the_real_process_adapter() {
 	let temp = TempDir::new().unwrap();
@@ -243,7 +261,7 @@ fn record_export_submit_and_status_use_the_real_process_adapter() {
 	assert!(String::from_utf8_lossy(&recorded.stdout).contains("uploaded successfully"));
 
 	let exported_path = temp.path().join("export\n\u{1b}[31m.tx");
-	let payload = base64::engine::general_purpose::STANDARD.encode([9_u8; 128]);
+	let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(9));
 	let exported = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(common)
 		.args([
@@ -348,7 +366,7 @@ fn audit_sec_18_an_arbitrary_byte_payload_is_not_a_verification_transaction() {
 	let verifier = fake_verifier(&temp);
 	let (record, keypair, hash) = create_record_and_keypair(&temp);
 	let exported_path = temp.path().join("audit-export.tx");
-	let payload = base64::engine::general_purpose::STANDARD.encode([9_u8; 128]);
+	let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(9));
 
 	let exported = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["verify", "--solana-verify", verifier.to_str().unwrap()])
