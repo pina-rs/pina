@@ -6,7 +6,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
    = note: `#[deny(require_zeroed_before_close)]` on by default
 
 error: account close should be preceded by zeroing the same account's data
@@ -17,7 +17,7 @@ LL |     state.close_with_recipient(&ID, ())?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:478:2
@@ -27,7 +27,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:493:2
@@ -37,7 +37,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:504:2
@@ -47,7 +47,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:511:2
@@ -57,7 +57,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:519:2
@@ -67,7 +67,7 @@ LL |     accounts[1].close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:527:2
@@ -77,7 +77,7 @@ LL |     accounts[0].close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:529:2
@@ -87,7 +87,7 @@ LL |     accounts[1].close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:540:2
@@ -97,7 +97,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:548:2
@@ -107,7 +107,7 @@ LL |     accounts.escrow().close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:560:2
@@ -117,7 +117,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:574:2
@@ -127,7 +127,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:588:2
@@ -137,7 +137,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:598:2
@@ -147,7 +147,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:610:2
@@ -157,7 +157,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:624:2
@@ -167,7 +167,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:638:2
@@ -177,7 +177,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:651:2
@@ -187,7 +187,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:664:2
@@ -197,7 +197,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:675:2
@@ -207,7 +207,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:684:2
@@ -217,7 +217,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:691:2
@@ -227,7 +227,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:700:2
@@ -237,7 +237,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:709:2
@@ -247,7 +247,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:717:2
@@ -257,7 +257,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:724:2
@@ -267,7 +267,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:732:2
@@ -277,7 +277,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:746:2
@@ -287,7 +287,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:759:2
@@ -297,7 +297,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:772:2
@@ -307,7 +307,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:781:2
@@ -317,7 +317,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:791:2
@@ -327,7 +327,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:808:2
@@ -337,7 +337,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:822:2
@@ -347,7 +347,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:836:2
@@ -357,7 +357,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:851:2
@@ -367,7 +367,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:868:2
@@ -377,7 +377,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:884:2
@@ -387,7 +387,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:893:2
@@ -397,7 +397,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:905:2
@@ -407,7 +407,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:919:2
@@ -417,7 +417,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:932:2
@@ -427,7 +427,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:940:3
@@ -437,7 +437,7 @@ LL |         state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:954:2
@@ -447,7 +447,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:965:2
@@ -457,7 +457,7 @@ LL |     closed.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:979:2
@@ -467,7 +467,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:993:2
@@ -477,7 +477,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1005:2
@@ -487,7 +487,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1014:2
@@ -497,7 +497,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1027:2
@@ -507,7 +507,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1037:2
@@ -517,7 +517,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1055:2
@@ -527,7 +527,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1067:2
@@ -537,7 +537,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1080:2
@@ -547,7 +547,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1091:2
@@ -557,7 +557,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1105:2
@@ -567,7 +567,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1115:2
@@ -577,7 +577,7 @@ LL |     accounts.list[0].close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1129:2
@@ -587,7 +587,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1143:2
@@ -597,7 +597,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1156:2
@@ -607,7 +607,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1169:2
@@ -617,7 +617,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1183:2
@@ -627,7 +627,7 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1196:2
@@ -637,7 +637,7 @@ LL |     ctx.escrow.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1203:2
@@ -647,7 +647,7 @@ LL |     AccountView::close(state)?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1209:2
@@ -657,7 +657,7 @@ LL |     <AccountView>::close(&mut *state)
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1214:2
@@ -667,7 +667,7 @@ LL |     CloseAccountWithRecipient::close_with_recipient(state, &ID, ())
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1228:3
@@ -677,7 +677,7 @@ LL |         state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1246:3
@@ -687,7 +687,7 @@ LL |         state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:1256:2
@@ -697,6 +697,6 @@ LL |     state.close()?;
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = help: known limits: after the fill, writes through `pina`, `pinocchio`, or `solana_account_view` methods, CPIs, and separately obtained handles to the account are not tracked, nor are lends after the close inside a loop
 
 error: aborting due to 70 previous errors

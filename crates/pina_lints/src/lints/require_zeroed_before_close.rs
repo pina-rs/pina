@@ -134,7 +134,11 @@ impl<'tcx> LateLintPass<'tcx> for RequireZeroedBeforeClose {
 					"to keep a separate close, first clear the whole data buffer of the same \
 					 account with `account.try_borrow_mut()?.fill(0);`",
 				);
-				diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
+				diag.help(
+					"known limits: after the fill, writes through `pina`, `pinocchio`, or \
+					 `solana_account_view` methods, CPIs, and separately obtained handles to the \
+					 account are not tracked, nor are lends after the close inside a loop",
+				);
 			});
 		}
 	}
