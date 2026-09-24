@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,9 +12,12 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class TestEventInstructionData {
-  const TestEventInstructionData() : discriminator = 1, migrationVersion = 0;
+  const TestEventInstructionData() :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -41,22 +45,34 @@ Decoder<TestEventInstructionData> getTestEventInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'testEvent instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'testEvent instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (TestEventInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (TestEventInstructionData(), newOffset);
+    return (
+      TestEventInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -79,21 +95,25 @@ Decoder<TestEventInstructionData> getTestEventInstructionDataDecoder() {
   };
 }
 
-Codec<TestEventInstructionData, TestEventInstructionData>
-getTestEventInstructionDataCodec() {
-  return combineCodec(
-    getTestEventInstructionDataEncoder(),
-    getTestEventInstructionDataDecoder(),
-  );
+Codec<TestEventInstructionData, TestEventInstructionData> getTestEventInstructionDataCodec() {
+  return combineCodec(getTestEventInstructionDataEncoder(), getTestEventInstructionDataDecoder());
 }
 
 /// Creates a [TestEvent] instruction.
-Instruction getTestEventInstruction({required Address programAddress}) {
-  final instructionData = TestEventInstructionData();
+Instruction getTestEventInstruction({
+  required Address programAddress,
+
+
+}) {
+  final instructionData = TestEventInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+
+    ],
     data: getTestEventInstructionDataEncoder().encode(instructionData),
   );
 }

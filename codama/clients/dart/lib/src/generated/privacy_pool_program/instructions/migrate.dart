@@ -6,13 +6,13 @@ import 'dart:typed_data';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-import '../programs/privacy_pool_program.dart'
-    show privacyPoolProgramProgramAddress;
+import '../programs/privacy_pool_program.dart' show privacyPoolProgramProgramAddress;
 
 /// Discriminator reserved by Pina for the framework `Migrate` instruction.
 const migrateDiscriminator = 255;
 
-Uint8List getMigrateDiscriminatorBytes() => Uint8List.fromList(const [255]);
+Uint8List getMigrateDiscriminatorBytes() =>
+    Uint8List.fromList(const [255]);
 
 /// Creates the framework-owned `Migrate` instruction: it runs the program's
 /// on-demand account migrations on their own, so the payer authorizes exactly
@@ -45,10 +45,7 @@ Instruction getMigrateInstruction({
       address: payer ?? resolvedProgram,
       role: payer == null ? AccountRole.readonly : AccountRole.writableSigner,
     ),
-    AccountMeta(
-      address: systemProgram ?? resolvedProgram,
-      role: AccountRole.readonly,
-    ),
+    AccountMeta(address: systemProgram ?? resolvedProgram, role: AccountRole.readonly),
     AccountMeta(
       address: poolConfig ?? resolvedProgram,
       role: poolConfig == null ? AccountRole.readonly : AccountRole.writable,
@@ -67,27 +64,19 @@ Instruction getMigrateInstruction({
     ),
     AccountMeta(
       address: custodianRegistry ?? resolvedProgram,
-      role: custodianRegistry == null
-          ? AccountRole.readonly
-          : AccountRole.writable,
+      role: custodianRegistry == null ? AccountRole.readonly : AccountRole.writable,
     ),
     AccountMeta(
       address: requesterRegistry ?? resolvedProgram,
-      role: requesterRegistry == null
-          ? AccountRole.readonly
-          : AccountRole.writable,
+      role: requesterRegistry == null ? AccountRole.readonly : AccountRole.writable,
     ),
     AccountMeta(
       address: noteCommitment ?? resolvedProgram,
-      role: noteCommitment == null
-          ? AccountRole.readonly
-          : AccountRole.writable,
+      role: noteCommitment == null ? AccountRole.readonly : AccountRole.writable,
     ),
     AccountMeta(
       address: disclosureRequest ?? resolvedProgram,
-      role: disclosureRequest == null
-          ? AccountRole.readonly
-          : AccountRole.writable,
+      role: disclosureRequest == null ? AccountRole.readonly : AccountRole.writable,
     ),
     AccountMeta(
       address: disclosureLog ?? resolvedProgram,
@@ -95,25 +84,10 @@ Instruction getMigrateInstruction({
     ),
     AccountMeta(
       address: verifyingKeyAccount ?? resolvedProgram,
-      role: verifyingKeyAccount == null
-          ? AccountRole.readonly
-          : AccountRole.writable,
+      role: verifyingKeyAccount == null ? AccountRole.readonly : AccountRole.writable,
     ),
   ];
-  final provided = [
-    payer,
-    systemProgram,
-    poolConfig,
-    poolVault,
-    merkleTree,
-    nullifierSet,
-    custodianRegistry,
-    requesterRegistry,
-    noteCommitment,
-    disclosureRequest,
-    disclosureLog,
-    verifyingKeyAccount,
-  ];
+  final provided = [payer, systemProgram, poolConfig, poolVault, merkleTree, nullifierSet, custodianRegistry, requesterRegistry, noteCommitment, disclosureRequest, disclosureLog, verifyingKeyAccount];
   var last = -1;
   for (var index = 0; index < provided.length; index++) {
     if (provided[index] != null) {

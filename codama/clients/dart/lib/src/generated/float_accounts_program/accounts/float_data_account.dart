@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,14 +12,16 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class FloatDataAccount {
   const FloatDataAccount({
     required this.dataF64,
     required this.dataF32,
     required this.authority,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -38,13 +41,12 @@ class FloatDataAccount {
           authority == other.authority;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, migrationVersion, dataF64, dataF32, authority);
+  int get hashCode => Object.hash(discriminator, migrationVersion, dataF64, dataF32, authority);
 
   @override
-  String toString() =>
-      'FloatDataAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, dataF64: $dataF64, dataF32: $dataF32, authority: $authority)';
+  String toString() => 'FloatDataAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, dataF64: $dataF64, dataF32: $dataF32, authority: $authority)';
 }
+
 
 Encoder<FloatDataAccount> getFloatDataAccountEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -77,15 +79,20 @@ Decoder<FloatDataAccount> getFloatDataAccountDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'floatDataAccount account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'floatDataAccount account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (FloatDataAccount, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -98,9 +105,9 @@ Decoder<FloatDataAccount> getFloatDataAccountDecoder() {
 
     return (
       FloatDataAccount(
-        dataF64: map['dataF64']! as BigInt,
-        dataF32: map['dataF32']! as int,
-        authority: map['authority']! as Address,
+      dataF64: map['dataF64']! as BigInt,
+      dataF32: map['dataF32']! as int,
+      authority: map['authority']! as Address,
       ),
       newOffset,
     );
@@ -127,15 +134,10 @@ Decoder<FloatDataAccount> getFloatDataAccountDecoder() {
 }
 
 Codec<FloatDataAccount, FloatDataAccount> getFloatDataAccountCodec() {
-  return combineCodec(
-    getFloatDataAccountEncoder(),
-    getFloatDataAccountDecoder(),
-  );
+  return combineCodec(getFloatDataAccountEncoder(), getFloatDataAccountDecoder());
 }
 
-Account<FloatDataAccount> decodeFloatDataAccount(
-  EncodedAccount encodedAccount,
-) {
+Account<FloatDataAccount> decodeFloatDataAccount(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getFloatDataAccountDecoder());
 }
 
@@ -147,11 +149,11 @@ const int floatDataAccountMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool floatDataAccountNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 1) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 1) {
+		return false;
+	}
+	return data[1] < 0;
 }

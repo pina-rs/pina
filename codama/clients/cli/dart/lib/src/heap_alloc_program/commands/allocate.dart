@@ -9,7 +9,8 @@ import 'package:pina_codama_clients/heap_alloc_program.dart';
 
 final class AllocateCommand extends Command<void> {
   AllocateCommand() {
-    argParser..addOption('value', mandatory: true, help: "value");
+    argParser
+      ..addOption('value', mandatory: true, help: "value");
   }
 
   @override

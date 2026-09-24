@@ -20,8 +20,7 @@ final class ReallocCommand extends Command<void> {
   String get name => 'realloc';
 
   @override
-  String get description =>
-      "Resizes the complete account-data buffer to `len` bytes.  `len` must equal `Sample::projected_bytes` for an active value count.";
+  String get description => "Resizes the complete account-data buffer to `len` bytes.  `len` must equal `Sample::projected_bytes` for an active value count.";
 
   @override
   Future<void> run() async {

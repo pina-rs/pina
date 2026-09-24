@@ -14,22 +14,10 @@ final class ClaimCommand extends Command<void> {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption(
-        'vesting_state',
-        mandatory: true,
-        help: "The vesting_state account",
-      )
-      ..addOption(
-        'beneficiary_ata',
-        mandatory: true,
-        help: "The beneficiary_ata account",
-      )
+      ..addOption('vesting_state', mandatory: true, help: "The vesting_state account")
+      ..addOption('beneficiary_ata', mandatory: true, help: "The beneficiary_ata account")
       ..addOption('vault', mandatory: true, help: "The vault account")
-      ..addOption(
-        'token_program',
-        mandatory: true,
-        help: "The token_program account",
-      )
+      ..addOption('token_program', mandatory: true, help: "The token_program account")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -45,19 +33,10 @@ final class ClaimCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final beneficiary = context.payerAddress;
     final mint = pubkey('--mint', results['mint']! as String);
-    final vestingState = pubkey(
-      '--vesting-state',
-      results['vesting_state']! as String,
-    );
-    final beneficiaryAta = pubkey(
-      '--beneficiary-ata',
-      results['beneficiary_ata']! as String,
-    );
+    final vestingState = pubkey('--vesting-state', results['vesting_state']! as String);
+    final beneficiaryAta = pubkey('--beneficiary-ata', results['beneficiary_ata']! as String);
     final vault = pubkey('--vault', results['vault']! as String);
-    final tokenProgram = pubkey(
-      '--token-program',
-      results['token_program']! as String,
-    );
+    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
     final clock = pubkey('--clock', results['clock']! as String);
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final instruction = getClaimInstruction(
@@ -67,9 +46,7 @@ final class ClaimCommand extends Command<void> {
       vestingState: vestingState,
       beneficiaryAta: beneficiaryAta,
       vault: vault,
-      associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-      ),
+      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
       clock: clock,
