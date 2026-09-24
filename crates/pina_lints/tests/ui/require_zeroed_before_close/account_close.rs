@@ -1,7 +1,16 @@
 // normalize-stderr-test: "\n$" -> ""
 // aux-build: solana_account_view.rs
 
-#![allow(const_item_mutation, dead_code, unused_assignments, unused_mut)]
+#![allow(
+	const_item_mutation,
+	dead_code,
+	irrefutable_let_patterns,
+	unreachable_code,
+	unused_assignments,
+	unused_labels,
+	unused_mut,
+	unused_variables
+)]
 
 extern crate solana_account_view;
 
@@ -74,6 +83,58 @@ fn next_account<'a>(iter: &mut Iter<'a>) -> Result<&'a mut AccountView, ProgramE
 
 fn pick<'a>(_first: &'a mut AccountView, second: &'a mut AccountView) -> &'a mut AccountView {
 	second
+}
+
+impl Ctx<'_> {
+	fn rotate(&mut self) {
+		core::mem::swap(&mut self.escrow, &mut self.vault);
+	}
+}
+
+// A method the lint cannot see into that writes the account's data.
+trait Scribble {
+	fn scribble(&mut self) -> Result<(), ProgramError>;
+}
+
+impl Scribble for AccountView {
+	fn scribble(&mut self) -> Result<(), ProgramError> {
+		self.try_borrow_mut()?[0] = 7;
+		Ok(())
+	}
+}
+
+struct Owned {
+	escrow: AccountView,
+	maker: AccountView,
+}
+
+struct Handler<'a> {
+	escrow: &'a mut AccountView,
+	maker: &'a mut AccountView,
+}
+
+fn same(account: &mut AccountView) -> &mut AccountView {
+	account
+}
+
+fn rotate(ctx: &mut Ctx<'_>) {
+	core::mem::swap(&mut ctx.escrow, &mut ctx.vault);
+}
+
+fn receive(_: &mut AccountView) -> Result<(), ProgramError> {
+	Ok(())
+}
+
+macro_rules! zero {
+	($account:expr) => {
+		$account.try_borrow_mut()?.fill(0)
+	};
+}
+
+macro_rules! retarget {
+	($binding:ident, $account:expr) => {
+		$binding = $account
+	};
 }
 
 fn doubler() -> fn(u8) -> u8 {
@@ -223,6 +284,86 @@ fn process_zeroed_in_each_branch(state: &mut AccountView, now: bool) -> Result<(
 		state.close()?;
 	}
 	Ok(())
+}
+
+// F10: a zero fill written by a macro.
+fn process_macro_zeroed(state: &mut AccountView) -> Result<(), ProgramError> {
+	zero!(state);
+	state.close()?;
+	Ok(())
+}
+
+// F12: `core::mem::drop` ends the buffer borrow like `drop`.
+fn process_core_drop(state: &mut AccountView) -> Result<(), ProgramError> {
+	let mut data = state.try_borrow_mut()?;
+	data.fill(0);
+	core::mem::drop(data);
+	state.close()?;
+	Ok(())
+}
+
+// N14 / F17: an early return before the zeroing is not a path to the close.
+fn process_early_return(
+	state: &mut AccountView,
+	value: Result<u8, ProgramError>,
+) -> Result<(), ProgramError> {
+	let _ = match value {
+		Ok(value) => value,
+		Err(error) => return Err(error),
+	};
+	state.try_borrow_mut()?.fill(0);
+	state.close()?;
+	Ok(())
+}
+
+// A labeled block and short-circuit that finish before the zeroing.
+fn process_branches_before_zeroing(
+	state: &mut AccountView,
+	skip: bool,
+) -> Result<(), ProgramError> {
+	let check = || skip;
+	if check() && skip {
+		let _ = [0_u8; const { 2 }];
+	}
+	'done: {
+		if skip {
+			break 'done;
+		}
+	}
+	state.try_borrow_mut()?[..].fill(0);
+	state.close()
+}
+
+// F14 / F19: lending a sibling field leaves the zeroed field alone.
+fn process_sibling_field_lent(ctx: Ctx<'_>) -> Result<(), ProgramError> {
+	let mut ctx = ctx;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	receive(&mut ctx.vault)?;
+	ctx.escrow.close()?;
+	Ok(())
+}
+
+fn process_owned_sibling_lent(accounts: &mut Owned) -> Result<(), ProgramError> {
+	accounts.escrow.try_borrow_mut()?.fill(0);
+	receive(&mut accounts.maker)?;
+	accounts.escrow.close()?;
+	Ok(())
+}
+
+impl Handler<'_> {
+	fn process(&mut self) -> Result<(), ProgramError> {
+		self.escrow.try_borrow_mut()?.fill(0);
+		receive(&mut self.maker)?;
+		self.escrow.close()?;
+		Ok(())
+	}
+
+	fn process_reborrowed_sibling(&mut self) -> Result<(), ProgramError> {
+		self.escrow.try_borrow_mut()?.fill(0);
+		receive(self.maker)?;
+		self.escrow.close()?;
+		Ok(())
+	}
 }
 
 fn process_combined_helper(state: &mut AccountView) -> Result<(), ProgramError> {
@@ -562,6 +703,252 @@ fn process_buffer_rewritten_after_zeroing(state: &mut AccountView) -> Result<(),
 	data[0] = 7;
 	drop(data);
 	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Flagged: a `break` can skip the zeroing.
+// ---------------------------------------------------------------------------
+
+// N01
+fn process_labeled_break(state: &mut AccountView, skip: bool) -> Result<(), ProgramError> {
+	'zero: {
+		if skip {
+			break 'zero;
+		}
+		state.try_borrow_mut()?.fill(0);
+	}
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N02
+fn process_loop_break(state: &mut AccountView, skip: bool) -> Result<(), ProgramError> {
+	loop {
+		if skip {
+			break;
+		}
+		state.try_borrow_mut()?.fill(0);
+		break;
+	}
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Flagged: the account's place is lent to code that could replace it.
+// ---------------------------------------------------------------------------
+
+// N03: a `&mut self` method on the root can swap its fields.
+fn process_root_method(ctx: Ctx<'_>) -> Result<(), ProgramError> {
+	let mut ctx = ctx;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	ctx.rotate();
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N04: a `ref mut` binding lends the alias's slot.
+fn process_ref_mut_binding(
+	state: &mut AccountView,
+	other: &mut AccountView,
+) -> Result<(), ProgramError> {
+	let mut alias = &mut *state;
+	let mut spare = &mut *other;
+	let ref mut slot = alias;
+	core::mem::swap(slot, &mut spare);
+	alias.try_borrow_mut()?.fill(0);
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N05: destructuring with `ref mut` lends the field.
+fn process_destructured_ref_mut<'a>(
+	ctx: Ctx<'a>,
+	other: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	let mut ctx = ctx;
+	let mut spare = other;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	{
+		let Ctx { ref mut escrow, .. } = ctx;
+		core::mem::swap(escrow, &mut spare);
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N06: a `ref mut` match arm lends the scrutinee.
+fn process_match_ref_mut(
+	state: &mut AccountView,
+	other: &mut AccountView,
+) -> Result<(), ProgramError> {
+	let mut alias = &mut *state;
+	let mut spare = &mut *other;
+	match alias {
+		ref mut slot => core::mem::swap(slot, &mut spare),
+	}
+	alias.try_borrow_mut()?.fill(0);
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N07: an untrusted `&mut self` method could rewrite the data.
+fn process_untrusted_writer(state: &mut AccountView) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	state.scribble()?;
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N08: a rewrite through a call result that borrowed the account.
+fn process_rewritten_through_call(state: &mut AccountView) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	{
+		let same = same(&mut *state);
+		same.try_borrow_mut()?[0] = 7;
+	}
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N09: a raw write through the alias's address.
+fn process_raw_retarget(
+	state: &mut AccountView,
+	other: &mut AccountView,
+) -> Result<(), ProgramError> {
+	let mut alias = &mut *state;
+	let spare = &mut *other;
+	unsafe { core::ptr::write(core::ptr::addr_of_mut!(alias), spare) };
+	alias.try_borrow_mut()?.fill(0);
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N10: a reassignment written by a macro.
+fn process_macro_retarget(
+	state: &mut AccountView,
+	other: &mut AccountView,
+) -> Result<(), ProgramError> {
+	let mut alias = &mut *state;
+	retarget!(alias, &mut *other);
+	alias.try_borrow_mut()?.fill(0);
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N11: a close in a `let ... else` before the zeroing.
+fn process_let_else_close(state: &mut AccountView, value: Option<u8>) -> Result<(), ProgramError> {
+	let Some(_value) = value else {
+		state.close()?;
+		//~^ ERROR: account close should be preceded by
+		return Ok(());
+	};
+	state.try_borrow_mut()?.fill(0);
+	Ok(())
+}
+
+// N12: a zeroing inside a closure that never runs.
+fn process_zeroed_in_closure(state: &mut AccountView) -> Result<(), ProgramError> {
+	let zero = |account: &mut AccountView| -> Result<(), ProgramError> {
+		account.try_borrow_mut()?.fill(0);
+		Ok(())
+	};
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N13: two bindings from indexed halves are distinct accounts.
+fn process_split_halves(accounts: &mut [AccountView]) -> Result<(), ProgramError> {
+	let (first, second) = accounts.split_at_mut(1);
+	let zeroed = &mut first[0];
+	let closed = &mut second[0];
+	zeroed.try_borrow_mut()?.fill(0);
+	closed.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N15: a default-binding match on a `&mut` root lends its fields.
+fn process_match_default_binding<'a>(
+	ctx: &mut Ctx<'a>,
+	mut spare: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	match ctx {
+		Ctx { escrow, .. } => core::mem::swap(escrow, &mut spare),
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// An `if let` on a `&mut` root lends its fields the same way.
+fn process_if_let_default_binding<'a>(
+	ctx: &mut Ctx<'a>,
+	mut spare: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	if let Ctx { escrow, .. } = ctx {
+		core::mem::swap(escrow, &mut spare);
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N16: lending a field through an explicit dereference.
+fn process_dereferenced_field_lent<'a>(
+	ctx: &mut Ctx<'a>,
+	mut spare: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	core::mem::swap(&mut (*ctx).escrow, &mut spare);
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N17: passing the `&mut` root to a helper.
+fn process_root_passed_to_helper(ctx: &mut Ctx<'_>) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	rotate(ctx);
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N18: lending a field through a reborrow alias of the root.
+fn process_field_lent_through_reborrow<'a>(
+	ctx: &mut Ctx<'a>,
+	mut spare: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	let root = &mut *ctx;
+	core::mem::swap(&mut root.escrow, &mut spare);
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// N19: lending the owned root's slot.
+fn process_owned_root_lent(ctx: Ctx<'_>) -> Result<(), ProgramError> {
+	let mut ctx = ctx;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	rotate(&mut ctx);
+	ctx.escrow.close()?;
 	//~^ ERROR: account close should be preceded by
 	Ok(())
 }

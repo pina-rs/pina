@@ -5,6 +5,7 @@ extern crate rustc_span;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use rustc_ast::ByRef;
 use rustc_ast::LitKind;
 use rustc_hir::BinOpKind;
 use rustc_hir::Expr;
@@ -12,6 +13,8 @@ use rustc_hir::ExprKind;
 use rustc_hir::HirId;
 use rustc_hir::MatchSource;
 use rustc_hir::Mutability;
+use rustc_hir::Node;
+use rustc_hir::Pat;
 use rustc_hir::UnOp;
 use rustc_hir::attrs::lang_items::LangItem;
 use rustc_hir::intravisit::FnKind;
@@ -48,16 +51,29 @@ crate::declare_late_lint! {
 	///
 	/// The zeroing proof is a `core` slice `fill(0)` over the entire buffer
 	/// returned by `AccountView::try_borrow_mut()?` — chained directly, through
-	/// `[..]`, or through a `let` binding of that buffer — on the same account,
-	/// on every path to the close, with no later mutable borrow of that account
-	/// or use of that buffer before the close. "Same account" is decided by
-	/// resolving both receivers to a local binding plus a field path. A `let`
-	/// alias is followed only when its initializer is a plain place (`x`,
-	/// `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized any other
-	/// way is its own account. Receivers reached through indexing, method or
-	/// function calls, and bindings that may change after their `let`
-	/// (assigned, mutably borrowed as a slot, or captured by a closure) have no
-	/// identity, so their closes are always flagged.
+	/// `[..]`, or through a `let` binding of that buffer — on the same account.
+	/// It must run on every path to the close: a fill inside an `if` or `else`
+	/// branch, a `match` arm, the right side of `&&`/`||`, a loop body, or a
+	/// labeled block proves only a close inside that same scope. It must stay
+	/// the last write: a later `try_borrow_mut()` of the account, or a use of
+	/// the zeroed buffer other than `drop`, before the close voids it.
+	///
+	/// "Same account" means both receivers resolve to the same local binding
+	/// plus field path. A `let` alias is followed only when its initializer is
+	/// a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding
+	/// initialized any other way is its own account. Receivers reached through
+	/// indexing or a method or function call have no identity, and neither do
+	/// bindings that are assigned, lent as a slot, or captured by a closure.
+	/// Lending the account's place, or any place it is reached through,
+	/// mutably anywhere before the close — `&mut`, `ref mut`, a default-binding
+	/// `match`, passing a `&mut` place to a call, or calling a `&mut self`
+	/// method outside the account crates — voids the proof; lending a sibling
+	/// field does not.
+	///
+	/// Methods from `solana_account_view`, `pinocchio`, and `pina` are trusted
+	/// not to replace the account, so a write through one of them (such as a
+	/// typed `as_account_mut()` loader) after the fill is not seen, and neither
+	/// is a write by a CPI.
 	/// `close_account_zeroed()` and the `CloseAccountZeroed` builder zero before
 	/// closing, so they are never flagged.
 	pub REQUIRE_ZEROED_BEFORE_CLOSE,
@@ -165,6 +181,8 @@ struct Analysis<'tcx> {
 	closes: Vec<Close<'tcx>>,
 	borrows: Vec<Borrow<'tcx>>,
 	buffer_uses: Vec<BufferUse>,
+	/// Places lent mutably to code the lint cannot follow, with their order.
+	lends: Vec<(usize, &'tcx Expr<'tcx>)>,
 }
 
 impl<'tcx> Analysis<'tcx> {
@@ -174,10 +192,24 @@ impl<'tcx> Analysis<'tcx> {
 	/// the close (no branch the close is not also inside), and stay the last
 	/// write: a later mutable borrow of the account or use of the fill's
 	/// buffer binding (other than `drop`) before the close voids it.
+	///
+	/// The account's place must also stay put. Lending the place, or any
+	/// place it is reached through, mutably to code the lint cannot follow
+	/// anywhere before the close could replace the account it names, so it
+	/// voids every proof for that place. Lending a sibling field does not.
 	fn is_zeroed_before(&self, close: &Close<'tcx>) -> bool {
 		let Some(closed) = self.place_of(close.receiver) else {
 			return false;
 		};
+		let is_lent = self.lends.iter().any(|(order, lent)| {
+			*order < close.order
+				&& self.place_of(lent).is_some_and(|lent| {
+					lent.root == closed.root && closed.fields.starts_with(&lent.fields)
+				})
+		});
+		if is_lent {
+			return false;
+		}
 		let is_between =
 			|order: usize, fill: &ZeroFill<'tcx>| fill.order < order && order < close.order;
 
@@ -283,6 +315,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 				closes: Vec::new(),
 				borrows: Vec::new(),
 				buffer_uses: Vec::new(),
+				lends: Vec::new(),
 			},
 		}
 	}
@@ -366,6 +399,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			}
 			_ => {
 				if let Some(binding) = local_path_binding(expr) {
+					self.record_lend(expr);
 					self.local_uses.push((binding, expr.hir_id));
 					if self.buffers.contains_key(&binding) {
 						let order = self.next_order();
@@ -432,6 +466,71 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 		}
 	}
 
+	/// Record a lend when the place built on the local path `path` is handed
+	/// out mutably.
+	///
+	/// The place is the path plus any field reads and dereferences around it.
+	/// Reading a field, calling a trusted account method, taking a shared
+	/// borrow, dropping, closing, and aliasing through a plain `let` are not
+	/// lends; a mutable borrow, a `ref mut` pattern binding, or passing a
+	/// `&mut` place anywhere else is.
+	fn record_lend(&mut self, path: &'tcx Expr<'tcx>) {
+		let mut place = path;
+		while let Node::Expr(parent) = self.cx.tcx.parent_hir_node(place.hir_id) {
+			match parent.kind {
+				ExprKind::Field(base, _) if base.hir_id == place.hir_id => place = parent,
+				ExprKind::Unary(UnOp::Deref, inner) if inner.hir_id == place.hir_id => {
+					place = parent
+				}
+				_ => break,
+			}
+		}
+
+		if self.lends_mutably(place) {
+			let order = self.next_order();
+			self.analysis.lends.push((order, place));
+		}
+	}
+
+	fn lends_mutably(&self, place: &'tcx Expr<'tcx>) -> bool {
+		let typeck = self.cx.typeck_results();
+		let is_mutable_reference =
+			|| typeck.expr_ty_adjusted(place).ref_mutability() == Some(Mutability::Mut);
+
+		match self.cx.tcx.parent_hir_node(place.hir_id) {
+			Node::LetStmt(local) => {
+				let is_alias = matches!(
+					local.pat.kind,
+					rustc_hir::PatKind::Binding(mode, _, _, None) if mode.0 == ByRef::No
+				);
+				!is_alias && binds_by_mutable_reference(self.cx, local.pat)
+			}
+			Node::Expr(parent) => {
+				match parent.kind {
+					ExprKind::AddrOf(_, Mutability::Mut, _) => {
+						!self.alias_borrows.contains(&parent.hir_id)
+					}
+					ExprKind::AddrOf(_, Mutability::Not, _) => false,
+					ExprKind::MethodCall(segment, receiver, ..)
+						if receiver.hir_id == place.hir_id =>
+					{
+						!TARGET_METHODS.contains(&segment.ident.name.as_str())
+							&& !is_trusted_method(self.cx, parent)
+							&& is_mutable_reference()
+					}
+					ExprKind::Call(callee, _) if is_drop(self.cx, callee) => false,
+					ExprKind::Match(scrutinee, arms, _) if scrutinee.hir_id == place.hir_id => {
+						arms.iter()
+							.any(|arm| binds_by_mutable_reference(self.cx, arm.pat))
+					}
+					ExprKind::Let(binding) => binds_by_mutable_reference(self.cx, binding.pat),
+					_ => is_mutable_reference(),
+				}
+			}
+			_ => is_mutable_reference(),
+		}
+	}
+
 	/// Mark a path used as a method receiver or field base as a projection.
 	fn note_projection(&mut self, expr: &Expr<'_>) {
 		let mut expr = expr;
@@ -446,16 +545,17 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 
 impl<'tcx> Visitor<'tcx> for Collector<'_, 'tcx> {
 	fn visit_local(&mut self, local: &'tcx rustc_hir::LetStmt<'tcx>) {
-		if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind
+		if let rustc_hir::PatKind::Binding(mode, binding, _, None) = local.pat.kind
+			&& mode.0 == ByRef::No
 			&& let Some(initializer) = local.init
 		{
 			if is_plain_place(initializer) {
 				self.analysis.aliases.insert(binding, initializer);
-				if let ExprKind::AddrOf(_, Mutability::Mut, inner) = initializer.kind
-					&& let Some(exposed) = slot_binding(inner)
-				{
+				if let ExprKind::AddrOf(_, Mutability::Mut, inner) = initializer.kind {
 					self.alias_borrows.insert(initializer.hir_id);
-					self.exposures.push((binding, exposed));
+					if let Some(exposed) = slot_binding(inner) {
+						self.exposures.push((binding, exposed));
+					}
 				}
 			} else if let Some(account) = borrowed_account(self.cx, initializer) {
 				self.buffers.insert(binding, account);
@@ -488,6 +588,13 @@ impl<'tcx> Visitor<'tcx> for Collector<'_, 'tcx> {
 			{
 				self.visit_expr(left);
 				self.visit_branch(right);
+			}
+			// A `break` can leave a loop body or labeled block before a zero
+			// fill inside it runs, so each is a branch of its own.
+			ExprKind::Loop(..) | ExprKind::Block(_, Some(_)) => {
+				self.branches.push(expr.hir_id);
+				rustc_hir::intravisit::walk_expr(self, expr);
+				self.branches.pop();
 			}
 			_ => rustc_hir::intravisit::walk_expr(self, expr),
 		}
@@ -529,14 +636,38 @@ fn assignment_base_binding(expr: &Expr<'_>) -> Option<HirId> {
 
 /// The local binding whose own storage `&mut <expr>` borrows.
 ///
-/// `&mut x` and `&mut x.field` lend the binding's slot, so the borrower can
-/// replace what it holds. `&mut *x` lends the value `x` points at instead,
-/// which leaves `x` itself unchanged.
+/// `&mut x` lends the binding's slot, so the borrower can replace what it
+/// holds and every alias resolved through it goes stale. Lending a field or
+/// the value behind a reference is recorded as a lend of that place instead,
+/// which only affects the places under it.
 fn slot_binding(expr: &Expr<'_>) -> Option<HirId> {
-	match expr.kind {
-		ExprKind::Field(inner, _) | ExprKind::Index(inner, ..) => slot_binding(inner),
-		_ => local_path_binding(expr),
-	}
+	local_path_binding(expr)
+}
+
+/// Whether any binding in `pattern` binds by mutable reference, explicitly
+/// (`ref mut`) or through default binding modes on a `&mut` scrutinee.
+fn binds_by_mutable_reference(cx: &LateContext<'_>, pattern: &Pat<'_>) -> bool {
+	let modes = cx.typeck_results().pat_binding_modes();
+	let mut binds_mutably = false;
+	pattern.walk_always(|pattern| {
+		binds_mutably |= modes
+			.get(pattern.hir_id)
+			.is_some_and(|mode| matches!(mode.0, ByRef::Yes(_, Mutability::Mut)));
+	});
+	binds_mutably
+}
+
+/// Whether a method call resolves to the account crates, whose methods never
+/// replace the account a place names.
+fn is_trusted_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
+	cx.typeck_results()
+		.type_dependent_def_id(expr.hir_id)
+		.is_some_and(|definition| {
+			matches!(
+				cx.tcx.crate_name(definition.krate).as_str(),
+				"solana_account_view" | "pinocchio" | "pina"
+			)
+		})
 }
 
 fn local_path_binding(expr: &Expr<'_>) -> Option<HirId> {
