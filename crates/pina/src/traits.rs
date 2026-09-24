@@ -1021,20 +1021,23 @@ pub trait LamportTransfer {
 /// # Examples
 ///
 /// ```ignore
-/// // Zero the escrow state first when stale bytes would be dangerous,
-/// // then close it and return rent to the authority:
-/// escrow_account.as_account_mut::<EscrowState>(&program_id)?.zeroed();
-/// escrow_account.close_with_recipient(&program_id, authority_account)?;
-///
-/// // Or use the built-in helper to clear the raw account bytes first:
+/// // Clear the raw account bytes, then close the account and return rent to
+/// // the authority in one step:
 /// escrow_account.close_account_zeroed(&program_id, authority_account)?;
+///
+/// // Or, when the close must stay a separate step, clear the whole data
+/// // buffer first. The temporary borrow ends with the statement, so the
+/// // close does not observe an active borrow:
+/// escrow_account.try_borrow_mut()?.fill(0);
+/// escrow_account.close_with_recipient(&program_id, authority_account)?;
 /// ```
 pub trait CloseAccountWithRecipient {
 	/// Close the account and transfer all remaining lamports to the recipient.
 	///
-	/// This helper does not zero account data for you. Call `zeroed()` first
-	/// when the account's old bytes must not remain revivable within the same
-	/// transaction.
+	/// This helper does not zero account data for you. Prefer
+	/// [`Self::close_account_zeroed`] when the account's old bytes must not
+	/// remain revivable within the same transaction, or clear them first with
+	/// `account.try_borrow_mut()?.fill(0);`.
 	fn close_with_recipient(
 		&mut self,
 		program_id: &Address,

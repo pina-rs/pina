@@ -360,15 +360,15 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		token::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
 			.invoke_signed_with_program(&signers, &token_program)?;
 
-		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
-		self.escrow.close_with_recipient(&ID, self.maker)
+		// Clear the raw backing bytes while closing.
+		self.escrow.close_account_zeroed(&ID, self.maker)
 	}
 }
 ```
 
 The PDA signer is constructed from the same seeds used to derive the escrow address. `invoke_signed_with_program` passes these seeds to the selected SPL Token program so the runtime can verify the PDA signature.
 
-`close_with_recipient` verifies that `ID` owns the escrow, transfers the remaining lamports to the maker, and closes the account. Use `zeroed()` first when the account data must be wiped before close.
+`close_account_zeroed` verifies that `ID` owns the escrow, zeroes its data, transfers the remaining lamports to the maker, and closes the account. The non-zeroing `close_with_recipient` fails the `require_zeroed_before_close` lint unless the whole data buffer is cleared first with `self.escrow.try_borrow_mut()?.fill(0);`.
 
 ## Entrypoint
 

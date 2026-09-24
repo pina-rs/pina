@@ -257,7 +257,7 @@ Default level: `deny`
 
 Default level: `deny`
 
-**Contract.** Call `zeroed()` on an account before closing it.
+**Contract.** Zero an account's data before closing it: close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`.
 
 **Why this matters.** A closed account's lamports are gone but its data survives until the account is reused. A later instruction that reads before writing sees the previous contents, so stale data can be reinterpreted as valid state.
 

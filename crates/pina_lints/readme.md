@@ -120,14 +120,44 @@ The lint tracks lexical call order and receiver identity. It does not infer writ
 
 ### `require_zeroed_before_close`
 
-Detects `close()` or `close_with_recipient()` without an earlier `zeroed()` on the same account. Prefer `close_account_zeroed()` when the combined helper fits.
+Detects `close()` or `close_with_recipient()` without first zeroing the same account's data. Prefer `close_account_zeroed()` or the `CloseAccountZeroed` builder, which zero the data and close in one step and are never flagged:
 
 ```rust
-state.zeroed()?;
+state.close_account_zeroed(&ID, recipient)?;
+```
+
+When the close must stay separate, clear the whole data buffer first:
+
+```rust
+state.try_borrow_mut()?.fill(0);
 state.close_with_recipient(&ID, recipient)?;
 ```
 
-This protects against stale bytes remaining observable during the transaction. The lint intentionally does not flag the combined zeroing close helper.
+This protects against stale bytes remaining observable during the transaction.
+
+The zeroing proof is a `fill(0)` resolved to `core`'s slice method over the entire buffer returned by `solana_account_view`'s `AccountView::try_borrow_mut()?` (the type Pina and Pinocchio re-export), in method or fully qualified form: chained directly, through `[..]`, or through a `let` binding of that buffer that is later only dropped. Closes are recognized in both forms too, so `AccountView::close(state)` and `<AccountView>::close(&mut *state)` are checked like `state.close()`. A partial fill (`data[..8].fill(0)`), a non-zero or non-literal fill, a same-named non-slice `fill`, and a same-named `try_borrow_mut` on another type are not proofs. The fill must also be the last write: a later `try_borrow_mut()` that could reach the same account, or any use of the zeroed buffer other than `drop`, before the close voids it. Writes through other paths, such as a typed `as_account_mut()` loader or a CPI, are not tracked.
+
+"Same account" means both receivers resolve to the same local binding plus field path. A `let` alias is followed only when its initializer is a plain place (`x`, `&x`, `&mut x`, `&mut *x`, `*x`, `x.field`), so `let alias = &mut *state;` names `state` and zeroing or closing through it counts. A binding initialized any other way, such as `let vault = next_account(&mut iter)?;`, is its own account rather than an alias of the call's argument. A receiver reached through indexing (`accounts[0]`) or a method or function call has no identity, so its close is always flagged; bind the account first. A binding that may hold a different value by the close has no identity either: one that is assigned (including through `*alias = ..`), lent as a slot (`&mut binding`, including `mem::swap` and `addr_of_mut!`), or captured by a closure.
+
+The account's place must also stay put. Lending the place, or any place it is reached through, mutably anywhere before the close voids the proof, even when the lend comes before the zeroing. A lend is any of:
+
+- a `&mut` borrow;
+- a `ref mut` binding, or a `match`, `if let`, or `let` whose default binding modes borrow it mutably;
+- passing a `&mut` place to a function;
+- calling a `&mut self` method outside `solana_account_view`, `pinocchio`, and `pina`, including a user function or method that only shares a close name, which lends its receiver to every other close;
+- a closure that captures the place mutably, or captures a `&mut` to it by value.
+
+So `rotate(ctx)`, `ctx.rotate()`, `|| rotate(ctx)`, and `mem::swap(&mut ctx.escrow, ..)` all void a proof for `ctx.escrow`, while lending the sibling `&mut ctx.maker` does not. A lend or `try_borrow_mut()` through an alias whose value may have changed since its `let`, or through an expression the lint cannot place (such as a getter's result), is assumed to reach every account, so it voids every proof it could affect.
+
+The zeroing must run on every path to the close: a fill inside an `if` or `else` branch, a `match` arm, the right side of `&&`/`||`, a loop body, a labeled block, or the `else` block of a `let ... else` proves only a close inside that same scope, because a condition, `break`, or failed pattern can skip it.
+
+Known limits:
+
+- Methods from `solana_account_view`, `pinocchio`, and `pina` are trusted not to replace the account, so a write to its data through one of them after the fill (such as a typed `as_account_mut()` loader) is not seen.
+- A write by a CPI after the fill is not seen.
+- A write through a separately obtained handle to the same account (a copied or cloned `AccountView`, or one returned by a call) after the fill is not seen.
+- A lend that appears after the close inside a loop is not considered for the next iteration.
+- The check is lexical within one function body, and zeroing inside a closure never counts.
 
 ### `require_sysvar_assert_before_sysvar_use`
 
