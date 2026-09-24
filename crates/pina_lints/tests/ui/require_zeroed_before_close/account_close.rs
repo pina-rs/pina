@@ -1122,6 +1122,20 @@ fn process_field_lent_through_reassigned_alias<'a>(
 	Ok(())
 }
 
+// A field lent through an alias whose identity a closure capture dropped.
+fn process_field_lent_through_captured_alias(ctx: &mut Ctx<'_>) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	{
+		let root = &mut *ctx;
+		let inspect = || touch(&root);
+		inspect();
+		receive(root.escrow)?;
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
 // A data borrow of an account the lint cannot place could be a duplicate of
 // the zeroed one.
 fn process_rewritten_through_unplaced_account(
