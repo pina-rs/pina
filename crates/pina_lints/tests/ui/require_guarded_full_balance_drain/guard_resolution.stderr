@@ -1,7 +1,7 @@
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:52:2
+  --> $DIR/guard_resolution.rs:138:2
    |
-LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
@@ -12,31 +12,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
    = note: `#[warn(require_guarded_full_balance_drain)]` on by default
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:60:2
-   |
-LL |     vault.send(&ID, balance, recipient)?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
-   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
-   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
-   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:121:2
-   |
-LL |     vault.send_owned(&ID, amount, recipient)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
-   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
-   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
-   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:145:2
+  --> $DIR/guard_resolution.rs:181:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +24,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:160:2
+  --> $DIR/guard_resolution.rs:203:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -60,19 +36,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:170:2
-   |
-LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
-   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
-   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
-   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:202:2
+  --> $DIR/guard_resolution.rs:215:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -84,7 +48,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:214:2
+  --> $DIR/guard_resolution.rs:226:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -96,9 +60,45 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/full_balance_drain.rs:223:2
+  --> $DIR/guard_resolution.rs:239:2
    |
-LL |     vault.send_owned(&ID, vault.lamports(), recipient)?;
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
+   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
+   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
+   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+warning: an instruction path can sweep an account's entire balance in one call
+  --> $DIR/guard_resolution.rs:249:2
+   |
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
+   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
+   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
+   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+warning: an instruction path can sweep an account's entire balance in one call
+  --> $DIR/guard_resolution.rs:279:2
+   |
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
+   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
+   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early `return`
+   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+warning: an instruction path can sweep an account's entire balance in one call
+  --> $DIR/guard_resolution.rs:291:2
+   |
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)

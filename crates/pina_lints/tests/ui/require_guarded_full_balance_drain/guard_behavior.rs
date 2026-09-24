@@ -49,16 +49,22 @@ impl CapState {
 
 const ID: () = ();
 
+const GLOBAL_LIMIT: u64 = 10;
+
 fn check_limits() -> Result<(), ()> {
-	Ok(())
+	if GLOBAL_LIMIT == 0 { Err(()) } else { Ok(()) }
 }
 
 fn assert_within_cap(state: &CapState) -> Result<(), ()> {
 	state.assert_within_window_cap()
 }
 
-fn check_limit_of(_value: u64) -> Result<(), ()> {
-	Ok(())
+fn check_limit_of(value: u64) -> Result<(), ()> {
+	if value > GLOBAL_LIMIT {
+		Err(())
+	} else {
+		Ok(())
+	}
 }
 
 // Returns the named guard's result, so a failure reaches the caller.

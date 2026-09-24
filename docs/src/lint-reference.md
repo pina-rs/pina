@@ -181,7 +181,7 @@ Default level: `warn`
 
 **Why this matters.** An ungated full-balance drain is the shape real key-compromise exploits use. Once the sweep authority leaks, nothing on-chain slows the drain; a pause switch plus a per-window cap bounds the blast radius.
 
-**Blessing an exception.** Add the guard, or express the operation as a close when that is the intent, since a close states where the remaining lamports go. The guard must behave like one: pass it the state or config it checks, and let its failure stop the handler with `?` or an early return. A discarded result or a zero-argument call does not count; a differently named local wrapper counts when its body enforces the named guard. Where a drain is intended and bounded elsewhere, scope `#[allow]` to the handler and name the compensating control.
+**Blessing an exception.** Add the guard, or express the operation as a close when that is the intent, since a close states where the remaining lamports go. The guard must behave like one: its name states the pause or cap check (or it is a local wrapper returning `Result` that enforces such a guard before any non-error return), its receiver or an argument is derived from the handler's parameters, and its failure stops the handler with `?`, `unwrap`, or a branch that returns `Err` or panics. A discarded result, a branch that returns `Ok`, a zero-argument or literal-only call, and a local callee that can only succeed do not count. Where a drain is intended and bounded elsewhere, scope `#[allow]` to the handler and name the compensating control.
 
 ## require_idl_root_to_define_one_program_id
 
