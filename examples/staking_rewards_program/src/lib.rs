@@ -819,19 +819,15 @@ impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
 			return Err(StakingError::RewardIndexExceedsCapacity.into());
 		}
 
+		// The vault must belong to the pool's own stored reward mint: a
+		// mismatched mint would validate the liability against a token
+		// account denominated in units the index never promised.
+		assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
 		// Gate two — solvency: the canonical reward vault must cover the
 		// aggregate liability, so equal entitlements never depend on claim
 		// order and the pool cannot promise rewards it does not hold. The
 		// vault is validated as the pool PDA's associated account below, so a
 		// caller cannot substitute a token account they control.
-		let reward_decimals = {
-			let mint = self
-				.reward_mint
-				.as_token_mint_for_program(self.token_program.address())?
-				.assert_no_extensions()?;
-			mint.decimals()
-		};
-		let _ = reward_decimals;
 		self.reward_vault
 			.assert_not_empty()?
 			.assert_owners(&SPL_PROGRAM_IDS)?

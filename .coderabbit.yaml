@@ -8,8 +8,6 @@
 # `test:idl` instead: CI regenerates every client and fails on any drift.
 language: en-US
 reviews:
-  limits:
-    files: 400
   path_filters:
     - "!codama/clients/**"
     - "!codama/idls/**"
