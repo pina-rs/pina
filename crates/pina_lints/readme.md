@@ -345,6 +345,14 @@ Known limits:
 - A local guard-named callee counts if anything in its body can fail, even for reasons unrelated to its claimed check. The constant-success test does not evaluate conditions beyond literal `true`/`false`.
 - Wrappers deeper than three levels are not followed.
 - A pause check with no guard-named call, such as `if state.paused { return Err(..) }` or a differently named helper taking only the flag, is not recognized.
+- Some correct guards are still reported, because the lint errs toward warning when it cannot prove the failure stops the handler:
+  - `unwrap_or_else(|_| panic!(..))` on a guard's result;
+  - a guard result that is reassigned before it is propagated (`res = res.map_err(..); res?`);
+  - a guard bound through tuple destructuring;
+  - a unit guard that fails through `.expect()` rather than `assert!`/`panic!`;
+  - a guard whose receiver is a `static`.
+
+  Propagate the guard's result directly with `?` to satisfy the lint.
 
 ## Performance reference
 
