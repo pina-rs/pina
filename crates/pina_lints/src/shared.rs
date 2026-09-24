@@ -25,11 +25,6 @@ pub struct CallInfo {
 	pub span: Span,
 	pub method: String,
 	pub receiver: Option<String>,
-	/// Local binding the receiver expression is rooted at, when it is one.
-	///
-	/// Resolve it through [`FunctionFacts::aliases`] to recognize a receiver
-	/// reached through a `let` alias as the same value.
-	pub receiver_binding: Option<HirId>,
 	pub receiver_span: Option<Span>,
 	pub path: Option<String>,
 	pub def_path: Option<String>,
@@ -369,7 +364,6 @@ fn collect_from_expr_inner(
 				span: expr.span,
 				method: method.to_string(),
 				receiver: expression_identity(receiver),
-				receiver_binding: expression_local_binding(receiver),
 				receiver_span: Some(receiver.span),
 				path: None,
 				def_path: definition.as_ref().map(|(path, _)| path.clone()),
@@ -426,7 +420,6 @@ fn collect_from_expr_inner(
 					span: expr.span,
 					method,
 					receiver: None,
-					receiver_binding: None,
 					receiver_span: None,
 					path: Some(path_name),
 					def_path: definition.as_ref().map(|(path, _)| path.clone()),

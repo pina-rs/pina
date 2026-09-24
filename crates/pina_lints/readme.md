@@ -133,7 +133,13 @@ state.try_borrow_mut()?.fill(0);
 state.close_with_recipient(&ID, recipient)?;
 ```
 
-This protects against stale bytes remaining observable during the transaction. The zeroing proof is a `fill(0)` resolved to `core`'s slice method over the entire buffer returned by `try_borrow_mut()?`, chained directly or through a `let` binding of that buffer. Receivers resolve through the shared fact collector's alias chains, so zeroing through `let alias = &mut *state;` proves `state` and closing through an alias of a zeroed account passes, while zeroing a different account proves nothing. A partial fill (`data[..8].fill(0)`), a non-zero fill, a same-named non-slice `fill`, and a binding reassigned after its `let` are not proofs. Indexed receivers such as `accounts[0]` collapse to their base binding, so review index-addressed closes manually.
+This protects against stale bytes remaining observable during the transaction.
+
+The zeroing proof is a `fill(0)` resolved to `core`'s slice method over the entire buffer returned by `solana_account_view`'s `AccountView::try_borrow_mut()?` (the type Pina and Pinocchio re-export): chained directly, through `[..]`, or through a `let` binding of that buffer that is later only dropped. A partial fill (`data[..8].fill(0)`), a non-zero or non-literal fill, a same-named non-slice `fill`, and a same-named `try_borrow_mut` on another type are not proofs. The fill must also be the last write: a later `try_borrow_mut()` of the same account, or any use of the zeroed buffer other than `drop`, before the close voids it. Writes through other paths, such as a typed `as_account_mut()` loader or a CPI, are not tracked.
+
+"Same account" means both receivers resolve to the same local binding plus field path. A `let` alias is followed only when its initializer is a plain place (`x`, `&x`, `&mut x`, `&mut *x`, `*x`, `x.field`), so `let alias = &mut *state;` names `state` and zeroing or closing through it counts. A binding initialized any other way, such as `let vault = next_account(&mut iter)?;`, is its own account rather than an alias of the call's argument. A receiver reached through indexing (`accounts[0]`) or a method or function call has no identity, so its close is always flagged; bind the account first. A binding that may hold a different value by the close has no identity either: one that is assigned (including through `*alias = ..`), lent as a slot (`&mut binding` passed anywhere, including `mem::swap`, or kept in an alias used for anything but a field read or method call), or captured by a closure. A `&mut self` method that replaces a field of the account's root is not tracked.
+
+The zeroing must run on every path to the close: a fill inside an `if` branch, a `match` arm, or the right side of `&&`/`||` proves only a close inside that same branch. Loops are not unrolled, and the check is lexical within one function body.
 
 ### `require_sysvar_assert_before_sysvar_use`
 
