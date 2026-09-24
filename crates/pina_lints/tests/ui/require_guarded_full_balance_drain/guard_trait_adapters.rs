@@ -1,0 +1,220 @@
+// normalize-stderr-test: "\n$" -> ""
+
+//! Core trait methods chained onto a guard's `Result` are owned by the
+//! trait, not by an impl of `Result`. The lint must classify them without
+//! asking the trait for a self type (which used to crash the driver), and it
+//! follows the ones that keep the failure observable.
+
+#![allow(
+	dead_code,
+	unused_must_use,
+	clippy::useless_conversion,
+	clippy::clone_on_copy
+)]
+
+struct AccountView;
+
+impl AccountView {
+	fn lamports(&self) -> u64 {
+		0
+	}
+
+	fn send_owned(
+		&mut self,
+		_program_id: &(),
+		_lamports: u64,
+		_recipient: &mut AccountView,
+	) -> Result<(), ()> {
+		Ok(())
+	}
+}
+
+struct CapState {
+	paused: bool,
+}
+
+impl CapState {
+	fn assert_within_window_cap(&self) -> Result<(), ()> {
+		if self.paused { Err(()) } else { Ok(()) }
+	}
+}
+
+const ID: () = ();
+
+fn process_cloned_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state.assert_within_window_cap().clone()?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_converted_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let checked: Result<(), ()> = state.assert_within_window_cap().into();
+
+	checked?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_from_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	Result::<(), ()>::from(state.assert_within_window_cap())?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// `guard.eq(&Ok(..))` is false exactly when the guard failed.
+fn process_compared_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().eq(&Ok(())) {
+	} else {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_compared_guard_ne(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().ne(&Ok(())) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// Returning early when the guard *passed* leaves the drain to the failure.
+fn process_compared_guard_inverted(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().eq(&Ok(())) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A cloned guard whose result is discarded still gates nothing.
+fn process_cloned_guard_discarded(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let _ = state.assert_within_window_cap().clone();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// Converting into `Option<Result<..>>` buries the failure inside a `Some`.
+fn process_option_from_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	Option::from(state.assert_within_window_cap()).unwrap();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_into_option_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let wrapped: Option<Result<(), ()>> = state.assert_within_window_cap().into();
+
+	wrapped.unwrap();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// The operator forms of `eq`/`ne` against `Ok(..)`.
+fn process_ne_operator(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() != Ok(()) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_eq_operator_else(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() == Ok(()) {
+	} else {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_eq_operator_inverted(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() == Ok(()) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// `or_else` whose fallback can only fail keeps the failure.
+fn process_or_else_failing(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state
+		.assert_within_window_cap()
+		.or_else(|error| Err(error))?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_or_else_recovering(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state
+		.assert_within_window_cap()
+		.or_else(|_| Ok::<(), ()>(()))?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn main() {}
+
+// check-warn
