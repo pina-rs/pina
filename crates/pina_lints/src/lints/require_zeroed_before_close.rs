@@ -73,8 +73,9 @@ crate::declare_late_lint! {
 	/// Lending the account's place, or any place it is reached through,
 	/// mutably anywhere before the close voids the proof. That covers `&mut`,
 	/// `ref mut`, a default-binding `match`, passing a `&mut` place to a call,
-	/// calling a `&mut self` method outside the account crates, and a closure
-	/// that captures the place mutably. Lending a sibling field does not void
+	/// calling a `&mut self` method outside the account crates (a user close
+	/// that only shares the name lends its receiver to every other close),
+	/// and a closure that captures the place mutably. Lending a sibling field does not void
 	/// it. A lend or borrow through an alias whose value may have changed, or
 	/// through an expression with no place, is assumed to reach every account.
 	///
@@ -159,11 +160,23 @@ struct ZeroFill<'tcx> {
 /// A `close()` or `close_with_recipient()` call.
 struct Close<'tcx> {
 	order: usize,
+	/// The close call itself, so a lend of its own receiver is not held
+	/// against it.
+	call: HirId,
 	span: Span,
 	/// The closed account: the method receiver, or the first argument of a
 	/// fully qualified call. `None` for a qualified call without arguments.
 	receiver: Option<&'tcx Expr<'tcx>>,
 	branches: Vec<HirId>,
+}
+
+/// A mutable lend recorded while walking the body.
+struct Lend<'tcx> {
+	order: usize,
+	lent: Lent<'tcx>,
+	/// The close call whose own receiver this lend is. An untrusted close is
+	/// an ordinary call to every other close, but not to itself.
+	own_close: Option<HirId>,
 }
 
 /// What a mutable lend hands out.
@@ -221,7 +234,7 @@ struct Analysis<'tcx> {
 	borrows: Vec<Borrow<'tcx>>,
 	buffer_uses: Vec<BufferUse>,
 	/// Places lent mutably to code the lint cannot follow, with their order.
-	lends: Vec<(usize, Lent<'tcx>)>,
+	lends: Vec<Lend<'tcx>>,
 }
 
 impl<'tcx> Analysis<'tcx> {
@@ -240,12 +253,12 @@ impl<'tcx> Analysis<'tcx> {
 		let Some(closed) = close.receiver.and_then(|receiver| self.place_of(receiver)) else {
 			return false;
 		};
-		let is_lent = self.lends.iter().any(|(order, lent)| {
-			let reach = match lent {
+		let is_lent = self.lends.iter().any(|lend| {
+			let reach = match lend.lent {
 				Lent::Place(place) => self.reach_of(place, &mut HashSet::new()),
-				Lent::Binding(binding) => self.reach_of_binding(*binding, &mut HashSet::new()),
+				Lent::Binding(binding) => self.reach_of_binding(binding, &mut HashSet::new()),
 			};
-			*order < close.order && reach.covers(&closed)
+			lend.order < close.order && lend.own_close != Some(close.call) && reach.covers(&closed)
 		});
 		if is_lent {
 			return false;
@@ -518,6 +531,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			let order = self.next_order();
 			self.analysis.closes.push(Close {
 				order,
+				call: expr.hir_id,
 				span: expr.span,
 				receiver: arguments.first(),
 				branches: self.branches.clone(),
@@ -544,7 +558,11 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			.collect::<Vec<_>>();
 		for binding in lent {
 			let order = self.next_order();
-			self.analysis.lends.push((order, Lent::Binding(binding)));
+			self.analysis.lends.push(Lend {
+				order,
+				lent: Lent::Binding(binding),
+				own_close: None,
+			});
 		}
 	}
 
@@ -565,6 +583,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			let order = self.next_order();
 			self.analysis.closes.push(Close {
 				order,
+				call: expr.hir_id,
 				span: expr.span,
 				receiver: Some(receiver),
 				branches: self.branches.clone(),
@@ -619,9 +638,21 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			}
 		}
 
+		// The account a trusted account method or close acts on is never
+		// lent; the receiver of any other close is lent to every close but
+		// that one.
+		let own_close = match self_argument(self.cx, place) {
+			Some(SelfArgument::Trusted) => return,
+			Some(SelfArgument::OwnClose(close)) => Some(close),
+			None => None,
+		};
 		if self.lends_mutably(place) {
 			let order = self.next_order();
-			self.analysis.lends.push((order, Lent::Place(place)));
+			self.analysis.lends.push(Lend {
+				order,
+				lent: Lent::Place(place),
+				own_close,
+			});
 		}
 	}
 
@@ -638,12 +669,10 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 				);
 				!is_alias && binds_by_mutable_reference(self.cx, local.pat)
 			}
-			Node::Expr(_) if is_account_self_argument(self.cx, place) => false,
 			Node::Expr(parent) => {
 				match parent.kind {
 					ExprKind::AddrOf(_, Mutability::Mut, _) => {
 						!self.alias_borrows.contains(&parent.hir_id)
-							&& !is_account_self_argument(self.cx, parent)
 					}
 					ExprKind::AddrOf(_, Mutability::Not, _) => false,
 					ExprKind::Call(callee, _) if is_drop(self.cx, callee) => false,
@@ -861,26 +890,45 @@ fn callee_name(callee: &Expr<'_>) -> Option<Symbol> {
 	}
 }
 
-/// Whether `expr` is the account a close or trusted account method acts on:
-/// a method receiver, or the first argument of the fully qualified form.
-/// Handing an account to its own close or to the account crates is not a
-/// lend.
-fn is_account_self_argument(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
-	let Node::Expr(parent) = cx.tcx.parent_hir_node(expr.hir_id) else {
-		return false;
+/// How an account expression is handed to the call that acts on it.
+enum SelfArgument {
+	/// The receiver, or first argument, of a method from the account crates,
+	/// which never replace the account a place names.
+	Trusted,
+	/// The receiver, or first argument, of this other close call.
+	OwnClose(HirId),
+}
+
+/// Whether `place` (or a borrow of it) is the account a call acts on: a
+/// method receiver, or the first argument of the fully qualified form.
+fn self_argument(cx: &LateContext<'_>, place: &Expr<'_>) -> Option<SelfArgument> {
+	let argument = match cx.tcx.parent_hir_node(place.hir_id) {
+		Node::Expr(parent) if matches!(parent.kind, ExprKind::AddrOf(..)) => parent,
+		_ => place,
+	};
+	let Node::Expr(call) = cx.tcx.parent_hir_node(argument.hir_id) else {
+		return None;
 	};
 
-	match parent.kind {
-		ExprKind::MethodCall(segment, receiver, ..) if receiver.hir_id == expr.hir_id => {
-			TARGET_METHODS.contains(&segment.ident.name.as_str()) || is_trusted_method(cx, parent)
+	let (is_trusted, name) = match call.kind {
+		ExprKind::MethodCall(segment, receiver, ..) if receiver.hir_id == argument.hir_id => {
+			(is_trusted_method(cx, call), segment.ident.name)
 		}
-		ExprKind::Call(callee, [first, ..]) if first.hir_id == expr.hir_id => {
-			callee_name(callee).is_some_and(|name| TARGET_METHODS.contains(&name.as_str()))
-				|| callee_definition(cx, callee).is_some_and(|definition| {
-					is_trusted_crate(cx.tcx.crate_name(definition.krate).as_str())
-				})
+		ExprKind::Call(callee, [first, ..]) if first.hir_id == argument.hir_id => {
+			let is_trusted = callee_definition(cx, callee).is_some_and(|definition| {
+				is_trusted_crate(cx.tcx.crate_name(definition.krate).as_str())
+			});
+			(is_trusted, callee_name(callee)?)
 		}
-		_ => false,
+		_ => return None,
+	};
+
+	if is_trusted {
+		Some(SelfArgument::Trusted)
+	} else if TARGET_METHODS.contains(&name.as_str()) {
+		Some(SelfArgument::OwnClose(call.hir_id))
+	} else {
+		None
 	}
 }
 

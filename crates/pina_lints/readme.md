@@ -144,7 +144,7 @@ The account's place must also stay put. Lending the place, or any place it is re
 - a `&mut` borrow;
 - a `ref mut` binding, or a `match`, `if let`, or `let` whose default binding modes borrow it mutably;
 - passing a `&mut` place to a function;
-- calling a `&mut self` method outside `solana_account_view`, `pinocchio`, and `pina`;
+- calling a `&mut self` method outside `solana_account_view`, `pinocchio`, and `pina`, including a user function or method that only shares a close name, which lends its receiver to every other close;
 - a closure that captures the place mutably, or captures a `&mut` to it by value.
 
 So `rotate(ctx)`, `ctx.rotate()`, `|| rotate(ctx)`, and `mem::swap(&mut ctx.escrow, ..)` all void a proof for `ctx.escrow`, while lending the sibling `&mut ctx.maker` does not. A lend or `try_borrow_mut()` through an alias whose value may have changed since its `let`, or through an expression the lint cannot place (such as a getter's result), is assumed to reach every account, so it voids every proof it could affect.

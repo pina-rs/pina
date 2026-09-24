@@ -127,6 +127,15 @@ fn rotate_through(ctx: &mut &mut Ctx<'_>) {
 
 fn touch<T>(_: &T) {}
 
+// A user function that only shares the close name: it swaps two slots.
+fn close<'a>(
+	slot: &mut &'a mut AccountView,
+	other: &mut &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	core::mem::swap(slot, other);
+	Ok(())
+}
+
 // A struct literal that holds a mutable account reference.
 struct Holder<'a> {
 	account: &'a mut AccountView,
@@ -1172,6 +1181,19 @@ fn process_account_held_by_struct(state: &mut AccountView) -> Result<(), Program
 		touch(&holder);
 	}
 	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// R11: a user function named `close` is an ordinary call to every other
+// close, so the slot it swaps voids the proof for the real close.
+fn process_named_close_swaps_slot<'a>(
+	ctx: &mut Ctx<'a>,
+	mut spare: &'a mut AccountView,
+) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	close(&mut ctx.escrow, &mut spare)?;
+	ctx.escrow.close()?;
 	//~^ ERROR: account close should be preceded by
 	Ok(())
 }
