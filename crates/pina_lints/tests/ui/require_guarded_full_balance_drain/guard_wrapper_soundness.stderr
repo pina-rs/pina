@@ -1,5 +1,5 @@
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:214:2
+  --> $DIR/guard_wrapper_soundness.rs:131:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -12,7 +12,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = note: `#[warn(require_guarded_full_balance_drain)]` on by default
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:229:2
+  --> $DIR/guard_wrapper_soundness.rs:142:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -24,7 +24,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:241:2
+  --> $DIR/guard_wrapper_soundness.rs:153:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -36,7 +36,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:253:2
+  --> $DIR/guard_wrapper_soundness.rs:164:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:288:2
+  --> $DIR/guard_wrapper_soundness.rs:175:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -60,7 +60,7 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 warning: an instruction path can sweep an account's entire balance in one call
-  --> $DIR/guard_divergence.rs:337:2
+  --> $DIR/guard_wrapper_soundness.rs:187:2
    |
 LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -71,4 +71,16 @@ LL |     vault.send_owned(&ID, vault.lamports(), recipient)
    = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
-warning: 6 warnings emitted
+warning: an instruction path can sweep an account's entire balance in one call
+  --> $DIR/guard_wrapper_soundness.rs:210:2
+   |
+LL |     vault.send_owned(&ID, vault.lamports(), recipient)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: gate full-balance sweeps behind a pause or circuit-breaker check (a pause flag plus a per-window withdrawal cap bounds a compromised key's blast radius)
+   = help: a guard counts only when it reads a parameter-derived receiver or argument and its failure stops the handler first: `?`, `unwrap`/`expect`, or an `if`/`match`/`let ... else` whose failing branch returns `Err`/`None` or panics; a branch that returns `Ok` does not count
+   = help: a differently named local wrapper counts when it returns `Result`/`Option` and enforces a named guard in its outermost scope before any early success `return` or `break`
+   = help: if this drain is an account-close path, use `close_account_zeroed` so `require_zeroed_before_close` covers the stale-data risk too
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+warning: 7 warnings emitted

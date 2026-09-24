@@ -32,6 +32,8 @@ use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
+use rustc_middle::ty::EarlyBinder;
+use rustc_middle::ty::GenericArgsRef;
 use rustc_middle::ty::Instance;
 use rustc_middle::ty::InstanceKind;
 use rustc_middle::ty::TyKind;
@@ -61,14 +63,18 @@ crate::declare_late_lint! {
 	///   the scrutinee's own binding, or panics. Arms are read in order, so a
 	///   `_` after an unguarded `Err(_)` arm only receives success. Adapters
 	///   that keep the failure are followed: `map_err`, `inspect_err`, `map`,
-	///   `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, `clone()`, `into()`,
-	///   and `From::from`. A `bool` guard, `is_err()`/`is_ok()`, or
-	///   `eq`/`ne(&Ok(..))` must gate an `if`, `assert!`, `assert_eq!`,
+	///   `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, `or_else` with a
+	///   fallback that can only fail, `clone()`, and `into()`/`From::from` into
+	///   a `Result` or the same type (never into `Option<Result<..>>`). A `bool`
+	///   guard, `is_err()`/`is_ok()`, or `eq`/`ne`/`==`/`!=` against `Ok(..)`
+	///   must gate an `if`, `assert!`, `assert_eq!`,
 	///   `assert_ne!`, or `pina::assert(..)?` so that execution continues only
 	///   on the passing value; that polarity is checked whenever the flag comes
 	///   from a fallible guard. A failing branch returns `Err`/`None`, returns
 	///   a local helper that can only fail, or panics; a branch that returns
-	///   `Ok`, breaks, or continues is not a failure. A guard bound to a local
+	///   `Ok`, breaks, or continues is not a failure. A guard-named local method
+	///   returning `()` counts where it is called when its body can panic, as
+	///   an `assert!`-style guard does. A guard bound to a local
 	///   counts where the local is enforced, and a labeled block that can
 	///   `break` with a success does not carry its tail guard out.
 	/// - **It reads the handler's inputs.** Its receiver or an argument is
@@ -80,15 +86,20 @@ crate::declare_late_lint! {
 	///   `guard`, `limit`, or `throttle`, or a local function returning
 	///   `Result`/`Option` whose body enforces such a guard in its outermost
 	///   scope before any early non-error `return` or `break` (followed up to
-	///   three wrappers deep). Closures, fn pointers, and generic callables are
-	///   named by their binding and never count by name.
+	///   three wrappers deep). A generic wrapper is instantiated with its
+	///   caller's arguments, so its trait calls are judged by the impl that
+	///   runs; inside a wrapper, a trait call that cannot be resolved (`dyn`,
+	///   an unconstrained generic) and a returned value the lint cannot see
+	///   into count as neither a guard nor a failure. Closures, fn pointers,
+	///   and generic callables are named by their binding and never count by
+	///   name.
 	/// - **It is not a constant success.** A local callee whose every returned
 	///   value is a literal `Ok(..)`/`Some(..)` (or `bool` literal), directly
 	///   or through a `let` binding that is never reassigned, and that has no
 	///   reachable `?`, `Err`/`None`, or panic, is not a guard. Branches behind
 	///   a literal `if true`/`if false` are treated as unreachable. Trait
-	///   methods are judged by the implementation that runs; when the lint
-	///   cannot resolve it, only the method name is used.
+	///   methods are judged by the implementation that runs; in the handler
+	///   itself, when the lint cannot resolve it, only the method name is used.
 	///
 	/// An early `return Ok(..)` on the failing side, such as
 	/// `if state.is_paused() { return Ok(()) }`, deliberately does not count:
@@ -110,15 +121,19 @@ crate::declare_late_lint! {
 	/// - a `bool` guard's polarity is unknown, so a failing branch on either
 	///   side of its `if` counts;
 	/// - a callee from another crate, or a trait call that cannot be resolved
-	///   in a generic handler, is judged by its name and call-site behavior
-	///   only;
+	///   in a generic handler (not a wrapper), is judged by its name and
+	///   call-site behavior only, and a unit guard from another crate never
+	///   counts;
 	/// - a local guard-named callee counts when anything in its body can fail
 	///   or panic, even for reasons unrelated to the check its name claims,
 	///   and the constant-success test does not evaluate conditions beyond
 	///   literal `true`/`false`;
-	/// - `return helper()` in a failing branch counts when `helper` cannot be
-	///   analyzed (another crate or an unresolved trait call), as the name
-	///   rule did before;
+	/// - in the handler (not in a wrapper), `return helper()` on the failing
+	///   side counts when `helper` cannot be analyzed (another crate or an
+	///   unresolved trait call), as the name rule did before, because any
+	///   `return` there skips the drain;
+	/// - `async fn` handlers and guards are not analyzed through `.await`
+	///   (irrelevant for SBF programs);
 	/// - wrappers deeper than three levels are not followed; and
 	/// - a pause check with no guard-named call, such as
 	///   `if state.paused { return Err(..) }`, is not recognized.
@@ -257,8 +272,13 @@ struct DrainAnalyzer<'a, 'tcx> {
 	typeck: &'tcx TypeckResults<'tcx>,
 	/// The walked body's value: an expression that reaches it is returned.
 	body_value: HirId,
-	/// Local functions entered to reach this body; the last is its owner.
+	/// Local functions entered to reach this body: the handler first, the
+	/// body's own function last.
 	callers: Vec<LocalDefId>,
+	/// The generic arguments this body is instantiated with at the call that
+	/// entered it, in terms of the handler's generics. `None` for the handler,
+	/// whose own generics stand for themselves.
+	instance_args: Option<GenericArgsRef<'tcx>>,
 	/// Bindings introduced by the body's parameters, `self` included.
 	parameters: HashSet<HirId>,
 	/// The expression each pattern binding was bound from.
@@ -289,6 +309,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		typeck: &'tcx TypeckResults<'tcx>,
 		body: &'tcx Body<'tcx>,
 		callers: Vec<LocalDefId>,
+		instance_args: Option<GenericArgsRef<'tcx>>,
 	) -> Self {
 		let mut parameters = HashSet::new();
 
@@ -303,6 +324,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			typeck,
 			body_value: body.value.hir_id,
 			callers,
+			instance_args,
 			parameters,
 			origins: HashMap::new(),
 			pending: HashMap::new(),
@@ -321,12 +343,18 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		analyzer
 	}
 
-	/// The function whose body is being walked.
-	fn owner(&self) -> LocalDefId {
+	/// The handler the analysis started from; every resolved argument list
+	/// is expressed in its generics.
+	fn root(&self) -> LocalDefId {
 		*self
 			.callers
-			.last()
+			.first()
 			.expect("an analysis always starts from its own body")
+	}
+
+	/// Whether this body is the handler itself rather than a wrapper it calls.
+	fn is_handler(&self) -> bool {
+		self.callers.len() == 1
 	}
 
 	/// Whether a guard satisfying `keep` runs before the current position on
@@ -399,27 +427,55 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			return;
 		}
 
-		let Some(value) = self.guard_value(call) else {
-			return;
-		};
-
 		if !inputs.iter().any(|input| self.reads_parameter(input)) {
 			return;
 		}
 
 		let implementation = callee.and_then(|(definition, args)| self.resolve(definition, args));
-		let local_body = implementation.and_then(|definition| self.local_body(definition));
+
+		// Inside a wrapper, a trait call that cannot be resolved to the impl
+		// that runs is unknown: its name belongs to the trait, not the code.
+		if implementation.is_none()
+			&& !self.is_handler()
+			&& callee
+				.is_some_and(|(definition, _)| self.cx.tcx.trait_of_assoc(definition).is_some())
+		{
+			return;
+		}
+
+		let local_body = implementation.and_then(|(definition, args)| {
+			self.local_body(definition)
+				.map(|(local, body)| (local, body, args))
+		});
+
+		let Some(value) = self.guard_value(call) else {
+			// A guard-named local method returning `()` enforces itself when its
+			// body can panic, as `assert!`-style guards do.
+			if names_guard(name)
+				&& self.typeck.expr_ty(call).is_unit()
+				&& local_body.is_some_and(|(local, body, _)| body_can_panic(self.cx, local, body))
+			{
+				self.guards.push(SeenGuard {
+					scopes: self.scopes.clone(),
+					receiver: None,
+					is_close: false,
+				});
+			}
+
+			return;
+		};
 
 		// A local body shows what the call really does: one that can only
 		// succeed gates nothing, whatever its name.
-		if let Some((local, body)) = local_body
+		if let Some((local, body, _)) = local_body
 			&& returns_constant(self.cx, local, body, value, Outcome::Succeeds)
 		{
 			return;
 		}
 
 		let delegates = value == GuardValue::Fallible
-			&& local_body.is_some_and(|(local, body)| self.is_guard_wrapper(local, body));
+			&& local_body
+				.is_some_and(|(local, body, args)| self.is_guard_wrapper(local, body, args));
 
 		if names_guard(name) || delegates {
 			self.enforce(call, value);
@@ -468,10 +524,17 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			.then_some(GuardValue::Fallible)
 	}
 
-	/// The implementation a call runs: a trait method resolves to the impl's
-	/// method (or the trait default the impl inherits). `None` when the
-	/// instance depends on the caller's generics or is not a plain item.
-	fn resolve(&self, definition: DefId, args_owner: HirId) -> Option<DefId> {
+	/// The implementation a call runs, with the arguments it runs with: a
+	/// trait method resolves to the impl's method (or the trait default the
+	/// impl inherits). Inside a wrapper, the call's arguments are first
+	/// instantiated with the wrapper's own arguments, so a generic wrapper is
+	/// judged by the concrete impl its caller picked. `None` when the instance
+	/// still depends on unknown generics or is not a plain item.
+	fn resolve(
+		&self,
+		definition: DefId,
+		args_owner: HirId,
+	) -> Option<(DefId, GenericArgsRef<'tcx>)> {
 		let tcx = self.cx.tcx;
 
 		if !matches!(tcx.def_kind(definition), DefKind::Fn | DefKind::AssocFn) {
@@ -486,16 +549,19 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			return None;
 		}
 
-		let typing_env = TypingEnv::post_analysis(tcx, self.owner().to_def_id());
-		let Ok(args) = tcx.try_normalize_erasing_regions(typing_env, Unnormalized::new_wip(args))
-		else {
+		let args = match self.instance_args {
+			Some(instance_args) => EarlyBinder::bind(tcx, args).instantiate(tcx, instance_args),
+			None => Unnormalized::new_wip(args),
+		};
+		let typing_env = TypingEnv::post_analysis(tcx, self.root().to_def_id());
+		let Ok(args) = tcx.try_normalize_erasing_regions(typing_env, args) else {
 			return None;
 		};
 
 		match Instance::try_resolve(tcx, typing_env, definition, args) {
 			Ok(Some(instance)) => {
 				match instance.def {
-					InstanceKind::Item(item) => Some(item),
+					InstanceKind::Item(item) => Some((item, instance.args)),
 					_ => None,
 				}
 			}
@@ -513,8 +579,16 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 
 	/// Whether a local function enforces a guard before any early non-error
 	/// `return`, so a call to it gates the caller the same way.
-	fn is_guard_wrapper(&self, local: LocalDefId, body: &'tcx Body<'tcx>) -> bool {
-		if self.callers.len() > MAX_WRAPPER_DEPTH || self.callers.contains(&local) {
+	fn is_guard_wrapper(
+		&self,
+		local: LocalDefId,
+		body: &'tcx Body<'tcx>,
+		args: GenericArgsRef<'tcx>,
+	) -> bool {
+		if self.callers.len() > MAX_WRAPPER_DEPTH
+			|| self.callers.contains(&local)
+			|| args.len() != self.cx.tcx.generics_of(local).count()
+		{
 			return false;
 		}
 
@@ -522,8 +596,14 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 
 		callers.push(local);
 
-		DrainAnalyzer::analyze(self.cx, self.cx.tcx.typeck(local), body, callers)
-			.guards_every_exit()
+		DrainAnalyzer::analyze(
+			self.cx,
+			self.cx.tcx.typeck(local),
+			body,
+			callers,
+			Some(args),
+		)
+		.guards_every_exit()
 	}
 
 	/// Whether `expr` mentions a local derived from a parameter.
@@ -602,7 +682,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 					} else if !(is_first
 						&& arguments.len() == 1
 						&& value == GuardValue::Fallible
-						&& self.is_fallible_from(callee, parent))
+						&& self.is_fallible_from(callee, parent, &arguments[0]))
 					{
 						return Enforcement::Unenforced;
 					}
@@ -613,7 +693,8 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 					let method = segment.ident.name.as_str();
 
 					if !self.is_core_fallible_method(parent) {
-						let Some(adapted) = self.core_trait_adapter(parent, method, arguments)
+						let Some(adapted) =
+							self.core_trait_adapter(parent, receiver, method, arguments)
 						else {
 							return Enforcement::Unenforced;
 						};
@@ -637,6 +718,12 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 							.is_some_and(|fallback| self.is_variant(fallback, &["Err", "None"]))
 					{
 						// `or(Err(..))` swaps the error but keeps the failure.
+					} else if method == "or_else"
+						&& arguments
+							.first()
+							.is_some_and(|fallback| self.always_fails(fallback))
+					{
+						// `or_else(|e| Err(..))` maps the error but keeps the failure.
 					} else if !FAILURE_PRESERVING_METHODS.contains(&method) {
 						return Enforcement::Unenforced;
 					}
@@ -649,10 +736,24 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 					value = GuardValue::Flag(polarity.map(|failing| !failing));
 				}
 				ExprKind::Binary(operator, left, right) => {
+					let other = if left.hir_id == child { right } else { left };
+
+					// `guard(..) == Ok(..)` is false exactly when the guard failed.
+					if value == GuardValue::Fallible {
+						if !matches!(operator.node, BinOpKind::Eq | BinOpKind::Ne)
+							|| !self.is_variant(peel_reference(other), &["Ok", "Some"])
+						{
+							return Enforcement::Unenforced;
+						}
+
+						value = GuardValue::Flag(Some(operator.node == BinOpKind::Ne));
+						child = parent.hir_id;
+						continue;
+					}
+
 					let GuardValue::Flag(polarity) = value else {
 						return Enforcement::Unenforced;
 					};
-					let other = if left.hir_id == child { right } else { left };
 
 					value = match operator.node {
 						// `failing || other` is true whenever the guard failed.
@@ -882,13 +983,32 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		};
 		let local_body = self
 			.resolve(definition, args_owner)
-			.and_then(|implementation| self.local_body(implementation));
+			.and_then(|(implementation, _)| self.local_body(implementation));
 
 		match local_body {
 			Some((local, body)) => {
 				returns_constant(self.cx, local, body, GuardValue::Fallible, Outcome::Fails)
 			}
 			None => lenient,
+		}
+	}
+
+	/// Whether calling `fallback` (a closure or `Err`/`None` itself) can only
+	/// produce a failure.
+	fn always_fails(&self, fallback: &Expr<'_>) -> bool {
+		match &fallback.kind {
+			ExprKind::Closure(closure) => {
+				let body = self.cx.tcx.hir_body(closure.body);
+
+				returns_constant(
+					self.cx,
+					closure.def_id,
+					body,
+					GuardValue::Fallible,
+					Outcome::Fails,
+				)
+			}
+			_ => self.is_variant(fallback, &["Err", "None"]),
 		}
 	}
 
@@ -1045,20 +1165,13 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		(tcx.crate_name(owner.krate).as_str() == "core").then(|| tcx.item_name(owner))
 	}
 
-	/// Whether `expr` has core's `Result` or `Option` type.
-	fn is_fallible_type(&self, expr: &Expr<'_>) -> bool {
-		matches!(
-			self.typeck.expr_ty(expr).kind(),
-			TyKind::Adt(definition, _) if is_core_item(self.cx, definition.did(), &["Result", "Option"])
-		)
-	}
-
 	/// How a core trait method applied to a fallible guard value changes it:
 	/// `clone`/`into` keep the failure, `eq`/`ne` against `Ok`/`Some` turn it
 	/// into a flag with a known polarity.
 	fn core_trait_adapter(
 		&self,
 		call: &Expr<'_>,
+		receiver: &Expr<'_>,
 		method: &str,
 		arguments: &[Expr<'_>],
 	) -> Option<GuardValue> {
@@ -1066,7 +1179,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		let owner = self.core_trait_of(definition)?;
 
 		match (owner.as_str(), method) {
-			("Clone", "clone") | ("Into", "into") if self.is_fallible_type(call) => {
+			("Clone", "clone") | ("Into", "into") if self.keeps_failure(receiver, call) => {
 				Some(GuardValue::Fallible)
 			}
 			("PartialEq", "eq" | "ne") => {
@@ -1086,9 +1199,22 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		}
 	}
 
+	/// Whether a conversion from `input` to `output` keeps the failure where
+	/// enforcement can see it: the output is a `Result`, or the same type.
+	/// `Option<Result<..>>` would bury the failure inside a `Some`.
+	fn keeps_failure(&self, input: &Expr<'_>, output: &Expr<'_>) -> bool {
+		let output_ty = self.typeck.expr_ty(output);
+
+		output_ty == self.typeck.expr_ty(input)
+			|| matches!(
+				output_ty.kind(),
+				TyKind::Adt(definition, _) if is_core_item(self.cx, definition.did(), &["Result"])
+			)
+	}
+
 	/// Whether `callee` is `From::from`, converting a fallible guard into
-	/// another `Result`/`Option` without dropping its failure.
-	fn is_fallible_from(&self, callee: &Expr<'_>, call: &Expr<'_>) -> bool {
+	/// another `Result` (or the same type) without dropping its failure.
+	fn is_fallible_from(&self, callee: &Expr<'_>, call: &Expr<'_>, input: &Expr<'_>) -> bool {
 		let ExprKind::Path(qpath) = &callee.kind else {
 			return false;
 		};
@@ -1099,7 +1225,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 
 		self.core_trait_of(definition)
 			.is_some_and(|owner| owner.as_str() == "From")
-			&& self.is_fallible_type(call)
+			&& self.keeps_failure(input, call)
 	}
 
 	/// Whether `expr` constructs one of core's `Result`/`Option` `variants`.
@@ -1112,7 +1238,10 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 	fn exit(&self, expr: &Expr<'_>) -> Exit {
 		match &expr.kind {
 			ExprKind::Ret(Some(value)) => {
-				if self.returns_failure(value, true) {
+				// In the handler any `return` skips the drain, so an opaque
+				// returned value keeps the old name-rule leniency. In a wrapper it
+				// could be a success that swallows the failure.
+				if self.returns_failure(value, self.is_handler()) {
 					Exit::Failure
 				} else {
 					Exit::Escape
@@ -1748,6 +1877,49 @@ fn returns_constant(
 	!scan.varies
 }
 
+/// Whether a local function body can panic on some reachable path, such as
+/// through `assert!` or `panic!`. Branches behind a literal `if true`/`if
+/// false` that cannot run, and closure bodies, are ignored.
+fn body_can_panic(cx: &LateContext<'_>, local: LocalDefId, body: &Body<'_>) -> bool {
+	struct PanicFinder<'b, 'tcx> {
+		typeck: &'b TypeckResults<'tcx>,
+		panics: bool,
+	}
+
+	impl<'hir> Visitor<'hir> for PanicFinder<'_, '_> {
+		fn visit_expr(&mut self, expr: &'hir Expr<'hir>) {
+			if let ExprKind::If(condition, then, otherwise) = &expr.kind
+				&& let Some(taken) = bool_literal(condition)
+			{
+				if taken {
+					self.visit_expr(then);
+				} else if let Some(otherwise) = otherwise {
+					self.visit_expr(otherwise);
+				}
+
+				return;
+			}
+
+			if matches!(expr.kind, ExprKind::Call(..) | ExprKind::MethodCall(..))
+				&& self.typeck.expr_ty(expr).is_never()
+			{
+				self.panics = true;
+			}
+
+			rustc_hir::intravisit::walk_expr(self, expr);
+		}
+	}
+
+	let mut finder = PanicFinder {
+		typeck: cx.tcx.typeck(local),
+		panics: false,
+	};
+
+	finder.visit_expr(body.value);
+
+	finder.panics
+}
+
 /// `expr` without a leading `&`/`&mut`.
 fn peel_reference<'a, 'hir>(expr: &'a Expr<'hir>) -> &'a Expr<'hir> {
 	match &expr.kind {
@@ -1871,7 +2043,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 			return;
 		}
 
-		let analyzer = DrainAnalyzer::analyze(cx, cx.typeck_results(), body, vec![def_id]);
+		let analyzer = DrainAnalyzer::analyze(cx, cx.typeck_results(), body, vec![def_id], None);
 
 		for span in &analyzer.order {
 			let Some(facts) = analyzer.drains.get(span) else {

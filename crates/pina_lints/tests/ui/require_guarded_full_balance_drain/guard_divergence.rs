@@ -301,6 +301,43 @@ fn process_error_conversion(
 	vault.send_owned(&ID, vault.lamports(), recipient)
 }
 
+struct PanicState {
+	paused: bool,
+}
+
+impl PanicState {
+	// A unit guard that panics on failure, like `assert!`.
+	fn assert_not_paused(&self) {
+		assert!(!self.paused, "paused");
+	}
+
+	// A unit guard-named method that can never fail.
+	fn note_pause(&self) {
+		let _ = self.paused;
+	}
+}
+
+fn process_unit_panicking_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &PanicState,
+) -> Result<(), ()> {
+	state.assert_not_paused();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_unit_silent_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &PanicState,
+) -> Result<(), ()> {
+	state.note_pause();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
 fn main() {}
 
 // check-warn

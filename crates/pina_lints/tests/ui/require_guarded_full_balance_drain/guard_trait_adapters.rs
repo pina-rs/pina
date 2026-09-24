@@ -5,7 +5,12 @@
 //! asking the trait for a self type (which used to crash the driver), and it
 //! follows the ones that keep the failure observable.
 
-#![allow(dead_code, clippy::useless_conversion, clippy::clone_on_copy)]
+#![allow(
+	dead_code,
+	unused_must_use,
+	clippy::useless_conversion,
+	clippy::clone_on_copy
+)]
 
 struct AccountView;
 
@@ -115,6 +120,96 @@ fn process_cloned_guard_discarded(
 	state: &CapState,
 ) -> Result<(), ()> {
 	let _ = state.assert_within_window_cap().clone();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// Converting into `Option<Result<..>>` buries the failure inside a `Some`.
+fn process_option_from_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	Option::from(state.assert_within_window_cap()).unwrap();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_into_option_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let wrapped: Option<Result<(), ()>> = state.assert_within_window_cap().into();
+
+	wrapped.unwrap();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// The operator forms of `eq`/`ne` against `Ok(..)`.
+fn process_ne_operator(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() != Ok(()) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_eq_operator_else(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() == Ok(()) {
+	} else {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_eq_operator_inverted(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap() == Ok(()) {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// `or_else` whose fallback can only fail keeps the failure.
+fn process_or_else_failing(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state
+		.assert_within_window_cap()
+		.or_else(|error| Err(error))?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_or_else_recovering(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state
+		.assert_within_window_cap()
+		.or_else(|_| Ok::<(), ()>(()))?;
 
 	vault.send_owned(&ID, vault.lamports(), recipient)
 	//~^ WARN: an instruction path can sweep an account's entire balance in one call

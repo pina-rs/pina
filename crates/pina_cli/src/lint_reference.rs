@@ -212,10 +212,10 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		           and it stops the handler on the failing value with `?`, `unwrap`, or a branch \
 		           that returns `Err` or panics; the polarity of `is_err`, `is_ok`, and \
 		           `assert_eq!` is checked. A discarded result, a branch that returns `Ok`, a \
-		           zero-argument or literal-only call, a closure, and a local callee that can \
-		           only return a literal success do not count. Where a drain is intended and \
-		           bounded elsewhere, scope `#[allow]` to the handler and name the compensating \
-		           control.",
+		           zero-argument or literal-only call, a closure, a local callee that can only \
+		           return a literal success, and a generic wrapper whose concrete impl does not \
+		           enforce the guard do not count. Where a drain is intended and bounded \
+		           elsewhere, scope `#[allow]` to the handler and name the compensating control.",
 	},
 	LintExplanation {
 		name: "require_idl_root_to_define_one_program_id",
