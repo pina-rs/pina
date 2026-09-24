@@ -80,7 +80,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
 | `require_consistent_token_program`                      | deny  | Token validation and CPI share one program identity |
 | `require_explicit_token_2022_extension_policy`          | deny  | Token-2022 extensions are explicitly allow-listed   |
-| `require_post_cpi_balance_reload`                       | deny  | Custody deposits use an observed balance delta      |
+| `require_post_cpi_balance_reload`                       | deny  | Token CPI destinations are reloaded after the CPI   |
 | `require_checked_asset_arithmetic`                      | deny  | Economic arithmetic fails on overflow/underflow     |
 | `require_guarded_full_balance_drain`                    | warn  | Full-balance drains are gated by a guard            |
 | `require_bounded_remaining_accounts`                    | deny  | Caller-controlled account work has a visible bound  |
@@ -276,16 +276,19 @@ Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccoun
 
 ### `require_post_cpi_balance_reload`
 
-Detects token transfers into accounts whose names indicate protocol custody (`vault`, `custody`, `reserve`, or `pool`) unless the destination amount is read before and after CPI.
+Detects a balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` builder:
+
+- **Snapshot tier (every destination).** When an integer local bound from the destination's `amount()` before the CPI is used after it, the destination must be read again after the CPI, before any other CPI. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name.
+- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no intervening CPI, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta.
 
 ```rust
-let before = vault.as_token_account_for_program(&program_id)?.amount();
+let before = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
 transfer.invoke_with_program(&program_id)?;
-let after = vault.as_token_account_for_program(&program_id)?.amount();
+let after = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the direct invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. A static `invoke()` is exempt only when the resolved constructor belongs to the canonical `pinocchio_token` crate, including Pina's `token` re-export; local look-alikes and Token-2022 builders remain covered. Opaque builder wrappers are not diagnosed because the analysis cannot associate them with a particular invocation; audit such wrappers manually or keep the transfer direct in the instruction handler.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. Builders are recognised by the resolved type their `new` or `with_multisig_signers` constructor returns, so re-exports, type aliases, and `use ... as` imports are covered; the system program's lamport `Transfer` is excluded by its arity. Destinations are compared after resolving `let` aliases, so a snapshot read through `let account = user_stake_ata.as_token_account()?` counts as a read of `user_stake_ata`. Only integer snapshots count: a pre-CPI `bool` such as `was_empty` records a fact about the earlier state rather than a balance, and a snapshot used only before the CPI is not stale. A static `invoke()` or `invoke_signed()` is exempt only when the builder's program type parameter resolves to `pinocchio_token::TokenProgram`, the legacy SPL Token program that cannot deduct a fee; Pina's `token_2022` aliases, local look-alikes, and every runtime-program invocation (`invoke_with_program()`, `invoke_with_unverified_program()`, and their signed variants) remain covered. Opaque builder wrappers are not diagnosed because the analysis cannot associate them with a particular invocation; audit such wrappers manually or keep the transfer direct in the instruction handler. The analysis orders code lexically, so review branch-sensitive reloads manually.
 
 ### `require_checked_asset_arithmetic`
 

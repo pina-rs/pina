@@ -197,9 +197,9 @@ Default level: `warn`
 
 Default level: `deny`
 
-**Contract.** Read a custody destination both before and after a token transfer CPI and account from the observed delta.
+**Contract.** Reload the destination of a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, `MintToChecked`) after the CPI whenever a balance snapshot taken before it is used afterwards, whatever the destination is called. A custody destination (`vault`, `custody`, `reserve`, or `pool`) must also be read both before and after every transfer and accounted from the observed delta.
 
-**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested. Accounting from the requested amount rather than the observed balance delta credits the protocol with tokens it never received.
+**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested, and any CPI into an account makes an earlier read of its balance stale. Accounting from the requested amount or a pre-CPI snapshot rather than the observed balance delta credits the protocol with tokens it never received.
 
 **Blessing an exception.** Reload the destination with `amount()` after the CPI and compute the delta. This is the fix the lint asks for, so there is no exception to bless: a transfer whose fee is known to be zero still has a correct delta, and reading it costs one load.
 
