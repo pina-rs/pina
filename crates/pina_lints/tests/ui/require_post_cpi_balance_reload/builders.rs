@@ -18,6 +18,19 @@ struct Token2022State {
 struct SplTransfer;
 struct LamportTransfer;
 struct AuthorityTransfer;
+struct SystemLikeTransfer;
+
+impl SystemLikeTransfer {
+	/// Payer, recipient, system program, lamports: three accounts and an
+	/// amount, but no mint, so it is not a token transfer.
+	fn new(_: &Account, _: &Account, _: &Account, _: u64) -> Self {
+		Self
+	}
+
+	fn invoke(&self) -> Result<(), ()> {
+		Ok(())
+	}
+}
 
 /// An account wrapper that is not named `AccountView` and derefs to one.
 struct Tok<'a>(&'a Account);
@@ -240,6 +253,69 @@ fn process_custody_reads_only_in_closures(
 	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
 	let _after = || vault.amount();
 	Ok(())
+}
+
+fn process_local_three_account_transfer_into_vault(
+	payer: &Account,
+	vault: &Account,
+	system_program: &Account,
+) -> Result<(), ()> {
+	SystemLikeTransfer::new(payer, vault, system_program, 10).invoke()
+}
+
+fn process_iterator_custody_reads_of_other_account(
+	accounts: &[Account],
+	mint: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let mut remaining = accounts.iter();
+	let fee = remaining.next().ok_or(())?;
+	let vault = remaining.next().ok_or(())?;
+	let _before = fee.amount();
+	SplTransfer::new(owner, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	let _after = fee.amount();
+	Ok(())
+}
+
+fn process_custody_deposit_through_token_crate_loader(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = pinocchio_token::state::TokenAccount::from_account_view(vault)?.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	let after = pinocchio_token::state::TokenAccount::from_account_view(vault)?.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_custody_with_dynamic_index_bracketed(
+	vaults: &[Account],
+	index: usize,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	// The typed identity cannot name `vaults.get(index)`; the reads written
+	// against the same receiver text still bracket the transfer.
+	let before = vaults.get(index).ok_or(())?.amount();
+	SplTransfer::new(source, mint, vaults.get(index).ok_or(())?, owner, 10, 0)
+		.invoke_with_program(owner)?;
+	let after = vaults.get(index).ok_or(())?.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_custody_with_dynamic_index_unbracketed(
+	vaults: &[Account],
+	index: usize,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	SplTransfer::new(source, mint, vaults.get(index).ok_or(())?, owner, 10, 0)
+		.invoke_with_program(owner)
+	//~^^ ERROR: transfer into `vaults.get(index).ok_or(())?` is not accounted from its observed balance delta
 }
 
 fn main() {}

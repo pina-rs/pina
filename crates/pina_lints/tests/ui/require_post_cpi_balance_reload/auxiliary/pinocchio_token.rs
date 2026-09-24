@@ -55,3 +55,18 @@ pub mod instructions {
 	pub type TransferChecked = transfer_checked::TransferChecked<super::TokenProgram>;
 	pub type Transfer = transfer::Transfer<super::TokenProgram>;
 }
+
+pub mod state {
+	/// Mirrors the crate's own account parser, which Pina re-exports.
+	pub struct TokenAccount;
+
+	impl TokenAccount {
+		pub fn from_account_view<T>(_: &T) -> Result<&'static TokenAccount, ()> {
+			Ok(&TokenAccount)
+		}
+
+		pub fn amount(&self) -> u64 {
+			0
+		}
+	}
+}

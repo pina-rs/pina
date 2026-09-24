@@ -278,8 +278,12 @@ Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccoun
 
 Detects a token balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every builder of a `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` instruction:
 
-- **Snapshot tier (every destination).** An integer local bound from the destination's balance before the CPI may be used after the CPI only in two ways. It may appear in the same statement as a post-CPI reload of the destination (`after.checked_sub(before)`, `before.checked_add(after - before)`, `if after < before`), where the reload comes after the CPI and runs on every path to that statement: it is not only inside an `if` arm, a closure, or a loop the statement is outside of. Or it may be compared against a constant (`if prior == 0`, `before as u128 >= CAP`), which records a fact about the earlier state. Any other use is flagged, even when a reload exists elsewhere, so reloading only to check it and then crediting `before + amount` still fails. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. Unrelated CPIs between the transfer and the reload are allowed.
-- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no other CPI in between, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta.
+- **Snapshot tier (every destination).** An integer local bound from the destination's balance before the CPI may be used after the CPI in only two ways.
+  - As a direct operand of arithmetic (`+ - * / %`), a comparison, or a `checked_*`/`saturating_*`/`wrapping_*`/`overflowing_*` method whose other operand is a post-CPI reload of the destination, or arithmetic over one. For example `after - before`, `after.checked_sub(before)`, `before.checked_add(after - before)`, `before.checked_add(delta)` where `delta = after.checked_sub(before)?`, and `if after < before`. The reload must follow the CPI and run on every path to the use: not only inside an `if` arm, a closure, or a loop the use is outside of.
+  - In a comparison against a constant (`if prior == 0`, `before as u128 >= CAP`), which records a fact about the earlier state.
+
+  Every other use is flagged, even when a reload exists elsewhere: a tuple, a struct field, a call argument, an array, or arithmetic against anything else. So `(after, before + 10).1`, `Receipt { observed: after, credited: before + 10 }`, and reloading only to check the reload and then crediting `before + amount` all fail. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. Unrelated CPIs between the transfer and the reload are allowed.
+- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no other CPI in between, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta. Where the typed identity below cannot name the destination or one of its reads, the tier falls back to the name-based check (reads whose written receiver matches the written destination), so code that check accepts is not newly rejected for that reason.
 
 ```rust
 let before = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
@@ -292,37 +296,46 @@ Token-2022 transfer fees can make `received` differ from the requested amount; S
 
 **What counts as a builder.** A `new` or `with_multisig_signers` constructor qualifies when all of the following hold:
 
-- Its resolved return type, after unwrapping `Result` and `Option`, has a name ending in `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked`.
-- Its signature has the token builder shape: at least three leading parameters that are references to a struct or generic type (source or mint, destination, authority), followed by an integer amount. So `SplTransfer` and the real `transfer_checked::TransferChecked` count, while `AuthorityTransfer::new(config, new_authority, signer)`, which moves no amount, does not.
-- It is not defined in `pinocchio_system` or `solana_system_interface`, whose builders move lamports.
+- Its resolved return type, after unwrapping `Result` and `Option`, has a name ending in `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked`. So `SplTransfer` and the real `transfer_checked::TransferChecked` both count.
+- Its signature leads with parameters that are references to a struct or generic type, followed by an integer amount.
+- It leads with enough account parameters. A builder defined in a token crate (`pinocchio_token`, `pinocchio_token_2022`, `spl_token`, `spl_token_2022`, `spl_token_interface`, or `pina`) needs three: it is a token instruction by where it comes from. A builder defined anywhere else needs four for a transfer (`from, mint, to, authority`), because naming the mint is what a lamport transfer never does, and three for a mint.
+- It is not defined in `pinocchio_system` or `solana_system_interface`.
 
-The destination is the third reference parameter when four lead (`from, mint, to, authority`) and the second otherwise.
+So `AuthorityTransfer::new(config, new_authority, signer)` (no amount) and a local `LamportTransfer::new(payer, vault, system_program, lamports)` (no mint) do not count. The destination is the third account when four lead and the second otherwise.
 
-**Which account an expression names.** Accounts are keyed by their root binding plus the full field path, so `ctx.user_ata`, `ctx.fee_ata`, and `ctx.vault` stay distinct whatever their field types are. Only these steps are looked through:
+**Which account an expression names.** Every local is keyed by its binding, never by its name, so shadowed locals and `let`-`else`, `if let`, and `match` bindings that share a name stay distinct. Fields extend the key with their full path, so `ctx.user_ata`, `ctx.fee_ata`, and `ctx.vault` stay distinct whatever their field types are. Only these steps are looked through:
 
 - `let` aliases, `&`, `*`, and `?`;
-- Pina's token-view loaders (`as_token_account()`, `as_token_account_for_program()`, `as_token_2022_account()`, `as_associated_token_account()`, and `as_account()`);
+- Pina's token-view methods (`as_token_account()`, `as_token_account_for_program()`, `as_token_2022_account()`, `as_associated_token_account()`, and `as_account()`);
+- the token crates' state loaders (`TokenAccount::from_account_view()` and the `_unchecked`/`from_account_info` variants), keyed by their first argument;
 - the `.base` field of a loaded Token-2022 view; and
-- methods with constant arguments that return the receiver's type (assertion chains, `ok_or(())`).
+- methods with constant arguments that do not take `&mut self` and return the receiver's type (assertion chains, `ok_or(())`).
 
-A method with constant arguments that returns another type becomes part of the key, so `accounts.get(2)` and `accounts.get(3)` differ. Anything else, such as a dynamic index or an arbitrary call, names no account and never matches a read of a different one.
+A method that takes `&mut self` (`Iterator::next`, `nth`, ...) produces a key unique to its call site, so two `it.next()` calls never name the same account. Any other such method with constant arguments that returns another type becomes part of the key (`accounts.get(2)` differs from `accounts.get(3)`). Anything else, such as a dynamic index or an arbitrary call, names no account, and a read that names no account never matches a destination.
 
 **What counts as a read.** `.amount()` and `Type::amount(account)` count, outside closures. A read inside a closure only happens if the closure runs, so it counts for neither tier. Snapshots are followed through tuple destructuring, verbatim copies (`let snapshot = before;`), and assignments (`before = ata.amount();`).
 
 **Unreachable uses.** A use the CPI cannot reach is not stale: the CPI sits in a block that always returns, or the use is in a sibling `if`/`match` arm.
 
-**Legacy program exemption.** A static `invoke()` or `invoke_signed()` is exempt when it is called on the builder itself, and the builder's program type parameter resolves to `pinocchio_token::TokenProgram`. That call targets the legacy SPL Token program, which has no transfer-fee extension, so the requested amount is exactly what arrives. The following stay covered:
+**Legacy program exemption.** A static `invoke()` or `invoke_signed()` is exempt when both of these hold:
 
-- a wrapper's `invoke()` (`Relay(builder).invoke()`);
-- Pina's `token_2022` aliases, which bind the same structs to `Token2022Program`;
+- its receiver's full type is the constructed builder; and
+- that builder's program type parameter is `pinocchio_token::TokenProgram`.
+
+That call targets the legacy SPL Token program, which has no transfer-fee extension, so the requested amount is exactly what arrives. The following stay covered:
+
+- a wrapper's `invoke()`;
+- any expression that yields a Token-2022 builder instead, such as `pick(legacy, token_2022).invoke()`;
+- Pina's `token_2022` aliases;
 - local look-alikes; and
 - every runtime-program invocation (`invoke_with_program()`, `invoke_with_unverified_program()`, and their signed variants).
 
 **Limits.**
 
 - A snapshot behind a helper function (`let before = read_balance(ata)`) or stored in a struct field (`Snap { before: ata.amount() }`) is not tracked.
-- A destination that names no account (for example `&accounts[i]` with a dynamic `i`) gets no snapshot analysis. The custody tier still requires reads for it.
-- Only the statement that holds the snapshot use is inspected. The reload must appear in it directly, or through a local bound from a post-CPI reload (or a verbatim copy of one). A delta computed in an earlier statement from the snapshot itself (`let sum = before + 1;`) is a stale use at that statement.
+- A destination that names no account gets no snapshot analysis. The custody tier still requires reads for it, through the name-based fallback.
+- A local builder that transfers without naming the mint (`from, to, authority, amount`) is only covered when it comes from a token crate.
+- A local's value is taken from its lexically latest definition before the use. Writes through `&mut` references to it are not tracked.
 - Builders passed through opaque wrappers are not associated with their invocation.
 - Code is ordered lexically, so loops are analysed in source order.
 

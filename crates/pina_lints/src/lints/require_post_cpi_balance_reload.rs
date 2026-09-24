@@ -5,6 +5,7 @@ extern crate rustc_span;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use rustc_hir::BinOpKind;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
@@ -34,11 +35,12 @@ crate::declare_late_lint! {
 	/// Requires the destination of every value-moving token CPI (`Transfer`,
 	/// `TransferChecked`, `MintTo`, and `MintToChecked` builders) to be
 	/// re-read after the CPI when an integer snapshot of its balance taken
-	/// before the CPI is used afterwards: the snapshot may only be combined
-	/// with that reload (as in `after.checked_sub(before)`) or compared with a
-	/// constant. Destinations named like protocol custody (`vault`, `custody`,
-	/// `reserve`, or `pool`) must additionally be read both before and after
-	/// every transfer, with no other CPI in between.
+	/// before the CPI is used afterwards: each later use of the snapshot must
+	/// be a direct operand of arithmetic or a comparison whose other operand
+	/// is that reload (as in `after.checked_sub(before)`), or a comparison with
+	/// a constant. Destinations named like protocol custody (`vault`,
+	/// `custody`, `reserve`, or `pool`) must additionally be read both before
+	/// and after every transfer, with no other CPI in between.
 	///
 	/// ### Why is this bad?
 	///
@@ -51,18 +53,41 @@ crate::declare_late_lint! {
 	"token balances snapshotted before a value-moving CPI must be reloaded after it"
 }
 
+/// Crates whose builders are token-program instructions by provenance.
+const TOKEN_PROGRAM_CRATES: &[&str] = &[
+	"pina",
+	"pinocchio_token",
+	"pinocchio_token_2022",
+	"spl_token",
+	"spl_token_2022",
+	"spl_token_interface",
+];
+
 /// Crates whose `Transfer` builders move lamports, not tokens.
 const SYSTEM_PROGRAM_CRATES: &[&str] = &["pinocchio_system", "solana_system_interface"];
 
-/// Pina loaders that parse an account's data into a token view without
+/// Pina methods that parse an account's data into a token view without
 /// changing which account is read.
-const TOKEN_VIEW_LOADERS: &[&str] = &[
+const TOKEN_VIEW_METHODS: &[&str] = &[
 	"as_account",
 	"as_associated_token_account",
 	"as_token_2022_account",
 	"as_token_account",
 	"as_token_account_for_program",
 ];
+
+/// Associated functions of the token crates' state types (`TokenAccount`,
+/// `Mint`, and their Token-2022 equivalents) that parse the account passed
+/// as their first argument.
+const TOKEN_VIEW_FUNCTIONS: &[&str] = &[
+	"from_account_info",
+	"from_account_info_unchecked",
+	"from_account_view",
+	"from_account_view_unchecked",
+];
+
+/// `Option`/`Result` adaptors that pass the success value through.
+const UNWRAPPING_METHODS: &[&str] = &["expect", "map_err", "ok_or", "ok_or_else", "unwrap"];
 
 /// A token-program instruction that increases its destination's balance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,6 +128,21 @@ impl TokenCpiKind {
 		}
 	}
 
+	/// The fewest leading account parameters a builder must take.
+	///
+	/// A builder from a token crate is a token instruction by provenance. A
+	/// builder defined anywhere else must also name what only a token
+	/// instruction has: a transfer must take the mint (`from, mint, to,
+	/// authority`), which a lamport transfer never does; a mint takes the
+	/// mint first by definition.
+	fn minimum_accounts(self, from_token_crate: bool) -> usize {
+		if self.is_transfer() && !from_token_crate {
+			4
+		} else {
+			3
+		}
+	}
+
 	/// Transfers can be charged a Token-2022 fee on arrival; mints cannot.
 	fn is_transfer(self) -> bool {
 		matches!(self, Self::Transfer | Self::TransferChecked)
@@ -122,27 +162,34 @@ impl TokenCpiKind {
 struct TokenCpiConstructor {
 	kind: TokenCpiKind,
 	destination_index: usize,
-	/// The credited account's key, or `None` when it cannot be named
-	/// precisely (a dynamic index, an arbitrary call).
-	destination: Option<String>,
+	/// The destination argument as written, for diagnostics and the custody
+	/// name check.
+	display: String,
+	/// The credited account's key, or `None` when it names no account
+	/// precisely.
+	destination: Option<AccountKey>,
 	builder: DefId,
-	/// The builder's program type parameter is the legacy SPL Token program.
-	/// A static `invoke()` of such a builder targets `Tokenkeg...`, which has
-	/// no transfer-fee extension, so the requested amount is exactly what
-	/// arrives.
-	legacy_program: bool,
 }
 
 /// A `.invoke*()` call and the builder type it is called on.
 struct Invocation {
 	hir_id: HirId,
 	receiver: Option<DefId>,
+	/// The receiver's full type is a builder bound to the legacy SPL Token
+	/// program.
+	receiver_is_legacy_builder: bool,
 }
 
-/// Which account an expression names, and whether it is a parsed token view
-/// of that account rather than the account handle itself.
+/// Which account an expression names.
+#[derive(Clone)]
 struct AccountKey {
-	path: String,
+	/// Unique within the function: locals are keyed by their binding
+	/// `HirId`, and stateful calls by their call site.
+	id: String,
+	/// The human-readable path, used for the custody name check.
+	text: String,
+	/// The expression is a parsed token view of the account rather than the
+	/// account handle itself.
 	view: bool,
 }
 
@@ -151,16 +198,17 @@ struct AccountKey {
 struct AmountRead {
 	hir_id: HirId,
 	span: Span,
-	account: String,
+	/// `None` when the receiver names no account precisely.
+	account: Option<String>,
 }
 
 /// A binding or assignment that gives integer locals a new value.
-struct Definition {
+struct Definition<'tcx> {
 	bindings: Vec<HirId>,
 	/// The whole `let` statement or assignment expression.
 	span: Span,
 	/// The expression providing the value.
-	value: Span,
+	value: &'tcx Expr<'tcx>,
 	/// The local copied verbatim, for `let snapshot = before;`.
 	copy_of: Option<HirId>,
 }
@@ -179,7 +227,7 @@ struct Analyzer<'cx, 'tcx> {
 	constructors: HashMap<Span, TokenCpiConstructor>,
 	invocations: HashMap<Span, Invocation>,
 	amount_reads: Vec<AmountRead>,
-	definitions: Vec<Definition>,
+	definitions: Vec<Definition<'tcx>>,
 	local_uses: Vec<LocalUse>,
 	closure_depth: usize,
 }
@@ -229,9 +277,26 @@ fn is_cpi_method(method: &str) -> bool {
 	)
 }
 
+fn is_arithmetic(operator: BinOpKind) -> bool {
+	matches!(
+		operator,
+		BinOpKind::Add | BinOpKind::Sub | BinOpKind::Mul | BinOpKind::Div | BinOpKind::Rem
+	)
+}
+
+fn is_integer_arithmetic_method(method: &str) -> bool {
+	["checked_", "saturating_", "wrapping_", "overflowing_"]
+		.iter()
+		.any(|prefix| method.starts_with(prefix))
+}
+
 impl<'tcx> Analyzer<'_, 'tcx> {
 	fn crate_name(&self, definition: DefId) -> String {
 		self.cx.tcx.crate_name(definition.krate).as_str().to_owned()
+	}
+
+	fn snippet(&self, span: Span) -> Option<String> {
+		self.cx.sess().source_map().span_to_snippet(span).ok()
 	}
 
 	/// Peels references, `Result`, and `Option` to the ADT underneath.
@@ -257,8 +322,26 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
+	/// Whether `ty` is a `pinocchio_token` builder bound to the legacy
+	/// `TokenProgram`. Such a builder's static `invoke()` calls
+	/// `invoke_with_unverified_program(&TokenProgram::ID)`, the legacy SPL
+	/// Token program, which has no transfer-fee extension.
+	fn is_legacy_builder(&self, ty: Ty<'tcx>) -> bool {
+		let TyKind::Adt(builder, generics) = ty.peel_refs().kind() else {
+			return false;
+		};
+
+		self.crate_name(builder.did()) == "pinocchio_token"
+			&& generics.types().last().is_none_or(|program| {
+				program.ty_adt_def().is_some_and(|program| {
+					self.crate_name(program.did()) == "pinocchio_token"
+						&& self.cx.tcx.item_name(program.did()).as_str() == "TokenProgram"
+				})
+			})
+	}
+
 	/// Whether an argument is fixed at compile time: a literal, `()`, or a
-	/// path to a constant or static, optionally borrowed or negated.
+	/// path to a constant or static, optionally borrowed, negated, or cast.
 	fn is_constant(&self, expr: &Expr<'_>) -> bool {
 		match &expr.kind {
 			ExprKind::Lit(_) => true,
@@ -282,32 +365,77 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
+	/// Whether a method call can return a different value on each call:
+	/// it takes `&mut self` (`Iterator::next`, `nth`, ...).
+	fn is_stateful_method(&self, call: &Expr<'_>) -> bool {
+		let Some(method) = self.cx.typeck_results().type_dependent_def_id(call.hir_id) else {
+			return true;
+		};
+		let signature = self
+			.cx
+			.tcx
+			.fn_sig(method)
+			.instantiate_identity()
+			.skip_binder();
+
+		signature.inputs().first().is_some_and(|receiver| {
+			matches!(
+				receiver.kind(),
+				TyKind::Ref(_, _, rustc_middle::ty::Mutability::Mut)
+			)
+		})
+	}
+
+	/// Whether `callee` resolves to a token crate's state loader such as
+	/// `TokenAccount::from_account_view`.
+	fn is_token_view_function(&self, callee: &Expr<'_>) -> bool {
+		let ExprKind::Path(path) = &callee.kind else {
+			return false;
+		};
+		let Res::Def(DefKind::AssocFn, function) = self.cx.qpath_res(path, callee.hir_id) else {
+			return false;
+		};
+
+		TOKEN_VIEW_FUNCTIONS.contains(&self.cx.tcx.item_name(function).as_str())
+			&& TOKEN_PROGRAM_CRATES.contains(&self.crate_name(function).as_str())
+	}
+
 	/// Names the account an expression refers to.
 	///
-	/// The key is the root binding plus the full field path, so
-	/// `ctx.user_ata` and `ctx.fee_ata` never collapse onto `ctx`. Only a
-	/// fixed allow-list of steps is looked through: `let` aliases, `&`, `*`,
-	/// `?`, Pina's token-view loaders, the `.base` field of a loaded view, and
-	/// methods whose result has the receiver's type and whose arguments are
-	/// constant (assertion chains, `ok_or(())`). A method with constant
-	/// arguments that changes the type (`get(2)`) becomes part of the key.
-	/// Anything else is unknown, and unknown matches no account.
+	/// Every local is keyed by its binding `HirId`, and fields extend the key
+	/// with their full path, so `ctx.user_ata` and `ctx.fee_ata` never
+	/// collapse onto `ctx`, and shadowed or pattern-bound locals with the same
+	/// name stay distinct. Only a fixed allow-list of steps is looked through:
+	/// `let` aliases, `&`, `*`, `?`, Pina's token-view methods, the token
+	/// crates' `from_account_view`-style loaders, the `.base` field of a
+	/// loaded view, and methods with constant arguments that return the
+	/// receiver's type. A stateful method (`&mut self`, such as `next()`)
+	/// yields a key unique to its call site. A method with constant arguments
+	/// that returns another type becomes part of the key (`get(2)`).
+	/// Anything else names no account and matches nothing.
 	fn account_key(&self, expr: &'tcx Expr<'tcx>) -> Option<AccountKey> {
 		match &expr.kind {
 			ExprKind::Path(rustc_hir::QPath::Resolved(None, path)) => {
-				if let Res::Local(binding) = path.res
-					&& let Some(initializer) = self.let_initializers.get(&binding)
-				{
+				let name = path
+					.segments
+					.iter()
+					.map(|segment| segment.ident.name.as_str())
+					.collect::<Vec<_>>()
+					.join("::");
+				let Res::Local(binding) = path.res else {
+					return Some(AccountKey {
+						id: name.clone(),
+						text: name,
+						view: false,
+					});
+				};
+				if let Some(initializer) = self.let_initializers.get(&binding) {
 					return self.account_key(initializer);
 				}
 
 				Some(AccountKey {
-					path: path
-						.segments
-						.iter()
-						.map(|segment| segment.ident.name.as_str())
-						.collect::<Vec<_>>()
-						.join("::"),
+					id: format!("{name}#{}", binding.local_id.as_u32()),
+					text: name,
 					view: false,
 				})
 			}
@@ -320,7 +448,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 
 				Some(AccountKey {
-					path: format!("{}.{field}", base.path),
+					id: format!("{}.{field}", base.id),
+					text: format!("{}.{field}", base.text),
 					view: false,
 				})
 			}
@@ -329,15 +458,11 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				if base.view || !matches!(index.kind, ExprKind::Lit(_)) {
 					return None;
 				}
-				let index = self
-					.cx
-					.sess()
-					.source_map()
-					.span_to_snippet(index.span)
-					.ok()?;
+				let index = self.snippet(index.span)?;
 
 				Some(AccountKey {
-					path: format!("{}[{index}]", base.path),
+					id: format!("{}[{index}]", base.id),
+					text: format!("{}[{index}]", base.text),
 					view: false,
 				})
 			}
@@ -346,17 +471,41 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::DropTemps(inner)
 			| ExprKind::Type(inner, _)
 			| ExprKind::Match(inner, _, MatchSource::TryDesugar(_)) => self.account_key(inner),
-			ExprKind::Call(..) => {
-				let argument = shared::try_branch_argument(self.cx, expr)?;
-				self.account_key(argument)
+			ExprKind::Call(callee, arguments) => {
+				if let Some(argument) = shared::try_branch_argument(self.cx, expr) {
+					return self.account_key(argument);
+				}
+				let [account, ..] = arguments else {
+					return None;
+				};
+				if !self.is_token_view_function(callee) {
+					return None;
+				}
+				let account = self.account_key(account)?;
+
+				Some(AccountKey {
+					view: true,
+					..account
+				})
 			}
 			ExprKind::MethodCall(segment, receiver, arguments, _) => {
 				let receiver_key = self.account_key(receiver)?;
 				let method = segment.ident.name.as_str();
-				if TOKEN_VIEW_LOADERS.contains(&method) && !receiver_key.view {
+				if TOKEN_VIEW_METHODS.contains(&method) && !receiver_key.view {
 					return Some(AccountKey {
-						path: receiver_key.path,
 						view: true,
+						..receiver_key
+					});
+				}
+				if self.is_stateful_method(expr) {
+					return Some(AccountKey {
+						id: format!(
+							"{}.{method}@{}",
+							receiver_key.id,
+							expr.hir_id.local_id.as_u32()
+						),
+						text: format!("{}.{method}()", receiver_key.text),
+						view: false,
 					});
 				}
 				if !arguments.iter().all(|argument| self.is_constant(argument)) {
@@ -364,21 +513,19 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 
 				let typeck = self.cx.typeck_results();
-				let preserves_type = self.core_adt(typeck.expr_ty(receiver)).is_some()
-					&& self.core_adt(typeck.expr_ty(receiver))
-						== self.core_adt(typeck.expr_ty(expr));
-				if preserves_type {
+				let receiver_adt = self.core_adt(typeck.expr_ty(receiver));
+				if receiver_adt.is_some() && receiver_adt == self.core_adt(typeck.expr_ty(expr)) {
 					return Some(receiver_key);
 				}
 
-				let source_map = self.cx.sess().source_map();
 				let arguments = arguments
 					.iter()
-					.map(|argument| source_map.span_to_snippet(argument.span).ok())
+					.map(|argument| self.snippet(argument.span))
 					.collect::<Option<Vec<_>>>()?
 					.join(", ");
 				Some(AccountKey {
-					path: format!("{}.{method}({arguments})", receiver_key.path),
+					id: format!("{}.{method}({arguments})", receiver_key.id),
+					text: format!("{}.{method}({arguments})", receiver_key.text),
 					view: false,
 				})
 			}
@@ -387,18 +534,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
-	fn account_path(&self, expr: &'tcx Expr<'tcx>) -> Option<String> {
-		self.account_key(expr).map(|key| key.path)
-	}
-
 	/// Classifies a call by the type it returns and by its signature.
 	///
 	/// The resolved builder type (after unwrapping `Result`/`Option`) must end
 	/// in a token instruction name, and the constructor must have the token
-	/// builder shape: at least three leading reference parameters (source or
-	/// mint, destination, authority) followed by an integer amount. Types
-	/// such as `AuthorityTransfer::new(config, new_authority, signer)` that
-	/// move no amount therefore do not count.
+	/// builder shape: leading parameters that are references to a struct or
+	/// generic type (see [`TokenCpiKind::minimum_accounts`]) followed by an
+	/// integer amount.
 	fn token_cpi_constructor(
 		&self,
 		expr: &'tcx Expr<'tcx>,
@@ -418,20 +560,12 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			return None;
 		}
 
-		let mut ty = self.cx.typeck_results().expr_ty(expr);
-		while let TyKind::Adt(wrapper, generics) = ty.kind()
-			&& (self.cx.tcx.is_diagnostic_item(sym::Result, wrapper.did())
-				|| self.cx.tcx.is_diagnostic_item(sym::Option, wrapper.did()))
-		{
-			ty = generics.type_at(0);
-		}
-		let TyKind::Adt(builder, generics) = ty.kind() else {
-			return None;
-		};
-		if SYSTEM_PROGRAM_CRATES.contains(&self.crate_name(builder.did()).as_str()) {
+		let builder = self.core_adt(self.cx.typeck_results().expr_ty(expr))?;
+		let builder_crate = self.crate_name(builder);
+		if SYSTEM_PROGRAM_CRATES.contains(&builder_crate.as_str()) {
 			return None;
 		}
-		let kind = TokenCpiKind::from_type_name(self.cx.tcx.item_name(builder.did()).as_str())?;
+		let kind = TokenCpiKind::from_type_name(self.cx.tcx.item_name(builder).as_str())?;
 
 		let signature = self
 			.cx
@@ -450,31 +584,25 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		let has_amount = parameters
 			.get(leading_accounts)
 			.is_some_and(|amount| amount.is_integral());
-		if leading_accounts < 3 || !has_amount {
+		let from_token_crate = TOKEN_PROGRAM_CRATES.contains(&builder_crate.as_str());
+		if leading_accounts < kind.minimum_accounts(from_token_crate) || !has_amount {
 			return None;
 		}
-		let destination_index = kind.destination_index(leading_accounts);
 
-		// `pina::token_2022` re-exports these builders as aliases of the
-		// `pinocchio_token` structs with a `Token2022Program` parameter, so the
-		// crate alone does not identify the legacy program: the program type
-		// parameter must be `pinocchio_token::TokenProgram` too.
-		let legacy_program = self.crate_name(builder.did()) == "pinocchio_token"
-			&& generics.types().last().is_none_or(|program| {
-				program.ty_adt_def().is_some_and(|program| {
-					self.crate_name(program.did()) == "pinocchio_token"
-						&& self.cx.tcx.item_name(program.did()).as_str() == "TokenProgram"
-				})
-			});
+		let destination_index = kind.destination_index(leading_accounts);
+		let destination = args.get(destination_index)?;
+		let display = self.snippet(destination.span)?;
+		let display = display
+			.trim_start_matches("&mut ")
+			.trim_start_matches('&')
+			.to_owned();
 
 		Some(TokenCpiConstructor {
 			kind,
 			destination_index,
-			destination: args
-				.get(destination_index)
-				.and_then(|destination| self.account_path(destination)),
-			builder: builder.did(),
-			legacy_program,
+			display,
+			destination: self.account_key(destination),
+			builder,
 		})
 	}
 
@@ -506,7 +634,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		self.definitions.push(Definition {
 			bindings,
 			span,
-			value: value.span,
+			value,
 			copy_of: local_path(value),
 		});
 	}
@@ -514,23 +642,18 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	fn reads_of<'a>(&'a self, destination: &'a str) -> impl Iterator<Item = &'a AmountRead> {
 		self.amount_reads
 			.iter()
-			.filter(move |read| read.account == destination)
+			.filter(move |read| read.account.as_deref() == Some(destination))
 	}
 
-	/// Definitions whose value contains a balance read of `destination`
-	/// selected by `read_filter`, or that copy such a definition verbatim.
-	fn balance_definitions(
-		&self,
-		destination: &str,
-		read_filter: impl Fn(&AmountRead) -> bool,
-	) -> Vec<&Definition> {
-		let mut found: Vec<&Definition> = Vec::new();
+	/// Definitions whose value contains a balance read of `destination`, or
+	/// that copy such a definition verbatim.
+	fn snapshot_definitions(&self, destination: &str) -> Vec<&Definition<'tcx>> {
+		let mut found: Vec<&Definition<'tcx>> = Vec::new();
 
 		for definition in &self.definitions {
 			let direct = self
 				.reads_of(destination)
-				.filter(|read| read_filter(read))
-				.any(|read| encloses(definition.value, read.span));
+				.any(|read| encloses(definition.value.span, read.span));
 			let copied = definition.copy_of.is_some_and(|source| {
 				found
 					.iter()
@@ -545,7 +668,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	}
 
 	/// The lexically latest definition of `binding` before `point`.
-	fn reaching_definition(&self, binding: HirId, point: Span) -> Option<&Definition> {
+	fn reaching_definition(&self, binding: HirId, point: Span) -> Option<&Definition<'tcx>> {
 		self.definitions
 			.iter()
 			.filter(|definition| {
@@ -615,10 +738,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						ExprKind::If(condition, ..) => condition.hir_id != child,
 						ExprKind::Loop(..) | ExprKind::Closure(..) => true,
 						ExprKind::Binary(operator, _, right) => {
-							matches!(
-								operator.node,
-								rustc_hir::BinOpKind::And | rustc_hir::BinOpKind::Or
-							) && right.hir_id == child
+							matches!(operator.node, BinOpKind::And | BinOpKind::Or)
+								&& right.hir_id == child
 						}
 						_ => false,
 					}
@@ -637,35 +758,29 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		false
 	}
 
-	/// The outermost expression around `usage` within its statement, `let`,
-	/// block tail, or match arm.
-	fn statement_expression(&self, usage: HirId) -> Span {
-		let mut span = self.cx.tcx.hir_span(usage);
+	/// The direct operator or method around a use, looking through `as`
+	/// casts, and the hir id of the operand that was climbed from.
+	fn operator_around(&self, usage: HirId) -> Option<(&'tcx Expr<'tcx>, HirId)> {
+		let mut operand = usage;
 
-		for (_, node) in self.cx.tcx.hir_parent_iter(usage) {
-			let Node::Expr(expr) = node else {
-				break;
+		loop {
+			let Node::Expr(parent) = self.cx.tcx.parent_hir_node(operand) else {
+				return None;
 			};
-			span = expr.span;
+			if matches!(parent.kind, ExprKind::Cast(..) | ExprKind::DropTemps(_)) {
+				operand = parent.hir_id;
+				continue;
+			}
+			return Some((parent, operand));
 		}
-
-		span
 	}
 
 	/// Comparing a pre-CPI snapshot against a constant (`if prior == 0`,
 	/// `before as u128 >= CAP`) records a fact about the account before the
 	/// CPI, which stays true.
 	fn is_constant_comparison(&self, usage: &LocalUse) -> bool {
-		let mut operand = usage.hir_id;
-		let parent = loop {
-			let Node::Expr(parent) = self.cx.tcx.parent_hir_node(operand) else {
-				return false;
-			};
-			if matches!(parent.kind, ExprKind::Cast(..) | ExprKind::DropTemps(_)) {
-				operand = parent.hir_id;
-				continue;
-			}
-			break parent;
+		let Some((parent, operand)) = self.operator_around(usage.hir_id) else {
+			return false;
 		};
 		let ExprKind::Binary(operator, left, right) = parent.kind else {
 			return false;
@@ -675,56 +790,112 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		operator.node.is_comparison() && self.is_constant(other)
 	}
 
-	/// Whether the statement expression holding a stale use also uses a
-	/// dominating post-CPI reload of `destination`, as in
-	/// `after.checked_sub(before)` or `before.checked_add(after - before)`.
+	/// Whether `expr` evaluates to a post-CPI balance of `destination`, or to
+	/// arithmetic over one: a direct reload, a local defined from one after
+	/// the CPI, or `after - before`/`after.checked_sub(before)`. Every reload
+	/// involved must follow the CPI and dominate `target`.
+	fn is_reload_value(
+		&self,
+		expr: &'tcx Expr<'tcx>,
+		destination: &str,
+		invocation: Span,
+		target: Span,
+		depth: usize,
+	) -> bool {
+		if depth > 16 {
+			return false;
+		}
+		let recurse = |inner: &'tcx Expr<'tcx>| {
+			self.is_reload_value(inner, destination, invocation, target, depth + 1)
+		};
+
+		match &expr.kind {
+			ExprKind::DropTemps(inner)
+			| ExprKind::Cast(inner, _)
+			| ExprKind::Match(inner, _, MatchSource::TryDesugar(_)) => recurse(inner),
+			ExprKind::Call(..) => shared::try_branch_argument(self.cx, expr).is_some_and(recurse),
+			ExprKind::Path(_) => {
+				let Some(binding) = local_path(expr) else {
+					return false;
+				};
+				self.reaching_definition(binding, expr.span)
+					.is_some_and(|definition| {
+						precedes(invocation, definition.span) && recurse(definition.value)
+					})
+			}
+			ExprKind::Binary(operator, left, right) if is_arithmetic(operator.node) => {
+				recurse(left) || recurse(right)
+			}
+			ExprKind::MethodCall(segment, receiver, arguments, _) => {
+				let method = segment.ident.name.as_str();
+				let is_reload = self.amount_reads.iter().any(|read| {
+					read.hir_id == expr.hir_id
+						&& read.account.as_deref() == Some(destination)
+						&& precedes(invocation, read.span)
+						&& self.dominates(read.hir_id, target)
+				});
+				if is_reload {
+					return true;
+				}
+				if UNWRAPPING_METHODS.contains(&method) {
+					return recurse(receiver);
+				}
+				is_integer_arithmetic_method(method)
+					&& (recurse(receiver) || arguments.iter().any(recurse))
+			}
+			_ => false,
+		}
+	}
+
+	/// Whether a use of the snapshot is a direct operand of arithmetic or a
+	/// comparison whose other operand is a post-CPI reload of `destination`
+	/// (or arithmetic over one): `after - before`,
+	/// `after.checked_sub(before)`, `before.checked_add(after - before)`,
+	/// `if after < before`. Tuples, call arguments, struct fields, arrays, and
+	/// arithmetic against anything else are stale uses.
 	fn is_combined_with_reload(
 		&self,
 		destination: &str,
 		invocation: Span,
 		usage: &LocalUse,
 	) -> bool {
-		let statement = self.statement_expression(usage.hir_id);
-		let dominating_reload = |read: &AmountRead| {
-			precedes(invocation, read.span) && self.dominates(read.hir_id, usage.span)
+		let Some((parent, operand)) = self.operator_around(usage.hir_id) else {
+			return false;
+		};
+		let is_reload = |other: &'tcx Expr<'tcx>| {
+			self.is_reload_value(other, destination, invocation, usage.span, 0)
 		};
 
-		let direct = self
-			.reads_of(destination)
-			.any(|read| encloses(statement, read.span) && dominating_reload(read));
-		if direct {
-			return true;
+		match parent.kind {
+			ExprKind::Binary(operator, left, right)
+				if is_arithmetic(operator.node) || operator.node.is_comparison() =>
+			{
+				is_reload(if left.hir_id == operand { right } else { left })
+			}
+			ExprKind::MethodCall(segment, receiver, arguments, _)
+				if is_integer_arithmetic_method(segment.ident.name.as_str()) =>
+			{
+				if receiver.hir_id == operand {
+					arguments.iter().any(is_reload)
+				} else {
+					is_reload(receiver)
+				}
+			}
+			_ => false,
 		}
-
-		let reloads = self.balance_definitions(destination, |read| {
-			dominating_reload(read) && precedes(read.span, statement)
-		});
-		let reload_bindings = reloads
-			.iter()
-			.filter(|definition| precedes(invocation, definition.span))
-			.flat_map(|definition| definition.bindings.iter().copied())
-			.collect::<HashSet<_>>();
-
-		self.local_uses.iter().any(|reload_use| {
-			encloses(statement, reload_use.span)
-				&& reload_bindings.contains(&reload_use.binding)
-				&& self
-					.reaching_definition(reload_use.binding, reload_use.span)
-					.is_some_and(|definition| precedes(invocation, definition.span))
-		})
 	}
 
 	/// The snapshot tier, which applies to every destination: returns a use
 	/// of a pre-CPI balance snapshot of `destination` that the CPI can reach
-	/// and that neither compares it with a constant nor combines it with a
-	/// dominating post-CPI reload.
+	/// and that neither compares it with a constant nor combines it directly
+	/// with a dominating post-CPI reload.
 	fn stale_snapshot_use(
 		&self,
 		destination: &str,
 		invocation: HirId,
 		invocation_span: Span,
 	) -> Option<Span> {
-		let snapshots = self.balance_definitions(destination, |_| true);
+		let snapshots = self.snapshot_definitions(destination);
 
 		self.local_uses
 			.iter()
@@ -748,13 +919,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	/// bracketed by destination reads with no other CPI in between.
 	fn custody_transfer_is_unaccounted(
 		&self,
-		destination: Option<&str>,
+		destination: &str,
 		invocation: Span,
 		cpi_spans: &[Span],
 	) -> bool {
-		let Some(destination) = destination else {
-			return true;
-		};
 		let cpi_between = |start: Span, end: Span| {
 			cpi_spans
 				.iter()
@@ -780,20 +948,21 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		if self.closure_depth > 0 {
 			return;
 		}
-		if let Some(account) = self.account_path(account) {
-			self.amount_reads.push(AmountRead {
-				hir_id: expr.hir_id,
-				span: expr.span,
-				account,
-			});
-		}
+		let account = self.account_key(account).map(|key| key.id);
+		self.amount_reads.push(AmountRead {
+			hir_id: expr.hir_id,
+			span: expr.span,
+			account,
+		});
 	}
 }
 
 impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 	fn visit_local(&mut self, local: &'tcx rustc_hir::LetStmt<'tcx>) {
 		if let Some(initializer) = local.init {
-			if let PatKind::Binding(_, binding, _, None) = local.pat.kind {
+			if let PatKind::Binding(_, binding, _, None) = local.pat.kind
+				&& local.els.is_none()
+			{
 				self.let_initializers.insert(binding, initializer);
 			}
 			self.record_definitions(local.pat, initializer, local.span);
@@ -823,12 +992,16 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 			ExprKind::MethodCall(segment, receiver, arguments, _) => {
 				let method = segment.ident.name.as_str();
 				if is_cpi_method(method) {
-					let receiver_ty = self.cx.typeck_results().expr_ty(receiver).peel_refs();
+					let receiver_ty = self.cx.typeck_results().expr_ty(receiver);
 					self.invocations.insert(
 						expr.span,
 						Invocation {
 							hir_id: expr.hir_id,
-							receiver: receiver_ty.ty_adt_def().map(|definition| definition.did()),
+							receiver: receiver_ty
+								.peel_refs()
+								.ty_adt_def()
+								.map(|definition| definition.did()),
+							receiver_is_legacy_builder: self.is_legacy_builder(receiver_ty),
 						},
 					);
 				}
@@ -843,7 +1016,7 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 					self.definitions.push(Definition {
 						bindings: vec![binding],
 						span: expr.span,
-						value: value.span,
+						value,
 						copy_of: local_path(value),
 					});
 					// Writing a local is not a read of its previous value.
@@ -888,6 +1061,40 @@ fn invocation_matches(constructor: &shared::CallInfo, invocation: &shared::CallI
 	invocation
 		.receiver_span
 		.is_some_and(|receiver| receiver.contains(constructor.span))
+}
+
+/// The custody check as the name-based lint on `main` performs it: reads
+/// matched by their written receiver text, ordered by collected call
+/// position.
+///
+/// Used only where the typed identity names no account, so code the
+/// name-based check accepted is not newly rejected for that reason alone.
+fn textual_custody_is_accounted(
+	calls: &[shared::CallInfo],
+	invocation: usize,
+	written: &str,
+) -> bool {
+	let reads_amount = |candidate: &shared::CallInfo| {
+		candidate.method == "amount" && candidate.receiver.as_deref() == Some(written)
+	};
+	let has_before = calls[..invocation]
+		.iter()
+		.rposition(reads_amount)
+		.is_some_and(|before| {
+			!calls[before + 1..invocation]
+				.iter()
+				.any(|call| is_cpi_method(&call.method))
+		});
+	let has_after = calls[invocation + 1..]
+		.iter()
+		.position(reads_amount)
+		.is_some_and(|offset| {
+			!calls[invocation + 1..invocation + 1 + offset]
+				.iter()
+				.any(|call| is_cpi_method(&call.method))
+		});
+
+	has_before && has_after
 }
 
 fn is_custody_account(identity: &str) -> bool {
@@ -971,65 +1178,92 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 			.filter(|call| is_cpi_method(&call.method))
 			.map(|call| call.span)
 			.collect::<Vec<_>>();
+		let unknown_read_spans = analyzer
+			.amount_reads
+			.iter()
+			.filter(|read| read.account.is_none())
+			.map(|read| read.span)
+			.collect::<HashSet<_>>();
 
 		for (index, call) in facts.calls.iter().enumerate() {
 			let Some(constructor) = analyzer.constructors.get(&call.span) else {
 				continue;
 			};
-			let Some(invocation_call) = facts.calls[index + 1..]
+			let Some(offset) = facts.calls[index + 1..]
 				.iter()
-				.find(|next| invocation_matches(call, next))
+				.position(|next| invocation_matches(call, next))
 			else {
 				// The builder was passed through an opaque wrapper. Avoid a
 				// deny-level guess when the actual invocation cannot be associated.
 				continue;
 			};
+			let invocation_index = index + 1 + offset;
+			let invocation_call = &facts.calls[invocation_index];
 			let Some(invocation) = analyzer.invocations.get(&invocation_call.span) else {
 				continue;
 			};
 
-			// A static `invoke()`/`invoke_signed()` called on the legacy-program
-			// builder itself targets SPL Token, which cannot deduct a fee, so the
-			// requested amount is exactly what arrives. A wrapper's `invoke()`
-			// could target any program and is not exempt.
-			let is_static_builder_invoke =
+			// A static `invoke()`/`invoke_signed()` whose receiver's full type is
+			// the legacy-program builder targets SPL Token, which cannot deduct a
+			// fee, so the requested amount is exactly what arrives. A wrapper's
+			// `invoke()`, or any expression that yields a Token-2022 builder,
+			// is not exempt.
+			let is_static_legacy_invoke =
 				matches!(invocation_call.method.as_str(), "invoke" | "invoke_signed")
-					&& invocation.receiver == Some(constructor.builder);
-			if constructor.legacy_program && is_static_builder_invoke {
+					&& invocation.receiver == Some(constructor.builder)
+					&& invocation.receiver_is_legacy_builder;
+			if is_static_legacy_invoke {
 				continue;
 			}
 
-			let written_destination = call
+			let written = call
 				.args
 				.get(constructor.destination_index)
-				.and_then(Option::as_deref)
-				.unwrap_or_default();
-			let destination = constructor.destination.as_deref();
+				.and_then(Option::as_deref);
+			let destination = constructor.destination.as_ref();
 			let is_custody = constructor.kind.is_transfer()
-				&& (is_custody_account(written_destination)
-					|| destination.is_some_and(is_custody_account));
-			if is_custody
-				&& analyzer.custody_transfer_is_unaccounted(
-					destination,
-					invocation_call.span,
-					&cpi_spans,
-				) {
-				lint_custody_transfer(cx, invocation_call.span, written_destination);
-				continue;
+				&& (is_custody_account(&constructor.display)
+					|| destination.is_some_and(|key| is_custody_account(&key.text)));
+			if is_custody {
+				let typed_unaccounted = destination.is_none_or(|key| {
+					analyzer.custody_transfer_is_unaccounted(
+						&key.id,
+						invocation_call.span,
+						&cpi_spans,
+					)
+				});
+				// Where the typed identity names no account (the destination or a
+				// matching read), fall back to the name-based check `main` runs.
+				let identity_unknown = destination.is_none()
+					|| facts.calls.iter().any(|read| {
+						read.method == "amount"
+							&& read.receiver.as_deref() == written
+							&& unknown_read_spans.contains(&read.span)
+					});
+				let textually_accounted = identity_unknown
+					&& written.is_some_and(|written| {
+						textual_custody_is_accounted(&facts.calls, invocation_index, written)
+					});
+				if typed_unaccounted && !textually_accounted {
+					lint_custody_transfer(cx, invocation_call.span, &constructor.display);
+					continue;
+				}
 			}
 
 			let Some(destination) = destination else {
 				continue;
 			};
-			if let Some(stale_use) =
-				analyzer.stale_snapshot_use(destination, invocation.hir_id, invocation_call.span)
-			{
+			if let Some(stale_use) = analyzer.stale_snapshot_use(
+				&destination.id,
+				invocation.hir_id,
+				invocation_call.span,
+			) {
 				lint_stale_snapshot(
 					cx,
 					invocation_call.span,
 					stale_use,
 					constructor.kind,
-					destination,
+					&constructor.display,
 				);
 			}
 		}
