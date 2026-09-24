@@ -3,8 +3,8 @@
 //! `trybuild` compares the compiler's output against the checked-in `.stderr`
 //! snapshots byte for byte. Instrumenting the crate under `cargo llvm-cov`
 //! changes that output — the diagnostics gain notes about the instrumented
-//! types — so two of the 43 cases mismatch under coverage even though the
-//! macros are unchanged. The suite therefore does not run there, matching
+//! types — so two cases mismatch under coverage even though the macros are
+//! unchanged. The suite therefore does not run there, matching
 //! `crates/pina_cli/tests/generated_surfpool.rs`. It still runs in the
 //! post-merge and `ci-full` tiers via `test:all`, where the snapshots are the
 //! real gate.

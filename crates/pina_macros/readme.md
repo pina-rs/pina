@@ -114,6 +114,12 @@ pub enum ExampleError {
 - `crate = ::pina` (optional)
 - `final` (omits `#[non_exhaustive]`)
 
+<!-- {=pinaReservedErrorRange} -->
+
+Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for its framework errors (`PinaProgramError`), so a client can always tell a program's own error from a framework one. Every `#[error]` variant must use a discriminant below `0xFFFF_0000` (`pina::RESERVED_ERROR_CODE_START`). The macro checks each explicit and implicit discriminant at compile time and rejects a variant in the reserved range; the check emits no code, so it costs no compute units and does not change program size.
+
+<!-- {/pinaReservedErrorRange} -->
+
 ### `#[derive(Accounts)]`
 
 <br>

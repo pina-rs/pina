@@ -2,6 +2,7 @@ use core::mem::size_of;
 
 use pina::PinaProgramError;
 use pina::ProgramError;
+use pina::RESERVED_ERROR_CODE_START;
 
 fn error_to_code(variant: PinaProgramError) -> u32 {
 	let program_error: ProgramError = variant.into();
@@ -55,6 +56,13 @@ fn error_codes_match_expected_discriminants() {
 	);
 }
 
+/// The reserved range is the published client contract, so its start must not
+/// drift from the value the `#[error]` diagnostic quotes.
+#[test]
+fn reserved_range_starts_at_the_documented_code() {
+	assert_eq!(RESERVED_ERROR_CODE_START, 0xFFFF_0000);
+}
+
 /// Error codes should occupy the reserved top range and not collide with
 /// typical user error codes (which start at 0).
 #[test]
@@ -76,7 +84,7 @@ fn error_codes_are_in_reserved_range() {
 	for variant in &variants {
 		let code = error_to_code(*variant);
 		assert!(
-			code >= 0xFFFF_0000,
+			code >= RESERVED_ERROR_CODE_START,
 			"error code {code:#X} is outside the reserved range"
 		);
 	}
