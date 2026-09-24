@@ -11,14 +11,19 @@ final class DirectTransferCommand extends Command<void> {
   DirectTransferCommand() {
     argParser
       ..addOption('amount', mandatory: true, help: "amount")
-      ..addOption('recipient', mandatory: true, help: "The recipient. Must be writable");
+      ..addOption(
+        'recipient',
+        mandatory: true,
+        help: "The recipient. Must be writable",
+      );
   }
 
   @override
   String get name => 'direct_transfer';
 
   @override
-  String get description => "Instruction data for `DirectTransfer`.  Same layout as `CpiTransferInstruction` but with a different discriminator byte.";
+  String get description =>
+      "Instruction data for `DirectTransfer`.  Same layout as `CpiTransferInstruction` but with a different discriminator byte.";
 
   @override
   Future<void> run() async {

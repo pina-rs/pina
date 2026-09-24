@@ -11,10 +11,26 @@ final class ApproveDisclosureCommand extends Command<void> {
   ApproveDisclosureCommand() {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
-      ..addOption('pool_config', mandatory: true, help: "The pool_config account")
-      ..addOption('custodian_registry', mandatory: true, help: "The custodian_registry account")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
-      ..addOption('disclosure_log', mandatory: true, help: "The disclosure_log account")
+      ..addOption(
+        'pool_config',
+        mandatory: true,
+        help: "The pool_config account",
+      )
+      ..addOption(
+        'custodian_registry',
+        mandatory: true,
+        help: "The custodian_registry account",
+      )
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      )
+      ..addOption(
+        'disclosure_log',
+        mandatory: true,
+        help: "The disclosure_log account",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -29,10 +45,22 @@ final class ApproveDisclosureCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final custodian = context.payerAddress;
-    final poolConfig = pubkey('--pool-config', results['pool_config']! as String);
-    final custodianRegistry = pubkey('--custodian-registry', results['custodian_registry']! as String);
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
-    final disclosureLog = pubkey('--disclosure-log', results['disclosure_log']! as String);
+    final poolConfig = pubkey(
+      '--pool-config',
+      results['pool_config']! as String,
+    );
+    final custodianRegistry = pubkey(
+      '--custodian-registry',
+      results['custodian_registry']! as String,
+    );
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
+    final disclosureLog = pubkey(
+      '--disclosure-log',
+      results['disclosure_log']! as String,
+    );
     final clock = pubkey('--clock', results['clock']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getApproveDisclosureInstruction(

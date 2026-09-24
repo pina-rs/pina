@@ -9,8 +9,7 @@ import 'package:pina_codama_clients/custom_errors_program.dart';
 
 final class RequireEqCommand extends Command<void> {
   RequireEqCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -21,9 +20,7 @@ final class RequireEqCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
-
 
     final instruction = getRequireEqInstruction(
       programAddress: context.programAddress,

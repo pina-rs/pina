@@ -141,39 +141,69 @@ const int multisigProgramErrorSpendingLimitRequiresProposal = 0x20; // 32
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _multisigProgramErrorMessages = {
-    multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
-    multisigProgramErrorUnauthorized: 'The member lacks the permission the instruction requires.',
-    multisigProgramErrorInvalidThreshold: 'The threshold is zero or exceeds the number of voting members.',
-    multisigProgramErrorTooManyMembers: 'The member list exceeds [`MAX_MEMBERS`].',
-    multisigProgramErrorDuplicateMember: 'The member list contains a duplicate or unsorted key.',
-    multisigProgramErrorUnknownPermission: 'A member carries a permission bit outside the defined set.',
-    multisigProgramErrorInvalidConfiguration: 'The multisig needs at least one member with each core permission.',
-    multisigProgramErrorTimeLockExceedsMaxAllowed: 'The timelock exceeds [`MAX_TIME_LOCK`].',
-    multisigProgramErrorInvalidProposalStatus: 'The proposal is not in the status this instruction requires.',
-    multisigProgramErrorStaleProposal: 'The proposal predates the last consensus change and is stale.',
-    multisigProgramErrorAlreadyVoted: 'The member has already cast this vote.',
-    multisigProgramErrorHasNotApproved: 'The member has no approval to revoke.',
-    multisigProgramErrorTimeLockNotReleased: 'The timelock has not elapsed since approval.',
-    multisigProgramErrorInvalidMessage: 'The encoded vault message is malformed or exceeds a capacity.',
-    multisigProgramErrorInvalidNumberOfAccounts: 'The remaining accounts do not match the message account keys.',
-    multisigProgramErrorInvalidAccount: 'An account does not match the key, signer, or writability the message',
-    multisigProgramErrorProtectedAccount: 'A message instruction wants to write a program-owned account the',
-    multisigProgramErrorInvalidActions: 'The encoded config action stream is malformed or exceeds a capacity.',
-    multisigProgramErrorMissingAccount: 'A config action references a spending limit account that is missing.',
-    multisigProgramErrorNotSupportedForControlled: 'Governed config transactions require an autonomous multisig.',
-    multisigProgramErrorNotSupportedForAutonomous: 'The config-authority path requires a controlled multisig.',
-    multisigProgramErrorMissingTreasury: 'The configured creation fee is positive but the treasury account is',
-    multisigProgramErrorSpendingLimitExceeded: 'The spending limit is exhausted for this period.',
-    multisigProgramErrorInvalidDestination: 'The destination is not on the spending limit\'s allow-list.',
-    multisigProgramErrorInvalidMint: 'The mint does not match the spending limit.',
-    multisigProgramErrorDecimalsMismatch: 'The decimals do not match the mint (SOL always has nine).',
-    multisigProgramErrorInvalidPeriod: 'The reset period is not one of the defined variants.',
-    multisigProgramErrorInvalidLegacyMultisig: 'The legacy account is not a multisig this program can import.',
-    multisigProgramErrorInvalidConfigAuthority: 'The program config authority does not match the signer.',
-    multisigProgramErrorInvalidProposalKind: 'The proposal kind does not match the instruction.',
-    multisigProgramErrorMissingRentPayer: 'A spending limit action needs its rent payer and system program.',
-    multisigProgramErrorProposalExpired: 'The proposal\'s recorded lifetime has elapsed.',
-    multisigProgramErrorSpendingLimitRequiresProposal: 'A spending-limit action moves vault funds and requires a governed',
+  multisigProgramErrorNotAmember: 'The signer is not a member of the multisig.',
+  multisigProgramErrorUnauthorized:
+      'The member lacks the permission the instruction requires.',
+  multisigProgramErrorInvalidThreshold:
+      'The threshold is zero or exceeds the number of voting members.',
+  multisigProgramErrorTooManyMembers:
+      'The member list exceeds [`MAX_MEMBERS`].',
+  multisigProgramErrorDuplicateMember:
+      'The member list contains a duplicate or unsorted key.',
+  multisigProgramErrorUnknownPermission:
+      'A member carries a permission bit outside the defined set.',
+  multisigProgramErrorInvalidConfiguration:
+      'The multisig needs at least one member with each core permission.',
+  multisigProgramErrorTimeLockExceedsMaxAllowed:
+      'The timelock exceeds [`MAX_TIME_LOCK`].',
+  multisigProgramErrorInvalidProposalStatus:
+      'The proposal is not in the status this instruction requires.',
+  multisigProgramErrorStaleProposal:
+      'The proposal predates the last consensus change and is stale.',
+  multisigProgramErrorAlreadyVoted: 'The member has already cast this vote.',
+  multisigProgramErrorHasNotApproved: 'The member has no approval to revoke.',
+  multisigProgramErrorTimeLockNotReleased:
+      'The timelock has not elapsed since approval.',
+  multisigProgramErrorInvalidMessage:
+      'The encoded vault message is malformed or exceeds a capacity.',
+  multisigProgramErrorInvalidNumberOfAccounts:
+      'The remaining accounts do not match the message account keys.',
+  multisigProgramErrorInvalidAccount:
+      'An account does not match the key, signer, or writability the message',
+  multisigProgramErrorProtectedAccount:
+      'A message instruction wants to write a program-owned account the',
+  multisigProgramErrorInvalidActions:
+      'The encoded config action stream is malformed or exceeds a capacity.',
+  multisigProgramErrorMissingAccount:
+      'A config action references a spending limit account that is missing.',
+  multisigProgramErrorNotSupportedForControlled:
+      'Governed config transactions require an autonomous multisig.',
+  multisigProgramErrorNotSupportedForAutonomous:
+      'The config-authority path requires a controlled multisig.',
+  multisigProgramErrorMissingTreasury:
+      'The configured creation fee is positive but the treasury account is',
+  multisigProgramErrorSpendingLimitExceeded:
+      'The spending limit is exhausted for this period.',
+  multisigProgramErrorInvalidDestination:
+      'The destination is not on the spending limit\'s allow-list.',
+  multisigProgramErrorInvalidMint:
+      'The mint does not match the spending limit.',
+  multisigProgramErrorDecimalsMismatch:
+      'The decimals do not match the mint (SOL always has nine).',
+  multisigProgramErrorInvalidPeriod:
+      'The reset period is not one of the defined variants.',
+  multisigProgramErrorInvalidLegacyMultisig:
+      'The legacy account is not a multisig this program can import.',
+  multisigProgramErrorInvalidConfigAuthority:
+      'The program config authority does not match the signer.',
+  multisigProgramErrorInvalidProposalKind:
+      'The proposal kind does not match the instruction.',
+  multisigProgramErrorMissingRentPayer:
+      'A spending limit action needs its rent payer and system program.',
+  multisigProgramErrorProposalExpired:
+      'The proposal\'s recorded lifetime has elapsed.',
+  multisigProgramErrorSpendingLimitRequiresProposal:
+      'A spending-limit action moves vault funds and requires a governed',
 };
 
 /// Get the error message for a MultisigProgram program error code.

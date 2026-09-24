@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
-
 
 @immutable
 class PoolState {
@@ -24,9 +22,8 @@ class PoolState {
     required this.outstandingRewards,
     required this.paused,
     required this.bump,
-  }) :
-      discriminator = 1,
-      migrationVersion = 0;
+  }) : discriminator = 1,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -56,12 +53,23 @@ class PoolState {
           bump == other.bump;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, admin, stakeMint, rewardMint, totalStaked, rewardIndex, outstandingRewards, paused, bump);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    admin,
+    stakeMint,
+    rewardMint,
+    totalStaked,
+    rewardIndex,
+    outstandingRewards,
+    paused,
+    bump,
+  );
 
   @override
-  String toString() => 'PoolState(discriminator: $discriminator, migrationVersion: $migrationVersion, admin: $admin, stakeMint: $stakeMint, rewardMint: $rewardMint, totalStaked: $totalStaked, rewardIndex: $rewardIndex, outstandingRewards: $outstandingRewards, paused: $paused, bump: $bump)';
+  String toString() =>
+      'PoolState(discriminator: $discriminator, migrationVersion: $migrationVersion, admin: $admin, stakeMint: $stakeMint, rewardMint: $rewardMint, totalStaked: $totalStaked, rewardIndex: $rewardIndex, outstandingRewards: $outstandingRewards, paused: $paused, bump: $bump)';
 }
-
 
 Encoder<PoolState> getPoolStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -109,20 +117,15 @@ Decoder<PoolState> getPoolStateDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'poolState account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'poolState account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (PoolState, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -135,31 +138,30 @@ Decoder<PoolState> getPoolStateDecoder() {
 
     return (
       PoolState(
-      admin: map['admin']! as Address,
-      stakeMint: map['stakeMint']! as Address,
-      rewardMint: map['rewardMint']! as Address,
-      totalStaked: map['totalStaked']! as BigInt,
-      rewardIndex: map['rewardIndex']! as BigInt,
-      outstandingRewards: map['outstandingRewards']! as BigInt,
-      paused: map['paused']! as bool,
-      bump: map['bump']! as int,
+        admin: map['admin']! as Address,
+        stakeMint: map['stakeMint']! as Address,
+        rewardMint: map['rewardMint']! as Address,
+        totalStaked: map['totalStaked']! as BigInt,
+        rewardIndex: map['rewardIndex']! as BigInt,
+        outstandingRewards: map['outstandingRewards']! as BigInt,
+        paused: map['paused']! as bool,
+        bump: map['bump']! as int,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() =>
-      FixedSizeDecoder<PoolState>(
-        fixedSize: structDecoder.fixedSize,
-        read: (bytes, offset) {
-          final bytesLength = bytes.length - offset;
-          if (bytesLength < structDecoder.fixedSize) {
-            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-          }
-          return readTopLevel(bytes, offset);
-        },
-      ),
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<PoolState>(
+      fixedSize: structDecoder.fixedSize,
+      read: (bytes, offset) {
+        final bytesLength = bytes.length - offset;
+        if (bytesLength < structDecoder.fixedSize) {
+          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+        }
+        return readTopLevel(bytes, offset);
+      },
+    ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<PoolState>(
         read: readTopLevel,
@@ -184,11 +186,11 @@ const int poolStateMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool poolStateNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 1) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 1) {
+    return false;
+  }
+  return data[1] < 0;
 }

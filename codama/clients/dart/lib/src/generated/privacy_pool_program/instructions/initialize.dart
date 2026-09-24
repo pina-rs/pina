@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class InitializeInstructionData {
@@ -24,9 +22,8 @@ class InitializeInstructionData {
     required this.requestersBump,
     required this.logBump,
     required this.custodians,
-  }) :
-      discriminator = 0,
-      migrationVersion = 0;
+  }) : discriminator = 0,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -51,7 +48,10 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     ('custodiansBump', getU8Encoder()),
     ('requestersBump', getU8Encoder()),
     ('logBump', getU8Encoder()),
-    ('custodians', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
+    (
+      'custodians',
+      fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false),
+    ),
   ]);
 
   return transformEncoder(
@@ -86,23 +86,16 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'initialize instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'initialize instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -110,14 +103,14 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
     return (
       InitializeInstructionData(
-      configBump: map['configBump']! as int,
-      vaultBump: map['vaultBump']! as int,
-      treeBump: map['treeBump']! as int,
-      nullifiersBump: map['nullifiersBump']! as int,
-      custodiansBump: map['custodiansBump']! as int,
-      requestersBump: map['requestersBump']! as int,
-      logBump: map['logBump']! as int,
-      custodians: map['custodians']! as Uint8List,
+        configBump: map['configBump']! as int,
+        vaultBump: map['vaultBump']! as int,
+        treeBump: map['treeBump']! as int,
+        nullifiersBump: map['nullifiersBump']! as int,
+        custodiansBump: map['custodiansBump']! as int,
+        requestersBump: map['requestersBump']! as int,
+        logBump: map['logBump']! as int,
+        custodians: map['custodians']! as Uint8List,
       ),
       newOffset,
     );
@@ -143,8 +136,12 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   };
 }
 
-Codec<InitializeInstructionData, InitializeInstructionData> getInitializeInstructionDataCodec() {
-  return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
+Codec<InitializeInstructionData, InitializeInstructionData>
+getInitializeInstructionDataCodec() {
+  return combineCodec(
+    getInitializeInstructionDataEncoder(),
+    getInitializeInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Initialize] instruction.
@@ -169,28 +166,28 @@ Instruction getInitializeInstruction({
   required Uint8List custodians,
 }) {
   final instructionData = InitializeInstructionData(
-      configBump: configBump,
-      vaultBump: vaultBump,
-      treeBump: treeBump,
-      nullifiersBump: nullifiersBump,
-      custodiansBump: custodiansBump,
-      requestersBump: requestersBump,
-      logBump: logBump,
-      custodians: custodians,
+    configBump: configBump,
+    vaultBump: vaultBump,
+    treeBump: treeBump,
+    nullifiersBump: nullifiersBump,
+    custodiansBump: custodiansBump,
+    requestersBump: requestersBump,
+    logBump: logBump,
+    custodians: custodians,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.writableSigner),
-    AccountMeta(address: poolConfig, role: AccountRole.writable),
-    AccountMeta(address: poolVault, role: AccountRole.writable),
-    AccountMeta(address: merkleTree, role: AccountRole.writable),
-    AccountMeta(address: nullifierSet, role: AccountRole.writable),
-    AccountMeta(address: custodianRegistry, role: AccountRole.writable),
-    AccountMeta(address: requesterRegistry, role: AccountRole.writable),
-    AccountMeta(address: disclosureLog, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
+      AccountMeta(address: poolConfig, role: AccountRole.writable),
+      AccountMeta(address: poolVault, role: AccountRole.writable),
+      AccountMeta(address: merkleTree, role: AccountRole.writable),
+      AccountMeta(address: nullifierSet, role: AccountRole.writable),
+      AccountMeta(address: custodianRegistry, role: AccountRole.writable),
+      AccountMeta(address: requesterRegistry, role: AccountRole.writable),
+      AccountMeta(address: disclosureLog, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getInitializeInstructionDataEncoder().encode(instructionData),
   );

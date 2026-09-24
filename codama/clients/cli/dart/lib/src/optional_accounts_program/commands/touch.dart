@@ -9,8 +9,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class TouchCommand extends Command<void> {
   TouchCommand() {
-    argParser
-      ..addOption('store', mandatory: true, help: "When present, the counter inside is incremented by one");
+    argParser..addOption(
+      'store',
+      mandatory: true,
+      help: "When present, the counter inside is incremented by one",
+    );
   }
 
   @override

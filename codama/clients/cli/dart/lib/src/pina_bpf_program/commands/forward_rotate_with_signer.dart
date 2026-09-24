@@ -12,7 +12,11 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
     argParser
       ..addOption('new_authority', mandatory: true, help: "newAuthority")
       ..addOption('oracle', mandatory: true, help: "The oracle account")
-      ..addOption('prop_amm_program', mandatory: true, help: "The prop_amm_program account");
+      ..addOption(
+        'prop_amm_program',
+        mandatory: true,
+        help: "The prop_amm_program account",
+      );
   }
 
   @override
@@ -27,8 +31,14 @@ final class ForwardRotateWithSignerCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final oracle = pubkey('--oracle', results['oracle']! as String);
     final authority = context.payerAddress;
-    final propAmmProgram = pubkey('--prop-amm-program', results['prop_amm_program']! as String);
-    final newAuthorityValue = pubkey('--new-authority', results['new_authority']! as String);
+    final propAmmProgram = pubkey(
+      '--prop-amm-program',
+      results['prop_amm_program']! as String,
+    );
+    final newAuthorityValue = pubkey(
+      '--new-authority',
+      results['new_authority']! as String,
+    );
     final instruction = getForwardRotateWithSignerInstruction(
       programAddress: context.programAddress,
       oracle: oracle,

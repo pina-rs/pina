@@ -11,8 +11,7 @@ import 'package:pina_codama_clients/prop_amm_program.dart';
 
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
-    argParser
-;
+    argParser;
   }
 
   @override
@@ -23,7 +22,6 @@ final class InitializeCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-
     final context = await createContext(globalResults!);
     final payer = context.payerAddress;
     final oracle = context.payerAddress;

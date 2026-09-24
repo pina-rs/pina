@@ -13,7 +13,8 @@ import 'package:solana_kit_keys/solana_kit_keys.dart';
 import 'package:solana_kit_rpc/solana_kit_rpc.dart';
 import 'package:solana_kit_rpc_api/solana_kit_rpc_api.dart';
 import 'package:solana_kit_rpc_spec/solana_kit_rpc_spec.dart';
-import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
+import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
+    hide TransactionVersion;
 import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
 
 import '../endpoint_guard.dart';
@@ -74,7 +75,9 @@ class CliContext {
       ),
     );
     final compiled = compileTransactionMessage(message);
-    final messageBytes = getCompiledTransactionMessageEncoder().encode(compiled);
+    final messageBytes = getCompiledTransactionMessageEncoder().encode(
+      compiled,
+    );
     final unsigned = Transaction(
       messageBytes: messageBytes,
       signatures: {payerAddress: null},
@@ -83,19 +86,18 @@ class CliContext {
     final wire = base64Encode(getTransactionEncoder().encode(signed));
 
     if (simulate) {
-      final simulation = await rpc
-          .request<Object?>('simulateTransaction', [
-            wire,
-            const SimulateTransactionConfig(
-              encoding: WireTransactionEncoding.base64,
-              sigVerify: false,
-              replaceRecentBlockhash: true,
-            ),
-          ])
-          .send();
-      final result = ((simulation as Map<String, Object?>)['result']
-              as Map<String, Object?>)['value']!
-          as Map<String, Object?>;
+      final simulation = await rpc.request<Object?>('simulateTransaction', [
+        wire,
+        const SimulateTransactionConfig(
+          encoding: WireTransactionEncoding.base64,
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+        ),
+      ]).send();
+      final result =
+          ((simulation as Map<String, Object?>)['result']
+                  as Map<String, Object?>)['value']!
+              as Map<String, Object?>;
       final logs = (result['logs'] as List<Object?>? ?? <Object?>[])
           .map((log) => log.toString())
           .toList();
@@ -137,8 +139,9 @@ class CliContext {
           GetAccountInfoConfig(encoding: AccountEncoding.base64),
         )
         .send();
-    final value = (response['result'] as Map<String, Object?>)['value']
-        as Map<String, Object?>?;
+    final value =
+        (response['result'] as Map<String, Object?>)['value']
+            as Map<String, Object?>?;
     if (value == null) {
       throw CliError('account ${address.toString()} was not found');
     }

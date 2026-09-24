@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class MultisigCreateInstructionData {
@@ -23,9 +21,8 @@ class MultisigCreateInstructionData {
     required this.memberPermissions,
     required this.configAuthority,
     required this.rentCollector,
-  }) :
-      discriminator = 2,
-      migrationVersion = 0;
+  }) : discriminator = 2,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -38,7 +35,8 @@ class MultisigCreateInstructionData {
   final Address rentCollector;
 }
 
-Encoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataEncoder() {
+Encoder<MultisigCreateInstructionData>
+getMultisigCreateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
@@ -46,7 +44,10 @@ Encoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataEncoder()
     ('threshold', getU16Encoder()),
     ('timelock', getU32Encoder()),
     ('ttl', getU32Encoder()),
-    ('memberPermissions', fixEncoderSize(getBytesEncoder(), 16, allowTruncation: false)),
+    (
+      'memberPermissions',
+      fixEncoderSize(getBytesEncoder(), 16, allowTruncation: false),
+    ),
     ('configAuthority', getAddressEncoder()),
     ('rentCollector', getAddressEncoder()),
   ]);
@@ -67,7 +68,8 @@ Encoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataEncoder()
   );
 }
 
-Decoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataDecoder() {
+Decoder<MultisigCreateInstructionData>
+getMultisigCreateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
@@ -81,23 +83,19 @@ Decoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataDecoder()
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'multisigCreate instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'multisigCreate instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (MultisigCreateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(2),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+  (MultisigCreateInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -105,13 +103,13 @@ Decoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataDecoder()
 
     return (
       MultisigCreateInstructionData(
-      bump: map['bump']! as int,
-      threshold: map['threshold']! as int,
-      timelock: map['timelock']! as int,
-      ttl: map['ttl']! as int,
-      memberPermissions: map['memberPermissions']! as Uint8List,
-      configAuthority: map['configAuthority']! as Address,
-      rentCollector: map['rentCollector']! as Address,
+        bump: map['bump']! as int,
+        threshold: map['threshold']! as int,
+        timelock: map['timelock']! as int,
+        ttl: map['ttl']! as int,
+        memberPermissions: map['memberPermissions']! as Uint8List,
+        configAuthority: map['configAuthority']! as Address,
+        rentCollector: map['rentCollector']! as Address,
       ),
       newOffset,
     );
@@ -137,8 +135,12 @@ Decoder<MultisigCreateInstructionData> getMultisigCreateInstructionDataDecoder()
   };
 }
 
-Codec<MultisigCreateInstructionData, MultisigCreateInstructionData> getMultisigCreateInstructionDataCodec() {
-  return combineCodec(getMultisigCreateInstructionDataEncoder(), getMultisigCreateInstructionDataDecoder());
+Codec<MultisigCreateInstructionData, MultisigCreateInstructionData>
+getMultisigCreateInstructionDataCodec() {
+  return combineCodec(
+    getMultisigCreateInstructionDataEncoder(),
+    getMultisigCreateInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [MultisigCreate] instruction.
@@ -160,31 +162,36 @@ Instruction getMultisigCreateInstruction({
   required Address rentCollector,
 }) {
   final instructionData = MultisigCreateInstructionData(
-      bump: bump,
-      threshold: threshold,
-      timelock: timelock,
-      ttl: ttl,
-      memberPermissions: memberPermissions,
-      configAuthority: configAuthority,
-      rentCollector: rentCollector,
+    bump: bump,
+    threshold: threshold,
+    timelock: timelock,
+    ttl: ttl,
+    memberPermissions: memberPermissions,
+    configAuthority: configAuthority,
+    rentCollector: rentCollector,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: programConfig, role: AccountRole.readonly),
-    AccountMeta(address: createKey, role: AccountRole.readonlySigner),
-    AccountMeta(address: multisig, role: AccountRole.writable),
-    AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
-    if (treasury != null) AccountMeta(address: treasury, role: AccountRole.writable) else AccountMeta(address: programAddress, role: AccountRole.readonly),
-    AccountMeta(address: memberAccounts, role: AccountRole.readonly),
+      AccountMeta(address: programConfig, role: AccountRole.readonly),
+      AccountMeta(address: createKey, role: AccountRole.readonlySigner),
+      AccountMeta(address: multisig, role: AccountRole.writable),
+      AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      if (treasury != null)
+        AccountMeta(address: treasury, role: AccountRole.writable)
+      else
+        AccountMeta(address: programAddress, role: AccountRole.readonly),
+      AccountMeta(address: memberAccounts, role: AccountRole.readonly),
     ],
     data: getMultisigCreateInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [MultisigCreate] instruction from raw instruction data.
-MultisigCreateInstructionData parseMultisigCreateInstruction(Instruction instruction) {
+MultisigCreateInstructionData parseMultisigCreateInstruction(
+  Instruction instruction,
+) {
   return getMultisigCreateInstructionDataDecoder().decode(instruction.data!);
 }

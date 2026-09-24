@@ -9,8 +9,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 
 final class InspectCommand extends Command<void> {
   InspectCommand() {
-    argParser
-      ..addOption('store', mandatory: true, help: "When present, must be the caller's store PDA");
+    argParser..addOption(
+      'store',
+      mandatory: true,
+      help: "When present, must be the caller's store PDA",
+    );
   }
 
   @override

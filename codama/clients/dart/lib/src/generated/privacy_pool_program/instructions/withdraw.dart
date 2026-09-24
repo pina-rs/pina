@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class WithdrawInstructionData {
   const WithdrawInstructionData({
@@ -21,9 +19,8 @@ class WithdrawInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) :
-      discriminator = 5,
-      migrationVersion = 0;
+  }) : discriminator = 5,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -38,7 +35,10 @@ Encoder<WithdrawInstructionData> getWithdrawInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
-    ('nullifier', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'nullifier',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('root', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('proofA', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
     ('proofB', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
@@ -71,23 +71,16 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'withdraw instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'withdraw instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (WithdrawInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(5),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(5)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -95,11 +88,11 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
 
     return (
       WithdrawInstructionData(
-      nullifier: map['nullifier']! as Uint8List,
-      root: map['root']! as Uint8List,
-      proofA: map['proofA']! as Uint8List,
-      proofB: map['proofB']! as Uint8List,
-      proofC: map['proofC']! as Uint8List,
+        nullifier: map['nullifier']! as Uint8List,
+        root: map['root']! as Uint8List,
+        proofA: map['proofA']! as Uint8List,
+        proofB: map['proofB']! as Uint8List,
+        proofC: map['proofC']! as Uint8List,
       ),
       newOffset,
     );
@@ -125,8 +118,12 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
   };
 }
 
-Codec<WithdrawInstructionData, WithdrawInstructionData> getWithdrawInstructionDataCodec() {
-  return combineCodec(getWithdrawInstructionDataEncoder(), getWithdrawInstructionDataDecoder());
+Codec<WithdrawInstructionData, WithdrawInstructionData>
+getWithdrawInstructionDataCodec() {
+  return combineCodec(
+    getWithdrawInstructionDataEncoder(),
+    getWithdrawInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Withdraw] instruction.
@@ -146,23 +143,23 @@ Instruction getWithdrawInstruction({
   required Uint8List proofC,
 }) {
   final instructionData = WithdrawInstructionData(
-      nullifier: nullifier,
-      root: root,
-      proofA: proofA,
-      proofB: proofB,
-      proofC: proofC,
+    nullifier: nullifier,
+    root: root,
+    proofA: proofA,
+    proofB: proofB,
+    proofC: proofC,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: poolVault, role: AccountRole.writable),
-    AccountMeta(address: merkleTree, role: AccountRole.readonly),
-    AccountMeta(address: nullifierSet, role: AccountRole.writable),
-    AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
-    AccountMeta(address: recipient, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: poolVault, role: AccountRole.writable),
+      AccountMeta(address: merkleTree, role: AccountRole.readonly),
+      AccountMeta(address: nullifierSet, role: AccountRole.writable),
+      AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
+      AccountMeta(address: recipient, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getWithdrawInstructionDataEncoder().encode(instructionData),
   );

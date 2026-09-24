@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,13 +11,10 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class ClaimInstructionData {
-  const ClaimInstructionData({
-    required this.amount,
-  }) :
-      discriminator = 1,
+  const ClaimInstructionData({required this.amount})
+    : discriminator = 1,
       migrationVersion = 0;
 
   final int discriminator;
@@ -51,34 +47,22 @@ Decoder<ClaimInstructionData> getClaimInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'claim instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'claim instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (ClaimInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 1);
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (
-      ClaimInstructionData(
-      amount: map['amount']! as BigInt,
-      ),
-      newOffset,
-    );
+    return (ClaimInstructionData(amount: map['amount']! as BigInt), newOffset);
   }
 
   return switch (structDecoder) {
@@ -101,8 +85,12 @@ Decoder<ClaimInstructionData> getClaimInstructionDataDecoder() {
   };
 }
 
-Codec<ClaimInstructionData, ClaimInstructionData> getClaimInstructionDataCodec() {
-  return combineCodec(getClaimInstructionDataEncoder(), getClaimInstructionDataDecoder());
+Codec<ClaimInstructionData, ClaimInstructionData>
+getClaimInstructionDataCodec() {
+  return combineCodec(
+    getClaimInstructionDataEncoder(),
+    getClaimInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Claim] instruction.
@@ -119,22 +107,20 @@ Instruction getClaimInstruction({
   required Address clock,
   required BigInt amount,
 }) {
-  final instructionData = ClaimInstructionData(
-      amount: amount,
-  );
+  final instructionData = ClaimInstructionData(amount: amount);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: beneficiary, role: AccountRole.writableSigner),
-    AccountMeta(address: mint, role: AccountRole.readonly),
-    AccountMeta(address: vestingState, role: AccountRole.writable),
-    AccountMeta(address: beneficiaryAta, role: AccountRole.writable),
-    AccountMeta(address: vault, role: AccountRole.writable),
-    AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
-    AccountMeta(address: tokenProgram, role: AccountRole.readonly),
-    AccountMeta(address: clock, role: AccountRole.readonly),
+      AccountMeta(address: beneficiary, role: AccountRole.writableSigner),
+      AccountMeta(address: mint, role: AccountRole.readonly),
+      AccountMeta(address: vestingState, role: AccountRole.writable),
+      AccountMeta(address: beneficiaryAta, role: AccountRole.writable),
+      AccountMeta(address: vault, role: AccountRole.writable),
+      AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: tokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getClaimInstructionDataEncoder().encode(instructionData),
   );
