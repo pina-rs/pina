@@ -242,7 +242,10 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		           a fact about the earlier state and is accepted as is. A static `invoke()` \
 		           called on a builder bound to the legacy `pinocchio_token` program is exempt \
 		           because that program cannot charge a fee; any other exception needs a narrowly \
-		           scoped `#[allow]` with the reason the snapshot is still correct.",
+		           scoped `#[allow]` with the reason the snapshot is still correct. When the \
+		           account comes from a `&mut self` accessor, bind it once and use that binding \
+		           for the reads and the transfer: a read through a `let` binding and a transfer \
+		           into a separate inline call are not matched.",
 	},
 	LintExplanation {
 		name: "require_program_check_before_cpi",

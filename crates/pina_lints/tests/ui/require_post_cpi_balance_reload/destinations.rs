@@ -1085,6 +1085,49 @@ fn process_custom_cursor_accounts_stay_distinct(
 	source_after.checked_sub(before).ok_or(())
 }
 
+fn process_rebound_mut_accessor_delta(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let user_ata = ctx.user_ata_mut();
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let user_ata = ctx.user_ata_mut();
+	let after = user_ata.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_bound_mut_accessor_stale(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let user_ata = ctx.user_ata_mut();
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	Ok(before + 10)
+}
+
+fn process_bound_then_inline_mut_accessor_is_not_tracked(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	// Documented limit: a read through a `let`-bound `&mut self` result and a
+	// transfer into the inline call are different identities, so this
+	// snapshot is not checked against the transfer.
+	let user_ata = ctx.user_ata_mut();
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, ctx.user_ata_mut(), owner, 10, 0)
+		.invoke_with_program(owner)?;
+	Ok(before + 10)
+}
+
 fn main() {}
 
 // compile-fail

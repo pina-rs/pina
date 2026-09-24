@@ -482,4 +482,17 @@ LL |     source_after.checked_sub(before).ok_or(())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
-error: aborting due to 36 previous errors
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:1110:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:1112:5
+   |
+LL |     Ok(before + 10)
+   |        ^^^^^^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: aborting due to 37 previous errors

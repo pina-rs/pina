@@ -406,6 +406,37 @@ fn process_custom_cursor_custody_reads_of_other_account(
 	Ok(())
 }
 
+fn process_custody_through_rebound_mut_accessor(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	// Rebinding the same accessor under the same name names one account.
+	let vault = ctx.vault_mut();
+	let before = vault.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	let vault = ctx.vault_mut();
+	let after = vault.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_custody_through_bound_then_inline_mut_accessor(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	// The bound read and the inline calls have different identities, so the
+	// typed check is uncertain and defers to the name-based verdict, which
+	// accepts this deposit (`ctx` is not custody-named there).
+	let vault = ctx.vault_mut();
+	let before = vault.amount();
+	SplTransfer::new(source, mint, ctx.vault_mut(), owner, 10, 0).invoke_with_program(owner)?;
+	let after = ctx.vault_mut().amount();
+	after.checked_sub(before).ok_or(())
+}
+
 fn main() {}
 
 // compile-fail

@@ -191,6 +191,10 @@ struct AccountKey {
 	/// The expression is a parsed token view of the account rather than the
 	/// account handle itself.
 	view: bool,
+	/// The key passes through a `let` bound to a non-cursor `&mut self`
+	/// method result, which may be an accessor (the same account on every
+	/// call) or a hand-written cursor (a new account on every call).
+	through_mut_binding: bool,
 }
 
 /// A read of a token balance outside any closure: `.amount()` or
@@ -200,6 +204,7 @@ struct AmountRead {
 	span: Span,
 	/// `None` when the receiver names no account precisely.
 	account: Option<String>,
+	through_mut_binding: bool,
 }
 
 /// A binding or assignment that gives integer locals a new value.
@@ -222,6 +227,8 @@ struct LocalUse {
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
 	let_initializers: HashMap<HirId, &'tcx Expr<'tcx>>,
+	/// `let` bindings initialized from a non-cursor `&mut self` method call.
+	mut_bindings: HashMap<HirId, &'tcx Expr<'tcx>>,
 	constructors: HashMap<Span, TokenCpiConstructor>,
 	invocations: HashMap<Span, Invocation>,
 	amount_reads: Vec<AmountRead>,
@@ -503,16 +510,35 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						id: name.clone(),
 						text: name,
 						view: false,
+						through_mut_binding: false,
 					});
 				};
 				if let Some(initializer) = self.let_initializers.get(&binding) {
 					return self.account_key(initializer);
+				}
+				if let Some(initializer) = self.mut_bindings.get(&binding) {
+					// The call's own key plus the binding's name: rebinding the same
+					// accessor under the same name (`let vault = ctx.vault_mut();`
+					// twice) names one account, as the name-based check treats it,
+					// while `let fee = c.take()?; let vault = c.take()?;` stay
+					// distinct.
+					let call = self.account_key(initializer);
+					return Some(AccountKey {
+						id: match &call {
+							Some(call) => format!("{}~{name}", call.id),
+							None => format!("{name}#{}", binding.local_id.as_u32()),
+						},
+						text: name,
+						view: call.is_some_and(|call| call.view),
+						through_mut_binding: true,
+					});
 				}
 
 				Some(AccountKey {
 					id: format!("{name}#{}", binding.local_id.as_u32()),
 					text: name,
 					view: false,
+					through_mut_binding: false,
 				})
 			}
 			ExprKind::Field(base, field) => {
@@ -527,6 +553,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					id: format!("{}.{field}", base.id),
 					text: format!("{}.{field}", base.text),
 					view: false,
+					through_mut_binding: base.through_mut_binding,
 				})
 			}
 			ExprKind::Index(base, index, _) => {
@@ -540,6 +567,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					id: format!("{}[{index}]", base.id),
 					text: format!("{}[{index}]", base.text),
 					view: false,
+					through_mut_binding: base.through_mut_binding,
 				})
 			}
 			ExprKind::Unary(rustc_hir::UnOp::Deref, inner)
@@ -582,6 +610,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						),
 						text: format!("{}.{method}()", receiver_key.text),
 						view: false,
+						through_mut_binding: receiver_key.through_mut_binding,
 					});
 				}
 				if self.passes_receiver_through(expr, method) {
@@ -604,6 +633,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					id: format!("{}.{definition:?}({arguments})", receiver_key.id),
 					text: format!("{}.{method}({arguments})", receiver_key.text),
 					view: false,
+					through_mut_binding: receiver_key.through_mut_binding,
 				})
 			}
 			ExprKind::Block(block, _) => block.expr.and_then(|tail| self.account_key(tail)),
@@ -1341,11 +1371,12 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		if self.closure_depth > 0 {
 			return;
 		}
-		let account = self.account_key(account).map(|key| key.id);
+		let key = self.account_key(account);
 		self.amount_reads.push(AmountRead {
 			hir_id: expr.hir_id,
 			span: expr.span,
-			account,
+			through_mut_binding: key.as_ref().is_some_and(|key| key.through_mut_binding),
+			account: key.map(|key| key.id),
 		});
 	}
 }
@@ -1355,9 +1386,12 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 		if let Some(initializer) = local.init {
 			if let PatKind::Binding(_, binding, _, None) = local.pat.kind
 				&& local.els.is_none()
-				&& !self.mutates_receiver(initializer)
 			{
-				self.let_initializers.insert(binding, initializer);
+				if !self.mutates_receiver(initializer) {
+					self.let_initializers.insert(binding, initializer);
+				} else if !self.is_advancing_method(self.peel_value(initializer)) {
+					self.mut_bindings.insert(binding, initializer);
+				}
 			}
 			self.record_definitions(local.pat, initializer, local.span);
 		}
@@ -1553,6 +1587,7 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 		let mut analyzer = Analyzer {
 			cx,
 			let_initializers: HashMap::new(),
+			mut_bindings: HashMap::new(),
 			constructors: HashMap::new(),
 			invocations: HashMap::new(),
 			amount_reads: Vec::new(),
@@ -1616,6 +1651,7 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 			let destination = constructor.destination.as_ref();
 			let is_custody = constructor.kind.is_transfer()
 				&& (is_custody_account(&constructor.display)
+					|| written.is_some_and(is_custody_account)
 					|| destination.is_some_and(|key| is_custody_account(&key.text)));
 			if is_custody {
 				let typed_unaccounted = destination.is_none_or(|key| {
@@ -1625,19 +1661,26 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 						&cpi_spans,
 					)
 				});
-				// Where the typed identity names no account (the destination or a
-				// matching read), fall back to the name-based check `main` runs.
-				let identity_unknown = destination.is_none()
+				// Where the typed identity is uncertain, defer to the verdict of the
+				// name-based check on `main`, so code it accepts is not newly
+				// rejected: the destination or a matching read names no account,
+				// or an identity passes through a `let` bound to a non-cursor
+				// `&mut self` result (an accessor or a hand-written cursor).
+				let identity_uncertain = destination.is_none_or(|key| key.through_mut_binding)
+					|| analyzer
+						.amount_reads
+						.iter()
+						.any(|read| read.through_mut_binding)
 					|| facts.calls.iter().any(|read| {
 						read.method == "amount"
 							&& read.receiver.as_deref() == written
 							&& unknown_read_spans.contains(&read.span)
 					});
-				let textually_accounted = identity_unknown
-					&& written.is_some_and(|written| {
-						textual_custody_is_accounted(&facts.calls, invocation_index, written)
-					});
-				if typed_unaccounted && !textually_accounted {
+				let main_accepts = written.is_none_or(|written| {
+					!is_custody_account(written)
+						|| textual_custody_is_accounted(&facts.calls, invocation_index, written)
+				});
+				if typed_unaccounted && !(identity_uncertain && main_accepts) {
 					lint_custody_transfer(cx, invocation_call.span, &constructor.display);
 					continue;
 				}
