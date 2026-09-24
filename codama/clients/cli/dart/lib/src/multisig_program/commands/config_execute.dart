@@ -15,11 +15,8 @@ final class ConfigExecuteCommand extends Command<void> {
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption(
-        'spending_limit_accounts',
-        mandatory: true,
-        help: "Spending limit accounts referenced by add/remove spending-limit",
-      );
+      ..addOption('rent_collector', mandatory: true, help: "Refund destination for closed spending-limit accounts. When the")
+      ..addOption('spending_limit_accounts', mandatory: true, help: "Spending limit accounts referenced by add/remove spending-limit");
   }
 
   @override
@@ -37,10 +34,8 @@ final class ConfigExecuteCommand extends Command<void> {
     final member = context.payerAddress;
     final rentPayer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
-    final spendingLimitAccounts = pubkey(
-      '--spending-limit-accounts',
-      results['spending_limit_accounts']! as String,
-    );
+    final rentCollector = pubkey('--rent-collector', results['rent_collector']! as String);
+    final spendingLimitAccounts = pubkey('--spending-limit-accounts', results['spending_limit_accounts']! as String);
 
     final instruction = getConfigExecuteInstruction(
       programAddress: context.programAddress,
@@ -50,6 +45,7 @@ final class ConfigExecuteCommand extends Command<void> {
       rentPayer: rentPayer,
       systemProgram: Address('11111111111111111111111111111111'),
       clock: clock,
+      rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,
     );
     await context.send([instruction]);

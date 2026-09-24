@@ -1169,6 +1169,10 @@ fn config_execute_adds_a_member_and_invalidates_prior_proposals() {
 			AccountMeta::new(members[0], true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			clock_meta(),
+			// No rent collector configured: any writable account fills the
+			// refund slot, but it must differ from the rent payer because
+			// duplicate mutable accounts are refused at parse time.
+			AccountMeta::new(members[1], true),
 		],
 	);
 	let result = world.run(&mollusk, &instruction, &[Check::success()]);
@@ -1322,6 +1326,8 @@ fn proposal_close_refunds_the_rent_collector() {
 		),
 	);
 	world.add(collector, system_account(0));
+	let (clock_key, clock_account) = mollusk.sysvars.keyed_account_for_clock_sysvar();
+	world.add(clock_key, clock_account);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -1330,6 +1336,7 @@ fn proposal_close_refunds_the_rent_collector() {
 			AccountMeta::new_readonly(multisig_key, false),
 			AccountMeta::new(proposal_key, false),
 			AccountMeta::new(collector, false),
+			clock_meta(),
 		],
 	);
 	let result = world.run(&mollusk, &instruction, &[Check::success()]);
@@ -1352,6 +1359,10 @@ fn config_authority_execute_rejects_add_spending_limit() {
 	let create_key = key(21);
 	let authority = key(80);
 	let rent_payer = key(81);
+	// Fills the refund slot: no rent collector is configured, so any writable
+	// account works, but it must differ from the rent payer because duplicate
+	// mutable accounts are refused at parse time.
+	let refund_filler = key(83);
 	let members = sorted_member_keys();
 	let (multisig_key, multisig_bump) = multisig_pda(&create_key);
 
@@ -1392,6 +1403,7 @@ fn config_authority_execute_rejects_add_spending_limit() {
 			AccountMeta::new(rent_payer, true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			clock_meta(),
+			AccountMeta::new(refund_filler, true),
 		],
 	);
 
@@ -1399,6 +1411,7 @@ fn config_authority_execute_rejects_add_spending_limit() {
 	world.add(multisig_key, stored_account(multisig, RENT_LAMPORTS));
 	world.add(authority, system_account(RENT_LAMPORTS));
 	world.add(rent_payer, system_account(RENT_LAMPORTS));
+	world.add(refund_filler, system_account(RENT_LAMPORTS));
 	let (clock_key, clock_account) = mollusk.sysvars.keyed_account_for_clock_sysvar();
 	world.add(clock_key, clock_account);
 	let (system_key, system_account) = keyed_account_for_system_program();
@@ -1432,6 +1445,7 @@ fn config_authority_execute_rejects_add_spending_limit() {
 			AccountMeta::new(rent_payer, true),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			clock_meta(),
+			AccountMeta::new(refund_filler, true),
 		],
 	);
 	let result = world.run(&mollusk, &allowed_instruction, &[Check::success()]);

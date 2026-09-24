@@ -16,11 +16,8 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
       ..addOption('actions', mandatory: true, help: "actions")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption(
-        'spending_limit_accounts',
-        mandatory: true,
-        help: "Spending limit accounts referenced by add/remove spending-limit",
-      );
+      ..addOption('rent_collector', mandatory: true, help: "Refund destination for closed spending-limit accounts and member-tail")
+      ..addOption('spending_limit_accounts', mandatory: true, help: "Spending limit accounts referenced by add/remove spending-limit");
   }
 
   @override
@@ -37,18 +34,10 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
     final authority = context.payerAddress;
     final rentPayer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
-    final spendingLimitAccounts = pubkey(
-      '--spending-limit-accounts',
-      results['spending_limit_accounts']! as String,
-    );
-    final actionsLenValue = integer(
-      '--actions-len',
-      results['actions_len']! as String,
-    );
-    final actionsValue = base58Bytes(
-      '--actions',
-      results['actions']! as String,
-    );
+    final rentCollector = pubkey('--rent-collector', results['rent_collector']! as String);
+    final spendingLimitAccounts = pubkey('--spending-limit-accounts', results['spending_limit_accounts']! as String);
+    final actionsLenValue = integer('--actions-len', results['actions_len']! as String);
+    final actionsValue = base58Bytes('--actions', results['actions']! as String);
     final instruction = getConfigAuthorityExecuteInstruction(
       programAddress: context.programAddress,
       multisig: multisig,
@@ -56,6 +45,7 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
       rentPayer: rentPayer,
       systemProgram: Address('11111111111111111111111111111111'),
       clock: clock,
+      rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,
       actionsLen: actionsLenValue,
       actions: actionsValue,

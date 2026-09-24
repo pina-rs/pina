@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
+
 
 @immutable
 class Proposal {
@@ -30,8 +32,9 @@ class Proposal {
     required this.ephemeralBumps,
     required this.message,
     required this.actions,
-  }) : discriminator = 3,
-       migrationVersion = 0;
+  }) :
+      discriminator = 3,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -75,30 +78,12 @@ class Proposal {
           actions == other.actions;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    multisig,
-    creator,
-    index,
-    kind,
-    vaultIndex,
-    vaultBump,
-    status,
-    statusAt,
-    expiresAt,
-    approvedMask,
-    rejectedMask,
-    ephemeralBumps,
-    message,
-    actions,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, multisig, creator, index, kind, vaultIndex, vaultBump, status, statusAt, expiresAt, approvedMask, rejectedMask, ephemeralBumps, message, actions);
 
   @override
-  String toString() =>
-      'Proposal(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, creator: $creator, index: $index, kind: $kind, vaultIndex: $vaultIndex, vaultBump: $vaultBump, status: $status, statusAt: $statusAt, expiresAt: $expiresAt, approvedMask: $approvedMask, rejectedMask: $rejectedMask, ephemeralBumps: $ephemeralBumps, message: $message, actions: $actions)';
+  String toString() => 'Proposal(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, creator: $creator, index: $index, kind: $kind, vaultIndex: $vaultIndex, vaultBump: $vaultBump, status: $status, statusAt: $statusAt, expiresAt: $expiresAt, approvedMask: $approvedMask, rejectedMask: $rejectedMask, ephemeralBumps: $ephemeralBumps, message: $message, actions: $actions)';
 }
+
 
 Encoder<Proposal> getProposalEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -116,63 +101,9 @@ Encoder<Proposal> getProposalEncoder() {
     ('expiresAt', getI64Encoder()),
     ('approvedMask', getU32Encoder()),
     ('rejectedMask', getU32Encoder()),
-    (
-      'ephemeralBumps',
-      offsetEncoder(
-        getPinaPodBoundedArrayEncoder(
-          getArrayEncoder(
-            transformEncoder(getU8Encoder(), (int value) => value),
-            size: PrefixedArraySize(
-              offsetEncoder(
-                offsetEncoder(
-                  getU8Encoder(),
-                  OffsetConfig(preOffset: (scope) => 103),
-                ),
-                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-              ),
-            ),
-          ),
-          4,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 5),
-      ),
-    ),
-    (
-      'message',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU8Encoder(), (int value) => value),
-          size: PrefixedArraySize(
-            offsetEncoder(
-              offsetEncoder(
-                getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 104),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        640,
-      ),
-    ),
-    (
-      'actions',
-      getPinaPodBoundedArrayEncoder(
-        getArrayEncoder(
-          transformEncoder(getU8Encoder(), (int value) => value),
-          size: PrefixedArraySize(
-            offsetEncoder(
-              offsetEncoder(
-                getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 106),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        128,
-      ),
-    ),
+    ('ephemeralBumps', offsetEncoder(getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 103)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 4), OffsetConfig(preOffset: (scope) => scope.preOffset + 5))),
+    ('message', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 104)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 640)),
+    ('actions', getPinaPodBoundedArrayEncoder(getArrayEncoder(transformEncoder(getU8Encoder(), (int value) => value), size: PrefixedArraySize(offsetEncoder(offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (scope) => 106)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), 128)),
   ]);
 
   return transformEncoder(
@@ -215,105 +146,26 @@ Decoder<Proposal> getProposalDecoder() {
     ('expiresAt', getI64Decoder()),
     ('approvedMask', getU32Decoder()),
     ('rejectedMask', getU32Decoder()),
-    (
-      'ephemeralBumps',
-      offsetDecoder(
-        getPinaPodBoundedArrayDecoder(
-          getArrayDecoder(
-            getU8Decoder(),
-            size: PrefixedArraySize(
-              offsetDecoder(
-                offsetDecoder(
-                  getU8Decoder(),
-                  OffsetConfig(preOffset: (scope) => 103),
-                ),
-                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-              ),
-            ),
-          ),
-          getPinaPodBoundedCountDecoder(
-            offsetDecoder(
-              offsetDecoder(
-                getU8Decoder(),
-                OffsetConfig(preOffset: (scope) => 103),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-            4,
-          ),
-          4,
-        ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 5),
-      ),
-    ),
-    (
-      'message',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU8Decoder(),
-          size: PrefixedArraySize(
-            offsetDecoder(
-              offsetDecoder(
-                getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 104),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        getPinaPodBoundedCountDecoder(
-          offsetDecoder(
-            offsetDecoder(
-              getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 104),
-            ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-          ),
-          640,
-        ),
-        640,
-      ),
-    ),
-    (
-      'actions',
-      getPinaPodBoundedArrayDecoder(
-        getArrayDecoder(
-          getU8Decoder(),
-          size: PrefixedArraySize(
-            offsetDecoder(
-              offsetDecoder(
-                getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 106),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-            ),
-          ),
-        ),
-        getPinaPodBoundedCountDecoder(
-          offsetDecoder(
-            offsetDecoder(
-              getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 106),
-            ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
-          ),
-          128,
-        ),
-        128,
-      ),
-    ),
+    ('ephemeralBumps', offsetDecoder(getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 103)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 103)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 4), 4), OffsetConfig(preOffset: (scope) => scope.preOffset + 5))),
+    ('message', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 104)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 104)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 640), 640)),
+    ('actions', getPinaPodBoundedArrayDecoder(getArrayDecoder(getU8Decoder(), size: PrefixedArraySize(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 106)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)))), getPinaPodBoundedCountDecoder(offsetDecoder(offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (scope) => 106)), OffsetConfig(postOffset: (scope) => scope.preOffset + 0)), 128), 128)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'proposal account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'proposal account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (Proposal, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(3),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -326,37 +178,38 @@ Decoder<Proposal> getProposalDecoder() {
 
     return (
       Proposal(
-        bump: map['bump']! as int,
-        multisig: map['multisig']! as Address,
-        creator: map['creator']! as Address,
-        index: map['index']! as BigInt,
-        kind: map['kind']! as int,
-        vaultIndex: map['vaultIndex']! as int,
-        vaultBump: map['vaultBump']! as int,
-        status: map['status']! as int,
-        statusAt: map['statusAt']! as BigInt,
-        expiresAt: map['expiresAt']! as BigInt,
-        approvedMask: map['approvedMask']! as int,
-        rejectedMask: map['rejectedMask']! as int,
-        ephemeralBumps: map['ephemeralBumps']! as List<int>,
-        message: map['message']! as List<int>,
-        actions: map['actions']! as List<int>,
+      bump: map['bump']! as int,
+      multisig: map['multisig']! as Address,
+      creator: map['creator']! as Address,
+      index: map['index']! as BigInt,
+      kind: map['kind']! as int,
+      vaultIndex: map['vaultIndex']! as int,
+      vaultBump: map['vaultBump']! as int,
+      status: map['status']! as int,
+      statusAt: map['statusAt']! as BigInt,
+      expiresAt: map['expiresAt']! as BigInt,
+      approvedMask: map['approvedMask']! as int,
+      rejectedMask: map['rejectedMask']! as int,
+      ephemeralBumps: map['ephemeralBumps']! as List<int>,
+      message: map['message']! as List<int>,
+      actions: map['actions']! as List<int>,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<Proposal>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<Proposal>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<Proposal>(
         read: readTopLevel,
@@ -381,11 +234,11 @@ const int proposalMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool proposalNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 3) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 3) {
+		return false;
+	}
+	return data[1] < 0;
 }

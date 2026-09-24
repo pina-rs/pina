@@ -1,0 +1,18 @@
+[package]
+name = "sec02-compact-no-validation"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Audit regression for SEC-02 of the 2026-09-22 deep audit: the
+# `compact,account-resize,derive` feature combination without `validation`
+# must still enforce the migration envelope on resizable-account updates.
+#
+# Deliberately NOT a workspace member: this crate exists to compile `pina`
+# with the exact feature combination the bypass lives in, which no workspace
+# member builds.
+[workspace]
+
+[dependencies]
+pina = { path = "../../../crates/pina", default-features = false, features = ["derive", "compact", "account-resize"] }
+pinocchio = { version = "^0.11", default-features = false }

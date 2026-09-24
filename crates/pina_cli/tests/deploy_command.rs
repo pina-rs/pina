@@ -642,3 +642,52 @@ fn conflicting_pending_publication_stops_before_remote_execution() {
 	);
 	assert!(!marker.exists());
 }
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// These tests assert the *secure* behavior from the audit report. They fail
+// on the current tree because the finding is still live, and must pass once
+// the corresponding fix lands. Run with:
+//   cargo test -p pina_cli --test deploy_command -- --ignored audit_sec_
+// ---------------------------------------------------------------------------
+
+/// SEC-12: a `--remote-command` deployment child that exits zero is treated
+/// as proof of an on-chain deployment, and a finalized publication receipt is
+/// recorded without any RPC readback of the program account. A fake child
+/// that performs no RPC work at all must not produce a receipt.
+///
+/// Current behavior: the exit-zero fake produces a finalized receipt, so the
+/// `pending` assertion below fails and the test proves the subprocess status
+/// is standing in for deployment evidence.
+#[cfg(unix)]
+#[test]
+#[ignore = "SEC-12: exploit is live; must pass once deployment receipts require on-chain proof"]
+fn audit_sec_12_an_exit_zero_remote_command_is_not_deployment_evidence() {
+	let fixture = ProjectFixture::new();
+	fixture.enable_migrations();
+	let output = remote_command(&fixture, "audit-noop-bin", "#!/bin/sh\nset -eu\nexit 0\n")
+		.output()
+		.unwrap_or_else(|error| panic!("run no-op remote deployment: {error}"));
+
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("pending") || !output.status.success(),
+		"a no-op deployment child must not report a completed deployment: {stderr}"
+	);
+
+	let ledger = pina_abi::decode_publication_ledger(
+		&fs::read(fixture.root.join("migrations/publications.json"))
+			.unwrap_or_else(|error| panic!("read publication ledger: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("decode publication ledger: {error}"));
+
+	// Without an RPC readback proving finalized ProgramData with the expected
+	// executable bytes and authority, the publication must stay pending (or
+	// the command must have refused to record anything at all).
+	assert!(
+		ledger.pending.is_some() || ledger.receipts.is_empty(),
+		"SEC-12: an exit-zero no-op child produced a finalized deployment receipt without any \
+		 on-chain proof"
+	);
+}

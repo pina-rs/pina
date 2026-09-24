@@ -389,6 +389,7 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		2 => Some("AlreadyCancelled"),
 		3 => Some("CliffNotReached"),
 		4 => Some("InsufficientVaultBalance"),
+		5 => Some("InvalidBeneficiaryAta"),
 		_ => None,
 	}
 }

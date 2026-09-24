@@ -30,6 +30,12 @@ final class InitializeCommand extends Command<void> {
       )
       ..addOption('vault', mandatory: true, help: "The vault account")
       ..addOption(
+        'admin_ata',
+        mandatory: true,
+        help:
+            "The admin's source ATA: a schedule becomes active only by moving its",
+      )
+      ..addOption(
         'token_program',
         mandatory: true,
         help: "The token_program account",
@@ -63,6 +69,7 @@ final class InitializeCommand extends Command<void> {
             programAddress: context.programAddress,
           )).$1;
     final vault = pubkey('--vault', results['vault']! as String);
+    final adminAta = pubkey('--admin-ata', results['admin_ata']! as String);
     final tokenProgram = pubkey(
       '--token-program',
       results['token_program']! as String,
@@ -88,6 +95,7 @@ final class InitializeCommand extends Command<void> {
       mint: mint,
       vestingState: vestingState,
       vault: vault,
+      adminAta: adminAta,
       associatedTokenProgram: Address(
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
       ),

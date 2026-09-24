@@ -29,6 +29,10 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	)
 	.requiredOption("--vault <vault>", "The `vault` account")
 	.requiredOption(
+		"--admin-ata <adminAta>",
+		"The admin's source ATA: a schedule becomes active only by moving its",
+	)
+	.requiredOption(
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
 	)
@@ -47,6 +51,7 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 				? undefined
 				: pubkey("--vesting-state", options.vestingState),
 			vault: pubkey("--vault", options.vault),
+			adminAta: pubkey("--admin-ata", options.adminAta),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
 		};
 		const instruction = await getInitializeInstructionAsync(

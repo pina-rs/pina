@@ -69,6 +69,9 @@ pub enum VestingError {
 	CliffNotReached = 3,
 	/// The vault holds fewer tokens than the claim must release.
 	InsufficientVaultBalance = 4,
+	/// The Cancel settlement destination is not a token account for this
+	/// mint owned by the beneficiary.
+	InvalidBeneficiaryAta = 5,
 }
 
 #[discriminator]
@@ -122,6 +125,11 @@ pub struct InitializeAccounts<'a> {
 	pub mint: &'a AccountView,
 	pub vesting_state: &'a mut AccountView,
 	pub vault: &'a AccountView,
+	/// The admin's source ATA: a schedule becomes active only by moving its
+	/// whole allocation into the vault in this same instruction, so a
+	/// valid-looking schedule can never promise value it does not hold. It is
+	/// mutable because the transfer debits it.
+	pub admin_ata: &'a mut AccountView,
 	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -150,6 +158,13 @@ pub struct CancelAccounts<'a> {
 	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
+	/// Clock for the vested-entitlement settlement: cancellation must not
+	/// confiscate what the linear curve has already released.
+	pub clock: &'a AccountView,
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here
+	/// before any remainder returns to the administrator. It is mutable
+	/// because the settlement transfer credits it.
+	pub beneficiary_ata: &'a mut AccountView,
 }
 
 /// Seed prefix for vesting PDAs.
@@ -230,6 +245,32 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// rejects a mismatch with `InvalidSeeds` before it creates anything.
 		self.vault.assert_empty()?.assert_writable()?;
 
+		// SEC-30: the exit paths reject every mint extension, so the entry
+		// path must too — a configuration accepted here with no exit would
+		// lock the funded allocation forever. The check reads the mint's TLV
+		// extension header once; there is no per-transfer cost.
+		let mint_decimals = {
+			let mint = self
+				.mint
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
+			mint.decimals()
+		};
+
+		// SEC-29: the admin's source ATA funds the allocation. The transfer
+		// below makes the schedule active only once its full promised value is
+		// in the vault, in this same instruction; a shortfall fails the whole
+		// transaction and rolls the created state back.
+		self.admin_ata
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				&admin_address,
+				&mint_address,
+				self.token_program.address(),
+			)?;
+
 		// The seeds bind `admin`, `beneficiary`, and `mint`, and `Initialize`
 		// requires the admin to sign, so only that admin can duplicate its own
 		// schedule. `Claim` and `Cancel` re-derive these seeds from the stored
@@ -266,6 +307,40 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			token_program: self.token_program,
 		}
 		.invoke()?;
+
+		// Move the whole allocation into the vault before the instruction can
+		// succeed: `total_amount` is a promise, and this is where it becomes
+		// collateralized. SPL rejects zero-amount transfers, and a zero-total
+		// schedule is rejected by `validate_schedule` above.
+		let vault_before = self
+			.vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
+		token::instructions::TransferChecked::new(
+			self.admin_ata,
+			self.mint,
+			self.vault,
+			self.admin,
+			args.total_amount.get(),
+			mint_decimals,
+		)
+		.invoke_with_program(self.token_program.address())?;
+
+		// The schedule records the observed vault delta, not the requested
+		// amount: with a transfer-fee mint the delivered balance could be
+		// lower than the promise, and the schedule must never claim more
+		// than it holds. The vault was asserted empty above, so the delta is
+		// exactly what landed.
+		let vault_after = self
+			.vault
+			.as_token_account_for_program(self.token_program.address())?
+			.amount();
+		let received = vault_after
+			.checked_sub(vault_before)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
+		vesting_state.total_amount.set(received);
+		drop(vesting_state);
 
 		Ok(())
 	}
@@ -439,7 +514,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		// with `InvalidSeeds` before its idempotent branch.
 		self.admin_ata.assert_writable()?;
 
-		let (admin, beneficiary, mint, cancelled, bump) = {
+		let (admin, beneficiary, mint, cancelled, bump, schedule) = {
 			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
 
 			self.admin.assert_address(&vesting_state.admin)?;
@@ -451,6 +526,13 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				vesting_state.mint,
 				vesting_state.cancelled.get(),
 				vesting_state.bump,
+				(
+					vesting_state.total_amount.get(),
+					vesting_state.start_ts.get(),
+					vesting_state.cliff_ts.get(),
+					vesting_state.end_ts.get(),
+					vesting_state.claimed_amount.get(),
+				),
 			)
 		};
 
@@ -511,16 +593,75 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		let signer = vesting_seeds.to_signer();
 		let signers = [signer.as_signer()];
 
-		// Return everything the beneficiary has not claimed, then close the
-		// vault so the rent follows the refund. A zero balance skips the
+		// A revocable cancellation settles the beneficiary's earned
+		// entitlement first: everything the linear curve has released minus
+		// what was already claimed belongs to the beneficiary, and only a
+		// genuinely unvested (or donated) remainder may return to the
+		// administrator. Both transfers are signed by the schedule and sourced
+		// from its validated vault above.
+		let (total_amount, start_ts, cliff_ts, end_ts, claimed_amount) = schedule;
+		let now = sysvars::clock::Clock::from_account_view(self.clock)?.unix_timestamp;
+		// The cliff gates every release path, Cancel included: before it
+		// nothing has vested, so the beneficiary is owed nothing and the
+		// whole vault balance is the administrator's remainder.
+		let before_cliff = u64::try_from(now).map_or(true, |now| now < cliff_ts);
+		let vested = if before_cliff {
+			0
+		} else {
+			vested_amount(total_amount, start_ts, end_ts, now)?
+		};
+		// `claimed_amount` never exceeds what vested at the claim's own
+		// timestamp, so this subtraction cannot underflow; a violation is
+		// corrupt state and fails loudly rather than silently settling zero.
+		let owed = vested
+			.checked_sub(claimed_amount)
+			.ok_or(ProgramError::ArithmeticOverflow)?
+			.min(remaining);
+		if owed > 0 {
+			// The settlement must land in an account the beneficiary controls
+			// for this mint: reading the token account's stored owner and mint
+			// binds the destination without a canonical ATA derivation. A
+			// token account for the right mint owned by anyone else — or an
+			// account for a different mint — is refused, so the admin cannot
+			// redirect the entitlement.
+			let (is_beneficiary_owned, is_right_mint) = {
+				let destination = self
+					.beneficiary_ata
+					.as_token_account_for_program(self.token_program.address())?;
+				(
+					destination.owner() == &beneficiary,
+					destination.mint() == &mint,
+				)
+			};
+			if !is_beneficiary_owned || !is_right_mint {
+				return Err(VestingError::InvalidBeneficiaryAta.into());
+			}
+			self.beneficiary_ata.assert_writable()?;
+
+			token::instructions::TransferChecked::new(
+				self.vault,
+				self.mint,
+				self.beneficiary_ata,
+				self.vesting_state,
+				owed,
+				mint_decimals,
+			)
+			.invoke_signed_with_program(&signers, self.token_program.address())?;
+		}
+
+		// Only the remainder returns to the administrator, then the vault
+		// closes so the rent follows the refund. A zero balance skips the
 		// transfer because SPL rejects a zero-amount move.
-		if remaining > 0 {
+		let remainder = remaining
+			.checked_sub(owed)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		if remainder > 0 {
 			token::instructions::TransferChecked::new(
 				self.vault,
 				self.mint,
 				self.admin_ata,
 				self.vesting_state,
-				remaining,
+				remainder,
 				mint_decimals,
 			)
 			.invoke_signed_with_program(&signers, self.token_program.address())?;

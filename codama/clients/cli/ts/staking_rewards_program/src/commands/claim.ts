@@ -17,7 +17,10 @@ import {
 export const claimCommand = registerGlobals(new Command("claim"))
 	.description("claim")
 	.requiredOption("--reward-mint <rewardMint>", "The `reward_mint` account")
-	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
+	.requiredOption(
+		"--pool-state <poolState>",
+		"The pool's state is written: the payout leaves the pool's outstanding",
+	)
 	.requiredOption(
 		"--position-state <positionState>",
 		"The `position_state` account",

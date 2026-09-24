@@ -248,8 +248,12 @@ codama-nodes = { default-features = false, version = "0.13.1" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
-# Exact pin shared with `pinapod`. Fixed-point bit layouts are the schema
-# contract, so mixed `fixed` versions can never be allowed to coexist.
+# Exact pin matching `pinapod`'s own `fixed = "=1.30.0"`. Fixed-point bit
+# layouts are the schema contract, so mixed `fixed` versions can never be
+# allowed to coexist. `pina` re-exports this crate as `pina::fixed`, so
+# downstream schemas never add `fixed` as a direct dependency; pinapod does
+# not yet re-export it (pina-rs/pinapod#41), which is the only reason this
+# entry exists at all.
 fixed = { default-features = false, version = "=1.30.0" }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
@@ -270,7 +274,11 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.20.0" }
-pinapod = { version = "0.4.3", default-features = false, features = ["solana-address", "solana-program-error"] }
+# Exact pin: pinapod defines the account wire format and its derive, so a
+# lockfile refresh must never move it within the 0.4 line. `pina` re-exports
+# the crate as `pina::pinapod`, so downstream consumers never depend on it
+# directly.
+pinapod = { version = "=0.4.3", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }

@@ -19,6 +19,12 @@ pub struct PoolState {
 	pub reward_mint: solana_pubkey::Pubkey,
 	pub total_staked: u64,
 	pub reward_index: u64,
+	/// Rewards owed but not yet paid: everything every position has accrued
+	/// or banked minus what claims have released. The reserve gate on
+	/// `SetRewardIndex` holds the vault against this number, so the vault
+	/// needs to cover only what is actually outstanding, not everything ever
+	/// promised, and withdrawals that bank rewards keep them counted.
+	pub outstanding_rewards: u64,
 	pub paused: bool,
 	pub bump: u8,
 }

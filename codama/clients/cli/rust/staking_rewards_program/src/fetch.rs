@@ -144,6 +144,7 @@ fn pool_state_json(account: &staking_rewards_program_client::accounts::PoolState
 		"reward_mint": account.reward_mint.to_string(),
 		"total_staked": account.total_staked.get(),
 		"reward_index": account.reward_index.get(),
+		"outstanding_rewards": account.outstanding_rewards.get(),
 		"paused": account.paused.get(),
 		"bump": account.bump,
 	})

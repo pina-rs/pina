@@ -216,6 +216,24 @@ fn non_interactive_record_refuses_before_spawning_verifier() {
 	assert!(String::from_utf8_lossy(&output.stderr).contains("requires confirmation"));
 }
 
+/// A structurally valid legacy transaction wire payload for export fixtures:
+/// one 64-byte signature, a message header declaring one required signer, two
+/// accounts, a blockhash, and one empty instruction.
+fn valid_tx_wire(seed: u8) -> Vec<u8> {
+	let mut bytes = Vec::new();
+	bytes.push(1); // signature count (compact-u16, high bit clear)
+	bytes.extend_from_slice(&[seed; 64]); // signature
+	bytes.extend_from_slice(&[1, 0, 1]); // header: 1 required, 0 ro-signed, 1 ro-unsigned
+	bytes.push(2); // two accounts
+	bytes.extend_from_slice(&[seed; 64]); // two 32-byte account keys
+	bytes.extend_from_slice(&[seed; 32]); // recent blockhash
+	bytes.push(1); // one instruction
+	bytes.push(1); // program id index
+	bytes.push(0); // no accounts
+	bytes.push(0); // no data
+	bytes
+}
+
 #[test]
 fn record_export_submit_and_status_use_the_real_process_adapter() {
 	let temp = TempDir::new().unwrap();
@@ -243,7 +261,7 @@ fn record_export_submit_and_status_use_the_real_process_adapter() {
 	assert!(String::from_utf8_lossy(&recorded.stdout).contains("uploaded successfully"));
 
 	let exported_path = temp.path().join("export\n\u{1b}[31m.tx");
-	let payload = base64::engine::general_purpose::STANDARD.encode([9_u8; 128]);
+	let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(9));
 	let exported = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(common)
 		.args([
@@ -318,4 +336,65 @@ fn missing_and_signaled_verifier_processes_are_errors() {
 		.unwrap();
 	assert_eq!(signaled.status.code(), Some(1));
 	assert!(String::from_utf8_lossy(&signaled.stderr).contains("signal"));
+}
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// These tests assert the *secure* behavior from the audit report. They fail
+// on the current tree because the finding is still live, and must pass once
+// the corresponding fix lands. Run with:
+//   cargo test -p pina_cli --test verification_command -- --ignored audit_sec_
+// ---------------------------------------------------------------------------
+
+/// SEC-18: the exported verification transaction is accepted by encoding and
+/// length alone. Any base64/base58 line of at least 64 bytes is persisted
+/// verbatim, without deserializing a Solana transaction or checking the
+/// program, instruction, accounts, or absence of extra instructions. A
+/// payload of repeated arbitrary bytes is not a transaction and must be
+/// refused.
+///
+/// Fixed behavior: 128 repeated `0x09` bytes decode cleanly from base64 but
+/// are not a structurally valid Solana transaction, so the export is refused
+/// before anything is written.
+#[test]
+fn audit_sec_18_an_arbitrary_byte_payload_is_not_a_verification_transaction() {
+	let temp = TempDir::new().unwrap();
+	let verifier = fake_verifier(&temp);
+	let (record, keypair, hash) = create_record_and_keypair(&temp);
+	let exported_path = temp.path().join("audit-export.tx");
+	let payload = base64::engine::general_purpose::STANDARD.encode([9_u8; 128]);
+
+	let exported = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["verify", "--solana-verify", verifier.to_str().unwrap()])
+		.args([
+			"record",
+			"--program-id",
+			PROGRAM_ID,
+			"--cluster",
+			"mainnet-beta",
+			"--build-record",
+			record.to_str().unwrap(),
+			"--export",
+			"SysvarRent111111111111111111111111111111111",
+			"--output",
+			exported_path.to_str().unwrap(),
+			"--export-encoding",
+			"base64",
+		])
+		.env("PINA_FAKE_DEPLOYED_HASH", &hash)
+		.env("PINA_FAKE_EXPORT_PAYLOAD", &payload)
+		.output()
+		.unwrap();
+
+	assert_ne!(
+		exported.status.code(),
+		Some(0),
+		"SEC-18: repeated arbitrary bytes were accepted as a verification transaction"
+	);
+	let stderr = String::from_utf8_lossy(&exported.stderr);
+	assert!(
+		stderr.to_lowercase().contains("transaction") || stderr.to_lowercase().contains("decode"),
+		"the rejection must name the unparseable transaction, got: {stderr}"
+	);
 }

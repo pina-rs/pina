@@ -26,12 +26,16 @@ pub struct ProposalCloseArgs {
 	/// The `rent_collector` account
 	#[arg(long)]
 	rent_collector: String,
+	/// Clock for the expiry test: an expired active proposal can neither progress nor reach a terminal status on its own, so expiry itself is a permissionless close condition. Stale proposals close the same way
+	#[arg(long)]
+	clock: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: ProposalCloseArgs) -> Result<(), CliError> {
 	let multisig = CliContext::pubkey("--multisig", &args.multisig)?;
 	let proposal = CliContext::pubkey("--proposal", &args.proposal)?;
 	let rent_collector = CliContext::pubkey("--rent_collector", &args.rent_collector)?;
+	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ProposalCloseInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
 			message: "instruction data rejected the provided arguments".to_string(),
@@ -42,6 +46,7 @@ pub(crate) fn run(context: &CliContext, args: ProposalCloseArgs) -> Result<(), C
 		multisig,
 		proposal,
 		rent_collector,
+		clock,
 	};
 
 	context.send(accounts.instruction(data))

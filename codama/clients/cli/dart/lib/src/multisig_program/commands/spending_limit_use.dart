@@ -13,38 +13,14 @@ final class SpendingLimitUseCommand extends Command<void> {
       ..addOption('amount', mandatory: true, help: "amount")
       ..addOption('decimals', mandatory: true, help: "decimals")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
-      ..addOption(
-        'spending_limit',
-        mandatory: true,
-        help: "The spending_limit account",
-      )
-      ..addOption(
-        'vault',
-        mandatory: true,
-        help: "The vault PDA: SOL source or SPL transfer authority",
-      )
-      ..addOption(
-        'destination',
-        mandatory: true,
-        help: "SOL destination, or the destination token account for SPL",
-      )
+      ..addOption('spending_limit', mandatory: true, help: "The spending_limit account")
+      ..addOption('vault', mandatory: true, help: "The vault PDA: SOL source or SPL transfer authority")
+      ..addOption('destination', mandatory: true, help: "SOL destination, or the destination token account for SPL")
       ..addOption('clock', mandatory: true, help: "The clock account")
-      ..addOption(
-        'vault_token_account',
-        mandatory: true,
-        help: "SPL source token account; absent for SOL",
-      )
+      ..addOption('vault_token_account', mandatory: true, help: "SPL source token account; absent for SOL")
       ..addOption('mint', mandatory: true, help: "SPL mint; absent for SOL")
-      ..addOption(
-        'token_program',
-        mandatory: true,
-        help: "SPL token program; absent for SOL",
-      )
-      ..addOption(
-        'system_program',
-        mandatory: true,
-        help: "System program; absent for SPL",
-      );
+      ..addOption('token_program', mandatory: true, help: "SPL token program; absent for SOL")
+      ..addOption('system_program', mandatory: true, help: "System program; absent for SPL");
   }
 
   @override
@@ -58,30 +34,15 @@ final class SpendingLimitUseCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final multisig = pubkey('--multisig', results['multisig']! as String);
-    final spendingLimit = pubkey(
-      '--spending-limit',
-      results['spending_limit']! as String,
-    );
+    final spendingLimit = pubkey('--spending-limit', results['spending_limit']! as String);
     final member = context.payerAddress;
     final vault = pubkey('--vault', results['vault']! as String);
-    final destination = pubkey(
-      '--destination',
-      results['destination']! as String,
-    );
+    final destination = pubkey('--destination', results['destination']! as String);
     final clock = pubkey('--clock', results['clock']! as String);
-    final vaultTokenAccount = pubkey(
-      '--vault-token-account',
-      results['vault_token_account']! as String,
-    );
+    final vaultTokenAccount = pubkey('--vault-token-account', results['vault_token_account']! as String);
     final mint = pubkey('--mint', results['mint']! as String);
-    final tokenProgram = pubkey(
-      '--token-program',
-      results['token_program']! as String,
-    );
-    final systemProgram = pubkey(
-      '--system-program',
-      results['system_program']! as String,
-    );
+    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+    final systemProgram = pubkey('--system-program', results['system_program']! as String);
     final amountValue = bigInteger('--amount', results['amount']! as String);
     final decimalsValue = integer('--decimals', results['decimals']! as String);
     final instruction = getSpendingLimitUseInstruction(
