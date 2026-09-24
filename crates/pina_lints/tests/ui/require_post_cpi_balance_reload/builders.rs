@@ -17,6 +17,33 @@ struct Token2022State {
 }
 struct SplTransfer;
 struct LamportTransfer;
+struct AuthorityTransfer;
+
+/// An account wrapper that is not named `AccountView` and derefs to one.
+struct Tok<'a>(&'a Account);
+
+impl core::ops::Deref for Tok<'_> {
+	type Target = Account;
+
+	fn deref(&self) -> &Account {
+		self.0
+	}
+}
+
+struct WrappedContext<'a> {
+	fee_ata: Tok<'a>,
+	vault: Tok<'a>,
+}
+
+impl AuthorityTransfer {
+	fn new(_: &Account, _: &Account, _: &Account) -> Self {
+		Self
+	}
+
+	fn invoke(&self) -> Result<(), ()> {
+		Ok(())
+	}
+}
 
 mod fallible {
 	pub(crate) struct TransferChecked;
@@ -179,6 +206,40 @@ fn process_system_program_transfer_into_vault(
 
 fn process_lamport_transfer_into_vault(payer: &Account, vault: &Account) -> Result<(), ()> {
 	LamportTransfer::new(payer, vault, 10).invoke()
+}
+
+fn process_authority_transfer_is_not_a_token_builder(
+	config: &Account,
+	new_pool_authority: &Account,
+	signer: &Account,
+) -> Result<(), ()> {
+	AuthorityTransfer::new(config, new_pool_authority, signer).invoke()
+}
+
+fn process_custody_reads_of_other_wrapped_account(
+	ctx: &WrappedContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = ctx.fee_ata.amount();
+	SplTransfer::new(source, mint, &ctx.vault, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `ctx.vault` is not accounted from its observed balance delta
+	let after = ctx.fee_ata.amount();
+	Ok(before + after)
+}
+
+fn process_custody_reads_only_in_closures(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let _before = || vault.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	let _after = || vault.amount();
+	Ok(())
 }
 
 fn main() {}
