@@ -26,7 +26,7 @@
 	"approvedTotals": {
 		"escrow_program": 7914,
 		"staking_rewards_program": 8399,
-		"vesting_program": 6177
+		"vesting_program": 6788
 	},
 	"runtimeApprovedTotals": {
 		"account_realloc_program/initialize": 3453,
@@ -80,9 +80,9 @@
 		"role_registry_program/deactivateRole": 463,
 		"role_registry_program/rotateAdmin": 353,
 		"role_registry_program/updateRole": 495,
-		"staking_rewards_program/claim": 18885,
-		"staking_rewards_program/deposit": 24927,
-		"staking_rewards_program/initializePool": 38040,
+		"staking_rewards_program/claim": 18956,
+		"staking_rewards_program/deposit": 25224,
+		"staking_rewards_program/initializePool": 38188,
 		"staking_rewards_program/openPosition": 6606,
 		"staking_rewards_program/withdraw": 5668,
 		"system_accounts_program/initialize": 134,
@@ -92,7 +92,9 @@
 		"token_loader_cu_program/legacy_ata_wrong_address": 7638,
 		"token_loader_cu_program/token_2022_ata_success": 3224,
 		"vesting_program/cancel": 29281,
-		"vesting_program/claim": 22206
+		"vesting_program/claim": 22206,
+		"staking_rewards_program/setRewardIndex": 2432,
+		"vesting_program/initialize": 27946
 	},
 	"runtimeExpectedOutcomes": {
 		"token_loader_cu_program/explicit_owner_assert_then_load": true,

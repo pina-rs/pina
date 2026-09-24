@@ -503,7 +503,7 @@ describe("staking rewards JS client contracts", () => {
 		expectAccountsMatch(claim.accounts, [
 			{ address: admin, role: WRITABLE },
 			{ address: rewardMint, role: READONLY },
-			{ address: poolState, role: READONLY },
+			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
 			{ address: rewardVault, role: WRITABLE },

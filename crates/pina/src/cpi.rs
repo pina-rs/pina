@@ -3435,6 +3435,57 @@ mod tests {
 			(account.lamports(), rent_account.lamports()),
 			original_lamports
 		);
+
+		// Exercise the delegation surface the builder path does not reach, so
+		// the wrapper stays honest about forwarding every trait method to the
+		// generated account it stands in for.
+		let patch = MisPredictingPatch(TestCompactStatePatch::new().value(3));
+		let mut stored = TestAccount::<64>::new(
+			Address::new_from_array([3; 32]),
+			owner,
+			1,
+			TestCompactState::MIN_SIZE,
+		);
+		{
+			let mut view = stored.view();
+			let mut data = view
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow state: {error:?}"));
+			TestCompactState::initialize(&mut data, &TestCompactStatePatch::new())
+				.unwrap_or_else(|error| panic!("initialize wrapper fixture: {error:?}"));
+		}
+		let data: [u8; 64] = stored.data;
+		let storage = &data[..TestCompactState::MIN_SIZE];
+		assert!(<MisPredictingState as HasDiscriminator>::matches_discriminator(storage));
+		assert_eq!(
+			<MisPredictingState as PinaPodCompact>::validate(storage),
+			TestCompactState::validate(storage)
+		);
+		let reference = MisPredictingState::try_from_bytes(storage)
+			.unwrap_or_else(|error| panic!("decode through the wrapper: {error:?}"));
+		assert_eq!(reference.value, 0);
+
+		let mut scratch = [0_u8; 64];
+		scratch[..storage.len()].copy_from_slice(storage);
+		let scratch = &mut scratch[..storage.len()];
+		let predicted = PinaPodPatch::<MisPredictingState>::updated_len(&patch, storage)
+			.unwrap_or_else(|error| panic!("patch preflight: {error:?}"));
+		let committed = PinaPodPatch::<MisPredictingState>::update(&patch, scratch)
+			.unwrap_or_else(|error| panic!("patch commit: {error:?}"));
+		assert_eq!(predicted, committed);
+
+		let fresh_buffer = &mut [0_u8; 64];
+		let fresh = &mut fresh_buffer[..TestCompactState::MIN_SIZE];
+		let initialized = PinaPodPatch::<MisPredictingState>::initialize(&patch, fresh)
+			.unwrap_or_else(|error| panic!("patch initialize: {error:?}"));
+		assert_eq!(initialized, TestCompactState::MIN_SIZE);
+
+		let wrapper_buffer = &mut [0_u8; 64];
+		wrapper_buffer[..storage.len()].copy_from_slice(storage);
+		let wrapper_scratch = &mut wrapper_buffer[..storage.len()];
+		let wrapper_initialized = MisPredictingState::initialize(wrapper_scratch, &patch)
+			.unwrap_or_else(|error| panic!("account initialize: {error:?}"));
+		assert_eq!(wrapper_initialized, TestCompactState::MIN_SIZE);
 	}
 
 	#[test]

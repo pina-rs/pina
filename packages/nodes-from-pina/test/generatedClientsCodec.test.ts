@@ -391,6 +391,7 @@ describe("staking codec roundtrips", () => {
 			rewardMint: ADDR_C as any,
 			totalStaked: 10_000n,
 			rewardIndex: 500n,
+			outstandingRewards: 250n,
 			paused: false,
 			bump: 5,
 		};
@@ -401,6 +402,7 @@ describe("staking codec roundtrips", () => {
 		expect(decoded.rewardMint).toBe(ADDR_C);
 		expect(decoded.totalStaked).toBe(10_000n);
 		expect(decoded.rewardIndex).toBe(500n);
+		expect(decoded.outstandingRewards).toBe(250n);
 		expect(decoded.paused).toBe(false);
 		expect(decoded.bump).toBe(5);
 	});
@@ -433,6 +435,7 @@ describe("staking codec roundtrips", () => {
 			rewardMint: ADDR_C as any,
 			totalStaked: 0n,
 			rewardIndex: 0n,
+			outstandingRewards: 0n,
 			paused: true,
 			bump: 1,
 		});

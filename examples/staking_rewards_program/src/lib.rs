@@ -829,8 +829,10 @@ impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
 		// Each position accrues with an independent floor, so the aggregate
 		// increment rounds up to stay an upper bound on what the positions
 		// accrue between them.
-		let increment =
-			(u128::from(total_staked) * u128::from(delta)).div_ceil(u128::from(REWARD_INDEX_SCALE));
+		let increment = u128::from(total_staked)
+			.checked_mul(u128::from(delta))
+			.ok_or(ProgramError::ArithmeticOverflow)?
+			.div_ceil(u128::from(REWARD_INDEX_SCALE));
 		let outstanding = u128::from(pool_state.outstanding_rewards.get())
 			.checked_add(increment)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
