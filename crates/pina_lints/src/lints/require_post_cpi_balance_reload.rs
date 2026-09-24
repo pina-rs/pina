@@ -34,13 +34,13 @@ crate::declare_late_lint! {
 	///
 	/// Requires the destination of every value-moving token CPI (`Transfer`,
 	/// `TransferChecked`, `MintTo`, and `MintToChecked` builders) to be
-	/// re-read after the CPI when an integer snapshot of its balance taken
-	/// before the CPI is used afterwards: each later use of the snapshot must
-	/// be a direct operand of arithmetic or a comparison whose other operand
-	/// is that reload (as in `after.checked_sub(before)`), or a comparison with
-	/// a constant. Destinations named like protocol custody (`vault`,
-	/// `custody`, `reserve`, or `pool`) must additionally be read both before
-	/// and after every transfer, with no other CPI in between.
+	/// re-read after the CPI before a balance snapshot taken before it is
+	/// trusted. After the CPI, a snapshot-derived value may only be compared
+	/// with a reload-derived value or a constant, subtracted with a reload to
+	/// form a delta (`after.checked_sub(before)`), or added to such a delta.
+	/// Destinations named like protocol custody (`vault`, `custody`,
+	/// `reserve`, or `pool`) must additionally be read both before and after
+	/// every transfer, with no other CPI in between.
 	///
 	/// ### Why is this bad?
 	///
@@ -209,8 +209,6 @@ struct Definition<'tcx> {
 	span: Span,
 	/// The expression providing the value.
 	value: &'tcx Expr<'tcx>,
-	/// The local copied verbatim, for `let snapshot = before;`.
-	copy_of: Option<HirId>,
 }
 
 /// A read of a local variable.
@@ -277,17 +275,34 @@ fn is_cpi_method(method: &str) -> bool {
 	)
 }
 
-fn is_arithmetic(operator: BinOpKind) -> bool {
+/// What a value is judged against: the CPI's destination, the CPI, and the
+/// use a reload must dominate.
+#[derive(Clone, Copy)]
+struct ValueContext<'a> {
+	destination: &'a str,
+	invocation: Span,
+	target: Span,
+}
+
+fn is_comparison(operation: &str) -> bool {
 	matches!(
-		operator,
-		BinOpKind::Add | BinOpKind::Sub | BinOpKind::Mul | BinOpKind::Div | BinOpKind::Rem
+		operation,
+		"eq" | "ne" | "lt" | "le" | "gt" | "ge" | "cmp" | "partial_cmp"
 	)
 }
 
-fn is_integer_arithmetic_method(method: &str) -> bool {
-	["checked_", "saturating_", "wrapping_", "overflowing_"]
-		.iter()
-		.any(|prefix| method.starts_with(prefix))
+fn is_subtraction_like(operation: &str) -> bool {
+	matches!(
+		operation,
+		"sub" | "checked_sub" | "saturating_sub" | "wrapping_sub" | "overflowing_sub" | "abs_diff"
+	)
+}
+
+fn is_addition_like(operation: &str) -> bool {
+	matches!(
+		operation,
+		"add" | "checked_add" | "saturating_add" | "wrapping_add" | "overflowing_add"
+	)
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
@@ -365,25 +380,58 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
-	/// Whether a method call can return a different value on each call:
-	/// it takes `&mut self` (`Iterator::next`, `nth`, ...).
-	fn is_stateful_method(&self, call: &Expr<'_>) -> bool {
+	/// Whether a method call advances a cursor, so each call returns the next
+	/// account: `Iterator::{next, nth}`, `DoubleEndedIterator::{next_back,
+	/// nth_back}`, and Pina's `AccountsCursor::next*`. Other `&mut self`
+	/// methods, such as accessors, return the same account on every call.
+	fn is_advancing_method(&self, call: &Expr<'_>) -> bool {
 		let Some(method) = self.cx.typeck_results().type_dependent_def_id(call.hir_id) else {
-			return true;
+			return false;
 		};
-		let signature = self
-			.cx
-			.tcx
-			.fn_sig(method)
-			.instantiate_identity()
-			.skip_binder();
+		let name = self.cx.tcx.item_name(method);
+		let name = name.as_str();
 
-		signature.inputs().first().is_some_and(|receiver| {
-			matches!(
-				receiver.kind(),
-				TyKind::Ref(_, _, rustc_middle::ty::Mutability::Mut)
-			)
-		})
+		if let Some(trait_id) = self.cx.tcx.trait_of_assoc(method) {
+			let trait_name = self.cx.tcx.item_name(trait_id);
+			return self.crate_name(trait_id) == "core"
+				&& matches!(trait_name.as_str(), "Iterator" | "DoubleEndedIterator")
+				&& matches!(name, "next" | "nth" | "next_back" | "nth_back");
+		}
+
+		self.crate_name(method) == "pina"
+			&& name.starts_with("next")
+			&& self
+				.cx
+				.tcx
+				.impl_of_assoc(method)
+				.and_then(|implementation| {
+					self.cx
+						.tcx
+						.type_of(implementation)
+						.instantiate_identity()
+						// Only the ADT's identity is read, which normalization cannot
+						// change.
+						.skip_normalization()
+						.ty_adt_def()
+				})
+				.is_some_and(|cursor| {
+					self.cx.tcx.item_name(cursor.did()).as_str() == "AccountsCursor"
+				})
+	}
+
+	/// Whether a method returns its receiver's value unchanged: `Option` and
+	/// `Result` adaptors that pass the success value through, and Pina's
+	/// `assert_*` checks, which return the account they checked.
+	fn passes_receiver_through(&self, call: &Expr<'_>, method: &str) -> bool {
+		let Some(definition) = self.cx.typeck_results().type_dependent_def_id(call.hir_id) else {
+			return false;
+		};
+
+		match self.crate_name(definition).as_str() {
+			"core" => UNWRAPPING_METHODS.contains(&method),
+			"pina" => method.starts_with("assert_"),
+			_ => false,
+		}
 	}
 
 	/// Whether `callee` resolves to a token crate's state loader such as
@@ -497,7 +545,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						..receiver_key
 					});
 				}
-				if self.is_stateful_method(expr) {
+				if self.is_advancing_method(expr) {
 					return Some(AccountKey {
 						id: format!(
 							"{}.{method}@{}",
@@ -508,23 +556,24 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						view: false,
 					});
 				}
+				if self.passes_receiver_through(expr, method) {
+					return Some(receiver_key);
+				}
 				if !arguments.iter().all(|argument| self.is_constant(argument)) {
 					return None;
 				}
 
-				let typeck = self.cx.typeck_results();
-				let receiver_adt = self.core_adt(typeck.expr_ty(receiver));
-				if receiver_adt.is_some() && receiver_adt == self.core_adt(typeck.expr_ty(expr)) {
-					return Some(receiver_key);
-				}
-
+				let definition = self
+					.cx
+					.typeck_results()
+					.type_dependent_def_id(expr.hir_id)?;
 				let arguments = arguments
 					.iter()
 					.map(|argument| self.snippet(argument.span))
 					.collect::<Option<Vec<_>>>()?
 					.join(", ");
 				Some(AccountKey {
-					id: format!("{}.{method}({arguments})", receiver_key.id),
+					id: format!("{}.{definition:?}({arguments})", receiver_key.id),
 					text: format!("{}.{method}({arguments})", receiver_key.text),
 					view: false,
 				})
@@ -635,7 +684,6 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			bindings,
 			span,
 			value,
-			copy_of: local_path(value),
 		});
 	}
 
@@ -645,26 +693,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			.filter(move |read| read.account.as_deref() == Some(destination))
 	}
 
-	/// Definitions whose value contains a balance read of `destination`, or
-	/// that copy such a definition verbatim.
-	fn snapshot_definitions(&self, destination: &str) -> Vec<&Definition<'tcx>> {
-		let mut found: Vec<&Definition<'tcx>> = Vec::new();
-
-		for definition in &self.definitions {
-			let direct = self
-				.reads_of(destination)
-				.any(|read| encloses(definition.value.span, read.span));
-			let copied = definition.copy_of.is_some_and(|source| {
-				found
-					.iter()
-					.any(|earlier| earlier.bindings.contains(&source))
-			});
-			if direct || copied {
-				found.push(definition);
-			}
-		}
-
-		found
+	/// Definitions made before the CPI whose value is snapshot-derived.
+	fn snapshot_definitions(&self, value: &ValueContext<'_>) -> Vec<&Definition<'tcx>> {
+		self.definitions
+			.iter()
+			.filter(|definition| precedes(definition.span, value.invocation))
+			.filter(|definition| self.is_snapshot_derived(definition.value, value, 0))
+			.collect()
 	}
 
 	/// The lexically latest definition of `binding` before `point`.
@@ -758,144 +793,386 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		false
 	}
 
-	/// The direct operator or method around a use, looking through `as`
-	/// casts, and the hir id of the operand that was climbed from.
-	fn operator_around(&self, usage: HirId) -> Option<(&'tcx Expr<'tcx>, HirId)> {
-		let mut operand = usage;
-
+	/// Peels expressions that pass a value through unchanged: casts, `?`,
+	/// and `Option`/`Result` unwrapping adaptors.
+	fn peel_value(&self, mut expr: &'tcx Expr<'tcx>) -> &'tcx Expr<'tcx> {
 		loop {
-			let Node::Expr(parent) = self.cx.tcx.parent_hir_node(operand) else {
-				return None;
+			expr = match &expr.kind {
+				ExprKind::DropTemps(inner)
+				| ExprKind::Cast(inner, _)
+				| ExprKind::Type(inner, _)
+				| ExprKind::Match(inner, _, MatchSource::TryDesugar(_)) => inner,
+				ExprKind::Call(..) => {
+					match shared::try_branch_argument(self.cx, expr) {
+						Some(inner) => inner,
+						None => return expr,
+					}
+				}
+				ExprKind::MethodCall(segment, receiver, ..)
+					if UNWRAPPING_METHODS.contains(&segment.ident.name.as_str()) =>
+				{
+					receiver
+				}
+				_ => return expr,
 			};
-			if matches!(parent.kind, ExprKind::Cast(..) | ExprKind::DropTemps(_)) {
-				operand = parent.hir_id;
-				continue;
-			}
-			return Some((parent, operand));
 		}
 	}
 
-	/// Comparing a pre-CPI snapshot against a constant (`if prior == 0`,
-	/// `before as u128 >= CAP`) records a fact about the account before the
-	/// CPI, which stays true.
-	fn is_constant_comparison(&self, usage: &LocalUse) -> bool {
-		let Some((parent, operand)) = self.operator_around(usage.hir_id) else {
-			return false;
-		};
-		let ExprKind::Binary(operator, left, right) = parent.kind else {
-			return false;
-		};
-		let other = if left.hir_id == operand { right } else { left };
-
-		operator.node.is_comparison() && self.is_constant(other)
+	/// Splits integer arithmetic into its operation name and operands:
+	/// `a - b` is `("sub", [a, b])`, `a.checked_sub(b)` and
+	/// `u64::checked_sub(a, b)` are `("checked_sub", [a, b])`.
+	fn arithmetic_parts(&self, expr: &'tcx Expr<'tcx>) -> Option<(String, Vec<&'tcx Expr<'tcx>>)> {
+		match &expr.kind {
+			ExprKind::Binary(operator, left, right) => {
+				let name = match operator.node {
+					BinOpKind::Add => "add",
+					BinOpKind::Sub => "sub",
+					BinOpKind::Mul => "mul",
+					BinOpKind::Div => "div",
+					BinOpKind::Rem => "rem",
+					BinOpKind::Eq => "eq",
+					BinOpKind::Ne => "ne",
+					BinOpKind::Lt => "lt",
+					BinOpKind::Le => "le",
+					BinOpKind::Gt => "gt",
+					BinOpKind::Ge => "ge",
+					BinOpKind::BitAnd => "bitand",
+					BinOpKind::BitOr => "bitor",
+					BinOpKind::BitXor => "bitxor",
+					BinOpKind::Shl => "shl",
+					BinOpKind::Shr => "shr",
+					BinOpKind::And | BinOpKind::Or => return None,
+				};
+				Some((name.to_owned(), vec![*left, *right]))
+			}
+			ExprKind::MethodCall(segment, receiver, arguments, _) => {
+				let integer_receiver = self
+					.cx
+					.typeck_results()
+					.expr_ty(receiver)
+					.peel_refs()
+					.is_integral();
+				integer_receiver.then(|| {
+					let mut operands = vec![*receiver];
+					operands.extend(arguments.iter());
+					(segment.ident.name.as_str().to_owned(), operands)
+				})
+			}
+			ExprKind::Call(callee, arguments) => {
+				let ExprKind::Path(path) = &callee.kind else {
+					return None;
+				};
+				let Res::Def(DefKind::AssocFn, function) = self.cx.qpath_res(path, callee.hir_id)
+				else {
+					return None;
+				};
+				let integer_first = arguments.first().is_some_and(|first| {
+					self.cx
+						.typeck_results()
+						.expr_ty(first)
+						.peel_refs()
+						.is_integral()
+				});
+				integer_first.then(|| {
+					(
+						self.cx.tcx.item_name(function).as_str().to_owned(),
+						arguments.iter().collect(),
+					)
+				})
+			}
+			_ => None,
+		}
 	}
 
-	/// Whether `expr` evaluates to a post-CPI balance of `destination`, or to
-	/// arithmetic over one: a direct reload, a local defined from one after
-	/// the CPI, or `after - before`/`after.checked_sub(before)`. Every reload
-	/// involved must follow the CPI and dominate `target`.
-	fn is_reload_value(
+	/// The reaching definition of a local used in `expr`, when `expr` is a
+	/// local path.
+	fn local_definition(&self, expr: &'tcx Expr<'tcx>) -> Option<&Definition<'tcx>> {
+		let binding = local_path(expr)?;
+		self.reaching_definition(binding, expr.span)
+	}
+
+	/// A post-CPI balance of the destination: a read after the CPI that
+	/// dominates `value.target`, a local defined as one, or a cast of one.
+	/// Arithmetic over a reload is not itself a reload.
+	fn is_reload(&self, expr: &'tcx Expr<'tcx>, value: &ValueContext<'_>, depth: usize) -> bool {
+		if depth > 16 {
+			return false;
+		}
+		let expr = self.peel_value(expr);
+		if self.amount_reads.iter().any(|read| {
+			read.hir_id == expr.hir_id
+				&& read.account.as_deref() == Some(value.destination)
+				&& precedes(value.invocation, read.span)
+				&& self.dominates(read.hir_id, value.target)
+		}) {
+			return true;
+		}
+
+		self.local_definition(expr).is_some_and(|definition| {
+			precedes(value.invocation, definition.span)
+				&& self.is_reload(definition.value, value, depth + 1)
+		})
+	}
+
+	/// A delta: a subtraction-like operation (`-`, `checked_sub`,
+	/// `saturating_sub`, `wrapping_sub`, `overflowing_sub`, `abs_diff`, in
+	/// method or `u64::checked_sub(a, b)` form) between a snapshot-derived
+	/// operand and a reload, or a local defined as one after the CPI.
+	fn is_delta(&self, expr: &'tcx Expr<'tcx>, value: &ValueContext<'_>, depth: usize) -> bool {
+		if depth > 16 {
+			return false;
+		}
+		let expr = self.peel_value(expr);
+		if let Some(definition) = self.local_definition(expr) {
+			return precedes(value.invocation, definition.span)
+				&& self.is_delta(definition.value, value, depth + 1);
+		}
+		let Some((operation, operands)) = self.arithmetic_parts(expr) else {
+			return false;
+		};
+		let [left, right] = operands[..] else {
+			return false;
+		};
+
+		is_subtraction_like(&operation)
+			&& ((self.is_snapshot_derived(left, value, depth + 1)
+				&& self.is_reload(right, value, depth + 1))
+				|| (self.is_reload(left, value, depth + 1)
+					&& self.is_snapshot_derived(right, value, depth + 1)))
+	}
+
+	/// A reload-derived value: a reload, a delta, or a local, cast, or
+	/// arithmetic result computed from one.
+	fn is_reload_derived(
 		&self,
 		expr: &'tcx Expr<'tcx>,
-		destination: &str,
-		invocation: Span,
-		target: Span,
+		value: &ValueContext<'_>,
 		depth: usize,
 	) -> bool {
 		if depth > 16 {
 			return false;
 		}
-		let recurse = |inner: &'tcx Expr<'tcx>| {
-			self.is_reload_value(inner, destination, invocation, target, depth + 1)
-		};
-
-		match &expr.kind {
-			ExprKind::DropTemps(inner)
-			| ExprKind::Cast(inner, _)
-			| ExprKind::Match(inner, _, MatchSource::TryDesugar(_)) => recurse(inner),
-			ExprKind::Call(..) => shared::try_branch_argument(self.cx, expr).is_some_and(recurse),
-			ExprKind::Path(_) => {
-				let Some(binding) = local_path(expr) else {
-					return false;
-				};
-				self.reaching_definition(binding, expr.span)
-					.is_some_and(|definition| {
-						precedes(invocation, definition.span) && recurse(definition.value)
-					})
-			}
-			ExprKind::Binary(operator, left, right) if is_arithmetic(operator.node) => {
-				recurse(left) || recurse(right)
-			}
-			ExprKind::MethodCall(segment, receiver, arguments, _) => {
-				let method = segment.ident.name.as_str();
-				let is_reload = self.amount_reads.iter().any(|read| {
-					read.hir_id == expr.hir_id
-						&& read.account.as_deref() == Some(destination)
-						&& precedes(invocation, read.span)
-						&& self.dominates(read.hir_id, target)
-				});
-				if is_reload {
-					return true;
-				}
-				if UNWRAPPING_METHODS.contains(&method) {
-					return recurse(receiver);
-				}
-				is_integer_arithmetic_method(method)
-					&& (recurse(receiver) || arguments.iter().any(recurse))
-			}
-			_ => false,
+		if self.is_reload(expr, value, depth + 1) || self.is_delta(expr, value, depth + 1) {
+			return true;
 		}
+		let expr = self.peel_value(expr);
+		if let Some(definition) = self.local_definition(expr) {
+			return precedes(value.invocation, definition.span)
+				&& self.is_reload_derived(definition.value, value, depth + 1);
+		}
+
+		self.arithmetic_parts(expr).is_some_and(|(_, operands)| {
+			operands
+				.iter()
+				.any(|operand| self.is_reload_derived(operand, value, depth + 1))
+		})
 	}
 
-	/// Whether a use of the snapshot is a direct operand of arithmetic or a
-	/// comparison whose other operand is a post-CPI reload of `destination`
-	/// (or arithmetic over one): `after - before`,
-	/// `after.checked_sub(before)`, `before.checked_add(after - before)`,
-	/// `if after < before`. Tuples, call arguments, struct fields, arrays, and
-	/// arithmetic against anything else are stale uses.
-	fn is_combined_with_reload(
+	/// A snapshot-derived value: a read of the destination before the CPI, a
+	/// local defined from one, or a cast or arithmetic result computed from
+	/// one. A delta is reload-derived instead.
+	fn is_snapshot_derived(
 		&self,
-		destination: &str,
-		invocation: Span,
-		usage: &LocalUse,
+		expr: &'tcx Expr<'tcx>,
+		value: &ValueContext<'_>,
+		depth: usize,
 	) -> bool {
-		let Some((parent, operand)) = self.operator_around(usage.hir_id) else {
+		if depth > 16 || self.is_delta(expr, value, depth + 1) {
 			return false;
-		};
-		let is_reload = |other: &'tcx Expr<'tcx>| {
-			self.is_reload_value(other, destination, invocation, usage.span, 0)
-		};
+		}
+		let expr = self.peel_value(expr);
+		if self.amount_reads.iter().any(|read| {
+			read.hir_id == expr.hir_id
+				&& read.account.as_deref() == Some(value.destination)
+				&& precedes(read.span, value.invocation)
+		}) {
+			return true;
+		}
+		if let Some(definition) = self.local_definition(expr) {
+			return self.is_snapshot_derived(definition.value, value, depth + 1);
+		}
+		if let ExprKind::Block(block, _) = &expr.kind {
+			return block
+				.expr
+				.is_some_and(|tail| self.is_snapshot_derived(tail, value, depth + 1));
+		}
 
-		match parent.kind {
-			ExprKind::Binary(operator, left, right)
-				if is_arithmetic(operator.node) || operator.node.is_comparison() =>
-			{
-				is_reload(if left.hir_id == operand { right } else { left })
-			}
-			ExprKind::MethodCall(segment, receiver, arguments, _)
-				if is_integer_arithmetic_method(segment.ident.name.as_str()) =>
-			{
-				if receiver.hir_id == operand {
-					arguments.iter().any(is_reload)
-				} else {
-					is_reload(receiver)
+		self.arithmetic_parts(expr).is_some_and(|(_, operands)| {
+			operands
+				.iter()
+				.any(|operand| self.is_snapshot_derived(operand, value, depth + 1))
+		})
+	}
+
+	/// Follows a snapshot-derived value from `expr` to where it ends up and
+	/// returns the span where it is trusted as a balance, if anywhere.
+	///
+	/// The value may only become:
+	/// - one side of a comparison whose other side is reload-derived or a
+	///   constant;
+	/// - an operand of a subtraction-like operation with a reload, which
+	///   yields a delta; or
+	/// - an operand of an addition-like operation whose other operand is a
+	///   delta.
+	///
+	/// Casts, `?`, unwrapping, other arithmetic, and `let`/assignment carry
+	/// the value on; every other destination (a call argument, a return, a
+	/// tuple, a struct field, a store) is a stale use.
+	fn stale_flow(
+		&self,
+		expr: &'tcx Expr<'tcx>,
+		value: &ValueContext<'_>,
+		depth: usize,
+	) -> Option<Span> {
+		if depth > 16 {
+			return Some(expr.span);
+		}
+		let mut current = expr;
+
+		loop {
+			let parent = self.cx.tcx.parent_hir_node(current.hir_id);
+			let Node::Expr(parent_expr) = parent else {
+				return self.stale_flow_into_binding(parent, current, value, depth);
+			};
+
+			let passes_through = match &parent_expr.kind {
+				ExprKind::DropTemps(_) | ExprKind::Cast(..) | ExprKind::Type(..) => true,
+				ExprKind::Match(scrutinee, _, MatchSource::TryDesugar(_)) => {
+					scrutinee.hir_id == current.hir_id
 				}
+				ExprKind::Call(..) => {
+					shared::try_branch_argument(self.cx, parent_expr)
+						.is_some_and(|argument| argument.hir_id == current.hir_id)
+				}
+				ExprKind::MethodCall(segment, receiver, ..) => {
+					receiver.hir_id == current.hir_id
+						&& UNWRAPPING_METHODS.contains(&segment.ident.name.as_str())
+				}
+				_ => false,
+			};
+			if passes_through {
+				current = parent_expr;
+				continue;
 			}
-			_ => false,
+
+			if let ExprKind::Assign(target, source, _) = &parent_expr.kind
+				&& source.hir_id == current.hir_id
+				&& local_path(target).is_some()
+			{
+				return self.stale_uses_of_definition(parent_expr.span, value, depth);
+			}
+
+			let Some((operation, operands)) = self.arithmetic_parts(parent_expr) else {
+				return Some(current.span);
+			};
+			let others = operands
+				.iter()
+				.filter(|operand| operand.hir_id != current.hir_id)
+				.copied()
+				.collect::<Vec<_>>();
+
+			if is_comparison(&operation) {
+				let verified = others.iter().all(|other| {
+					self.is_constant(other) || self.is_reload_derived(other, value, depth + 1)
+				});
+				return (!verified).then_some(current.span);
+			}
+			if is_subtraction_like(&operation)
+				&& others
+					.iter()
+					.any(|other| self.is_reload(other, value, depth + 1))
+			{
+				return None;
+			}
+			if is_addition_like(&operation)
+				&& others
+					.iter()
+					.any(|other| self.is_delta(other, value, depth + 1))
+			{
+				return None;
+			}
+
+			// Any other arithmetic keeps the result snapshot-derived.
+			current = parent_expr;
 		}
 	}
 
-	/// The snapshot tier, which applies to every destination: returns a use
-	/// of a pre-CPI balance snapshot of `destination` that the CPI can reach
-	/// and that neither compares it with a constant nor combines it directly
-	/// with a dominating post-CPI reload.
+	/// A snapshot-derived value bound by `let` or assigned to a local flows
+	/// on through that local's later uses.
+	fn stale_flow_into_binding(
+		&self,
+		parent: Node<'tcx>,
+		current: &'tcx Expr<'tcx>,
+		value: &ValueContext<'_>,
+		depth: usize,
+	) -> Option<Span> {
+		let Node::LetStmt(local) = parent else {
+			return Some(current.span);
+		};
+		if local
+			.init
+			.is_none_or(|initializer| initializer.hir_id != current.hir_id)
+		{
+			return Some(current.span);
+		}
+		if matches!(local.pat.kind, PatKind::Wild) {
+			return None;
+		}
+		if !matches!(local.pat.kind, PatKind::Binding(_, _, _, None)) {
+			return Some(current.span);
+		}
+
+		self.stale_uses_of_definition(local.span, value, depth)
+	}
+
+	fn stale_uses_of_definition(
+		&self,
+		span: Span,
+		value: &ValueContext<'_>,
+		depth: usize,
+	) -> Option<Span> {
+		// Only integer locals are tracked; a snapshot-derived value bound to
+		// anything else (an `Option`, a struct) is treated as trusted there.
+		let Some(definition) = self
+			.definitions
+			.iter()
+			.find(|definition| definition.span == span)
+		else {
+			return Some(span);
+		};
+
+		self.local_uses
+			.iter()
+			.filter(|usage| definition.bindings.contains(&usage.binding))
+			.filter(|usage| {
+				self.reaching_definition(usage.binding, usage.span)
+					.is_some_and(|reaching| std::ptr::eq(reaching, definition))
+			})
+			.find_map(|usage| {
+				let use_expr = self.cx.tcx.hir_expect_expr(usage.hir_id);
+				let nested = ValueContext {
+					target: usage.span,
+					..*value
+				};
+				self.stale_flow(use_expr, &nested, depth + 1)
+			})
+	}
+
+	/// The snapshot tier, which applies to every destination: returns where
+	/// a pre-CPI balance snapshot of `destination` is trusted after a CPI
+	/// that can reach it.
 	fn stale_snapshot_use(
 		&self,
 		destination: &str,
 		invocation: HirId,
 		invocation_span: Span,
 	) -> Option<Span> {
-		let snapshots = self.snapshot_definitions(destination);
+		let context = ValueContext {
+			destination,
+			invocation: invocation_span,
+			target: invocation_span,
+		};
+		let snapshots = self.snapshot_definitions(&context);
 
 		self.local_uses
 			.iter()
@@ -903,16 +1180,20 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			.filter(|usage| {
 				self.reaching_definition(usage.binding, usage.span)
 					.is_some_and(|definition| {
-						precedes(definition.span, invocation_span)
-							&& snapshots
-								.iter()
-								.any(|snapshot| std::ptr::eq(*snapshot, definition))
+						snapshots
+							.iter()
+							.any(|snapshot| std::ptr::eq(*snapshot, definition))
 					})
 			})
 			.filter(|usage| self.reaches(invocation, usage.span))
-			.filter(|usage| !self.is_constant_comparison(usage))
-			.find(|usage| !self.is_combined_with_reload(destination, invocation_span, usage))
-			.map(|usage| usage.span)
+			.find_map(|usage| {
+				let use_expr = self.cx.tcx.hir_expect_expr(usage.hir_id);
+				let context = ValueContext {
+					target: usage.span,
+					..context
+				};
+				self.stale_flow(use_expr, &context, 0)
+			})
 	}
 
 	/// The custody tier: a transfer into a custody-named account must be
@@ -1017,7 +1298,6 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 						bindings: vec![binding],
 						span: expr.span,
 						value,
-						copy_of: local_path(value),
 					});
 					// Writing a local is not a read of its previous value.
 					self.visit_expr(value);

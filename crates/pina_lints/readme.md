@@ -278,11 +278,17 @@ Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccoun
 
 Detects a token balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every builder of a `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` instruction:
 
-- **Snapshot tier (every destination).** An integer local bound from the destination's balance before the CPI may be used after the CPI in only two ways.
-  - As a direct operand of arithmetic (`+ - * / %`), a comparison, or a `checked_*`/`saturating_*`/`wrapping_*`/`overflowing_*` method whose other operand is a post-CPI reload of the destination, or arithmetic over one. For example `after - before`, `after.checked_sub(before)`, `before.checked_add(after - before)`, `before.checked_add(delta)` where `delta = after.checked_sub(before)?`, and `if after < before`. The reload must follow the CPI and run on every path to the use: not only inside an `if` arm, a closure, or a loop the use is outside of.
-  - In a comparison against a constant (`if prior == 0`, `before as u128 >= CAP`), which records a fact about the earlier state.
+- **Snapshot tier (every destination).** After a value-moving CPI into an account, two kinds of value are tracked:
+  - A **snapshot-derived** value is a read of the account's balance taken before the CPI, or any local, cast (`as`), or arithmetic result computed from one.
+  - A **reload** is a read of the same account after the CPI that runs on every path to the use. It may not sit only inside an `if` arm, a closure, or a loop the use is outside of. A **reload-derived** value is a reload, or any local, cast, or arithmetic result computed from one.
 
-  Every other use is flagged, even when a reload exists elsewhere: a tuple, a struct field, a call argument, an array, or arithmetic against anything else. So `(after, before + 10).1`, `Receipt { observed: after, credited: before + 10 }`, and reloading only to check the reload and then crediting `before + amount` all fail. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. Unrelated CPIs between the transfer and the reload are allowed.
+  After the CPI, a snapshot-derived value may appear only as:
+
+  1. one side of a comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`, `.eq()`, `.cmp()`, ...) whose other side is reload-derived or a constant. This verifies the real balance: `if after != before + 10`, `let expected = before.checked_add(10)?; if after != expected`, and `if prior == 0` all pass;
+  2. an operand of a subtraction-like operation whose other operand is a reload: `-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, or `abs_diff`, in method or function-call syntax (`u64::checked_sub(after, before)`). The result is a **delta**, which is reload-derived and no longer stale: `after - before`, `after.checked_sub(before)`, `after as u128 - before as u128`; or
+  3. an operand of an addition-like operation (`+`, `checked_add`, `saturating_add`, `wrapping_add`, `overflowing_add`) whose other operand is a delta, directly or through a local: `before + (after - before)`, or `let delta = after.checked_sub(before)?; before.checked_add(delta)`.
+
+  Every other appearance is a stale use: other arithmetic whose result is then returned, stored, or passed on; a call argument; a return value; a tuple, struct field, or array element; an addition with a bare reload (`before.checked_add(after)`); or arithmetic that cancels the reload out (`before + after * 0`, `before.wrapping_add(after - after)`). This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. Unrelated CPIs between the transfer and the reload are allowed.
 - **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no other CPI in between, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta. Where the typed identity below cannot name the destination or one of its reads, the tier falls back to the name-based check (reads whose written receiver matches the written destination), so code that check accepts is not newly rejected for that reason.
 
 ```rust
@@ -309,9 +315,9 @@ So `AuthorityTransfer::new(config, new_authority, signer)` (no amount) and a loc
 - Pina's token-view methods (`as_token_account()`, `as_token_account_for_program()`, `as_token_2022_account()`, `as_associated_token_account()`, and `as_account()`);
 - the token crates' state loaders (`TokenAccount::from_account_view()` and the `_unchecked`/`from_account_info` variants), keyed by their first argument;
 - the `.base` field of a loaded Token-2022 view; and
-- methods with constant arguments that do not take `&mut self` and return the receiver's type (assertion chains, `ok_or(())`).
+- `Option`/`Result` adaptors that pass the success value through (`ok_or`, `ok_or_else`, `unwrap`, `expect`, `map_err`), and Pina's `assert_*` checks, which return the account they checked.
 
-A method that takes `&mut self` (`Iterator::next`, `nth`, ...) produces a key unique to its call site, so two `it.next()` calls never name the same account. Any other such method with constant arguments that returns another type becomes part of the key (`accounts.get(2)` differs from `accounts.get(3)`). Anything else, such as a dynamic index or an arbitrary call, names no account, and a read that names no account never matches a destination.
+Cursor methods get a key unique to their call site, so two `it.next()` calls never name the same account. These are `Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, and Pina's `AccountsCursor::next*`. Every other method call with constant arguments is keyed by its receiver, the method's resolved definition, and its arguments, whether or not it takes `&mut self`. So an accessor such as `ctx.vault_mut()` names the same account on every call, and `accounts.get(2)` differs from `accounts.get(3)`. Anything else, such as a dynamic index or a call with a non-constant argument, names no account, and a read that names no account never matches a destination.
 
 **What counts as a read.** `.amount()` and `Type::amount(account)` count, outside closures. A read inside a closure only happens if the closure runs, so it counts for neither tier. Snapshots are followed through tuple destructuring, verbatim copies (`let snapshot = before;`), and assignments (`before = ata.amount();`).
 
@@ -333,8 +339,10 @@ That call targets the legacy SPL Token program, which has no transfer-fee extens
 **Limits.**
 
 - A snapshot behind a helper function (`let before = read_balance(ata)`) or stored in a struct field (`Snap { before: ata.amount() }`) is not tracked.
+- A snapshot-derived value bound to a non-integer local (such as an `Option<u64>`) is not followed further and is reported at that binding.
 - A destination that names no account gets no snapshot analysis. The custody tier still requires reads for it, through the name-based fallback.
 - A local builder that transfers without naming the mint (`from, to, authority, amount`) is only covered when it comes from a token crate.
+- A `&mut self` method other than the listed cursors is assumed to return the same account on every call with the same constant arguments. A method that advances hidden state is keyed as if it were an accessor.
 - A local's value is taken from its lexically latest definition before the use. Writes through `&mut` references to it are not tracked.
 - Builders passed through opaque wrappers are not associated with their invocation.
 - Code is ordered lexically, so loops are analysed in source order.

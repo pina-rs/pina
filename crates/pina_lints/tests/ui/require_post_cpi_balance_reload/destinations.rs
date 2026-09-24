@@ -58,6 +58,17 @@ fn pick<A, B>(_first: A, second: B) -> B {
 	second
 }
 
+/// Accounts reached through `&mut self` accessors.
+struct AccessorContext<'a> {
+	user_ata: &'a Account,
+}
+
+impl<'a> AccessorContext<'a> {
+	fn user_ata_mut(&mut self) -> &'a Account {
+		self.user_ata
+	}
+}
+
 /// A wrapper whose `invoke()` could target any program.
 struct Relay<T>(T);
 
@@ -820,6 +831,152 @@ fn process_legacy_builder_swapped_for_token_2022(
 	.invoke()?;
 	//~^^^^^ ERROR: transfer into `treasury` makes an earlier read of its balance stale
 	Ok(before + 10)
+}
+
+fn process_snapshot_through_mut_accessor(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = ctx.user_ata_mut().amount();
+	TransferChecked::new(source, mint, ctx.user_ata_mut(), owner, 10, 0)
+		.invoke_with_program(owner)?;
+	//~^^ ERROR: transfer into `ctx.user_ata_mut()` makes an earlier read of its balance stale
+	Ok(before + 10)
+}
+
+fn process_reload_multiplied_by_zero(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let after = user_ata.amount();
+	Ok(before + after * 0 + 10)
+}
+
+fn process_reload_minus_itself(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let after = user_ata.amount();
+	Ok(before.wrapping_add(after - after).wrapping_add(10))
+}
+
+fn process_snapshot_added_to_bare_reload(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let after = user_ata.amount();
+	before.checked_add(after).ok_or(())
+}
+
+fn process_next_item_is_not_a_reload(
+	accounts: &[Account],
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let mut remaining = accounts.iter();
+	let destination = remaining.next().ok_or(())?;
+	let before = destination.amount();
+	TransferChecked::new(owner, mint, destination, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `destination` makes an earlier read of its balance stale
+	let after = remaining.next().ok_or(())?.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_function_call_syntax_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	u64::checked_sub(after, before).ok_or(())
+}
+
+fn process_absolute_difference_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	Ok(after.abs_diff(before))
+}
+
+fn process_exact_arrival_check(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	if after != before + 10 {
+		return Err(());
+	}
+	Ok(())
+}
+
+fn process_expected_balance_local_check(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let expected = before.checked_add(10).ok_or(())?;
+	let after = user_ata.amount();
+	if after != expected {
+		return Err(());
+	}
+	Ok(())
+}
+
+fn process_widened_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u128, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	Ok(after as u128 - before as u128)
+}
+
+fn process_saturating_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	let received = after.saturating_sub(before);
+	Ok(received)
 }
 
 fn main() {}

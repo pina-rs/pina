@@ -18,6 +18,30 @@ struct Token2022State {
 struct SplTransfer;
 struct LamportTransfer;
 struct AuthorityTransfer;
+
+/// Accounts reached through `&mut self` accessors.
+struct AccessorContext<'a> {
+	vault: &'a Account,
+}
+
+impl<'a> AccessorContext<'a> {
+	fn vault_mut(&mut self) -> &'a Account {
+		self.vault
+	}
+}
+
+/// A program's own state loader, which the typed identity does not know.
+struct PoolState;
+
+impl PoolState {
+	fn load(_: &Account) -> Result<PoolState, ()> {
+		Ok(PoolState)
+	}
+
+	fn amount(&self) -> u64 {
+		0
+	}
+}
 struct SystemLikeTransfer;
 
 impl SystemLikeTransfer {
@@ -316,6 +340,42 @@ fn process_custody_with_dynamic_index_unbracketed(
 	SplTransfer::new(source, mint, vaults.get(index).ok_or(())?, owner, 10, 0)
 		.invoke_with_program(owner)
 	//~^^ ERROR: transfer into `vaults.get(index).ok_or(())?` is not accounted from its observed balance delta
+}
+
+fn process_custody_through_mut_accessor(
+	ctx: &mut AccessorContext<'_>,
+	source: &Account,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = ctx.vault_mut().amount();
+	SplTransfer::new(source, mint, ctx.vault_mut(), owner, 10, 0).invoke_with_program(owner)?;
+	let after = ctx.vault_mut().amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_custody_through_program_loader(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = PoolState::load(vault)?.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	let after = PoolState::load(vault)?.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_custody_through_program_loader_without_reload(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let _before = PoolState::load(vault)?.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	Ok(())
 }
 
 fn main() {}
