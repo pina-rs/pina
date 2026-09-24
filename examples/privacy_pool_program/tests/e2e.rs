@@ -7,7 +7,7 @@
 //! ```
 //!
 //! ```sh
-//! SBF_OUT_DIR=target/deploy \
+//! SBF_OUT_DIR="$PWD/target/deploy" \
 //!     cargo test -p privacy_pool_program --features prover --test e2e -- --include-ignored
 //! ```
 //!

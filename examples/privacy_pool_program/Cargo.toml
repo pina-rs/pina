@@ -12,6 +12,14 @@ repository.workspace = true
 [lib]
 crate-type = ["cdylib", "lib"]
 
+# The SBF end-to-end suite proves spends on the host through the `prover`
+# module, so it only builds with that feature. Declaring it here lets a plain
+# `cargo test -p privacy_pool_program` skip the suite instead of failing to
+# compile it.
+[[test]]
+name = "e2e"
+required-features = ["prover"]
+
 [features]
 # Host-only proving toolkit: circuits, trusted setup, proof serialization.
 # Never compiled into the SBF artifact.
