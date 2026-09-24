@@ -37,6 +37,7 @@ use rustc_middle::ty::InstanceKind;
 use rustc_middle::ty::TyKind;
 use rustc_middle::ty::TypeckResults;
 use rustc_middle::ty::TypingEnv;
+use rustc_middle::ty::Unnormalized;
 use rustc_span::ExpnKind;
 use rustc_span::MacroKind;
 use rustc_span::Span;
@@ -55,27 +56,44 @@ crate::declare_late_lint! {
 	///
 	/// - **The guard's failure stops the drain.** A `Result` or `Option`
 	///   guard is propagated with `?`, extracted with `unwrap()`/`expect()`,
-	///   returned, or tested by a `match`, `if let`, or `let ... else` whose
-	///   failure side returns `Err`/`None` or panics. A `bool` guard (or
-	///   `is_err()`/`is_ok()` of a fallible one) gates an `if` whose branch
-	///   for the failing value returns `Err`/`None` or panics, including
-	///   `assert!`, `assert_eq!`, and `pina::assert(..)?`. A branch that
-	///   returns `Ok`, breaks, or continues is not a failure, and a result
-	///   that is discarded or only inspected gates nothing. A guard bound to
-	///   a local counts where that local is enforced.
+	///   returned, or tested by a `match`, `if let`, or `let ... else` in which
+	///   every arm that can receive the failure returns `Err`/`None`, returns
+	///   the scrutinee's own binding, or panics. Arms are read in order, so a
+	///   `_` after an unguarded `Err(_)` arm only receives success. Adapters
+	///   that keep the failure are followed: `map_err`, `inspect_err`, `map`,
+	///   `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, `clone()`, `into()`,
+	///   and `From::from`. A `bool` guard, `is_err()`/`is_ok()`, or
+	///   `eq`/`ne(&Ok(..))` must gate an `if`, `assert!`, `assert_eq!`,
+	///   `assert_ne!`, or `pina::assert(..)?` so that execution continues only
+	///   on the passing value; that polarity is checked whenever the flag comes
+	///   from a fallible guard. A failing branch returns `Err`/`None`, returns
+	///   a local helper that can only fail, or panics; a branch that returns
+	///   `Ok`, breaks, or continues is not a failure. A guard bound to a local
+	///   counts where the local is enforced, and a labeled block that can
+	///   `break` with a success does not carry its tail guard out.
 	/// - **It reads the handler's inputs.** Its receiver or an argument is
-	///   derived from a function parameter (including `self`); a zero-argument
-	///   call, or one fed only literals and constants, cannot inspect the state
-	///   it claims to guard.
-	/// - **It names the check, or delegates to one.** Its name contains
-	///   `pause`, `cap`, `circuit`, `halt`, `guard`, `limit`, or `throttle`,
-	///   or it is a local function returning `Result`/`Option` whose body
-	///   enforces such a guard in its outermost scope before any early
-	///   non-error `return` (followed up to three wrappers deep).
-	/// - **It can fail.** A local callee whose every return value is a
-	///   constant `Ok(..)`/`Some(..)` or `bool` literal is not a guard. Trait
+	///   derived from a function parameter (including `self`), directly or
+	///   through locals bound from one; a zero-argument call, or one fed only
+	///   literals and constants, cannot inspect the state it claims to guard.
+	/// - **It names the check, or delegates to one.** It is a function or
+	///   method whose name contains `pause`, `cap`, `circuit`, `halt`,
+	///   `guard`, `limit`, or `throttle`, or a local function returning
+	///   `Result`/`Option` whose body enforces such a guard in its outermost
+	///   scope before any early non-error `return` or `break` (followed up to
+	///   three wrappers deep). Closures, fn pointers, and generic callables are
+	///   named by their binding and never count by name.
+	/// - **It is not a constant success.** A local callee whose every returned
+	///   value is a literal `Ok(..)`/`Some(..)` (or `bool` literal), directly
+	///   or through a `let` binding that is never reassigned, and that has no
+	///   reachable `?`, `Err`/`None`, or panic, is not a guard. Branches behind
+	///   a literal `if true`/`if false` are treated as unreachable. Trait
 	///   methods are judged by the implementation that runs; when the lint
 	///   cannot resolve it, only the method name is used.
+	///
+	/// An early `return Ok(..)` on the failing side, such as
+	/// `if state.is_paused() { return Ok(()) }`, deliberately does not count:
+	/// for a `bool` guard the lint cannot tell which value is the failing one,
+	/// and reporting success for a blocked sweep hides the pause from callers.
 	///
 	/// ### Why is this bad?
 	///
@@ -95,7 +113,12 @@ crate::declare_late_lint! {
 	///   in a generic handler, is judged by its name and call-site behavior
 	///   only;
 	/// - a local guard-named callee counts when anything in its body can fail
-	///   or panic, even for reasons unrelated to the check its name claims;
+	///   or panic, even for reasons unrelated to the check its name claims,
+	///   and the constant-success test does not evaluate conditions beyond
+	///   literal `true`/`false`;
+	/// - `return helper()` in a failing branch counts when `helper` cannot be
+	///   analyzed (another crate or an unresolved trait call), as the name
+	///   rule did before;
 	/// - wrappers deeper than three levels are not followed; and
 	/// - a pause check with no guard-named call, such as
 	///   `if state.paused { return Err(..) }`, is not recognized.
@@ -390,7 +413,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		// A local body shows what the call really does: one that can only
 		// succeed gates nothing, whatever its name.
 		if let Some((local, body)) = local_body
-			&& returns_constant(self.cx, local, body, value)
+			&& returns_constant(self.cx, local, body, value, Outcome::Succeeds)
 		{
 			return;
 		}
@@ -464,6 +487,10 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		}
 
 		let typing_env = TypingEnv::post_analysis(tcx, self.owner().to_def_id());
+		let Ok(args) = tcx.try_normalize_erasing_regions(typing_env, Unnormalized::new_wip(args))
+		else {
+			return None;
+		};
 
 		match Instance::try_resolve(tcx, typing_env, definition, args) {
 			Ok(Some(instance)) => {
@@ -572,18 +599,29 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 						&& self.is_pina_assert(callee)
 					{
 						value = GuardValue::Fallible;
-					} else {
+					} else if !(is_first
+						&& arguments.len() == 1
+						&& value == GuardValue::Fallible
+						&& self.is_fallible_from(callee, parent))
+					{
 						return Enforcement::Unenforced;
 					}
 				}
 				ExprKind::MethodCall(segment, receiver, arguments, _)
 					if receiver.hir_id == child && value == GuardValue::Fallible =>
 				{
-					if !self.is_core_fallible_method(parent) {
-						return Enforcement::Unenforced;
-					}
-
 					let method = segment.ident.name.as_str();
+
+					if !self.is_core_fallible_method(parent) {
+						let Some(adapted) = self.core_trait_adapter(parent, method, arguments)
+						else {
+							return Enforcement::Unenforced;
+						};
+
+						value = adapted;
+						child = parent.hir_id;
+						continue;
+					}
 
 					if FAILURE_ABORTING_METHODS.contains(&method) {
 						return Enforcement::Enforced(short_circuits);
@@ -666,19 +704,18 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 				ExprKind::Match(scrutinee, arms, MatchSource::Normal)
 					if scrutinee.hir_id == child && value == GuardValue::Fallible =>
 				{
-					// Every arm that can receive the failure must fail too.
-					let enforced = arms.iter().all(|arm| {
-						classify_pattern(arm.pat) == PatternClass::Success
-							|| self.branch_fails(arm.body, parent)
-					});
-
-					return enforced_if(enforced, short_circuits);
+					return enforced_if(self.arms_fail(arms, parent), short_circuits);
 				}
 				ExprKind::Ret(Some(returned_value)) if returned_value.hir_id == child => {
 					return returned(value, short_circuits);
 				}
 				ExprKind::AddrOf(_, _, inner) if inner.hir_id == child => {
 					return enforced_if(self.asserted_equal(parent, value), short_circuits);
+				}
+				// A labeled block's value also comes from its `break`s: one that
+				// breaks with a success skips the guard in the tail.
+				ExprKind::Block(_, Some(_)) if self.breaks_without_failure(parent) => {
+					return Enforcement::Unenforced;
 				}
 				ExprKind::Block(..)
 				| ExprKind::DropTemps(_)
@@ -724,6 +761,140 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			}
 			_ => self.is_variant(expr, &["Err", "None"]),
 		}
+	}
+
+	/// Whether every arm that can receive the guard's failure fails too.
+	///
+	/// Arms are tried in order: an unguarded `Err(_)`/`Ok(_)` arm consumes that
+	/// side, so a later `_` arm only receives what is left. An arm that binds
+	/// the whole scrutinee and returns the binding propagates the failure.
+	fn arms_fail(&self, arms: &[rustc_hir::Arm<'_>], matched: &Expr<'_>) -> bool {
+		let mut success_left = true;
+		let mut failure_left = true;
+
+		for arm in arms {
+			let class = classify_pattern(arm.pat);
+			let receives_failure = failure_left && class != PatternClass::Success;
+
+			if receives_failure {
+				let only_failure = class == PatternClass::Failure || !success_left;
+				let propagates = only_failure && self.returns_own_binding(arm);
+
+				if !propagates && !self.branch_fails(arm.body, matched) {
+					return false;
+				}
+			}
+
+			if arm.guard.is_none() && covers_class(arm.pat) {
+				match class {
+					PatternClass::Success => success_left = false,
+					PatternClass::Failure => failure_left = false,
+					PatternClass::Both => return true,
+				}
+			}
+		}
+
+		true
+	}
+
+	/// Whether `arm` binds the whole scrutinee and hands that binding back as
+	/// its `return` value (or, when the `match` is returned, as its value).
+	fn returns_own_binding(&self, arm: &rustc_hir::Arm<'_>) -> bool {
+		let PatKind::Binding(_, binding, ..) = arm.pat.kind else {
+			return false;
+		};
+		let is_binding = |expr: &Expr<'_>| {
+			matches!(
+				&expr.kind,
+				ExprKind::Path(QPath::Resolved(_, path)) if path.res == Res::Local(binding)
+			)
+		};
+		let mut body = arm.body;
+
+		loop {
+			match &body.kind {
+				ExprKind::Ret(Some(value)) => return is_binding(value),
+				ExprKind::Block(block, None) if block.stmts.is_empty() => {
+					let Some(tail) = block.expr else {
+						return false;
+					};
+
+					body = tail;
+				}
+				ExprKind::Block(block, None) => {
+					let [rest @ .., last] = block.stmts else {
+						return false;
+					};
+					let leaves_early = rest.iter().any(|statement| {
+						matches!(
+							&statement.kind,
+							StmtKind::Expr(inner) | StmtKind::Semi(inner)
+								if self.exit(inner) != Exit::FallThrough
+						)
+					});
+
+					if leaves_early || block.expr.is_some() {
+						return false;
+					}
+
+					let (StmtKind::Expr(inner) | StmtKind::Semi(inner)) = &last.kind else {
+						return false;
+					};
+
+					body = inner;
+				}
+				_ => return false,
+			}
+		}
+	}
+
+	/// Whether a `return` of `value` fails the caller: an `Err`/`None`, or a
+	/// call to a local function that can only fail. With `lenient`, a call
+	/// the analysis cannot see into also counts, as the name rule did before.
+	fn returns_failure(&self, value: &Expr<'_>, lenient: bool) -> bool {
+		if let Some(variant) = variant_constructed(self.cx, self.typeck, value) {
+			return matches!(variant.as_str(), "Err" | "None");
+		}
+
+		let callee = match &value.kind {
+			ExprKind::Call(callee, _) => {
+				match &callee.kind {
+					ExprKind::Path(qpath) => {
+						match self.typeck.qpath_res(qpath, callee.hir_id) {
+							Res::Def(DefKind::Fn | DefKind::AssocFn, definition) => {
+								Some((definition, callee.hir_id))
+							}
+							_ => None,
+						}
+					}
+					_ => None,
+				}
+			}
+			ExprKind::MethodCall(..) => {
+				self.typeck
+					.type_dependent_def_id(value.hir_id)
+					.map(|definition| (definition, value.hir_id))
+			}
+			_ => return false,
+		};
+		let Some((definition, args_owner)) = callee else {
+			return false;
+		};
+		let local_body = self
+			.resolve(definition, args_owner)
+			.and_then(|implementation| self.local_body(implementation));
+
+		match local_body {
+			Some((local, body)) => {
+				returns_constant(self.cx, local, body, GuardValue::Fallible, Outcome::Fails)
+			}
+			None => lenient,
+		}
+	}
+
+	/// Whether a labeled block has a `break` that leaves it without a failure.
+	fn breaks_without_failure(&self, block: &Expr<'_>) -> bool {
+		breaks_to(block).any(|value| !value.is_some_and(|value| self.returns_failure(value, false)))
 	}
 
 	/// Enforcement of a guard value used as a `let` initializer.
@@ -800,23 +971,26 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 			return false;
 		}
 
-		match value {
-			// A `bool` guard compared with anything panics on one outcome.
-			GuardValue::Flag(_) => true,
-			// `assert_eq!(guard(..), Ok(..))` panics on every failure.
-			GuardValue::Fallible => {
-				let other = if left.hir_id == reference.hir_id {
-					right
-				} else {
-					left
-				};
-				let other = match &other.kind {
-					ExprKind::AddrOf(_, _, inner) => inner,
-					_ => other,
-				};
+		let other = peel_reference(if left.hir_id == reference.hir_id {
+			right
+		} else {
+			left
+		});
+		let is_equality = assertion.as_str() == "assert_eq";
 
-				assertion.as_str() == "assert_eq" && self.is_variant(other, &["Ok", "Some"])
+		match value {
+			// Execution continues only when the flag equals the literal
+			// (`assert_eq!`) or its negation (`assert_ne!`); that value must be
+			// the passing one. An unknown polarity accepts either.
+			GuardValue::Flag(polarity) => {
+				bool_literal(other).is_some_and(|literal| {
+					let continuing = if is_equality { literal } else { !literal };
+
+					polarity.is_none_or(|failing| continuing != failing)
+				})
 			}
+			// `assert_eq!(guard(..), Ok(..))` panics on every failure.
+			GuardValue::Fallible => is_equality && self.is_variant(other, &["Ok", "Some"]),
 		}
 	}
 
@@ -831,16 +1005,24 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		let tcx = self.cx.tcx;
 
 		tcx.crate_name(definition.krate).as_str() == "pina"
-			&& tcx.item_name(definition).as_str() == "assert"
+			&& matches!(
+				tcx.def_path_str(definition).as_str(),
+				"pina::assert" | "pina::utils::assert"
+			)
 	}
 
-	/// Whether a method call resolves to core's `Result` or `Option`.
+	/// Whether a method call resolves to an inherent method of core's
+	/// `Result` or `Option`.
 	fn is_core_fallible_method(&self, call: &Expr<'_>) -> bool {
 		let Some(definition) = self.typeck.type_dependent_def_id(call.hir_id) else {
 			return false;
 		};
 		let tcx = self.cx.tcx;
-		let Some(implementation) = tcx.opt_parent(definition) else {
+
+		// Only an inherent impl has a self type to inspect: a trait method
+		// (`Clone::clone`, `PartialEq::eq`) is owned by the trait, which has no
+		// `type_of`.
+		let Some(implementation) = tcx.inherent_impl_of_assoc(definition) else {
 			return false;
 		};
 		let TyKind::Adt(owner, _) = tcx
@@ -855,6 +1037,71 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 		is_core_item(self.cx, owner.did(), &["Result", "Option"])
 	}
 
+	/// The core trait that owns the method `definition` resolves to, if any.
+	fn core_trait_of(&self, definition: DefId) -> Option<rustc_span::Symbol> {
+		let tcx = self.cx.tcx;
+		let owner = tcx.trait_of_assoc(definition)?;
+
+		(tcx.crate_name(owner.krate).as_str() == "core").then(|| tcx.item_name(owner))
+	}
+
+	/// Whether `expr` has core's `Result` or `Option` type.
+	fn is_fallible_type(&self, expr: &Expr<'_>) -> bool {
+		matches!(
+			self.typeck.expr_ty(expr).kind(),
+			TyKind::Adt(definition, _) if is_core_item(self.cx, definition.did(), &["Result", "Option"])
+		)
+	}
+
+	/// How a core trait method applied to a fallible guard value changes it:
+	/// `clone`/`into` keep the failure, `eq`/`ne` against `Ok`/`Some` turn it
+	/// into a flag with a known polarity.
+	fn core_trait_adapter(
+		&self,
+		call: &Expr<'_>,
+		method: &str,
+		arguments: &[Expr<'_>],
+	) -> Option<GuardValue> {
+		let definition = self.typeck.type_dependent_def_id(call.hir_id)?;
+		let owner = self.core_trait_of(definition)?;
+
+		match (owner.as_str(), method) {
+			("Clone", "clone") | ("Into", "into") if self.is_fallible_type(call) => {
+				Some(GuardValue::Fallible)
+			}
+			("PartialEq", "eq" | "ne") => {
+				let [other] = arguments else {
+					return None;
+				};
+				let other = peel_reference(other);
+
+				if !self.is_variant(other, &["Ok", "Some"]) {
+					return None;
+				}
+
+				// `guard.eq(&Ok(..))` is false exactly when the guard failed.
+				Some(GuardValue::Flag(Some(method == "ne")))
+			}
+			_ => None,
+		}
+	}
+
+	/// Whether `callee` is `From::from`, converting a fallible guard into
+	/// another `Result`/`Option` without dropping its failure.
+	fn is_fallible_from(&self, callee: &Expr<'_>, call: &Expr<'_>) -> bool {
+		let ExprKind::Path(qpath) = &callee.kind else {
+			return false;
+		};
+		let Res::Def(DefKind::AssocFn, definition) = self.typeck.qpath_res(qpath, callee.hir_id)
+		else {
+			return false;
+		};
+
+		self.core_trait_of(definition)
+			.is_some_and(|owner| owner.as_str() == "From")
+			&& self.is_fallible_type(call)
+	}
+
 	/// Whether `expr` constructs one of core's `Result`/`Option` `variants`.
 	fn is_variant(&self, expr: &Expr<'_>, variants: &[&str]) -> bool {
 		variant_constructed(self.cx, self.typeck, expr)
@@ -865,7 +1112,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 	fn exit(&self, expr: &Expr<'_>) -> Exit {
 		match &expr.kind {
 			ExprKind::Ret(Some(value)) => {
-				if self.is_variant(value, &["Err", "None"]) {
+				if self.returns_failure(value, true) {
 					Exit::Failure
 				} else {
 					Exit::Escape
@@ -1067,6 +1314,10 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 					self.enforce(expr, value);
 				}
 			}
+			// A `break` can leave a labeled block before a guard inside it runs.
+			ExprKind::Block(block, Some(_)) if breaks_to(expr).next().is_some() => {
+				self.visit_branch_block(block);
+			}
 			ExprKind::Block(block, _) => self.visit_block(block),
 			ExprKind::If(condition, then, otherwise) => {
 				// The condition runs in the enclosing scope, so an early-return
@@ -1104,13 +1355,21 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 				if let ExprKind::Path(qpath) = &callee.kind
 					&& let Some(name) = qpath_name(qpath)
 				{
-					let definition = match self.typeck.qpath_res(qpath, callee.hir_id) {
-						Res::Def(_, definition) => Some((definition, callee.hir_id)),
-						_ => None,
-					};
-					let inputs: Vec<&'tcx Expr<'tcx>> = arguments.iter().collect();
+					// Closures, fn pointers, and generic callables are named by
+					// their binding, which says nothing about what they run.
+					if let Res::Def(DefKind::Fn | DefKind::AssocFn, definition) =
+						self.typeck.qpath_res(qpath, callee.hir_id)
+					{
+						let inputs: Vec<&'tcx Expr<'tcx>> = arguments.iter().collect();
 
-					self.record_call(expr, name, None, &inputs, definition);
+						self.record_call(
+							expr,
+							name,
+							None,
+							&inputs,
+							Some((definition, callee.hir_id)),
+						);
+					}
 				}
 
 				self.visit_expr(callee);
@@ -1172,7 +1431,7 @@ impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 
 				// A non-error `return` lets a wrapper succeed without reaching
 				// a guard written after it.
-				if !value.is_some_and(|value| self.is_variant(value, &["Err", "None"])) {
+				if !value.is_some_and(|value| self.returns_failure(value, false)) {
 					self.escapes.push(self.guards.len());
 				}
 			}
@@ -1323,54 +1582,143 @@ fn variant_constructed(
 		.then(|| cx.tcx.item_name(variant))
 }
 
-/// Whether a local function can only return one constant outcome: every
-/// returned value is an `Ok(..)`/`Some(..)` (or a `bool` literal for a
-/// `bool` guard) and nothing in it can fail or panic.
+/// The constant outcome [`returns_constant`] checks a function for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Outcome {
+	/// Only `Ok(..)`/`Some(..)` (or a `bool` literal) can come back, and
+	/// nothing inside can fail or panic.
+	Succeeds,
+	/// Only `Err(..)`/`None` can come back.
+	Fails,
+}
+
+/// Whether a local function can only produce `outcome`.
+///
+/// Every returned value (the tail and each `return`) must be the constant
+/// outcome, directly or through a `let` binding that is never reassigned. A
+/// branch behind a literal `if true`/`if false` that can never run is
+/// ignored, so `if false { return Err(..) }` does not make a function able to
+/// fail. For [`Outcome::Succeeds`], any `?`, `Err`/`None`, or panic that can
+/// run means the function may fail after all.
 fn returns_constant(
 	cx: &LateContext<'_>,
 	local: LocalDefId,
 	body: &Body<'_>,
 	value: GuardValue,
+	outcome: Outcome,
 ) -> bool {
-	struct Scan<'a, 'b, 'tcx> {
-		cx: &'a LateContext<'tcx>,
-		typeck: &'b TypeckResults<'tcx>,
-		value: GuardValue,
-		varies: bool,
+	struct Bindings<'hir> {
+		initializers: HashMap<HirId, &'hir Expr<'hir>>,
+		reassigned: HashSet<HirId>,
 	}
 
-	impl Scan<'_, '_, '_> {
-		fn constant(&self, returned: &Expr<'_>) -> bool {
-			match self.value {
-				GuardValue::Fallible => {
-					variant_constructed(self.cx, self.typeck, returned)
-						.is_some_and(|variant| matches!(variant.as_str(), "Ok" | "Some"))
-				}
-				GuardValue::Flag(_) => bool_literal(returned).is_some(),
+	impl<'hir> Visitor<'hir> for Bindings<'hir> {
+		fn visit_local(&mut self, local: &'hir LetStmt<'hir>) {
+			if let (PatKind::Binding(_, binding, _, None), Some(init)) =
+				(local.pat.kind, local.init)
+			{
+				self.initializers.insert(binding, init);
 			}
-		}
-	}
 
-	impl<'hir> Visitor<'hir> for Scan<'_, '_, '_> {
+			rustc_hir::intravisit::walk_local(self, local);
+		}
+
 		fn visit_expr(&mut self, expr: &'hir Expr<'hir>) {
-			let fails = match &expr.kind {
-				ExprKind::Match(_, _, MatchSource::TryDesugar(_)) => true,
-				ExprKind::Call(..) | ExprKind::MethodCall(..) => {
-					self.typeck.expr_ty(expr).is_never()
-				}
-				ExprKind::Ret(Some(returned)) => !self.constant(returned),
-				ExprKind::Ret(None) => false,
-				_ => {
-					variant_constructed(self.cx, self.typeck, expr)
-						.is_some_and(|variant| matches!(variant.as_str(), "Err" | "None"))
-				}
+			let place = match &expr.kind {
+				ExprKind::Assign(place, ..) | ExprKind::AssignOp(_, place, _) => Some(*place),
+				ExprKind::AddrOf(_, mutability, place) if mutability.is_mut() => Some(*place),
+				_ => None,
 			};
 
-			self.varies |= fails;
+			if let Some(binding) = place.and_then(shared::expression_local_binding) {
+				self.reassigned.insert(binding);
+			}
 
 			rustc_hir::intravisit::walk_expr(self, expr);
 		}
 	}
+
+	struct Scan<'a, 'b, 'hir, 'tcx> {
+		cx: &'a LateContext<'tcx>,
+		typeck: &'b TypeckResults<'tcx>,
+		bindings: Bindings<'hir>,
+		value: GuardValue,
+		outcome: Outcome,
+		varies: bool,
+	}
+
+	impl<'hir> Scan<'_, '_, 'hir, '_> {
+		fn constant(&self, returned: &'hir Expr<'hir>, depth: usize) -> bool {
+			if let ExprKind::Path(QPath::Resolved(_, path)) = &returned.kind
+				&& let Res::Local(binding) = path.res
+			{
+				return depth < 8
+					&& !self.bindings.reassigned.contains(&binding)
+					&& self
+						.bindings
+						.initializers
+						.get(&binding)
+						.is_some_and(|init| self.constant(init, depth + 1));
+			}
+
+			match (self.outcome, self.value) {
+				(Outcome::Succeeds, GuardValue::Fallible) => {
+					variant_constructed(self.cx, self.typeck, returned)
+						.is_some_and(|variant| matches!(variant.as_str(), "Ok" | "Some"))
+				}
+				(Outcome::Succeeds, GuardValue::Flag(_)) => bool_literal(returned).is_some(),
+				(Outcome::Fails, _) => {
+					variant_constructed(self.cx, self.typeck, returned)
+						.is_some_and(|variant| matches!(variant.as_str(), "Err" | "None"))
+						|| self.typeck.expr_ty(returned).is_never()
+				}
+			}
+		}
+	}
+
+	impl<'hir> Visitor<'hir> for Scan<'_, '_, 'hir, '_> {
+		fn visit_expr(&mut self, expr: &'hir Expr<'hir>) {
+			// Only the branch a literal condition selects can run.
+			if let ExprKind::If(condition, then, otherwise) = &expr.kind
+				&& let Some(taken) = bool_literal(condition)
+			{
+				self.visit_expr(condition);
+
+				if taken {
+					self.visit_expr(then);
+				} else if let Some(otherwise) = otherwise {
+					self.visit_expr(otherwise);
+				}
+
+				return;
+			}
+
+			let varies = match (&expr.kind, self.outcome) {
+				(ExprKind::Ret(Some(returned)), _) => !self.constant(returned, 0),
+				(ExprKind::Ret(None), _) => false,
+				(ExprKind::Match(_, _, MatchSource::TryDesugar(_)), Outcome::Succeeds) => true,
+				(ExprKind::Call(..) | ExprKind::MethodCall(..), Outcome::Succeeds) => {
+					self.typeck.expr_ty(expr).is_never()
+				}
+				(_, Outcome::Succeeds) => {
+					variant_constructed(self.cx, self.typeck, expr)
+						.is_some_and(|variant| matches!(variant.as_str(), "Err" | "None"))
+				}
+				(_, Outcome::Fails) => false,
+			};
+
+			self.varies |= varies;
+
+			rustc_hir::intravisit::walk_expr(self, expr);
+		}
+	}
+
+	let mut bindings = Bindings {
+		initializers: HashMap::new(),
+		reassigned: HashSet::new(),
+	};
+
+	bindings.visit_expr(body.value);
 
 	let mut tail = body.value;
 
@@ -1383,19 +1731,85 @@ fn returns_constant(
 	let mut scan = Scan {
 		cx,
 		typeck: cx.tcx.typeck(local),
+		bindings,
 		value,
+		outcome,
 		varies: false,
 	};
 	let tail_is_block_without_value =
 		matches!(&tail.kind, ExprKind::Block(block, _) if block.expr.is_none());
 
-	if !tail_is_block_without_value && !scan.constant(tail) {
+	if !tail_is_block_without_value && !scan.constant(tail, 0) {
 		return false;
 	}
 
 	scan.visit_expr(body.value);
 
 	!scan.varies
+}
+
+/// `expr` without a leading `&`/`&mut`.
+fn peel_reference<'a, 'hir>(expr: &'a Expr<'hir>) -> &'a Expr<'hir> {
+	match &expr.kind {
+		ExprKind::AddrOf(_, _, inner) => inner,
+		_ => expr,
+	}
+}
+
+/// Whether an unguarded arm with this pattern receives every value of its
+/// class: `Err(_)`, `Ok(value)`, `None`, `_`, or a plain binding.
+fn covers_class(pattern: &Pat<'_>) -> bool {
+	match &pattern.kind {
+		PatKind::TupleStruct(_, fields, _) => fields.iter().all(|field| irrefutable(field)),
+		PatKind::Expr(_) => classify_pattern(pattern) != PatternClass::Both,
+		_ => irrefutable(pattern),
+	}
+}
+
+/// Whether `pattern` matches every value of its type.
+fn irrefutable(pattern: &Pat<'_>) -> bool {
+	match &pattern.kind {
+		PatKind::Wild => true,
+		PatKind::Binding(.., sub) => sub.is_none_or(|sub| irrefutable(sub)),
+		PatKind::Tuple(fields, _) => fields.iter().all(|field| irrefutable(field)),
+		PatKind::Ref(inner, ..) | PatKind::Deref(inner) => irrefutable(inner),
+		_ => false,
+	}
+}
+
+/// The values carried by every `break` that leaves the labeled block
+/// `block`, outside nested closures.
+fn breaks_to<'hir>(block: &'hir Expr<'hir>) -> std::vec::IntoIter<Option<&'hir Expr<'hir>>> {
+	struct BreakFinder<'hir> {
+		targets: [HirId; 2],
+		values: Vec<Option<&'hir Expr<'hir>>>,
+	}
+
+	impl<'hir> Visitor<'hir> for BreakFinder<'hir> {
+		fn visit_expr(&mut self, expr: &'hir Expr<'hir>) {
+			if let ExprKind::Break(destination, value) = &expr.kind
+				&& destination
+					.target_id
+					.is_ok_and(|target| self.targets.contains(&target))
+			{
+				self.values.push(*value);
+			}
+
+			rustc_hir::intravisit::walk_expr(self, expr);
+		}
+	}
+
+	let ExprKind::Block(inner, Some(_)) = &block.kind else {
+		return Vec::new().into_iter();
+	};
+	let mut finder = BreakFinder {
+		targets: [block.hir_id, inner.hir_id],
+		values: Vec::new(),
+	};
+
+	finder.visit_block(inner);
+
+	finder.values.into_iter()
 }
 
 /// Whether a call name states pause, cap, or circuit-breaker intent.
@@ -1485,7 +1899,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 				);
 				diag.help(
 					"a differently named local wrapper counts when it returns `Result`/`Option` \
-					 and enforces a named guard in its outermost scope before any early `return`",
+					 and enforces a named guard in its outermost scope before any early success \
+					 `return` or `break`",
 				);
 				diag.help(
 					"if this drain is an account-close path, use `close_account_zeroed` so \

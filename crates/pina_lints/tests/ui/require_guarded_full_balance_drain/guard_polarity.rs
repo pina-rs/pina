@@ -297,6 +297,182 @@ fn process_or_of_failures(
 	vault.send_owned(&ID, vault.lamports(), recipient)
 }
 
+// `assert_eq!`/`assert_ne!` keep going only on the asserted value, which
+// here is the failing one.
+fn process_assert_eq_failure_true(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	assert_eq!(state.assert_within_window_cap().is_err(), true);
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_assert_ne_success_true(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	assert_ne!(state.assert_within_window_cap().is_ok(), true);
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_assert_failure(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	assert!(state.assert_within_window_cap().is_err());
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_is_ok_eq_true_returns(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().is_ok() == true {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_is_err_ne_false_else(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.assert_within_window_cap().is_err() != false {
+	} else {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_and_passing_returns(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	armed: bool,
+) -> Result<(), ()> {
+	if armed && state.assert_within_window_cap().is_ok() {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_bound_flag_negated(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let failed = state.assert_within_window_cap().is_err();
+
+	if !failed {
+		return Err(());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// The success arm consumes `Ok`, so the wildcard receives only the failure.
+fn process_success_arm_then_wildcard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	match state.assert_within_window_cap() {
+		Ok(()) => return Err(()),
+		_ => {}
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_if_let_success_returns(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if let Ok(()) = state.assert_within_window_cap() {
+		return Err(());
+	} else {
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// `or(Some(..))` replaces the failure with success.
+fn process_option_or_some(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	state.assert_within_window_cap().ok().or(Some(())).unwrap();
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// The failure arm consumes `Err`, so the wildcard receives only success.
+fn process_failure_arm_then_wildcard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	match state.assert_within_window_cap() {
+		Err(error) => return Err(error),
+		_ => {}
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// Returning the scrutinee's own non-`Ok` binding propagates the failure.
+fn process_returned_binding(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	match state.assert_within_window_cap() {
+		Ok(()) => {}
+		failure => return failure,
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// A catch-all binding that also receives `Ok` does not only propagate.
+fn process_returned_catch_all(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	strict: bool,
+) -> Result<(), ()> {
+	match state.assert_within_window_cap() {
+		Ok(()) if strict => {}
+		outcome => return outcome,
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
 fn main() {}
 
 // check-warn

@@ -292,6 +292,190 @@ fn process_unnamed_pause_helper(
 	//~^ WARN: an instruction path can sweep an account's entire balance in one call
 }
 
+// Constant success through a binding, and an error branch that cannot run.
+fn cap_bound_ok(_state: &CapState) -> Result<(), ()> {
+	let outcome = Ok(());
+	outcome
+}
+
+#[allow(unreachable_code)]
+fn cap_dead_err(_state: &CapState) -> Result<(), ()> {
+	if false {
+		return Err(());
+	}
+
+	Ok(())
+}
+
+fn labeled_policy(state: &CapState, bypass: bool) -> Result<(), ()> {
+	let outcome = 'check: {
+		if bypass {
+			break 'check Ok(());
+		}
+
+		state.assert_within_window_cap()
+	};
+
+	outcome
+}
+
+fn loop_policy(state: &CapState, bypass: bool) -> Result<(), ()> {
+	let outcome = loop {
+		if bypass {
+			break Ok(());
+		}
+
+		break state.assert_within_window_cap();
+	};
+
+	outcome
+}
+
+fn for_loop_policy(state: &CapState, items: &[u8]) -> Result<(), ()> {
+	for _ in items {}
+
+	state.assert_within_window_cap()?;
+
+	Ok(())
+}
+
+trait Guarded {
+	fn check_cap(&self) -> Result<(), ()>;
+}
+
+impl Guarded for CapState {
+	fn check_cap(&self) -> Result<(), ()> {
+		self.assert_within_window_cap()
+	}
+}
+
+fn const_cap<const N: usize>(state: &CapState) -> Result<(), ()> {
+	state.assert_within_window_cap()
+}
+
+fn process_constant_through_binding(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	cap_bound_ok(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_constant_behind_dead_branch(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	cap_dead_err(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_labeled_break_wrapper(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	bypass: bool,
+) -> Result<(), ()> {
+	labeled_policy(state, bypass)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_loop_break_wrapper(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	bypass: bool,
+) -> Result<(), ()> {
+	loop_policy(state, bypass)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_for_loop_wrapper(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	items: &[u8],
+) -> Result<(), ()> {
+	for_loop_policy(state, items)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_generic_trait<T: Guarded>(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	guarded: &T,
+) -> Result<(), ()> {
+	guarded.check_cap()?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_dyn_trait(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	guarded: &dyn Guarded,
+) -> Result<(), ()> {
+	guarded.check_cap()?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_ufcs_trait(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	<CapState as Guarded>::check_cap(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_const_generic<const N: usize>(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	const_cap::<N>(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// A closure or generic callable is named by its binding, not its body.
+fn process_closure_named_like_guard(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let cap_check = |state: &CapState| state.assert_within_window_cap();
+
+	cap_check(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_generic_callable<F: Fn(&CapState) -> Result<(), ()>>(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	cap_fn: F,
+) -> Result<(), ()> {
+	cap_fn(state)?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
 fn main() {}
 
 // check-warn

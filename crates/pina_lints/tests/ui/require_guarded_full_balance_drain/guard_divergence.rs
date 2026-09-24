@@ -254,6 +254,53 @@ fn process_assert_ne_fallible(
 	//~^ WARN: an instruction path can sweep an account's entire balance in one call
 }
 
+fn reject() -> Result<(), ()> {
+	Err(())
+}
+
+fn allow() -> Result<(), ()> {
+	Ok(())
+}
+
+// Returning a local helper that can only fail is an error return.
+fn process_return_rejecting_helper(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.is_paused() {
+		return reject();
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// Returning a local helper that can only succeed is not.
+fn process_return_allowing_helper(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.is_paused() {
+		return allow();
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+fn process_error_conversion(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	if state.is_paused() {
+		return Err(().into());
+	}
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
 fn main() {}
 
 // check-warn

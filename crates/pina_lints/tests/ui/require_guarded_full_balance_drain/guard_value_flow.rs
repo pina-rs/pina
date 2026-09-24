@@ -201,6 +201,69 @@ fn process_guard_in_closure(
 	//~^ WARN: an instruction path can sweep an account's entire balance in one call
 }
 
+// A labeled block can skip the guard with a successful `break`.
+fn process_labeled_break_bypass(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	bypass: bool,
+) -> Result<(), ()> {
+	let checked = 'check: {
+		if bypass {
+			break 'check Ok(());
+		}
+
+		state.assert_within_window_cap()
+	};
+
+	checked?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
+// A `break` that carries a failure still fails the propagated value.
+fn process_labeled_break_failure(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+	closed: bool,
+) -> Result<(), ()> {
+	let checked = 'check: {
+		if closed {
+			break 'check Err(());
+		}
+
+		state.assert_within_window_cap()
+	};
+
+	checked?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+// `pina::assert` on a flag whose failing value is unknown counts either way.
+fn process_pina_assert_flag(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	pina::assert(state.is_paused(), (), "paused")?;
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+}
+
+fn process_pina_assert_discarded(
+	vault: &mut AccountView,
+	recipient: &mut AccountView,
+	state: &CapState,
+) -> Result<(), ()> {
+	let _ = pina::assert(!state.is_paused(), (), "paused");
+
+	vault.send_owned(&ID, vault.lamports(), recipient)
+	//~^ WARN: an instruction path can sweep an account's entire balance in one call
+}
+
 fn main() {}
 
 // check-warn

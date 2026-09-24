@@ -207,13 +207,15 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		blessing: "Add the guard, or express the operation as a close when that is the intent, \
 		           since a close states where the remaining lamports go. The guard must behave \
 		           like one: its name states the pause or cap check (or it is a local wrapper \
-		           returning `Result` that enforces such a guard before any non-error return), \
-		           its receiver or an argument is derived from the handler's parameters, and its \
-		           failure stops the handler with `?`, `unwrap`, or a branch that returns `Err` \
-		           or panics. A discarded result, a branch that returns `Ok`, a zero-argument or \
-		           literal-only call, and a local callee that can only succeed do not count. \
-		           Where a drain is intended and bounded elsewhere, scope `#[allow]` to the \
-		           handler and name the compensating control.",
+		           returning `Result` that enforces such a guard before any early success \
+		           return), its receiver or an argument is derived from the handler's parameters, \
+		           and it stops the handler on the failing value with `?`, `unwrap`, or a branch \
+		           that returns `Err` or panics; the polarity of `is_err`, `is_ok`, and \
+		           `assert_eq!` is checked. A discarded result, a branch that returns `Ok`, a \
+		           zero-argument or literal-only call, a closure, and a local callee that can \
+		           only return a literal success do not count. Where a drain is intended and \
+		           bounded elsewhere, scope `#[allow]` to the handler and name the compensating \
+		           control.",
 	},
 	LintExplanation {
 		name: "require_idl_root_to_define_one_program_id",
