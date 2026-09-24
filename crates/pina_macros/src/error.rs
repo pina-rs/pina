@@ -6,6 +6,9 @@ use quote::quote;
 use quote::quote_spanned;
 use syn::Attribute;
 use syn::ItemEnum;
+use syn::Meta;
+use syn::Token;
+use syn::punctuated::Punctuated;
 
 use crate::args::ErrorArgs;
 
@@ -81,14 +84,14 @@ fn reserved_range_assertion(
 	let cfg_attrs = variant
 		.attrs
 		.iter()
-		.filter(|attr| attr.path().is_ident("cfg"));
+		.filter_map(|attr| presence_condition(&attr.meta));
 
 	// The quoted range mirrors `pina::RESERVED_ERROR_CODE_START`, which the
 	// comparison itself reads so the boundary has one source of truth.
 	// `allow(deprecated)` keeps a deprecated variant from warning at a use
 	// site the author never wrote.
 	quote_spanned! {variant_name.span()=>
-		#(#cfg_attrs)*
+		#(#[#cfg_attrs])*
 		#[allow(deprecated)]
 		const _: () = ::core::assert!(
 			(#enum_name::#variant_name as u32) < #crate_path::RESERVED_ERROR_CODE_START,
@@ -102,6 +105,39 @@ fn reserved_range_assertion(
 			)
 		);
 	}
+}
+
+/// Keeps the part of a variant attribute that decides whether the variant
+/// exists: a `cfg`, or a `cfg_attr` reduced to the `cfg`s it can produce.
+///
+/// `cfg_attr` may expand to `cfg`, and may nest, so it is rebuilt recursively
+/// with its predicates intact. Everything else is dropped, because an attribute
+/// such as `serde(...)` or `doc` is not valid on the generated `const`.
+fn presence_condition(meta: &Meta) -> Option<Meta> {
+	if meta.path().is_ident("cfg") {
+		return Some(meta.clone());
+	}
+
+	if !meta.path().is_ident("cfg_attr") {
+		return None;
+	}
+
+	// A malformed `cfg_attr` is left to rustc, which reports it on the variant.
+	let Meta::List(list) = meta else {
+		return None;
+	};
+	let mut parts = list
+		.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+		.ok()?
+		.into_iter();
+	let predicate = parts.next()?;
+	let conditions: Vec<Meta> = parts.filter_map(|part| presence_condition(&part)).collect();
+
+	if conditions.is_empty() {
+		return None;
+	}
+
+	Some(syn::parse_quote!(cfg_attr(#predicate, #(#conditions),*)))
 }
 
 #[cfg(test)]
@@ -182,5 +218,75 @@ mod tests {
 			"only the variant's `cfg` carries over: {expanded}"
 		);
 		assert_eq!(expanded.matches("Onlywith").count(), 1);
+	}
+
+	fn condition(meta: syn::Meta) -> Option<String> {
+		super::presence_condition(&meta).map(|kept| squeezed(&quote::quote!(#kept).to_string()))
+	}
+
+	#[test]
+	fn cfg_attr_keeps_only_the_cfg_it_can_produce() {
+		assert_eq!(
+			condition(syn::parse_quote!(cfg(feature = "extra"))).as_deref(),
+			Some("cfg(feature=\"extra\")")
+		);
+		assert_eq!(
+			condition(syn::parse_quote!(cfg_attr(
+				not(feature = "extra"),
+				serde(rename = "x"),
+				cfg(feature = "extra"),
+				doc = "kept on the variant only"
+			)))
+			.as_deref(),
+			Some("cfg_attr(not(feature=\"extra\"),cfg(feature=\"extra\"))")
+		);
+		assert_eq!(
+			condition(syn::parse_quote!(cfg_attr(
+				unix,
+				cfg_attr(all(), cfg(feature = "extra"), allow(unused)),
+				cfg_attr(windows, doc = "dropped")
+			)))
+			.as_deref(),
+			Some("cfg_attr(unix,cfg_attr(all(),cfg(feature=\"extra\")))")
+		);
+	}
+
+	#[test]
+	fn attributes_that_cannot_remove_the_variant_are_dropped() {
+		for meta in [
+			syn::parse_quote!(deprecated),
+			syn::parse_quote!(serde(rename = "x")),
+			syn::parse_quote!(cfg_attr(unix, serde(rename = "x"))),
+			// Malformed `cfg_attr` forms are rustc's to report on the variant.
+			syn::parse_quote!(cfg_attr),
+			syn::parse_quote!(cfg_attr = "unix"),
+			syn::parse_quote!(cfg_attr()),
+			syn::parse_quote!(cfg_attr(1 + 1)),
+		] {
+			let rendered = quote::quote!(#meta).to_string();
+
+			assert_eq!(condition(meta), None, "`{rendered}` must be dropped");
+		}
+	}
+
+	#[test]
+	fn a_cfg_attr_variant_condition_reaches_the_assertion() {
+		let expanded = squeezed(&expand_with(
+			quote::quote!(),
+			quote::quote!(
+				pub enum MyError {
+					#[cfg_attr(not(feature = "extra"), cfg(feature = "extra"), allow(unused))]
+					Extra = 1,
+				}
+			),
+		));
+
+		assert!(
+			expanded.contains(
+				"#[cfg_attr(not(feature=\"extra\"),cfg(feature=\"extra\"))]#\
+				 [allow(deprecated)]const_:()="
+			),
+			"the assertion must share the variant's `cfg_attr`: {expanded}"
+		);
 	}
 }
