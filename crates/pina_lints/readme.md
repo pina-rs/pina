@@ -315,6 +315,22 @@ for account in remaining {
 
 Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases and computes loop-carried state to a fixed point. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound, including for later iterations of an enclosing loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
+### `require_guarded_full_balance_drain`
+
+Detects an instruction handler that sends an account's entire `lamports()` balance with `send` or `send_owned` when no pause, circuit-breaker, or withdrawal-cap guard runs first on every path, and no close of the same account does.
+
+```rust
+fn enforce_withdrawal_policy(config: &VaultConfig) -> Result<(), ProgramError> {
+	assert_not_paused(config)?;
+	config.assert_within_window_cap()
+}
+
+enforce_withdrawal_policy(&config)?;
+vault.send_owned(&ID, vault.lamports(), recipient)?;
+```
+
+A call counts as the guard only when it behaves like one. Its failure must stop the handler before the drain: `?`, `unwrap()`, `expect()` (through `map_err` or `inspect_err`), or an `if`, `match`, or `let ... else` that returns on failure. It must also read the state it checks, as a receiver or an argument that refers to a local binding. A discarded result such as `let _ = state.check_limits();`, a guard that cannot fail, and a zero-argument or literal-only call such as `check_limits()?` do not count. The name still has to state the intent — a fragment of `pause`, `cap`, `circuit`, `halt`, `guard`, `limit`, or `throttle` — because behavior alone cannot tell a cap check from `assert_signer()?`, which every handler propagates. A differently named local function counts when its own body enforces such a guard on every path, followed up to three wrappers deep, so `enforce_withdrawal_policy(&config)?` above is accepted. Guards from other crates are judged by their name and call-site behavior only. The analysis is lexical: a guard confined to one branch or a loop body does not dominate the drain, and an early `return Ok(..)` inside a wrapper before its guard is not detected.
+
 ## Performance reference
 
 ### `deny_heap_allocations_in_onchain_instruction_handlers`

@@ -205,9 +205,12 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		            Once the sweep authority leaks, nothing on-chain slows the drain; a pause \
 		            switch plus a per-window cap bounds the blast radius.",
 		blessing: "Add the guard, or express the operation as a close when that is the intent, \
-		           since a close states where the remaining lamports go. Where a drain is \
-		           intended and bounded elsewhere, scope `#[allow]` to the handler and name the \
-		           compensating control.",
+		           since a close states where the remaining lamports go. The guard must behave \
+		           like one: pass it the state or config it checks, and let its failure stop the \
+		           handler with `?` or an early return. A discarded result or a zero-argument \
+		           call does not count; a differently named local wrapper counts when its body \
+		           enforces the named guard. Where a drain is intended and bounded elsewhere, \
+		           scope `#[allow]` to the handler and name the compensating control.",
 	},
 	LintExplanation {
 		name: "require_idl_root_to_define_one_program_id",

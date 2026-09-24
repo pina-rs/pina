@@ -1,22 +1,31 @@
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
 
+use rustc_hir::BinOpKind;
 use rustc_hir::Block;
 use rustc_hir::Body;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
 use rustc_hir::MatchSource;
+use rustc_hir::Node;
 use rustc_hir::PatKind;
 use rustc_hir::QPath;
 use rustc_hir::Stmt;
 use rustc_hir::StmtKind;
+use rustc_hir::UnOp;
+use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
+use rustc_hir::def_id::DefId;
+use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::FnKind;
+use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
+use rustc_middle::ty::TypeckResults;
 use rustc_span::Span;
 
 use crate::diagnostics;
@@ -28,6 +37,19 @@ crate::declare_late_lint! {
 	/// Warns when an instruction handler can sweep an account's entire
 	/// balance to a recipient in a single call without a preceding pause,
 	/// circuit-breaker, or withdrawal-cap guard.
+	///
+	/// A call counts as the guard only when it behaves like one:
+	///
+	/// - its result is enforced before the drain, through `?`, `unwrap()`,
+	///   `expect()`, or an `if`, `match`, or `let ... else` that leaves the
+	///   function on failure — a discarded result gates nothing;
+	/// - it reads the state it checks, as a receiver or an argument that
+	///   refers to a local binding — a zero-argument call cannot inspect the
+	///   configuration it claims to guard; and
+	/// - its name says it is a pause, cap, circuit-breaker, halt, guard,
+	///   limit, or throttle check, or it is a local function whose body
+	///   enforces such a check on every path, so a differently named wrapper
+	///   still counts.
 	///
 	/// ### Why is this bad?
 	///
@@ -48,17 +70,42 @@ const CLOSE_METHODS: &[&str] = &[
 	"close_with_recipient",
 	"close_account_zeroed",
 ];
+/// Name fragments that state a call's intent to gate value movement.
+///
+/// The name alone is never enough: a guard must also enforce its result and
+/// read the state it checks. The name stays a requirement because behavior
+/// alone cannot tell a pause or cap check from any other propagated
+/// validation — every handler propagates `assert_signer()?` on an account
+/// before it moves funds, and that is not a circuit breaker.
 const GUARD_TERMS: &[&str] = &[
 	"pause", "cap", "circuit", "halt", "guard", "limit", "throttle",
 ];
 const TARGET_NEEDLES: &[&str] = &["process", "process_instruction", "instruction"];
+/// `Result` and `Option` adapters that keep a guard's failure observable, so
+/// the enforcement can happen on the adapted value instead.
+const FAILURE_PRESERVING_METHODS: &[&str] = &[
+	"inspect",
+	"inspect_err",
+	"is_err",
+	"is_none",
+	"is_ok",
+	"is_some",
+	"map_err",
+	"ok_or",
+	"ok_or_else",
+];
+/// `Result` and `Option` extractors that abort the transaction on failure.
+const FAILURE_ABORTING_METHODS: &[&str] = &["expect", "unwrap"];
+/// How many nested local wrappers the analysis follows to find the guard a
+/// differently named call delegates to.
+const MAX_WRAPPER_DEPTH: usize = 3;
 
 /// What the analysis learned about one full-balance drain candidate.
 #[derive(Debug, Clone, Copy)]
 struct DrainFacts {
 	/// The drained account's own complete balance is what leaves the account.
 	full_balance: bool,
-	/// A guard-shaped call runs first on every path that reaches the drain.
+	/// A behaving guard runs first on every path that reaches the drain.
 	guarded: bool,
 	/// A same-receiver close or zeroing call runs first the same way.
 	closing: bool,
@@ -84,12 +131,22 @@ struct SeenGuard {
 /// an early-return guard written in the `if` condition, which is evaluated in
 /// the enclosing scope. Proving full dominance is beyond a lexical lint, so the
 /// diagnostic also states its control-flow limitation.
-#[derive(Default)]
-struct DrainAnalyzer<'tcx> {
+///
+/// The same traversal analyzes a local wrapper's body: the wrapper is a guard
+/// when a behaving guard dominates the end of that body.
+struct DrainAnalyzer<'a, 'tcx> {
+	cx: &'a LateContext<'tcx>,
+	/// Type-check results of the body being walked. A wrapper body has its
+	/// own, so these cannot come from `cx`, which only knows the handler.
+	typeck: &'tcx TypeckResults<'tcx>,
+	/// The walked body's value: an expression that reaches it is returned.
+	body_value: HirId,
+	/// Local functions entered to reach this body, so wrapper recursion ends.
+	callers: Vec<LocalDefId>,
 	/// One identifier per scope pushed as the traversal descends.
 	scopes: Vec<u32>,
 	next_scope: u32,
-	/// Guard-shaped and close calls visited so far, in traversal order.
+	/// Guard and close calls visited so far, in traversal order.
 	guards: Vec<SeenGuard>,
 	/// Initializer of every `let` binding, so rebinding chains resolve.
 	initializers: HashMap<HirId, &'tcx Expr<'tcx>>,
@@ -99,10 +156,26 @@ struct DrainAnalyzer<'tcx> {
 	order: Vec<Span>,
 }
 
-impl<'tcx> DrainAnalyzer<'tcx> {
+impl<'a, 'tcx> DrainAnalyzer<'a, 'tcx> {
 	/// Analyze a whole function body.
-	fn analyze(body: &'tcx Body<'tcx>) -> Self {
-		let mut analyzer = Self::default();
+	fn analyze(
+		cx: &'a LateContext<'tcx>,
+		typeck: &'tcx TypeckResults<'tcx>,
+		body: &'tcx Body<'tcx>,
+		callers: Vec<LocalDefId>,
+	) -> Self {
+		let mut analyzer = Self {
+			cx,
+			typeck,
+			body_value: body.value.hir_id,
+			callers,
+			scopes: Vec::new(),
+			next_scope: 0,
+			guards: Vec::new(),
+			initializers: HashMap::new(),
+			drains: HashMap::new(),
+			order: Vec::new(),
+		};
 
 		analyzer.visit_expr(body.value);
 
@@ -148,19 +221,163 @@ impl<'tcx> DrainAnalyzer<'tcx> {
 		}
 	}
 
-	/// Record a call that may guard or close a later drain.
-	fn record_guard(&mut self, method: &str, receiver: Option<String>) {
-		let lowercase = method.to_ascii_lowercase();
-		let is_guard = GUARD_TERMS.iter().any(|term| lowercase.contains(term));
-		let is_close = CLOSE_METHODS.contains(&method);
+	/// Record a call when it behaves like a guard or closes an account.
+	fn record_call(
+		&mut self,
+		call: &'tcx Expr<'tcx>,
+		name: &str,
+		receiver: Option<String>,
+		inputs: &[&'tcx Expr<'tcx>],
+		callee: Option<DefId>,
+	) {
+		let is_close = CLOSE_METHODS.contains(&name) && receiver.is_some();
 
-		if is_guard || is_close {
+		if is_close || self.is_guard(call, name, inputs, callee) {
 			self.guards.push(SeenGuard {
 				scopes: self.scopes.clone(),
 				receiver,
 				is_close,
 			});
 		}
+	}
+
+	/// Whether `call` behaves like a guard: it enforces its result, reads the
+	/// state it checks, and either names the check or delegates to a local
+	/// function that performs one.
+	fn is_guard(
+		&self,
+		call: &'tcx Expr<'tcx>,
+		name: &str,
+		inputs: &[&'tcx Expr<'tcx>],
+		callee: Option<DefId>,
+	) -> bool {
+		if !inputs.iter().any(|input| reads_local_binding(input)) || !self.result_is_enforced(call)
+		{
+			return false;
+		}
+
+		names_guard(name) || callee.is_some_and(|callee| self.is_guard_wrapper(callee))
+	}
+
+	/// Whether a local function enforces a guard on every path through its
+	/// body, so a call to it gates the caller the same way.
+	fn is_guard_wrapper(&self, callee: DefId) -> bool {
+		let tcx = self.cx.tcx;
+		let Some(local) = callee.as_local() else {
+			return false;
+		};
+
+		if self.callers.len() > MAX_WRAPPER_DEPTH
+			|| self.callers.contains(&local)
+			|| !matches!(tcx.def_kind(callee), DefKind::Fn | DefKind::AssocFn)
+		{
+			return false;
+		}
+
+		let Some(body) = tcx.hir_maybe_body_owned_by(local) else {
+			return false;
+		};
+		let mut callers = self.callers.clone();
+
+		callers.push(local);
+
+		// The analysis ends at the body's outermost scope, so a guard counts
+		// only when no branch or loop can skip it.
+		DrainAnalyzer::analyze(self.cx, tcx.typeck(local), body, callers)
+			.has_dominant(|guard| !guard.is_close)
+	}
+
+	/// Whether a failure of `call` stops execution before the code after it:
+	/// the result is propagated with `?`, extracted with `unwrap()` or
+	/// `expect()`, returned from the function, or tested by an `if`, `match`,
+	/// or `let ... else` whose failure side leaves the function.
+	///
+	/// A call whose result is discarded, or only inspected, gates nothing.
+	fn result_is_enforced(&self, call: &Expr<'_>) -> bool {
+		let tcx = self.cx.tcx;
+		let mut child = call.hir_id;
+
+		loop {
+			if child == self.body_value {
+				return true;
+			}
+
+			let parent = match tcx.parent_hir_node(child) {
+				Node::Expr(parent) => parent,
+				// A block's tail is the block's value.
+				Node::Block(block) if block.expr.is_some_and(|tail| tail.hir_id == child) => {
+					child = block.hir_id;
+					continue;
+				}
+				// `let ... else` requires the else block to diverge.
+				Node::LetStmt(local) => {
+					return local.els.is_some()
+						&& local.init.is_some_and(|init| init.hir_id == child);
+				}
+				_ => return false,
+			};
+
+			match &parent.kind {
+				// `guard(..)?` lowers to a match on `Try::branch(guard(..))`.
+				ExprKind::Call(_, [argument]) if argument.hir_id == child => {
+					return matches!(
+						tcx.parent_hir_node(parent.hir_id),
+						Node::Expr(Expr {
+							kind: ExprKind::Match(scrutinee, _, MatchSource::TryDesugar(_)),
+							..
+						}) if scrutinee.hir_id == parent.hir_id
+					);
+				}
+				ExprKind::MethodCall(_, receiver, ..) if receiver.hir_id == child => {
+					if self.is_fallible_method(parent, FAILURE_ABORTING_METHODS) {
+						return true;
+					}
+
+					if !self.is_fallible_method(parent, FAILURE_PRESERVING_METHODS) {
+						return false;
+					}
+				}
+				ExprKind::If(condition, then, _) if condition.hir_id == child => {
+					return self.diverges(then);
+				}
+				ExprKind::Match(scrutinee, arms, MatchSource::Normal)
+					if scrutinee.hir_id == child =>
+				{
+					return arms.iter().any(|arm| self.diverges(arm.body));
+				}
+				ExprKind::Ret(Some(value)) if value.hir_id == child => return true,
+				// Either failing operand takes the diverging branch.
+				ExprKind::Binary(operator, ..) if operator.node == BinOpKind::Or => {}
+				ExprKind::Unary(UnOp::Not, _)
+				| ExprKind::Let(_)
+				| ExprKind::Block(..)
+				| ExprKind::DropTemps(_)
+				| ExprKind::Use(..)
+				| ExprKind::Type(..) => {}
+				_ => return false,
+			}
+
+			child = parent.hir_id;
+		}
+	}
+
+	/// Whether `expr` resolves to one of `methods` on core's `Result` or
+	/// `Option`, rather than a local method that happens to share the name.
+	fn is_fallible_method(&self, expr: &Expr<'_>, methods: &[&str]) -> bool {
+		let Some(definition) = self.typeck.type_dependent_def_id(expr.hir_id) else {
+			return false;
+		};
+		let tcx = self.cx.tcx;
+		let path = tcx.def_path_str(definition);
+
+		tcx.crate_name(definition.krate).as_str() == "core"
+			&& (path.contains("::result::Result") || path.contains("::option::Option"))
+			&& methods.contains(&tcx.item_name(definition).as_str())
+	}
+
+	/// Whether evaluating `expr` never continues past it.
+	fn diverges(&self, expr: &Expr<'_>) -> bool {
+		self.typeck.expr_ty(expr).is_never()
 	}
 
 	/// Visit `expr` inside a scope a guard cannot escape to stay dominant.
@@ -248,7 +465,12 @@ impl<'tcx> DrainAnalyzer<'tcx> {
 					);
 					self.order.push(expr.span);
 				} else {
-					self.record_guard(method, receiver_identity);
+					// The receiver is the state a method-style guard reads.
+					let inputs: Vec<&'tcx Expr<'tcx>> =
+						std::iter::once(*receiver).chain(arguments.iter()).collect();
+					let callee = self.typeck.type_dependent_def_id(expr.hir_id);
+
+					self.record_call(expr, method, receiver_identity, &inputs, callee);
 				}
 
 				self.visit_expr(receiver);
@@ -296,6 +518,18 @@ impl<'tcx> DrainAnalyzer<'tcx> {
 				let _ = closure;
 			}
 			ExprKind::Call(callee, arguments) => {
+				if let ExprKind::Path(qpath) = &callee.kind
+					&& let Some(name) = qpath_name(qpath)
+				{
+					let definition = match self.typeck.qpath_res(qpath, callee.hir_id) {
+						Res::Def(_, definition) => Some(definition),
+						_ => None,
+					};
+					let inputs: Vec<&'tcx Expr<'tcx>> = arguments.iter().collect();
+
+					self.record_call(expr, name, None, &inputs, definition);
+				}
+
 				self.visit_expr(callee);
 
 				for argument in *arguments {
@@ -346,6 +580,50 @@ impl<'tcx> DrainAnalyzer<'tcx> {
 	}
 }
 
+/// Whether a call name states pause, cap, or circuit-breaker intent.
+fn names_guard(name: &str) -> bool {
+	let lowercase = name.to_ascii_lowercase();
+
+	GUARD_TERMS.iter().any(|term| lowercase.contains(term))
+}
+
+/// The final segment of a called path: `check` in `limits::check(..)`.
+fn qpath_name<'hir>(qpath: &QPath<'hir>) -> Option<&'hir str> {
+	match qpath {
+		QPath::Resolved(_, path) => {
+			path.segments
+				.last()
+				.map(|segment| segment.ident.name.as_str())
+		}
+		QPath::TypeRelative(_, segment) => Some(segment.ident.name.as_str()),
+	}
+}
+
+/// Whether `expr` mentions a local binding — a parameter such as `self` or
+/// the handler's accounts, or a value computed from them.
+///
+/// Literals and constants cannot carry the state a guard checks, so a guard
+/// whose inputs are all compile-time values is a name, not a check.
+fn reads_local_binding<'hir>(expr: &'hir Expr<'hir>) -> bool {
+	struct LocalFinder {
+		found: bool,
+	}
+
+	impl<'hir> Visitor<'hir> for LocalFinder {
+		fn visit_path(&mut self, path: &rustc_hir::Path<'hir>, _: HirId) {
+			self.found |= matches!(path.res, Res::Local(_));
+
+			rustc_hir::intravisit::walk_path(self, path);
+		}
+	}
+
+	let mut finder = LocalFinder { found: false };
+
+	finder.visit_expr(expr);
+
+	finder.found
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 	fn check_fn(
 		&mut self,
@@ -354,7 +632,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 		_: &'tcx rustc_hir::FnDecl<'tcx>,
 		body: &'tcx Body<'tcx>,
 		_: Span,
-		def_id: rustc_hir::def_id::LocalDefId,
+		def_id: LocalDefId,
 	) {
 		let def_path = cx.tcx.def_path_str(def_id.to_def_id());
 		if shared::should_skip_def_path(&def_path)
@@ -363,7 +641,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 			return;
 		}
 
-		let analyzer = DrainAnalyzer::analyze(body);
+		let analyzer = DrainAnalyzer::analyze(cx, cx.typeck_results(), body, vec![def_id]);
 
 		for span in &analyzer.order {
 			let Some(facts) = analyzer.drains.get(span) else {
@@ -382,6 +660,12 @@ impl<'tcx> LateLintPass<'tcx> for RequireGuardedFullBalanceDrain {
 					"gate full-balance sweeps behind a pause or circuit-breaker check (a pause \
 					 flag plus a per-window withdrawal cap bounds a compromised key's blast \
 					 radius)",
+				);
+				diag.help(
+					"a guard counts only when it reads the state it checks (a receiver or \
+					 argument) and its failure stops the handler before the drain (`?`, \
+					 `unwrap`/`expect`, or an `if`/`match`/`let ... else` that returns); a \
+					 differently named local wrapper counts when its body enforces such a guard",
 				);
 				diag.help(
 					"if this drain is an account-close path, use `close_account_zeroed` so \
