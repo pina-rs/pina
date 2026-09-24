@@ -245,7 +245,9 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		           scoped `#[allow]` with the reason the snapshot is still correct. When the \
 		           account comes from a `&mut self` accessor, bind it once and use that binding \
 		           for the reads and the transfer: a read through a `let` binding and a transfer \
-		           into a separate inline call are not matched.",
+		           into a separate inline call are not matched. Give each result of a \
+		           hand-written cursor its own binding name: rebinding `let acct = \
+		           cursor.take()?;` under the same name is treated as one account.",
 	},
 	LintExplanation {
 		name: "require_program_check_before_cpi",
