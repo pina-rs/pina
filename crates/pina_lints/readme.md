@@ -120,14 +120,20 @@ The lint tracks lexical call order and receiver identity. It does not infer writ
 
 ### `require_zeroed_before_close`
 
-Detects `close()` or `close_with_recipient()` without an earlier `zeroed()` on the same account. Prefer `close_account_zeroed()` when the combined helper fits.
+Detects `close()` or `close_with_recipient()` without first zeroing the same account's data. Prefer `close_account_zeroed()` or the `CloseAccountZeroed` builder, which zero the data and close in one step and are never flagged:
 
 ```rust
-state.zeroed()?;
+state.close_account_zeroed(&ID, recipient)?;
+```
+
+When the close must stay separate, clear the whole data buffer first:
+
+```rust
+state.try_borrow_mut()?.fill(0);
 state.close_with_recipient(&ID, recipient)?;
 ```
 
-This protects against stale bytes remaining observable during the transaction. The lint intentionally does not flag the combined zeroing close helper.
+This protects against stale bytes remaining observable during the transaction. The zeroing proof is a `fill(0)` resolved to `core`'s slice method over the entire buffer returned by `try_borrow_mut()?`, chained directly or through a `let` binding of that buffer. Receivers resolve through the shared fact collector's alias chains, so zeroing through `let alias = &mut *state;` proves `state` and closing through an alias of a zeroed account passes, while zeroing a different account proves nothing. A partial fill (`data[..8].fill(0)`), a non-zero fill, a same-named non-slice `fill`, and a binding reassigned after its `let` are not proofs. Indexed receivers such as `accounts[0]` collapse to their base binding, so review index-addressed closes manually.
 
 ### `require_sysvar_assert_before_sysvar_use`
 

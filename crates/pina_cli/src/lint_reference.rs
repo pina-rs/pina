@@ -304,7 +304,9 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 	LintExplanation {
 		name: "require_zeroed_before_close",
 		default_level: "deny",
-		contract: "Call `zeroed()` on an account before closing it.",
+		contract: "Zero an account's data before closing it: close with `close_account_zeroed()`, \
+		           or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` before \
+		           `close_with_recipient()` or `close()`.",
 		rationale: "A closed account's lamports are gone but its data survives until the account \
 		            is reused. A later instruction that reads before writing sees the previous \
 		            contents, so stale data can be reinterpreted as valid state.",

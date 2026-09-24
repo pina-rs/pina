@@ -211,7 +211,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
-- **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
+- **Use `close_account_zeroed(&ID, recipient)` or `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()`** when stale account bytes must be invalidated before close; when the close must stay separate, clear the whole buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient(&ID, recipient)`
 - **Use `CreateProgramAccount` or `CreateCompactProgramAccount` for canonical PDA creation**; their explicit-bump variants also reject noncanonical bumps without separate seed assertions
 - **Keep `assert_seeds()` / `assert_canonical_bump()` for validation-only paths** that are not immediately followed by a checked creation builder
 - **Give each account type its own seed namespace** so PDAs cannot collide across account types
@@ -223,7 +223,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 Closing guidance under Pinocchio 0.11:
 
 - `close_with_recipient(&ID, recipient)` verifies that `ID` owns the account, transfers its lamports, and closes the account handle. It does not zero or resize account data.
-- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or manually call `zeroed()` before `close_with_recipient(&ID, recipient)`.
+- When stale bytes must be invalidated, use `close_account_zeroed(&ID, recipient)` or `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()`. When the close must stay separate, clear the whole data buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient(&ID, recipient)`.
 - The `account-resize` feature only affects realloc helpers; it does not change close semantics.
 
 <!-- {/pinaCloseAccountGuidance} -->

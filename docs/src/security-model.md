@@ -68,7 +68,7 @@ Historical events are immutable. Generated event decoders validate their exact r
 Closing guidance under Pinocchio 0.11:
 
 - `close_with_recipient(&ID, recipient)` verifies that `ID` owns the account, transfers its lamports, and closes the account handle. It does not zero or resize account data.
-- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or manually call `zeroed()` before `close_with_recipient(&ID, recipient)`.
+- When stale bytes must be invalidated, use `close_account_zeroed(&ID, recipient)` or `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()`. When the close must stay separate, clear the whole data buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient(&ID, recipient)`.
 - The `account-resize` feature only affects realloc helpers; it does not change close semantics.
 
 <!-- {/pinaCloseAccountGuidance} -->
@@ -90,7 +90,7 @@ Closing guidance under Pinocchio 0.11:
 - **Use `as_account::<T>()` or `as_account_mut::<T>()`** when a handler needs fixed-account fields; these guard-backed loaders check the owner, discriminator, exact size, and nested values
 - **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
-- **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
+- **Use `close_account_zeroed(&ID, recipient)` or `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()`** when stale account bytes must be invalidated before close; when the close must stay separate, clear the whole buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient(&ID, recipient)`
 - **Use `CreateProgramAccount` or `CreateCompactProgramAccount` for canonical PDA creation**; their explicit-bump variants also reject noncanonical bumps without separate seed assertions
 - **Reserve `CreateProgramAccountWithUncheckedBump` for seed namespaces that already bind uniqueness**; it checks the supplied bump derives the account's address but does not prove it canonical
 - **Keep `assert_seeds()` / `assert_canonical_bump()` for validation-only paths** that are not immediately followed by a checked creation builder
