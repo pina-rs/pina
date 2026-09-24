@@ -78,6 +78,8 @@ Instruction cases with the same result fail on every unapproved increase. A revi
 
 Static profiles warn when both the absolute and percentage warning thresholds are reached, and fail when both failure thresholds are reached. Smaller static increases stay visible as regressions. Programs and instructions are discovered from the head checkout. Head-only items create baselines; missing head measurements fail.
 
+A Surfpool batch that exits nonzero fails the head measurement, with one exception: when every test binary in the batch printed `test result: ok` and every instruction case the batch owns has at least one sample, the exit came from the Surfpool runtime shutting down after the measurements landed. The report records that batch under `incompleteTeardowns` and lists it as a tolerated teardown exit instead of failing. A failed test, a binary that died before its summary, or a case without samples still fails.
+
 The workflow uploads the reports, manifests, copied ELF files, and SHA-256 hashes as CI artifacts. This provenance prevents a successful report from silently describing a stale or different binary.
 
 ## Run the comparison locally

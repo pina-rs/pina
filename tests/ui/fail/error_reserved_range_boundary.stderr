@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000
+ --> tests/ui/fail/error_reserved_range_boundary.rs:7:2
+  |
+7 |     Boundary = 0xFFFF_0000,
+  |     ^^^^^^^^ evaluation of `_` failed here

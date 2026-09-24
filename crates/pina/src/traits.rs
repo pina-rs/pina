@@ -1068,6 +1068,32 @@ pub trait CloseAccountWithRecipient {
 /// `distinct = false` escape hatch uses [`Self::remaining_mut`] to preserve
 /// aliases for instruction contracts that intentionally allow them.
 ///
+/// # Alias rules
+///
+/// Alias checks look forward. A mutable account parsed through
+/// [`Self::next_mut`] or [`Self::next_mut_opt`] must not appear in any later
+/// slot, whichever way that slot is parsed. An account that is already parsed
+/// has left the cursor, so a readonly slot followed by a mutable slot for the
+/// same account is accepted. This is deliberate: an authority that signs
+/// readonly and also pays as a writable payer is one account in two slots,
+/// and the runtime marks both slots writable. Declare the readonly field first
+/// when an instruction allows that overlap. When the fields must be distinct
+/// accounts, check it explicitly (compare the two addresses) instead of relying
+/// on declaration order.
+///
+/// # Account identity
+///
+/// The runtime serializes a repeated account once and marks every later slot
+/// as a duplicate of it, and the entrypoint deserializer makes each duplicate
+/// slot a copy of the original [`AccountView`]. Two slots therefore name the
+/// same account exactly when their views compare equal, which is one pointer
+/// comparison rather than a writable-flag load and a 32-byte address
+/// comparison. Views built outside the entrypoint deserializer with separate
+/// headers for the same address (hand-written host fixtures, for example) are
+/// distinct accounts to the cursor.
+///
+/// # Optional accounts
+///
 /// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) may
 /// be absent at the end of the account slice. Within a positional list, a slot
 /// holding the executing program's own address marks the value as absent,
@@ -1217,11 +1243,10 @@ impl<'a> AccountsCursor<'a> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for (index, account) in remaining.iter().enumerate() {
 			validate_writable(*account)?;
-			if remaining[..index]
-				.iter()
-				.any(|previous| previous.address() == account.address())
-			{
-				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			for previous in &remaining[..index] {
+				if previous == account {
+					return Err(PinaProgramError::DuplicateMutableAccount.into());
+				}
 			}
 		}
 
@@ -1237,25 +1262,21 @@ impl<'a> AccountsCursor<'a> {
 		Err(PinaProgramError::TooManyAccountKeys.into())
 	}
 
-	/// Reject a mutable account that aliases a writable account still in the
-	/// cursor's remaining slice.
+	/// Reject a mutable account that appears again in the cursor's remaining
+	/// slice.
 	///
 	/// This check protects fields parsed individually through [`Self::next_mut`]
-	/// and [`Self::next_mut_opt`]. It does not inspect pairs contained entirely
+	/// and [`Self::next_mut_opt`]; see the type-level alias rules for why it
+	/// only looks forward. Both callers have already required the account to
+	/// be writable, and a duplicate slot shares its header, so every alias it
+	/// finds is writable too. It does not inspect pairs contained entirely
 	/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
 	/// that stricter trailing check.
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
-		if !account.is_writable() {
-			return Ok(());
-		}
-
-		let address = account.address();
-		let aliases_future_writable_account = self
-			.remaining
-			.iter()
-			.any(|remaining| remaining.is_writable() && remaining.address() == address);
-		if aliases_future_writable_account {
-			return Err(PinaProgramError::DuplicateMutableAccount.into());
+		for remaining in &*self.remaining {
+			if *remaining == account {
+				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			}
 		}
 
 		Ok(())

@@ -43,6 +43,26 @@ impl ::core::cmp::PartialEq for MyError {
 }
 #[automatically_derived]
 impl ::core::cmp::Eq for MyError {}
+#[allow(deprecated)]
+const _: () = if !((MyError::Invalid as u32) < pina::RESERVED_ERROR_CODE_START) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `MyError::Invalid` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
+#[allow(deprecated)]
+const _: () = if !((MyError::Duplicate as u32) < pina::RESERVED_ERROR_CODE_START) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `MyError::Duplicate` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
 impl ::core::convert::From<MyError> for pina::ProgramError {
     fn from(e: MyError) -> Self {
         pina::ProgramError::Custom(e as u32)
@@ -59,6 +79,16 @@ impl ::core::fmt::Debug for FinalError {
         ::core::fmt::Formatter::write_str(f, "Unauthorized")
     }
 }
+#[allow(deprecated)]
+const _: () = if !((FinalError::Unauthorized as u32) < pina::RESERVED_ERROR_CODE_START) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `FinalError::Unauthorized` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
 impl ::core::convert::From<FinalError> for pina::ProgramError {
     fn from(e: FinalError) -> Self {
         pina::ProgramError::Custom(e as u32)
@@ -94,6 +124,63 @@ impl ::core::fmt::Debug for DetailedError {
         )
     }
 }
+#[allow(deprecated)]
+const _: () = if !((DetailedError::InsufficientFunds as u32)
+    < pina::RESERVED_ERROR_CODE_START)
+{
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DetailedError::InsufficientFunds` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
+#[allow(deprecated)]
+const _: () = if !((DetailedError::AlreadyInitialized as u32)
+    < pina::RESERVED_ERROR_CODE_START)
+{
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DetailedError::AlreadyInitialized` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
+#[allow(deprecated)]
+const _: () = if !((DetailedError::InvalidAuthority as u32)
+    < pina::RESERVED_ERROR_CODE_START)
+{
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DetailedError::InvalidAuthority` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
+#[allow(deprecated)]
+const _: () = if !((DetailedError::InvalidMint as u32) < pina::RESERVED_ERROR_CODE_START)
+{
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DetailedError::InvalidMint` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
+#[allow(deprecated)]
+const _: () = if !((DetailedError::Overflow as u32) < pina::RESERVED_ERROR_CODE_START) {
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DetailedError::Overflow` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
 impl ::core::convert::From<DetailedError> for pina::ProgramError {
     fn from(e: DetailedError) -> Self {
         pina::ProgramError::Custom(e as u32)
@@ -111,6 +198,18 @@ impl ::core::fmt::Debug for DefaultCrateError {
         ::core::fmt::Formatter::write_str(f, "Something")
     }
 }
+#[allow(deprecated)]
+const _: () = if !((DefaultCrateError::Something as u32)
+    < ::pina::RESERVED_ERROR_CODE_START)
+{
+    {
+        ::core::panicking::panic_fmt(
+            format_args!(
+                "error discriminant for `DefaultCrateError::Something` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina\'s framework errors; use a value below 0xFFFF_0000",
+            ),
+        );
+    }
+};
 impl ::core::convert::From<DefaultCrateError> for ::pina::ProgramError {
     fn from(e: DefaultCrateError) -> Self {
         ::pina::ProgramError::Custom(e as u32)

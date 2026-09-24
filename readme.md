@@ -604,6 +604,12 @@ pub enum MyError {
 }
 ```
 
+<!-- {=pinaReservedErrorRange} -->
+
+Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for its framework errors (`PinaProgramError`), so a client can always tell a program's own error from a framework one. Every `#[error]` variant must use a discriminant below `0xFFFF_0000` (`pina::RESERVED_ERROR_CODE_START`). The macro checks each explicit and implicit discriminant at compile time and rejects a variant in the reserved range; the check emits no code, so it costs no compute units and does not change program size.
+
+<!-- {/pinaReservedErrorRange} -->
+
 ### Account validation chains
 
 <br>
@@ -702,7 +708,7 @@ pub struct MyAccounts<'a> {
 }
 ```
 
-The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. Internally it uses `AccountsCursor` to walk the account slice left-to-right and reject writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. It validates that the exact number of accounts is provided unless the final field captures the remaining accounts, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
+The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. Internally it uses `AccountsCursor` to walk the account slice left-to-right and reject writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. The check looks forward, so a mutable field is rejected when its account reappears in a later slot. A readonly field declared before a mutable field for the same account, such as an authority that also pays, is accepted. It validates that the exact number of accounts is provided unless the final field captures the remaining accounts, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
 
 Use the `#[pina(remaining)]` attribute on the last field to capture trailing accounts:
 

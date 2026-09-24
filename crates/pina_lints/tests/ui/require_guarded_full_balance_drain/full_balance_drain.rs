@@ -32,11 +32,13 @@ impl AccountView {
 	}
 }
 
-struct CapState;
+struct CapState {
+	paused: bool,
+}
 
 impl CapState {
 	fn assert_within_window_cap(&self) -> Result<(), ()> {
-		Ok(())
+		if self.paused { Err(()) } else { Ok(()) }
 	}
 
 	fn touch(&self) -> Result<(), ()> {

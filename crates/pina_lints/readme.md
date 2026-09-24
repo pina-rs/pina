@@ -331,6 +331,45 @@ for account in remaining {
 
 Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases and computes loop-carried state to a fixed point. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound, including for later iterations of an enclosing loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
+### `require_guarded_full_balance_drain`
+
+Detects an instruction handler that sends an account's entire `lamports()` balance with `send` or `send_owned` unless a pause, circuit-breaker, or withdrawal-cap guard is enforced earlier in the same or an enclosing scope (not inside a branch, loop body, closure, or the right operand of `&&`/`||`), or the same account is closed first.
+
+```rust
+fn enforce_withdrawal_policy(config: &VaultConfig) -> Result<(), ProgramError> {
+	assert_not_paused(config)?;
+	config.assert_within_window_cap()
+}
+
+enforce_withdrawal_policy(&config)?;
+vault.send_owned(&ID, vault.lamports(), recipient)?;
+```
+
+A call counts as the guard only when all of the following hold:
+
+- **Its failure stops the handler.** A `Result`/`Option` guard is propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None` (or evaluate to one when the whole expression is itself returned or propagated), return the scrutinee's own binding, or panic. Arms are read in order, so a `_` after an unguarded `Err(_)` arm only receives success. Adapters that keep the failure are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, `or_else` whose fallback can only fail, `clone()`, and `into()`/`From::from` into a `Result` or the same type. `or(Ok(..))`, `or(Some(..))`, a recovering `or_else`, `unwrap_or`, a conversion into `Option<Result<..>>`, and a discarded result are not.
+- **Polarity is checked.** A `bool` guard, `is_err()`/`is_ok()`, or `eq`/`ne`/`==`/`!=` against `Ok(..)` of a fallible one must gate an `if`, `assert!`, `assert_eq!`, `assert_ne!`, or `pina::assert(ok, error, message)?` so that execution continues only on the passing value. So `if guard().is_ok() { return Ok(()) }`, `assert_eq!(guard().is_err(), true)`, and `match guard() { Ok(()) => return Err(..), _ => {} }` do not gate the drain that follows. A guard that returns a `bool` itself has no known polarity, so a failing branch on either side of its `if` counts.
+- **A failing branch fails.** It returns `Err`/`None`, returns a local helper that can only fail (`return reject()`), or panics. A guard-named local method returning `()`, such as `fn assert_not_paused(&self) { assert!(!self.paused) }`, counts where it is called when its body can panic. A branch that returns `Ok`, `break`s, or `continue`s is not a failure. An early `return Ok(..)` on the paused path, such as `if state.is_paused() { return Ok(()) }`, deliberately does not count. For a `bool` guard the lint cannot tell which value is the failing one, and reporting success for a blocked sweep hides the pause from callers.
+- **It reads the handler's inputs.** Its receiver or an argument must be derived from a function parameter (including `self`), directly or through locals bound from one. A zero-argument call, or one fed only literals and constants (even through a local such as `let zero = 0;`), cannot inspect the state it claims to guard.
+- **It names the check, or delegates to one.** It is a function or method whose name contains `pause`, `cap`, `circuit`, `halt`, `guard`, `limit`, or `throttle`, because behavior alone cannot tell a cap check from `assert_signer()?`, which every handler propagates. Closures, fn pointers, and generic callables are named by their binding and never count by name. A differently named local function that returns `Result`/`Option` counts when its own body enforces such a guard in its outermost scope before any early success `return` or `break`, followed up to three wrappers deep, so `enforce_withdrawal_policy(&config)?` above is accepted. A wrapper returning `bool` is never followed. A generic wrapper is instantiated with its caller's arguments, so `fn policy<T: Guarded>(t: &T) -> Result<..> { t.check_cap() }` is judged by the impl its caller passes, not by the name `check_cap`. Inside a wrapper, a trait call that cannot be resolved (`dyn`, an unconstrained generic) counts as neither a guard nor a failure, and so does a `return` of a value the lint cannot see into (`return Ok(()).into()`, `return identity(Ok(()))`, `return finish.finish()`). A guard bound to a local counts where the local is enforced, unless it is reassigned or mutably borrowed first. A labeled block that can `break` with a success does not carry its tail guard out.
+- **It is not a constant success.** A local callee whose every returned value is a literal `Ok(..)`/`Some(..)` (or a `bool` literal), directly or through a never-reassigned `let` binding, and that has no reachable `?`, `Err`/`None`, or panic, is not a guard, whatever its name. Branches behind a literal `if true`/`if false` count as unreachable. Trait method calls are judged by the implementation that runs, never by a default body that the implementation overrides. In a generic handler (not a wrapper) where the implementation cannot be resolved, only the method name is used.
+
+Known limits:
+
+- Callees from other crates are judged by their name and call-site behavior only, and a unit guard from another crate never counts. In the handler itself, but not in a wrapper, a `return helper()` on the failing side whose helper cannot be analyzed counts as a failing branch, as the name rule did before, because any `return` there skips the drain.
+- `async fn` handlers and guards are not analyzed through `.await`, which does not arise in SBF programs.
+- A local guard-named callee counts if anything in its body can fail, even for reasons unrelated to its claimed check. The constant-success test does not evaluate conditions beyond literal `true`/`false`.
+- Wrappers deeper than three levels are not followed.
+- A pause check with no guard-named call, such as `if state.paused { return Err(..) }` or a differently named helper taking only the flag, is not recognized.
+- Some correct guards are still reported, because the lint errs toward warning when it cannot prove the failure stops the handler:
+  - `unwrap_or_else(|_| panic!(..))` on a guard's result;
+  - a guard result that is reassigned before it is propagated (`res = res.map_err(..); res?`);
+  - a guard bound through tuple destructuring;
+  - a unit guard that fails through `.expect()` rather than `assert!`/`panic!`;
+  - a guard whose receiver is a `static`.
+
+  Propagate the guard's result directly with `?` to satisfy the lint.
+
 ## Performance reference
 
 ### `deny_heap_allocations_in_onchain_instruction_handlers`
