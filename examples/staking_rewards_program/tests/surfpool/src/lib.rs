@@ -2212,3 +2212,100 @@ fn banked_pending_rewards_stay_reserved_until_claimed() {
 		program.stop().expect("stop isolated program test");
 	});
 }
+
+/// The reserve gate must bind the vault to the pool's own stored reward mint:
+/// a caller naming any other mint gets that mint's pool-owned ATA, and without
+/// the binding check anyone could create a worthless mint, fund its pool ATA
+/// to any balance, and move the reward index with no real reward tokens
+/// behind it. The update must be refused with `InvalidPool` before the vault
+/// balance is read.
+#[test]
+#[ignore = "run with pina test"]
+fn set_reward_index_rejects_a_foreign_reward_mint() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		// An attacker's mint with its own pool-owned ATA, funded far beyond
+		// the real reward vault: without the stored-mint binding this balance
+		// would satisfy the reserve gate.
+		let foreign_mint =
+			provision_mint(&program, &admin, &mint_authority, 7).expect("provision foreign mint");
+		let foreign_vault = ata_of(&pool, &foreign_mint);
+		fund_stake_ata(
+			&program,
+			&admin,
+			&pool,
+			&foreign_mint,
+			&mint_authority,
+			1_000_000,
+		)
+		.expect("fund the foreign mint's pool ATA");
+
+		let error = program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&foreign_mint,
+				&token_program_id(),
+				&foreign_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect_err("a foreign reward mint must not satisfy the reserve gate");
+		pina_test::assert_custom_error(&error, StakingError::InvalidPool as u32);
+
+		// The rejected update moved neither the index nor the liability.
+		let pool_account = program.account(&pool).expect("fetch pool state");
+		assert_eq!(
+			u64::from_le_bytes(
+				pool_account.data[106..114]
+					.try_into()
+					.expect("reward index")
+			),
+			0,
+			"the rejected update must not move the index"
+		);
+		assert_eq!(
+			u64::from_le_bytes(
+				pool_account.data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"the rejected update must not move the liability"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
