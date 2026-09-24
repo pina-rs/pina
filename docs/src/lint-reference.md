@@ -197,11 +197,11 @@ Default level: `warn`
 
 Default level: `deny`
 
-**Contract.** Read a custody destination both before and after a token transfer CPI and account from the observed delta.
+**Contract.** After a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, `MintToChecked`) into any account, a balance snapshot taken before the CPI, or a value computed from one, may only be compared with a post-CPI reload or a constant, subtracted from a reload to form a delta (`after.checked_sub(before)`), or added to such a delta. A custody-named transfer destination (`vault`, `custody`, `reserve`, or `pool`) must also be read both before and after every transfer, with no other CPI in between.
 
-**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested. Accounting from the requested amount rather than the observed balance delta credits the protocol with tokens it never received.
+**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested, so a balance read before the CPI no longer describes the account after it. Accounting from the requested amount or a pre-CPI snapshot rather than the observed balance delta credits the protocol with tokens it never received.
 
-**Blessing an exception.** Reload the destination with `amount()` after the CPI and compute the delta. This is the fix the lint asks for, so there is no exception to bless: a transfer whose fee is known to be zero still has a correct delta, and reading it costs one load.
+**Blessing an exception.** Reload the destination with `amount()` after the CPI and account from the delta `after.checked_sub(before)`, or verify the arrival with `if after != expected`. Comparing the snapshot against a constant (`if prior == 0`) records a fact about the earlier state and is accepted as is. A static `invoke()` called on a builder bound to the legacy `pinocchio_token` program is exempt because that program cannot charge a fee; any other exception needs a narrowly scoped `#[allow]` with the reason the snapshot is still correct. When the account comes from a `&mut self` accessor, bind it once and use that binding for the reads and the transfer: a read through a `let` binding and a transfer into a separate inline call are not matched. Give each result of a hand-written cursor its own binding name: rebinding `let acct = cursor.take()?;` under the same name is treated as one account.
 
 ## require_program_check_before_cpi
 
