@@ -1,43 +1,57 @@
 #![allow(dead_code)]
 
-use core::marker::PhantomData;
+//! Mirrors the shape of `pinocchio_token` 0.7: builders are generic over the
+//! token program, and `instructions::*` re-exports them as aliases bound to the
+//! legacy `TokenProgram`.
 
-/// Mirrors `pinocchio_token::TokenProgram`, the legacy program marker.
+/// The legacy SPL Token program marker.
 pub struct TokenProgram;
 
 pub mod instructions {
-	pub struct TransferChecked;
+	pub mod transfer_checked {
+		use core::marker::PhantomData;
 
-	impl TransferChecked {
-		pub fn new<T>(_: &T, _: &T, _: &T, _: &T, _: u64, _: u8) -> Self {
-			Self
+		pub struct TransferChecked<Program>(PhantomData<Program>);
+
+		impl<Program> TransferChecked<Program> {
+			pub fn new<T>(_: &T, _: &T, _: &T, _: &T, _: u64, _: u8) -> Self {
+				Self(PhantomData)
+			}
+
+			pub fn invoke(&self) -> Result<(), ()> {
+				Ok(())
+			}
+
+			pub fn invoke_signed(&self, _: &[u8]) -> Result<(), ()> {
+				Ok(())
+			}
+
+			pub fn invoke_with_program<T>(&self, _: &T) -> Result<(), ()> {
+				Ok(())
+			}
 		}
+	}
 
-		pub fn invoke(&self) -> Result<(), ()> {
-			Ok(())
+	pub mod transfer {
+		use core::marker::PhantomData;
+
+		pub struct Transfer<Program>(PhantomData<Program>);
+
+		impl<Program> Transfer<Program> {
+			pub fn new<T>(_: &T, _: &T, _: &T, _: u64) -> Self {
+				Self(PhantomData)
+			}
+
+			pub fn invoke(&self) -> Result<(), ()> {
+				Ok(())
+			}
+
+			pub fn invoke_with_program<T>(&self, _: &T) -> Result<(), ()> {
+				Ok(())
+			}
 		}
 	}
 
-	/// Mirrors the real crate's program-generic builder aliases.
-	pub type LegacyTransfer = super::generic::Transfer<super::TokenProgram>;
-}
-
-pub mod generic {
-	use super::PhantomData;
-
-	pub struct Transfer<Program>(PhantomData<Program>);
-
-	impl<Program> Transfer<Program> {
-		pub fn new<T>(_: &T, _: &T, _: &T, _: u64) -> Self {
-			Self(PhantomData)
-		}
-
-		pub fn invoke(&self) -> Result<(), ()> {
-			Ok(())
-		}
-
-		pub fn invoke_with_program<T>(&self, _: &T) -> Result<(), ()> {
-			Ok(())
-		}
-	}
+	pub type TransferChecked = transfer_checked::TransferChecked<super::TokenProgram>;
+	pub type Transfer = transfer::Transfer<super::TokenProgram>;
 }

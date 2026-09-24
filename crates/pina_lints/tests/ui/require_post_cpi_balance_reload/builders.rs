@@ -1,0 +1,186 @@
+// aux-build: pinocchio_token.rs
+// aux-build: pinocchio_system.rs
+// normalize-stderr-test: "\n$" -> ""
+
+//! Builder recognition: builders are classified by the type their constructor
+//! returns, whatever it is called or however many arguments it takes.
+
+#![allow(dead_code)]
+
+extern crate pinocchio_system;
+extern crate pinocchio_token;
+
+struct Account;
+struct TokenState;
+struct Token2022State {
+	base: TokenState,
+}
+struct SplTransfer;
+struct LamportTransfer;
+
+mod fallible {
+	pub(crate) struct TransferChecked;
+
+	impl TransferChecked {
+		pub(crate) fn new(
+			_: &super::Account,
+			_: &super::Account,
+			_: &super::Account,
+			_: &super::Account,
+			_: u64,
+			_: u8,
+		) -> Result<Self, ()> {
+			Ok(Self)
+		}
+
+		pub(crate) fn invoke_with_program(&self, _program: &super::Account) -> Result<(), ()> {
+			Ok(())
+		}
+	}
+}
+
+mod without_decimals {
+	pub(crate) struct TransferChecked;
+
+	impl TransferChecked {
+		pub(crate) fn new(
+			_: &super::Account,
+			_: &super::Account,
+			_: &super::Account,
+			_: &super::Account,
+			_: u64,
+		) -> Self {
+			Self
+		}
+
+		pub(crate) fn invoke_with_program(&self, _program: &super::Account) -> Result<(), ()> {
+			Ok(())
+		}
+	}
+}
+
+impl Account {
+	fn amount(&self) -> u64 {
+		0
+	}
+
+	fn as_token_2022_account(&self) -> Result<Token2022State, ()> {
+		Ok(Token2022State { base: TokenState })
+	}
+}
+
+impl TokenState {
+	fn amount(&self) -> u64 {
+		0
+	}
+}
+
+impl SplTransfer {
+	fn new(_: &Account, _: &Account, _: &Account, _: &Account, _: u64, _: u8) -> Self {
+		Self
+	}
+
+	fn invoke_with_program(&self, _program: &Account) -> Result<(), ()> {
+		Ok(())
+	}
+}
+
+impl LamportTransfer {
+	fn new(_: &Account, _: &Account, _: u64) -> Self {
+		Self
+	}
+
+	fn invoke(&self) -> Result<(), ()> {
+		Ok(())
+	}
+}
+
+fn process_suffix_named_builder(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+}
+
+fn process_fallible_constructor(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	fallible::TransferChecked::new(source, mint, vault, owner, 10, 0)?.invoke_with_program(owner)
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+}
+
+fn process_constructor_without_decimals(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	without_decimals::TransferChecked::new(source, mint, vault, owner, 10)
+		.invoke_with_program(owner)
+	//~^^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+}
+
+fn process_legacy_transfer_with_dynamic_program(
+	source: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	pinocchio_token::instructions::Transfer::new(source, vault, owner, 10)
+		.invoke_with_program(owner)
+	//~^^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+}
+
+fn process_legacy_static_invoke_into_vault(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	// Static `invoke()` of a builder bound to `pinocchio_token::TokenProgram`
+	// targets the legacy SPL Token program, which cannot deduct a fee.
+	pinocchio_token::instructions::TransferChecked::new(source, mint, vault, owner, 10, 0).invoke()
+}
+
+fn process_legacy_static_invoke_signed_into_vault(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	pinocchio_token::instructions::TransferChecked::new(source, mint, vault, owner, 10, 0)
+		.invoke_signed(&[])
+}
+
+fn process_custody_token_2022_base_reads(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = vault.as_token_2022_account()?.base.amount();
+	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	let after = vault.as_token_2022_account()?.base.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_system_program_transfer_into_vault(
+	payer: &Account,
+	base: &Account,
+	vault: &Account,
+) -> Result<(), ()> {
+	pinocchio_system::instructions::Transfer::new(payer, base, vault, 10).invoke()
+}
+
+fn process_lamport_transfer_into_vault(payer: &Account, vault: &Account) -> Result<(), ()> {
+	LamportTransfer::new(payer, vault, 10).invoke()
+}
+
+fn main() {}
+
+// compile-fail

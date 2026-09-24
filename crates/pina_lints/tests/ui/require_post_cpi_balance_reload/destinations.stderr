@@ -1,11 +1,11 @@
 error: transfer into `user_stake_ata` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:107:2
+  --> $DIR/destinations.rs:123:2
    |
 LL |     TransferChecked::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:109:2
+  --> $DIR/destinations.rs:125:2
    |
 LL |     before.checked_add(10).ok_or(())
    |     ^^^^^^
@@ -13,109 +13,213 @@ LL |     before.checked_add(10).ok_or(())
    = note: `#[deny(require_post_cpi_balance_reload)]` on by default
 
 error: transfer into `treasury` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:130:2
+  --> $DIR/destinations.rs:146:2
    |
 LL |     Transfer::new(source, treasury, owner, 10).invoke_with_program(owner)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:132:5
+  --> $DIR/destinations.rs:148:5
    |
 LL |     if treasury_balance.checked_add(10).is_none() {
    |        ^^^^^^^^^^^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: mint into `fee_receiver` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:144:2
+  --> $DIR/destinations.rs:160:2
    |
 LL |     MintTo::new(mint, fee_receiver, authority, 10).invoke_with_program(authority)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:146:5
+  --> $DIR/destinations.rs:162:5
    |
 LL |     Ok(fees)
    |        ^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: transfer into `user_stake_ata` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:201:2
+  --> $DIR/destinations.rs:228:2
    |
 LL |     StakeDeposit::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:203:5
+  --> $DIR/destinations.rs:230:5
    |
 LL |     Ok(before)
    |        ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: transfer into `user_stake_ata` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:213:2
+  --> $DIR/destinations.rs:240:2
    |
 LL | /     TransferChecked::with_multisig_signers(source, mint, user_stake_ata, owner, 10, 0, &[])
 LL | |         .invoke_with_unverified_program(owner)?;
    | |______________________________________________^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:216:5
+  --> $DIR/destinations.rs:243:5
    |
 LL |     Ok(before)
    |        ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: transfer into `user_stake_ata` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:226:2
+  --> $DIR/destinations.rs:253:2
    |
 LL |     TransferChecked::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:228:20
+  --> $DIR/destinations.rs:255:20
    |
 LL |     let expected = || before + 10;
    |                       ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
-error: transfer into `user_stake_ata` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:239:2
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:266:2
    |
-LL |     TransferChecked::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:243:20
+  --> $DIR/destinations.rs:270:2
    |
-LL |     after.checked_sub(before).ok_or(())
-   |                       ^^^^^^
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:281:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:288:2
+   |
+LL |     before.checked_add(total).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:313:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:315:2
+   |
+LL |     snapshot.checked_add(10).ok_or(())
+   |     ^^^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:325:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:327:2
+   |
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:338:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:340:2
+   |
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:362:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, decimals).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:364:2
+   |
+LL |     before.checked_add(u64::from(decimals)).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:375:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:377:2
+   |
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:387:2
+   |
+LL |     TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:389:2
+   |
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
+   = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
+
+error: transfer into `user_ata` makes an earlier read of its balance stale
+  --> $DIR/destinations.rs:412:2
+   |
+LL |     transfer.invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the pre-CPI balance snapshot is used here
+  --> $DIR/destinations.rs:414:2
+   |
+LL |     before.checked_add(10).ok_or(())
+   |     ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: transfer into `treasury` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:262:2
+  --> $DIR/destinations.rs:493:2
    |
-LL | /     pinocchio_token::instructions::LegacyTransfer::new(source, treasury, owner, 10)
+LL | /     pinocchio_token::instructions::Transfer::new(source, treasury, owner, 10)
 LL | |         .invoke_with_program(owner)?;
    | |___________________________________^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:265:2
+  --> $DIR/destinations.rs:496:2
    |
 LL |     before.checked_add(10).ok_or(())
    |     ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
 error: transfer into `treasury` makes an earlier read of its balance stale
-  --> $DIR/destinations.rs:274:2
+  --> $DIR/destinations.rs:506:2
    |
-LL |     Token2022Transfer::new(source, treasury, owner, 10).invoke()?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Token2022TransferChecked::new(source, mint, treasury, owner, 10, 0).invoke()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the pre-CPI balance snapshot is used here
-  --> $DIR/destinations.rs:276:2
+  --> $DIR/destinations.rs:508:2
    |
 LL |     before.checked_add(10).ok_or(())
    |     ^^^^^^
    = help: reload the destination amount after the CPI and account from `after.checked_sub(before)` instead of trusting the snapshot
 
-error: aborting due to 9 previous errors
+error: aborting due to 17 previous errors

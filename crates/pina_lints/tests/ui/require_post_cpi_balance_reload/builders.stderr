@@ -1,0 +1,36 @@
+error: transfer into `vault` is not accounted from its observed balance delta
+  --> $DIR/builders.rs:104:2
+   |
+LL |     SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: read the destination amount before CPI, release the destination borrow (drop or scope it), invoke the transfer, reload the amount, and use `checked_sub` for the received value
+   = note: `#[deny(require_post_cpi_balance_reload)]` on by default
+
+error: transfer into `vault` is not accounted from its observed balance delta
+  --> $DIR/builders.rs:114:2
+   |
+LL |     fallible::TransferChecked::new(source, mint, vault, owner, 10, 0)?.invoke_with_program(owner)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: read the destination amount before CPI, release the destination borrow (drop or scope it), invoke the transfer, reload the amount, and use `checked_sub` for the received value
+
+error: transfer into `vault` is not accounted from its observed balance delta
+  --> $DIR/builders.rs:124:2
+   |
+LL | /     without_decimals::TransferChecked::new(source, mint, vault, owner, 10)
+LL | |         .invoke_with_program(owner)
+   | |___________________________________^
+   |
+   = help: read the destination amount before CPI, release the destination borrow (drop or scope it), invoke the transfer, reload the amount, and use `checked_sub` for the received value
+
+error: transfer into `vault` is not accounted from its observed balance delta
+  --> $DIR/builders.rs:134:2
+   |
+LL | /     pinocchio_token::instructions::Transfer::new(source, vault, owner, 10)
+LL | |         .invoke_with_program(owner)
+   | |___________________________________^
+   |
+   = help: read the destination amount before CPI, release the destination borrow (drop or scope it), invoke the transfer, reload the amount, and use `checked_sub` for the received value
+
+error: aborting due to 4 previous errors

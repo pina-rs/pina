@@ -276,10 +276,10 @@ Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccoun
 
 ### `require_post_cpi_balance_reload`
 
-Detects a balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` builder:
+Detects a token balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every builder of a `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` instruction:
 
-- **Snapshot tier (every destination).** When an integer local bound from the destination's `amount()` before the CPI is used after it, the destination must be read again after the CPI, before any other CPI. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name.
-- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no intervening CPI, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta.
+- **Snapshot tier (every destination).** An integer local bound from the destination's balance before the CPI must not be used after the CPI unless the destination is read again first. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. The reload must come after the CPI and before the use, its value must be used (not discarded or bound to `_after`), and it must run on every path to the use (not only inside an `if` arm, loop, or closure). Unrelated CPIs between the transfer and the reload are allowed.
+- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no other CPI in between, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta.
 
 ```rust
 let before = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
@@ -288,7 +288,28 @@ let after = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. Builders are recognised by the resolved type their `new` or `with_multisig_signers` constructor returns, so re-exports, type aliases, and `use ... as` imports are covered; the system program's lamport `Transfer` is excluded by its arity. Destinations are compared after resolving `let` aliases, so a snapshot read through `let account = user_stake_ata.as_token_account()?` counts as a read of `user_stake_ata`. Only integer snapshots count: a pre-CPI `bool` such as `was_empty` records a fact about the earlier state rather than a balance, and a snapshot used only before the CPI is not stale. A static `invoke()` or `invoke_signed()` is exempt only when the builder's program type parameter resolves to `pinocchio_token::TokenProgram`, the legacy SPL Token program that cannot deduct a fee; Pina's `token_2022` aliases, local look-alikes, and every runtime-program invocation (`invoke_with_program()`, `invoke_with_unverified_program()`, and their signed variants) remain covered. Opaque builder wrappers are not diagnosed because the analysis cannot associate them with a particular invocation; audit such wrappers manually or keep the transfer direct in the instruction handler. The analysis orders code lexically, so review branch-sensitive reloads manually.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement.
+
+**What counts as a builder.** The resolved type returned by a `new` or `with_multisig_signers` constructor decides, after unwrapping `Result` and `Option`. Its name must end in `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` (so `SplTransfer` and the real `transfer_checked::TransferChecked` both count), and it must lead with at least three account arguments. The destination is the third account when four accounts lead (`from, mint, to, authority`) and the second otherwise. Builders defined in `pinocchio_system` or `solana_system_interface` move lamports and are ignored.
+
+**What counts as a read.** `.amount()` and `Type::amount(account)`, with `let` aliases followed and field projections into loaded token state resolved back to the account. So `token.base.amount()` after `let token = ata.as_token_2022_account()?`, and `ata.as_token_2022_account()?.base.amount()`, are both reads of `ata`. Snapshots are tracked through tuple destructuring, verbatim copies (`let snapshot = before;`), and assignments (`before = ata.amount();`).
+
+**What is not a stale use.**
+
+- A snapshot used only before the CPI.
+- A non-integer fact such as `let was_empty = ata.amount() == 0`.
+- A comparison of the snapshot against a constant (`if prior == 0`), which records a fact about the earlier state.
+- A use the CPI cannot reach: the CPI sits in a block that always returns, or in a sibling `if`/`match` arm.
+
+**Legacy program exemption.** A static `invoke()` or `invoke_signed()` is exempt when the builder's program type parameter resolves to `pinocchio_token::TokenProgram`. That call targets the legacy SPL Token program, which has no transfer-fee extension, so the requested amount is exactly what arrives. Pina's `token_2022` aliases bind the same structs to `Token2022Program` and stay covered, and so do local look-alikes and every runtime-program invocation (`invoke_with_program()`, `invoke_with_unverified_program()`, and their signed variants).
+
+**Limits.**
+
+- A snapshot hidden behind a helper function (`let before = read_balance(ata)`) or stored in a struct field (`Snap { before: ata.amount() }`) is not tracked.
+- Builders passed through opaque wrappers are not associated with their invocation.
+- Loops are analysed in source order.
+
+Audit such code manually or keep the transfer and the reads direct in the instruction handler.
 
 ### `require_checked_asset_arithmetic`
 

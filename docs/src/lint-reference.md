@@ -197,11 +197,11 @@ Default level: `warn`
 
 Default level: `deny`
 
-**Contract.** Reload the destination of a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, `MintToChecked`) after the CPI whenever a balance snapshot taken before it is used afterwards, whatever the destination is called. A custody destination (`vault`, `custody`, `reserve`, or `pool`) must also be read both before and after every transfer and accounted from the observed delta.
+**Contract.** When an integer snapshot of a token balance is taken before a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, `MintToChecked`) into that account and used after it, reload the destination after the CPI and before the use, whatever the destination is called. A custody-named transfer destination (`vault`, `custody`, `reserve`, or `pool`) must also be read both before and after every transfer, with no other CPI in between.
 
-**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested, and any CPI into an account makes an earlier read of its balance stale. Accounting from the requested amount or a pre-CPI snapshot rather than the observed balance delta credits the protocol with tokens it never received.
+**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested, so a balance read before the CPI no longer describes the account after it. Accounting from the requested amount or a pre-CPI snapshot rather than the observed balance delta credits the protocol with tokens it never received.
 
-**Blessing an exception.** Reload the destination with `amount()` after the CPI and compute the delta. This is the fix the lint asks for, so there is no exception to bless: a transfer whose fee is known to be zero still has a correct delta, and reading it costs one load.
+**Blessing an exception.** Reload the destination with `amount()` after the CPI, use the reloaded value, and compute the delta. Comparing the snapshot against a constant (`if prior == 0`) records a fact about the earlier state and is accepted as is. A static `invoke()` of a builder bound to the legacy `pinocchio_token` program is exempt because that program cannot charge a fee; any other exception needs a narrowly scoped `#[allow]` with the reason the snapshot is still correct.
 
 ## require_program_check_before_cpi
 

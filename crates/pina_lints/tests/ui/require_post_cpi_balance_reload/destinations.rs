@@ -1,35 +1,31 @@
 // aux-build: pinocchio_token.rs
 // normalize-stderr-test: "\n$" -> ""
 
-#![allow(dead_code)]
+//! The snapshot tier: a pre-CPI balance snapshot of any destination, whatever
+//! it is called, must not be trusted after a value-moving token CPI.
+
+#![allow(dead_code, unused_assignments)]
 
 extern crate pinocchio_token;
 
 struct Account;
+struct TokenState;
+struct Token2022State {
+	base: TokenState,
+}
 struct Transfer;
 struct TransferChecked;
 struct MintTo;
 struct MintToChecked;
 struct Token2022Program;
+struct CloseAccount;
 
 /// A re-export alias still resolves to the `TransferChecked` builder type.
 type StakeDeposit = TransferChecked;
-type Token2022Transfer = pinocchio_token::generic::Transfer<Token2022Program>;
+type Token2022TransferChecked =
+	pinocchio_token::instructions::transfer_checked::TransferChecked<Token2022Program>;
 
-mod system {
-	/// Lamport transfers share the `Transfer` name but take no token amount.
-	pub(crate) struct Transfer;
-
-	impl Transfer {
-		pub(crate) fn new(_: &super::Account, _: &super::Account, _: u64) -> Self {
-			Self
-		}
-
-		pub(crate) fn invoke(&self) -> Result<(), ()> {
-			Ok(())
-		}
-	}
-}
+const EMPTY: u64 = 0;
 
 impl Account {
 	fn amount(&self) -> u64 {
@@ -38,6 +34,16 @@ impl Account {
 
 	fn as_token_account(&self) -> Result<&Account, ()> {
 		Ok(self)
+	}
+
+	fn as_token_2022_account(&self) -> Result<Token2022State, ()> {
+		Ok(Token2022State { base: TokenState })
+	}
+}
+
+impl TokenState {
+	fn amount(&self) -> u64 {
+		0
 	}
 }
 
@@ -93,6 +99,16 @@ impl MintToChecked {
 	}
 
 	fn invoke_with_program(&self, _program: &Account) -> Result<(), ()> {
+		Ok(())
+	}
+}
+
+impl CloseAccount {
+	fn new(_: &Account, _: &Account, _: &Account) -> Self {
+		Self
+	}
+
+	fn invoke(&self) -> Result<(), ()> {
 		Ok(())
 	}
 }
@@ -190,7 +206,18 @@ fn process_non_integer_snapshot(
 	Ok(was_empty)
 }
 
-fn process_aliased_destination(
+fn process_constant_comparison_of_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_stake_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let prior = user_stake_ata.amount();
+	TransferChecked::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
+	Ok(if prior == 0 || EMPTY == prior { 1 } else { 0 })
+}
+
+fn process_aliased_builder_type(
 	source: &Account,
 	mint: &Account,
 	user_stake_ata: &Account,
@@ -229,6 +256,209 @@ fn process_snapshot_captured_by_closure(
 	Ok(expected())
 }
 
+fn process_unused_reload(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let _after = user_ata.amount();
+	user_ata.amount();
+	before.checked_add(10).ok_or(())
+}
+
+fn process_reload_in_one_branch(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+	flag: bool,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let mut total = 0;
+	if flag {
+		let after = user_ata.amount();
+		total = after;
+	}
+	before.checked_add(total).ok_or(())
+}
+
+fn process_reload_in_condition(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	if user_ata.amount() < before {
+		return Err(());
+	}
+	Ok(0)
+}
+
+fn process_copied_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	let snapshot = before;
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	snapshot.checked_add(10).ok_or(())
+}
+
+fn process_function_call_syntax_read(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = Account::amount(user_ata);
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(10).ok_or(())
+}
+
+fn process_assigned_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let mut before = 0;
+	before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(10).ok_or(())
+}
+
+fn process_snapshot_overwritten_after_cpi(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let mut balance = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	balance = user_ata.amount();
+	Ok(balance)
+}
+
+fn process_tuple_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let (before, decimals) = (user_ata.amount(), 6u8);
+	TransferChecked::new(source, mint, user_ata, owner, 10, decimals).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(u64::from(decimals)).ok_or(())
+}
+
+fn process_token_2022_base_through_alias(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let token = user_ata.as_token_2022_account()?;
+	let before = token.base.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(10).ok_or(())
+}
+
+fn process_token_2022_base_direct(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.as_token_2022_account()?.base.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(10).ok_or(())
+}
+
+fn process_token_2022_base_with_reload(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.as_token_2022_account()?.base.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.as_token_2022_account()?.base.amount();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_bound_builder_then_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let transfer = TransferChecked::new(source, mint, user_ata, owner, 10, 0);
+	let before = user_ata.amount();
+	transfer.invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	before.checked_add(10).ok_or(())
+}
+
+fn process_cpi_in_other_branch(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+	deposit: bool,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	if deposit {
+		TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+		let after = user_ata.amount();
+		after.checked_sub(before).ok_or(())
+	} else {
+		Ok(before)
+	}
+}
+
+fn process_cpi_in_diverging_block(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+	deposit: bool,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	if !deposit {
+		TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+		return Ok(0);
+	}
+	Ok(before)
+}
+
+fn process_two_deposits_one_reload(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	TransferChecked::new(source, mint, user_ata, owner, 5, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	after.checked_sub(before).ok_or(())
+}
+
 fn process_reload_after_unrelated_cpi(
 	source: &Account,
 	mint: &Account,
@@ -237,19 +467,20 @@ fn process_reload_after_unrelated_cpi(
 ) -> Result<u64, ()> {
 	let before = user_stake_ata.amount();
 	TransferChecked::new(source, mint, user_stake_ata, owner, 10, 0).invoke_with_program(owner)?;
-	//~^ ERROR: transfer into `user_stake_ata` makes an earlier read of its balance stale
-	MintTo::new(mint, source, owner, 10).invoke_with_program(owner)?;
+	CloseAccount::new(source, owner, owner).invoke()?;
 	let after = user_stake_ata.amount();
 	after.checked_sub(before).ok_or(())
 }
 
 fn process_legacy_program_snapshot(
 	source: &Account,
+	mint: &Account,
 	treasury: &Account,
 	owner: &Account,
 ) -> Result<u64, ()> {
 	let before = treasury.amount();
-	pinocchio_token::instructions::LegacyTransfer::new(source, treasury, owner, 10).invoke()?;
+	pinocchio_token::instructions::TransferChecked::new(source, mint, treasury, owner, 10, 0)
+		.invoke()?;
 	before.checked_add(10).ok_or(())
 }
 
@@ -259,25 +490,22 @@ fn process_legacy_builder_with_dynamic_program(
 	owner: &Account,
 ) -> Result<u64, ()> {
 	let before = treasury.amount();
-	pinocchio_token::instructions::LegacyTransfer::new(source, treasury, owner, 10)
+	pinocchio_token::instructions::Transfer::new(source, treasury, owner, 10)
 		.invoke_with_program(owner)?;
 	//~^^ ERROR: transfer into `treasury` makes an earlier read of its balance stale
 	before.checked_add(10).ok_or(())
 }
 
-fn process_token_2022_alias_snapshot(
+fn process_token_2022_alias_static_invoke(
 	source: &Account,
+	mint: &Account,
 	treasury: &Account,
 	owner: &Account,
 ) -> Result<u64, ()> {
 	let before = treasury.amount();
-	Token2022Transfer::new(source, treasury, owner, 10).invoke()?;
+	Token2022TransferChecked::new(source, mint, treasury, owner, 10, 0).invoke()?;
 	//~^ ERROR: transfer into `treasury` makes an earlier read of its balance stale
 	before.checked_add(10).ok_or(())
-}
-
-fn process_lamport_transfer_into_vault(payer: &Account, vault: &Account) -> Result<(), ()> {
-	system::Transfer::new(payer, vault, 10).invoke()
 }
 
 fn main() {}
