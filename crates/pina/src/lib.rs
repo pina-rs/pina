@@ -71,14 +71,6 @@ mod utils;
 #[cfg(kani)]
 mod verification;
 
-/// Re-export of the pinned [`fixed`] crate behind the `fixed` feature.
-///
-/// Fixed-point schema fields must use this exact crate instance: `pinapod`
-/// pins `fixed =1.30.0`, and a `ZcField` implementation for a different
-/// `fixed` build does not exist. Deriving schemas over `pina::fixed` types
-/// removes the version-mismatch failure mode entirely.
-#[cfg(feature = "fixed")]
-pub use fixed;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
@@ -112,6 +104,14 @@ pub use pinapod::ZcElem;
 pub use pinapod::ZcField;
 /// Validation trait for stored (pod) types.
 pub use pinapod::ZcValidate;
+/// Re-export of the [`fixed`] crate behind the `fixed` feature, forwarded
+/// from `pinapod`'s own re-export.
+///
+/// Pina carries no `fixed` requirement of its own: the crate a fixed-point
+/// schema names is always the one `pinapod` implements `ZcField` for, so
+/// there is no second pin to keep in step with.
+#[cfg(feature = "fixed")]
+pub use pinapod::fixed;
 /// Alignment-one storage for an IEEE-754 `f32` schema field.
 ///
 /// A schema declares `f32`; Pina maps it to this pod so the field is stored
