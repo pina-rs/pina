@@ -422,7 +422,13 @@ impl BundledFixture {
 			.unwrap_or_else(|error| panic!("failed to read command log: {error}"))
 	}
 
-	/// Run the copied CLI, retrying a spawn that fails with `ETXTBSY`.
+	/// Run the copied CLI with no extra arguments.
+	fn run(&self) -> std::process::Output {
+		self.run_with(&[])
+	}
+
+	/// Run the copied CLI with `args`, retrying a spawn that fails with
+	/// `ETXTBSY`.
 	///
 	/// The fixture writes the CLI copy with `fs::copy` and renames it into
 	/// place; on Linux CI the exec that immediately follows can transiently
@@ -431,11 +437,14 @@ impl BundledFixture {
 	/// intermittent — observed on runners across separate merges — and a
 	/// bounded retry is the honest guard: the alternative, a test that flakes
 	/// on kernel timing, tells us nothing about the CLI.
-	fn run(&self) -> std::process::Output {
+	///
+	/// Every spawn of the copied CLI goes through here, so a test cannot
+	/// reintroduce the flake by reaching for `command()` directly.
+	fn run_with(&self, args: &[&str]) -> std::process::Output {
 		const ETXTBSY: i32 = 26;
 		let mut backoff_ms = 25;
 		for attempt in 0..5 {
-			match self.command().output() {
+			match self.command().args(args).output() {
 				Ok(output) => return output,
 				Err(error) if error.raw_os_error() == Some(ETXTBSY) && attempt < 4 => {
 					std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
@@ -557,11 +566,7 @@ fn a_cached_driver_is_reused_without_touching_the_bundle() {
 #[test]
 fn build_driver_never_falls_back_to_an_unmatched_bundle() {
 	let fixture = BundledFixture::new("pina-lint-build-driver", Some("#!/bin/bash\nexit 0\n"));
-	let output = fixture
-		.command()
-		.arg("--build-driver")
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint --build-driver: {error}"));
+	let output = fixture.run_with(&["--build-driver"]);
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
