@@ -227,7 +227,7 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		contract: "After a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, \
 		           `MintToChecked`) into any account, a balance snapshot taken before the CPI, or \
 		           a value computed from one, may only be compared with a post-CPI reload or a \
-		           constant, subtracted with a reload to form a delta \
+		           constant, subtracted from a reload to form a delta \
 		           (`after.checked_sub(before)`), or added to such a delta. A custody-named \
 		           transfer destination (`vault`, `custody`, `reserve`, or `pool`) must also be \
 		           read both before and after every transfer, with no other CPI in between.",

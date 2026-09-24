@@ -30,6 +30,20 @@ impl<'a> AccessorContext<'a> {
 	}
 }
 
+/// A hand-written cursor: each `take()` hands out the next account.
+struct TakeCursor<'a> {
+	accounts: &'a [Account],
+	position: usize,
+}
+
+impl<'a> TakeCursor<'a> {
+	fn take(&mut self) -> Result<&'a Account, ()> {
+		let account = self.accounts.get(self.position).ok_or(())?;
+		self.position += 1;
+		Ok(account)
+	}
+}
+
 /// A program's own state loader, which the typed identity does not know.
 struct PoolState;
 
@@ -375,6 +389,20 @@ fn process_custody_through_program_loader_without_reload(
 	let _before = PoolState::load(vault)?.amount();
 	SplTransfer::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
 	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	Ok(())
+}
+
+fn process_custom_cursor_custody_reads_of_other_account(
+	cursor: &mut TakeCursor<'_>,
+	mint: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let fee = cursor.take()?;
+	let vault = cursor.take()?;
+	let _before = fee.amount();
+	SplTransfer::new(owner, mint, vault, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	let _after = fee.amount();
 	Ok(())
 }
 

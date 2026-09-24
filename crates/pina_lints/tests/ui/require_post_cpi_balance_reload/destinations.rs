@@ -69,6 +69,20 @@ impl<'a> AccessorContext<'a> {
 	}
 }
 
+/// A hand-written cursor: each `take()` hands out the next account.
+struct TakeCursor<'a> {
+	accounts: &'a [Account],
+	position: usize,
+}
+
+impl<'a> TakeCursor<'a> {
+	fn take(&mut self) -> Result<&'a Account, ()> {
+		let account = self.accounts.get(self.position).ok_or(())?;
+		self.position += 1;
+		Ok(account)
+	}
+}
+
 /// A wrapper whose `invoke()` could target any program.
 struct Relay<T>(T);
 
@@ -977,6 +991,98 @@ fn process_saturating_delta(
 	let after = user_ata.amount();
 	let received = after.saturating_sub(before);
 	Ok(received)
+}
+
+fn process_widened_from_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u128, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	u128::from(after).checked_sub(u128::from(before)).ok_or(())
+}
+
+fn process_signed_from_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<i128, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	Ok(i128::from(after) - i128::from(before))
+}
+
+fn process_widened_into_snapshot(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u128, ()> {
+	let before: u128 = user_ata.amount().into();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after: u128 = user_ata.amount().into();
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_fallible_conversion_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<i64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	let after: i64 = after.try_into().map_err(|_| ())?;
+	let before = i64::try_from(before).map_err(|_| ())?;
+	after.checked_sub(before).ok_or(())
+}
+
+fn process_ordering_against_reload(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<bool, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	let after = user_ata.amount();
+	Ok(before.cmp(&after) == core::cmp::Ordering::Less)
+}
+
+fn process_reverse_sign_delta(
+	source: &Account,
+	mint: &Account,
+	user_ata: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let before = user_ata.amount();
+	TransferChecked::new(source, mint, user_ata, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `user_ata` makes an earlier read of its balance stale
+	let after = user_ata.amount();
+	before
+		.wrapping_add(before.wrapping_sub(after))
+		.checked_add(0)
+		.ok_or(())
+}
+
+fn process_custom_cursor_accounts_stay_distinct(
+	cursor: &mut TakeCursor<'_>,
+	mint: &Account,
+	owner: &Account,
+) -> Result<u64, ()> {
+	let source = cursor.take()?;
+	let destination = cursor.take()?;
+	let before = destination.amount();
+	TransferChecked::new(source, mint, destination, owner, 10, 0).invoke_with_program(owner)?;
+	//~^ ERROR: transfer into `destination` makes an earlier read of its balance stale
+	let source_after = source.amount();
+	source_after.checked_sub(before).ok_or(())
 }
 
 fn main() {}

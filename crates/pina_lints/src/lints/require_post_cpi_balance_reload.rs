@@ -36,7 +36,7 @@ crate::declare_late_lint! {
 	/// `TransferChecked`, `MintTo`, and `MintToChecked` builders) to be
 	/// re-read after the CPI before a balance snapshot taken before it is
 	/// trusted. After the CPI, a snapshot-derived value may only be compared
-	/// with a reload-derived value or a constant, subtracted with a reload to
+	/// with a reload-derived value or a constant, subtracted from a reload to
 	/// form a delta (`after.checked_sub(before)`), or added to such a delta.
 	/// Destinations named like protocol custody (`vault`, `custody`,
 	/// `reserve`, or `pool`) must additionally be read both before and after
@@ -419,6 +419,34 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				})
 	}
 
+	/// Whether an initializer comes from a `&mut self` method call (looking
+	/// through `?` and `Option`/`Result` adaptors). Such a call may hand out
+	/// a different account each time, like a hand-written cursor's `take()`,
+	/// so the binding it initializes names its own account instead of
+	/// aliasing the call.
+	fn mutates_receiver(&self, initializer: &'tcx Expr<'tcx>) -> bool {
+		let call = self.peel_value(initializer);
+		let ExprKind::MethodCall(..) = call.kind else {
+			return false;
+		};
+		let Some(method) = self.cx.typeck_results().type_dependent_def_id(call.hir_id) else {
+			return false;
+		};
+		let signature = self
+			.cx
+			.tcx
+			.fn_sig(method)
+			.instantiate_identity()
+			.skip_binder();
+
+		signature.inputs().first().is_some_and(|receiver| {
+			matches!(
+				receiver.kind(),
+				TyKind::Ref(_, _, rustc_middle::ty::Mutability::Mut)
+			)
+		})
+	}
+
 	/// Whether a method returns its receiver's value unchanged: `Option` and
 	/// `Result` adaptors that pass the success value through, and Pina's
 	/// `assert_*` checks, which return the account they checked.
@@ -797,10 +825,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	/// and `Option`/`Result` unwrapping adaptors.
 	fn peel_value(&self, mut expr: &'tcx Expr<'tcx>) -> &'tcx Expr<'tcx> {
 		loop {
+			if let Some(operand) = self.integer_conversion_operand(expr) {
+				expr = operand;
+				continue;
+			}
 			expr = match &expr.kind {
 				ExprKind::DropTemps(inner)
 				| ExprKind::Cast(inner, _)
 				| ExprKind::Type(inner, _)
+				| ExprKind::AddrOf(_, _, inner)
+				| ExprKind::Unary(rustc_hir::UnOp::Deref, inner)
 				| ExprKind::Match(inner, _, MatchSource::TryDesugar(_)) => inner,
 				ExprKind::Call(..) => {
 					match shared::try_branch_argument(self.cx, expr) {
@@ -816,6 +850,67 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				_ => return expr,
 			};
 		}
+	}
+
+	/// Whether a resolved function or method is `From::from`, `Into::into`,
+	/// `TryFrom::try_from`, or `TryInto::try_into`, called on the trait or
+	/// through one of its impls.
+	fn is_conversion(&self, function: DefId) -> bool {
+		let tcx = self.cx.tcx;
+		let conversion_trait = tcx.trait_of_assoc(function).or_else(|| {
+			tcx.trait_impl_of_assoc(function)
+				.map(|implementation| tcx.impl_trait_id(implementation))
+		});
+
+		conversion_trait.is_some_and(|conversion| {
+			[sym::From, sym::Into, sym::TryFrom, sym::TryInto]
+				.into_iter()
+				.any(|name| tcx.is_diagnostic_item(name, conversion))
+		})
+	}
+
+	/// The integer carried by a type: the type itself, or the success type of
+	/// a `Result` from a fallible conversion.
+	fn is_integer_payload(&self, ty: Ty<'tcx>) -> bool {
+		match ty.kind() {
+			TyKind::Adt(definition, generics)
+				if self
+					.cx
+					.tcx
+					.is_diagnostic_item(sym::Result, definition.did()) =>
+			{
+				generics.type_at(0).is_integral()
+			}
+			_ => ty.is_integral(),
+		}
+	}
+
+	/// The converted operand of an integer-to-integer conversion
+	/// (`u128::from(x)`, `x.into()`, `i128::try_from(x)`, `x.try_into()`),
+	/// which carries the same value.
+	fn integer_conversion_operand(&self, expr: &'tcx Expr<'tcx>) -> Option<&'tcx Expr<'tcx>> {
+		let typeck = self.cx.typeck_results();
+		let (function, operand) = match &expr.kind {
+			ExprKind::Call(callee, [operand]) => {
+				let ExprKind::Path(path) = &callee.kind else {
+					return None;
+				};
+				let Res::Def(DefKind::AssocFn, function) = self.cx.qpath_res(path, callee.hir_id)
+				else {
+					return None;
+				};
+				(function, operand)
+			}
+			ExprKind::MethodCall(_, receiver, [], _) => {
+				(typeck.type_dependent_def_id(expr.hir_id)?, *receiver)
+			}
+			_ => return None,
+		};
+		let converts_integers = self.is_conversion(function)
+			&& typeck.expr_ty(operand).peel_refs().is_integral()
+			&& self.is_integer_payload(typeck.expr_ty(expr));
+
+		converts_integers.then_some(operand)
 	}
 
 	/// Splits integer arithmetic into its operation name and operands:
@@ -915,9 +1010,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	}
 
 	/// A delta: a subtraction-like operation (`-`, `checked_sub`,
-	/// `saturating_sub`, `wrapping_sub`, `overflowing_sub`, `abs_diff`, in
-	/// method or `u64::checked_sub(a, b)` form) between a snapshot-derived
-	/// operand and a reload, or a local defined as one after the CPI.
+	/// `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or
+	/// `u64::checked_sub(a, b)` form) of a snapshot-derived subtrahend from a
+	/// reload, `abs_diff` between the two in either order, or a local defined
+	/// as one after the CPI.
 	fn is_delta(&self, expr: &'tcx Expr<'tcx>, value: &ValueContext<'_>, depth: usize) -> bool {
 		if depth > 16 {
 			return false;
@@ -934,11 +1030,15 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			return false;
 		};
 
-		is_subtraction_like(&operation)
-			&& ((self.is_snapshot_derived(left, value, depth + 1)
-				&& self.is_reload(right, value, depth + 1))
-				|| (self.is_reload(left, value, depth + 1)
-					&& self.is_snapshot_derived(right, value, depth + 1)))
+		// The reload is the minuend (`after - before`), except for the
+		// symmetric `abs_diff`; `before - after` is not the amount received.
+		let forward = self.is_reload(left, value, depth + 1)
+			&& self.is_snapshot_derived(right, value, depth + 1);
+		let symmetric = operation == "abs_diff"
+			&& self.is_snapshot_derived(left, value, depth + 1)
+			&& self.is_reload(right, value, depth + 1);
+
+		is_subtraction_like(&operation) && (forward || symmetric)
 	}
 
 	/// A reload-derived value: a reload, a delta, or a local, cast, or
@@ -1035,21 +1135,29 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				return self.stale_flow_into_binding(parent, current, value, depth);
 			};
 
-			let passes_through = match &parent_expr.kind {
-				ExprKind::DropTemps(_) | ExprKind::Cast(..) | ExprKind::Type(..) => true,
-				ExprKind::Match(scrutinee, _, MatchSource::TryDesugar(_)) => {
-					scrutinee.hir_id == current.hir_id
-				}
-				ExprKind::Call(..) => {
-					shared::try_branch_argument(self.cx, parent_expr)
-						.is_some_and(|argument| argument.hir_id == current.hir_id)
-				}
-				ExprKind::MethodCall(segment, receiver, ..) => {
-					receiver.hir_id == current.hir_id
-						&& UNWRAPPING_METHODS.contains(&segment.ident.name.as_str())
-				}
-				_ => false,
-			};
+			let converts = self
+				.integer_conversion_operand(parent_expr)
+				.is_some_and(|operand| operand.hir_id == current.hir_id);
+			let passes_through = converts
+				|| match &parent_expr.kind {
+					ExprKind::DropTemps(_)
+					| ExprKind::Cast(..)
+					| ExprKind::Type(..)
+					| ExprKind::AddrOf(..)
+					| ExprKind::Unary(rustc_hir::UnOp::Deref, _) => true,
+					ExprKind::Match(scrutinee, _, MatchSource::TryDesugar(_)) => {
+						scrutinee.hir_id == current.hir_id
+					}
+					ExprKind::Call(..) => {
+						shared::try_branch_argument(self.cx, parent_expr)
+							.is_some_and(|argument| argument.hir_id == current.hir_id)
+					}
+					ExprKind::MethodCall(segment, receiver, ..) => {
+						receiver.hir_id == current.hir_id
+							&& UNWRAPPING_METHODS.contains(&segment.ident.name.as_str())
+					}
+					_ => false,
+				};
 			if passes_through {
 				current = parent_expr;
 				continue;
@@ -1077,7 +1185,11 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				});
 				return (!verified).then_some(current.span);
 			}
+			// A delta takes the snapshot as the subtrahend of a reload
+			// (`after - before`), or either side of the symmetric `abs_diff`.
+			let is_subtrahend = operands.len() == 2 && operands[1].hir_id == current.hir_id;
 			if is_subtraction_like(&operation)
+				&& (is_subtrahend || operation == "abs_diff")
 				&& others
 					.iter()
 					.any(|other| self.is_reload(other, value, depth + 1))
@@ -1243,6 +1355,7 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 		if let Some(initializer) = local.init {
 			if let PatKind::Binding(_, binding, _, None) = local.pat.kind
 				&& local.els.is_none()
+				&& !self.mutates_receiver(initializer)
 			{
 				self.let_initializers.insert(binding, initializer);
 			}

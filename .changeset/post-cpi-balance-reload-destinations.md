@@ -7,10 +7,10 @@ pina_cli: fix
 
 `require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.
 
-After the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, cast, or arithmetic result computed from one. It may appear only as:
+After the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:
 
 1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);
-2. an operand of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, `abs_diff`, in method or `u64::checked_sub(a, b)` form) with a reload, which yields a delta; or
+2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or
 3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).
 
 The reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:
@@ -28,7 +28,7 @@ Accounts are keyed by binding (never by name) plus full field path. Only these s
 - the `.base` field of a loaded Token-2022 view; and
 - `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.
 
-Cursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.
+Cursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from any `&mut self` method call, such as a hand-written cursor's `take()`, names its own account. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.
 
 Builders are recognised by their constructor's resolved return type and signature:
 
