@@ -49,6 +49,11 @@ interface RuntimeReport {
 	cases?: RuntimeCase[];
 	missingCases?: string[];
 	testFailures?: string[];
+	/**
+	 * Batches that exited nonzero after every test binary passed and every
+	 * owned case was measured. Informational: the measurements are complete.
+	 */
+	incompleteTeardowns?: string[];
 	unavailablePrograms?: string[];
 }
 
@@ -103,6 +108,8 @@ interface RuntimeComparisonResult {
 	newBaselines: string[];
 	removedCases: string[];
 	hardErrors: string[];
+	/** Head measurement caveats that do not fail the comparison. */
+	notes: string[];
 }
 
 interface Arguments {
@@ -236,6 +243,9 @@ function mergeRuntimeReports(reports: RuntimeReport[]): RuntimeReport {
 		cases: reports.flatMap((report) => report.cases ?? []),
 		missingCases: reports.flatMap((report) => report.missingCases ?? []),
 		testFailures: reports.flatMap((report) => report.testFailures ?? []),
+		incompleteTeardowns: reports.flatMap((report) =>
+			report.incompleteTeardowns ?? []
+		),
 		unavailablePrograms: reports.flatMap((report) =>
 			report.unavailablePrograms ?? []
 		),
@@ -445,7 +455,12 @@ export function compareRuntimeReports(
 	for (const program of headReport.unavailablePrograms ?? []) {
 		hardErrors.push(`head benchmark ELF is unavailable for \`${program}\``);
 	}
-	return { comparisons, newBaselines, removedCases, hardErrors };
+
+	const notes = (headReport.incompleteTeardowns ?? []).map((teardown) =>
+		`head benchmark tolerated a teardown exit: ${teardown}`
+	);
+
+	return { comparisons, newBaselines, removedCases, hardErrors, notes };
 }
 
 function formatInt(value: number): string {
@@ -677,6 +692,9 @@ function renderMarkdown(
 					`🗂️ ${formatCount(runtime.removedCases.length, "removed case")}`,
 				]
 				: []),
+			...(runtime.notes.length > 0
+				? [`🧹 ${formatCount(runtime.notes.length, "tolerated teardown exit")}`]
+				: []),
 		],
 	);
 	const staticBlockingRegressions = staticComparisons.filter(
@@ -783,6 +801,13 @@ function renderMarkdown(
 			"",
 			"Runtime measurement errors:",
 			...runtime.hardErrors.map((item) => `- ${item}`),
+		);
+	}
+	if (!staticOnly && runtime.notes.length > 0) {
+		lines.push(
+			"",
+			"Runtime measurement notes:",
+			...runtime.notes.map((item) => `- ${item}`),
 		);
 	}
 	if (runtimeOnly) {
@@ -897,6 +922,7 @@ export function run(arguments_: Arguments): number {
 		newBaselines: [],
 		removedCases: [],
 		hardErrors: [],
+		notes: [],
 	};
 	const baseReports: RuntimeReport[] = [];
 	const headReports: RuntimeReport[] = [];
@@ -963,6 +989,7 @@ export function run(arguments_: Arguments): number {
 						runtimeNewBaselines: runtime.newBaselines.length,
 						runtimeRemovedCases: runtime.removedCases.length,
 						runtimeErrors: runtime.hardErrors.length,
+						runtimeNotes: runtime.notes.length,
 						comparedPrograms: staticResult.comparisons.length,
 						failures:
 							staticResult.comparisons.filter((item) => item.status === "fail")
@@ -986,6 +1013,7 @@ export function run(arguments_: Arguments): number {
 						newBaselines: runtime.newBaselines,
 						removedCases: runtime.removedCases,
 						errors: runtime.hardErrors,
+						notes: runtime.notes,
 					},
 					newStaticBaselines: staticResult.newBaselines,
 					removedPrograms: staticResult.removedPrograms,
