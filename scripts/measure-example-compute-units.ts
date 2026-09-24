@@ -81,6 +81,13 @@ function command(
 	return { status: result.status ?? 1, stdout: result.stdout ?? "" };
 }
 
+/**
+ * Run a batch command, streaming its output while keeping a copy of stdout.
+ *
+ * libtest prints each binary's `test result:` line to stdout, and
+ * `classifyBatchExit` reads those lines to tell a teardown crash apart from a
+ * failed test. Stderr is inherited untouched.
+ */
 export function commandAsync(
 	program: string,
 	args: string[],
@@ -89,7 +96,7 @@ export function commandAsync(
 		env: NodeJS.ProcessEnv;
 		timeoutMinutes?: number;
 	},
-): Promise<number> {
+): Promise<{ status: number; stdout: string }> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(program, args, {
 			cwd: options.cwd,
@@ -97,7 +104,13 @@ export function commandAsync(
 			// Own process group so the watchdog can terminate the whole batch,
 			// including the cargo test binaries and their Surfpool runtimes.
 			detached: process.platform !== "win32",
-			stdio: "inherit",
+			stdio: ["inherit", "pipe", "inherit"],
+		});
+		const stdoutChunks: Buffer[] = [];
+
+		child.stdout.on("data", (chunk: Buffer) => {
+			stdoutChunks.push(chunk);
+			process.stdout.write(chunk);
 		});
 
 		const terminate = (signal: NodeJS.Signals) => {
@@ -152,9 +165,67 @@ export function commandAsync(
 		});
 		child.once("close", (code) => {
 			clearWatchdog();
-			resolve(code ?? 1);
+			resolve({
+				status: code ?? 1,
+				stdout: Buffer.concat(stdoutChunks).toString("utf8"),
+			});
 		});
 	});
+}
+
+/** How a finished Surfpool batch counts toward the measurement gate. */
+export type BatchOutcome = "passed" | "incompleteTeardown" | "failed";
+
+/** What a finished Surfpool batch left behind. */
+export interface BatchEvidence {
+	/** Exit status of the `cargo test` process that ran the batch. */
+	status: number;
+	/** The batch's stdout, where libtest prints each `test result:` line. */
+	stdout: string;
+	/** Test binaries the batch runs: one `--lib` target per test package. */
+	testBinaries: number;
+	/** Every `program/instruction` case the batch's programs declare. */
+	ownedCases: readonly string[];
+	/** Recorded sample count per case, across every batch. */
+	sampleCounts: ReadonlyMap<string, number>;
+}
+
+// libtest's per-binary summary, e.g.
+// `test result: ok. 5 passed; 0 failed; 0 ignored; ...`.
+const TEST_RESULT_LINE = /^test result: (ok|FAILED)\./gmu;
+
+// libtest only colors a terminal, but strip escapes so a forced `--color`
+// cannot hide a summary line.
+const ANSI_ESCAPE = /\u001b\[[0-9;]*m/gu;
+
+/**
+ * Decide whether a batch's exit status fails the measurement.
+ *
+ * A nonzero exit is tolerated as `incompleteTeardown` only when the process
+ * died after its work was provably done: every test binary printed
+ * `test result: ok`, none printed `FAILED`, and every case the batch owns has
+ * at least one recorded sample. That is a crash or hang while the Surfpool
+ * runtime shut down, not a missing or bad measurement. Anything short of that
+ * (a failed test, a binary that died before its summary, a build error, a
+ * case with no samples) still fails.
+ */
+export function classifyBatchExit(evidence: BatchEvidence): BatchOutcome {
+	if (evidence.status === 0) {
+		return "passed";
+	}
+
+	const results = [
+		...evidence.stdout.replace(ANSI_ESCAPE, "").matchAll(TEST_RESULT_LINE),
+	].map((match) => match[1]);
+	const everyBinaryPassed = evidence.testBinaries > 0 &&
+		results.length === evidence.testBinaries &&
+		results.every((result) => result === "ok");
+	const everyCaseMeasured = evidence.ownedCases.length > 0 &&
+		evidence.ownedCases.every((id) => (evidence.sampleCounts.get(id) ?? 0) > 0);
+
+	return everyBinaryPassed && everyCaseMeasured
+		? "incompleteTeardown"
+		: "failed";
 }
 
 function attachTestPackages(
@@ -317,7 +388,6 @@ async function main(): Promise<number> {
 		inventory.programs,
 		unavailablePrograms,
 	);
-	const testFailures: string[] = [];
 	const instructionNamesByProgram = new Map<string, Map<number, string>>();
 	mkdirSync(dirname(outputFile), { recursive: true });
 
@@ -397,6 +467,12 @@ async function main(): Promise<number> {
 	// own, differing from run to run. Serializing removes the race, and the
 	// batches have to share one machine's CPU regardless.
 	const recordFiles: string[] = [];
+	const batchRuns: Array<{
+		number: number;
+		status: number;
+		stdout: string;
+		programs: MeasuredProgram[];
+	}> = [];
 
 	for (const [batchIndex, batch] of batches.entries()) {
 		const benchmarkManifest = join(
@@ -418,7 +494,7 @@ async function main(): Promise<number> {
 				batch.programs.map((program) => program.name).join(", ")
 			}\n`,
 		);
-		const status = await commandAsync(
+		const { status, stdout } = await commandAsync(
 			"cargo",
 			[
 				"test",
@@ -442,14 +518,19 @@ async function main(): Promise<number> {
 			},
 		);
 
-		if (status !== 0) {
-			testFailures.push(
-				`Surfpool batch ${batchIndex + 1} exited with ${status}`,
-			);
-		}
-
+		batchRuns.push({
+			number: batchIndex + 1,
+			status,
+			stdout,
+			programs: batch.programs,
+		});
 		recordFiles.push(recordFile);
 	}
+
+	const caseIds = (program: MeasuredProgram): string[] =>
+		[...(instructionNamesByProgram.get(program.name) ??
+			new Map<number, string>()).values()]
+			.map((name) => `${program.name}/${name}`);
 
 	const samples = recordFiles.flatMap(readSamples);
 	const samplesByCase = new Map<string, number[]>();
@@ -485,11 +566,40 @@ async function main(): Promise<number> {
 		.toSorted((left, right) => left.id.localeCompare(right.id));
 	const measuredCases = new Set(cases.map((item) => item.id));
 	const missingCases = programs.flatMap((program) =>
-		[...(instructionNamesByProgram.get(program.name) ??
-			new Map<number, string>()).values()]
-			.map((name) => `${program.name}/${name}`)
-			.filter((id) => !measuredCases.has(id))
+		caseIds(program).filter((id) => !measuredCases.has(id))
 	).toSorted();
+	const sampleCounts = new Map(
+		cases.map((item) => [item.id, item.sampleCount]),
+	);
+	const testFailures: string[] = [];
+	const incompleteTeardowns: string[] = [];
+
+	for (const batchRun of batchRuns) {
+		const outcome = classifyBatchExit({
+			status: batchRun.status,
+			stdout: batchRun.stdout,
+			testBinaries: batchRun.programs.length,
+			ownedCases: batchRun.programs.flatMap(caseIds),
+			sampleCounts,
+		});
+		const exit =
+			`Surfpool batch ${batchRun.number} exited with ${batchRun.status}`;
+
+		if (outcome === "passed") {
+			continue;
+		}
+
+		if (outcome === "failed") {
+			testFailures.push(exit);
+			continue;
+		}
+
+		const note =
+			`${exit} after every test binary passed and every case it owns was measured`;
+		process.stdout.write(`Tolerating teardown exit: ${note}\n`);
+		incompleteTeardowns.push(note);
+	}
+
 	const lockFile = join(sourceWorkspace, "Cargo.lock");
 	const report = {
 		provenance: {
@@ -501,6 +611,7 @@ async function main(): Promise<number> {
 		cases,
 		missingCases,
 		testFailures: testFailures.toSorted(),
+		incompleteTeardowns: incompleteTeardowns.toSorted(),
 		unavailablePrograms: [...unavailablePrograms].toSorted(),
 	};
 	writeFileSync(outputFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");

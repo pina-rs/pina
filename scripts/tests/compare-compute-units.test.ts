@@ -422,3 +422,79 @@ test("a new program reports its current compute units and build size", () => {
 	assert.match(markdown, /new_example/u);
 	assert.match(markdown, /56,789 B/u);
 });
+
+test("tolerated teardown exits surface as notes without failing the comparison", () => {
+	const tolerated = compareRuntimeReports(
+		policy,
+		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
+		{
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+			incompleteTeardowns: ["Surfpool batch 4 exited with 101"],
+		},
+	);
+	assert.deepEqual(tolerated.hardErrors, []);
+	assert.deepEqual(tolerated.notes, [
+		"head benchmark tolerated a teardown exit: Surfpool batch 4 exited with 101",
+	]);
+
+	const failed = compareRuntimeReports(
+		policy,
+		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
+		{
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+			testFailures: ["Surfpool batch 4 exited with 101"],
+		},
+	);
+	assert.deepEqual(failed.hardErrors, [
+		"head benchmark test failed: Surfpool batch 4 exited with 101",
+	]);
+	assert.deepEqual(failed.notes, []);
+
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-teardown-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(root, "policy.json"), JSON.stringify(policy));
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+			incompleteTeardowns: ["Surfpool batch 4 exited with 101"],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /🧹 1 tolerated teardown exit/u);
+	assert.match(markdown, /Runtime measurement notes:/u);
+	assert.match(
+		markdown,
+		/- head benchmark tolerated a teardown exit: Surfpool batch 4 exited with 101/u,
+	);
+
+	const report = JSON.parse(
+		readFileSync(join(root, "comparison.json"), "utf8"),
+	) as { summary: { runtimeNotes: number }; runtime: { notes: string[] } };
+	assert.equal(report.summary.runtimeNotes, 1);
+	assert.equal(report.runtime.notes.length, 1);
+});
