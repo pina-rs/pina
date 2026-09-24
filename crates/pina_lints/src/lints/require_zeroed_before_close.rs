@@ -1,5 +1,6 @@
 extern crate rustc_ast;
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
@@ -21,6 +22,8 @@ use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
+use rustc_middle::ty::BorrowKind;
+use rustc_middle::ty::UpvarCapture;
 use rustc_span::Span;
 use rustc_span::Symbol;
 
@@ -50,13 +53,16 @@ crate::declare_late_lint! {
 	/// ```
 	///
 	/// The zeroing proof is a `core` slice `fill(0)` over the entire buffer
-	/// returned by `AccountView::try_borrow_mut()?` — chained directly, through
-	/// `[..]`, or through a `let` binding of that buffer — on the same account.
-	/// It must run on every path to the close: a fill inside an `if` or `else`
-	/// branch, a `match` arm, the right side of `&&`/`||`, a loop body, or a
-	/// labeled block proves only a close inside that same scope. It must stay
-	/// the last write: a later `try_borrow_mut()` of the account, or a use of
-	/// the zeroed buffer other than `drop`, before the close voids it.
+	/// returned by `AccountView::try_borrow_mut()?`, in method or fully
+	/// qualified form, chained directly, through `[..]`, or through a `let`
+	/// binding of that buffer, on the same account. Closes are recognized in
+	/// both forms too (`state.close()`, `AccountView::close(state)`). The fill
+	/// must run on every path to the close: a fill inside an `if` or `else`
+	/// branch, a `match` arm, the right side of `&&`/`||`, a loop body, a
+	/// labeled block, or a `let ... else` block proves only a close inside
+	/// that same scope. It must stay the last write: a later `try_borrow_mut()`
+	/// that could reach the account, or a use of the zeroed buffer other than
+	/// `drop`, before the close voids it.
 	///
 	/// "Same account" means both receivers resolve to the same local binding
 	/// plus field path. A `let` alias is followed only when its initializer is
@@ -65,15 +71,19 @@ crate::declare_late_lint! {
 	/// indexing or a method or function call have no identity, and neither do
 	/// bindings that are assigned, lent as a slot, or captured by a closure.
 	/// Lending the account's place, or any place it is reached through,
-	/// mutably anywhere before the close — `&mut`, `ref mut`, a default-binding
-	/// `match`, passing a `&mut` place to a call, or calling a `&mut self`
-	/// method outside the account crates — voids the proof; lending a sibling
-	/// field does not.
+	/// mutably anywhere before the close voids the proof. That covers `&mut`,
+	/// `ref mut`, a default-binding `match`, passing a `&mut` place to a call,
+	/// calling a `&mut self` method outside the account crates, and a closure
+	/// that captures the place mutably. Lending a sibling field does not void
+	/// it. A lend or borrow through an alias whose value may have changed, or
+	/// through an expression with no place, is assumed to reach every account.
 	///
 	/// Methods from `solana_account_view`, `pinocchio`, and `pina` are trusted
 	/// not to replace the account, so a write through one of them (such as a
-	/// typed `as_account_mut()` loader) after the fill is not seen, and neither
-	/// is a write by a CPI.
+	/// typed `as_account_mut()` loader) after the fill is not seen. Neither is
+	/// a write by a CPI, nor one through a separately obtained handle to the
+	/// same account (a copied or cloned `AccountView`, or one returned by a
+	/// call).
 	/// `close_account_zeroed()` and the `CloseAccountZeroed` builder zero before
 	/// closing, so they are never flagged.
 	pub REQUIRE_ZEROED_BEFORE_CLOSE,
@@ -150,8 +160,37 @@ struct ZeroFill<'tcx> {
 struct Close<'tcx> {
 	order: usize,
 	span: Span,
-	receiver: &'tcx Expr<'tcx>,
+	/// The closed account: the method receiver, or the first argument of a
+	/// fully qualified call. `None` for a qualified call without arguments.
+	receiver: Option<&'tcx Expr<'tcx>>,
 	branches: Vec<HirId>,
+}
+
+/// What a mutable lend hands out.
+enum Lent<'tcx> {
+	/// A place expression built on a local path.
+	Place(&'tcx Expr<'tcx>),
+	/// A local binding captured by a closure.
+	Binding(HirId),
+}
+
+/// The accounts a lend or a data borrow could affect.
+enum Reach {
+	/// Exactly the accounts at and under this place.
+	Place(AccountPlace),
+	/// An account the lint cannot pin down, so possibly any of them.
+	Anywhere,
+}
+
+impl Reach {
+	fn covers(&self, closed: &AccountPlace) -> bool {
+		match self {
+			Self::Place(place) => {
+				place.root == closed.root && closed.fields.starts_with(&place.fields)
+			}
+			Self::Anywhere => true,
+		}
+	}
 }
 
 /// A mutable borrow of an account's data through `AccountView::try_borrow_mut`.
@@ -182,7 +221,7 @@ struct Analysis<'tcx> {
 	borrows: Vec<Borrow<'tcx>>,
 	buffer_uses: Vec<BufferUse>,
 	/// Places lent mutably to code the lint cannot follow, with their order.
-	lends: Vec<(usize, &'tcx Expr<'tcx>)>,
+	lends: Vec<(usize, Lent<'tcx>)>,
 }
 
 impl<'tcx> Analysis<'tcx> {
@@ -198,14 +237,15 @@ impl<'tcx> Analysis<'tcx> {
 	/// anywhere before the close could replace the account it names, so it
 	/// voids every proof for that place. Lending a sibling field does not.
 	fn is_zeroed_before(&self, close: &Close<'tcx>) -> bool {
-		let Some(closed) = self.place_of(close.receiver) else {
+		let Some(closed) = close.receiver.and_then(|receiver| self.place_of(receiver)) else {
 			return false;
 		};
 		let is_lent = self.lends.iter().any(|(order, lent)| {
-			*order < close.order
-				&& self.place_of(lent).is_some_and(|lent| {
-					lent.root == closed.root && closed.fields.starts_with(&lent.fields)
-				})
+			let reach = match lent {
+				Lent::Place(place) => self.reach_of(place, &mut HashSet::new()),
+				Lent::Binding(binding) => self.reach_of_binding(*binding, &mut HashSet::new()),
+			};
+			*order < close.order && reach.covers(&closed)
 		});
 		if is_lent {
 			return false;
@@ -222,13 +262,58 @@ impl<'tcx> Analysis<'tcx> {
 				&& self.place_of(fill.account).as_ref() == Some(&closed)
 				&& !self.borrows.iter().any(|borrow| {
 					is_between(borrow.order, fill)
-						&& self.place_of(borrow.account).as_ref() == Some(&closed)
+						&& self
+							.reach_of(borrow.account, &mut HashSet::new())
+							.covers(&closed)
 				}) && !self.buffer_uses.iter().any(|buffer_use| {
 				is_between(buffer_use.order, fill)
 					&& Some(buffer_use.buffer) == fill.buffer
 					&& !buffer_use.is_drop
 			})
 		})
+	}
+
+	/// The accounts a lend or data borrow through `expr` could affect.
+	///
+	/// Unlike [`Self::place_of`], this never drops a signal that voids a
+	/// proof: an alias whose value may have changed since its `let`, or an
+	/// expression without a place, could reach any account.
+	fn reach_of(&self, expr: &Expr<'_>, visited: &mut HashSet<HirId>) -> Reach {
+		match expr.kind {
+			ExprKind::Unary(UnOp::Deref, inner) | ExprKind::AddrOf(_, _, inner) => {
+				self.reach_of(inner, visited)
+			}
+			ExprKind::Field(base, field) => {
+				match self.reach_of(base, visited) {
+					Reach::Place(mut place) => {
+						place.fields.push(field.name);
+						Reach::Place(place)
+					}
+					Reach::Anywhere => Reach::Anywhere,
+				}
+			}
+			_ => {
+				match local_path_binding(expr) {
+					Some(binding) => self.reach_of_binding(binding, visited),
+					None => Reach::Anywhere,
+				}
+			}
+		}
+	}
+
+	fn reach_of_binding(&self, binding: HirId, visited: &mut HashSet<HirId>) -> Reach {
+		match self.aliases.get(&binding) {
+			Some(_) if self.unstable.contains(&binding) || !visited.insert(binding) => {
+				Reach::Anywhere
+			}
+			Some(initializer) => self.reach_of(initializer, visited),
+			None => {
+				Reach::Place(AccountPlace {
+					root: binding,
+					fields: Vec::new(),
+				})
+			}
+		}
 	}
 
 	/// Resolve an account expression to its identity.
@@ -384,6 +469,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 				if let Some(upvars) = self.cx.tcx.upvars_mentioned(closure.def_id) {
 					self.analysis.unstable.extend(upvars.keys().copied());
 				}
+				self.record_closure_lends(closure.def_id);
 			}
 			ExprKind::Field(base, _) => self.note_projection(base),
 			ExprKind::Call(callee, [argument]) if is_drop(self.cx, callee) => {
@@ -393,6 +479,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 					}
 				}
 			}
+			ExprKind::Call(callee, arguments) => self.record_call(expr, callee, arguments),
 			ExprKind::MethodCall(segment, receiver, arguments, _) => {
 				self.note_projection(receiver);
 				self.record_method_call(expr, segment.ident.name, receiver, arguments);
@@ -415,6 +502,52 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 		}
 	}
 
+	/// Record a fully qualified call: `AccountView::close(account)` closes
+	/// and `AccountView::try_borrow_mut(account)` borrows, like their method
+	/// forms, with the first argument as the account.
+	fn record_call(
+		&mut self,
+		expr: &'tcx Expr<'tcx>,
+		callee: &'tcx Expr<'tcx>,
+		arguments: &'tcx [Expr<'tcx>],
+	) {
+		if let Some(account) = account_borrow(self.cx, expr) {
+			let order = self.next_order();
+			self.analysis.borrows.push(Borrow { order, account });
+		} else if callee_name(callee).is_some_and(|name| TARGET_METHODS.contains(&name.as_str())) {
+			let order = self.next_order();
+			self.analysis.closes.push(Close {
+				order,
+				span: expr.span,
+				receiver: arguments.first(),
+				branches: self.branches.clone(),
+			});
+		}
+	}
+
+	/// Record the variables a closure captures mutably, or captures by value
+	/// when they hold a `&mut`, as lent where the closure is created.
+	fn record_closure_lends(&mut self, closure: rustc_hir::def_id::LocalDefId) {
+		let lent = self
+			.cx
+			.typeck_results()
+			.closure_min_captures_flattened(closure)
+			.filter(|capture| {
+				match capture.info.capture_kind {
+					UpvarCapture::ByRef(kind) => kind != BorrowKind::Immutable,
+					UpvarCapture::ByValue | UpvarCapture::ByUse => {
+						capture.place.ty().ref_mutability() == Some(Mutability::Mut)
+					}
+				}
+			})
+			.map(|capture| capture.get_root_variable())
+			.collect::<Vec<_>>();
+		for binding in lent {
+			let order = self.next_order();
+			self.analysis.lends.push((order, Lent::Binding(binding)));
+		}
+	}
+
 	fn record_method_call(
 		&mut self,
 		expr: &'tcx Expr<'tcx>,
@@ -433,7 +566,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 			self.analysis.closes.push(Close {
 				order,
 				span: expr.span,
-				receiver,
+				receiver: Some(receiver),
 				branches: self.branches.clone(),
 			});
 			return;
@@ -488,7 +621,7 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 
 		if self.lends_mutably(place) {
 			let order = self.next_order();
-			self.analysis.lends.push((order, place));
+			self.analysis.lends.push((order, Lent::Place(place)));
 		}
 	}
 
@@ -505,19 +638,14 @@ impl<'cx, 'tcx> Collector<'cx, 'tcx> {
 				);
 				!is_alias && binds_by_mutable_reference(self.cx, local.pat)
 			}
+			Node::Expr(_) if is_account_self_argument(self.cx, place) => false,
 			Node::Expr(parent) => {
 				match parent.kind {
 					ExprKind::AddrOf(_, Mutability::Mut, _) => {
 						!self.alias_borrows.contains(&parent.hir_id)
+							&& !is_account_self_argument(self.cx, parent)
 					}
 					ExprKind::AddrOf(_, Mutability::Not, _) => false,
-					ExprKind::MethodCall(segment, receiver, ..)
-						if receiver.hir_id == place.hir_id =>
-					{
-						!TARGET_METHODS.contains(&segment.ident.name.as_str())
-							&& !is_trusted_method(self.cx, parent)
-							&& is_mutable_reference()
-					}
 					ExprKind::Call(callee, _) if is_drop(self.cx, callee) => false,
 					ExprKind::Match(scrutinee, arms, _) if scrutinee.hir_id == place.hir_id => {
 						arms.iter()
@@ -561,7 +689,18 @@ impl<'tcx> Visitor<'tcx> for Collector<'_, 'tcx> {
 				self.buffers.insert(binding, account);
 			}
 		}
-		rustc_hir::intravisit::walk_local(self, local);
+
+		if let Some(initializer) = local.init {
+			self.visit_expr(initializer);
+		}
+		self.visit_pat(local.pat);
+		// The `else` block of `let ... else` runs only when the pattern fails,
+		// so a zero fill inside it proves nothing for the code after the `let`.
+		if let Some(otherwise) = local.els {
+			self.branches.push(otherwise.hir_id);
+			self.visit_block(otherwise);
+			self.branches.pop();
+		}
 	}
 
 	fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
@@ -662,12 +801,7 @@ fn binds_by_mutable_reference(cx: &LateContext<'_>, pattern: &Pat<'_>) -> bool {
 fn is_trusted_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	cx.typeck_results()
 		.type_dependent_def_id(expr.hir_id)
-		.is_some_and(|definition| {
-			matches!(
-				cx.tcx.crate_name(definition.krate).as_str(),
-				"solana_account_view" | "pinocchio" | "pina"
-			)
-		})
+		.is_some_and(|definition| is_trusted_crate(cx.tcx.crate_name(definition.krate).as_str()))
 }
 
 fn local_path_binding(expr: &Expr<'_>) -> Option<HirId> {
@@ -687,15 +821,71 @@ fn account_borrow<'tcx>(
 	cx: &LateContext<'tcx>,
 	expr: &'tcx Expr<'tcx>,
 ) -> Option<&'tcx Expr<'tcx>> {
-	let ExprKind::MethodCall(segment, account, [], _) = expr.kind else {
+	let (definition, account) = match expr.kind {
+		ExprKind::MethodCall(_, account, [], _) => {
+			(
+				cx.typeck_results().type_dependent_def_id(expr.hir_id)?,
+				account,
+			)
+		}
+		ExprKind::Call(callee, [account]) => (callee_definition(cx, callee)?, account),
+		_ => return None,
+	};
+
+	(cx.tcx.crate_name(definition.krate).as_str() == "solana_account_view"
+		&& cx.tcx.item_name(definition).as_str() == "try_borrow_mut")
+		.then_some(account)
+}
+
+/// The definition a path callee resolves to, including `Type::method`.
+fn callee_definition(cx: &LateContext<'_>, callee: &Expr<'_>) -> Option<rustc_hir::def_id::DefId> {
+	let ExprKind::Path(ref path) = callee.kind else {
 		return None;
 	};
-	if segment.ident.name.as_str() != "try_borrow_mut" {
+	let rustc_hir::def::Res::Def(_, definition) = cx.qpath_res(path, callee.hir_id) else {
 		return None;
-	}
+	};
 
-	let definition = cx.typeck_results().type_dependent_def_id(expr.hir_id)?;
-	(cx.tcx.crate_name(definition.krate).as_str() == "solana_account_view").then_some(account)
+	Some(definition)
+}
+
+/// The final segment a path callee is written with, as `close` in
+/// `AccountView::close` or `<AccountView>::close`.
+fn callee_name(callee: &Expr<'_>) -> Option<Symbol> {
+	match callee.kind {
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			path.segments.last().map(|segment| segment.ident.name)
+		}
+		ExprKind::Path(rustc_hir::QPath::TypeRelative(_, segment)) => Some(segment.ident.name),
+		_ => None,
+	}
+}
+
+/// Whether `expr` is the account a close or trusted account method acts on:
+/// a method receiver, or the first argument of the fully qualified form.
+/// Handing an account to its own close or to the account crates is not a
+/// lend.
+fn is_account_self_argument(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
+	let Node::Expr(parent) = cx.tcx.parent_hir_node(expr.hir_id) else {
+		return false;
+	};
+
+	match parent.kind {
+		ExprKind::MethodCall(segment, receiver, ..) if receiver.hir_id == expr.hir_id => {
+			TARGET_METHODS.contains(&segment.ident.name.as_str()) || is_trusted_method(cx, parent)
+		}
+		ExprKind::Call(callee, [first, ..]) if first.hir_id == expr.hir_id => {
+			callee_name(callee).is_some_and(|name| TARGET_METHODS.contains(&name.as_str()))
+				|| callee_definition(cx, callee).is_some_and(|definition| {
+					is_trusted_crate(cx.tcx.crate_name(definition.krate).as_str())
+				})
+		}
+		_ => false,
+	}
+}
+
+fn is_trusted_crate(name: &str) -> bool {
+	matches!(name, "solana_account_view" | "pinocchio" | "pina")
 }
 
 /// The account expression of `account.try_borrow_mut()?`.
@@ -749,13 +939,10 @@ fn is_literal_zero(expr: &Expr<'_>) -> bool {
 
 /// Whether `callee` is `core::mem::drop`.
 fn is_drop(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
-	let ExprKind::Path(ref path) = callee.kind else {
-		return false;
-	};
-	let rustc_hir::def::Res::Def(_, definition) = cx.qpath_res(path, callee.hir_id) else {
-		return false;
-	};
-
-	cx.tcx.def_path_str(definition) == "std::mem::drop"
-		|| cx.tcx.def_path_str(definition) == "core::mem::drop"
+	callee_definition(cx, callee).is_some_and(|definition| {
+		matches!(
+			cx.tcx.def_path_str(definition).as_str(),
+			"std::mem::drop" | "core::mem::drop"
+		)
+	})
 }

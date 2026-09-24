@@ -1,5 +1,5 @@
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:380:2
+  --> $DIR/account_close.rs:457:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -10,7 +10,7 @@ LL |     state.close()?;
    = note: `#[deny(require_zeroed_before_close)]` on by default
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:386:2
+  --> $DIR/account_close.rs:463:2
    |
 LL |     state.close_with_recipient(&ID, ())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -20,7 +20,7 @@ LL |     state.close_with_recipient(&ID, ())?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:392:2
+  --> $DIR/account_close.rs:469:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -30,7 +30,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:407:2
+  --> $DIR/account_close.rs:484:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -40,90 +40,10 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:418:2
+  --> $DIR/account_close.rs:495:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:425:2
-   |
-LL |     ctx.escrow.close()?;
-   |     ^^^^^^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:433:2
-   |
-LL |     accounts[1].close()?;
-   |     ^^^^^^^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:441:2
-   |
-LL |     accounts[0].close()?;
-   |     ^^^^^^^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:443:2
-   |
-LL |     accounts[1].close()?;
-   |     ^^^^^^^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:454:2
-   |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:462:2
-   |
-LL |     accounts.escrow().close()?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:474:2
-   |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:488:2
-   |
-LL |     ctx.escrow.close()?;
-   |     ^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
@@ -140,17 +60,37 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:512:2
+  --> $DIR/account_close.rs:510:2
    |
-LL |     ctx.escrow.close()?;
-   |     ^^^^^^^^^^^^^^^^^^
+LL |     accounts[1].close()?;
+   |     ^^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:524:2
+  --> $DIR/account_close.rs:518:2
+   |
+LL |     accounts[0].close()?;
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:520:2
+   |
+LL |     accounts[1].close()?;
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:531:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -160,17 +100,17 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:538:2
+  --> $DIR/account_close.rs:539:2
    |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
+LL |     accounts.escrow().close()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:552:2
+  --> $DIR/account_close.rs:551:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -182,18 +122,18 @@ LL |     state.close()?;
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:565:2
    |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:578:2
+  --> $DIR/account_close.rs:579:2
    |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
@@ -202,25 +142,15 @@ LL |     state.close()?;
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:589:2
    |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:598:2
-   |
-LL |     state.close()?;
-   |     ^^^^^^^^^^^^^
-   |
-   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
-   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
-   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-
-error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:605:2
+  --> $DIR/account_close.rs:601:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -230,7 +160,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:614:2
+  --> $DIR/account_close.rs:615:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -240,7 +170,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:623:2
+  --> $DIR/account_close.rs:629:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -250,7 +180,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:631:2
+  --> $DIR/account_close.rs:642:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -260,7 +190,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:638:2
+  --> $DIR/account_close.rs:655:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -270,7 +200,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:646:2
+  --> $DIR/account_close.rs:666:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -280,7 +210,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:660:2
+  --> $DIR/account_close.rs:675:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -290,7 +220,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:673:2
+  --> $DIR/account_close.rs:682:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -300,7 +230,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:686:2
+  --> $DIR/account_close.rs:691:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -310,7 +240,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:695:2
+  --> $DIR/account_close.rs:700:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -320,7 +250,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:705:2
+  --> $DIR/account_close.rs:708:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -330,7 +260,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:722:2
+  --> $DIR/account_close.rs:715:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -340,7 +270,17 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:736:2
+  --> $DIR/account_close.rs:723:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:737:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -352,15 +292,25 @@ LL |     state.close()?;
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:750:2
    |
-LL |     ctx.escrow.close()?;
-   |     ^^^^^^^^^^^^^^^^^^
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
    |
    = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:765:2
+  --> $DIR/account_close.rs:763:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:772:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -372,6 +322,36 @@ LL |     state.close()?;
 error: account close should be preceded by zeroing the same account's data
   --> $DIR/account_close.rs:782:2
    |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:799:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:813:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:827:2
+   |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
    |
@@ -380,7 +360,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:798:2
+  --> $DIR/account_close.rs:842:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -390,7 +370,17 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:807:2
+  --> $DIR/account_close.rs:859:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:875:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -400,7 +390,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:819:2
+  --> $DIR/account_close.rs:884:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -410,7 +400,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:833:2
+  --> $DIR/account_close.rs:896:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -420,7 +410,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:846:2
+  --> $DIR/account_close.rs:910:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -430,7 +420,17 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:854:3
+  --> $DIR/account_close.rs:923:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:931:3
    |
 LL |         state.close()?;
    |         ^^^^^^^^^^^^^
@@ -440,7 +440,7 @@ LL |         state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:868:2
+  --> $DIR/account_close.rs:945:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -450,7 +450,7 @@ LL |     state.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:879:2
+  --> $DIR/account_close.rs:956:2
    |
 LL |     closed.close()?;
    |     ^^^^^^^^^^^^^^
@@ -460,7 +460,7 @@ LL |     closed.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:893:2
+  --> $DIR/account_close.rs:970:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -470,7 +470,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:907:2
+  --> $DIR/account_close.rs:984:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -480,7 +480,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:919:2
+  --> $DIR/account_close.rs:996:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -490,7 +490,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:928:2
+  --> $DIR/account_close.rs:1005:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -500,7 +500,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:941:2
+  --> $DIR/account_close.rs:1018:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -510,7 +510,7 @@ LL |     ctx.escrow.close()?;
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: account close should be preceded by zeroing the same account's data
-  --> $DIR/account_close.rs:951:2
+  --> $DIR/account_close.rs:1028:2
    |
 LL |     ctx.escrow.close()?;
    |     ^^^^^^^^^^^^^^^^^^
@@ -519,4 +519,164 @@ LL |     ctx.escrow.close()?;
    = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
-error: aborting due to 52 previous errors
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1046:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1058:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1071:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1082:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1096:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1106:2
+   |
+LL |     accounts.list[0].close()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1120:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1133:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1146:2
+   |
+LL |     ctx.escrow.close()?;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1160:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1167:2
+   |
+LL |     AccountView::close(state)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1173:2
+   |
+LL |     <AccountView>::close(&mut *state)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1178:2
+   |
+LL |     CloseAccountWithRecipient::close_with_recipient(state, &ID, ())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1192:3
+   |
+LL |         state.close()?;
+   |         ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1210:3
+   |
+LL |         state.close()?;
+   |         ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: account close should be preceded by zeroing the same account's data
+  --> $DIR/account_close.rs:1220:2
+   |
+LL |     state.close()?;
+   |     ^^^^^^^^^^^^^
+   |
+   = help: close with `account.close_account_zeroed(&ID, recipient)?` (or the `CloseAccountZeroed` builder), which zeroes the data and closes in one step
+   = help: to keep a separate close, first clear the whole data buffer of the same account with `account.try_borrow_mut()?.fill(0);`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: aborting due to 68 previous errors

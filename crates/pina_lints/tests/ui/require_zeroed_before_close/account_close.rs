@@ -121,6 +121,17 @@ fn rotate(ctx: &mut Ctx<'_>) {
 	core::mem::swap(&mut ctx.escrow, &mut ctx.vault);
 }
 
+fn rotate_through(ctx: &mut &mut Ctx<'_>) {
+	core::mem::swap(&mut ctx.escrow, &mut ctx.vault);
+}
+
+fn touch<T>(_: &T) {}
+
+// A struct literal that holds a mutable account reference.
+struct Holder<'a> {
+	account: &'a mut AccountView,
+}
+
 fn receive(_: &mut AccountView) -> Result<(), ProgramError> {
 	Ok(())
 }
@@ -363,6 +374,72 @@ impl Handler<'_> {
 		receive(self.maker)?;
 		self.escrow.close()?;
 		Ok(())
+	}
+}
+
+// Fully qualified zeroing and closing are the same calls.
+fn process_qualified_zeroed_close(state: &mut AccountView) -> Result<(), ProgramError> {
+	AccountView::try_borrow_mut(state)?.fill(0);
+	AccountView::close(state)?;
+	Ok(())
+}
+
+fn process_qualified_reborrowed_close(state: &mut AccountView) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	<AccountView>::close(&mut *state)
+}
+
+// A `let` without an initializer does not disturb the proof.
+fn process_deferred_initialization(state: &mut AccountView) -> Result<(), ProgramError> {
+	let value: u8;
+	value = 1;
+	touch(&value);
+	state.try_borrow_mut()?.fill(0);
+	state.close()?;
+	Ok(())
+}
+
+// E10: a `continue` before the zeroing skips the close too.
+fn process_continue_before_zeroing(
+	state: &mut AccountView,
+	skip: bool,
+) -> Result<(), ProgramError> {
+	loop {
+		if skip {
+			continue;
+		}
+		state.try_borrow_mut()?.fill(0);
+		state.close()?;
+		break;
+	}
+	Ok(())
+}
+
+// E13: each `while let` iteration zeroes the account it closes.
+fn process_while_let(accounts: &mut [AccountView]) -> Result<(), ProgramError> {
+	let mut iter = accounts.iter_mut();
+	while let Some(state) = iter.next() {
+		state.try_borrow_mut()?.fill(0);
+		state.close()?;
+	}
+	Ok(())
+}
+
+// E19: a labeled block holding both the zeroing and the close.
+fn process_labeled_block_both(state: &mut AccountView) -> Result<(), ProgramError> {
+	'close: {
+		state.try_borrow_mut()?.fill(0);
+		state.close()?;
+	}
+	Ok(())
+}
+
+// E18: the recipient is a sibling field, reborrowed or not.
+impl Handler<'_> {
+	fn process_close_to_recipient(&mut self) -> Result<(), ProgramError> {
+		self.escrow.try_borrow_mut()?.fill(0);
+		self.escrow.close_with_recipient(&ID, ())?;
+		receive(self.maker)
 	}
 }
 
@@ -949,6 +1026,198 @@ fn process_owned_root_lent(ctx: Ctx<'_>) -> Result<(), ProgramError> {
 	ctx.escrow.try_borrow_mut()?.fill(0);
 	rotate(&mut ctx);
 	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Flagged: third review.
+// ---------------------------------------------------------------------------
+
+// E01: a zeroing in a `let ... else` block runs only when the pattern fails.
+fn process_zeroed_in_let_else(
+	state: &mut AccountView,
+	value: Option<u8>,
+) -> Result<(), ProgramError> {
+	let Some(_value) = value else {
+		state.try_borrow_mut()?.fill(0);
+		return Ok(());
+	};
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// E02: a lend through an alias whose own slot was lent.
+fn process_lent_through_unstable_alias(ctx: &mut Ctx<'_>) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	{
+		let mut root = &mut *ctx;
+		rotate_through(&mut root);
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// E03: a closure that captures an alias of the root mutably lends it.
+fn process_closure_captures_alias(ctx: &mut Ctx<'_>) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	{
+		let root = &mut *ctx;
+		let mut swap = || rotate(root);
+		swap();
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// A closure that mutably borrows an owned root lends it.
+fn process_closure_borrows_root(ctx: Ctx<'_>) -> Result<(), ProgramError> {
+	let mut ctx = ctx;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	let mut swap = || ctx.rotate();
+	swap();
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// E04: a rewrite through an alias whose identity was dropped.
+fn process_rewritten_through_unstable_alias(state: &mut AccountView) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	{
+		let alias = &mut *state;
+		let inspect = || touch(&alias);
+		inspect();
+		alias.try_borrow_mut()?[0] = 7;
+	}
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// A rewrite through a borrow the lint cannot place.
+fn process_rewritten_through_getter(accounts: &mut Accounts) -> Result<(), ProgramError> {
+	let state = &mut accounts.list[0];
+	state.try_borrow_mut()?.fill(0);
+	accounts.escrow().try_borrow_mut()?[0] = 7;
+	accounts.list[0].close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// A field lent through an alias whose value may have changed.
+fn process_field_lent_through_reassigned_alias<'a>(
+	ctx: &mut Ctx<'a>,
+	other: &mut Ctx<'a>,
+) -> Result<(), ProgramError> {
+	let mut root = &mut *ctx;
+	root = &mut *other;
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	receive(root.escrow)?;
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// A data borrow of an account the lint cannot place could be a duplicate of
+// the zeroed one.
+fn process_rewritten_through_unplaced_account(
+	state: &mut AccountView,
+	accounts: &mut [AccountView],
+) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	accounts[0].try_borrow_mut()?[0] = 7;
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// A `move` closure that takes a `&mut` to the root lends it.
+fn process_move_closure_takes_root(ctx: &mut Ctx<'_>) -> Result<(), ProgramError> {
+	ctx.escrow.try_borrow_mut()?.fill(0);
+	{
+		let root = &mut *ctx;
+		let mut swap = move || rotate(root);
+		swap();
+	}
+	ctx.escrow.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// Handing the account to a struct literal lends it.
+fn process_account_held_by_struct(state: &mut AccountView) -> Result<(), ProgramError> {
+	state.try_borrow_mut()?.fill(0);
+	{
+		let holder = Holder {
+			account: &mut *state,
+		};
+		touch(&holder);
+	}
+	state.close()?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+// E05, E06: fully qualified closes are closes.
+fn process_qualified_close(state: &mut AccountView) -> Result<(), ProgramError> {
+	AccountView::close(state)?;
+	//~^ ERROR: account close should be preceded by
+	Ok(())
+}
+
+fn process_qualified_type_close(state: &mut AccountView) -> Result<(), ProgramError> {
+	<AccountView>::close(&mut *state)
+	//~^ ERROR: account close should be preceded by
+}
+
+fn process_qualified_recipient_close(state: &mut AccountView) -> Result<(), ProgramError> {
+	CloseAccountWithRecipient::close_with_recipient(state, &ID, ())
+	//~^ ERROR: account close should be preceded by
+}
+
+// E09: `break 'outer` from an inner loop skips the zeroing.
+fn process_nested_break(state: &mut AccountView, skip: bool) -> Result<(), ProgramError> {
+	'outer: loop {
+		loop {
+			if skip {
+				break 'outer;
+			}
+			state.try_borrow_mut()?.fill(0);
+			break;
+		}
+		state.close()?;
+		//~^ ERROR: account close should be preceded by
+		break;
+	}
+	Ok(())
+}
+
+// E12: a zeroing in one branch of an earlier iteration.
+fn process_loop_zeroed_conditionally(
+	accounts: &mut [AccountView],
+	zero: bool,
+) -> Result<(), ProgramError> {
+	let mut iter = Iter(accounts.iter_mut());
+	loop {
+		let state = next_account(&mut iter)?;
+		if zero {
+			state.try_borrow_mut()?.fill(0);
+		}
+		state.close()?;
+		//~^ ERROR: account close should be preceded by
+	}
+}
+
+// E17: any mutable lend of the account before the close voids the proof,
+// even one before the zeroing. This matches `main` and stays conservative.
+fn process_lent_before_zeroing(state: &mut AccountView) -> Result<(), ProgramError> {
+	receive(state)?;
+	state.try_borrow_mut()?.fill(0);
+	state.close()?;
 	//~^ ERROR: account close should be preceded by
 	Ok(())
 }
