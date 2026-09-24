@@ -354,19 +354,16 @@ fn missing_and_signaled_verifier_processes_are_errors() {
 /// payload of repeated arbitrary bytes is not a transaction and must be
 /// refused.
 ///
-/// Current behavior: 128 repeated `0x09` bytes are accepted and written (see
-/// `record_export_submit_and_status_use_the_real_process_adapter` above,
-/// which pins today's behavior), so the refusal assertion below fails and
-/// the test proves the missing semantic validation.
+/// Fixed behavior: 128 repeated `0x09` bytes decode cleanly from base64 but
+/// are not a structurally valid Solana transaction, so the export is refused
+/// before anything is written.
 #[test]
-#[ignore = "SEC-18: exploit is live; must pass once exported transactions are semantically \
-            validated"]
 fn audit_sec_18_an_arbitrary_byte_payload_is_not_a_verification_transaction() {
 	let temp = TempDir::new().unwrap();
 	let verifier = fake_verifier(&temp);
 	let (record, keypair, hash) = create_record_and_keypair(&temp);
 	let exported_path = temp.path().join("audit-export.tx");
-	let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(9));
+	let payload = base64::engine::general_purpose::STANDARD.encode([9_u8; 128]);
 
 	let exported = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["verify", "--solana-verify", verifier.to_str().unwrap()])

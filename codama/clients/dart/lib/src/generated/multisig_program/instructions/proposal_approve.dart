@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,18 +12,18 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class ProposalApproveInstructionData {
-  const ProposalApproveInstructionData()
-    : discriminator = 6,
+  const ProposalApproveInstructionData() :
+      discriminator = 6,
       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
 }
 
-Encoder<ProposalApproveInstructionData>
-getProposalApproveInstructionDataEncoder() {
+Encoder<ProposalApproveInstructionData> getProposalApproveInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
@@ -37,33 +38,41 @@ getProposalApproveInstructionDataEncoder() {
   );
 }
 
-Decoder<ProposalApproveInstructionData>
-getProposalApproveInstructionDataDecoder() {
+Decoder<ProposalApproveInstructionData> getProposalApproveInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'proposalApprove instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'proposalApprove instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
-  (ProposalApproveInstructionData, int) readTopLevel(
-    Uint8List bytes,
-    int offset,
-  ) {
-    getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
+  (ProposalApproveInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(
+      getU8Encoder().encode(6),
+    ).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(0),
+    ).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
-    return (ProposalApproveInstructionData(), newOffset);
+    return (
+      ProposalApproveInstructionData(
+
+      ),
+      newOffset,
+    );
   }
 
   return switch (structDecoder) {
@@ -86,12 +95,8 @@ getProposalApproveInstructionDataDecoder() {
   };
 }
 
-Codec<ProposalApproveInstructionData, ProposalApproveInstructionData>
-getProposalApproveInstructionDataCodec() {
-  return combineCodec(
-    getProposalApproveInstructionDataEncoder(),
-    getProposalApproveInstructionDataDecoder(),
-  );
+Codec<ProposalApproveInstructionData, ProposalApproveInstructionData> getProposalApproveInstructionDataCodec() {
+  return combineCodec(getProposalApproveInstructionDataEncoder(), getProposalApproveInstructionDataDecoder());
 }
 
 /// Creates a [ProposalApprove] instruction.
@@ -101,24 +106,25 @@ Instruction getProposalApproveInstruction({
   required Address proposal,
   required Address member,
   required Address clock,
+
 }) {
-  final instructionData = ProposalApproveInstructionData();
+  final instructionData = ProposalApproveInstructionData(
+
+  );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: multisig, role: AccountRole.readonly),
-      AccountMeta(address: proposal, role: AccountRole.writable),
-      AccountMeta(address: member, role: AccountRole.readonlySigner),
-      AccountMeta(address: clock, role: AccountRole.readonly),
+    AccountMeta(address: multisig, role: AccountRole.readonly),
+    AccountMeta(address: proposal, role: AccountRole.writable),
+    AccountMeta(address: member, role: AccountRole.readonlySigner),
+    AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getProposalApproveInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [ProposalApprove] instruction from raw instruction data.
-ProposalApproveInstructionData parseProposalApproveInstruction(
-  Instruction instruction,
-) {
+ProposalApproveInstructionData parseProposalApproveInstruction(Instruction instruction) {
   return getProposalApproveInstructionDataDecoder().decode(instruction.data!);
 }

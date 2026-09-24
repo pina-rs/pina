@@ -21,7 +21,7 @@ pub struct ClaimArgs {
 	/// The `reward_mint` account
 	#[arg(long)]
 	reward_mint: String,
-	/// The `pool_state` account
+	/// The pool's state is written: the payout leaves the pool's outstanding reward liability
 	#[arg(long)]
 	pool_state: String,
 	/// The `position_state` account

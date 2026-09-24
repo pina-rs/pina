@@ -1063,6 +1063,13 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 		program
 			.fund(&funder.pubkey(), FUND)
 			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+		// Fills the refund slot: no rent collector is configured, so any
+		// writable account works, but it must differ from the rent payer
+		// because duplicate mutable accounts are refused at parse time.
+		let refund_filler = Keypair::new_from_array([0xD0; 32]);
+		program
+			.fund(&refund_filler.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund refund filler: {error:?}"));
 
 		// A controlled multisig: `authority` may act directly, which is exactly
 		// the path that must not be able to mint itself an allowance.
@@ -1136,6 +1143,7 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(refund_filler.pubkey(), false),
 						AccountMeta::new(limit_key, false),
 					],
 				),
@@ -1170,6 +1178,7 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(refund_filler.pubkey(), false),
 					],
 				),
 				&[&authority, &funder],
@@ -1398,6 +1407,9 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 		}
 		let authority = Keypair::new_from_array([0xEE; 32]);
 		let collector = Pubkey::new_from_array([0xCC; 32]);
+		// The authority path names the collector as its refund slot before
+		// any close does, so the account must exist by then.
+		program.fund(&collector, 0).err();
 		let funder = Keypair::new_from_array([0xF0; 32]);
 		program
 			.fund(&funder.pubkey(), FUND)
@@ -1583,6 +1595,9 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						// The multisig configures this collector, so the slot
+						// must carry exactly that address.
+						AccountMeta::new(collector, false),
 					],
 				),
 				&[&authority, &funder],

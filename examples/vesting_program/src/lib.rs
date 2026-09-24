@@ -599,9 +599,17 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		// genuinely unvested (or donated) remainder may return to the
 		// administrator. Both transfers are signed by the schedule and sourced
 		// from its validated vault above.
-		let (total_amount, start_ts, _cliff_ts, end_ts, claimed_amount) = schedule;
+		let (total_amount, start_ts, cliff_ts, end_ts, claimed_amount) = schedule;
 		let now = sysvars::clock::Clock::from_account_view(self.clock)?.unix_timestamp;
-		let vested = vested_amount(total_amount, start_ts, end_ts, now)?;
+		// The cliff gates every release path, Cancel included: before it
+		// nothing has vested, so the beneficiary is owed nothing and the
+		// whole vault balance is the administrator's remainder.
+		let before_cliff = u64::try_from(now).map_or(true, |now| now < cliff_ts);
+		let vested = if before_cliff {
+			0
+		} else {
+			vested_amount(total_amount, start_ts, end_ts, now)?
+		};
 		// `claimed_amount` never exceeds what vested at the claim's own
 		// timestamp, so this subtraction cannot underflow; a violation is
 		// corrupt state and fails loudly rather than silently settling zero.

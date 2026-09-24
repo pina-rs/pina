@@ -243,8 +243,8 @@ fn withdraw_instruction(
 }
 
 /// PoolState content: [disc][version][admin 32][stake_mint 32][reward_mint 32]
-/// [total_staked 8][reward_index 8][paused][bump]. `tests/abi_layout.rs` pins
-/// the same envelope geometry.
+/// [total_staked 8][reward_index 8][outstanding_rewards 8][paused][bump].
+/// `tests/abi_layout.rs` pins the same envelope geometry.
 fn set_reward_index_instruction(
 	program: &ProgramTest,
 	admin: &Pubkey,
@@ -283,7 +283,7 @@ fn claim_instruction(
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*reward_mint, false),
-			AccountMeta::new_readonly(*pool, false),
+			AccountMeta::new(*pool, false),
 			AccountMeta::new(*position, false),
 			AccountMeta::new(*user_reward_ata, false),
 			AccountMeta::new(*reward_vault, false),
@@ -389,8 +389,13 @@ fn assert_pool(
 		0u64.to_le_bytes(),
 		"reward_index zero"
 	);
-	assert_eq!(account.data[114], 0, "pool is unpaused");
-	assert_eq!(account.data[115], bump);
+	assert_eq!(
+		&account.data[114..122],
+		0u64.to_le_bytes(),
+		"outstanding_rewards zero"
+	);
+	assert_eq!(account.data[122], 0, "pool is unpaused");
+	assert_eq!(account.data[123], bump);
 }
 
 /// PositionState content: [disc][version][pool 32][owner 32][staked 8]
@@ -1900,6 +1905,309 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 				staked,
 			))
 			.expect("the staked principal must remain withdrawable after any accepted index");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The outstanding-liability counter must fall when a claim pays out: rewards
+/// that have left the vault are no longer a promise the vault must cover, so a
+/// later index advance is accepted against the smaller remaining liability
+/// even though the vault only holds the outstanding remainder. Before the fix,
+/// SetRewardIndex re-derived the full liability from genesis on every update
+/// (`total_staked * new_index / SCALE`), so this advance was rejected against
+/// rewards that had already been paid and banked stake that had already left.
+#[test]
+#[ignore = "run with pina test"]
+fn claims_reduce_the_liability_the_vault_must_back() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+		let user_stake_ata = ata_of(&admin, &stake_mint);
+		let user_reward_ata = ata_of(&admin, &reward_mint);
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		let staked = 1_000u64;
+		fund_stake_ata(
+			&program,
+			&admin,
+			&admin,
+			&stake_mint,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Deposit");
+
+		// One full drip is owed on the staked balance, so fund the vault with
+		// exactly that payout.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the first drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect("execute the first SetRewardIndex");
+
+		// The claim pays the accrued rewards out of the vault, so the vault is
+		// now empty and the liability must have fallen with it — to zero.
+		program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect("execute Claim");
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"a paid-out claim must leave no outstanding liability"
+		);
+
+		// A second drip needs only the new increment covered. Before the fix,
+		// this was rejected: the gate re-derived `staked * new_index / SCALE`
+		// from genesis against an emptied vault.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the second drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				2 * REWARD_INDEX_SCALE,
+			))
+			.expect("an index advance after a claim must cover only the new increment");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Banked rewards keep counting toward the outstanding liability until they
+/// are claimed: a withdrawal checkpoints a position's earned rewards into
+/// `pending_rewards`, and the vault must still cover them after the position's
+/// stake has left the pool. Before the fix, SetRewardIndex measured the
+/// liability as `total_staked * index`, so a withdrawal after a drip silently
+/// dropped the banked rewards from what the gate demanded the vault cover.
+#[test]
+#[ignore = "run with pina test"]
+fn banked_pending_rewards_stay_reserved_until_claimed() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+		let user_stake_ata = ata_of(&admin, &stake_mint);
+		let user_reward_ata = ata_of(&admin, &reward_mint);
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		let staked = 1_000u64;
+		fund_stake_ata(
+			&program,
+			&admin,
+			&admin,
+			&stake_mint,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Deposit");
+
+		// One full drip over the staked balance, fully funded.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect("execute SetRewardIndex");
+
+		// Withdraw the full stake: the accrual over the staked balance is
+		// banked into `pending_rewards` before the stake leaves the pool.
+		program
+			.send_instruction(withdraw_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Withdraw");
+
+		// The banked rewards are still owed, so the outstanding liability must
+		// have survived the withdrawal.
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			staked,
+			"banked pending rewards must stay reserved after the stake leaves"
+		);
+
+		// The claim still pays the banked rewards from the vault.
+		program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect("the banked rewards must remain payable after the withdrawal");
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"the liability must fall to zero once the banked rewards are paid"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});

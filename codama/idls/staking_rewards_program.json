@@ -83,6 +83,22 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
+							"name": "outstandingRewards",
+							"docs": [
+								"Rewards owed but not yet paid: everything every position has accrued",
+								"or banked minus what claims have released. The reserve gate on",
+								"`SetRewardIndex` holds the vault against this number, so the vault",
+								"needs to cover only what is actually outstanding, not everything ever",
+								"promised, and withdrawals that bank rewards keep them counted."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "paused",
 							"type": {
 								"kind": "booleanTypeNode",
@@ -866,9 +882,13 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"docs": [
+							"The pool's state is written: the payout leaves the pool's outstanding",
+							"reward liability."
+						]
 					},
 					{
 						"kind": "instructionAccountNode",

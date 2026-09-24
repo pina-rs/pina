@@ -1625,6 +1625,11 @@ pub struct ConfigAuthorityExecuteAccounts<'a> {
 	pub rent_payer: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 	pub clock: &'a AccountView,
+	/// Refund destination for closed spending-limit accounts and member-tail
+	/// shrinkage. When the multisig configures a rent collector this must be
+	/// that address; with none configured any writable account fills the slot
+	/// and refunds fall back to `rent_payer`, which also funds any growth.
+	pub rent_collector: &'a mut AccountView,
 	/// Spending limit accounts referenced by add/remove spending-limit
 	/// actions, in any order.
 	#[pina(remaining)]
@@ -2899,11 +2904,20 @@ impl<'a> ProcessAccountInfos<'a> for VaultExecuteAccounts<'a> {
 
 /// Commit the working multisig state after a config action stream: validate
 /// the invariants, invalidate prior proposals when consensus moved, and
-/// write through the resize builder (member tails may have grown).
+/// write through the resize builder (member tails may have grown or shrunk).
+///
+/// The member tail is the account's only variable-size part, so the member
+/// count decides the resize direction. Growth charges `rent_payer`, which
+/// must be a funded signer. Shrinkage refunds excess rent to
+/// `shrink_refunds`, which callers bind to the multisig's configured rent
+/// collector: an executor must not be able to name their own wallet as the
+/// funding account and pocket a governed refund.
 fn commit_multisig(
 	multisig_account: &mut AccountView,
 	working: &mut MultisigWorkingState,
 	rent_payer: &mut AccountView,
+	shrink_refunds: &mut AccountView,
+	original_member_count: usize,
 ) -> Result<(), ProgramError> {
 	working.validate()?;
 
@@ -2913,9 +2927,15 @@ fn commit_multisig(
 		current_stale_index(multisig_account)?
 	};
 
+	let rent_account = if working.member_count < original_member_count {
+		shrink_refunds
+	} else {
+		rent_payer
+	};
+
 	UpdateResizableAccount {
 		account: multisig_account,
-		rent_account: rent_payer,
+		rent_account,
 		program_id: &ID,
 		patch: MultisigPatch::new()
 			.threshold(working.threshold)
@@ -3007,7 +3027,7 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 		// themselves by naming their own wallet as `rent_payer`.
 		// With no collector configured the refunds alias the funding
 		// account, preserving the historical behavior.
-		let refund_destination = if multisig.rent_collector == Address::default() {
+		let mut refund_destination = if multisig.rent_collector == Address::default() {
 			*self.rent_payer
 		} else {
 			self.rent_collector
@@ -3016,6 +3036,7 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 		};
 		let mut funding = *self.rent_payer;
 		let mut refunds = refund_destination;
+		let original_member_count = multisig.member_count;
 		let mut working = MultisigWorkingState::capture(&multisig);
 		apply_config_actions(
 			&multisig_key,
@@ -3027,7 +3048,13 @@ impl<'a> ProcessAccountInfos<'a> for ConfigExecuteAccounts<'a> {
 			self.system_program,
 			now,
 		)?;
-		commit_multisig(self.multisig, &mut working, self.rent_payer)?;
+		commit_multisig(
+			self.multisig,
+			&mut working,
+			self.rent_payer,
+			&mut refund_destination,
+			original_member_count,
+		)?;
 
 		update_proposal_header(
 			self.proposal,
@@ -3073,9 +3100,22 @@ impl<'a> ProcessAccountInfos<'a> for ConfigAuthorityExecuteAccounts<'a> {
 
 		let multisig_key = *self.multisig.address();
 		let now = read_timestamp(self.clock)?;
+		// The same refund rule as the governed path: closing and shrinkage
+		// refunds belong to the multisig's configured rent collector, and
+		// only growth charges the authority's own rent payer. Without this
+		// the authority could name itself the funding account and pocket
+		// every governed refund on the instant path.
+		let mut refund_destination = if multisig.rent_collector == Address::default() {
+			*self.rent_payer
+		} else {
+			self.rent_collector
+				.assert_address(&multisig.rent_collector)?;
+			*self.rent_collector
+		};
+		let original_member_count = multisig.member_count;
 		let mut working = MultisigWorkingState::capture(&multisig);
 		let mut funding = *self.rent_payer;
-		let mut refunds = *self.rent_payer;
+		let mut refunds = refund_destination;
 		apply_config_actions(
 			&multisig_key,
 			&mut working,
@@ -3086,7 +3126,13 @@ impl<'a> ProcessAccountInfos<'a> for ConfigAuthorityExecuteAccounts<'a> {
 			self.system_program,
 			now,
 		)?;
-		commit_multisig(self.multisig, &mut working, self.rent_payer)?;
+		commit_multisig(
+			self.multisig,
+			&mut working,
+			self.rent_payer,
+			&mut refund_destination,
+			original_member_count,
+		)?;
 
 		Ok(())
 	}

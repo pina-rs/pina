@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 7e7daaef4679dbb6b76da485ef20348071eb3cb29597605a009e6f3a816b6398
+// manifest-sha256: 8349feb393052b7976abae112cb8ee7614af79da820564b302d18ddc8f91b2b8
 // program-id: 9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr
 // version_type: u8
 
@@ -25,7 +25,7 @@ pub mod account_1_01 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "351720941a731db77082c2c3d3bae14f30d17427095d4aa0d7ef90c8ebd8c960";
+	pub const SCHEMA_SHA256: &str = "6d2d9c3b4bc80af20912b85f8f86a129e723dc0df272ab90c948dd93d8a4776b";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -35,11 +35,11 @@ pub mod account_1_01 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Payload size in bytes, excluding the envelope header.
-	pub const PAYLOAD_SIZE: usize = 114;
+	pub const PAYLOAD_SIZE: usize = 122;
 	/// Total encoded size in bytes, including the envelope header.
 	pub const SIZE: usize = MIGRATION_HEADER_SIZE + PAYLOAD_SIZE;
 	/// Manifest payload size; must agree with `PAYLOAD_SIZE`.
-	pub const MANIFEST_PAYLOAD_SIZE: usize = 114;
+	pub const MANIFEST_PAYLOAD_SIZE: usize = 122;
 	/// `(name, absolute_offset, size)` in encoded bytes.
 	pub const FIELDS: &[(&str, usize, usize)] = &[
 		("admin", MIGRATION_HEADER_SIZE + 0, 32),
@@ -47,8 +47,9 @@ pub mod account_1_01 {
 		("reward_mint", MIGRATION_HEADER_SIZE + 64, 32),
 		("total_staked", MIGRATION_HEADER_SIZE + 96, 8),
 		("reward_index", MIGRATION_HEADER_SIZE + 104, 8),
-		("paused", MIGRATION_HEADER_SIZE + 112, 1),
-		("bump", MIGRATION_HEADER_SIZE + 113, 1),
+		("outstanding_rewards", MIGRATION_HEADER_SIZE + 112, 8),
+		("paused", MIGRATION_HEADER_SIZE + 120, 1),
+		("bump", MIGRATION_HEADER_SIZE + 121, 1),
 	];
 }
 

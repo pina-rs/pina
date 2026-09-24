@@ -43,7 +43,10 @@ struct LedgerState {
 
 /// The runtime-shaped account buffer used by `crates/pina`'s own CPI tests:
 /// the account metadata precedes the data in one allocation so `AccountView`
-/// borrows both.
+/// borrows both. `repr(C)` pins that field order, because
+/// `AccountView::new_unchecked` reads the header and the data at fixed
+/// offsets behind one pointer.
+#[repr(C)]
 struct TestAccount<const N: usize> {
 	header: RuntimeAccount,
 	data: [u8; N],

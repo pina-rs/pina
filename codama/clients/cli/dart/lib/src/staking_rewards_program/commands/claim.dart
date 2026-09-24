@@ -12,32 +12,12 @@ import 'package:pina_codama_clients/staking_rewards_program.dart';
 final class ClaimCommand extends Command<void> {
   ClaimCommand() {
     argParser
-      ..addOption(
-        'reward_mint',
-        mandatory: true,
-        help: "The reward_mint account",
-      )
-      ..addOption('pool_state', mandatory: true, help: "The pool_state account")
-      ..addOption(
-        'position_state',
-        mandatory: true,
-        help: "The position_state account",
-      )
-      ..addOption(
-        'user_reward_ata',
-        mandatory: true,
-        help: "The user_reward_ata account",
-      )
-      ..addOption(
-        'reward_vault',
-        mandatory: true,
-        help: "The reward_vault account",
-      )
-      ..addOption(
-        'token_program',
-        mandatory: true,
-        help: "The token_program account",
-      );
+      ..addOption('reward_mint', mandatory: true, help: "The reward_mint account")
+      ..addOption('pool_state', mandatory: true, help: "The pool's state is written: the payout leaves the pool's outstanding")
+      ..addOption('position_state', mandatory: true, help: "The position_state account")
+      ..addOption('user_reward_ata', mandatory: true, help: "The user_reward_ata account")
+      ..addOption('reward_vault', mandatory: true, help: "The reward_vault account")
+      ..addOption('token_program', mandatory: true, help: "The token_program account");
   }
 
   @override
@@ -51,27 +31,12 @@ final class ClaimCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final user = context.payerAddress;
-    final rewardMint = pubkey(
-      '--reward-mint',
-      results['reward_mint']! as String,
-    );
+    final rewardMint = pubkey('--reward-mint', results['reward_mint']! as String);
     final poolState = pubkey('--pool-state', results['pool_state']! as String);
-    final positionState = pubkey(
-      '--position-state',
-      results['position_state']! as String,
-    );
-    final userRewardAta = pubkey(
-      '--user-reward-ata',
-      results['user_reward_ata']! as String,
-    );
-    final rewardVault = pubkey(
-      '--reward-vault',
-      results['reward_vault']! as String,
-    );
-    final tokenProgram = pubkey(
-      '--token-program',
-      results['token_program']! as String,
-    );
+    final positionState = pubkey('--position-state', results['position_state']! as String);
+    final userRewardAta = pubkey('--user-reward-ata', results['user_reward_ata']! as String);
+    final rewardVault = pubkey('--reward-vault', results['reward_vault']! as String);
+    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
 
     final instruction = getClaimInstruction(
       programAddress: context.programAddress,
@@ -81,9 +46,7 @@ final class ClaimCommand extends Command<void> {
       positionState: positionState,
       userRewardAta: userRewardAta,
       rewardVault: rewardVault,
-      associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-      ),
+      associatedTokenProgram: Address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
       tokenProgram: tokenProgram,
       systemProgram: Address('11111111111111111111111111111111'),
     );

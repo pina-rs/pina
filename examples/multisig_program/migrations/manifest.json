@@ -1218,6 +1218,14 @@
 								"pda": null
 							},
 							{
+								"name": "rent_collector",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "spending_limit_accounts",
 								"writable": true,
 								"signer": false,

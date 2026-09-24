@@ -41,6 +41,10 @@
 								"rustType": "u64"
 							},
 							{
+								"name": "outstanding_rewards",
+								"rustType": "u64"
+							},
+							{
 								"name": "paused",
 								"rustType": "bool"
 							},
@@ -480,7 +484,7 @@
 							},
 							{
 								"name": "pool_state",
-								"writable": false,
+								"writable": true,
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,

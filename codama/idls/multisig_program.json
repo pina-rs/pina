@@ -2639,6 +2639,19 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "rentCollector",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Refund destination for closed spending-limit accounts and member-tail",
+							"shrinkage. When the multisig configures a rent collector this must be",
+							"that address; with none configured any writable account fills the slot",
+							"and refunds fall back to `rent_payer`, which also funds any growth."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "spendingLimitAccounts",
 						"isWritable": true,
 						"isSigner": false,
