@@ -327,3 +327,73 @@ fn fixture_update_authority_still_publishes_prices() {
 		program.stop().expect("stop isolated program test");
 	});
 }
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// Each test below asserts the *secure* behavior from the audit report. It
+// fails on the current tree because the exploit is still live, and must pass
+// once the corresponding fix lands. Run with `pina test --project
+// examples/prop_amm_program --filter audit_sec_`.
+// ---------------------------------------------------------------------------
+
+/// SEC-32: `RotateAuthority` changes the stored authority, but `Update`
+/// still authorizes the immutable global `UPDATE_AUTHORITY` constant, so the
+/// advertised rotation cannot transfer publishing power and the old global
+/// key remains authorized forever. After a rotation, the new authority must
+/// be able to publish and the previous one must not.
+///
+/// Current behavior: the rotated-in authority cannot update, so the `expect`
+/// below fails and the test proves the rotation is inert.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_32_update_follows_the_rotated_authority() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let payer = program.payer();
+		let oracle = Keypair::new_from_array([2; 32]);
+
+		program
+			.send_with_signers(
+				initialize_instruction(&program, &payer, &oracle.pubkey()),
+				&[&oracle],
+			)
+			.expect("execute Initialize");
+
+		let new_authority = Keypair::new_from_array([3; 32]);
+		program
+			.send_instruction(rotate_instruction(
+				&program,
+				&oracle.pubkey(),
+				&payer,
+				&new_authority.pubkey(),
+			))
+			.expect("rotate to the new authority");
+
+		// The rotated-in authority publishes a new price.
+		program
+			.send_with_signers(
+				update_instruction(
+					&program,
+					&oracle.pubkey(),
+					&new_authority.pubkey(),
+					1_234_567_u64,
+				),
+				&[&new_authority],
+			)
+			.expect("the rotated-in authority must be able to publish prices");
+
+		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
+		assert_eq!(
+			u64::from_le_bytes(account.data[34..42].try_into().expect("price")),
+			1_234_567,
+			"the rotated-in authority's price landed on-chain"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}

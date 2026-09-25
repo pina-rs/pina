@@ -27,6 +27,9 @@ pub struct ConfigExecuteArgs {
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
+	/// Refund destination for closed spending-limit accounts. When the multisig configures a rent collector this must be that address; with none configured any writable account fills the slot and refunds fall back to `rent_payer`, which also funds any growth
+	#[arg(long)]
+	rent_collector: String,
 	/// Spending limit accounts referenced by add/remove spending-limit actions, in any order
 	#[arg(long)]
 	spending_limit_accounts: String,
@@ -38,6 +41,7 @@ pub(crate) fn run(context: &CliContext, args: ConfigExecuteArgs) -> Result<(), C
 	let member = context.payer_pubkey();
 	let rent_payer = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
+	let rent_collector = CliContext::pubkey("--rent_collector", &args.rent_collector)?;
 	let spending_limit_accounts =
 		CliContext::pubkey("--spending_limit_accounts", &args.spending_limit_accounts)?;
 	let data = ConfigExecuteInstructionData::new(|_data| {}).map_err(|_| {
@@ -53,6 +57,7 @@ pub(crate) fn run(context: &CliContext, args: ConfigExecuteArgs) -> Result<(), C
 		rent_payer,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 		clock,
+		rent_collector,
 		spending_limit_accounts,
 	};
 

@@ -16,6 +16,8 @@ pub const CLAIM_MIGRATION_VERSION: u8 = 0u8;
 pub struct Claim {
 	pub user: solana_pubkey::Pubkey,
 	pub reward_mint: solana_pubkey::Pubkey,
+	/// The pool's state is written: the payout leaves the pool's outstanding
+	/// reward liability.
 	pub pool_state: solana_pubkey::Pubkey,
 	pub position_state: solana_pubkey::Pubkey,
 	pub user_reward_ata: solana_pubkey::Pubkey,
@@ -66,10 +68,7 @@ impl Claim {
 			self.reward_mint,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.pool_state,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.position_state,
 			false,

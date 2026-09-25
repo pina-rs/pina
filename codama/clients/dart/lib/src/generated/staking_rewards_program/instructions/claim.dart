@@ -107,7 +107,7 @@ Instruction getClaimInstruction({
     accounts: [
       AccountMeta(address: user, role: AccountRole.writableSigner),
       AccountMeta(address: rewardMint, role: AccountRole.readonly),
-      AccountMeta(address: poolState, role: AccountRole.readonly),
+      AccountMeta(address: poolState, role: AccountRole.writable),
       AccountMeta(address: positionState, role: AccountRole.writable),
       AccountMeta(address: userRewardAta, role: AccountRole.writable),
       AccountMeta(address: rewardVault, role: AccountRole.writable),

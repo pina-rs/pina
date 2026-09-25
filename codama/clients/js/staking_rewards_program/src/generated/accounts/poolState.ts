@@ -63,6 +63,14 @@ export type PoolState = {
 	rewardMint: Address;
 	totalStaked: bigint;
 	rewardIndex: bigint;
+	/**
+	 * Rewards owed but not yet paid: everything every position has accrued
+	 * or banked minus what claims have released. The reserve gate on
+	 * `SetRewardIndex` holds the vault against this number, so the vault
+	 * needs to cover only what is actually outstanding, not everything ever
+	 * promised, and withdrawals that bank rewards keep them counted.
+	 */
+	outstandingRewards: bigint;
 	paused: boolean;
 	bump: number;
 };
@@ -73,6 +81,14 @@ export type PoolStateArgs = {
 	rewardMint: Address;
 	totalStaked: number | bigint;
 	rewardIndex: number | bigint;
+	/**
+	 * Rewards owed but not yet paid: everything every position has accrued
+	 * or banked minus what claims have released. The reserve gate on
+	 * `SetRewardIndex` holds the vault against this number, so the vault
+	 * needs to cover only what is actually outstanding, not everything ever
+	 * promised, and withdrawals that bank rewards keep them counted.
+	 */
+	outstandingRewards: number | bigint;
 	paused: boolean;
 	bump: number;
 };
@@ -88,6 +104,7 @@ export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
 			["rewardMint", getAddressEncoder()],
 			["totalStaked", getU64Encoder()],
 			["rewardIndex", getU64Encoder()],
+			["outstandingRewards", getU64Encoder()],
 			["paused", getBooleanEncoder()],
 			["bump", getU8Encoder()],
 		]),
@@ -108,6 +125,7 @@ export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
 		["rewardMint", getAddressDecoder()],
 		["totalStaked", getU64Decoder()],
 		["rewardIndex", getU64Decoder()],
+		["outstandingRewards", getU64Decoder()],
 		["paused", getPinaPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);

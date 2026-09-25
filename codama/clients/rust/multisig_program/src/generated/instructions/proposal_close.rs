@@ -17,6 +17,10 @@ pub struct ProposalClose {
 	pub multisig: solana_pubkey::Pubkey,
 	pub proposal: solana_pubkey::Pubkey,
 	pub rent_collector: solana_pubkey::Pubkey,
+	/// Clock for the expiry test: an expired active proposal can neither
+	/// progress nor reach a terminal status on its own, so expiry itself is a
+	/// permissionless close condition. Stale proposals close the same way.
+	pub clock: solana_pubkey::Pubkey,
 }
 
 impl ProposalClose {
@@ -24,11 +28,13 @@ impl ProposalClose {
 		multisig: solana_pubkey::Pubkey,
 		proposal: solana_pubkey::Pubkey,
 		rent_collector: solana_pubkey::Pubkey,
+		clock: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			multisig,
 			proposal,
 			rent_collector,
+			clock,
 		}
 	}
 
@@ -45,7 +51,7 @@ impl ProposalClose {
 		data: ProposalCloseInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.multisig,
 			false,
@@ -54,6 +60,9 @@ impl ProposalClose {
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.rent_collector,
 			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.clock, false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {

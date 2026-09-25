@@ -22,11 +22,23 @@ pub struct SetRewardIndexArgs {
 	/// The `pool_state` account
 	#[arg(long)]
 	pool_state: String,
+	/// The pool's reward mint, for validating the vault binding
+	#[arg(long)]
+	reward_mint: String,
+	/// The token program that owns the reward mint and vault
+	#[arg(long)]
+	token_program: String,
+	/// The pool's canonical reward vault. An index update is a promise to pay: it must not create liabilities the vault cannot honor or that a per-position accrual cannot represent
+	#[arg(long)]
+	reward_vault: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: SetRewardIndexArgs) -> Result<(), CliError> {
 	let admin = context.payer_pubkey();
 	let pool_state = CliContext::pubkey("--pool_state", &args.pool_state)?;
+	let reward_mint = CliContext::pubkey("--reward_mint", &args.reward_mint)?;
+	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
+	let reward_vault = CliContext::pubkey("--reward_vault", &args.reward_vault)?;
 	let data = SetRewardIndexInstructionData::new(|data| {
 		data.new_index.set(args.new_index);
 	})
@@ -36,7 +48,13 @@ pub(crate) fn run(context: &CliContext, args: SetRewardIndexArgs) -> Result<(), 
 		}
 	})?;
 
-	let accounts = SetRewardIndex { admin, pool_state };
+	let accounts = SetRewardIndex {
+		admin,
+		pool_state,
+		reward_mint,
+		token_program,
+		reward_vault,
+	};
 
 	context.send(accounts.instruction(data))
 }

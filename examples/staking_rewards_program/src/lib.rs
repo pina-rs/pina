@@ -55,6 +55,12 @@ pub enum StakingError {
 	RewardIndexRegressed = 5,
 	/// The position has accrued nothing to release.
 	NothingToClaim = 6,
+	/// The reward index would create liabilities no `u64` payout can
+	/// represent, freezing affected positions at their next checkpoint.
+	RewardIndexExceedsCapacity = 7,
+	/// The reward index would create liabilities beyond the reward vault's
+	/// balance, making equal entitlements depend on claim order.
+	RewardIndexExceedsReserves = 8,
 }
 
 #[discriminator(entrypoint)]
@@ -81,6 +87,12 @@ pub struct PoolState {
 	pub reward_mint: Address,
 	pub total_staked: u64,
 	pub reward_index: u64,
+	/// Rewards owed but not yet paid: everything every position has accrued
+	/// or banked minus what claims have released. The reserve gate on
+	/// `SetRewardIndex` holds the vault against this number, so the vault
+	/// needs to cover only what is actually outstanding, not everything ever
+	/// promised, and withdrawals that bank rewards keep them counted.
+	pub outstanding_rewards: u64,
 	pub paused: bool,
 	pub bump: u8,
 }
@@ -191,7 +203,9 @@ pub struct WithdrawAccounts<'a> {
 pub struct ClaimAccounts<'a> {
 	pub user: &'a mut AccountView,
 	pub reward_mint: &'a AccountView,
-	pub pool_state: &'a AccountView,
+	/// The pool's state is written: the payout leaves the pool's outstanding
+	/// reward liability.
+	pub pool_state: &'a mut AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
 	pub reward_vault: &'a mut AccountView,
@@ -204,6 +218,14 @@ pub struct ClaimAccounts<'a> {
 pub struct SetRewardIndexAccounts<'a> {
 	pub admin: &'a AccountView,
 	pub pool_state: &'a mut AccountView,
+	/// The pool's reward mint, for validating the vault binding.
+	pub reward_mint: &'a AccountView,
+	/// The token program that owns the reward mint and vault.
+	pub token_program: &'a AccountView,
+	/// The pool's canonical reward vault. An index update is a promise to pay:
+	/// it must not create liabilities the vault cannot honor or that a
+	/// per-position accrual cannot represent.
+	pub reward_vault: &'a AccountView,
 }
 
 /// Scale applied to the pool's rewards-per-token index.
@@ -260,6 +282,16 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		// Every value-exit path asserts extension-free mints, so the entry
+		// path must apply the same policy before creating state or vaults: a
+		// configuration accepted here with no exit would lock funded stake
+		// and rewards forever. Each check walks one TLV header, once per pool.
+		self.stake_mint
+			.as_token_mint_for_program(self.token_program.address())?
+			.assert_no_extensions()?;
+		self.reward_mint
+			.as_token_mint_for_program(self.token_program.address())?
+			.assert_no_extensions()?;
 		self.associated_token_program
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
@@ -297,6 +329,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			pool_state.reward_mint = *self.reward_mint.address();
 			pool_state.total_staked.set(0);
 			pool_state.reward_index.set(0);
+			pool_state.outstanding_rewards.set(0);
 			pool_state.paused.set(false);
 			pool_state.bump = args.bump;
 
@@ -679,7 +712,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		// guard. Reloading it immutably first would validate it twice.
 		let pool_handle = *self.pool_state;
 		let user_handle = *self.user;
-		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 
 		if pool_state.paused.get() {
@@ -713,6 +746,15 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		let pool_stake_mint = pool_state.stake_mint;
 		let pool_reward_mint = pool_state.reward_mint;
 		drop(position_state);
+		// The payout leaves the pool's outstanding liability: the reserve
+		// gate advanced the counter when this reward accrued, so the counter
+		// must fall by exactly what the vault just released.
+		let remaining_liability = pool_state
+			.outstanding_rewards
+			.get()
+			.checked_sub(payout)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		pool_state.outstanding_rewards.set(remaining_liability);
 		drop(pool_state);
 
 		// Ensure user's reward ATA exists
@@ -762,6 +804,7 @@ impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.pool_state.assert_not_empty()?;
 
+		let pool_key = *self.pool_state.address();
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		self.admin.assert_address(&pool_state.admin)?;
 
@@ -773,6 +816,64 @@ impl<'a> ProcessAccountInfos<'a> for SetRewardIndexAccounts<'a> {
 			return Err(StakingError::RewardIndexRegressed.into());
 		}
 
+		// The update accrues `total_staked * index_delta` new rewards across
+		// every position at once, so that increment is what joins the
+		// outstanding pool liability. Banked-but-unclaimed rewards from
+		// earlier checkpoints stay counted until someone claims them, and
+		// paid-out rewards left the counter at their claim — exactly the
+		// quantities the vault must be able to cover.
+		let total_staked = pool_state.total_staked.get();
+		let delta = new_index
+			.checked_sub(pool_state.reward_index.get())
+			.ok_or(StakingError::RewardIndexRegressed)?;
+		// Each position accrues with an independent floor, so the aggregate
+		// increment rounds up to stay an upper bound on what the positions
+		// accrue between them.
+		let increment = u128::from(total_staked)
+			.checked_mul(u128::from(delta))
+			.ok_or(ProgramError::ArithmeticOverflow)?
+			.div_ceil(u128::from(REWARD_INDEX_SCALE));
+		let outstanding = u128::from(pool_state.outstanding_rewards.get())
+			.checked_add(increment)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		// Gate one — representability: an outstanding liability no `u64`
+		// payout can hold freezes the positions at their next checkpoint
+		// (deposit, withdrawal, and claim would all overflow), so it is
+		// refused here.
+		if outstanding > u128::from(u64::MAX) {
+			return Err(StakingError::RewardIndexExceedsCapacity.into());
+		}
+
+		// The vault must belong to the pool's own stored reward mint: a
+		// mismatched mint would validate the liability against a token
+		// account denominated in units the index never promised.
+		assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
+		// Gate two — solvency: the canonical reward vault must cover the
+		// aggregate liability, so equal entitlements never depend on claim
+		// order and the pool cannot promise rewards it does not hold. The
+		// vault is validated as the pool PDA's associated account below, so a
+		// caller cannot substitute a token account they control.
+		self.reward_vault
+			.assert_not_empty()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				&pool_key,
+				self.reward_mint.address(),
+				self.token_program.address(),
+			)?;
+		let vault_balance = u128::from(
+			self.reward_vault
+				.as_token_account_for_program(self.token_program.address())?
+				.amount(),
+		);
+		if outstanding > vault_balance {
+			return Err(StakingError::RewardIndexExceedsReserves.into());
+		}
+
+		pool_state
+			.outstanding_rewards
+			.set(u64::try_from(outstanding).map_err(|_| ProgramError::ArithmeticOverflow)?);
 		pool_state.reward_index.set(new_index);
 
 		Ok(())
@@ -831,6 +932,8 @@ mod tests {
 		assert_eq!(StakingError::InvalidPool as u32, 4);
 		assert_eq!(StakingError::RewardIndexRegressed as u32, 5);
 		assert_eq!(StakingError::NothingToClaim as u32, 6);
+		assert_eq!(StakingError::RewardIndexExceedsCapacity as u32, 7);
+		assert_eq!(StakingError::RewardIndexExceedsReserves as u32, 8);
 	}
 
 	#[test]

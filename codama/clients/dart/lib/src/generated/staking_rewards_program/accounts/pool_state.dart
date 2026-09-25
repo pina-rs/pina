@@ -19,6 +19,7 @@ class PoolState {
     required this.rewardMint,
     required this.totalStaked,
     required this.rewardIndex,
+    required this.outstandingRewards,
     required this.paused,
     required this.bump,
   }) : discriminator = 1,
@@ -31,6 +32,7 @@ class PoolState {
   final Address rewardMint;
   final BigInt totalStaked;
   final BigInt rewardIndex;
+  final BigInt outstandingRewards;
   final bool paused;
   final int bump;
 
@@ -46,6 +48,7 @@ class PoolState {
           rewardMint == other.rewardMint &&
           totalStaked == other.totalStaked &&
           rewardIndex == other.rewardIndex &&
+          outstandingRewards == other.outstandingRewards &&
           paused == other.paused &&
           bump == other.bump;
 
@@ -58,13 +61,14 @@ class PoolState {
     rewardMint,
     totalStaked,
     rewardIndex,
+    outstandingRewards,
     paused,
     bump,
   );
 
   @override
   String toString() =>
-      'PoolState(discriminator: $discriminator, migrationVersion: $migrationVersion, admin: $admin, stakeMint: $stakeMint, rewardMint: $rewardMint, totalStaked: $totalStaked, rewardIndex: $rewardIndex, paused: $paused, bump: $bump)';
+      'PoolState(discriminator: $discriminator, migrationVersion: $migrationVersion, admin: $admin, stakeMint: $stakeMint, rewardMint: $rewardMint, totalStaked: $totalStaked, rewardIndex: $rewardIndex, outstandingRewards: $outstandingRewards, paused: $paused, bump: $bump)';
 }
 
 Encoder<PoolState> getPoolStateEncoder() {
@@ -76,6 +80,7 @@ Encoder<PoolState> getPoolStateEncoder() {
     ('rewardMint', getAddressEncoder()),
     ('totalStaked', getU64Encoder()),
     ('rewardIndex', getU64Encoder()),
+    ('outstandingRewards', getU64Encoder()),
     ('paused', getBooleanEncoder()),
     ('bump', getU8Encoder()),
   ]);
@@ -90,6 +95,7 @@ Encoder<PoolState> getPoolStateEncoder() {
       'rewardMint': value.rewardMint,
       'totalStaked': value.totalStaked,
       'rewardIndex': value.rewardIndex,
+      'outstandingRewards': value.outstandingRewards,
       'paused': value.paused,
       'bump': value.bump,
     },
@@ -105,6 +111,7 @@ Decoder<PoolState> getPoolStateDecoder() {
     ('rewardMint', getAddressDecoder()),
     ('totalStaked', getU64Decoder()),
     ('rewardIndex', getU64Decoder()),
+    ('outstandingRewards', getU64Decoder()),
     ('paused', getBooleanDecoder()),
     ('bump', getU8Decoder()),
   ]);
@@ -136,6 +143,7 @@ Decoder<PoolState> getPoolStateDecoder() {
         rewardMint: map['rewardMint']! as Address,
         totalStaked: map['totalStaked']! as BigInt,
         rewardIndex: map['rewardIndex']! as BigInt,
+        outstandingRewards: map['outstandingRewards']! as BigInt,
         paused: map['paused']! as bool,
         bump: map['bump']! as int,
       ),

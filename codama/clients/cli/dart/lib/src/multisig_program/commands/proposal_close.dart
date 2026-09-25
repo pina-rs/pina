@@ -16,6 +16,12 @@ final class ProposalCloseCommand extends Command<void> {
         'rent_collector',
         mandatory: true,
         help: "The rent_collector account",
+      )
+      ..addOption(
+        'clock',
+        mandatory: true,
+        help:
+            "Clock for the expiry test: an expired active proposal can neither",
       );
   }
 
@@ -35,12 +41,14 @@ final class ProposalCloseCommand extends Command<void> {
       '--rent-collector',
       results['rent_collector']! as String,
     );
+    final clock = pubkey('--clock', results['clock']! as String);
 
     final instruction = getProposalCloseInstruction(
       programAddress: context.programAddress,
       multisig: multisig,
       proposal: proposal,
       rentCollector: rentCollector,
+      clock: clock,
     );
     await context.send([instruction]);
   }

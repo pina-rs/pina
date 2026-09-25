@@ -1428,13 +1428,126 @@ fn split_export_output(
 		}
 	})?;
 
-	if decoded.len() < 64 {
-		return Err(VerifyError::InvalidExport {
+	// Length alone accepted any payload of at least one signature's width.
+	// The export is persisted as the on-chain verification transaction, so it
+	// must actually deserialize as one: a structurally valid (versioned)
+	// Solana transaction whose every account index is in range and whose
+	// message contains at least one instruction. Anything else fails closed
+	// before a byte is written.
+	validate_transaction_wire(&decoded).map_err(|()| {
+		VerifyError::InvalidExport {
 			encoding: encoding.as_str(),
-		});
-	}
+		}
+	})?;
 
 	Ok((diagnostics.as_bytes().to_vec(), payload.to_owned()))
+}
+
+/// Decodes one compact-u16 at `offset`, advancing it past the encoding.
+///
+/// Solana uses short-u16: up to three bytes, each contributing seven bits,
+/// high bit marking continuation.
+fn read_compact_u16(bytes: &[u8], offset: &mut usize) -> Result<usize, ()> {
+	let mut value = 0_usize;
+	for shift in [0_u32, 7, 14] {
+		let byte = *bytes.get(*offset).ok_or(())?;
+		*offset += 1;
+		value |= (usize::from(byte & 0x7f)).checked_shl(shift).ok_or(())?;
+		if byte & 0x80 == 0 {
+			return u16::try_from(value).map(usize::from).map_err(|_| ());
+		}
+	}
+	Err(())
+}
+
+/// Advances `offset` by exactly `len` bytes, failing when fewer remain.
+fn skip_bytes(bytes: &[u8], offset: &mut usize, len: usize) -> Result<(), ()> {
+	let end = offset.checked_add(len).ok_or(())?;
+	if end > bytes.len() {
+		return Err(());
+	}
+	*offset = end;
+	Ok(())
+}
+
+/// Validate a decoded Solana transaction envelope without deserializing keys.
+///
+/// Walks the real wire layout — `[compact-u16 signature count][signatures]
+/// [message]`, where a versioned message opens with `0x80 | version` after the
+/// signatures — with bounds checks on every field and full-consumption
+/// requirements: a legacy message must end with its last instruction, and a v0
+/// message must carry its address-table-lookup section (accepted only as an
+/// empty lookup list; loaded-address extensions are out of scope for this
+/// export boundary). Semantic expectations (program ids, instruction counts)
+/// remain the operator's judgement recorded alongside the export.
+fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
+	let mut offset = 0;
+	let signature_count = read_compact_u16(bytes, &mut offset)?;
+	if signature_count == 0 || signature_count > 16 {
+		return Err(());
+	}
+	skip_bytes(
+		bytes,
+		&mut offset,
+		signature_count.checked_mul(64).ok_or(())?,
+	)?;
+
+	// The version prefix, if any, is the first message byte — after the
+	// signatures, not before them.
+	let versioned = bytes.get(offset).copied().unwrap_or(0) & 0x80 != 0;
+	if versioned {
+		// Only version zero is defined; the lower bits must be zero.
+		if bytes[offset] != 0x80 {
+			return Err(());
+		}
+		offset += 1;
+	}
+
+	// Header: required signatures, readonly signed, readonly unsigned.
+	let header = bytes.get(offset).copied().ok_or(())?;
+	if header == 0 {
+		return Err(());
+	}
+	skip_bytes(bytes, &mut offset, 3)?;
+
+	let account_count = read_compact_u16(bytes, &mut offset)?;
+	skip_bytes(bytes, &mut offset, account_count.checked_mul(32).ok_or(())?)?;
+	// Recent blockhash.
+	skip_bytes(bytes, &mut offset, 32)?;
+
+	let instruction_count = read_compact_u16(bytes, &mut offset)?;
+	if instruction_count == 0 {
+		return Err(());
+	}
+	for _ in 0..instruction_count {
+		let program_index = usize::from(*bytes.get(offset).ok_or(())?);
+		let accounts_len = read_compact_u16(bytes, &mut offset)?;
+		if program_index >= account_count || accounts_len > account_count {
+			return Err(());
+		}
+		// The account index list is one byte per index in the wire format.
+		skip_bytes(bytes, &mut offset, accounts_len)?;
+		let data_len = read_compact_u16(bytes, &mut offset)?;
+		skip_bytes(bytes, &mut offset, data_len)?;
+	}
+
+	if versioned {
+		// v0 closes with the address-table-lookup count; only an empty list
+		// is accepted, since loaded addresses would make account indices
+		// resolve outside the static table this check bounds them to.
+		let lookups = read_compact_u16(bytes, &mut offset)?;
+		if lookups != 0 {
+			return Err(());
+		}
+	}
+
+	// Every byte must belong to the transaction; trailing bytes mean the
+	// payload is not the exported transaction.
+	if offset != bytes.len() {
+		return Err(());
+	}
+
+	Ok(())
 }
 
 fn write_export(path: &Path, contents: &[u8]) -> Result<(), VerifyError> {
@@ -1832,12 +1945,61 @@ mod tests {
 		assert!(submit_program(&FakeExecutor::default(), PROGRAM_ID, "invalid").is_err());
 	}
 
+	/// Encodes a minimal valid Solana transaction in the real wire layout:
+	/// `[compact-u16 signature count][signatures][message]`, where a versioned
+	/// message opens with the `0x80` prefix and closes with an empty
+	/// address-table-lookup section. One signature, a two-account message, one
+	/// instruction carrying `data`.
+	fn encode_tx_wire(data: &[u8], versioned: bool) -> Vec<u8> {
+		let mut bytes = Vec::new();
+		bytes.push(1); // compact-u16: one signature
+		bytes.extend_from_slice(&[9_u8; 64]);
+		if versioned {
+			bytes.push(0x80); // v0 message prefix, after the signatures
+		}
+		bytes.extend_from_slice(&[1, 0, 1]); // header: one required signer
+		bytes.push(2); // compact-u16: two accounts
+		bytes.extend_from_slice(&[9_u8; 64]); // two 32-byte keys
+		bytes.extend_from_slice(&[9_u8; 32]); // recent blockhash
+		bytes.push(1); // compact-u16: one instruction
+		bytes.push(1); // program id index
+		bytes.push(0); // compact-u16: no account indices
+		bytes.extend_from_slice(&encode_compact_u16(data.len() as u16));
+		bytes.extend_from_slice(data);
+		if versioned {
+			bytes.push(0); // compact-u16: no address-table lookups
+		}
+		bytes
+	}
+
+	/// A minimal valid legacy transaction, for export fixtures.
+	fn valid_tx_wire(seed: u8) -> Vec<u8> {
+		let _ = seed;
+		encode_tx_wire(&[], false)
+	}
+
+	/// Compact-u16 (short-u16) encoding for fixture construction.
+	fn encode_compact_u16(mut value: u16) -> Vec<u8> {
+		let mut out = Vec::new();
+		loop {
+			let mut byte = (value & 0x7f) as u8;
+			value >>= 7;
+			if value != 0 {
+				byte |= 0x80;
+			}
+			out.push(byte);
+			if value == 0 {
+				return out;
+			}
+		}
+	}
+
 	#[test]
 	fn export_writes_only_validated_payload_and_preserves_diagnostics() {
 		let temp = TempDir::new().unwrap();
 		let build_record = create_build_record(&temp);
 		let output_path = temp.path().join("transaction with spaces.txt");
-		let payload = base64::engine::general_purpose::STANDARD.encode([7_u8; 128]);
+		let payload = base64::engine::general_purpose::STANDARD.encode(valid_tx_wire(7));
 		let upstream_output = format!("Cloning repository\nBuilding program\n{payload}\n");
 		let executor = FakeExecutor::with([
 			version(),
@@ -2011,7 +2173,7 @@ mod tests {
 		));
 
 		options.export_authority = Some(String::new());
-		let payload = bs58::encode([8_u8; 128]).into_string();
+		let payload = bs58::encode(valid_tx_wire(8)).into_string();
 		let executor = FakeExecutor::with([
 			version(),
 			output(0, format!("{}\n", record_hash()), ""),
@@ -2248,8 +2410,102 @@ mod tests {
 	}
 
 	#[test]
+	fn transaction_wire_accepts_both_wire_versions() {
+		// The v0 prefix sits after the signatures; a large instruction-data
+		// length exercises the two-byte compact-u16 form.
+		let big_payload = vec![7_u8; 300];
+		let versioned = encode_tx_wire(&big_payload, true);
+		assert!(validate_transaction_wire(&versioned).is_ok());
+
+		let legacy = encode_tx_wire(&big_payload, false);
+		assert!(validate_transaction_wire(&legacy).is_ok());
+	}
+
+	#[test]
+	fn transaction_wire_rejects_structurally_broken_payloads() {
+		let base = || encode_tx_wire(&[], false);
+
+		// Signature count of zero.
+		let mut zero_signatures = base();
+		zero_signatures[0] = 0;
+		assert!(validate_transaction_wire(&zero_signatures).is_err());
+
+		// A compact-u16 that never terminates: three continuation bytes would
+		// need a fourth, which short-u16 forbids.
+		let mut unterminated_compact = base();
+		unterminated_compact[0] = 0x80;
+		unterminated_compact.insert(1, 0x80);
+		unterminated_compact.insert(2, 0x80);
+		assert!(validate_transaction_wire(&unterminated_compact).is_err());
+
+		// Signature count above the accepted bound.
+		let mut absurd_signatures = base();
+		absurd_signatures[0] = 17;
+		assert!(validate_transaction_wire(&absurd_signatures).is_err());
+
+		// Truncated inside the signature list.
+		assert!(validate_transaction_wire(&base()[..40]).is_err());
+
+		// Zero header byte (no required signers).
+		let mut zero_header = base();
+		zero_header[65] = 0;
+		assert!(validate_transaction_wire(&zero_header).is_err());
+
+		// Truncated account table.
+		assert!(validate_transaction_wire(&base()[..80]).is_err());
+
+		// Instruction count of zero.
+		let mut no_instructions = base();
+		no_instructions[165] = 0;
+		assert!(validate_transaction_wire(&no_instructions).is_err());
+
+		// Program id index beyond the account table.
+		let mut bad_program_index = base();
+		bad_program_index[166] = 9;
+		assert!(validate_transaction_wire(&bad_program_index).is_err());
+
+		// Truncated mid-blockhash.
+		assert!(validate_transaction_wire(&base()[..160]).is_err());
+
+		// Instruction present but the data length missing.
+		assert!(validate_transaction_wire(&base()[..168]).is_err());
+
+		// An instruction whose declared data length overruns the message.
+		let mut overrun = base();
+		// Overwrite the data-length compact-u16 with an in-range 2-byte form.
+		let data_len_at = overrun.len() - 1;
+		overrun[data_len_at] = 0x85; // continuation: low 7 bits = 5
+		overrun.push(0x02); // high 7 bits = 2 → 261 bytes of data, none present
+		assert!(validate_transaction_wire(&overrun).is_err());
+
+		// Trailing bytes after a complete legacy message are rejected.
+		let mut trailing = base();
+		trailing.push(0xFF);
+		assert!(validate_transaction_wire(&trailing).is_err());
+
+		// A versioned transaction without the address-table-lookup count is
+		// rejected: the message must be fully consumed.
+		let short_versioned = encode_tx_wire(&[], true);
+		assert!(validate_transaction_wire(&short_versioned[..short_versioned.len() - 1]).is_err());
+
+		// A v0 message that declares address-table lookups is rejected: the
+		// static bounds this checker enforces cannot resolve loaded indices.
+		let mut with_lookup = encode_tx_wire(&[], true);
+		let last = with_lookup.len() - 1;
+		with_lookup[last] = 1;
+		assert!(validate_transaction_wire(&with_lookup).is_err());
+
+		// A nonzero version prefix (0x81) is not v0 and is rejected.
+		let mut future_version = encode_tx_wire(&[], true);
+		future_version[65] = 0x81;
+		assert!(validate_transaction_wire(&future_version).is_err());
+
+		// A compact-u16 that runs off the end of the payload.
+		assert!(validate_transaction_wire(&[0xFF, 0xFF]).is_err());
+	}
+	#[test]
 	fn export_payload_validation_covers_both_encodings_and_write_errors() {
-		let base58 = bs58::encode([5_u8; 64]).into_string();
+		let base58 = bs58::encode(valid_tx_wire(5)).into_string();
 		assert_eq!(
 			split_export_output(base58.as_bytes(), ExportEncoding::Base58)
 				.unwrap()

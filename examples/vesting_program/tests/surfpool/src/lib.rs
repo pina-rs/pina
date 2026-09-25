@@ -127,6 +127,7 @@ fn initialize_instruction(
 	mint: &Pubkey,
 	vesting_state: &Pubkey,
 	vault: &Pubkey,
+	admin_ata: &Pubkey,
 	bump: u8,
 	schedule: (u64, u64, u64),
 ) -> pina_test::Instruction {
@@ -147,6 +148,7 @@ fn initialize_instruction(
 			AccountMeta::new_readonly(*mint, false),
 			AccountMeta::new(*vesting_state, false),
 			AccountMeta::new(*vault, false),
+			AccountMeta::new(*admin_ata, false),
 			AccountMeta::new_readonly(ata_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
@@ -189,6 +191,8 @@ fn cancel_instruction(
 	vesting_state: &Pubkey,
 	vault: &Pubkey,
 	admin_ata: &Pubkey,
+	clock: &Pubkey,
+	beneficiary_ata: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
 		&[VestingInstruction::Cancel as u8, 0u8],
@@ -201,6 +205,8 @@ fn cancel_instruction(
 			AccountMeta::new_readonly(ata_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
+			AccountMeta::new_readonly(*clock, false),
+			AccountMeta::new(*beneficiary_ata, false),
 		],
 	)
 }
@@ -297,6 +303,20 @@ fn initialize_claim_and_cancel() {
 		// A schedule that is already fully elapsed vests the whole allocation
 		// from the first claim, which is the simple path this test exercises.
 		// The cliff and linear-unlock paths get their own cases below.
+		//
+		// Initialize is atomic funding now: the admin's ATA must hold the
+		// allocation first, and the instruction moves it into the vault.
+		let payer = program.payer();
+		let admin_ata = ata_of(&admin.pubkey(), &mint);
+		provision_ata(
+			&mut program,
+			&payer,
+			&admin.pubkey(),
+			&mint,
+			Some(&mint_authority),
+			TOTAL,
+		)
+		.expect("fund the admin ATA");
 		program
 			.send_with_signers(
 				initialize_instruction(
@@ -306,6 +326,7 @@ fn initialize_claim_and_cancel() {
 					&mint,
 					&vesting_state,
 					&vault,
+					&admin_ata,
 					bump,
 					(0, 0, 0),
 				),
@@ -325,9 +346,13 @@ fn initialize_claim_and_cancel() {
 			bump,
 		);
 
-		// Fund the vault with the full allocation so releases are observable.
+		// The vault already holds the allocation: Initialize moved it.
 		let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
-		mint_into(&program, &mint, &vault, &mint_authority, TOTAL).expect("fund vault");
+		assert_eq!(
+			token_amount(&program, &vault),
+			TOTAL,
+			"Initialize funded the vault"
+		);
 		assert_eq!(
 			token_amount(&program, &vault),
 			TOTAL,
@@ -385,6 +410,8 @@ fn initialize_claim_and_cancel() {
 					&vesting_state,
 					&vault,
 					&admin_ata,
+					&clock_sysvar_id(),
+					&ata_of(&beneficiary.pubkey(), &mint),
 				),
 				&[&admin],
 			)
@@ -401,10 +428,19 @@ fn initialize_claim_and_cancel() {
 			true,
 			bump,
 		);
+		// Cancellation settles the vested-but-unclaimed entitlement to the
+		// beneficiary first: on a fully elapsed schedule that is
+		// `TOTAL - CLAIM_AMOUNT`, and only a genuinely unvested remainder —
+		// zero here — may return to the admin.
+		assert_eq!(
+			token_amount(&program, &beneficiary_ata),
+			TOTAL,
+			"the beneficiary holds everything claimed plus the vested settlement"
+		);
 		assert_eq!(
 			token_amount(&program, &admin_ata),
-			TOTAL - CLAIM_AMOUNT,
-			"the admin recovered the unclaimed remainder"
+			0,
+			"an elapsed schedule leaves no unvested remainder for the admin"
 		);
 		// Closing an SPL account deletes it outright: the account no longer
 		// exists, so any later read must fail. This is what proves no value is
@@ -482,6 +518,21 @@ fn funded_schedule(program: &mut ProgramTest) -> FundedSchedule {
 		vesting_pda(&program_id, &admin.pubkey(), &beneficiary.pubkey(), &mint);
 	let vault = ata_of(&vesting_state, &mint);
 
+	// Initialize funds the vault atomically from the admin's ATA now, so the
+	// allocation is minted to the admin first and moved by the instruction.
+	let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
+	let admin_ata = ata_of(&admin.pubkey(), &mint);
+	let payer = program.payer();
+	provision_ata(
+		program,
+		&payer,
+		&admin.pubkey(),
+		&mint,
+		Some(&mint_authority),
+		TOTAL,
+	)
+	.expect("fund the admin ATA");
+
 	program
 		.send_with_signers(
 			initialize_instruction(
@@ -491,6 +542,7 @@ fn funded_schedule(program: &mut ProgramTest) -> FundedSchedule {
 				&mint,
 				&vesting_state,
 				&vault,
+				&admin_ata,
 				bump,
 				(0, 0, 0),
 			),
@@ -498,12 +550,7 @@ fn funded_schedule(program: &mut ProgramTest) -> FundedSchedule {
 		)
 		.expect("execute Initialize");
 
-	let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
-	let admin_ata = ata_of(&admin.pubkey(), &mint);
-	let payer = program.payer();
 	provision_ata(program, &payer, &beneficiary.pubkey(), &mint, None, 0).expect("beneficiary ATA");
-	provision_ata(program, &payer, &admin.pubkey(), &mint, None, 0).expect("admin ATA");
-	mint_into(program, &mint, &vault, &mint_authority, TOTAL).expect("fund vault");
 
 	FundedSchedule {
 		mint,
@@ -636,6 +683,8 @@ fn cancel_rejects_a_foreign_vault() {
 					&schedule.vesting_state,
 					&decoy,
 					&schedule.admin_ata,
+					&clock_sysvar_id(),
+					&schedule.beneficiary_ata,
 				),
 				&[&schedule.admin],
 			)
@@ -680,6 +729,219 @@ fn cancel_rejects_a_foreign_vault() {
 		assert!(
 			program.account(&schedule.vault).is_ok(),
 			"the real vault was not closed"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// Each test below asserts the *secure* behavior from the audit report. It
+// fails on the current tree because the exploit is still live, and must pass
+// once the corresponding fix lands. Run with `pina test --project
+// examples/vesting_program --filter audit_sec_`.
+// ---------------------------------------------------------------------------
+
+const TOKEN_2022_PROGRAM: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+
+fn token_2022_program_id() -> Pubkey {
+	Pubkey::from_str_const(TOKEN_2022_PROGRAM)
+}
+
+/// SEC-29: `Initialize` records `total_amount` and creates an empty vault, so
+/// a valid-looking, already-vested schedule can promise value it does not
+/// hold and the beneficiary only discovers the shortfall at claim time. An
+/// active schedule must be fully collateralized by the end of its
+/// initializing instruction.
+///
+/// Current behavior: the unfunded elapsed schedule is accepted with a
+/// zero-balance vault, so the assertion below fails and the test proves the
+/// unbacked promise.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_29_an_active_schedule_must_be_funded_at_initialization() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([12; 32]);
+		let admin = Keypair::new_from_array([11; 32]);
+		program.fund(&admin.pubkey(), FUND).expect("fund admin");
+		let beneficiary = Keypair::new_from_array([14; 32]);
+		program
+			.fund(&beneficiary.pubkey(), FUND)
+			.expect("fund beneficiary");
+
+		let payer = program.payer();
+		let mint = provision_mint(&mut program, &payer, &mint_authority).expect("provision mint");
+		let (vesting_state, bump) =
+			vesting_pda(&program_id, &admin.pubkey(), &beneficiary.pubkey(), &mint);
+		let vault = ata_of(&vesting_state, &mint);
+
+		// Initialize an already-elapsed schedule with NO vault funding.
+		let initialized = program.send_with_signers(
+			initialize_instruction(
+				&program,
+				&admin.pubkey(),
+				&beneficiary.pubkey(),
+				&mint,
+				&vesting_state,
+				&vault,
+				&ata_of(&admin.pubkey(), &mint),
+				bump,
+				(0, 0, 0),
+			),
+			&[&admin],
+		);
+
+		if let Err(error) = initialized {
+			assert!(
+				error.transaction_error().is_some(),
+				"harness failure before the program could reject the schedule: {error:?}"
+			);
+			// Rejected: the funded-initialization fix holds.
+			program.stop().expect("stop isolated program test");
+			return;
+		}
+
+		let vault_balance = token_amount(&program, &vault);
+		assert!(
+			vault_balance >= TOTAL,
+			"SEC-29: an active schedule was created promising {TOTAL} with only {vault_balance} \
+			 in its vault"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// SEC-30 lives in `tests/e2e.rs` (`initialize_rejects_a_token_2022_mint_with_extensions`):
+/// the Surfpool harness's historical-account cheatcode only accepts
+/// program-owned fixtures, so an extended Token-2022 mint cannot be
+/// provisioned here. Mollusk installs arbitrary accounts and carries the
+/// proof.
+
+/// SEC-28: `Cancel` returns the entire unclaimed vault balance to the
+/// administrator, even after the schedule has fully vested, so the issuer can
+/// confiscate the beneficiary's earned entitlement by cancelling. A revocable
+/// vesting cancel must first settle the vested-but-unclaimed amount to the
+/// beneficiary.
+///
+/// Current behavior: the elapsed schedule's cancel hands the whole balance to
+/// the admin ATA, so the beneficiary-entitlement assertion below fails and
+/// the test proves the confiscation.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_28_cancellation_settles_vested_entitlement_to_the_beneficiary() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([12; 32]);
+		let admin = Keypair::new_from_array([11; 32]);
+		program.fund(&admin.pubkey(), FUND).expect("fund admin");
+		let beneficiary = Keypair::new_from_array([14; 32]);
+		program
+			.fund(&beneficiary.pubkey(), FUND)
+			.expect("fund beneficiary");
+
+		let payer = program.payer();
+		let mint = provision_mint(&mut program, &payer, &mint_authority).expect("provision mint");
+		let (vesting_state, bump) =
+			vesting_pda(&program_id, &admin.pubkey(), &beneficiary.pubkey(), &mint);
+		let vault = ata_of(&vesting_state, &mint);
+		let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
+		let admin_ata = ata_of(&admin.pubkey(), &mint);
+
+		// Initialize funds the vault atomically, so mint the allocation to the
+		// admin first and let the instruction move it.
+		provision_ata(
+			&mut program,
+			&payer,
+			&admin.pubkey(),
+			&mint,
+			Some(&mint_authority),
+			TOTAL,
+		)
+		.expect("fund the admin ATA");
+		program
+			.send_with_signers(
+				initialize_instruction(
+					&program,
+					&admin.pubkey(),
+					&beneficiary.pubkey(),
+					&mint,
+					&vesting_state,
+					&vault,
+					&admin_ata,
+					bump,
+					(0, 0, 0),
+				),
+				&[&admin],
+			)
+			.expect("execute Initialize");
+
+		// Create the beneficiary's ATA up front (idempotent create, tag 1) so
+		// the settlement assertion below reads a real balance instead of a
+		// missing account.
+		let payer = program.payer();
+		let create_beneficiary_ata = Instruction::new_with_bytes(
+			ata_program_id(),
+			&[1u8],
+			vec![
+				AccountMeta::new(payer, true),
+				AccountMeta::new(beneficiary_ata, false),
+				AccountMeta::new_readonly(beneficiary.pubkey(), false),
+				AccountMeta::new_readonly(mint, false),
+				AccountMeta::new_readonly(Pubkey::default(), false),
+				AccountMeta::new_readonly(token_program_id(), false),
+			],
+		);
+		program
+			.send_instruction(create_beneficiary_ata)
+			.expect("create beneficiary ATA");
+
+		// The schedule has fully elapsed with nothing claimed, so the entire
+		// allocation is vested entitlement belonging to the beneficiary.
+		program
+			.time_travel_to_timestamp_millis(2_500_000_000_000)
+			.expect("time travel past the schedule end");
+
+		program
+			.send_with_signers(
+				cancel_instruction(
+					&program,
+					&admin.pubkey(),
+					&mint,
+					&vesting_state,
+					&vault,
+					&admin_ata,
+					&clock_sysvar_id(),
+					&ata_of(&beneficiary.pubkey(), &mint),
+				),
+				&[&admin],
+			)
+			.expect("execute Cancel");
+
+		// The vested-but-unclaimed entitlement must have reached the
+		// beneficiary, and only a genuinely unvested remainder may return to
+		// the administrator. With a fully elapsed schedule that remainder is
+		// zero.
+		assert_eq!(
+			token_amount(&program, &beneficiary_ata),
+			TOTAL,
+			"SEC-28: the vested-but-unclaimed entitlement must settle to the beneficiary"
+		);
+		assert_eq!(
+			token_amount(&program, &admin_ata),
+			0,
+			"a fully vested schedule has no unvested remainder to return to the admin"
 		);
 
 		program.stop().expect("stop isolated program test");

@@ -98,6 +98,7 @@ Instruction getProposalCloseInstruction({
   required Address multisig,
   required Address proposal,
   required Address rentCollector,
+  required Address clock,
 }) {
   final instructionData = ProposalCloseInstructionData();
 
@@ -107,6 +108,7 @@ Instruction getProposalCloseInstruction({
       AccountMeta(address: multisig, role: AccountRole.readonly),
       AccountMeta(address: proposal, role: AccountRole.writable),
       AccountMeta(address: rentCollector, role: AccountRole.writable),
+      AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getProposalCloseInstructionDataEncoder().encode(instructionData),
   );

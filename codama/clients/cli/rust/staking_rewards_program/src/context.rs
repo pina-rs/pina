@@ -391,6 +391,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		4 => Some("InvalidPool"),
 		5 => Some("RewardIndexRegressed"),
 		6 => Some("NothingToClaim"),
+		7 => Some("RewardIndexExceedsCapacity"),
+		8 => Some("RewardIndexExceedsReserves"),
 		_ => None,
 	}
 }

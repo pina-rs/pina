@@ -118,12 +118,14 @@ describe("vesting JS client contracts", () => {
 		const beneficiaryAta = "BeneficiaryAta111111111111111111111111111111";
 		const tokenProgram = "So11111111111111111111111111111111111111112";
 
+		const adminAta = "AdminAta11111111111111111111111111111111111";
 		const initialize = getVestingInitializeInstruction({
 			admin,
 			beneficiary,
 			mint,
 			vestingState,
 			vault,
+			adminAta,
 			totalAmount: 500n,
 			startTs: 111n,
 			cliffTs: 222n,
@@ -138,6 +140,7 @@ describe("vesting JS client contracts", () => {
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: adminAta, role: WRITABLE },
 			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
@@ -177,13 +180,14 @@ describe("vesting JS client contracts", () => {
 		);
 		expect(parseClaimInstruction(claim).data.amount).toBe(25n);
 
-		const adminAta = "AdminAta11111111111111111111111111111111111";
 		const cancel = getCancelInstruction({
 			admin,
 			mint,
 			vestingState,
 			adminAta,
 			vault,
+			clock,
+			beneficiaryAta,
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(cancel.accounts, [
@@ -195,6 +199,8 @@ describe("vesting JS client contracts", () => {
 			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
+			{ address: clock, role: READONLY },
+			{ address: beneficiaryAta, role: WRITABLE },
 		]);
 		expect(Array.from(cancel.data)).toEqual([
 			VESTING_CANCEL_DISCRIMINATOR,
@@ -497,7 +503,7 @@ describe("staking rewards JS client contracts", () => {
 		expectAccountsMatch(claim.accounts, [
 			{ address: admin, role: WRITABLE },
 			{ address: rewardMint, role: READONLY },
-			{ address: poolState, role: READONLY },
+			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
 			{ address: rewardVault, role: WRITABLE },

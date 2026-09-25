@@ -76,7 +76,7 @@ export type ClaimInstruction<
 				: TAccountUser,
 			TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint>
 				: TAccountRewardMint,
-			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
+			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
 				: TAccountPoolState,
 			TAccountPositionState extends string
 				? WritableAccount<TAccountPositionState>
@@ -153,6 +153,10 @@ export type ClaimInput<
 > = {
 	user: TransactionSigner<TAccountUser>;
 	rewardMint: Address<TAccountRewardMint>;
+	/**
+	 * The pool's state is written: the payout leaves the pool's outstanding
+	 * reward liability.
+	 */
 	poolState: Address<TAccountPoolState>;
 	positionState: Address<TAccountPositionState>;
 	userRewardAta: Address<TAccountUserRewardAta>;
@@ -207,7 +211,7 @@ export function getClaimInstruction<
 	const originalAccounts = {
 		user: { value: input.user ?? null, isWritable: true },
 		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: false },
+		poolState: { value: input.poolState ?? null, isWritable: true },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
 		rewardVault: { value: input.rewardVault ?? null, isWritable: true },
@@ -274,6 +278,10 @@ export type ParsedClaimInstruction<
 	accounts: {
 		user: TAccountMetas[0];
 		rewardMint: TAccountMetas[1];
+		/**
+		 * The pool's state is written: the payout leaves the pool's outstanding
+		 * reward liability.
+		 */
 		poolState: TAccountMetas[2];
 		positionState: TAccountMetas[3];
 		userRewardAta: TAccountMetas[4];

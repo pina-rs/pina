@@ -24,12 +24,17 @@ export const proposalCloseCommand = registerGlobals(
 		"--rent-collector <rentCollector>",
 		"The `rent_collector` account",
 	)
+	.requiredOption(
+		"--clock <clock>",
+		"Clock for the expiry test: an expired active proposal can neither",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			multisig: pubkey("--multisig", options.multisig),
 			proposal: pubkey("--proposal", options.proposal),
 			rentCollector: pubkey("--rent-collector", options.rentCollector),
+			clock: pubkey("--clock", options.clock),
 		};
 		const instruction = getProposalCloseInstruction(
 			...[input],

@@ -279,13 +279,15 @@ enabled = true
 required = true
 skip_labels = ["release", "dependencies"]
 comment_on_failure = true
-changed_paths = ["codecov.yml"]
 ignored_paths = [
 	"**/tests/**",
 	"**/snapshots/**",
 	"changelog.md",
 	"docs/**",
 	"templates/**",
+	# Coverage tooling config: it changes how reports are scored, not what
+	# any package ships, so it never makes a package release-relevant.
+	"codecov.yml",
 ]
 
 [lints]

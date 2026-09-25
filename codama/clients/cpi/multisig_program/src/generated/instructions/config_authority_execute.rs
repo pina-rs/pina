@@ -41,6 +41,14 @@ pub struct ConfigAuthorityExecute<'account> {
 	/// Required privileges: read-only.
 	pub clock: &'account AccountView,
 
+	/// CPI account `rentCollector`.
+	/// Refund destination for closed spending-limit accounts and member-tail
+	/// shrinkage. When the multisig configures a rent collector this must be
+	/// that address; with none configured any writable account fills the slot
+	/// and refunds fall back to `rent_payer`, which also funds any growth.
+	/// Required privileges: writable.
+	pub rent_collector: &'account AccountView,
+
 	/// CPI account `spendingLimitAccounts`.
 	/// Spending limit accounts referenced by add/remove spending-limit
 	/// actions, in any order.
@@ -91,12 +99,13 @@ impl<'account> ConfigAuthorityExecute<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 6] = [
+		let accounts: [CpiHandle<'_>; 7] = [
 			CpiHandle::writable(self.multisig)?,
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable_signer(self.rent_payer)?,
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.clock),
+			CpiHandle::writable(self.rent_collector)?,
 			CpiHandle::writable(self.spending_limit_accounts)?,
 		];
 		let data = self.ix.to_bytes()?;

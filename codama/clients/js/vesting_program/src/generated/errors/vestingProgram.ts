@@ -24,12 +24,18 @@ export const VESTING_PROGRAM_ERROR__ALREADY_CANCELLED = 0x2; // 2
 export const VESTING_PROGRAM_ERROR__CLIFF_NOT_REACHED = 0x3; // 3
 /** The vault holds fewer tokens than the claim must release. */
 export const VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE = 0x4; // 4
+/**
+ * The Cancel settlement destination is not a token account for this
+ * mint owned by the beneficiary.
+ */
+export const VESTING_PROGRAM_ERROR__INVALID_BENEFICIARY_ATA = 0x5; // 5
 
 export type VestingProgramError =
 	| typeof VESTING_PROGRAM_ERROR__ALREADY_CANCELLED
 	| typeof VESTING_PROGRAM_ERROR__CLAIM_TOO_LARGE
 	| typeof VESTING_PROGRAM_ERROR__CLIFF_NOT_REACHED
 	| typeof VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE
+	| typeof VESTING_PROGRAM_ERROR__INVALID_BENEFICIARY_ATA
 	| typeof VESTING_PROGRAM_ERROR__INVALID_SCHEDULE;
 
 let vestingProgramErrorMessages:
@@ -45,6 +51,8 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The schedule has not reached its cliff, so nothing has vested yet.`,
 		[VESTING_PROGRAM_ERROR__INSUFFICIENT_VAULT_BALANCE]:
 			`The vault holds fewer tokens than the claim must release.`,
+		[VESTING_PROGRAM_ERROR__INVALID_BENEFICIARY_ATA]:
+			`The Cancel settlement destination is not a token account for this`,
 		[VESTING_PROGRAM_ERROR__INVALID_SCHEDULE]:
 			`The schedule is malformed: its window is empty, unordered, or fully elapsed.`,
 	};

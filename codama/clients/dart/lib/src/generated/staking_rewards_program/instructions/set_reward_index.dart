@@ -106,6 +106,9 @@ Instruction getSetRewardIndexInstruction({
   required Address programAddress,
   required Address admin,
   required Address poolState,
+  required Address rewardMint,
+  required Address tokenProgram,
+  required Address rewardVault,
   required BigInt newIndex,
 }) {
   final instructionData = SetRewardIndexInstructionData(newIndex: newIndex);
@@ -115,6 +118,9 @@ Instruction getSetRewardIndexInstruction({
     accounts: [
       AccountMeta(address: admin, role: AccountRole.readonlySigner),
       AccountMeta(address: poolState, role: AccountRole.writable),
+      AccountMeta(address: rewardMint, role: AccountRole.readonly),
+      AccountMeta(address: tokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: rewardVault, role: AccountRole.readonly),
     ],
     data: getSetRewardIndexInstructionDataEncoder().encode(instructionData),
   );

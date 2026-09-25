@@ -64,6 +64,8 @@ export type CancelInstruction<
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
+	TAccountClock extends string | AccountMeta<string> = string,
+	TAccountBeneficiaryAta extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -92,6 +94,11 @@ export type CancelInstruction<
 			TAccountTokenProgram extends string
 				? ReadonlyAccount<TAccountTokenProgram>
 				: TAccountTokenProgram,
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
+			TAccountBeneficiaryAta extends string
+				? WritableAccount<TAccountBeneficiaryAta>
+				: TAccountBeneficiaryAta,
 			...TRemainingAccounts,
 		]
 	>;
@@ -146,6 +153,8 @@ export type CancelInput<
 	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
+	TAccountClock extends string = string,
+	TAccountBeneficiaryAta extends string = string,
 > = {
 	admin: TransactionSigner<TAccountAdmin>;
 	mint: Address<TAccountMint>;
@@ -155,6 +164,17 @@ export type CancelInput<
 	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
+	/**
+	 * Clock for the vested-entitlement settlement: cancellation must not
+	 * confiscate what the linear curve has already released.
+	 */
+	clock: Address<TAccountClock>;
+	/**
+	 * The beneficiary's ATA: the vested-but-unclaimed amount settles here
+	 * before any remainder returns to the administrator. It is mutable
+	 * because the settlement transfer credits it.
+	 */
+	beneficiaryAta: Address<TAccountBeneficiaryAta>;
 };
 
 export function getCancelInstruction<
@@ -166,6 +186,8 @@ export function getCancelInstruction<
 	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
+	TAccountClock extends string,
+	TAccountBeneficiaryAta extends string,
 	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CancelInput<
@@ -176,7 +198,9 @@ export function getCancelInstruction<
 		TAccountVault,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
-		TAccountTokenProgram
+		TAccountTokenProgram,
+		TAccountClock,
+		TAccountBeneficiaryAta
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): CancelInstruction<
@@ -188,7 +212,9 @@ export function getCancelInstruction<
 	TAccountVault,
 	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
-	TAccountTokenProgram
+	TAccountTokenProgram,
+	TAccountClock,
+	TAccountBeneficiaryAta
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
@@ -207,6 +233,8 @@ export function getCancelInstruction<
 		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		clock: { value: input.clock ?? null, isWritable: false },
+		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -238,6 +266,8 @@ export function getCancelInstruction<
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
+			getAccountMeta("clock", accounts.clock),
+			getAccountMeta("beneficiaryAta", accounts.beneficiaryAta),
 		],
 		data: getCancelInstructionDataEncoder().encode({}),
 		programAddress,
@@ -250,7 +280,9 @@ export function getCancelInstruction<
 		TAccountVault,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
-		TAccountTokenProgram
+		TAccountTokenProgram,
+		TAccountClock,
+		TAccountBeneficiaryAta
 	>);
 }
 
@@ -268,6 +300,17 @@ export type ParsedCancelInstruction<
 		associatedTokenProgram: TAccountMetas[5];
 		systemProgram: TAccountMetas[6];
 		tokenProgram: TAccountMetas[7];
+		/**
+		 * Clock for the vested-entitlement settlement: cancellation must not
+		 * confiscate what the linear curve has already released.
+		 */
+		clock: TAccountMetas[8];
+		/**
+		 * The beneficiary's ATA: the vested-but-unclaimed amount settles here
+		 * before any remainder returns to the administrator. It is mutable
+		 * because the settlement transfer credits it.
+		 */
+		beneficiaryAta: TAccountMetas[9];
 	};
 	data: CancelInstructionData;
 };
@@ -281,12 +324,12 @@ export function parseCancelInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCancelInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 10) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 10,
 			},
 		);
 	}
@@ -307,6 +350,8 @@ export function parseCancelInstruction<
 			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
+			clock: getNextAccount(),
+			beneficiaryAta: getNextAccount(),
 		},
 		data: getCancelInstructionDataDecoder().decode(instruction.data),
 	};

@@ -1,0 +1,58 @@
+{
+	"abiVersion": "0.20",
+	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+	"versionType": "u8",
+	"auto": [
+		"accounts"
+	],
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "LedgerState",
+			"versions": [
+				{
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "label",
+								"rustType": "String<8>"
+							},
+							{
+								"name": "codes",
+								"rustType": "Vec<u16, 3>"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": null
+				},
+				{
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "label",
+								"rustType": "String<8>"
+							},
+							{
+								"name": "codes",
+								"rustType": "Vec<u16, 3>"
+							}
+						],
+						"codec": "pinaPodV2"
+					},
+					"transition": {
+						"mode": "manual",
+						"renames": [],
+						"implementationSha256": "c9c49dc6c261ffedccbf0ae46de09a9286e48b02d72574d93e5dff9687e77a48"
+					}
+				}
+			]
+		}
+	}
+}

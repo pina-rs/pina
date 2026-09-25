@@ -248,6 +248,7 @@ codama-nodes = { default-features = false, version = "0.13.1" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
+
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
@@ -267,9 +268,9 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.20.0" }
-# Fixed-point types arrive through `pinapod`'s `fixed` re-export (forwarded
-# as `pina::fixed`), so there is deliberately no `fixed` dependency here to
-# hold at pinapod's exact pin. 0.4.4 is the first release carrying it.
+# Pinapod defines the account wire format and its derive, and 0.4.4 is the
+# first release re-exporting `fixed` (`pina::fixed` forwards it), so
+# downstream fixed-point schemas depend on `pina` alone.
 pinapod = { version = "0.4.4", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }

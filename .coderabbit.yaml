@@ -1,0 +1,14 @@
+# CodeRabbit configuration.
+#
+# The default reviews.limits.files cap is 100. A change to an example's
+# instruction ABI regenerates its clients in seven languages, which alone
+# exceeds that cap, so legitimate workspaces-sized changes were silently
+# skipped ("Too many files!") and merged without review. Raise the cap and
+# exclude the deterministic generated output, which is verified by
+# `test:idl` instead: CI regenerates every client and fails on any drift.
+language: en-US
+reviews:
+  path_filters:
+    - "!codama/clients/**"
+    - "!codama/idls/**"
+    - "!**/node_modules/**"

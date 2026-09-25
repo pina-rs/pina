@@ -16,6 +16,11 @@ final class ConfigExecuteCommand extends Command<void> {
       ..addOption('proposal', mandatory: true, help: "The proposal account")
       ..addOption('clock', mandatory: true, help: "The clock account")
       ..addOption(
+        'rent_collector',
+        mandatory: true,
+        help: "Refund destination for closed spending-limit accounts. When the",
+      )
+      ..addOption(
         'spending_limit_accounts',
         mandatory: true,
         help: "Spending limit accounts referenced by add/remove spending-limit",
@@ -37,6 +42,10 @@ final class ConfigExecuteCommand extends Command<void> {
     final member = context.payerAddress;
     final rentPayer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
+    final rentCollector = pubkey(
+      '--rent-collector',
+      results['rent_collector']! as String,
+    );
     final spendingLimitAccounts = pubkey(
       '--spending-limit-accounts',
       results['spending_limit_accounts']! as String,
@@ -50,6 +59,7 @@ final class ConfigExecuteCommand extends Command<void> {
       rentPayer: rentPayer,
       systemProgram: Address('11111111111111111111111111111111'),
       clock: clock,
+      rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,
     );
     await context.send([instruction]);
