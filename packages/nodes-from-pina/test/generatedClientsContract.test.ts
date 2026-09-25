@@ -1,4 +1,9 @@
+import { type Address, createNoopSigner } from "@solana/kit";
 import { describe, expect, test } from "vitest";
+
+// Kit 8 resolves signer accounts only from `TransactionSigner` inputs; the
+// test fixtures keep plain string addresses, so wrap them into no-op signers.
+const noopSigner = (address: string) => createNoopSigner(address as Address);
 
 import {
 	CANCEL_DISCRIMINATOR as VESTING_CANCEL_DISCRIMINATOR,
@@ -79,6 +84,8 @@ const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
 
 const READONLY = 0;
 const WRITABLE = 1;
+const READONLY_SIGNER = 2;
+const WRITABLE_SIGNER = 3;
 
 type AccountExpectation = { address: string; role: number };
 
@@ -119,7 +126,7 @@ describe("vesting JS client contracts", () => {
 		const tokenProgram = "So11111111111111111111111111111111111111112";
 
 		const initialize = getVestingInitializeInstruction({
-			admin,
+			admin: noopSigner(admin),
 			beneficiary,
 			mint,
 			vestingState,
@@ -133,7 +140,7 @@ describe("vesting JS client contracts", () => {
 		} as any);
 		expect(initialize.programAddress).toBe(VESTING_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(initialize.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: beneficiary, role: READONLY },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
@@ -152,7 +159,7 @@ describe("vesting JS client contracts", () => {
 
 		const clock = "ClockSysvar1111111111111111111111111111111";
 		const claim = getClaimInstruction({
-			beneficiary,
+			beneficiary: noopSigner(beneficiary),
 			mint,
 			vestingState,
 			beneficiaryAta,
@@ -162,7 +169,7 @@ describe("vesting JS client contracts", () => {
 			amount: 25n,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: beneficiary, role: WRITABLE },
+			{ address: beneficiary, role: WRITABLE_SIGNER },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: beneficiaryAta, role: WRITABLE },
@@ -179,7 +186,7 @@ describe("vesting JS client contracts", () => {
 
 		const adminAta = "AdminAta11111111111111111111111111111111111";
 		const cancel = getCancelInstruction({
-			admin,
+			admin: noopSigner(admin),
 			mint,
 			vestingState,
 			adminAta,
@@ -187,7 +194,7 @@ describe("vesting JS client contracts", () => {
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(cancel.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: adminAta, role: WRITABLE },
@@ -245,13 +252,13 @@ describe("role registry JS client contracts", () => {
 		);
 
 		const init = getRoleInitializeInstruction({
-			admin,
+			admin: noopSigner(admin),
 			registryConfig,
 			bump: 8,
 		} as any);
 		expect(init.programAddress).toBe(ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -260,7 +267,7 @@ describe("role registry JS client contracts", () => {
 		expect(parseRoleInitializeInstruction(init).data.bump).toBe(8);
 
 		const addRole = getAddRoleInstruction({
-			admin,
+			admin: noopSigner(admin),
 			grantee,
 			registryConfig,
 			roleEntry,
@@ -269,7 +276,7 @@ describe("role registry JS client contracts", () => {
 			bump: 7,
 		} as any);
 		expectAccountsMatch(addRole.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: grantee, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: roleEntry, role: WRITABLE },
@@ -282,13 +289,13 @@ describe("role registry JS client contracts", () => {
 		expect(parseAddRoleInstruction(addRole).data.roleId).toBe(11n);
 
 		const updateRole = getUpdateRoleInstruction({
-			admin,
+			admin: noopSigner(admin),
 			registryConfig,
 			roleEntry,
 			permissions: 42n,
 		} as any);
 		expectAccountsMatch(updateRole.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: READONLY_SIGNER },
 			{ address: registryConfig, role: READONLY },
 			{ address: roleEntry, role: WRITABLE },
 		]);
@@ -300,12 +307,12 @@ describe("role registry JS client contracts", () => {
 		expect(parseUpdateRoleInstruction(updateRole).data.permissions).toBe(42n);
 
 		const deactivateRole = getDeactivateRoleInstruction({
-			admin,
+			admin: noopSigner(admin),
 			registryConfig,
 			roleEntry,
 		} as any);
 		expectAccountsMatch(deactivateRole.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: READONLY_SIGNER },
 			{ address: registryConfig, role: READONLY },
 			{ address: roleEntry, role: WRITABLE },
 		]);
@@ -318,12 +325,12 @@ describe("role registry JS client contracts", () => {
 		]);
 
 		const rotateAdmin = getRotateAdminInstruction({
-			admin,
+			admin: noopSigner(admin),
 			newAdmin,
 			registryConfig,
 		} as any);
 		expectAccountsMatch(rotateAdmin.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: READONLY_SIGNER },
 			{ address: newAdmin, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 		]);
@@ -393,7 +400,7 @@ describe("staking rewards JS client contracts", () => {
 		);
 
 		const init = getInitializePoolInstruction({
-			admin,
+			admin: noopSigner(admin),
 			stakeMint,
 			rewardMint,
 			poolState,
@@ -404,7 +411,7 @@ describe("staking rewards JS client contracts", () => {
 		} as any);
 		expect(init.programAddress).toBe(STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: stakeMint, role: READONLY },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
@@ -419,13 +426,13 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseInitializePoolInstruction(init).data.bump).toBe(5);
 
 		const openPosition = getOpenPositionInstruction({
-			user: admin,
+			user: noopSigner(admin),
 			poolState,
 			positionState,
 			bump: 4,
 		} as any);
 		expectAccountsMatch(openPosition.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
@@ -436,7 +443,7 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseOpenPositionInstruction(openPosition).data.bump).toBe(4);
 
 		const deposit = getDepositInstruction({
-			user: admin,
+			user: noopSigner(admin),
 			stakeMint,
 			poolState,
 			positionState,
@@ -446,7 +453,7 @@ describe("staking rewards JS client contracts", () => {
 			amount: 42n,
 		} as any);
 		expectAccountsMatch(deposit.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: stakeMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
@@ -462,7 +469,7 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseDepositInstruction(deposit).data.amount).toBe(42n);
 
 		const withdraw = getWithdrawInstruction({
-			user: admin,
+			user: noopSigner(admin),
 			stakeMint,
 			poolState,
 			positionState,
@@ -472,7 +479,7 @@ describe("staking rewards JS client contracts", () => {
 			amount: 7n,
 		} as any);
 		expectAccountsMatch(withdraw.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: READONLY_SIGNER },
 			{ address: stakeMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
@@ -486,7 +493,7 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseWithdrawInstruction(withdraw).data.amount).toBe(7n);
 
 		const claim = getStakingClaimInstruction({
-			user: admin,
+			user: noopSigner(admin),
 			rewardMint,
 			poolState,
 			positionState,
@@ -495,7 +502,7 @@ describe("staking rewards JS client contracts", () => {
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: admin, role: WRITABLE },
+			{ address: admin, role: WRITABLE_SIGNER },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
