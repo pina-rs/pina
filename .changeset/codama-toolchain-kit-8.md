@@ -1,5 +1,8 @@
 ---
 pina_cli: fix
+pina_codama_nodes: fix
+pina_codama_renderer_cpi: fix
+pina_codama_renderer_cli: fix
 ---
 
 # Pin client generation to the Kit 8 Codama toolchain
