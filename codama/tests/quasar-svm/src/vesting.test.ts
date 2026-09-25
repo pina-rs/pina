@@ -119,7 +119,9 @@ describe("vesting_program quasar e2e", () => {
 			mint.address,
 			0n,
 		);
-		const adminAta = await createAta(admin.address, mint.address, 0n);
+		// The admin holds the allocation: Initialize moves it into the vault in
+		// the same instruction, so a schedule can never exist unfunded.
+		const adminAta = await createAta(admin.address, mint.address, 1_000n);
 		const [vestingPda, bump] = await deriveVestingPda(
 			admin.address,
 			beneficiary.address,
@@ -130,13 +132,6 @@ describe("vesting_program quasar e2e", () => {
 			mint.address,
 			SPL_TOKEN_PROGRAM_ID as Address,
 		);
-		// Fund the vault with the allocation, so the release has something to
-		// pay out of and the refund has something to return.
-		const fundedVault = await createKeyedAssociatedTokenAccount(
-			vestingPda as Address,
-			mint.address,
-			1_000n,
-		);
 		const initializeResult = svm.processInstruction(
 			getInitializeInstruction({
 				admin,
@@ -144,6 +139,7 @@ describe("vesting_program quasar e2e", () => {
 				mint: mint.address,
 				vestingState: vestingPda,
 				vault: vaultAta,
+				adminAta: adminAta.address,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
 				totalAmount: 1_000n,
 				startTs: 0n,
@@ -156,9 +152,22 @@ describe("vesting_program quasar e2e", () => {
 				mint,
 				createKeyedSystemAccount(vestingPda as Address, 0n),
 				createKeyedSystemAccount(vaultAta, 0n),
+				adminAta,
 			],
 		);
 		initializeResult.assertSuccess();
+
+		// The atomic funding moved the allocation out of the admin's account.
+		const fundedVault = expectSome(
+			initializeResult.account(vaultAta),
+			"the vault should exist after initialize",
+		);
+		expect(
+			expectSome(
+				initializeResult.account(vaultAta, getTokenDecoder()),
+				"the vault should be funded by initialize",
+			).amount,
+		).toBe(1_000n);
 
 		const initializedState = decodeVestingState(
 			expectSome(
@@ -218,7 +227,9 @@ describe("vesting_program quasar e2e", () => {
 				vestingState: vestingPda,
 				adminAta: adminAta.address,
 				vault: vaultAta,
+				beneficiaryAta: beneficiaryAta.address,
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
+				clock: SYSVAR_CLOCK_ADDRESS,
 			}),
 			[
 				adminAccount,
@@ -227,21 +238,38 @@ describe("vesting_program quasar e2e", () => {
 					claimResult.account(vestingPda),
 					"vesting state should exist before cancel",
 				),
-				adminAta,
+				expectSome(
+					initializeResult.account(adminAta.address),
+					"the admin ATA should survive initialize",
+				),
 				expectSome(
 					claimResult.account(vaultAta),
 					"vault ATA should exist before cancel",
 				),
+				expectSome(
+					claimResult.account(beneficiaryAta.address),
+					"the beneficiary ATA should survive the claim",
+				),
+				createClockAccount(1_000n),
 			],
 		);
 		cancelResult.assertSuccess();
 
-		// Cancel refunds the unclaimed balance to the admin and closes the vault.
+		// Cancel settles the beneficiary's earned entitlement first, then
+		// refunds only the genuinely unvested remainder. The clock sits past the
+		// schedule's end, so every token still in the vault is vested and owed
+		// to the beneficiary: the 250 already claimed stays with them and the
+		// remaining 750 follows, leaving the administrator a zero refund.
+		const beneficiaryAtaAfterCancel = expectSome(
+			cancelResult.account(beneficiaryAta.address, getTokenDecoder()),
+			"beneficiary ATA should exist after cancel",
+		);
+		expect(beneficiaryAtaAfterCancel.amount).toBe(1_000n);
 		const adminAtaAfterCancel = expectSome(
 			cancelResult.account(adminAta.address, getTokenDecoder()),
 			"admin ATA should exist after cancel",
 		);
-		expect(adminAtaAfterCancel.amount).toBe(750n);
+		expect(adminAtaAfterCancel.amount).toBe(0n);
 
 		const cancelledState = decodeVestingState(
 			expectSome(
