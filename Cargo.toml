@@ -248,9 +248,6 @@ codama-nodes = { default-features = false, version = "0.13.1" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
-# Exact pin shared with `pinapod`. Fixed-point bit layouts are the schema
-# contract, so mixed `fixed` versions can never be allowed to coexist.
-fixed = { default-features = false, version = "=1.30.0" }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
@@ -270,7 +267,10 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.20.0" }
-pinapod = { version = "0.4.3", default-features = false, features = ["solana-address", "solana-program-error"] }
+# Fixed-point types arrive through `pinapod`'s `fixed` re-export (forwarded
+# as `pina::fixed`), so there is deliberately no `fixed` dependency here to
+# hold at pinapod's exact pin. 0.4.4 is the first release carrying it.
+pinapod = { version = "0.4.4", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
