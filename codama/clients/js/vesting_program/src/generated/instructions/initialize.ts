@@ -66,6 +66,7 @@ export type InitializeInstruction<
 	TAccountMint extends string | AccountMeta<string> = string,
 	TAccountVestingState extends string | AccountMeta<string> = string,
 	TAccountVault extends string | AccountMeta<string> = string,
+	TAccountAdminAta extends string | AccountMeta<string> = string,
 	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
 		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
@@ -90,6 +91,8 @@ export type InitializeInstruction<
 				: TAccountVestingState,
 			TAccountVault extends string ? WritableAccount<TAccountVault>
 				: TAccountVault,
+			TAccountAdminAta extends string ? WritableAccount<TAccountAdminAta>
+				: TAccountAdminAta,
 			TAccountAssociatedTokenProgram extends string
 				? ReadonlyAccount<TAccountAssociatedTokenProgram>
 				: TAccountAssociatedTokenProgram,
@@ -172,6 +175,7 @@ export type InitializeAsyncInput<
 	TAccountVestingState extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAdminAta extends InstructionAccountInput = InstructionAccountInput,
 	TAccountAssociatedTokenProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
@@ -184,6 +188,13 @@ export type InitializeAsyncInput<
 	mint: TAccountMint;
 	vestingState?: TAccountVestingState;
 	vault: TAccountVault;
+	/**
+	 * The admin's source ATA: a schedule becomes active only by moving its
+	 * whole allocation into the vault in this same instruction, so a
+	 * valid-looking schedule can never promise value it does not hold. It is
+	 * mutable because the transfer debits it.
+	 */
+	adminAta: TAccountAdminAta;
 	associatedTokenProgram?: TAccountAssociatedTokenProgram;
 	systemProgram?: TAccountSystemProgram;
 	tokenProgram: TAccountTokenProgram;
@@ -200,6 +211,7 @@ export async function getInitializeInstructionAsync<
 	TAccountMint extends InstructionAccountInput,
 	TAccountVestingState extends InstructionAccountInput,
 	TAccountVault extends InstructionAccountInput,
+	TAccountAdminAta extends InstructionAccountInput,
 	TAccountAssociatedTokenProgram extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TAccountTokenProgram extends InstructionAccountInput,
@@ -211,6 +223,7 @@ export async function getInitializeInstructionAsync<
 		TAccountMint,
 		TAccountVestingState,
 		TAccountVault,
+		TAccountAdminAta,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
@@ -238,6 +251,10 @@ export async function getInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountVault,
 			InstructionAccountInputAddress<TAccountVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAdminAta,
+			InstructionAccountInputAddress<TAccountAdminAta>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountAssociatedTokenProgram,
@@ -275,6 +292,11 @@ export async function getInitializeInstructionAsync<
 			isWritable: true,
 		},
 		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
+		adminAta: {
+			value: input.adminAta ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isSigner: false,
@@ -336,6 +358,7 @@ export async function getInitializeInstructionAsync<
 			getAccountMeta("mint", accounts.mint),
 			getAccountMeta("vestingState", accounts.vestingState),
 			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("adminAta", accounts.adminAta),
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
@@ -367,6 +390,10 @@ export async function getInitializeInstructionAsync<
 			InstructionAccountInputAddress<TAccountVault>
 		>,
 		ResolvedInstructionAccountMeta<
+			TAccountAdminAta,
+			InstructionAccountInputAddress<TAccountAdminAta>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountAssociatedTokenProgram,
 			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
 		>,
@@ -388,6 +415,7 @@ export type InitializeInput<
 	TAccountVestingState extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAdminAta extends InstructionAccountInput = InstructionAccountInput,
 	TAccountAssociatedTokenProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
@@ -400,6 +428,13 @@ export type InitializeInput<
 	mint: TAccountMint;
 	vestingState: TAccountVestingState;
 	vault: TAccountVault;
+	/**
+	 * The admin's source ATA: a schedule becomes active only by moving its
+	 * whole allocation into the vault in this same instruction, so a
+	 * valid-looking schedule can never promise value it does not hold. It is
+	 * mutable because the transfer debits it.
+	 */
+	adminAta: TAccountAdminAta;
 	associatedTokenProgram?: TAccountAssociatedTokenProgram;
 	systemProgram?: TAccountSystemProgram;
 	tokenProgram: TAccountTokenProgram;
@@ -416,6 +451,7 @@ export function getInitializeInstruction<
 	TAccountMint extends InstructionAccountInput,
 	TAccountVestingState extends InstructionAccountInput,
 	TAccountVault extends InstructionAccountInput,
+	TAccountAdminAta extends InstructionAccountInput,
 	TAccountAssociatedTokenProgram extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TAccountTokenProgram extends InstructionAccountInput,
@@ -427,6 +463,7 @@ export function getInitializeInstruction<
 		TAccountMint,
 		TAccountVestingState,
 		TAccountVault,
+		TAccountAdminAta,
 		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
@@ -453,6 +490,10 @@ export function getInitializeInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountVault,
 		InstructionAccountInputAddress<TAccountVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAdminAta,
+		InstructionAccountInputAddress<TAccountAdminAta>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountAssociatedTokenProgram,
@@ -489,6 +530,11 @@ export function getInitializeInstruction<
 			isWritable: true,
 		},
 		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
+		adminAta: {
+			value: input.adminAta ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
 			isSigner: false,
@@ -534,6 +580,7 @@ export function getInitializeInstruction<
 			getAccountMeta("mint", accounts.mint),
 			getAccountMeta("vestingState", accounts.vestingState),
 			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("adminAta", accounts.adminAta),
 			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
@@ -565,6 +612,10 @@ export function getInitializeInstruction<
 			InstructionAccountInputAddress<TAccountVault>
 		>,
 		ResolvedInstructionAccountMeta<
+			TAccountAdminAta,
+			InstructionAccountInputAddress<TAccountAdminAta>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountAssociatedTokenProgram,
 			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
 		>,
@@ -590,9 +641,16 @@ export type ParsedInitializeInstruction<
 		mint: TAccountMetas[2];
 		vestingState: TAccountMetas[3];
 		vault: TAccountMetas[4];
-		associatedTokenProgram: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
-		tokenProgram: TAccountMetas[7];
+		/**
+		 * The admin's source ATA: a schedule becomes active only by moving its
+		 * whole allocation into the vault in this same instruction, so a
+		 * valid-looking schedule can never promise value it does not hold. It is
+		 * mutable because the transfer debits it.
+		 */
+		adminAta: TAccountMetas[5];
+		associatedTokenProgram: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
+		tokenProgram: TAccountMetas[8];
 	};
 	data: InitializeInstructionData;
 };
@@ -606,12 +664,12 @@ export function parseInitializeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -629,6 +687,7 @@ export function parseInitializeInstruction<
 			mint: getNextAccount(),
 			vestingState: getNextAccount(),
 			vault: getNextAccount(),
+			adminAta: getNextAccount(),
 			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),

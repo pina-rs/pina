@@ -57,6 +57,7 @@ export type ProposalCloseInstruction<
 	TAccountMultisig extends string | AccountMeta<string> = string,
 	TAccountProposal extends string | AccountMeta<string> = string,
 	TAccountRentCollector extends string | AccountMeta<string> = string,
+	TAccountClock extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -70,6 +71,8 @@ export type ProposalCloseInstruction<
 			TAccountRentCollector extends string
 				? WritableAccount<TAccountRentCollector>
 				: TAccountRentCollector,
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
 			...TRemainingAccounts,
 		]
 	>;
@@ -123,22 +126,31 @@ export type ProposalCloseInput<
 	TAccountProposal extends InstructionAccountInput = InstructionAccountInput,
 	TAccountRentCollector extends InstructionAccountInput =
 		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	multisig: TAccountMultisig;
 	proposal: TAccountProposal;
 	rentCollector: TAccountRentCollector;
+	/**
+	 * Clock for the expiry test: an expired active proposal can neither
+	 * progress nor reach a terminal status on its own, so expiry itself is a
+	 * permissionless close condition. Stale proposals close the same way.
+	 */
+	clock: TAccountClock;
 };
 
 export function getProposalCloseInstruction<
 	TAccountMultisig extends InstructionAccountInput,
 	TAccountProposal extends InstructionAccountInput,
 	TAccountRentCollector extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ProposalCloseInput<
 		TAccountMultisig,
 		TAccountProposal,
-		TAccountRentCollector
+		TAccountRentCollector,
+		TAccountClock
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): ProposalCloseInstruction<
@@ -154,6 +166,10 @@ export function getProposalCloseInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountRentCollector,
 		InstructionAccountInputAddress<TAccountRentCollector>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
 	>
 > {
 	// Program address.
@@ -180,6 +196,7 @@ export function getProposalCloseInstruction<
 			isSigner: false,
 			isWritable: true,
 		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -191,6 +208,7 @@ export function getProposalCloseInstruction<
 			getAccountMeta("multisig", accounts.multisig),
 			getAccountMeta("proposal", accounts.proposal),
 			getAccountMeta("rentCollector", accounts.rentCollector),
+			getAccountMeta("clock", accounts.clock),
 		],
 		data: getProposalCloseInstructionDataEncoder().encode({}),
 		programAddress,
@@ -207,6 +225,10 @@ export function getProposalCloseInstruction<
 		ResolvedInstructionAccountMeta<
 			TAccountRentCollector,
 			InstructionAccountInputAddress<TAccountRentCollector>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
 		>
 	>);
 }
@@ -220,6 +242,12 @@ export type ParsedProposalCloseInstruction<
 		multisig: TAccountMetas[0];
 		proposal: TAccountMetas[1];
 		rentCollector: TAccountMetas[2];
+		/**
+		 * Clock for the expiry test: an expired active proposal can neither
+		 * progress nor reach a terminal status on its own, so expiry itself is a
+		 * permissionless close condition. Stale proposals close the same way.
+		 */
+		clock: TAccountMetas[3];
 	};
 	data: ProposalCloseInstructionData;
 };
@@ -233,12 +261,12 @@ export function parseProposalCloseInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedProposalCloseInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
+	if (instruction.accounts.length < 4) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
+				expectedAccountMetas: 4,
 			},
 		);
 	}
@@ -254,6 +282,7 @@ export function parseProposalCloseInstruction<
 			multisig: getNextAccount(),
 			proposal: getNextAccount(),
 			rentCollector: getNextAccount(),
+			clock: getNextAccount(),
 		},
 		data: getProposalCloseInstructionDataDecoder().decode(instruction.data),
 	};

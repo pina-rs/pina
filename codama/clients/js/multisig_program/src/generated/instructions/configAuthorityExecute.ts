@@ -71,6 +71,7 @@ export type ConfigAuthorityExecuteInstruction<
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountClock extends string | AccountMeta<string> = string,
+	TAccountRentCollector extends string | AccountMeta<string> = string,
 	TAccountSpendingLimitAccounts extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
@@ -93,6 +94,9 @@ export type ConfigAuthorityExecuteInstruction<
 				: TAccountSystemProgram,
 			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
 				: TAccountClock,
+			TAccountRentCollector extends string
+				? WritableAccount<TAccountRentCollector>
+				: TAccountRentCollector,
 			TAccountSpendingLimitAccounts extends string
 				? WritableAccount<TAccountSpendingLimitAccounts>
 				: TAccountSpendingLimitAccounts,
@@ -160,6 +164,8 @@ export type ConfigAuthorityExecuteInput<
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentCollector extends InstructionAccountInput =
+		InstructionAccountInput,
 	TAccountSpendingLimitAccounts extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
@@ -168,6 +174,13 @@ export type ConfigAuthorityExecuteInput<
 	rentPayer: TAccountRentPayer;
 	systemProgram?: TAccountSystemProgram;
 	clock: TAccountClock;
+	/**
+	 * Refund destination for closed spending-limit accounts and member-tail
+	 * shrinkage. When the multisig configures a rent collector this must be
+	 * that address; with none configured any writable account fills the slot
+	 * and refunds fall back to `rent_payer`, which also funds any growth.
+	 */
+	rentCollector: TAccountRentCollector;
 	/**
 	 * Spending limit accounts referenced by add/remove spending-limit
 	 * actions, in any order.
@@ -183,6 +196,7 @@ export function getConfigAuthorityExecuteInstruction<
 	TAccountRentPayer extends InstructionSignerInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TAccountClock extends InstructionAccountInput,
+	TAccountRentCollector extends InstructionAccountInput,
 	TAccountSpendingLimitAccounts extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -192,6 +206,7 @@ export function getConfigAuthorityExecuteInstruction<
 		TAccountRentPayer,
 		TAccountSystemProgram,
 		TAccountClock,
+		TAccountRentCollector,
 		TAccountSpendingLimitAccounts
 	>,
 	config?: { programAddress?: TProgramAddress },
@@ -216,6 +231,10 @@ export function getConfigAuthorityExecuteInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountClock,
 		InstructionAccountInputAddress<TAccountClock>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentCollector,
+		InstructionAccountInputAddress<TAccountRentCollector>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountSpendingLimitAccounts,
@@ -252,6 +271,11 @@ export function getConfigAuthorityExecuteInstruction<
 			isWritable: false,
 		},
 		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+		rentCollector: {
+			value: input.rentCollector ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		spendingLimitAccounts: {
 			value: input.spendingLimitAccounts ?? null,
 			isSigner: false,
@@ -281,6 +305,7 @@ export function getConfigAuthorityExecuteInstruction<
 			getAccountMeta("rentPayer", accounts.rentPayer),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("clock", accounts.clock),
+			getAccountMeta("rentCollector", accounts.rentCollector),
 			getAccountMeta("spendingLimitAccounts", accounts.spendingLimitAccounts),
 		],
 		data: getConfigAuthorityExecuteInstructionDataEncoder().encode(
@@ -310,6 +335,10 @@ export function getConfigAuthorityExecuteInstruction<
 			InstructionAccountInputAddress<TAccountClock>
 		>,
 		ResolvedInstructionAccountMeta<
+			TAccountRentCollector,
+			InstructionAccountInputAddress<TAccountRentCollector>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountSpendingLimitAccounts,
 			InstructionAccountInputAddress<TAccountSpendingLimitAccounts>
 		>
@@ -328,10 +357,17 @@ export type ParsedConfigAuthorityExecuteInstruction<
 		systemProgram: TAccountMetas[3];
 		clock: TAccountMetas[4];
 		/**
+		 * Refund destination for closed spending-limit accounts and member-tail
+		 * shrinkage. When the multisig configures a rent collector this must be
+		 * that address; with none configured any writable account fills the slot
+		 * and refunds fall back to `rent_payer`, which also funds any growth.
+		 */
+		rentCollector: TAccountMetas[5];
+		/**
 		 * Spending limit accounts referenced by add/remove spending-limit
 		 * actions, in any order.
 		 */
-		spendingLimitAccounts: TAccountMetas[5];
+		spendingLimitAccounts: TAccountMetas[6];
 	};
 	data: ConfigAuthorityExecuteInstructionData;
 };
@@ -345,12 +381,12 @@ export function parseConfigAuthorityExecuteInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedConfigAuthorityExecuteInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 6) {
+	if (instruction.accounts.length < 7) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 6,
+				expectedAccountMetas: 7,
 			},
 		);
 	}
@@ -368,6 +404,7 @@ export function parseConfigAuthorityExecuteInstruction<
 			rentPayer: getNextAccount(),
 			systemProgram: getNextAccount(),
 			clock: getNextAccount(),
+			rentCollector: getNextAccount(),
 			spendingLimitAccounts: getNextAccount(),
 		},
 		data: getConfigAuthorityExecuteInstructionDataDecoder().decode(

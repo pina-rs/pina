@@ -23,6 +23,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
+	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -60,6 +61,9 @@ export type SetRewardIndexInstruction<
 	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 	TAccountAdmin extends string | AccountMeta<string> = string,
 	TAccountPoolState extends string | AccountMeta<string> = string,
+	TAccountRewardMint extends string | AccountMeta<string> = string,
+	TAccountTokenProgram extends string | AccountMeta<string> = string,
+	TAccountRewardVault extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -72,6 +76,13 @@ export type SetRewardIndexInstruction<
 				: TAccountAdmin,
 			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
 				: TAccountPoolState,
+			TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint>
+				: TAccountRewardMint,
+			TAccountTokenProgram extends string
+				? ReadonlyAccount<TAccountTokenProgram>
+				: TAccountTokenProgram,
+			TAccountRewardVault extends string ? ReadonlyAccount<TAccountRewardVault>
+				: TAccountRewardVault,
 			...TRemainingAccounts,
 		]
 	>;
@@ -125,19 +136,42 @@ export function getSetRewardIndexInstructionDataCodec(): FixedSizeCodec<
 export type SetRewardIndexInput<
 	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
 	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	admin: TAccountAdmin;
 	poolState: TAccountPoolState;
+	/** The pool's reward mint, for validating the vault binding. */
+	rewardMint: TAccountRewardMint;
+	/** The token program that owns the reward mint and vault. */
+	tokenProgram: TAccountTokenProgram;
+	/**
+	 * The pool's canonical reward vault. An index update is a promise to pay:
+	 * it must not create liabilities the vault cannot honor or that a
+	 * per-position accrual cannot represent.
+	 */
+	rewardVault: TAccountRewardVault;
 	newIndex: SetRewardIndexInstructionDataArgs["newIndex"];
 };
 
 export function getSetRewardIndexInstruction<
 	TAccountAdmin extends InstructionSignerInput,
 	TAccountPoolState extends InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
-	input: SetRewardIndexInput<TAccountAdmin, TAccountPoolState>,
+	input: SetRewardIndexInput<
+		TAccountAdmin,
+		TAccountPoolState,
+		TAccountRewardMint,
+		TAccountTokenProgram,
+		TAccountRewardVault
+	>,
 	config?: { programAddress?: TProgramAddress },
 ): SetRewardIndexInstruction<
 	TProgramAddress,
@@ -148,6 +182,18 @@ export function getSetRewardIndexInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountPoolState,
 		InstructionAccountInputAddress<TAccountPoolState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRewardMint,
+		InstructionAccountInputAddress<TAccountRewardMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRewardVault,
+		InstructionAccountInputAddress<TAccountRewardVault>
 	>
 > {
 	// Program address.
@@ -165,6 +211,21 @@ export function getSetRewardIndexInstruction<
 			isSigner: false,
 			isWritable: true,
 		},
+		rewardMint: {
+			value: input.rewardMint ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		rewardVault: {
+			value: input.rewardVault ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -178,6 +239,9 @@ export function getSetRewardIndexInstruction<
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
 			getAccountMeta("poolState", accounts.poolState),
+			getAccountMeta("rewardMint", accounts.rewardMint),
+			getAccountMeta("tokenProgram", accounts.tokenProgram),
+			getAccountMeta("rewardVault", accounts.rewardVault),
 		],
 		data: getSetRewardIndexInstructionDataEncoder().encode(
 			args as SetRewardIndexInstructionDataArgs,
@@ -192,6 +256,18 @@ export function getSetRewardIndexInstruction<
 		ResolvedInstructionAccountMeta<
 			TAccountPoolState,
 			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardMint,
+			InstructionAccountInputAddress<TAccountRewardMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardVault,
+			InstructionAccountInputAddress<TAccountRewardVault>
 		>
 	>);
 }
@@ -204,6 +280,16 @@ export type ParsedSetRewardIndexInstruction<
 	accounts: {
 		admin: TAccountMetas[0];
 		poolState: TAccountMetas[1];
+		/** The pool's reward mint, for validating the vault binding. */
+		rewardMint: TAccountMetas[2];
+		/** The token program that owns the reward mint and vault. */
+		tokenProgram: TAccountMetas[3];
+		/**
+		 * The pool's canonical reward vault. An index update is a promise to pay:
+		 * it must not create liabilities the vault cannot honor or that a
+		 * per-position accrual cannot represent.
+		 */
+		rewardVault: TAccountMetas[4];
 	};
 	data: SetRewardIndexInstructionData;
 };
@@ -217,12 +303,12 @@ export function parseSetRewardIndexInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetRewardIndexInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 2) {
+	if (instruction.accounts.length < 5) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 2,
+				expectedAccountMetas: 5,
 			},
 		);
 	}
@@ -234,7 +320,13 @@ export function parseSetRewardIndexInstruction<
 	};
 	return {
 		programAddress: instruction.programAddress,
-		accounts: { admin: getNextAccount(), poolState: getNextAccount() },
+		accounts: {
+			admin: getNextAccount(),
+			poolState: getNextAccount(),
+			rewardMint: getNextAccount(),
+			tokenProgram: getNextAccount(),
+			rewardVault: getNextAccount(),
+		},
 		data: getSetRewardIndexInstructionDataDecoder().decode(instruction.data),
 	};
 }
