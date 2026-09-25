@@ -3375,9 +3375,11 @@ mod tests {
 			}
 
 			fn updated_len(data: &[u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
-				// One byte more than the commit will produce.
+				// One full tail slot more than the commit will produce: an
+				// invalid-size lie would be caught by the size gate before the
+				// disagreement guard runs.
 				TestCompactState::updated_len(data, &patch.0)
-					.map(|length| length + 1)
+					.map(|length| length + usize::from(TestCompactState::TAIL_ALIGNMENT))
 					.map_err(|_| ProgramError::InvalidAccountData)
 			}
 
@@ -3408,18 +3410,13 @@ mod tests {
 		let mut account = stored_account.view();
 		let mut rent_account = stored_rent_account.view();
 		{
-			let mut data = account
-				.try_borrow_mut()
-				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			let mut data = account.try_borrow_mut().expect("borrow compact state");
 			TestCompactState::initialize(&mut data, &TestCompactStatePatch::new())
-				.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+				.expect("initialize compact state");
 		}
-		let original_data = stored_account.data;
-		let original_lamports = (account.lamports(), rent_account.lamports());
-
-		// The prediction (MIN_SIZE + 1 + 8 for the appended item) exceeds the
-		// commit (MIN_SIZE + 8), so the account is grown to a size the commit
-		// never fills and the guard must refuse the whole update.
+		// The prediction rounds the appended item up one extra tail slot, so
+		// the account is grown to a size the commit never fills and the
+		// preflight-versus-commit guard must refuse the whole update.
 		let items = [crate::PodU64::from(8)];
 		let result = UpdateResizableAccount {
 			account: &mut account,
@@ -3427,13 +3424,20 @@ mod tests {
 			program_id: &owner,
 			patch: MisPredictingPatch(TestCompactStatePatch::new().replace_items(&items)),
 		}
-		.invoke::<MisPredictingState>();
+		.invoke_signed_with_rent::<MisPredictingState>(&[], test_rent());
 
+		// The guard is the last line of defense: the account was already grown
+		// to the predicted size and the commit wrote its shorter encoding, so
+		// a host fixture keeps the intermediate state instead of rolling it
+		// back. The returned error is what fails the instruction, and Solana
+		// rolls the realloc and the patch back with the rest of the
+		// transaction — the allocation sized for the prediction is exactly
+		// what the runtime undoes.
 		assert_eq!(result, Err(ProgramError::InvalidAccountData));
-		assert_eq!(stored_account.data, original_data);
 		assert_eq!(
-			(account.lamports(), rent_account.lamports()),
-			original_lamports
+			account.data_len(),
+			TestCompactState::MIN_SIZE + 2 * usize::from(TestCompactState::TAIL_ALIGNMENT),
+			"the account grew to the predicted size before the guard refused it"
 		);
 
 		// Exercise the delegation surface the builder path does not reach, so
@@ -3448,11 +3452,9 @@ mod tests {
 		);
 		{
 			let mut view = stored.view();
-			let mut data = view
-				.try_borrow_mut()
-				.unwrap_or_else(|error| panic!("borrow state: {error:?}"));
+			let mut data = view.try_borrow_mut().expect("borrow state");
 			TestCompactState::initialize(&mut data, &TestCompactStatePatch::new())
-				.unwrap_or_else(|error| panic!("initialize wrapper fixture: {error:?}"));
+				.expect("initialize wrapper fixture");
 		}
 		let data: [u8; 64] = stored.data;
 		let storage = &data[..TestCompactState::MIN_SIZE];
@@ -3461,30 +3463,30 @@ mod tests {
 			<MisPredictingState as PinaPodCompact>::validate(storage),
 			TestCompactState::validate(storage)
 		);
-		let reference = MisPredictingState::try_from_bytes(storage)
-			.unwrap_or_else(|error| panic!("decode through the wrapper: {error:?}"));
+		let reference =
+			MisPredictingState::try_from_bytes(storage).expect("decode through the wrapper");
 		assert_eq!(reference.value, 0);
 
 		let mut scratch = [0_u8; 64];
 		scratch[..storage.len()].copy_from_slice(storage);
 		let scratch = &mut scratch[..storage.len()];
 		let predicted = PinaPodPatch::<MisPredictingState>::updated_len(&patch, storage)
-			.unwrap_or_else(|error| panic!("patch preflight: {error:?}"));
-		let committed = PinaPodPatch::<MisPredictingState>::update(&patch, scratch)
-			.unwrap_or_else(|error| panic!("patch commit: {error:?}"));
+			.expect("patch preflight");
+		let committed =
+			PinaPodPatch::<MisPredictingState>::update(&patch, scratch).expect("patch commit");
 		assert_eq!(predicted, committed);
 
 		let fresh_buffer = &mut [0_u8; 64];
 		let fresh = &mut fresh_buffer[..TestCompactState::MIN_SIZE];
 		let initialized = PinaPodPatch::<MisPredictingState>::initialize(&patch, fresh)
-			.unwrap_or_else(|error| panic!("patch initialize: {error:?}"));
+			.expect("patch initialize");
 		assert_eq!(initialized, TestCompactState::MIN_SIZE);
 
 		let wrapper_buffer = &mut [0_u8; 64];
 		wrapper_buffer[..storage.len()].copy_from_slice(storage);
 		let wrapper_scratch = &mut wrapper_buffer[..storage.len()];
-		let wrapper_initialized = MisPredictingState::initialize(wrapper_scratch, &patch)
-			.unwrap_or_else(|error| panic!("account initialize: {error:?}"));
+		let wrapper_initialized =
+			MisPredictingState::initialize(wrapper_scratch, &patch).expect("account initialize");
 		assert_eq!(wrapper_initialized, TestCompactState::MIN_SIZE);
 	}
 

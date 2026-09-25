@@ -2430,6 +2430,14 @@ mod tests {
 		zero_signatures[0] = 0;
 		assert!(validate_transaction_wire(&zero_signatures).is_err());
 
+		// A compact-u16 that never terminates: three continuation bytes would
+		// need a fourth, which short-u16 forbids.
+		let mut unterminated_compact = base();
+		unterminated_compact[0] = 0x80;
+		unterminated_compact.insert(1, 0x80);
+		unterminated_compact.insert(2, 0x80);
+		assert!(validate_transaction_wire(&unterminated_compact).is_err());
+
 		// Signature count above the accepted bound.
 		let mut absurd_signatures = base();
 		absurd_signatures[0] = 17;
