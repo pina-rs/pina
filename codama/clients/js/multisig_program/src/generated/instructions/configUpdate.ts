@@ -31,13 +31,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProgramConfigPda } from "../pdas";
 import {
@@ -142,11 +145,12 @@ export function getConfigUpdateInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ConfigUpdateAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProgramConfig extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	programConfig?: Address<TAccountProgramConfig>;
+	authority: TAccountAuthority;
+	programConfig?: TAccountProgramConfig;
 	setTreasury: ConfigUpdateInstructionDataArgs["setTreasury"];
 	treasury: ConfigUpdateInstructionDataArgs["treasury"];
 	setCreationFee: ConfigUpdateInstructionDataArgs["setCreationFee"];
@@ -154,8 +158,8 @@ export type ConfigUpdateAsyncInput<
 };
 
 export async function getConfigUpdateInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProgramConfig extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigUpdateAsyncInput<TAccountAuthority, TAccountProgramConfig>,
@@ -163,18 +167,35 @@ export async function getConfigUpdateInstructionAsync<
 ): Promise<
 	ConfigUpdateInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		programConfig: { value: input.programConfig ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -191,7 +212,6 @@ export async function getConfigUpdateInstructionAsync<
 		});
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -203,17 +223,24 @@ export async function getConfigUpdateInstructionAsync<
 		programAddress,
 	} as ConfigUpdateInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>
 	>);
 }
 
 export type ConfigUpdateInput<
-	TAccountAuthority extends string = string,
-	TAccountProgramConfig extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	programConfig: Address<TAccountProgramConfig>;
+	authority: TAccountAuthority;
+	programConfig: TAccountProgramConfig;
 	setTreasury: ConfigUpdateInstructionDataArgs["setTreasury"];
 	treasury: ConfigUpdateInstructionDataArgs["treasury"];
 	setCreationFee: ConfigUpdateInstructionDataArgs["setCreationFee"];
@@ -221,25 +248,42 @@ export type ConfigUpdateInput<
 };
 
 export function getConfigUpdateInstruction<
-	TAccountAuthority extends string,
-	TAccountProgramConfig extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigUpdateInput<TAccountAuthority, TAccountProgramConfig>,
 	config?: { programAddress?: TProgramAddress },
 ): ConfigUpdateInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountProgramConfig
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProgramConfig,
+		InstructionAccountInputAddress<TAccountProgramConfig>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		programConfig: { value: input.programConfig ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -249,7 +293,6 @@ export function getConfigUpdateInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -261,8 +304,14 @@ export function getConfigUpdateInstruction<
 		programAddress,
 	} as ConfigUpdateInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>
 	>);
 }
 

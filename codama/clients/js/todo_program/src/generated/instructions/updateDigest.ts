@@ -29,14 +29,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import {
@@ -125,31 +128,44 @@ export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type UpdateDigestAsyncInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo?: Address<TAccountTodo>;
+	owner: TAccountOwner;
+	todo?: TAccountTodo;
 	digest: UpdateDigestInstructionDataArgs["digest"];
 };
 
 export async function getUpdateDigestInstructionAsync<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateDigestAsyncInput<TAccountOwner, TAccountTodo>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>
+	UpdateDigestInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -169,7 +185,6 @@ export async function getUpdateDigestInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -179,33 +194,56 @@ export async function getUpdateDigestInstructionAsync<
 			args as UpdateDigestInstructionDataArgs,
 		),
 		programAddress,
-	} as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
+	} as UpdateDigestInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
+	>);
 }
 
 export type UpdateDigestInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo: Address<TAccountTodo>;
+	owner: TAccountOwner;
+	todo: TAccountTodo;
 	digest: UpdateDigestInstructionDataArgs["digest"];
 };
 
 export function getUpdateDigestInstruction<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateDigestInput<TAccountOwner, TAccountTodo>,
 	config?: { programAddress?: TProgramAddress },
-): UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo> {
+): UpdateDigestInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountOwner,
+		InstructionAccountInputAddress<TAccountOwner>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTodo,
+		InstructionAccountInputAddress<TAccountTodo>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -215,7 +253,6 @@ export function getUpdateDigestInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -225,7 +262,17 @@ export function getUpdateDigestInstruction<
 			args as UpdateDigestInstructionDataArgs,
 		),
 		programAddress,
-	} as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
+	} as UpdateDigestInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
+	>);
 }
 
 export type ParsedUpdateDigestInstruction<

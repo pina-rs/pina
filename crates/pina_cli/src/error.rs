@@ -112,6 +112,17 @@ pub enum CodamaError {
 		reason: &'static str,
 	},
 
+	#[error(
+		"scaffolded TypeScript client at {path} pins `@solana/kit` {range}, but generated sources \
+		 require `@solana/kit` {minimum} or newer; update the manifest's range by hand, because \
+		 generation never rewrites an existing scaffold"
+	)]
+	StaleKitScaffold {
+		path: PathBuf,
+		range: String,
+		minimum: u16,
+	},
+
 	#[error("IDL generation failed for `{example}` ({path}): {source}")]
 	GenerateIdl {
 		example: String,

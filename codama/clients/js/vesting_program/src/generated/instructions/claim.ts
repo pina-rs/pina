@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -146,38 +149,43 @@ export function getClaimInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ClaimInput<
-	TAccountBeneficiary extends string = string,
-	TAccountMint extends string = string,
-	TAccountVestingState extends string = string,
-	TAccountBeneficiaryAta extends string = string,
-	TAccountVault extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountClock extends string = string,
+	TAccountBeneficiary extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountVestingState extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountBeneficiaryAta extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	beneficiary: TransactionSigner<TAccountBeneficiary>;
-	mint: Address<TAccountMint>;
-	vestingState: Address<TAccountVestingState>;
-	beneficiaryAta: Address<TAccountBeneficiaryAta>;
-	vault: Address<TAccountVault>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	clock: Address<TAccountClock>;
+	beneficiary: TAccountBeneficiary;
+	mint: TAccountMint;
+	vestingState: TAccountVestingState;
+	beneficiaryAta: TAccountBeneficiaryAta;
+	vault: TAccountVault;
+	associatedTokenProgram?: TAccountAssociatedTokenProgram;
+	systemProgram?: TAccountSystemProgram;
+	tokenProgram: TAccountTokenProgram;
+	clock: TAccountClock;
 	amount: ClaimInstructionDataArgs["amount"];
 };
 
 export function getClaimInstruction<
-	TAccountBeneficiary extends string,
-	TAccountMint extends string,
-	TAccountVestingState extends string,
-	TAccountBeneficiaryAta extends string,
-	TAccountVault extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TAccountTokenProgram extends string,
-	TAccountClock extends string,
+	TAccountBeneficiary extends InstructionSignerInput,
+	TAccountMint extends InstructionAccountInput,
+	TAccountVestingState extends InstructionAccountInput,
+	TAccountBeneficiaryAta extends InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ClaimInput<
@@ -194,34 +202,85 @@ export function getClaimInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ClaimInstruction<
 	TProgramAddress,
-	TAccountBeneficiary,
-	TAccountMint,
-	TAccountVestingState,
-	TAccountBeneficiaryAta,
-	TAccountVault,
-	TAccountAssociatedTokenProgram,
-	TAccountSystemProgram,
-	TAccountTokenProgram,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountBeneficiary,
+		InstructionAccountInputAddress<TAccountBeneficiary>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMint,
+		InstructionAccountInputAddress<TAccountMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVestingState,
+		InstructionAccountInputAddress<TAccountVestingState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountBeneficiaryAta,
+		InstructionAccountInputAddress<TAccountBeneficiaryAta>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVault,
+		InstructionAccountInputAddress<TAccountVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAssociatedTokenProgram,
+		InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		VESTING_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		beneficiary: { value: input.beneficiary ?? null, isWritable: true },
-		mint: { value: input.mint ?? null, isWritable: false },
-		vestingState: { value: input.vestingState ?? null, isWritable: true },
-		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true },
-		vault: { value: input.vault ?? null, isWritable: true },
+		beneficiary: {
+			value: input.beneficiary ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+		vestingState: {
+			value: input.vestingState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		beneficiaryAta: {
+			value: input.beneficiaryAta ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		clock: { value: input.clock ?? null, isWritable: false },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -245,7 +304,6 @@ export function getClaimInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("beneficiary", accounts.beneficiary),
@@ -264,15 +322,42 @@ export function getClaimInstruction<
 		programAddress,
 	} as ClaimInstruction<
 		TProgramAddress,
-		TAccountBeneficiary,
-		TAccountMint,
-		TAccountVestingState,
-		TAccountBeneficiaryAta,
-		TAccountVault,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram,
-		TAccountTokenProgram,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountBeneficiary,
+			InstructionAccountInputAddress<TAccountBeneficiary>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMint,
+			InstructionAccountInputAddress<TAccountMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVestingState,
+			InstructionAccountInputAddress<TAccountVestingState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountBeneficiaryAta,
+			InstructionAccountInputAddress<TAccountBeneficiaryAta>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVault,
+			InstructionAccountInputAddress<TAccountVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

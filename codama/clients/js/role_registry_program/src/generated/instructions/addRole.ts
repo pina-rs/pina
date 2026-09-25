@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -141,28 +144,30 @@ export function getAddRoleInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type AddRoleInput<
-	TAccountAdmin extends string = string,
-	TAccountGrantee extends string = string,
-	TAccountRegistryConfig extends string = string,
-	TAccountRoleEntry extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountGrantee extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRegistryConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountRoleEntry extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	grantee: Address<TAccountGrantee>;
-	registryConfig: Address<TAccountRegistryConfig>;
-	roleEntry: Address<TAccountRoleEntry>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	admin: TAccountAdmin;
+	grantee: TAccountGrantee;
+	registryConfig: TAccountRegistryConfig;
+	roleEntry: TAccountRoleEntry;
+	systemProgram?: TAccountSystemProgram;
 	roleId: AddRoleInstructionDataArgs["roleId"];
 	permissions: AddRoleInstructionDataArgs["permissions"];
 	bump: AddRoleInstructionDataArgs["bump"];
 };
 
 export function getAddRoleInstruction<
-	TAccountAdmin extends string,
-	TAccountGrantee extends string,
-	TAccountRegistryConfig extends string,
-	TAccountRoleEntry extends string,
-	TAccountSystemProgram extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountGrantee extends InstructionAccountInput,
+	TAccountRegistryConfig extends InstructionAccountInput,
+	TAccountRoleEntry extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -176,23 +181,57 @@ export function getAddRoleInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): AddRoleInstruction<
 	TProgramAddress,
-	TAccountAdmin,
-	TAccountGrantee,
-	TAccountRegistryConfig,
-	TAccountRoleEntry,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAdmin,
+		InstructionAccountInputAddress<TAccountAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountGrantee,
+		InstructionAccountInputAddress<TAccountGrantee>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRegistryConfig,
+		InstructionAccountInputAddress<TAccountRegistryConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRoleEntry,
+		InstructionAccountInputAddress<TAccountRoleEntry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: true },
-		grantee: { value: input.grantee ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
-		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: true },
+		grantee: {
+			value: input.grantee ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		registryConfig: {
+			value: input.registryConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		roleEntry: {
+			value: input.roleEntry ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -210,7 +249,6 @@ export function getAddRoleInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -225,11 +263,26 @@ export function getAddRoleInstruction<
 		programAddress,
 	} as AddRoleInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountGrantee,
-		TAccountRegistryConfig,
-		TAccountRoleEntry,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountGrantee,
+			InstructionAccountInputAddress<TAccountGrantee>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRegistryConfig,
+			InstructionAccountInputAddress<TAccountRegistryConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRoleEntry,
+			InstructionAccountInputAddress<TAccountRoleEntry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

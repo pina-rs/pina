@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import {
@@ -119,34 +122,55 @@ export function getAddTagInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type AddTagAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile?: Address<TAccountProfile>;
+	profile?: TAccountProfile;
 	tag: AddTagInstructionDataArgs["tag"];
 };
 
 export async function getAddTagInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: AddTagAsyncInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	AddTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>
+	AddTagInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -166,7 +190,6 @@ export async function getAddTagInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -176,36 +199,67 @@ export async function getAddTagInstructionAsync<
 			args as AddTagInstructionDataArgs,
 		),
 		programAddress,
-	} as AddTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>);
+	} as AddTagInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
+	>);
 }
 
 export type AddTagInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile: Address<TAccountProfile>;
+	profile: TAccountProfile;
 	tag: AddTagInstructionDataArgs["tag"];
 };
 
 export function getAddTagInstruction<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: AddTagInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
-): AddTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile> {
+): AddTagInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProfile,
+		InstructionAccountInputAddress<TAccountProfile>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -215,7 +269,6 @@ export function getAddTagInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -225,7 +278,17 @@ export function getAddTagInstruction<
 			args as AddTagInstructionDataArgs,
 		),
 		programAddress,
-	} as AddTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>);
+	} as AddTagInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
+	>);
 }
 
 export type ParsedAddTagInstruction<

@@ -146,6 +146,8 @@ An update owns only renderer-owned paths. The Rust and CPI renderers refuse to r
 
 Names are read back from scaffolded manifests on later runs: the Rust CLI derives its dependency path from the crate name in the existing `Cargo.toml`, and the Dart CLI derives its package import from the `name:` in the existing `pubspec.yaml`. Renaming a client in its manifest after first generation is therefore supported and respected.
 
+Because a scaffolded `package.json` is never rewritten, its `@solana/kit` range stays wherever the first generation left it even as the generated sources around it move forward with the renderer toolchain. TypeScript generation therefore refuses to update a client whose existing manifest pins a `@solana/kit` major older than the generated sources compile against; it fails naming the manifest and the range to raise, and `overwrite` mode is the explicit way to start the scaffold over on the current ranges.
+
 ## Example configurations
 
 Defaults only — generates Rust and TypeScript clients into `./clients` next to the program:

@@ -26,12 +26,15 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -113,37 +116,53 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeInput<
-	TAccountAuthority extends string = string,
-	TAccountWallet extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountWallet extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	wallet: Address<TAccountWallet>;
+	authority: TAccountAuthority;
+	wallet: TAccountWallet;
 };
 
 export function getInitializeInstruction<
-	TAccountAuthority extends string,
-	TAccountWallet extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountWallet extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<TAccountAuthority, TAccountWallet>,
 	config?: { programAddress?: TProgramAddress },
-): InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountWallet> {
+): InitializeInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountWallet,
+		InstructionAccountInputAddress<TAccountWallet>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		wallet: { value: input.wallet ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		wallet: { value: input.wallet ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -153,8 +172,14 @@ export function getInitializeInstruction<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountWallet
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountWallet,
+			InstructionAccountInputAddress<TAccountWallet>
+		>
 	>);
 }
 

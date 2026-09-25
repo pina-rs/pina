@@ -27,13 +27,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -120,34 +123,47 @@ export function getRotateAuthorityInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RotateAuthorityInput<
-	TAccountOracle extends string = string,
-	TAccountAuthority extends string = string,
+	TAccountOracle extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
-	oracle: Address<TAccountOracle>;
-	authority: TransactionSigner<TAccountAuthority>;
+	oracle: TAccountOracle;
+	authority: TAccountAuthority;
 	newAuthority: RotateAuthorityInstructionDataArgs["newAuthority"];
 };
 
 export function getRotateAuthorityInstruction<
-	TAccountOracle extends string,
-	TAccountAuthority extends string,
+	TAccountOracle extends InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput,
 	TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RotateAuthorityInput<TAccountOracle, TAccountAuthority>,
 	config?: { programAddress?: TProgramAddress },
 ): RotateAuthorityInstruction<
 	TProgramAddress,
-	TAccountOracle,
-	TAccountAuthority
+	ResolvedInstructionAccountMeta<
+		TAccountOracle,
+		InstructionAccountInputAddress<TAccountOracle>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		oracle: { value: input.oracle ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
+		oracle: { value: input.oracle ?? null, isSigner: false, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -157,7 +173,6 @@ export function getRotateAuthorityInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("oracle", accounts.oracle),
@@ -169,8 +184,14 @@ export function getRotateAuthorityInstruction<
 		programAddress,
 	} as RotateAuthorityInstruction<
 		TProgramAddress,
-		TAccountOracle,
-		TAccountAuthority
+		ResolvedInstructionAccountMeta<
+			TAccountOracle,
+			InstructionAccountInputAddress<TAccountOracle>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>
 	>);
 }
 

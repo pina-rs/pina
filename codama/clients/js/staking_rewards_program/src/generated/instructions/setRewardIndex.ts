@@ -27,13 +27,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -120,17 +123,17 @@ export function getSetRewardIndexInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type SetRewardIndexInput<
-	TAccountAdmin extends string = string,
-	TAccountPoolState extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	poolState: Address<TAccountPoolState>;
+	admin: TAccountAdmin;
+	poolState: TAccountPoolState;
 	newIndex: SetRewardIndexInstructionDataArgs["newIndex"];
 };
 
 export function getSetRewardIndexInstruction<
-	TAccountAdmin extends string,
-	TAccountPoolState extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountPoolState extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -138,17 +141,30 @@ export function getSetRewardIndexInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): SetRewardIndexInstruction<
 	TProgramAddress,
-	TAccountAdmin,
-	TAccountPoolState
+	ResolvedInstructionAccountMeta<
+		TAccountAdmin,
+		InstructionAccountInputAddress<TAccountAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolState,
+		InstructionAccountInputAddress<TAccountPoolState>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+		poolState: {
+			value: input.poolState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -158,7 +174,6 @@ export function getSetRewardIndexInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -170,8 +185,14 @@ export function getSetRewardIndexInstruction<
 		programAddress,
 	} as SetRewardIndexInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountPoolState
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>
 	>);
 }
 

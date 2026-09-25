@@ -26,13 +26,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -121,19 +124,20 @@ export function getDeactivateRoleInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type DeactivateRoleInput<
-	TAccountAdmin extends string = string,
-	TAccountRegistryConfig extends string = string,
-	TAccountRoleEntry extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountRegistryConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountRoleEntry extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	registryConfig: Address<TAccountRegistryConfig>;
-	roleEntry: Address<TAccountRoleEntry>;
+	admin: TAccountAdmin;
+	registryConfig: TAccountRegistryConfig;
+	roleEntry: TAccountRoleEntry;
 };
 
 export function getDeactivateRoleInstruction<
-	TAccountAdmin extends string,
-	TAccountRegistryConfig extends string,
-	TAccountRoleEntry extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountRegistryConfig extends InstructionAccountInput,
+	TAccountRoleEntry extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -145,26 +149,45 @@ export function getDeactivateRoleInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): DeactivateRoleInstruction<
 	TProgramAddress,
-	TAccountAdmin,
-	TAccountRegistryConfig,
-	TAccountRoleEntry
+	ResolvedInstructionAccountMeta<
+		TAccountAdmin,
+		InstructionAccountInputAddress<TAccountAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRegistryConfig,
+		InstructionAccountInputAddress<TAccountRegistryConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRoleEntry,
+		InstructionAccountInputAddress<TAccountRoleEntry>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: false },
-		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+		registryConfig: {
+			value: input.registryConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		roleEntry: {
+			value: input.roleEntry ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -175,9 +198,18 @@ export function getDeactivateRoleInstruction<
 		programAddress,
 	} as DeactivateRoleInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountRegistryConfig,
-		TAccountRoleEntry
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRegistryConfig,
+			InstructionAccountInputAddress<TAccountRegistryConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRoleEntry,
+			InstructionAccountInputAddress<TAccountRoleEntry>
+		>
 	>);
 }
 

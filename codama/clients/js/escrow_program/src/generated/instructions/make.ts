@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -159,25 +162,28 @@ export function getMakeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MakeInput<
-	TAccountMaker extends string = string,
-	TAccountMintA extends string = string,
-	TAccountMintB extends string = string,
-	TAccountMakerAtaA extends string = string,
-	TAccountEscrow extends string = string,
-	TAccountVault extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTokenProgram extends string = string,
+	TAccountMaker extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMintA extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMintB extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMakerAtaA extends InstructionAccountInput = InstructionAccountInput,
+	TAccountEscrow extends InstructionAccountInput = InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	maker: TransactionSigner<TAccountMaker>;
-	mintA: Address<TAccountMintA>;
-	mintB: Address<TAccountMintB>;
-	makerAtaA: Address<TAccountMakerAtaA>;
-	escrow: Address<TAccountEscrow>;
-	vault: Address<TAccountVault>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
+	maker: TAccountMaker;
+	mintA: TAccountMintA;
+	mintB: TAccountMintB;
+	makerAtaA: TAccountMakerAtaA;
+	escrow: TAccountEscrow;
+	vault: TAccountVault;
+	associatedTokenProgram?: TAccountAssociatedTokenProgram;
+	systemProgram?: TAccountSystemProgram;
+	tokenProgram: TAccountTokenProgram;
 	seed: MakeInstructionDataArgs["seed"];
 	amountA: MakeInstructionDataArgs["amountA"];
 	amountB: MakeInstructionDataArgs["amountB"];
@@ -185,15 +191,15 @@ export type MakeInput<
 };
 
 export function getMakeInstruction<
-	TAccountMaker extends string,
-	TAccountMintA extends string,
-	TAccountMintB extends string,
-	TAccountMakerAtaA extends string,
-	TAccountEscrow extends string,
-	TAccountVault extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TAccountTokenProgram extends string,
+	TAccountMaker extends InstructionSignerInput,
+	TAccountMintA extends InstructionAccountInput,
+	TAccountMintB extends InstructionAccountInput,
+	TAccountMakerAtaA extends InstructionAccountInput,
+	TAccountEscrow extends InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: MakeInput<
@@ -210,34 +216,77 @@ export function getMakeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): MakeInstruction<
 	TProgramAddress,
-	TAccountMaker,
-	TAccountMintA,
-	TAccountMintB,
-	TAccountMakerAtaA,
-	TAccountEscrow,
-	TAccountVault,
-	TAccountAssociatedTokenProgram,
-	TAccountSystemProgram,
-	TAccountTokenProgram
+	ResolvedInstructionAccountMeta<
+		TAccountMaker,
+		InstructionAccountInputAddress<TAccountMaker>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMintA,
+		InstructionAccountInputAddress<TAccountMintA>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMintB,
+		InstructionAccountInputAddress<TAccountMintB>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMakerAtaA,
+		InstructionAccountInputAddress<TAccountMakerAtaA>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountEscrow,
+		InstructionAccountInputAddress<TAccountEscrow>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVault,
+		InstructionAccountInputAddress<TAccountVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAssociatedTokenProgram,
+		InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ESCROW_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		maker: { value: input.maker ?? null, isWritable: true },
-		mintA: { value: input.mintA ?? null, isWritable: false },
-		mintB: { value: input.mintB ?? null, isWritable: false },
-		makerAtaA: { value: input.makerAtaA ?? null, isWritable: true },
-		escrow: { value: input.escrow ?? null, isWritable: true },
-		vault: { value: input.vault ?? null, isWritable: true },
+		maker: { value: input.maker ?? null, isSigner: true, isWritable: true },
+		mintA: { value: input.mintA ?? null, isSigner: false, isWritable: false },
+		mintB: { value: input.mintB ?? null, isSigner: false, isWritable: false },
+		makerAtaA: {
+			value: input.makerAtaA ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true },
+		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
 		associatedTokenProgram: {
 			value: input.associatedTokenProgram ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -261,7 +310,6 @@ export function getMakeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("maker", accounts.maker),
@@ -280,15 +328,42 @@ export function getMakeInstruction<
 		programAddress,
 	} as MakeInstruction<
 		TProgramAddress,
-		TAccountMaker,
-		TAccountMintA,
-		TAccountMintB,
-		TAccountMakerAtaA,
-		TAccountEscrow,
-		TAccountVault,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram,
-		TAccountTokenProgram
+		ResolvedInstructionAccountMeta<
+			TAccountMaker,
+			InstructionAccountInputAddress<TAccountMaker>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMintA,
+			InstructionAccountInputAddress<TAccountMintA>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMintB,
+			InstructionAccountInputAddress<TAccountMintB>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMakerAtaA,
+			InstructionAccountInputAddress<TAccountMakerAtaA>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountEscrow,
+			InstructionAccountInputAddress<TAccountEscrow>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVault,
+			InstructionAccountInputAddress<TAccountVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>
 	>);
 }
 

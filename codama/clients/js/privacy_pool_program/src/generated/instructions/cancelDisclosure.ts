@@ -25,13 +25,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -119,35 +122,50 @@ export function getCancelDisclosureInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CancelDisclosureInput<
-	TAccountRequester extends string = string,
-	TAccountDisclosureRequest extends string = string,
+	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	requester: TransactionSigner<TAccountRequester>;
-	disclosureRequest: Address<TAccountDisclosureRequest>;
+	requester: TAccountRequester;
+	disclosureRequest: TAccountDisclosureRequest;
 	reserved: CancelDisclosureInstructionDataArgs["reserved"];
 };
 
 export function getCancelDisclosureInstruction<
-	TAccountRequester extends string,
-	TAccountDisclosureRequest extends string,
+	TAccountRequester extends InstructionSignerInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CancelDisclosureInput<TAccountRequester, TAccountDisclosureRequest>,
 	config?: { programAddress?: TProgramAddress },
 ): CancelDisclosureInstruction<
 	TProgramAddress,
-	TAccountRequester,
-	TAccountDisclosureRequest
+	ResolvedInstructionAccountMeta<
+		TAccountRequester,
+		InstructionAccountInputAddress<TAccountRequester>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		requester: { value: input.requester ?? null, isWritable: false },
+		requester: {
+			value: input.requester ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
 		disclosureRequest: {
 			value: input.disclosureRequest ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
 	};
@@ -159,7 +177,6 @@ export function getCancelDisclosureInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("requester", accounts.requester),
@@ -171,8 +188,14 @@ export function getCancelDisclosureInstruction<
 		programAddress,
 	} as CancelDisclosureInstruction<
 		TProgramAddress,
-		TAccountRequester,
-		TAccountDisclosureRequest
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>
 	>);
 }
 

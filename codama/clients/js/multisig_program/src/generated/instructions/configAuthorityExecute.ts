@@ -32,14 +32,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	fixPinaPodEncoderSize,
@@ -151,34 +154,36 @@ export function getConfigAuthorityExecuteInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ConfigAuthorityExecuteInput<
-	TAccountMultisig extends string = string,
-	TAccountAuthority extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountClock extends string = string,
-	TAccountSpendingLimitAccounts extends string = string,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSpendingLimitAccounts extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	multisig: Address<TAccountMultisig>;
-	authority: TransactionSigner<TAccountAuthority>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	clock: Address<TAccountClock>;
+	multisig: TAccountMultisig;
+	authority: TAccountAuthority;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
+	clock: TAccountClock;
 	/**
 	 * Spending limit accounts referenced by add/remove spending-limit
 	 * actions, in any order.
 	 */
-	spendingLimitAccounts: Address<TAccountSpendingLimitAccounts>;
+	spendingLimitAccounts: TAccountSpendingLimitAccounts;
 	actionsLen: ConfigAuthorityExecuteInstructionDataArgs["actionsLen"];
 	actions: ConfigAuthorityExecuteInstructionDataArgs["actions"];
 };
 
 export function getConfigAuthorityExecuteInstruction<
-	TAccountMultisig extends string,
-	TAccountAuthority extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountClock extends string,
-	TAccountSpendingLimitAccounts extends string,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TAccountSpendingLimitAccounts extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigAuthorityExecuteInput<
@@ -192,26 +197,64 @@ export function getConfigAuthorityExecuteInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ConfigAuthorityExecuteInstruction<
 	TProgramAddress,
-	TAccountMultisig,
-	TAccountAuthority,
-	TAccountRentPayer,
-	TAccountSystemProgram,
-	TAccountClock,
-	TAccountSpendingLimitAccounts
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentPayer,
+		InstructionAccountInputAddress<TAccountRentPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSpendingLimitAccounts,
+		InstructionAccountInputAddress<TAccountSpendingLimitAccounts>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		clock: { value: input.clock ?? null, isWritable: false },
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 		spendingLimitAccounts: {
 			value: input.spendingLimitAccounts ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
 	};
@@ -231,7 +274,6 @@ export function getConfigAuthorityExecuteInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("multisig", accounts.multisig),
@@ -247,12 +289,30 @@ export function getConfigAuthorityExecuteInstruction<
 		programAddress,
 	} as ConfigAuthorityExecuteInstruction<
 		TProgramAddress,
-		TAccountMultisig,
-		TAccountAuthority,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountClock,
-		TAccountSpendingLimitAccounts
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSpendingLimitAccounts,
+			InstructionAccountInputAddress<TAccountSpendingLimitAccounts>
+		>
 	>);
 }
 

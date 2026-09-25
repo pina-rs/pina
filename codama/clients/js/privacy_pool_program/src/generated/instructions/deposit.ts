@@ -29,14 +29,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	fixPinaPodEncoderSize,
@@ -159,19 +162,21 @@ export function getDepositInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type DepositInput<
-	TAccountDepositor extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountPoolVault extends string = string,
-	TAccountMerkleTree extends string = string,
-	TAccountNoteCommitment extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountDepositor extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	depositor: TransactionSigner<TAccountDepositor>;
-	poolConfig: Address<TAccountPoolConfig>;
-	poolVault: Address<TAccountPoolVault>;
-	merkleTree: Address<TAccountMerkleTree>;
-	noteCommitment: Address<TAccountNoteCommitment>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	depositor: TAccountDepositor;
+	poolConfig: TAccountPoolConfig;
+	poolVault: TAccountPoolVault;
+	merkleTree: TAccountMerkleTree;
+	noteCommitment: TAccountNoteCommitment;
+	systemProgram?: TAccountSystemProgram;
 	bump: DepositInstructionDataArgs["bump"];
 	commitment: DepositInstructionDataArgs["commitment"];
 	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
@@ -181,12 +186,12 @@ export type DepositInput<
 };
 
 export function getDepositInstruction<
-	TAccountDepositor extends string,
-	TAccountPoolConfig extends string,
-	TAccountPoolVault extends string,
-	TAccountMerkleTree extends string,
-	TAccountNoteCommitment extends string,
-	TAccountSystemProgram extends string,
+	TAccountDepositor extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: DepositInput<
@@ -200,25 +205,70 @@ export function getDepositInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): DepositInstruction<
 	TProgramAddress,
-	TAccountDepositor,
-	TAccountPoolConfig,
-	TAccountPoolVault,
-	TAccountMerkleTree,
-	TAccountNoteCommitment,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountDepositor,
+		InstructionAccountInputAddress<TAccountDepositor>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolVault,
+		InstructionAccountInputAddress<TAccountPoolVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMerkleTree,
+		InstructionAccountInputAddress<TAccountMerkleTree>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNoteCommitment,
+		InstructionAccountInputAddress<TAccountNoteCommitment>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		depositor: { value: input.depositor ?? null, isWritable: true },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: true },
-		poolVault: { value: input.poolVault ?? null, isWritable: true },
-		merkleTree: { value: input.merkleTree ?? null, isWritable: true },
-		noteCommitment: { value: input.noteCommitment ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		depositor: {
+			value: input.depositor ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		poolVault: {
+			value: input.poolVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -236,7 +286,6 @@ export function getDepositInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("depositor", accounts.depositor),
@@ -252,12 +301,30 @@ export function getDepositInstruction<
 		programAddress,
 	} as DepositInstruction<
 		TProgramAddress,
-		TAccountDepositor,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNoteCommitment,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountDepositor,
+			InstructionAccountInputAddress<TAccountDepositor>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

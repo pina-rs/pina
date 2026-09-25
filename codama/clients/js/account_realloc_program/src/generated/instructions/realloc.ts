@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -123,24 +126,25 @@ export function getReallocInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ReallocInput<
-	TAccountAuthority extends string = string,
-	TAccountSample extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSample extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/**
 	 * The sample authority. It pays rent on growth and receives excess rent on
 	 * shrink, so it must be writable as well as a signer.
 	 */
-	authority: TransactionSigner<TAccountAuthority>;
-	sample: Address<TAccountSample>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	sample: TAccountSample;
+	systemProgram?: TAccountSystemProgram;
 	len: ReallocInstructionDataArgs["len"];
 };
 
 export function getReallocInstruction<
-	TAccountAuthority extends string,
-	TAccountSample extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountSample extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -148,19 +152,39 @@ export function getReallocInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ReallocInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountSample,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSample,
+		InstructionAccountInputAddress<TAccountSample>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		sample: { value: input.sample ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		sample: { value: input.sample ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -178,7 +202,6 @@ export function getReallocInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -191,9 +214,18 @@ export function getReallocInstruction<
 		programAddress,
 	} as ReallocInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountSample,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample,
+			InstructionAccountInputAddress<TAccountSample>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

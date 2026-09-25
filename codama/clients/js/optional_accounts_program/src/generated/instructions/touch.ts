@@ -25,13 +25,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -113,39 +116,55 @@ export function getTouchInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type TouchInput<
-	TAccountAuthority extends string = string,
-	TAccountStore extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountStore extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The store's authority. Must sign. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** When present, the counter inside is incremented by one. */
-	store?: Address<TAccountStore>;
+	store?: TAccountStore;
 };
 
 export function getTouchInstruction<
-	TAccountAuthority extends string,
-	TAccountStore extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountStore extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: TouchInput<TAccountAuthority, TAccountStore>,
 	config?: { programAddress?: TProgramAddress },
-): TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore> {
+): TouchInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStore,
+		InstructionAccountInputAddress<TAccountStore>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		store: { value: input.store ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		store: { value: input.store ?? null, isSigner: false, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -153,7 +172,17 @@ export function getTouchInstruction<
 		],
 		data: getTouchInstructionDataEncoder().encode({}),
 		programAddress,
-	} as TouchInstruction<TProgramAddress, TAccountAuthority, TAccountStore>);
+	} as TouchInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStore,
+			InstructionAccountInputAddress<TAccountStore>
+		>
+	>);
 }
 
 export type ParsedTouchInstruction<

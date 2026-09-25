@@ -29,6 +29,19 @@ use crate::project::ClientLanguage;
 use crate::project::GenerationMode;
 use crate::project::Project;
 
+/// The `codama` core package installed for renderers that need only the
+/// runtime. Pinned so an offline or sandboxed `npx`/`pnpm dlx` run resolves
+/// the same tree as everyone else.
+const CODAMA_PACKAGE: &str = "codama@1.11.0";
+/// The `@codama/renderers-js` line whose scaffolded clients target
+/// `@solana/kit` 8.
+const RENDERERS_JS_PACKAGE: &str = "@codama/renderers-js@2.5.0";
+/// The `codama-renderers-dart` line matching [`CODAMA_PACKAGE`].
+const RENDERERS_DART_PACKAGE: &str = "codama-renderers-dart@0.5.6";
+/// The minimum `@solana/kit` major the generated TypeScript sources compile
+/// against, matching the manifests [`RENDERERS_JS_PACKAGE`] scaffolds.
+const MINIMUM_GENERATED_KIT_MAJOR: u16 = 8;
+
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import { createFromJson, visit } from "codama";
 import {
@@ -580,6 +593,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 		for example in &examples {
 			validate_generation_target(&plan.typescript_out.join(example), settings)?;
+			verify_typescript_scaffold_kit_major(&plan.typescript_out.join(example), settings)?;
 		}
 
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
@@ -669,6 +683,70 @@ const fn cli_render_mode(mode: GenerationMode) -> CliRenderMode {
 		GenerationMode::Update => CliRenderMode::Update,
 		GenerationMode::Overwrite => CliRenderMode::Overwrite,
 	}
+}
+
+/// Refuse to regenerate a TypeScript client whose scaffold still pins an
+/// older `@solana/kit` major than the generated sources need.
+///
+/// Scaffolded manifests are intentionally never rewritten by generation, so
+/// a manifest created by an older renderer keeps its original pin forever.
+/// Rendering new sources against it leaves the client uncompilable with no
+/// diagnostic naming the cause; failing here turns that silent drift into an
+/// actionable error.
+fn verify_typescript_scaffold_kit_major(
+	path: &Path,
+	settings: GenerationSettings,
+) -> Result<(), CodamaError> {
+	if settings.mode == GenerationMode::Overwrite {
+		// `overwrite` removes the scaffold and re-creates it with the
+		// current renderer's ranges, so there is nothing to defend.
+		return Ok(());
+	}
+
+	let manifest_path = path.join("package.json");
+	let Ok(manifest) = std::fs::read_to_string(&manifest_path) else {
+		// A missing or unreadable manifest is either a fresh target or a
+		// custom `--no-scaffold` layout; neither has a pin to defend.
+		return Ok(());
+	};
+
+	let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&manifest) else {
+		return Ok(());
+	};
+
+	let range = ["peerDependencies", "dependencies"]
+		.iter()
+		.find_map(|section| {
+			parsed
+				.get(*section)
+				.and_then(|section| section.get("@solana/kit"))
+				.and_then(serde_json::Value::as_str)
+		});
+
+	let Some(range) = range else {
+		return Ok(());
+	};
+
+	if kit_range_major(range).is_some_and(|major| major < MINIMUM_GENERATED_KIT_MAJOR) {
+		return Err(CodamaError::StaleKitScaffold {
+			path: manifest_path,
+			range: range.to_owned(),
+			minimum: MINIMUM_GENERATED_KIT_MAJOR,
+		});
+	}
+
+	Ok(())
+}
+
+/// Read the leading major out of a plain semver range (`^7.0.0`, `>=8`,
+/// `8.x`); ranges that do not name a major (`*`, `workspace:*`) return
+/// `None` and are never policed.
+fn kit_range_major(range: &str) -> Option<u16> {
+	let range = range
+		.trim()
+		.trim_start_matches(['^', '~', '>', '=', 'v', ' ']);
+	let digits: &str = &range[..range.chars().take_while(char::is_ascii_digit).count()];
+	digits.parse().ok()
 }
 
 fn validate_generation_target(
@@ -1006,7 +1084,7 @@ fn run_client_generation_with_npx(
 ) -> std::io::Result<BoundedOutput> {
 	let mut command = Command::new(&plan.npx);
 
-	command.arg("-y").arg("-p").arg("codama@1.10.1");
+	command.arg("-y").arg("-p").arg(CODAMA_PACKAGE);
 	add_npx_renderer_package(&mut command, renderer);
 	command
 		.arg("node")
@@ -1030,7 +1108,7 @@ fn run_client_generation_with_pnpm(
 	idl_paths: &[PathBuf],
 ) -> Result<BoundedOutput, CodamaError> {
 	let mut command = Command::new("pnpm");
-	command.arg("dlx").arg("--package").arg("codama@1.10.1");
+	command.arg("dlx").arg("--package").arg(CODAMA_PACKAGE);
 	add_pnpm_renderer_package(&mut command, renderer);
 	command
 		.arg("node")
@@ -1212,10 +1290,10 @@ fn add_npx_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 
 	match renderer {
 		ClientLanguage::Cpi | ClientLanguage::Rust | ClientLanguage::CliRust => {
-			command.arg("codama@1.10.1")
+			command.arg(CODAMA_PACKAGE)
 		}
-		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
-		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
+		ClientLanguage::Typescript => command.arg(RENDERERS_JS_PACKAGE),
+		ClientLanguage::Dart => command.arg(RENDERERS_DART_PACKAGE),
 		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
 }
@@ -1225,10 +1303,10 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 
 	match renderer {
 		ClientLanguage::Cpi | ClientLanguage::Rust | ClientLanguage::CliRust => {
-			command.arg("codama@1.10.1")
+			command.arg(CODAMA_PACKAGE)
 		}
-		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
-		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
+		ClientLanguage::Typescript => command.arg(RENDERERS_JS_PACKAGE),
+		ClientLanguage::Dart => command.arg(RENDERERS_DART_PACKAGE),
 		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
 }
@@ -1329,6 +1407,130 @@ mod tests {
 			generation: default_generation_settings(),
 			npx: npx.into(),
 		}
+	}
+
+	fn write_kit_manifest(dir: &Path, kit_range: &str) {
+		std::fs::create_dir_all(dir).unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		std::fs::write(
+			dir.join("package.json"),
+			format!(r#"{{"peerDependencies": {{"@solana/kit": "{kit_range}"}}}}"#),
+		)
+		.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+	}
+
+	#[test]
+	fn stale_kit_scaffold_fails_with_the_manifest_range_named() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let client = temp.path().join("counter_program");
+		write_kit_manifest(&client, "^7.0.0");
+
+		let error = verify_typescript_scaffold_kit_major(
+			&client,
+			GenerationSettings {
+				mode: GenerationMode::Auto,
+				scaffold: true,
+			},
+		)
+		.expect_err("a Kit 7 scaffold must block regeneration");
+
+		assert!(
+			matches!(error, CodamaError::StaleKitScaffold { ref range, minimum: 8, .. } if range == "^7.0.0"),
+			"unexpected error: {error}"
+		);
+		assert!(
+			error
+				.to_string()
+				.contains("never rewrites an existing scaffold"),
+			"the error must explain why the manifest is not updated: {error}"
+		);
+	}
+
+	#[test]
+	fn fresh_and_current_kit_scaffolds_pass_the_guard() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let settings = GenerationSettings {
+			mode: GenerationMode::Auto,
+			scaffold: true,
+		};
+
+		// A missing manifest is a fresh scaffold or a `--no-scaffold` target.
+		verify_typescript_scaffold_kit_major(&temp.path().join("missing"), settings)
+			.unwrap_or_else(|error| panic!("missing manifest must pass: {error}"));
+
+		let current = temp.path().join("current");
+		write_kit_manifest(&current, "^8.3.0");
+		verify_typescript_scaffold_kit_major(&current, settings)
+			.unwrap_or_else(|error| panic!("current manifest must pass: {error}"));
+
+		// A dependency-section pin is checked too.
+		let dependency = temp.path().join("dependency");
+		std::fs::create_dir_all(&dependency)
+			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		std::fs::write(
+			dependency.join("package.json"),
+			r#"{"dependencies": {"@solana/kit": "^7.2.0"}}"#,
+		)
+		.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+		assert!(matches!(
+			verify_typescript_scaffold_kit_major(&dependency, settings),
+			Err(CodamaError::StaleKitScaffold { .. })
+		));
+	}
+
+	#[test]
+	fn unreadable_and_rangeless_kit_pins_are_not_policed() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let settings = GenerationSettings {
+			mode: GenerationMode::Auto,
+			scaffold: true,
+		};
+
+		for range in ["workspace:*", "*"] {
+			let client = temp.path().join(range.replace(':', "_"));
+			write_kit_manifest(&client, range);
+			verify_typescript_scaffold_kit_major(&client, settings)
+				.unwrap_or_else(|error| panic!("range {range} must pass: {error}"));
+		}
+
+		let malformed = temp.path().join("malformed");
+		std::fs::create_dir_all(&malformed)
+			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		std::fs::write(malformed.join("package.json"), b"not json")
+			.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+		verify_typescript_scaffold_kit_major(&malformed, settings)
+			.unwrap_or_else(|error| panic!("malformed manifest must pass: {error}"));
+	}
+
+	#[test]
+	fn overwrite_mode_skips_the_kit_scaffold_guard() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let client = temp.path().join("counter_program");
+		write_kit_manifest(&client, "^6.10.0");
+
+		verify_typescript_scaffold_kit_major(
+			&client,
+			GenerationSettings {
+				mode: GenerationMode::Overwrite,
+				scaffold: true,
+			},
+		)
+		.unwrap_or_else(|error| panic!("overwrite must skip the guard: {error}"));
+	}
+
+	#[test]
+	fn kit_range_major_reads_the_leading_major_only() {
+		assert_eq!(kit_range_major("^7.0.0"), Some(7));
+		assert_eq!(kit_range_major(" ^8 "), Some(8));
+		assert_eq!(kit_range_major(">=8"), Some(8));
+		assert_eq!(kit_range_major("~6.10.0"), Some(6));
+		assert_eq!(kit_range_major("8.x"), Some(8));
+		assert_eq!(kit_range_major("workspace:*"), None);
+		assert_eq!(kit_range_major("*"), None);
+		assert_eq!(kit_range_major("latest"), None);
 	}
 
 	#[cfg(unix)]
@@ -1525,15 +1727,25 @@ mod tests {
 		));
 	}
 
+	/// The exact packages are pinned here so a toolchain bump that changes
+	/// which `@solana/kit` major fresh scaffolds receive cannot land
+	/// silently.
+	#[test]
+	fn pinned_codama_packages_target_the_kit_8_line() {
+		assert_eq!(CODAMA_PACKAGE, "codama@1.11.0");
+		assert_eq!(RENDERERS_JS_PACKAGE, "@codama/renderers-js@2.5.0");
+		assert_eq!(RENDERERS_DART_PACKAGE, "codama-renderers-dart@0.5.6");
+	}
+
 	#[test]
 	fn renderer_command_helpers_cover_each_language() {
 		let renderer_cli = renderer_cli_package();
 		for (language, package) in [
-			(ClientLanguage::Cpi, "codama@1.10.1"),
-			(ClientLanguage::Rust, "codama@1.10.1"),
-			(ClientLanguage::CliRust, "codama@1.10.1"),
-			(ClientLanguage::Typescript, "@codama/renderers-js@2.3.1"),
-			(ClientLanguage::Dart, "codama-renderers-dart@0.5.5"),
+			(ClientLanguage::Cpi, CODAMA_PACKAGE),
+			(ClientLanguage::Rust, CODAMA_PACKAGE),
+			(ClientLanguage::CliRust, CODAMA_PACKAGE),
+			(ClientLanguage::Typescript, RENDERERS_JS_PACKAGE),
+			(ClientLanguage::Dart, RENDERERS_DART_PACKAGE),
 			(ClientLanguage::CliTs, renderer_cli.as_str()),
 			(ClientLanguage::CliDart, renderer_cli.as_str()),
 		] {
