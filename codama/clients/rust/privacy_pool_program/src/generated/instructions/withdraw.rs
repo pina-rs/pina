@@ -26,7 +26,6 @@ pub struct Withdraw {
 impl Withdraw {
 	pub fn new(
 		pool_config: solana_pubkey::Pubkey,
-		pool_vault: solana_pubkey::Pubkey,
 		merkle_tree: solana_pubkey::Pubkey,
 		nullifier_set: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
@@ -34,7 +33,11 @@ impl Withdraw {
 	) -> Self {
 		Self {
 			pool_config,
-			pool_vault,
+			pool_vault: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-vault".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			merkle_tree,
 			nullifier_set,
 			verifying_key_account,

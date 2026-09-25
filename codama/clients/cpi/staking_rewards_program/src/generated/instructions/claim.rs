@@ -30,7 +30,9 @@ pub struct Claim<'account> {
 	pub reward_mint: &'account AccountView,
 
 	/// CPI account `poolState`.
-	/// Required privileges: read-only.
+	/// The pool's state is written: the payout leaves the pool's outstanding
+	/// reward liability.
+	/// Required privileges: writable.
 	pub pool_state: &'account AccountView,
 
 	/// CPI account `positionState`.
@@ -96,7 +98,7 @@ impl<'account> Claim<'account> {
 		let accounts: [CpiHandle<'_>; 9] = [
 			CpiHandle::writable_signer(self.user)?,
 			CpiHandle::readonly(self.reward_mint),
-			CpiHandle::readonly(self.pool_state),
+			CpiHandle::writable(self.pool_state)?,
 			CpiHandle::writable(self.position_state)?,
 			CpiHandle::writable(self.user_reward_ata)?,
 			CpiHandle::writable(self.reward_vault)?,

@@ -809,7 +809,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": null
+								"pda": "pool_vault"
 							},
 							{
 								"name": "merkle_tree",
@@ -892,7 +892,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": null
+								"pda": "pool_vault"
 							},
 							{
 								"name": "merkle_tree",

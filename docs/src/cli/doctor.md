@@ -15,7 +15,7 @@ pina doctor --json
 The report checks:
 
 - nearest Cargo program package, source entrypoint, and declared program ID;
-- lint-driver resolution: the active toolchain, the expected release, the resolved driver and how it was obtained, both search paths, and the remedy when nothing matched;
+- lint-driver resolution: the active toolchain, the release the shipped lints are verified against, the resolved driver with its own toolchain and how it was obtained, both search paths, and the remedy when nothing matched;
 - canonical SBF artifact and program-keypair paths;
 - source/keypair identity agreement;
 - required Rust/SBF tools (`cargo`, `rustc`, `rust-src`, nightly `-Z` support, and `sbpf-linker`);
@@ -24,7 +24,7 @@ The report checks:
 
 Human output is stable, color-free text. It includes typed check IDs such as `project.discovery`, `project.program-id`, `project.artifact`, `lint.driver`, and `tool.surfpool` so the same vocabulary appears in logs and agent output.
 
-The `Lint driver:` section answers the one question a failing `pina lint` leaves open — which toolchain is active, which driver Pina resolved for it, and what to run when none resolved. `pina doctor` reports this state **without** downloading or building anything: a diagnostic that populates a cache cannot be run to find out what is wrong. A missing driver is a warning, not an error, because it blocks `pina lint` only and the project can still build and deploy.
+The `Lint driver:` section answers the one question a failing `pina lint` leaves open — which toolchain is active, which driver Pina resolved for it and which toolchain that driver was built for, and what to run when none resolved. `pina doctor` reports this state **without** downloading or building anything: a diagnostic that populates a cache cannot be run to find out what is wrong. A missing driver is a warning, not an error, because it blocks `pina lint` only and the project can still build and deploy.
 
 ## Agent JSON
 

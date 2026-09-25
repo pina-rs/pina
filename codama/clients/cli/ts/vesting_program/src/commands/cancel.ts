@@ -27,6 +27,14 @@ export const cancelCommand = registerGlobals(new Command("cancel"))
 		"--token-program <tokenProgram>",
 		"The `token_program` account",
 	)
+	.requiredOption(
+		"--clock <clock>",
+		"Clock for the vested-entitlement settlement: cancellation must not",
+	)
+	.requiredOption(
+		"--beneficiary-ata <beneficiaryAta>",
+		"The beneficiary's ATA: the vested-but-unclaimed amount settles here",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
@@ -36,6 +44,8 @@ export const cancelCommand = registerGlobals(new Command("cancel"))
 			adminAta: pubkey("--admin-ata", options.adminAta),
 			vault: pubkey("--vault", options.vault),
 			tokenProgram: pubkey("--token-program", options.tokenProgram),
+			clock: pubkey("--clock", options.clock),
+			beneficiaryAta: pubkey("--beneficiary-ata", options.beneficiaryAta),
 		};
 		const instruction = getCancelInstruction(
 			...[input],

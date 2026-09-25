@@ -29,6 +29,23 @@ pub struct SetRewardIndex<'account> {
 	/// Required privileges: writable.
 	pub pool_state: &'account AccountView,
 
+	/// CPI account `rewardMint`.
+	/// The pool's reward mint, for validating the vault binding.
+	/// Required privileges: read-only.
+	pub reward_mint: &'account AccountView,
+
+	/// CPI account `tokenProgram`.
+	/// The token program that owns the reward mint and vault.
+	/// Required privileges: read-only.
+	pub token_program: &'account AccountView,
+
+	/// CPI account `rewardVault`.
+	/// The pool's canonical reward vault. An index update is a promise to pay:
+	/// it must not create liabilities the vault cannot honor or that a
+	/// per-position accrual cannot represent.
+	/// Required privileges: read-only.
+	pub reward_vault: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `set_reward_index`.
 	pub ix: SetRewardIndexIx,
 }
@@ -69,9 +86,12 @@ impl<'account> SetRewardIndex<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 2] = [
+		let accounts: [CpiHandle<'_>; 5] = [
 			CpiHandle::readonly_signer(self.admin),
 			CpiHandle::writable(self.pool_state)?,
+			CpiHandle::readonly(self.reward_mint),
+			CpiHandle::readonly(self.token_program),
+			CpiHandle::readonly(self.reward_vault),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

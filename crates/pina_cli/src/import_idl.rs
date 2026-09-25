@@ -40,10 +40,15 @@ pub enum ImportSource {
 
 impl ImportSource {
 	/// A short, human-readable description for the provenance block.
+	///
+	/// URL credentials are redacted before the description is built: the same
+	/// string is echoed to stdout and persisted into the generated README, so
+	/// a pre-signed query parameter would otherwise leak into logs and
+	/// version control on every import.
 	fn describe(&self) -> String {
 		match self {
 			Self::File(path) => format!("file `{}`", path.display()),
-			Self::Url(url) => format!("url `{url}`"),
+			Self::Url(url) => format!("url `{}`", redact_url_credentials(url)),
 			Self::Cluster {
 				cluster,
 				program_id,
@@ -307,19 +312,22 @@ fn read_bounded_reader(mut reader: impl Read) -> Result<Vec<u8>, ImportError> {
 }
 
 fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
+	// Every error path below reports the redacted form: an invalid URL can
+	// still carry credentials in its userinfo, and the error reaches stderr.
+	let redacted_for_errors = redact_url_credentials(url);
 	let parsed = url::Url::parse(url).map_err(|error| {
 		ImportError::Fetch {
-			reason: format!("`{url}` is not a valid URL: {error}"),
+			reason: format!("`{redacted_for_errors}` is not a valid URL: {error}"),
 		}
 	})?;
 
 	if !matches!(parsed.scheme(), "http" | "https") {
 		return Err(ImportError::Fetch {
 			reason: format!(
-				"`{}` uses the unsupported scheme `{}`; only http and https are accepted",
-				parsed.scheme(),
-				parsed.scheme()
-			),
+					"`{redacted_for_errors}` uses the unsupported scheme `{}`; only http and \
+					 https 				 are accepted",
+					parsed.scheme()
+				),
 		});
 	}
 
@@ -332,9 +340,9 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 	if parsed.scheme() == "http" && !loopback {
 		return Err(ImportError::Fetch {
 			reason: format!(
-				"`{url}` uses plain HTTP; only HTTPS may fetch IDLs from remote hosts (use 				 \
-				 `https`, or `http` against localhost for development)"
-			),
+					"`{redacted_for_errors}` uses plain HTTP; only HTTPS may fetch IDLs from \
+					 remote 				 hosts (use `https`, or `http` against localhost for development)"
+				),
 		});
 	}
 
@@ -428,6 +436,24 @@ fn apply_program_id(root: &Value, program_id: &str) -> Result<codama_nodes::Root
 	);
 
 	serde_json::from_value(root).map_err(|source| ImportError::InvalidJson { source })
+}
+
+/// Strips the query and fragment from a URL for display and persistence.
+///
+/// The full URL — credentials included — still reaches the HTTP request; only
+/// the copy a human reads is redacted, and the content digest remains the
+/// durable provenance.
+fn redact_url_credentials(url: &str) -> String {
+	let Ok(mut parsed) = url::Url::parse(url) else {
+		return "<unparseable url redacted>".to_owned();
+	};
+	// Userinfo, query, and fragment all carry credentials or tracking state;
+	// only the scheme/host/path are safe to echo or persist.
+	let _ = parsed.set_username("");
+	let _ = parsed.set_password(None);
+	parsed.set_query(None);
+	parsed.set_fragment(None);
+	parsed.to_string()
 }
 
 /// Writes the provenance README into a rendered crate.

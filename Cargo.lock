@@ -6314,9 +6314,8 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pina"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
- "fixed",
  "pastey",
  "pina_macros",
  "pinapod",
@@ -6396,7 +6395,7 @@ version = "0.0.0"
 
 [[package]]
 name = "pina_cli"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "atomic-write-file",
  "base64 0.23.1",
@@ -6443,7 +6442,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cli_renderer"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -6457,7 +6456,7 @@ dependencies = [
 
 [[package]]
 name = "pina_codama_renderer"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -6471,7 +6470,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cpi_renderer"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -6488,7 +6487,7 @@ dependencies = [
 
 [[package]]
 name = "pina_lints"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "paste",
  "regex",
@@ -6498,7 +6497,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
@@ -6512,7 +6511,7 @@ dependencies = [
 
 [[package]]
 name = "pina_profile"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "object 0.40.0",
  "serde",
@@ -6523,7 +6522,7 @@ dependencies = [
 
 [[package]]
 name = "pina_root"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "account_realloc_program",
  "counter_program",
@@ -6548,7 +6547,7 @@ dependencies = [
 
 [[package]]
 name = "pina_sdk_ids"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "proptest",
  "solana-address 2.6.1",
@@ -6556,7 +6555,7 @@ dependencies = [
 
 [[package]]
 name = "pina_test"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "base64 0.23.1",
  "serde_json",
@@ -6591,9 +6590,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4c309cbe981e5203c605b9ea8132fe69b70e6e7a3318fe07e709eeb61b5fa93"
+checksum = "63ca818a5961bc811462e252305e681142adb73ae070a68df39eb28e78153564"
 dependencies = [
  "fixed",
  "pinapod-derive",
@@ -6603,9 +6602,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2be5850aa7a0cd1eecd6c5750eb99ded3dac6e0d62d37619b96e334369de7e1f"
+checksum = "77fed19e67240497319f9a7b3e01f9e165dda7e46e401e43fd54b7109f9269af"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",

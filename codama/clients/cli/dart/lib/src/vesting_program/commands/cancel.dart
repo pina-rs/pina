@@ -24,6 +24,18 @@ final class CancelCommand extends Command<void> {
         'token_program',
         mandatory: true,
         help: "The token_program account",
+      )
+      ..addOption(
+        'clock',
+        mandatory: true,
+        help:
+            "Clock for the vested-entitlement settlement: cancellation must not",
+      )
+      ..addOption(
+        'beneficiary_ata',
+        mandatory: true,
+        help:
+            "The beneficiary's ATA: the vested-but-unclaimed amount settles here",
       );
   }
 
@@ -49,6 +61,11 @@ final class CancelCommand extends Command<void> {
       '--token-program',
       results['token_program']! as String,
     );
+    final clock = pubkey('--clock', results['clock']! as String);
+    final beneficiaryAta = pubkey(
+      '--beneficiary-ata',
+      results['beneficiary_ata']! as String,
+    );
 
     final instruction = getCancelInstruction(
       programAddress: context.programAddress,
@@ -62,6 +79,8 @@ final class CancelCommand extends Command<void> {
       ),
       systemProgram: Address('11111111111111111111111111111111'),
       tokenProgram: tokenProgram,
+      clock: clock,
+      beneficiaryAta: beneficiaryAta,
     );
     await context.send([instruction]);
   }

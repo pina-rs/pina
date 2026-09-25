@@ -1,8 +1,16 @@
+/// First custom error code of the range Pina reserves for its framework
+/// errors.
+///
+/// <!-- {=pinaReservedErrorRange|trim|linePrefix:"/// ":true} -->
+/// Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for its framework errors (`PinaProgramError`), so a client can always tell a program's own error from a framework one. Every `#[error]` variant must use a discriminant below `0xFFFF_0000` (`pina::RESERVED_ERROR_CODE_START`). The macro checks each explicit and implicit discriminant at compile time and rejects a variant in the reserved range; the check emits no code, so it costs no compute units and does not change program size.<!-- {/pinaReservedErrorRange} -->
+pub const RESERVED_ERROR_CODE_START: u32 = 0xFFFF_0000;
+
 /// Built-in pina framework errors.
 ///
-/// These occupy the top end of the `u32` range (`0xFFFF_0000..=0xFFFF_FFFF`)
-/// to avoid collisions with user-defined program errors. User `#[error]` enums
-/// should use discriminant values below `0xFFFF_0000` to prevent overlap.
+/// These occupy the top end of the `u32` range
+/// ([`RESERVED_ERROR_CODE_START`]`..=u32::MAX`) so they never collide with
+/// user-defined program errors. The `#[error]` macro rejects a user variant in
+/// that range at compile time.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
 /// All APIs in this section are designed for on-chain determinism.
@@ -110,6 +118,22 @@ pub enum PinaProgramError {
 	/// the caller accounted for silently credits the recipient short, so the
 	/// reconciliation refuses to guess which side is wrong.
 	UnverifiedTransfer = 0xFFFF_FFF1,
+	/// A compact creation patch stores a PDA bump that disagrees with the
+	/// canonical bump the creation validated.
+	///
+	/// Returned by [`crate::CreateCompactProgramAccountWithBump`] after it
+	/// committed the patch and the stored bump field does not hold the bump
+	/// the builder derived and validated. An account whose stored bump differs
+	/// from its address's canonical bump can never be loaded through the
+	/// canonical stored-bump loaders, so the creation refuses to leave it
+	/// behind and clears the account data.
+	///
+	/// # Remedy
+	///
+	/// Store the creation's bump in the patch (`patch.bump(bump)`), or use
+	/// [`crate::CreateCompactProgramAccount::invoke_with_bump`], which passes
+	/// the derived bump to the patch factory for you.
+	StoredBumpMismatch = 0xFFFF_FFF0,
 	/// Too many PDA seeds were provided.
 	SeedsTooMany = 0xFFFF_FFFD,
 	/// More account keys were provided than the instruction expects.

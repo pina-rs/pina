@@ -67,6 +67,7 @@ final class FetchPoolStateCommand extends Command<void> {
       'reward_mint': account.data.rewardMint,
       'total_staked': account.data.totalStaked,
       'reward_index': account.data.rewardIndex,
+      'outstanding_rewards': account.data.outstandingRewards,
       'paused': account.data.paused,
       'bump': account.data.bump,
     });

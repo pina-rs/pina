@@ -117,11 +117,11 @@ Default level: `deny`
 
 Default level: `deny`
 
-**Contract.** Prove a PDA bump is canonical with `assert_canonical_bump()` before accepting a PDA through `assert_seeds_with_bump()`.
+**Contract.** Prove a PDA bump is canonical with `assert_canonical_bump()` before accepting a PDA through `assert_seeds_with_bump()`. `assert_stored_bump()` is the generated counterpart of `assert_seeds()`: it reuses a bump the handler parsed from the same account, and this lint requires that provenance.
 
-**Why this matters.** A program-derived address has one canonical bump. Accepting any valid bump lets one seed namespace resolve to several addresses, breaking the uniqueness the seeds were chosen to provide.
+**Why this matters.** A program-derived address has one canonical bump. Accepting any valid bump lets one seed namespace resolve to several addresses, breaking the uniqueness the seeds were chosen to provide. `assert_stored_bump()` names the one legitimate source for an explicit bump — the account's own stored field, read in this instruction — so the provenance is checked rather than assumed.
 
-**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump`, which names the decision. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
+**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump`, which names the decision. `assert_stored_bump()` passes only when its bump argument resolves to a parse of the same account; a bump from instruction data or a different account fails. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
 
 ## require_canonical_instruction_dispatch_for_idl
 
@@ -181,7 +181,7 @@ Default level: `warn`
 
 **Why this matters.** An ungated full-balance drain is the shape real key-compromise exploits use. Once the sweep authority leaks, nothing on-chain slows the drain; a pause switch plus a per-window cap bounds the blast radius.
 
-**Blessing an exception.** Add the guard, or express the operation as a close when that is the intent, since a close states where the remaining lamports go. Where a drain is intended and bounded elsewhere, scope `#[allow]` to the handler and name the compensating control.
+**Blessing an exception.** Add the guard, or express the operation as a close when that is the intent, since a close states where the remaining lamports go. The guard must behave like one: its name states the pause or cap check (or it is a local wrapper returning `Result` that enforces such a guard before any early success return), its receiver or an argument is derived from the handler's parameters, and it stops the handler on the failing value with `?`, `unwrap`, or a branch that returns `Err` or panics; the polarity of `is_err`, `is_ok`, and `assert_eq!` is checked. A discarded result, a branch that returns `Ok`, a zero-argument or literal-only call, a closure, a local callee that can only return a literal success, and a generic wrapper whose concrete impl does not enforce the guard do not count. Where a drain is intended and bounded elsewhere, scope `#[allow]` to the handler and name the compensating control.
 
 ## require_idl_root_to_define_one_program_id
 
@@ -197,11 +197,11 @@ Default level: `warn`
 
 Default level: `deny`
 
-**Contract.** Read a custody destination both before and after a token transfer CPI and account from the observed delta.
+**Contract.** After a value-moving token CPI (`Transfer`, `TransferChecked`, `MintTo`, `MintToChecked`) into any account, a balance snapshot taken before the CPI, or a value computed from one, may only be compared with a post-CPI reload or a constant, subtracted from a reload to form a delta (`after.checked_sub(before)`), or added to such a delta. A custody-named transfer destination (`vault`, `custody`, `reserve`, or `pool`) must also be read both before and after every transfer, with no other CPI in between.
 
-**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested. Accounting from the requested amount rather than the observed balance delta credits the protocol with tokens it never received.
+**Why this matters.** Token-2022 transfer fees can make the amount received differ from the amount requested, so a balance read before the CPI no longer describes the account after it. Accounting from the requested amount or a pre-CPI snapshot rather than the observed balance delta credits the protocol with tokens it never received.
 
-**Blessing an exception.** Reload the destination with `amount()` after the CPI and compute the delta. This is the fix the lint asks for, so there is no exception to bless: a transfer whose fee is known to be zero still has a correct delta, and reading it costs one load.
+**Blessing an exception.** Reload the destination with `amount()` after the CPI and account from the delta `after.checked_sub(before)`, or verify the arrival with `if after != expected`. Comparing the snapshot against a constant (`if prior == 0`) records a fact about the earlier state and is accepted as is. A static `invoke()` called on a builder bound to the legacy `pinocchio_token` program is exempt because that program cannot charge a fee; any other exception needs a narrowly scoped `#[allow]` with the reason the snapshot is still correct. When the account comes from a `&mut self` accessor, bind it once and use that binding for the reads and the transfer: a read through a `let` binding and a transfer into a separate inline call are not matched. Give each result of a hand-written cursor its own binding name: rebinding `let acct = cursor.take()?;` under the same name is treated as one account.
 
 ## require_program_check_before_cpi
 
@@ -257,7 +257,7 @@ Default level: `deny`
 
 Default level: `deny`
 
-**Contract.** Call `zeroed()` on an account before closing it.
+**Contract.** Zero an account's data before closing it: close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`.
 
 **Why this matters.** A closed account's lamports are gone but its data survives until the account is reused. A later instruction that reads before writing sees the previous contents, so stale data can be reinterpreted as valid state.
 

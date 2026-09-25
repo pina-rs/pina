@@ -16,11 +16,31 @@ pub const SET_REWARD_INDEX_MIGRATION_VERSION: u8 = 0u8;
 pub struct SetRewardIndex {
 	pub admin: solana_pubkey::Pubkey,
 	pub pool_state: solana_pubkey::Pubkey,
+	/// The pool's reward mint, for validating the vault binding.
+	pub reward_mint: solana_pubkey::Pubkey,
+	/// The token program that owns the reward mint and vault.
+	pub token_program: solana_pubkey::Pubkey,
+	/// The pool's canonical reward vault. An index update is a promise to pay:
+	/// it must not create liabilities the vault cannot honor or that a
+	/// per-position accrual cannot represent.
+	pub reward_vault: solana_pubkey::Pubkey,
 }
 
 impl SetRewardIndex {
-	pub fn new(admin: solana_pubkey::Pubkey, pool_state: solana_pubkey::Pubkey) -> Self {
-		Self { admin, pool_state }
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		pool_state: solana_pubkey::Pubkey,
+		reward_mint: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+		reward_vault: solana_pubkey::Pubkey,
+	) -> Self {
+		Self {
+			admin,
+			pool_state,
+			reward_mint,
+			token_program,
+			reward_vault,
+		}
 	}
 
 	pub fn instruction(
@@ -36,11 +56,23 @@ impl SetRewardIndex {
 		data: SetRewardIndexInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.admin, true,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.reward_mint,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.reward_vault,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,

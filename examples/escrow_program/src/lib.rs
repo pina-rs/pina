@@ -327,9 +327,10 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			)
 		};
 
-		// Verify the escrow is the PDA for the maker and seed, using the
-		// stored bump field (avoids re-deriving the canonical bump on-chain).
-		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
+		// Verify the escrow is the PDA for the maker and seed. The parse above
+		// already captured `bump`, so this performs the identical
+		// single-derivation check without re-parsing the account.
+		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
 
 		// Validate maker and mint accounts
 		//
@@ -457,9 +458,10 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			(escrow.maker, escrow.mint_a, escrow.seed, escrow.bump)
 		};
 
-		// Verify the escrow is the PDA for the maker and seed, using the
-		// stored bump field (avoids re-deriving the canonical bump on-chain).
-		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
+		// Verify the escrow is the PDA for the maker and seed. The parse above
+		// already captured `bump`, so this performs the identical
+		// single-derivation check without re-parsing the account.
+		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
 
 		// Only the recorded maker may abort its own offer, and the mint must be
 		// the one the offer escrowed.

@@ -243,12 +243,15 @@ fn withdraw_instruction(
 }
 
 /// PoolState content: [disc][version][admin 32][stake_mint 32][reward_mint 32]
-/// [total_staked 8][reward_index 8][paused][bump]. `tests/abi_layout.rs` pins
-/// the same envelope geometry.
+/// [total_staked 8][reward_index 8][outstanding_rewards 8][paused][bump].
+/// `tests/abi_layout.rs` pins the same envelope geometry.
 fn set_reward_index_instruction(
 	program: &ProgramTest,
 	admin: &Pubkey,
 	pool: &Pubkey,
+	reward_mint: &Pubkey,
+	token_program: &Pubkey,
+	reward_vault: &Pubkey,
 	new_index: u64,
 ) -> pina_test::Instruction {
 	let mut data = vec![StakingInstruction::SetRewardIndex as u8, 0u8];
@@ -259,6 +262,9 @@ fn set_reward_index_instruction(
 		vec![
 			AccountMeta::new_readonly(*admin, true),
 			AccountMeta::new(*pool, false),
+			AccountMeta::new_readonly(*reward_mint, false),
+			AccountMeta::new_readonly(*token_program, false),
+			AccountMeta::new(*reward_vault, false),
 		],
 	)
 }
@@ -277,7 +283,7 @@ fn claim_instruction(
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*reward_mint, false),
-			AccountMeta::new_readonly(*pool, false),
+			AccountMeta::new(*pool, false),
 			AccountMeta::new(*position, false),
 			AccountMeta::new(*user_reward_ata, false),
 			AccountMeta::new(*reward_vault, false),
@@ -383,8 +389,13 @@ fn assert_pool(
 		0u64.to_le_bytes(),
 		"reward_index zero"
 	);
-	assert_eq!(account.data[114], 0, "pool is unpaused");
-	assert_eq!(account.data[115], bump);
+	assert_eq!(
+		&account.data[114..122],
+		0u64.to_le_bytes(),
+		"outstanding_rewards zero"
+	);
+	assert_eq!(account.data[122], 0, "pool is unpaused");
+	assert_eq!(account.data[123], bump);
 }
 
 /// PositionState content: [disc][version][pool 32][owner 32][staked 8]
@@ -1008,7 +1019,15 @@ fn rewards_accrue_once_per_index_and_release() {
 		// A drip of one full index unit: one reward token per staked token.
 		let index = REWARD_INDEX_SCALE;
 		program
-			.send_instruction(set_reward_index_instruction(&program, &admin, &pool, index))
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				index,
+			))
 			.expect("execute SetRewardIndex");
 
 		// The drip may not move rewards backwards: that is what would let a
@@ -1018,6 +1037,9 @@ fn rewards_accrue_once_per_index_and_release() {
 				&program,
 				&admin,
 				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
 				index - 1,
 			))
 			.expect_err("reject a regressed reward index");
@@ -1206,6 +1228,9 @@ fn rejects_a_deposit_without_stake_tokens() {
 				&program,
 				&admin,
 				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
 				1_000_000_000,
 			))
 			.expect("execute SetRewardIndex");
@@ -1386,6 +1411,901 @@ fn stake_vault_backs_total_staked() {
 			"the ledger released the withdrawn stake"
 		);
 		assert_stake_backing(&program, &stake_vault, &pool);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// Each test below asserts the *secure* behavior from the audit report. It
+// fails on the current tree because the exploit is still live, and must pass
+// once the corresponding fix lands. They are the acceptance tests for those
+// fixes: run them with `pina test --project examples/staking_rewards_program
+// --filter audit_sec_`.
+// ---------------------------------------------------------------------------
+
+/// SEC-26: the canonical pool PDA for a mint pair is a singleton, and
+/// `InitializePool` stores whichever signer arrives first as the permanent
+/// administrator. An unapproved first caller must not be able to occupy it.
+///
+/// Current behavior: any funded signer initializes the canonical pool and
+/// becomes the stored administrator, so the first `expect_err` below fails
+/// and the test proves the capture is live.
+/// Dormant acceptance test for issue #502: the exploit this test proves is
+/// deferred pending the initialization trust-model decision. Enable the
+/// `audit-deferred` feature and run this test explicitly once the fix lands.
+#[cfg(feature = "audit-deferred")]
+#[test]
+#[ignore = "deferred: issue #502"]
+fn audit_sec_26_unapproved_first_initializer_cannot_capture_the_singleton_pool() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let intended_admin = program.payer();
+		let attacker = Keypair::new_from_array([0xAD; 32]);
+		program
+			.fund(&attacker.pubkey(), FUND)
+			.expect("fund attacker");
+
+		let stake_mint = provision_mint(&program, &intended_admin, &mint_authority, 3)
+			.expect("provision stake mint");
+		let reward_mint = provision_mint(&program, &intended_admin, &mint_authority, 4)
+			.expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		// The attacker races the intended administrator to the canonical pool.
+		let error = program
+			.send_with_signers(
+				initialize_pool_instruction(
+					&program,
+					&attacker.pubkey(),
+					&stake_mint,
+					&reward_mint,
+					&pool,
+					&stake_vault,
+					&reward_vault,
+					pool_bump,
+				),
+				&[&attacker],
+			)
+			.expect_err("an unapproved signer must not capture the canonical pool");
+
+		// The rejection must not leave any state behind: no pool, no vaults.
+		assert!(
+			program.account(&pool).is_err(),
+			"authorization failure must not create pool state"
+		);
+		let message = error.message();
+		assert!(
+			message.contains("Unauthorized") || message.contains("custom program error"),
+			"expected an authorization rejection, got: {message}"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// SEC-27 (reserves): `SetRewardIndex` accepts any monotone index without
+/// consulting the reward vault or tracking aggregate liabilities. An update
+/// that promises more rewards than the vault holds must be rejected before
+/// the index moves.
+///
+/// Current behavior: the update is accepted, so the `expect_err` below fails
+/// and the test proves unbacked liabilities are live.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserves() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		// Two depositors stake 10 each, so the ledger credits 20 staked.
+		let staked: u64 = 10;
+		for seed in [5u8, 6u8] {
+			let depositor = Keypair::new_from_array([seed; 32]);
+			program
+				.fund(&depositor.pubkey(), FUND)
+				.expect("fund depositor");
+			let (position, position_bump) = position_pda(&program_id, &pool, &depositor.pubkey());
+			program
+				.send_with_signers(
+					open_position_instruction(
+						&program,
+						&depositor.pubkey(),
+						&pool,
+						&position,
+						position_bump,
+					),
+					&[&depositor],
+				)
+				.expect("execute OpenPosition");
+			fund_stake_ata(
+				&program,
+				&admin,
+				&depositor.pubkey(),
+				&stake_mint,
+				&mint_authority,
+				staked,
+			)
+			.expect("fund stake ATA");
+			program
+				.send_with_signers(
+					deposit_instruction(
+						&program,
+						&depositor.pubkey(),
+						&stake_mint,
+						&pool,
+						&position,
+						&ata_of(&depositor.pubkey(), &stake_mint),
+						&stake_vault,
+						staked,
+					),
+					&[&depositor],
+				)
+				.expect("execute Deposit");
+		}
+		assert_stake_backing(&program, &stake_vault, &pool);
+
+		// Fund the reward vault with exactly ONE of the two promised payouts.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund reward vault with half the liability");
+
+		// One full index unit promises one reward token per staked token:
+		// 20 owed against a 10-token vault. The update must be rejected.
+		let error = program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect_err("an index update beyond the vault's reserves must be rejected");
+
+		// The rejected update must leave the index unchanged at zero.
+		let pool_account = program.account(&pool).expect("fetch pool state");
+		assert_eq!(
+			u64::from_le_bytes(
+				pool_account.data[106..114]
+					.try_into()
+					.expect("reward index")
+			),
+			0,
+			"a rejected index update must not move the index: {}",
+			error.message()
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// SEC-27 (claim order): when an index update is accepted, equal entitlements
+/// must not depend on the order in which users claim. With the current
+/// underfunded index accepted, the first claim drains the vault and the
+/// second fails, so the second claim below fails and the test proves the
+/// order dependence.
+///
+/// After the fix this test passes either because the underfunded update is
+/// rejected (the branch returns early) or because reserves always cover the
+/// accepted liability and both claims succeed.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		let staked: u64 = 10;
+		let mut positions = Vec::new();
+		for seed in [5u8, 6u8] {
+			let depositor = Keypair::new_from_array([seed; 32]);
+			program
+				.fund(&depositor.pubkey(), FUND)
+				.expect("fund depositor");
+			let (position, position_bump) = position_pda(&program_id, &pool, &depositor.pubkey());
+			program
+				.send_with_signers(
+					open_position_instruction(
+						&program,
+						&depositor.pubkey(),
+						&pool,
+						&position,
+						position_bump,
+					),
+					&[&depositor],
+				)
+				.expect("execute OpenPosition");
+			fund_stake_ata(
+				&program,
+				&admin,
+				&depositor.pubkey(),
+				&stake_mint,
+				&mint_authority,
+				staked,
+			)
+			.expect("fund stake ATA");
+			program
+				.send_with_signers(
+					deposit_instruction(
+						&program,
+						&depositor.pubkey(),
+						&stake_mint,
+						&pool,
+						&position,
+						&ata_of(&depositor.pubkey(), &stake_mint),
+						&stake_vault,
+						staked,
+					),
+					&[&depositor],
+				)
+				.expect("execute Deposit");
+			positions.push((depositor, position));
+		}
+
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund reward vault with half the liability");
+
+		// If the underfunded update is rejected — the SEC-27 fix — equal
+		// treatment is upheld and this test has nothing left to prove.
+		if let Err(error) = program.send_instruction(set_reward_index_instruction(
+			&program,
+			&admin,
+			&pool,
+			&reward_mint,
+			&token_program_id(),
+			&reward_vault,
+			REWARD_INDEX_SCALE,
+		)) {
+			assert!(
+				error.transaction_error().is_some(),
+				"harness failure before the program could reject the update: {error:?}"
+			);
+			program.stop().expect("stop isolated program test");
+			return;
+		}
+
+		// The update was accepted, so both equal entitlements must be payable,
+		// regardless of who claims first.
+		for (depositor, position) in &positions {
+			program
+				.send_with_signers(
+					claim_instruction(
+						&program,
+						&depositor.pubkey(),
+						&reward_mint,
+						&pool,
+						position,
+						&ata_of(&depositor.pubkey(), &reward_mint),
+						&reward_vault,
+					),
+					&[depositor],
+				)
+				.unwrap_or_else(|error| {
+					panic!(
+						"an accepted index must honor every equal entitlement: {}",
+						error.message()
+					)
+				});
+			let received = vault_amount(
+				&program
+					.account(&ata_of(&depositor.pubkey(), &reward_mint))
+					.expect("fetch reward ATA"),
+			);
+			assert_eq!(
+				received, staked,
+				"each position must receive its full entitlement"
+			);
+		}
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// SEC-27 (unrepresentable liabilities): a large accepted index makes the
+/// per-position accrual unrepresentable in `u64`, after which claim, deposit,
+/// and withdraw all fail with `ArithmeticOverflow` and the position is
+/// frozen. The index update that creates an unrepresentable obligation must
+/// be rejected before state moves.
+///
+/// Current behavior: `u64::MAX` is accepted and the subsequent withdrawal
+/// fails with `Program arithmetic overflowed`, so the `expect` below fails
+/// and the test proves the freeze.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+		// Two trillion base units (two million tokens at six decimals): large
+		// enough that `staked * u64::MAX / SCALE` no longer fits a `u64` payout.
+		let staked = 2_000_000_000_000u64;
+		fund_stake_ata(
+			&program,
+			&admin,
+			&admin,
+			&stake_mint,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&ata_of(&admin, &stake_mint),
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Deposit");
+
+		// `u64::MAX` scaled units over the staked balance cannot be represented
+		// as a `u64` payout. Whatever the reserves say, this update must not be
+		// accepted: it would freeze the position above.
+		if let Err(error) = program.send_instruction(set_reward_index_instruction(
+			&program,
+			&admin,
+			&pool,
+			&reward_mint,
+			&token_program_id(),
+			&reward_vault,
+			u64::MAX,
+		)) {
+			assert!(
+				error.transaction_error().is_some(),
+				"harness failure before the program could reject the update: {error:?}"
+			);
+			// Rejected: the SEC-27 fix holds, nothing left to prove.
+			program.stop().expect("stop isolated program test");
+			return;
+		}
+
+		// Accepted today: the staked principal can no longer leave the pool,
+		// because every checkpoint that re-computes the accrual overflows.
+		// Demanding the withdrawal succeed turns the observed freeze into the
+		// test failure that proves the exploit.
+		program
+			.send_instruction(withdraw_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&ata_of(&admin, &stake_mint),
+				&stake_vault,
+				staked,
+			))
+			.expect("the staked principal must remain withdrawable after any accepted index");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The outstanding-liability counter must fall when a claim pays out: rewards
+/// that have left the vault are no longer a promise the vault must cover, so a
+/// later index advance is accepted against the smaller remaining liability
+/// even though the vault only holds the outstanding remainder. Before the fix,
+/// SetRewardIndex re-derived the full liability from genesis on every update
+/// (`total_staked * new_index / SCALE`), so this advance was rejected against
+/// rewards that had already been paid and banked stake that had already left.
+#[test]
+#[ignore = "run with pina test"]
+fn claims_reduce_the_liability_the_vault_must_back() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+		let user_stake_ata = ata_of(&admin, &stake_mint);
+		let user_reward_ata = ata_of(&admin, &reward_mint);
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		let staked = 1_000u64;
+		fund_stake_ata(
+			&program,
+			&admin,
+			&admin,
+			&stake_mint,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Deposit");
+
+		// One full drip is owed on the staked balance, so fund the vault with
+		// exactly that payout.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the first drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect("execute the first SetRewardIndex");
+
+		// The claim pays the accrued rewards out of the vault, so the vault is
+		// now empty and the liability must have fallen with it — to zero.
+		program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect("execute Claim");
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"a paid-out claim must leave no outstanding liability"
+		);
+
+		// A second drip needs only the new increment covered. Before the fix,
+		// this was rejected: the gate re-derived `staked * new_index / SCALE`
+		// from genesis against an emptied vault.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the second drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				2 * REWARD_INDEX_SCALE,
+			))
+			.expect("an index advance after a claim must cover only the new increment");
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// Banked rewards keep counting toward the outstanding liability until they
+/// are claimed: a withdrawal checkpoints a position's earned rewards into
+/// `pending_rewards`, and the vault must still cover them after the position's
+/// stake has left the pool. Before the fix, SetRewardIndex measured the
+/// liability as `total_staked * index`, so a withdrawal after a drip silently
+/// dropped the banked rewards from what the gate demanded the vault cover.
+#[test]
+#[ignore = "run with pina test"]
+fn banked_pending_rewards_stay_reserved_until_claimed() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+		let user_stake_ata = ata_of(&admin, &stake_mint);
+		let user_reward_ata = ata_of(&admin, &reward_mint);
+		let (position, position_bump) = position_pda(&program_id, &pool, &admin);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+		program
+			.send_instruction(open_position_instruction(
+				&program,
+				&admin,
+				&pool,
+				&position,
+				position_bump,
+			))
+			.expect("execute OpenPosition");
+
+		let staked = 1_000u64;
+		fund_stake_ata(
+			&program,
+			&admin,
+			&admin,
+			&stake_mint,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund stake ATA");
+		program
+			.send_instruction(deposit_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Deposit");
+
+		// One full drip over the staked balance, fully funded.
+		mint_into(
+			&program,
+			&reward_mint,
+			&reward_vault,
+			&mint_authority,
+			staked,
+		)
+		.expect("fund the drip");
+		program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&reward_mint,
+				&token_program_id(),
+				&reward_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect("execute SetRewardIndex");
+
+		// Withdraw the full stake: the accrual over the staked balance is
+		// banked into `pending_rewards` before the stake leaves the pool.
+		program
+			.send_instruction(withdraw_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&pool,
+				&position,
+				&user_stake_ata,
+				&stake_vault,
+				staked,
+			))
+			.expect("execute Withdraw");
+
+		// The banked rewards are still owed, so the outstanding liability must
+		// have survived the withdrawal.
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			staked,
+			"banked pending rewards must stay reserved after the stake leaves"
+		);
+
+		// The claim still pays the banked rewards from the vault.
+		program
+			.send_instruction(claim_instruction(
+				&program,
+				&admin,
+				&reward_mint,
+				&pool,
+				&position,
+				&user_reward_ata,
+				&reward_vault,
+			))
+			.expect("the banked rewards must remain payable after the withdrawal");
+		assert_eq!(
+			u64::from_le_bytes(
+				program.account(&pool).expect("fetch pool state").data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"the liability must fall to zero once the banked rewards are paid"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+/// The reserve gate must bind the vault to the pool's own stored reward mint:
+/// a caller naming any other mint gets that mint's pool-owned ATA, and without
+/// the binding check anyone could create a worthless mint, fund its pool ATA
+/// to any balance, and move the reward index with no real reward tokens
+/// behind it. The update must be refused with `InvalidPool` before the vault
+/// balance is read.
+#[test]
+#[ignore = "run with pina test"]
+fn set_reward_index_rejects_a_foreign_reward_mint() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let mint_authority = Keypair::new_from_array([2; 32]);
+		program
+			.fund(&mint_authority.pubkey(), FUND)
+			.expect("fund mint authority");
+
+		let admin = program.payer();
+		let stake_mint =
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let reward_mint =
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+
+		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		let stake_vault = ata_of(&pool, &stake_mint);
+		let reward_vault = ata_of(&pool, &reward_mint);
+
+		program
+			.send_instruction(initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				pool_bump,
+			))
+			.expect("execute InitializePool");
+
+		// An attacker's mint with its own pool-owned ATA, funded far beyond
+		// the real reward vault: without the stored-mint binding this balance
+		// would satisfy the reserve gate.
+		let foreign_mint =
+			provision_mint(&program, &admin, &mint_authority, 7).expect("provision foreign mint");
+		let foreign_vault = ata_of(&pool, &foreign_mint);
+		fund_stake_ata(
+			&program,
+			&admin,
+			&pool,
+			&foreign_mint,
+			&mint_authority,
+			1_000_000,
+		)
+		.expect("fund the foreign mint's pool ATA");
+
+		let error = program
+			.send_instruction(set_reward_index_instruction(
+				&program,
+				&admin,
+				&pool,
+				&foreign_mint,
+				&token_program_id(),
+				&foreign_vault,
+				REWARD_INDEX_SCALE,
+			))
+			.expect_err("a foreign reward mint must not satisfy the reserve gate");
+		pina_test::assert_custom_error(&error, StakingError::InvalidPool as u32);
+
+		// The rejected update moved neither the index nor the liability.
+		let pool_account = program.account(&pool).expect("fetch pool state");
+		assert_eq!(
+			u64::from_le_bytes(
+				pool_account.data[106..114]
+					.try_into()
+					.expect("reward index")
+			),
+			0,
+			"the rejected update must not move the index"
+		);
+		assert_eq!(
+			u64::from_le_bytes(
+				pool_account.data[114..122]
+					.try_into()
+					.expect("outstanding rewards")
+			),
+			0,
+			"the rejected update must not move the liability"
+		);
 
 		program.stop().expect("stop isolated program test");
 	});

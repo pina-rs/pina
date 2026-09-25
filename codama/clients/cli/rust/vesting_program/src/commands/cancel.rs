@@ -33,6 +33,12 @@ pub struct CancelArgs {
 	/// The `token_program` account
 	#[arg(long)]
 	token_program: String,
+	/// Clock for the vested-entitlement settlement: cancellation must not confiscate what the linear curve has already released
+	#[arg(long)]
+	clock: String,
+	/// The beneficiary's ATA: the vested-but-unclaimed amount settles here before any remainder returns to the administrator. It is mutable because the settlement transfer credits it
+	#[arg(long)]
+	beneficiary_ata: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError> {
@@ -42,6 +48,8 @@ pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError
 	let admin_ata = CliContext::pubkey("--admin_ata", &args.admin_ata)?;
 	let vault = CliContext::pubkey("--vault", &args.vault)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
+	let clock = CliContext::pubkey("--clock", &args.clock)?;
+	let beneficiary_ata = CliContext::pubkey("--beneficiary_ata", &args.beneficiary_ata)?;
 	let data = CancelInstructionData::new(|_data| {}).map_err(|_| {
 		CliError::InvalidData {
 			message: "instruction data rejected the provided arguments".to_string(),
@@ -59,6 +67,8 @@ pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError
 		),
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 		token_program,
+		clock,
+		beneficiary_ata,
 	};
 
 	context.send(accounts.instruction(data))

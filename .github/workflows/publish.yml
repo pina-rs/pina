@@ -24,6 +24,7 @@ on:
   push:
     tags:
       - "v*"
+      - "abi/v*"
 
 permissions:
   contents: read
@@ -51,7 +52,7 @@ jobs:
     name: resolve release revision
     if: >-
       github.repository_owner == 'pina-rs' &&
-      startsWith(inputs.tag || github.ref_name, 'v')
+      (startsWith(inputs.tag || github.ref_name, 'v') || startsWith(inputs.tag || github.ref_name, 'abi/v'))
     permissions:
       contents: read # Resolve the tag and the requested ref to commit SHAs.
     runs-on: ubuntu-latest
@@ -246,7 +247,10 @@ jobs:
           bin: pina
           manifest-path: crates/pina_cli/Cargo.toml
           profile: release
-          ref: ${{ needs.resolve_revision.outputs.sha }}
+          # The action derives its upload target from this ref and refuses a
+          # bare SHA outside a dry run, so it gets the tag itself; resolve_revision
+          # has already proven the tag points at the validated commit.
+          ref: ${{ inputs.checkout_ref || format('refs/tags/{0}', env.RELEASE_TAG) }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
           include: ${{ matrix.lint_driver == true && (endsWith(matrix.target, '-windows-msvc') && format('target/{0}/release/pina_lint_driver.exe', matrix.target) || format('target/{0}/release/pina_lint_driver', matrix.target)) || '' }}
@@ -415,8 +419,8 @@ jobs:
       - name: validate release tag input
         run: |
           set -euo pipefail
-          if [[ "$RELEASE_TAG" != v* ]]; then
-            echo "::error::Tag '$RELEASE_TAG' must be a release tag like v0.9.0" >&2
+          if [[ "$RELEASE_TAG" != v* && "$RELEASE_TAG" != abi/v* ]]; then
+            echo "::error::Tag '$RELEASE_TAG' must be a release tag like v0.9.0 or abi/v0.20.0" >&2
             exit 1
           fi
         shell: bash

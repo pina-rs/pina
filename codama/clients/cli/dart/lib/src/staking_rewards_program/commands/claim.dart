@@ -17,7 +17,12 @@ final class ClaimCommand extends Command<void> {
         mandatory: true,
         help: "The reward_mint account",
       )
-      ..addOption('pool_state', mandatory: true, help: "The pool_state account")
+      ..addOption(
+        'pool_state',
+        mandatory: true,
+        help:
+            "The pool's state is written: the payout leaves the pool's outstanding",
+      )
       ..addOption(
         'position_state',
         mandatory: true,

@@ -20,12 +20,27 @@ export const setRewardIndexCommand = registerGlobals(
 	.description("setRewardIndex")
 	.requiredOption("--new-index <newIndex>", "newIndex")
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
+	.requiredOption(
+		"--reward-mint <rewardMint>",
+		"The pool's reward mint, for validating the vault binding",
+	)
+	.requiredOption(
+		"--token-program <tokenProgram>",
+		"The token program that owns the reward mint and vault",
+	)
+	.requiredOption(
+		"--reward-vault <rewardVault>",
+		"The pool's canonical reward vault. An index update is a promise to pay:",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			newIndex: bigInteger("--new-index", options.newIndex),
 			admin: context.payer,
 			poolState: pubkey("--pool-state", options.poolState),
+			rewardMint: pubkey("--reward-mint", options.rewardMint),
+			tokenProgram: pubkey("--token-program", options.tokenProgram),
+			rewardVault: pubkey("--reward-vault", options.rewardVault),
 		};
 		const instruction = getSetRewardIndexInstruction(
 			...[input],

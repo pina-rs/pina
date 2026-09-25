@@ -80,7 +80,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
 | `require_consistent_token_program`                      | deny  | Token validation and CPI share one program identity |
 | `require_explicit_token_2022_extension_policy`          | deny  | Token-2022 extensions are explicitly allow-listed   |
-| `require_post_cpi_balance_reload`                       | deny  | Custody deposits use an observed balance delta      |
+| `require_post_cpi_balance_reload`                       | deny  | Token CPI destinations are reloaded after the CPI   |
 | `require_checked_asset_arithmetic`                      | deny  | Economic arithmetic fails on overflow/underflow     |
 | `require_guarded_full_balance_drain`                    | warn  | Full-balance drains are gated by a guard            |
 | `require_bounded_remaining_accounts`                    | deny  | Caller-controlled account work has a visible bound  |
@@ -120,14 +120,44 @@ The lint tracks lexical call order and receiver identity. It does not infer writ
 
 ### `require_zeroed_before_close`
 
-Detects `close()` or `close_with_recipient()` without an earlier `zeroed()` on the same account. Prefer `close_account_zeroed()` when the combined helper fits.
+Detects `close()` or `close_with_recipient()` without first zeroing the same account's data. Prefer `close_account_zeroed()` or the `CloseAccountZeroed` builder, which zero the data and close in one step and are never flagged:
 
 ```rust
-state.zeroed()?;
+state.close_account_zeroed(&ID, recipient)?;
+```
+
+When the close must stay separate, clear the whole data buffer first:
+
+```rust
+state.try_borrow_mut()?.fill(0);
 state.close_with_recipient(&ID, recipient)?;
 ```
 
-This protects against stale bytes remaining observable during the transaction. The lint intentionally does not flag the combined zeroing close helper.
+This protects against stale bytes remaining observable during the transaction.
+
+The zeroing proof is a `fill(0)` resolved to `core`'s slice method over the entire buffer returned by `solana_account_view`'s `AccountView::try_borrow_mut()?` (the type Pina and Pinocchio re-export), in method or fully qualified form: chained directly, through `[..]`, or through a `let` binding of that buffer that is later only dropped. Closes are recognized in both forms too, so `AccountView::close(state)` and `<AccountView>::close(&mut *state)` are checked like `state.close()`. A partial fill (`data[..8].fill(0)`), a non-zero or non-literal fill, a same-named non-slice `fill`, and a same-named `try_borrow_mut` on another type are not proofs. The fill must also be the last write: a later `try_borrow_mut()` that could reach the same account, or any use of the zeroed buffer other than `drop`, before the close voids it. Writes through other paths, such as a typed `as_account_mut()` loader or a CPI, are not tracked.
+
+"Same account" means both receivers resolve to the same local binding plus field path. A `let` alias is followed only when its initializer is a plain place (`x`, `&x`, `&mut x`, `&mut *x`, `*x`, `x.field`), so `let alias = &mut *state;` names `state` and zeroing or closing through it counts. A binding initialized any other way, such as `let vault = next_account(&mut iter)?;`, is its own account rather than an alias of the call's argument. A receiver reached through indexing (`accounts[0]`) or a method or function call has no identity, so its close is always flagged; bind the account first. A binding that may hold a different value by the close has no identity either: one that is assigned (including through `*alias = ..`), lent as a slot (`&mut binding`, including `mem::swap` and `addr_of_mut!`), or captured by a closure.
+
+The account's place must also stay put. Lending the place, or any place it is reached through, mutably anywhere before the close voids the proof, even when the lend comes before the zeroing. A lend is any of:
+
+- a `&mut` borrow;
+- a `ref mut` binding, or a `match`, `if let`, or `let` whose default binding modes borrow it mutably;
+- passing a `&mut` place to a function;
+- calling a `&mut self` method outside `solana_account_view`, `pinocchio`, and `pina`, including a user function or method that only shares a close name, which lends its receiver to every other close;
+- a closure that captures the place mutably, or captures a `&mut` to it by value.
+
+So `rotate(ctx)`, `ctx.rotate()`, `|| rotate(ctx)`, and `mem::swap(&mut ctx.escrow, ..)` all void a proof for `ctx.escrow`, while lending the sibling `&mut ctx.maker` does not. A lend or `try_borrow_mut()` through an alias whose value may have changed since its `let`, or through an expression the lint cannot place (such as a getter's result), is assumed to reach every account, so it voids every proof it could affect.
+
+The zeroing must run on every path to the close: a fill inside an `if` or `else` branch, a `match` arm, the right side of `&&`/`||`, a loop body, a labeled block, or the `else` block of a `let ... else` proves only a close inside that same scope, because a condition, `break`, or failed pattern can skip it.
+
+Known limits:
+
+- Methods from `solana_account_view`, `pinocchio`, and `pina` are trusted not to replace the account, so a write to its data through one of them after the fill (such as a typed `as_account_mut()` loader) is not seen.
+- A write by a CPI after the fill is not seen.
+- A write through a separately obtained handle to the same account (a copied or cloned `AccountView`, or one returned by a call) after the fill is not seen.
+- A lend that appears after the close inside a loop is not considered for the next iteration.
+- The check is lexical within one function body, and zeroing inside a closure never counts.
 
 ### `require_sysvar_assert_before_sysvar_use`
 
@@ -276,16 +306,91 @@ Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccoun
 
 ### `require_post_cpi_balance_reload`
 
-Detects token transfers into accounts whose names indicate protocol custody (`vault`, `custody`, `reserve`, or `pool`) unless the destination amount is read before and after CPI.
+Detects a token balance snapshot that is trusted after a value-moving token CPI changed the balance it describes. Two tiers apply to every builder of a `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` instruction:
+
+- **Snapshot tier (every destination).** After a value-moving CPI into an account, two kinds of value are tracked:
+  - A **snapshot-derived** value is an integer read of the account's balance taken before the CPI, or any local, conversion, or arithmetic result computed from one.
+  - A **reload** is a read of the same account after the CPI that runs on every path to the use. It may not sit only inside an `if` arm, a closure, or a loop the use is outside of. A **reload-derived** value is a reload, or any local, conversion, or arithmetic result computed from one.
+  - Conversions carry the value unchanged: `as` casts, borrows, and the integer-to-integer `From::from`, `Into::into`, `TryFrom::try_from`, and `TryInto::try_into`, resolved through their traits, with any `?`, `unwrap`, `expect`, or `map_err` after the fallible forms. So `u128::from(after).checked_sub(u128::from(before))`, `i128::from(after) - i128::from(before)`, and `let before: u128 = ata.amount().into()` work like the plain `u64` forms.
+
+  After the CPI, a snapshot-derived value may appear only as:
+
+  1. one side of a comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`, `.eq()`, `.cmp()`, ...) whose other side is reload-derived or a constant, looking through `&`. This verifies the real balance: `if after != before + 10`, `let expected = before.checked_add(10)?; if after != expected`, `before.cmp(&after)`, and `if prior == 0` all pass;
+  2. the subtrahend of a subtraction-like operation whose minuend is a reload: `-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, or `overflowing_sub`, in method or function-call syntax (`u64::checked_sub(after, before)`), or either operand of the symmetric `abs_diff`. The result is a **delta**, which is reload-derived and no longer stale: `after - before`, `after.checked_sub(before)`, `after as u128 - before as u128`. The reverse sign (`before - after`) is not the amount received and stays snapshot-derived; or
+  3. an operand of an addition-like operation (`+`, `checked_add`, `saturating_add`, `wrapping_add`, `overflowing_add`) whose other operand is a delta, directly or through a local: `before + (after - before)`, or `let delta = after.checked_sub(before)?; before.checked_add(delta)`.
+
+  Every other appearance is a stale use:
+
+  - other arithmetic whose result is then returned, stored, or passed on;
+  - a call argument, a return value, or a tuple, struct field, or array element;
+  - an addition with a bare reload (`before.checked_add(after)`); and
+  - arithmetic that cancels the reload out (`before + after * 0`, `before.wrapping_add(after - after)`).
+
+  A value bound to a local that is never read goes nowhere and is not reported. This covers `user_stake_ata`, `treasury`, `fee_receiver`, and any other name. Unrelated CPIs between the transfer and the reload are allowed.
+
+  Logging or emitting the pre-transfer balance is a stale use by design: an event that reports `before` as a balance after the CPI publishes a value the chain no longer holds. Log the reload and the delta instead (`log(after); log(received)`). If the old balance must be recorded, compute and record it before the CPI, or place a narrowly scoped `#[allow(require_post_cpi_balance_reload, reason = "...")]` on the handler. Likewise, after verifying `if after != expected { return Err(..) }`, return `after` rather than `expected`.
+- **Custody tier (custody-named transfer destinations).** A transfer into an account whose name contains `vault`, `custody`, `reserve`, or `pool` must be bracketed by destination reads with no other CPI in between, even when no snapshot exists yet, because a custody deposit is only safe to credit from the observed delta. Where the typed identity below cannot name the destination or one of its reads, the tier falls back to the name-based check (reads whose written receiver matches the written destination), so code that check accepts is not newly rejected for that reason.
 
 ```rust
-let before = vault.as_token_account_for_program(&program_id)?.amount();
+let before = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
 transfer.invoke_with_program(&program_id)?;
-let after = vault.as_token_account_for_program(&program_id)?.amount();
+let after = user_stake_ata.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the direct invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. A static `invoke()` is exempt only when the resolved constructor belongs to the canonical `pinocchio_token` crate, including Pina's `token` re-export; local look-alikes and Token-2022 builders remain covered. Opaque builder wrappers are not diagnosed because the analysis cannot associate them with a particular invocation; audit such wrappers manually or keep the transfer direct in the instruction handler.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement.
+
+**What counts as a builder.** A `new` or `with_multisig_signers` constructor qualifies when all of the following hold:
+
+- Its resolved return type, after unwrapping `Result` and `Option`, has a name ending in `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked`. So `SplTransfer` and the real `transfer_checked::TransferChecked` both count.
+- Its signature leads with parameters that are references to a struct or generic type, followed by an integer amount.
+- It leads with enough account parameters. A builder defined in a token crate (`pinocchio_token`, `pinocchio_token_2022`, `spl_token`, `spl_token_2022`, `spl_token_interface`, or `pina`) needs three: it is a token instruction by where it comes from. A builder defined anywhere else needs four for a transfer (`from, mint, to, authority`), because naming the mint is what a lamport transfer never does, and three for a mint.
+- It is not defined in `pinocchio_system` or `solana_system_interface`.
+
+So `AuthorityTransfer::new(config, new_authority, signer)` (no amount) and a local `LamportTransfer::new(payer, vault, system_program, lamports)` (no mint) do not count. The destination is the third account when four lead and the second otherwise.
+
+**Which account an expression names.** Every local is keyed by its binding, never by its name, so shadowed locals and `let`-`else`, `if let`, and `match` bindings that share a name stay distinct. Fields extend the key with their full path, so `ctx.user_ata`, `ctx.fee_ata`, and `ctx.vault` stay distinct whatever their field types are. Only these steps are looked through:
+
+- `let` aliases, `&`, `*`, and `?`;
+- Pina's token-view methods (`as_token_account()`, `as_token_account_for_program()`, `as_token_2022_account()`, `as_associated_token_account()`, and `as_account()`);
+- the token crates' state loaders (`TokenAccount::from_account_view()` and the `_unchecked`/`from_account_info` variants), keyed by their first argument;
+- the `.base` field of a loaded Token-2022 view; and
+- `Option`/`Result` adaptors that pass the success value through (`ok_or`, `ok_or_else`, `unwrap`, `expect`, `map_err`), and Pina's `assert_*` checks, which return the account they checked.
+
+Cursor methods get a key unique to their call site, so two `it.next()` calls never name the same account. These are `Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, and Pina's `AccountsCursor::next*`. Every other method call with constant arguments is keyed by its receiver, the method's resolved definition, and its arguments, whether or not it takes `&mut self`. So an accessor such as `ctx.vault_mut()` names the same account on every call, and `accounts.get(2)` differs from `accounts.get(3)`. A `let` binding initialized from a non-cursor `&mut self` method call (looking through `?` and `Option`/`Result` adaptors) is keyed by that call and its binding name. So `let fee = cursor.take()?; let vault = cursor.take()?;` never collide, while rebinding the same accessor under the same name (`let vault = ctx.vault_mut();` before and after the transfer) names one account, as the name-based check treats it. Because such a call may be an accessor or a hand-written cursor, the custody tier defers to the name-based verdict whenever the destination or a balance read passes through such a binding. Anything else, such as a dynamic index or a call with a non-constant argument, names no account, and a read that names no account never matches a destination.
+
+**What counts as a read.** `.amount()` and `Type::amount(account)` count, outside closures. A read inside a closure only happens if the closure runs, so it counts for neither tier. Snapshots are followed through tuple destructuring, verbatim copies (`let snapshot = before;`), and assignments (`before = ata.amount();`).
+
+**Unreachable uses.** A use the CPI cannot reach is not stale: the CPI sits in a block that always returns, or the use is in a sibling `if`/`match` arm.
+
+**Legacy program exemption.** A static `invoke()` or `invoke_signed()` is exempt when both of these hold:
+
+- its receiver's full type is the constructed builder; and
+- that builder's program type parameter is `pinocchio_token::TokenProgram`.
+
+That call targets the legacy SPL Token program, which has no transfer-fee extension, so the requested amount is exactly what arrives. The following stay covered:
+
+- a wrapper's `invoke()`;
+- any expression that yields a Token-2022 builder instead, such as `pick(legacy, token_2022).invoke()`;
+- Pina's `token_2022` aliases;
+- local look-alikes; and
+- every runtime-program invocation (`invoke_with_program()`, `invoke_with_unverified_program()`, and their signed variants).
+
+**Limits.**
+
+- A snapshot behind a helper function (`let before = read_balance(ata)`) or stored in a struct field (`Snap { before: ata.amount() }`) is not tracked.
+- A snapshot-derived value that flows into a non-integer local (such as `let x: Option<u64> = before.checked_add(10);`) is not followed further and is reported at that binding.
+- A snapshot that starts out as a non-integer value, such as `Some(ata.amount())` or `ata.amount().checked_add(0)` bound to an `Option<u64>`, is never tracked, so its later uses are not checked.
+- A delta that cancels itself out (`let d = after - before; before + d - d + 10`) is accepted: the addition with the delta makes the result reload-derived, and later arithmetic on a reload-derived value is not re-examined.
+- A destination that names no account gets no snapshot analysis. The custody tier still requires reads for it, through the name-based fallback.
+- A local builder that transfers without naming the mint (`from, to, authority, amount`) is only covered when it comes from a token crate.
+- A `&mut self` method other than the listed cursors, called inline more than once (`cursor.take()?.amount()` twice), is assumed to return the same account on every call with the same constant arguments. Bind each result with `let` to give it its own identity. Binding two results of the same call under the same name treats them as one account. So rebinding a hand-written cursor as `let acct = cursor.take()?;` before and after the transfer counts the second account's read as the first account's reload, and a stale snapshot of the first account is not reported. Give each cursor result its own name.
+- A read through a `let`-bound `&mut self` result and a transfer into a separate inline call of the same method (`let vault = ctx.vault_mut(); let before = vault.amount(); transfer(ctx.vault_mut())`) are different identities, so the snapshot tier does not check that snapshot. Use the binding for both the reads and the transfer.
+- A local's value is taken from its lexically latest definition before the use. Writes through `&mut` references to it are not tracked.
+- Builders passed through opaque wrappers are not associated with their invocation.
+- Code is ordered lexically, so loops are analysed in source order.
+
+Audit such code manually or keep the transfer and the reads direct in the instruction handler.
 
 ### `require_checked_asset_arithmetic`
 
@@ -314,6 +419,45 @@ for account in remaining {
 ```
 
 Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases and computes loop-carried state to a fixed point. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound, including for later iterations of an enclosing loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
+
+### `require_guarded_full_balance_drain`
+
+Detects an instruction handler that sends an account's entire `lamports()` balance with `send` or `send_owned` unless a pause, circuit-breaker, or withdrawal-cap guard is enforced earlier in the same or an enclosing scope (not inside a branch, loop body, closure, or the right operand of `&&`/`||`), or the same account is closed first.
+
+```rust
+fn enforce_withdrawal_policy(config: &VaultConfig) -> Result<(), ProgramError> {
+	assert_not_paused(config)?;
+	config.assert_within_window_cap()
+}
+
+enforce_withdrawal_policy(&config)?;
+vault.send_owned(&ID, vault.lamports(), recipient)?;
+```
+
+A call counts as the guard only when all of the following hold:
+
+- **Its failure stops the handler.** A `Result`/`Option` guard is propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None` (or evaluate to one when the whole expression is itself returned or propagated), return the scrutinee's own binding, or panic. Arms are read in order, so a `_` after an unguarded `Err(_)` arm only receives success. Adapters that keep the failure are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, `or_else` whose fallback can only fail, `clone()`, and `into()`/`From::from` into a `Result` or the same type. `or(Ok(..))`, `or(Some(..))`, a recovering `or_else`, `unwrap_or`, a conversion into `Option<Result<..>>`, and a discarded result are not.
+- **Polarity is checked.** A `bool` guard, `is_err()`/`is_ok()`, or `eq`/`ne`/`==`/`!=` against `Ok(..)` of a fallible one must gate an `if`, `assert!`, `assert_eq!`, `assert_ne!`, or `pina::assert(ok, error, message)?` so that execution continues only on the passing value. So `if guard().is_ok() { return Ok(()) }`, `assert_eq!(guard().is_err(), true)`, and `match guard() { Ok(()) => return Err(..), _ => {} }` do not gate the drain that follows. A guard that returns a `bool` itself has no known polarity, so a failing branch on either side of its `if` counts.
+- **A failing branch fails.** It returns `Err`/`None`, returns a local helper that can only fail (`return reject()`), or panics. A guard-named local method returning `()`, such as `fn assert_not_paused(&self) { assert!(!self.paused) }`, counts where it is called when its body can panic. A branch that returns `Ok`, `break`s, or `continue`s is not a failure. An early `return Ok(..)` on the paused path, such as `if state.is_paused() { return Ok(()) }`, deliberately does not count. For a `bool` guard the lint cannot tell which value is the failing one, and reporting success for a blocked sweep hides the pause from callers.
+- **It reads the handler's inputs.** Its receiver or an argument must be derived from a function parameter (including `self`), directly or through locals bound from one. A zero-argument call, or one fed only literals and constants (even through a local such as `let zero = 0;`), cannot inspect the state it claims to guard.
+- **It names the check, or delegates to one.** It is a function or method whose name contains `pause`, `cap`, `circuit`, `halt`, `guard`, `limit`, or `throttle`, because behavior alone cannot tell a cap check from `assert_signer()?`, which every handler propagates. Closures, fn pointers, and generic callables are named by their binding and never count by name. A differently named local function that returns `Result`/`Option` counts when its own body enforces such a guard in its outermost scope before any early success `return` or `break`, followed up to three wrappers deep, so `enforce_withdrawal_policy(&config)?` above is accepted. A wrapper returning `bool` is never followed. A generic wrapper is instantiated with its caller's arguments, so `fn policy<T: Guarded>(t: &T) -> Result<..> { t.check_cap() }` is judged by the impl its caller passes, not by the name `check_cap`. Inside a wrapper, a trait call that cannot be resolved (`dyn`, an unconstrained generic) counts as neither a guard nor a failure, and so does a `return` of a value the lint cannot see into (`return Ok(()).into()`, `return identity(Ok(()))`, `return finish.finish()`). A guard bound to a local counts where the local is enforced, unless it is reassigned or mutably borrowed first. A labeled block that can `break` with a success does not carry its tail guard out.
+- **It is not a constant success.** A local callee whose every returned value is a literal `Ok(..)`/`Some(..)` (or a `bool` literal), directly or through a never-reassigned `let` binding, and that has no reachable `?`, `Err`/`None`, or panic, is not a guard, whatever its name. Branches behind a literal `if true`/`if false` count as unreachable. Trait method calls are judged by the implementation that runs, never by a default body that the implementation overrides. In a generic handler (not a wrapper) where the implementation cannot be resolved, only the method name is used.
+
+Known limits:
+
+- Callees from other crates are judged by their name and call-site behavior only, and a unit guard from another crate never counts. In the handler itself, but not in a wrapper, a `return helper()` on the failing side whose helper cannot be analyzed counts as a failing branch, as the name rule did before, because any `return` there skips the drain.
+- `async fn` handlers and guards are not analyzed through `.await`, which does not arise in SBF programs.
+- A local guard-named callee counts if anything in its body can fail, even for reasons unrelated to its claimed check. The constant-success test does not evaluate conditions beyond literal `true`/`false`.
+- Wrappers deeper than three levels are not followed.
+- A pause check with no guard-named call, such as `if state.paused { return Err(..) }` or a differently named helper taking only the flag, is not recognized.
+- Some correct guards are still reported, because the lint errs toward warning when it cannot prove the failure stops the handler:
+  - `unwrap_or_else(|_| panic!(..))` on a guard's result;
+  - a guard result that is reassigned before it is propagated (`res = res.map_err(..); res?`);
+  - a guard bound through tuple destructuring;
+  - a unit guard that fails through `.expect()` rather than `assert!`/`panic!`;
+  - a guard whose receiver is a `static`.
+
+  Propagate the guard's result directly with `?` to satisfy the lint.
 
 ## Performance reference
 

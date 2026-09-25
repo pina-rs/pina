@@ -33,6 +33,13 @@ pub struct ProposalClose<'account> {
 	/// Required privileges: writable.
 	pub rent_collector: &'account AccountView,
 
+	/// CPI account `clock`.
+	/// Clock for the expiry test: an expired active proposal can neither
+	/// progress nor reach a terminal status on its own, so expiry itself is a
+	/// permissionless close condition. Stale proposals close the same way.
+	/// Required privileges: read-only.
+	pub clock: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `proposal_close`.
 	pub ix: ProposalCloseIx,
 }
@@ -69,10 +76,11 @@ impl<'account> ProposalClose<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 3] = [
+		let accounts: [CpiHandle<'_>; 4] = [
 			CpiHandle::readonly(self.multisig),
 			CpiHandle::writable(self.proposal)?,
 			CpiHandle::writable(self.rent_collector)?,
+			CpiHandle::readonly(self.clock),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

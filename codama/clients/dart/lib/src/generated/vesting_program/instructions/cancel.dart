@@ -98,6 +98,8 @@ Instruction getCancelInstruction({
   required Address associatedTokenProgram,
   required Address systemProgram,
   required Address tokenProgram,
+  required Address clock,
+  required Address beneficiaryAta,
 }) {
   final instructionData = CancelInstructionData();
 
@@ -112,6 +114,8 @@ Instruction getCancelInstruction({
       AccountMeta(address: associatedTokenProgram, role: AccountRole.readonly),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
       AccountMeta(address: tokenProgram, role: AccountRole.readonly),
+      AccountMeta(address: clock, role: AccountRole.readonly),
+      AccountMeta(address: beneficiaryAta, role: AccountRole.writable),
     ],
     data: getCancelInstructionDataEncoder().encode(instructionData),
   );

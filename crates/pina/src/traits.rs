@@ -270,6 +270,26 @@ where
 	}
 }
 
+/// A compact account whose PDA bump seed is stored in a declared field.
+///
+/// `#[pda(bump = ...)]` on a `#[account(compact)]` struct generates the
+/// implementation, which loads the declared field's byte directly from the
+/// compact header. [`crate::CreateCompactProgramAccountWithBump`] requires it
+/// so creation can reject a patch whose stored bump disagrees with the
+/// canonical bump the builder validated: an account that stores a different
+/// bump can never be loaded through the canonical stored-bump loaders, and the
+/// surplus rent it holds is stranded until the account is closed.
+#[cfg(feature = "compact")]
+pub trait PinaCompactStoredBump: PinaCompactAccount {
+	/// Load the stored bump field's byte from the compact header.
+	///
+	/// This is a direct offset read, not a validation pass: it returns
+	/// [`ProgramError::InvalidAccountData`] only when `data` is too short to
+	/// hold the header, and otherwise returns the byte at the field's offset
+	/// without checking the discriminator or the tails.
+	fn stored_bump(data: &[u8]) -> Result<u8, ProgramError>;
+}
+
 /// Validation trait for deserialized account data (e.g. `EscrowState`).
 ///
 /// Allows chaining arbitrary boolean assertions on the typed account, returning
@@ -1001,20 +1021,23 @@ pub trait LamportTransfer {
 /// # Examples
 ///
 /// ```ignore
-/// // Zero the escrow state first when stale bytes would be dangerous,
-/// // then close it and return rent to the authority:
-/// escrow_account.as_account_mut::<EscrowState>(&program_id)?.zeroed();
-/// escrow_account.close_with_recipient(&program_id, authority_account)?;
-///
-/// // Or use the built-in helper to clear the raw account bytes first:
+/// // Clear the raw account bytes, then close the account and return rent to
+/// // the authority in one step:
 /// escrow_account.close_account_zeroed(&program_id, authority_account)?;
+///
+/// // Or, when the close must stay a separate step, clear the whole data
+/// // buffer first. The temporary borrow ends with the statement, so the
+/// // close does not observe an active borrow:
+/// escrow_account.try_borrow_mut()?.fill(0);
+/// escrow_account.close_with_recipient(&program_id, authority_account)?;
 /// ```
 pub trait CloseAccountWithRecipient {
 	/// Close the account and transfer all remaining lamports to the recipient.
 	///
-	/// This helper does not zero account data for you. Call `zeroed()` first
-	/// when the account's old bytes must not remain revivable within the same
-	/// transaction.
+	/// This helper does not zero account data for you. Prefer
+	/// [`Self::close_account_zeroed`] when the account's old bytes must not
+	/// remain revivable within the same transaction, or clear them first with
+	/// `account.try_borrow_mut()?.fill(0);`.
 	fn close_with_recipient(
 		&mut self,
 		program_id: &Address,
@@ -1044,6 +1067,32 @@ pub trait CloseAccountWithRecipient {
 /// [`Self::remaining_mut_distinct`] by default. Its explicit
 /// `distinct = false` escape hatch uses [`Self::remaining_mut`] to preserve
 /// aliases for instruction contracts that intentionally allow them.
+///
+/// # Alias rules
+///
+/// Alias checks look forward. A mutable account parsed through
+/// [`Self::next_mut`] or [`Self::next_mut_opt`] must not appear in any later
+/// slot, whichever way that slot is parsed. An account that is already parsed
+/// has left the cursor, so a readonly slot followed by a mutable slot for the
+/// same account is accepted. This is deliberate: an authority that signs
+/// readonly and also pays as a writable payer is one account in two slots,
+/// and the runtime marks both slots writable. Declare the readonly field first
+/// when an instruction allows that overlap. When the fields must be distinct
+/// accounts, check it explicitly (compare the two addresses) instead of relying
+/// on declaration order.
+///
+/// # Account identity
+///
+/// The runtime serializes a repeated account once and marks every later slot
+/// as a duplicate of it, and the entrypoint deserializer makes each duplicate
+/// slot a copy of the original [`AccountView`]. Two slots therefore name the
+/// same account exactly when their views compare equal, which is one pointer
+/// comparison rather than a writable-flag load and a 32-byte address
+/// comparison. Views built outside the entrypoint deserializer with separate
+/// headers for the same address (hand-written host fixtures, for example) are
+/// distinct accounts to the cursor.
+///
+/// # Optional accounts
 ///
 /// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) may
 /// be absent at the end of the account slice. Within a positional list, a slot
@@ -1194,11 +1243,10 @@ impl<'a> AccountsCursor<'a> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for (index, account) in remaining.iter().enumerate() {
 			validate_writable(*account)?;
-			if remaining[..index]
-				.iter()
-				.any(|previous| previous.address() == account.address())
-			{
-				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			for previous in &remaining[..index] {
+				if previous == account {
+					return Err(PinaProgramError::DuplicateMutableAccount.into());
+				}
 			}
 		}
 
@@ -1214,25 +1262,21 @@ impl<'a> AccountsCursor<'a> {
 		Err(PinaProgramError::TooManyAccountKeys.into())
 	}
 
-	/// Reject a mutable account that aliases a writable account still in the
-	/// cursor's remaining slice.
+	/// Reject a mutable account that appears again in the cursor's remaining
+	/// slice.
 	///
 	/// This check protects fields parsed individually through [`Self::next_mut`]
-	/// and [`Self::next_mut_opt`]. It does not inspect pairs contained entirely
+	/// and [`Self::next_mut_opt`]; see the type-level alias rules for why it
+	/// only looks forward. Both callers have already required the account to
+	/// be writable, and a duplicate slot shares its header, so every alias it
+	/// finds is writable too. It does not inspect pairs contained entirely
 	/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
 	/// that stricter trailing check.
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
-		if !account.is_writable() {
-			return Ok(());
-		}
-
-		let address = account.address();
-		let aliases_future_writable_account = self
-			.remaining
-			.iter()
-			.any(|remaining| remaining.is_writable() && remaining.address() == address);
-		if aliases_future_writable_account {
-			return Err(PinaProgramError::DuplicateMutableAccount.into());
+		for remaining in &*self.remaining {
+			if *remaining == account {
+				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			}
 		}
 
 		Ok(())

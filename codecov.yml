@@ -15,6 +15,11 @@ ignore:
   # is factored into a host-tested module (`crates/pina_lints/src/collisions.rs`
   # is at 100%), so this excludes only the rustc-glue layer.
   - "crates/pina_lints/src/lints"
+  # Standalone audit-regression crates that exist precisely to run against a
+  # pinned dependency set (see their Cargo.tomls). They are separate Cargo
+  # workspaces the coverage job does not instrument; their own test suites are
+  # their coverage.
+  - "security/regressions"
 
 coverage:
   status:

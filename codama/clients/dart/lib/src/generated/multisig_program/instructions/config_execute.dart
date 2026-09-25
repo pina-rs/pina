@@ -101,6 +101,7 @@ Instruction getConfigExecuteInstruction({
   required Address rentPayer,
   required Address systemProgram,
   required Address clock,
+  required Address rentCollector,
   required Address spendingLimitAccounts,
 }) {
   final instructionData = ConfigExecuteInstructionData();
@@ -114,6 +115,7 @@ Instruction getConfigExecuteInstruction({
       AccountMeta(address: rentPayer, role: AccountRole.writableSigner),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
       AccountMeta(address: clock, role: AccountRole.readonly),
+      AccountMeta(address: rentCollector, role: AccountRole.writable),
       AccountMeta(address: spendingLimitAccounts, role: AccountRole.writable),
     ],
     data: getConfigExecuteInstructionDataEncoder().encode(instructionData),

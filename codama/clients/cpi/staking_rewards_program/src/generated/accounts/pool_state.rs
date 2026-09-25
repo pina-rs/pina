@@ -20,6 +20,7 @@ pub struct PoolState {
 	pub reward_mint: Address,
 	pub total_staked: u64,
 	pub reward_index: u64,
+	pub outstanding_rewards: u64,
 	pub paused: bool,
 	pub bump: u8,
 }
@@ -29,7 +30,7 @@ pub const POOL_STATE_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl PoolState {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 116;
+	pub const LEN: usize = 124;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
@@ -59,6 +60,9 @@ impl PoolState {
 		cursor += 8;
 		let reward_index: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
+		let outstanding_rewards: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
+		cursor += 8;
 		let paused = data.get(cursor).copied()? != 0;
 		cursor += 1;
 		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
@@ -69,6 +73,7 @@ impl PoolState {
 			reward_mint,
 			total_staked,
 			reward_index,
+			outstanding_rewards,
 			paused,
 			bump,
 		})

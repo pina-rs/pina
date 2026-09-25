@@ -20,6 +20,11 @@ pub struct ConfigExecute {
 	pub rent_payer: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub clock: solana_pubkey::Pubkey,
+	/// Refund destination for closed spending-limit accounts. When the
+	/// multisig configures a rent collector this must be that address; with
+	/// none configured any writable account fills the slot and refunds fall
+	/// back to `rent_payer`, which also funds any growth.
+	pub rent_collector: solana_pubkey::Pubkey,
 	/// Spending limit accounts referenced by add/remove spending-limit
 	/// actions, in any order.
 	pub spending_limit_accounts: solana_pubkey::Pubkey,
@@ -32,6 +37,7 @@ impl ConfigExecute {
 		member: solana_pubkey::Pubkey,
 		rent_payer: solana_pubkey::Pubkey,
 		clock: solana_pubkey::Pubkey,
+		rent_collector: solana_pubkey::Pubkey,
 		spending_limit_accounts: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
@@ -41,6 +47,7 @@ impl ConfigExecute {
 			rent_payer,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			clock,
+			rent_collector,
 			spending_limit_accounts,
 		}
 	}
@@ -58,7 +65,7 @@ impl ConfigExecute {
 		data: ConfigExecuteInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.multisig, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.proposal, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
@@ -72,6 +79,10 @@ impl ConfigExecute {
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.clock, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.rent_collector,
+			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.spending_limit_accounts,

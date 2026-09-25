@@ -246,6 +246,19 @@
 					},
 					{
 						"kind": "instructionAccountNode",
+						"name": "adminAta",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The admin's source ATA: a schedule becomes active only by moving its",
+							"whole allocation into the vault in this same instruction, so a",
+							"valid-looking schedule can never promise value it does not hold. It is",
+							"mutable because the transfer debits it."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
 						"name": "associatedTokenProgram",
 						"isWritable": false,
 						"isSigner": false,
@@ -601,6 +614,29 @@
 						"isWritable": false,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "clock",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Clock for the vested-entitlement settlement: cancellation must not",
+							"confiscate what the linear curve has already released."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "beneficiaryAta",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The beneficiary's ATA: the vested-but-unclaimed amount settles here",
+							"before any remainder returns to the administrator. It is mutable",
+							"because the settlement transfer credits it."
+						]
 					}
 				],
 				"arguments": [
@@ -753,6 +789,16 @@
 				"message": "The vault holds fewer tokens than the claim must release.",
 				"docs": [
 					"The vault holds fewer tokens than the claim must release."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidBeneficiaryAta",
+				"code": 5,
+				"message": "The Cancel settlement destination is not a token account for this",
+				"docs": [
+					"The Cancel settlement destination is not a token account for this",
+					"mint owned by the beneficiary."
 				]
 			}
 		]

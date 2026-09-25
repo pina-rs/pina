@@ -145,6 +145,14 @@
 								"pda": null
 							},
 							{
+								"name": "admin_ata",
+								"writable": true,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
 								"name": "associated_token_program",
 								"writable": false,
 								"signer": false,
@@ -217,7 +225,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "vesting"
+								"pda": null
 							},
 							{
 								"name": "beneficiary_ata",
@@ -311,7 +319,7 @@
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,
-								"pda": "vesting"
+								"pda": null
 							},
 							{
 								"name": "admin_ata",
@@ -348,6 +356,22 @@
 							{
 								"name": "token_program",
 								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "clock",
+								"writable": false,
+								"signer": false,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "beneficiary_ata",
+								"writable": true,
 								"signer": false,
 								"optional": false,
 								"defaultValue": null,

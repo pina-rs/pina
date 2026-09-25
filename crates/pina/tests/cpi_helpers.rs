@@ -61,6 +61,22 @@ struct CompactBuilderState {
 	items: pina::Vec<u64, 4>,
 }
 
+/// Seed prefix for [`CompactBumpBuilderState`] PDAs.
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+const SEED_COMPACT_BUMP_BUILDER: &[u8] = b"compact-bump-builder";
+
+/// A compact builder account that stores its own PDA bump, so the explicit
+/// bump creation path can verify the patch keeps the stored bump connected.
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[pina::account(crate = ::pina, discriminator = BuilderAccountType::BuilderState, compact)]
+#[pina::pda(crate = ::pina, seeds = [SEED_COMPACT_BUMP_BUILDER], bump = bump)]
+#[allow(dead_code)]
+struct CompactBumpBuilderState {
+	pub value: u8,
+	pub bump: u8,
+	pub items: pina::Vec<u64, 2>,
+}
+
 #[test]
 fn combine_seeds_with_bump_basic() {
 	let seed_a: &[u8] = b"escrow";
@@ -446,10 +462,10 @@ fn compact_creation_rejects_invalid_sizes_before_cpi() {
 		owner: &owner,
 		seeds,
 		bump,
-		patch: CompactBuilderStatePatch::new(),
-		space: CompactBuilderState::MAX_SIZE + 8,
+		patch: CompactBumpBuilderStatePatch::new(),
+		space: CompactBumpBuilderState::MAX_SIZE + 8,
 	}
-	.invoke::<CompactBuilderState>();
+	.invoke::<CompactBumpBuilderState>();
 	assert_eq!(explicit, Err(ProgramError::InvalidAccountData));
 }
 
@@ -546,10 +562,10 @@ fn compact_public_bump_creation_paths_reach_checked_allocation() {
 		owner: &owner,
 		seeds,
 		bump,
-		patch: CompactBuilderStatePatch::new().value(bump),
-		space: CompactBuilderState::HEADER_SIZE,
+		patch: CompactBumpBuilderStatePatch::new().value(bump).bump(bump),
+		space: CompactBumpBuilderState::HEADER_SIZE,
 	}
-	.invoke::<CompactBuilderState>();
+	.invoke::<CompactBumpBuilderState>();
 	assert_eq!(explicit, Err(ProgramError::UnsupportedSysvar));
 }
 
@@ -584,10 +600,10 @@ fn explicit_bump_compact_creation_rejects_a_valid_noncanonical_pda() {
 		owner: &owner,
 		seeds,
 		bump,
-		patch: CompactBuilderStatePatch::new(),
-		space: CompactBuilderState::HEADER_SIZE,
+		patch: CompactBumpBuilderStatePatch::new(),
+		space: CompactBumpBuilderState::HEADER_SIZE,
 	}
-	.invoke::<CompactBuilderState>();
+	.invoke::<CompactBumpBuilderState>();
 
 	assert_eq!(result, Err(ProgramError::InvalidSeeds));
 }

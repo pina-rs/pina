@@ -4,7 +4,355 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-## [0.20.0](https://github.com/pina-rs/pina/releases/tag/v0.20.0) (2026-09-22)
+## [0.21.0](https://github.com/pina-rs/pina/releases/tag/v0.21.0) (2026-09-25)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Reject compact creation patches that store a different bump
+
+_Packages:_ _pina_
+
+`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).
+
+The builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.
+
+`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)
+
+#### Require post-CPI reloads for every token CPI destination
+
+_Packages:_ _pina_lints_
+
+`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.
+
+After the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:
+
+1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);
+2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or
+3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).
+
+The reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:
+
+- a call argument, a return value, a store, a tuple, a struct field, or an array element;
+- an addition with a bare reload; and
+- arithmetic that cancels the reload out (`before + after * 0`).
+
+Uses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.
+
+Accounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:
+
+- `let` aliases, `&`, `*`, and `?`;
+- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;
+- the `.base` field of a loaded Token-2022 view; and
+- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.
+
+Cursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.
+
+Builders are recognised by their constructor's resolved return type and signature:
+
+- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.
+- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.
+- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.
+
+The system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.
+
+The static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.
+
+`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)
+
+#### Fix zeroed-before-close help text and aliasing
+
+_Packages:_ _pina_lints_
+
+The lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).
+
+The help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.
+
+"Same account" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.
+
+This is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.
+
+A user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.
+
+The `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)
+
+#### Reject reserved-range `#[error]` discriminants
+
+_Packages:_ _pina_macros_
+
+Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:
+
+```text
+error[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000
+```
+
+The boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)
+
+### Features
+
+#### Add assert_stored_bump for one-parse PDA validation
+
+_Packages:_ _pina_, _pina_lints_, _pina_macros_
+
+`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.
+
+The provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.
+
+Adopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)
+
+#### Reject reserved-range `#[error]` discriminants
+
+_Packages:_ _pina_
+
+Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:
+
+```text
+error[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000
+```
+
+The boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)
+
+#### Reject compact creation patches that store a different bump
+
+_Packages:_ _pina_macros_
+
+`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).
+
+The builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.
+
+`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)
+
+### Fixes
+
+#### Compare cursor aliases by account identity
+
+_Packages:_ _pina_
+
+`AccountsCursor` alias checks now compare `AccountView`s instead of addresses. The entrypoint deserializer makes every duplicate slot a copy of the original view, so a single pointer comparison replaces the writable-flag load and 32-byte address comparison that `next_mut`, `next_mut_opt`, and `remaining_mut_distinct` performed for each slot they scanned. Across the example suite, 59 of 100 measured instructions got cheaper and none got more expensive, saving 969 compute units in total. Examples: privacy pool `initialize` went from 49,373 to 49,245, staking `deposit` from 24,927 to 24,874, and escrow `make` from 37,073 to 37,035.
+
+The cursor documentation now states the alias rules, and tests pin them. Checks look forward: a mutable account must not reappear in a later slot. A readonly slot followed by a mutable slot for the same account is accepted, because an authority that signs readonly and also pays is one account that the runtime marks writable in both slots. When two fields must be distinct accounts, compare their addresses explicitly.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #526](https://github.com/pina-rs/pina/pull/526) · _Related issues:_ [#513](https://github.com/pina-rs/pina/issues/513)
+
+#### take `fixed` from pinapod's re-export
+
+_Packages:_ _pina_
+
+The `fixed` feature carried a second exact pin of the `fixed` crate — `=1.30.0`, duplicated from `pinapod`'s workspace table and held in lockstep by hand, because the root manifest's comment warned that mixed `fixed` versions can never be allowed to coexist. Pinapod 0.4.4 made that duplication unnecessary: its `fixed` feature re-exports the pinned crate, and Pina's own `fixed` feature already forwarded to `pinapod/fixed`.
+
+`pina::fixed` now forwards `pinapod::fixed`, and the `fixed`, workspace, and optional-dependency declarations are gone. The resolved crate is identical — the same 1.30.0 instance, so `pina::fixed` names the same types and every existing schema compiles unchanged — but the pin exists in exactly one place instead of two, and a future `fixed` bump is pinapod's change to make rather than a coordinated edit across both repositories.
+
+The pinapod minimum moves to 0.4.4, the first release carrying the re-export.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #529](https://github.com/pina-rs/pina/pull/529)
+
+#### Enforce the migration envelope in resizable updates
+
+_Packages:_ _pina_
+
+`UpdateResizableAccount` applied patches through a raw writer when the `validation` feature was off — the default feature set — so the preflight still checked the discriminator but never `require_current_migration_version` before bytes were written. A compact account holding a stale envelope (version `n`, layout `L_n`) could be patched as if its bytes were the current layout, silently corrupting state and leaving the stale version byte in place for the next read to replay.
+
+Both the preflight and the write now route through the generated `T::updated_len`/`T::update`, which enforce the storage length, the discriminator, and the migration envelope before any byte changes, and write the current version afterwards. Only the application-level re-validation those methods append is feature-gated, so the check is now identical in every build. Behavior for current-envelope accounts is unchanged; 45 `cpi_helpers` tests pass with and without `validation`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)
+
+#### Close live 2026-09-22 audit findings: runtime and CLI
+
+_Packages:_ _pina_, _pina_cli_, _pina_codama_nodes_
+
+`UpdateResizableAccount` now routes every feature combination through the generated account-level update contract, so a compact update on a stale migration envelope is refused — and the envelope advanced — even without the `validation` feature. The preflight-versus-commit length agreement is a release-mode error instead of a compiled-out `debug_assert`. `pinapod` moves to 0.4.4, the first release whose generated layouts fail closed on preflight-versus-commit length disagreement and which re-exports `fixed` itself.
+
+`pina::pinapod` and `pina::fixed` (behind the `fixed` feature) re-export pinapod and its `fixed` carry-through, so consumers derive fixed-point schemas without adding either dependency. `security/regressions/sec33-downstream-reexport` proves the contract by building against `pina` alone.
+
+The generated Codama node package's client contract test follows the retired example ABIs, so its assertions move with the instruction account lists.
+
+`pina import` redacts URL query credentials and fragments from the echoed source, the persisted provenance README, and the import outcome. The exported verification transaction is no longer accepted by encoding and length alone: the payload must deserialize as a structurally valid Solana transaction (legacy or versioned) with in-range account indices and a non-empty instruction list before a byte is written.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504)
+
+#### Close live 2026-09-22 audit example findings
+
+_Packages:_ _pina_, _pina_cli_
+
+The examples below ship with the workspace; their IDLs and generated clients are regenerated in the same change, so the release line records the ABI movement alongside the framework fixes.
+
+Multisig: creation and config changes reject a nonzero proposal TTL at or below the timelock (it expires every proposal before its execution window can open); expired and stale proposals are permissionlessly closable with their rent refunded to the configured collector; spending-limit closures during config execution refund the configured rent collector instead of the executor-supplied rent payer; and member-tail shrinkage refunds the collector too — `commit_multisig` selects the resize rent account by direction, growth still charging the executing rent payer, so an executor cannot pocket a governed refund by roster reduction. The authority path (`ConfigAuthorityExecute`) gains the same validated `rent_collector` account the governed path has.
+
+Staking: the pool tracks an `outstanding_rewards` liability counter — advanced by the index increment on `SetRewardIndex`, reduced by each payout on `Claim`, and holding banked pending rewards through withdrawals — and refuses an index update whose outstanding liability exceeds `u64` capacity or the canonical reward vault's balance. The vault now backs what is actually owed, so paid-out rewards stop reserving capacity and banked rewards keep reserving it; equal entitlements no longer depend on claim order. `InitializePool` rejects extended Token-2022 mints so no pool can be born without working exits.
+
+Vesting: `Initialize` moves the full allocation from the admin's ATA into the vault in the same instruction (a schedule cannot exist unfunded) and rejects extended Token-2022 mints; `Cancel` settles nothing before the cliff (the beneficiary's pre-cliff entitlement is zero) and after it returns the vested-but-unclaimed entitlement to the beneficiary's ATA before any remainder returns to the administrator, bound to the stored owner and mint.
+
+The measured cost of the fixes is ratcheted into `scripts/compute-unit-policy.json`: staking `claim` 18,956 (+71), `deposit` 25,224 (+297), `initializePool` 38,188 (+148), and a first `setRewardIndex` entry at 2,432 (the reserve gate's vault binding, derivation, and balance read); vesting `initialize` 27,946 (the funding CPI) and the static `vesting_program` total 6,788 (+693, +11.4%, mostly the atomic funding transfer and the Token-2022 admission checks). Every approved value is the deterministic Surfpool measurement of the final binary, reproduced locally and in CI. The multisig rows rise with the same review round: `configAuthorityExecute` 3,768 (+113, the collector account and its validation on the authority path), `configExecute` 13,772 (+72, shrink-direction selection and the governed refund binding), and `proposalClose` 4,060 (+57, collector address validation).
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504), [#506](https://github.com/pina-rs/pina/issues/506)
+
+#### Report the resolved lint driver's own toolchain
+
+_Packages:_ _pina_cli_
+
+`pina doctor --json` reported `lintDriver.expectedToolchain` as the pinned nightly the shipped lints are developed against, even when a driver had resolved for a different negotiated toolchain. A cached, downloaded, or source-built driver exists for the active compiler revision by construction, so an otherwise healthy diagnostic looked mismatched and sent consumers toward unnecessary toolchain changes (#458).
+
+The report now emits `lintDriver.resolvedToolchain`, naming the toolchain the resolved driver was actually built for: the active toolchain for a cached, downloaded, or source-built driver, the shipped nightly for a bundled one — which is honest even when it differs from the active compiler, because the load probe already proved the bundle compatible — and nothing for a `PINA_LINT_DRIVER_PATH` override or when no driver resolved. The `expectedToolchain` key keeps its name, value, and meaning.
+
+Human output renames the `expected toolchain:` line to `shipped-lint toolchain:` so it states what the constant actually means rather than reading like a requirement on the project, and prints `resolved toolchain:` under the resolved driver.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #497](https://github.com/pina-rs/pina/pull/497) · _Closed issues:_ [#458](https://github.com/pina-rs/pina/issues/458)
+
+#### Require post-CPI reloads for every token CPI destination
+
+_Packages:_ _pina_cli_
+
+`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.
+
+After the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:
+
+1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);
+2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or
+3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).
+
+The reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:
+
+- a call argument, a return value, a store, a tuple, a struct field, or an array element;
+- an addition with a bare reload; and
+- arithmetic that cancels the reload out (`before + after * 0`).
+
+Uses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.
+
+Accounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:
+
+- `let` aliases, `&`, `*`, and `?`;
+- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;
+- the `.base` field of a loaded Token-2022 view; and
+- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.
+
+Cursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.
+
+Builders are recognised by their constructor's resolved return type and signature:
+
+- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.
+- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.
+- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.
+
+The system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.
+
+The static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.
+
+`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)
+
+#### Require full-balance drain guards to behave like guards
+
+_Packages:_ _pina_lints_
+
+`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:
+
+- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.
+- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.
+- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.
+- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.
+- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.
+
+Trait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)
+
+#### Retry an aborted Surfpool start once with fresh ports
+
+_Packages:_ _pina_test_
+
+Surfpool's SDK picks each RPC port by binding `127.0.0.1:0` and releasing the listener before its runloop rebinds it, so an `OfflineSurfnet::start` (and therefore `ProgramTest::start`) could lose that port to another socket and abort with `Failed to start WebSocket RPC server: AddrInUse`. That failed the test that happened to start the instance, even though nothing about the program under test was wrong.
+
+`OfflineSurfnet::start` now retries exactly once when the SDK reports an aborted runloop or a port-allocation failure. Both leave no running instance behind, and the next attempt draws fresh ports. The first failure is printed to stderr so flaky starts stay visible. Every other startup error, a second failure, and everything after startup (program deployment, transactions, assertions) are returned unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #521](https://github.com/pina-rs/pina/pull/521)
+
+### Documentation
+
+#### Fix zeroed-before-close help text and aliasing
+
+_Packages:_ _pina_, _pina_cli_
+
+The lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).
+
+The help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.
+
+"Same account" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.
+
+This is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.
+
+A user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.
+
+The `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)
+
+#### Require full-balance drain guards to behave like guards
+
+_Packages:_ _pina_cli_
+
+`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:
+
+- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.
+- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.
+- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.
+- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.
+- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.
+
+Trait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)
+
+### Notes
+
+#### Build privacy pool host tests without the prover feature
+
+_Packages:_ _pina_
+
+`cargo test -p privacy_pool_program` failed to compile: the SBF end-to-end suite in `tests/e2e.rs` imports the host-only `prover` module and names `ark_groth16` types, and both exist only when the `prover` feature is enabled. The workspace test sweep never saw it, because the privacy pool's Surfpool crate depends on the program with `prover` and feature unification switched it on for every workspace build.
+
+The `e2e` test target now declares `required-features = ["prover"]`, so a plain host run skips the suite and the documented `--features prover --test e2e -- --include-ignored` invocation still builds and runs it. The program's dependencies, SBF artifact, and compute units are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #523](https://github.com/pina-rs/pina/pull/523) · _Closed issues:_ [#518](https://github.com/pina-rs/pina/issues/518)
+
+#### Pin the privacy pool vault
+
+_Packages:_ _pina_
+
+`privacy_pool_program` transferred deposits to, and paid withdrawals from, whatever account the caller passed as `pool_vault` without verifying it. The vault is data-less by design, so no handler parsed it and no check existed: a depositor could name an account they control, keep their lamports, and still have a spendable commitment recorded in the merkle tree — minting notes backed by nothing and draining the honest pool as those notes were withdrawn.
+
+Both `Deposit` and `Withdraw` now assert the vault is the pool's derived PDA before any value moves. An adversarial Surfpool case proves it: a substituted vault fails against the unpatched program (the deposit succeeds and the note exists) and is rejected with the check. The recorded ABI and the generated clients follow: the vault account now carries a `pda` binding in the manifest and IDL, and the generated `Deposit`/`Withdraw` constructors derive it instead of accepting it, so the client API cannot express the substitution.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)
+
+#### Add assert_stored_bump for one-parse PDA validation
+
+_Packages:_ _pina_cli_
+
+`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.
+
+The provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.
+
+Adopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)
+
+## [0.20.0](https://github.com/pina-rs/pina/releases/tag/v0.20.0) (2026-09-23)
 
 Grouped release for `core`.
 
@@ -20,7 +368,7 @@ The weak loader is now `with_stored_bump_pda`, which says what it checks. The ol
 
 `pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Generate every repository client with `pina generate`
 
@@ -30,7 +378,7 @@ _Packages:_ _pina_cli_
 
 Dogfooding this path in the repository surfaced a bug in shared Dart CLI packages: `pina generate` published the whole staged `bin/` directory for each program, so generating one project deleted the entrypoints of every other project sharing the package. Only the single entrypoint owned by the invocation is published now.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #474](https://github.com/pina-rs/pina/pull/474)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #474](https://github.com/pina-rs/pina/pull/474) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Rename `pina migrations make` to `pina migrations create`
 
@@ -44,7 +392,7 @@ The internal API moved with it: `pina_cli::migrations::make_migrations` is `crea
 
 Two things deliberately did not change. Checked-in transition files keep their recorded `@generated by pina migrations make` header, because their bytes are pinned by SHA-256 in `migrations/manifest.json` and rewriting a published transition is exactly the history rewrite the pin exists to prevent; the generator only writes that header for new transitions. Released changelog and publication records keep the historical command name as written.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #475](https://github.com/pina-rs/pina/pull/475)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #475](https://github.com/pina-rs/pina/pull/475) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the confirmed 2026-09-19 sweep findings
 
@@ -62,7 +410,7 @@ A migration manifest whose `rustName` is not a plain Rust identifier now fails v
 
 The account migration executor zero-fills the grown region before each transition applies, matching the instruction and event workspaces, so a hand-written transition that skips an added field commits zeros rather than the account's own realloc residue.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #472](https://github.com/pina-rs/pina/pull/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #472](https://github.com/pina-rs/pina/pull/472) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 ### Features
 
@@ -78,7 +426,7 @@ The method has a default implementation that length-checks and then delegates to
 
 Tests cover short buffers of every length up to `BYTES` (including a short inner slice of a long array), exact and oversized buffers, and that the checked write produces the same bytes as the unchecked one.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Accept const capacities in schemas
 
@@ -104,7 +452,7 @@ A capacity that cannot be evaluated at expansion time now fails the build with a
 
 `pina_abi` gains `SchemaConsts`, the shared evaluator both the macros and the CLI use so the two layers agree on what a constant means. `pina_cli` resolves capacities while it parses a program, so migration and IDL tooling reads the same numbers the compiler does.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #463](https://github.com/pina-rs/pina/pull/463) · _Closed issues:_ [#460](https://github.com/pina-rs/pina/issues/460)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #463](https://github.com/pina-rs/pina/pull/463) · _Closed issues:_ [#460](https://github.com/pina-rs/pina/issues/460) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Reject event schemas that cannot fit the SBF stack
 
@@ -116,7 +464,7 @@ The generated `emit` function materializes a whole event record in one stack fra
 
 `pina_macros` emits a compile-time assertion in every `#[event]` expansion, so an oversized schema now fails the build with a message naming the struct and the remedy. A record exactly at the bound still compiles; the assertion is inclusive.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Match the Migrate trigger to the discriminator width
 
@@ -128,7 +476,7 @@ _Packages:_ _pina_, _pina_macros_
 
 `pina_macros` selects the helper from the enum's `primitive`, so `#[discriminator(entrypoint, migrations(...))]` on a wider discriminator now reaches the reserved path. The generated guard for a default `u8` program is byte-identical to before, so the common case takes no compute regression. The documentation on the reserved-discriminator constants and in `docs/src/migrations/flow.md` now names the width pairing.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Add an opt-in heap allocation entrypoint
 
@@ -144,7 +492,7 @@ The macro's rustdoc documents the costs that `no_allocator!` currently makes imp
 
 `heap_alloc_program` exercises the new macro end to end. Its mollusk suite holds the heap frame at a fixed size and shows a fill inside the frame completing, a fill past it aborting, and the same fill succeeding once the frame is raised. Its Surfpool suite runs the same artifact on a real runtime, where `Box` round-trips through the bump allocator. Three doc sites that described allocator-freeness as an unconditional Pina property now say "by default".
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #465](https://github.com/pina-rs/pina/pull/465) · _Closed issues:_ [#462](https://github.com/pina-rs/pina/issues/462)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #465](https://github.com/pina-rs/pina/pull/465) · _Closed issues:_ [#462](https://github.com/pina-rs/pina/issues/462) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Version the ABI document on `pina_abi`'s own release line
 
@@ -158,7 +506,7 @@ The document also stops storing its own derivations. The physical layout descrip
 
 Readers normalize any supported document through an ordered table of adjacent converters; the integer format 1–3 readers, their downgrade ladders, and the private compatibility shims are deleted. A document stamped above the reader, or below the oldest supported version, fails closed and names the supported version. Document types derive `JsonSchema`, so each document's schema is generated rather than hand-written and is published at a permanent versioned URL.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #468](https://github.com/pina-rs/pina/pull/468)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #468](https://github.com/pina-rs/pina/pull/468) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Name the stored-bump compact PDA loader for what it verifies
 
@@ -170,7 +518,7 @@ The weak loader is now `with_stored_bump_pda`, which says what it checks. The ol
 
 `pina_cli`'s IDL parser recognizes `with_stored_bump_pda` as a PDA loader alongside the other names, so account properties are unchanged.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the shadow-PDA and discriminator-collision gaps
 
@@ -180,7 +528,7 @@ Fixed-account `#[pda]` schemas now generate `load_checked_pda` and `load_checked
 
 A new deny lint `deny_colliding_account_discriminators` closes the other proven framework finding. Discriminators are author-chosen integers and rustc only rejects duplicates within one enum, so two account enums that agree on a value and a serialized width pass every typed loader check — owner, discriminator, exact size — and either account deserializes as the other (the sealevel-attacks type-cosplay class; proven executable in the same test file). The lint collects every generated `impl HasDiscriminator` for types that also implement pina's account traits, evaluates the `VALUE` const and the repr width, and denies any value claimed by two different account types. Events share the trait shape but live in the log namespace, so they are excluded by construction. A UI fixture pair pins the collision and the clean case, and the lint ships in the catalog with the CLI's `lints.json`, `--explain` reference, and the docs page updated to match.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Move the host stack to Surfpool 1.6 / Agave 4.2
 
@@ -198,7 +546,7 @@ Every other tilde range in the crate already accommodated the newer train, so no
 
 The upgrade also removes a documented limitation. Surfpool 1.5 could not derive CPI signers for PDAs with four or more seed arguments, so any program seeding a PDA that way could not run its Surfpool suite end to end. On 1.6.0 the vesting example's `[b"vesting", admin, beneficiary, mint]` plus bump PDA completes `Initialize` → `Claim` → `Cancel`, which the previous train could not reach. `crates/pina_test/readme.md` now records the fix instead of the caveat.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #482](https://github.com/pina-rs/pina/pull/482) · _Related issues:_ [#289](https://github.com/pina-rs/pina/issues/289), [#38](https://github.com/pina-rs/pina/issues/38), [#39](https://github.com/pina-rs/pina/issues/39), [#802](https://github.com/pina-rs/pina/issues/802)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #482](https://github.com/pina-rs/pina/pull/482) · _Related issues:_ [#289](https://github.com/pina-rs/pina/issues/289), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494), [#802](https://github.com/pina-rs/pina/issues/802)
 
 ### Fixes
 
@@ -216,7 +564,7 @@ An account that is layout-valid but semantically invalid, such as non-UTF-8 byte
 
 The observable effect on Pina is the regenerated `pda.expanded.rs` snapshot, and the compute units that 0.4.2 added are gone: the `compact_accounts_program` instructions that regressed by 46 to 308 units under 0.4.2 measure at or below their 0.4.1 cost again.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #485](https://github.com/pina-rs/pina/pull/485) · _Related issues:_ [#38](https://github.com/pina-rs/pina/issues/38), [#39](https://github.com/pina-rs/pina/issues/39)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #485](https://github.com/pina-rs/pina/pull/485) · _Related issues:_ [#38](https://github.com/pina-rs/pina/issues/38), [#39](https://github.com/pina-rs/pina/issues/39), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Stop enabling `bytemuck` on `solana-address`/`solana-pubkey`
 
@@ -228,7 +576,7 @@ Both entries now request what Pina actually depends on. `solana-address` asks fo
 
 Deployable programs are unchanged: `bytemuck` contributed no symbols to any built program, so all 24 `bpf-entrypoint` examples produce byte-identical sizes and an identical instruction mix with and without it. This is a dependency-graph cleanup, not a size or compute-unit change.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #464](https://github.com/pina-rs/pina/pull/464)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #464](https://github.com/pina-rs/pina/pull/464) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the shadow-PDA and discriminator-collision gaps
 
@@ -238,7 +586,7 @@ Fixed-account `#[pda]` schemas now generate `load_checked_pda` and `load_checked
 
 A new deny lint `deny_colliding_account_discriminators` closes the other proven framework finding. Discriminators are author-chosen integers and rustc only rejects duplicates within one enum, so two account enums that agree on a value and a serialized width pass every typed loader check — owner, discriminator, exact size — and either account deserializes as the other (the sealevel-attacks type-cosplay class; proven executable in the same test file). The lint collects every generated `impl HasDiscriminator` for types that also implement pina's account traits, evaluates the `VALUE` const and the repr width, and denies any value claimed by two different account types. Events share the trait shape but live in the log namespace, so they are excluded by construction. A UI fixture pair pins the collision and the clean case, and the lint ships in the catalog with the CLI's `lints.json`, `--explain` reference, and the docs page updated to match.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the confirmed 2026-09-19 sweep findings
 
@@ -256,7 +604,7 @@ A migration manifest whose `rustName` is not a plain Rust identifier now fails v
 
 The account migration executor zero-fills the grown region before each transition applies, matching the instruction and event workspaces, so a hand-written transition that skips an added field commits zeros rather than the account's own realloc residue.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #472](https://github.com/pina-rs/pina/pull/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #472](https://github.com/pina-rs/pina/pull/472) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Fix the CPI scaffold's pina dependency for workspace crates
 
@@ -266,7 +614,7 @@ _Packages:_ _pina_cli_, _pina_cpi_renderer_
 
 The scaffold now takes the dependency source from the caller. `pina generate`, whose output is always a workspace member, inherits the workspace dependency; `pina cpi` and `pina import`, whose output lives in the caller's own project with no workspace entry to inherit, pin the renderer's own release line instead of a stale literal. A regression test covers both modes.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #489](https://github.com/pina-rs/pina/pull/489) · _Related issues:_ [#486](https://github.com/pina-rs/pina/issues/486)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #489](https://github.com/pina-rs/pina/pull/489) · _Related issues:_ [#486](https://github.com/pina-rs/pina/issues/486), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Retry the lint driver probe while the kernel reports it busy
 
@@ -276,7 +624,7 @@ _Packages:_ _pina_cli_
 
 `pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Emit valid TypeScript for reserved Migrate type arguments
 
@@ -286,7 +634,7 @@ The reserved `Migrate` composer closed its `MigrateInput<...>` type argument lis
 
 The generator now emits the comma-free shape dprint normalizes to, so committed clients are unchanged and raw output is valid TypeScript. Caught by the migrations walkthrough, which loads the freshly generated client through esbuild without a formatting pass.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Verify the lint driver download before installing it
 
@@ -298,7 +646,7 @@ The download path now fetches the `sha256` published beside the asset, compares 
 
 A locally built driver (`pina lint --build-driver`) keeps its existing trust root — a cargo build against the pinned `pina_lints` release — and installs through a separate function, since no published checksum exists for an artifact built on the local machine.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Fix the IDL size message and sanitize doc topics
 
@@ -310,7 +658,7 @@ _Packages:_ _pina_cli_
 
 The unused `tar` dependency is gone from `pina_cli` and the workspace dependency table; nothing in the crate referenced it, and the only other lockfile consumer is `agave-snapshots`, which declares it directly.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Read transition offsets from the stored schema
 
@@ -326,7 +674,7 @@ A generated manual draft now carries an offset table in its header: one row per 
 
 A recorded manual transition now scopes itself to the hop it was written for. Previously the recorded mode seeded the _next_ adjacent change too, so any hop after a hand-written transition was branded manual forever, even one the byte-level proof fully justifies — removing a field two versions after a narrowing conversion wrongly demanded another manual body. Repeated `make` runs over the manual hop's own draft still replay its recorded mode, so authored bodies remain stable.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Add the multisig example and fix generators
 
@@ -336,9 +684,9 @@ _Packages:_ _pina_cli_, _pina_codama_renderer_cli_
 
 Freshly scaffolded Rust CLI clients hard-coded `../../rust/<example>` as the dependency path, but the crate lives three directories deeper, so the manifest never resolved; existing examples only survived because update mode preserves their committed manifests, meaning no new example could scaffold a working CLI. The path is now derived from the configured rust and CLI output roots. The Dart CLI renderer emitted boolean instruction arguments as mandatory string options cast to `as String`, which failed `dart analyze` with a String-to-bool error; booleans are now declared as flags and read as `bool`, defaulting to false. The `pina docs` snapshot scratch space also moved under the workspace `target/` directory so recorded argument paths keep the same relative form on every machine and CI runner instead of leaking environment-specific absolute temp paths.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #466](https://github.com/pina-rs/pina/pull/466) · _Related issues:_ [#462](https://github.com/pina-rs/pina/issues/462)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #466](https://github.com/pina-rs/pina/pull/466) · _Related issues:_ [#462](https://github.com/pina-rs/pina/issues/462), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
-- **pina_cli**: **Document the lint-driver origin overrides as operator-only.** `PINA_LINT_DRIVER_RELEASE`, `_REPO`, and `_BASE_URL` redirect the driver download and its checksum together, so they are a trusted-origin control rather than a convenience knob: whatever serves the override chooses which binary the CLI runs. The constants now say so, which is the documentation half of the 2026-09-21 audit's supply-chain finding; the version-pinned `npx` renderer fetches stay registry-trust-by-design. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+- **pina_cli**: **Document the lint-driver origin overrides as operator-only.** `PINA_LINT_DRIVER_RELEASE`, `_REPO`, and `_BASE_URL` redirect the driver download and its checksum together, so they are a trusted-origin control rather than a convenience knob: whatever serves the override chooses which binary the CLI runs. The constants now say so, which is the documentation half of the 2026-09-21 audit's supply-chain finding; the version-pinned `npx` renderer fetches stay registry-trust-by-design. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Reject Cargo library names that cannot be path components
 
@@ -348,7 +696,7 @@ Cargo accepts any string as a `[lib] name` and reports it verbatim through `carg
 
 `Project::discover` now validates the library name once, where it enters the project model, and rejects anything outside `[A-Za-z0-9_-]` with the new `ProjectError::InvalidLibraryName`. Cargo already refuses the empty name before metadata reaches pina. Validating at the ingestion point keeps every current and future path join safe instead of patching individual sinks, and no legitimate library name is affected because Cargo's own naming rules are a subset of the accepted set.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Version the ABI document on `pina_abi`'s own release line
 
@@ -362,7 +710,7 @@ The document also stops storing its own derivations. The physical layout descrip
 
 Readers normalize any supported document through an ordered table of adjacent converters; the integer format 1–3 readers, their downgrade ladders, and the private compatibility shims are deleted. A document stamped above the reader, or below the oldest supported version, fails closed and names the supported version. Document types derive `JsonSchema`, so each document's schema is generated rather than hand-written and is published at a permanent versioned URL.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #468](https://github.com/pina-rs/pina/pull/468)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #468](https://github.com/pina-rs/pina/pull/468) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Qualify every `Address` in generated PDA code
 
@@ -372,7 +720,7 @@ _Packages:_ _pina_macros_
 
 The expansion also emits the same identity proof the schema path uses — `const _: fn(Address) -> pina::Address = |value| value;` — but only when a declaration actually has an `Address` seed, so a numeric-only `#[pda]` never requires `Address` in scope. The proof binds the caller's bare `Address` spelling to the crate's type, so a future unqualified spelling is a compile error in the user's crate rather than a silent shadow.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Reject PDA declarations that cannot derive
 
@@ -382,7 +730,7 @@ Every generated `#[pda]` derivation appends a bump seed: `try_find_pda` and `fin
 
 The macro now caps the declared list at 15 seeds and names both numbers in the error. The cap applies whether or not the declaration has a `bump =` field, because the bump-free variant derives through `try_find_pda` and appends a bump there. A declaration that previously compiled with 16 seeds was already unreachable at runtime; it now fails the build instead of shipping a PDA that always returns `InvalidSeeds`.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Fix generated CLI payer and PDA handling
 
@@ -392,7 +740,7 @@ The generated TypeScript, Dart, and Rust CLIs had related defects rooted in the 
 
 Payer-resolution accounts (accounts defaulted to the transaction payer) accepted an override option in every CLI, but the override was either silently ignored (TypeScript) or produced a transaction whose signer meta pointed at an address no loaded keypair signs for (Dart and Rust). Since these CLIs sign with exactly one keypair, all three renderers now resolve payer-resolution accounts to the loaded payer and stop emitting the unusable override options.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #486](https://github.com/pina-rs/pina/pull/486)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #486](https://github.com/pina-rs/pina/pull/486) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Keep untrusted IDL names inside generated doc comments
 
@@ -402,7 +750,7 @@ _Packages:_ _pina_cpi_renderer_
 
 Both sites now route through `render_doc`, which splits on newlines and prefixes every line as a comment, so an embedded newline becomes another comment line instead of code. `pina_cpi_renderer` gains a regression test that deserializes a malicious IDL through the same `read_root_node` path `pina cpi` uses, asserts the newline survives parsing (so the test keeps exercising the real path), and fails if any payload line escapes its comment.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Fix CLI Explorer links and keypair validation
 
@@ -412,7 +760,7 @@ The Dart CLI renderer printed an Explorer URL without a cluster selector, so a s
 
 Both renderers also accepted a keypair array of 64 values without checking the values themselves. `Uint8Array` and `Uint8List` wrap out-of-range bytes rather than rejecting them, so a malformed keypair file produced a different signer instead of an error — one that would simply fail every transaction with no explanation. Each byte must now be an integer from 0 to 255, and anything else fails with the existing keypair-loading error.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #465](https://github.com/pina-rs/pina/pull/465) · _Closed issues:_ [#462](https://github.com/pina-rs/pina/issues/462)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #465](https://github.com/pina-rs/pina/pull/465) · _Closed issues:_ [#462](https://github.com/pina-rs/pina/issues/462) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 ### Notes
 
@@ -424,7 +772,7 @@ _Packages:_ _pina_
 
 The guidance consolidates what two example handlers (`vesting_program`'s `Claim` and `Cancel`) had drifted into — each paid the search twice per instruction until the companion example change removed the redundant calls and recorded the measured savings. The same audit confirmed `escrow_program`'s `Take` derives its `taker_ata_b` exactly once, so its search is not redundant and stays. Docs-only change; no behavior, wire, or measurement impact.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #488](https://github.com/pina-rs/pina/pull/488) · _Related issues:_ [#487](https://github.com/pina-rs/pina/issues/487)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #488](https://github.com/pina-rs/pina/pull/488) · _Related issues:_ [#487](https://github.com/pina-rs/pina/issues/487), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Drop duplicated ATA derivations from hot paths
 
@@ -439,7 +787,7 @@ Measured on the Surfpool simulation maximum (the same statistic the performance 
 
 `escrow_program`'s `Take` was audited for the same shape and deliberately left alone: its `taker_ata_b` derivation is the account's only canonical pin (the handler's `CreateIdempotent` CPI derives the maker's ATA, and the transfer CPI only proves signer authority), so removing it would let a taker pay from any mint-B account they control. Two adversarial Surfpool cases added here prove both sides: a foreign vault is rejected by both vesting handlers with no state change, and `Take` rejects both a foreign and a funded non-canonical taker-controlled token-B account.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #487](https://github.com/pina-rs/pina/pull/487)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #487](https://github.com/pina-rs/pina/pull/487) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Retry the lint driver probe while the kernel reports it busy
 
@@ -449,7 +797,7 @@ _Packages:_ _pina_
 
 `pina` carries no behavior change in this release line; the entry records the added test coverage for the public `into_discriminator!` macro.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #461](https://github.com/pina-rs/pina/pull/461) · _Related issues:_ [#457](https://github.com/pina-rs/pina/issues/457), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Reject empty escrow offers and prove the maker is writable
 
@@ -461,7 +809,7 @@ _Packages:_ _pina_
 
 Two Surfpool cases cover the behavior: one asserts `EmptyOffer` and that no balance moves and no account is created, and one presents a read-only maker through a non-payer keypair and asserts the failure plus unchanged escrow, vault, and taker balances.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Rename `pina migrations make` to `pina migrations create`
 
@@ -475,7 +823,7 @@ The internal API moved with it: `pina_cli::migrations::make_migrations` is `crea
 
 Two things deliberately did not change. Checked-in transition files keep their recorded `@generated by pina migrations make` header, because their bytes are pinned by SHA-256 in `migrations/manifest.json` and rewriting a published transition is exactly the history rewrite the pin exists to prevent; the generator only writes that header for new transitions. Released changelog and publication records keep the historical command name as written.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #475](https://github.com/pina-rs/pina/pull/475)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #475](https://github.com/pina-rs/pina/pull/475) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the remaining audit findings in the example programs
 
@@ -485,7 +833,7 @@ _Packages:_ _pina_
 
 `escrow_program` gains a maker `Cancel` (discriminator 3) that refunds the full vault balance and closes both accounts, so a maker is no longer stranded until a taker appears. `prop_amm_program`'s `Update` now accepts the oracle's stored authority in addition to the benchmark's static key, making `RotateAuthority` mean what it says — previously the rotated key could never publish a price. The multisig readme documents the permissionless `ConfigInitialize` race (initialize the config in the deployment transaction or a sniper owns the fee treasury) and the spending-limit rules, and the staking readme documents the same first-initializer shape for pool creation.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Align the advisory gates on deny.toml
 
@@ -497,9 +845,9 @@ _Packages:_ _pina_cli_
 
 The `[advisories]` section also needed the `RUSTSEC-2021-0139`, `RUSTSEC-2024-0375`, `RUSTSEC-2024-0384`, `RUSTSEC-2020-0016`, `RUSTSEC-2025-0134`, and `RUSTSEC-2026-0173` entries that only the old cargo-audit list had, so moving advisories into the deny gate does not weaken it.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
-- **pina_cli**: **Stop the deploy stdin test racing a startup deadline.** The test that proves `solana` inherits a closed stdin polled the child against a three-second deadline, which Pina's `cargo metadata` project discovery exceeded on a loaded runner. It now waits for the marker the fake `solana` writes after reading EOF and keeps a thirty-second deadline purely as a hang bound. Test-only; no release note. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #469](https://github.com/pina-rs/pina/pull/469)
+- **pina_cli**: **Stop the deploy stdin test racing a startup deadline.** The test that proves `solana` inherits a closed stdin polled the child against a three-second deadline, which Pina's `cargo metadata` project discovery exceeded on a loaded runner. It now waits for the marker the fake `solana` writes after reading EOF and keeps a thirty-second deadline purely as a hang bound. Test-only; no release note. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #469](https://github.com/pina-rs/pina/pull/469) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Close the shadow-PDA and discriminator-collision gaps
 
@@ -509,11 +857,11 @@ Fixed-account `#[pda]` schemas now generate `load_checked_pda` and `load_checked
 
 A new deny lint `deny_colliding_account_discriminators` closes the other proven framework finding. Discriminators are author-chosen integers and rustc only rejects duplicates within one enum, so two account enums that agree on a value and a serialized width pass every typed loader check — owner, discriminator, exact size — and either account deserializes as the other (the sealevel-attacks type-cosplay class; proven executable in the same test file). The lint collects every generated `impl HasDiscriminator` for types that also implement pina's account traits, evaluates the `VALUE` const and the repr width, and denies any value claimed by two different account types. Events share the trait shape but live in the log namespace, so they are excluded by construction. A UI fixture pair pins the collision and the clean case, and the lint ships in the catalog with the CLI's `lints.json`, `--explain` reference, and the docs page updated to match.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
-- **pina_cpi_renderer**: **Derive the scaffold release-line test from the crate version.** `scaffold_declares_pina_from_the_configured_source` computes the expected `pina` pin from `CARGO_PKG_VERSION` the same way `ScaffoldDependency::Published` renders it, so the assertion follows the crate's release line instead of holding a hard-coded `0.19` that the next version bump would leave behind. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #490](https://github.com/pina-rs/pina/pull/490) · _Related issues:_ [#459](https://github.com/pina-rs/pina/issues/459)
-- **pina_codama_nodes**: **Pin the client contract test to the released surfaces.** The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456)
-- _Packages:_ _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_ **Document the lint-driver origin overrides as operator-only.** `PINA_LINT_DRIVER_RELEASE`, `_REPO`, and `_BASE_URL` redirect the driver download and its checksum together, so they are a trusted-origin control rather than a convenience knob: whatever serves the override chooses which binary the CLI runs. The constants now say so, which is the documentation half of the 2026-09-21 audit's supply-chain finding; the version-pinned `npx` renderer fetches stay registry-trust-by-design. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472)
+- **pina_cpi_renderer**: **Derive the scaffold release-line test from the crate version.** `scaffold_declares_pina_from_the_configured_source` computes the expected `pina` pin from `CARGO_PKG_VERSION` the same way `ScaffoldDependency::Published` renders it, so the assertion follows the crate's release line instead of holding a hard-coded `0.19` that the next version bump would leave behind. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #490](https://github.com/pina-rs/pina/pull/490) · _Related issues:_ [#459](https://github.com/pina-rs/pina/issues/459), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
+- **pina_codama_nodes**: **Pin the client contract test to the released surfaces.** The vesting and staking clients gained accounts in this release (the claim clock sysvar and refund path, the staking reward vault), so the package's contract test pins the new slot counts and roles. Test-only; no release note. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #457](https://github.com/pina-rs/pina/pull/457) · _Related issues:_ [#442](https://github.com/pina-rs/pina/issues/442), [#448](https://github.com/pina-rs/pina/issues/448), [#456](https://github.com/pina-rs/pina/issues/456), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
+- _Packages:_ _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_ **Document the lint-driver origin overrides as operator-only.** `PINA_LINT_DRIVER_RELEASE`, `_REPO`, and `_BASE_URL` redirect the driver download and its checksum together, so they are a trusted-origin control rather than a convenience knob: whatever serves the override chooses which binary the CLI runs. The constants now say so, which is the documentation half of the 2026-09-21 audit's supply-chain finding; the version-pinned `npx` renderer fetches stay registry-trust-by-design. _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #483](https://github.com/pina-rs/pina/pull/483) · _Related issues:_ [#472](https://github.com/pina-rs/pina/issues/472), [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Read transition offsets from the stored schema
 
@@ -529,7 +877,7 @@ A generated manual draft now carries an offset table in its header: one row per 
 
 A recorded manual transition now scopes itself to the hop it was written for. Previously the recorded mode seeded the _next_ adjacent change too, so any hop after a hand-written transition was branded manual forever, even one the byte-level proof fully justifies — removing a field two versions after a narrowing conversion wrongly demanded another manual body. Repeated `make` runs over the manual hop's own draft still replay its recorded mode, so authored bodies remain stable.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #481](https://github.com/pina-rs/pina/pull/481) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 #### Generate every repository client with `pina generate`
 
@@ -539,7 +887,7 @@ _Packages:_ _pina_skill_
 
 Dogfooding this path in the repository surfaced a bug in shared Dart CLI packages: `pina generate` published the whole staged `bin/` directory for each program, so generating one project deleted the entrypoints of every other project sharing the package. Only the single entrypoint owned by the invocation is published now.
 
-_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #474](https://github.com/pina-rs/pina/pull/474)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #474](https://github.com/pina-rs/pina/pull/474) · _Related issues:_ [#491](https://github.com/pina-rs/pina/issues/491), [#492](https://github.com/pina-rs/pina/issues/492), [#494](https://github.com/pina-rs/pina/issues/494)
 
 ## [0.19.0](https://github.com/pina-rs/pina/releases/tag/v0.19.0) (2026-09-18)
 

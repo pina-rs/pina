@@ -45,6 +45,7 @@ use solana_transaction::versioned::VersionedTransaction;
 pub use solana_transaction_error::TransactionError;
 use surfpool_sdk::BlockProductionMode;
 use surfpool_sdk::Surfnet;
+use surfpool_sdk::SurfnetError;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 use surfpool_sdk::cheatcodes::builders::SetAccount;
 
@@ -783,13 +784,15 @@ impl OfflineSurfnet {
 		// timer and confirms normally. Reported upstream in
 		// <https://github.com/solana-foundation/surfpool/issues/814>; drop this
 		// override once the transaction-triggered path is fixed.
-		let inner = Surfnet::builder()
-			.offline(true)
-			.payer(Keypair::new_from_array(TEST_PAYER_SEED))
-			.block_production_mode(BlockProductionMode::Clock)
-			.start()
-			.await
-			.map_err(|error| test_error("start offline Surfpool", error))?;
+		let inner = start_with_one_retry(|| {
+			Surfnet::builder()
+				.offline(true)
+				.payer(Keypair::new_from_array(TEST_PAYER_SEED))
+				.block_production_mode(BlockProductionMode::Clock)
+				.start()
+		})
+		.await
+		.map_err(|error| test_error("start offline Surfpool", error))?;
 
 		Ok(Self { inner })
 	}
@@ -1511,6 +1514,46 @@ fn write_compute_units(
 	Ok(())
 }
 
+/// Whether a failed Surfnet start is worth one more attempt.
+///
+/// Surfpool's SDK picks each RPC port by binding `127.0.0.1:0` and dropping the
+/// listener before its runloop rebinds it, so a start can lose that port to
+/// another socket and abort with `AddrInUse`. A fresh attempt draws fresh
+/// ports. Only failures that leave no running instance behind qualify: an
+/// aborted runloop has already exited, and a port-allocation failure started
+/// nothing. `Startup` is excluded because its airdrop-visibility timeout can
+/// leave a live runloop the SDK returns no handle to stop, and `Runtime` covers
+/// deterministic SVM initialization and thread-spawn failures.
+const fn is_retryable_startup_failure(error: &SurfnetError) -> bool {
+	matches!(
+		error,
+		SurfnetError::Aborted(_) | SurfnetError::PortAllocation(_)
+	)
+}
+
+/// Run a Surfnet start, retrying once after a retryable startup failure.
+///
+/// The first failure is logged to stderr so a flaky start stays visible in
+/// test output. The retry is bounded to a single extra attempt, and a second
+/// failure is returned as-is. A failed start returns no `Surfnet` handle: the
+/// SDK has already dropped its side of the instance, so there is nothing left
+/// to stop before the next attempt.
+async fn start_with_one_retry<T, F, Fut>(mut start: F) -> Result<T, SurfnetError>
+where
+	F: FnMut() -> Fut,
+	Fut: Future<Output = Result<T, SurfnetError>>,
+{
+	match start().await {
+		Err(error) if is_retryable_startup_failure(&error) => {
+			eprintln!(
+				"pina_test: Surfpool startup failed ({error}); retrying once with fresh ports"
+			);
+			start().await
+		}
+		result => result,
+	}
+}
+
 fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestError {
 	TestError {
 		operation,
@@ -1874,5 +1917,88 @@ mod tests {
 				.stop()
 				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));
 		});
+	}
+
+	/// Replay scripted start outcomes and count how many attempts ran.
+	fn scripted_start(
+		outcomes: Vec<Result<u8, SurfnetError>>,
+	) -> (Result<u8, SurfnetError>, usize) {
+		let outcomes = std::cell::RefCell::new(outcomes.into_iter());
+		let attempts = std::cell::Cell::new(0);
+		let result = run(start_with_one_retry(|| {
+			attempts.set(attempts.get() + 1);
+			let outcome = outcomes
+				.borrow_mut()
+				.next()
+				.unwrap_or_else(|| panic!("start ran more often than scripted"));
+			async move { outcome }
+		}));
+
+		(result, attempts.get())
+	}
+
+	/// Aborted runloops and failed port allocations leave nothing running and
+	/// draw fresh ports on the next attempt; every other failure is final.
+	#[test]
+	fn only_instance_free_startup_failures_are_retryable() {
+		assert!(is_retryable_startup_failure(&SurfnetError::Aborted(
+			"Failed to start WebSocket RPC server: AddrInUse".into()
+		)));
+		assert!(is_retryable_startup_failure(&SurfnetError::PortAllocation(
+			"bind".into()
+		)));
+		assert!(!is_retryable_startup_failure(&SurfnetError::Startup(
+			"startup balances not visible".into()
+		)));
+		assert!(!is_retryable_startup_failure(&SurfnetError::Runtime(
+			"failed to initialize Surfnet SVM".into()
+		)));
+		assert!(!is_retryable_startup_failure(&SurfnetError::Cheatcode(
+			"rpc".into()
+		)));
+	}
+
+	/// A successful first start runs exactly once.
+	#[test]
+	fn a_successful_start_is_not_repeated() {
+		let (result, attempts) = scripted_start(vec![Ok(1)]);
+
+		assert!(matches!(result, Ok(1)));
+		assert_eq!(attempts, 1);
+	}
+
+	/// The port race observed in CI recovers on the second attempt.
+	#[test]
+	fn an_aborted_start_is_retried_once() {
+		let (result, attempts) =
+			scripted_start(vec![Err(SurfnetError::Aborted("AddrInUse".into())), Ok(2)]);
+
+		assert!(matches!(result, Ok(2)));
+		assert_eq!(attempts, 2);
+	}
+
+	/// The retry is bounded: a second failure is returned, not retried again.
+	#[test]
+	fn a_second_startup_failure_is_returned() {
+		let (result, attempts) = scripted_start(vec![
+			Err(SurfnetError::Aborted("first".into())),
+			Err(SurfnetError::PortAllocation("second".into())),
+		]);
+
+		assert!(
+			matches!(result, Err(SurfnetError::PortAllocation(message)) if message == "second")
+		);
+		assert_eq!(attempts, 2);
+	}
+
+	/// A non-retryable failure is returned from the first attempt.
+	#[test]
+	fn a_non_retryable_failure_is_not_retried() {
+		let (result, attempts) = scripted_start(vec![Err(SurfnetError::Startup(
+			"startup balances not visible".into(),
+		))]);
+
+		assert!(matches!(result, Err(SurfnetError::Startup(_))));
+		assert_eq!(attempts, 1);
 	}
 }

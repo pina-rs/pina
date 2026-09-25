@@ -28,6 +28,16 @@ export const STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL = 0x4; // 4
 export const STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED = 0x5; // 5
 /** The position has accrued nothing to release. */
 export const STAKING_REWARDS_PROGRAM_ERROR__NOTHING_TO_CLAIM = 0x6; // 6
+/**
+ * The reward index would create liabilities no `u64` payout can
+ * represent, freezing affected positions at their next checkpoint.
+ */
+export const STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_CAPACITY = 0x7; // 7
+/**
+ * The reward index would create liabilities beyond the reward vault's
+ * balance, making equal entitlements depend on claim order.
+ */
+export const STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_RESERVES = 0x8; // 8
 
 export type StakingRewardsProgramError =
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE
@@ -35,6 +45,8 @@ export type StakingRewardsProgramError =
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__INVALID_POOL
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__NOTHING_TO_CLAIM
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_CAPACITY
+	| typeof STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_RESERVES
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED
 	| typeof STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED;
 
@@ -53,6 +65,10 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The position has accrued nothing to release.`,
 		[STAKING_REWARDS_PROGRAM_ERROR__POOL_PAUSED]:
 			`The pool is paused, so deposits and withdrawals are refused.`,
+		[STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_CAPACITY]:
+			`The reward index would create liabilities no \`u64\` payout can`,
+		[STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_EXCEEDS_RESERVES]:
+			`The reward index would create liabilities beyond the reward vault's`,
 		[STAKING_REWARDS_PROGRAM_ERROR__REWARD_INDEX_REGRESSED]:
 			`The supplied reward index would move rewards backwards.`,
 		[STAKING_REWARDS_PROGRAM_ERROR__UNAUTHORIZED]:

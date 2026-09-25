@@ -83,6 +83,20 @@ struct DefaultDistinctRemaining<'a> {
 	pub rest: &'a mut [AccountView],
 }
 
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct ReadThenMutate<'a> {
+	pub observed: &'a AccountView,
+	pub mutated: &'a mut AccountView,
+}
+
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct ReadThenRead<'a> {
+	pub first: &'a AccountView,
+	pub second: &'a AccountView,
+}
+
 struct AccountBuilder {
 	address: Address,
 	owner: Address,
@@ -231,16 +245,46 @@ unsafe fn create_test_input(
 		"duplicate accounts require at least one unique account"
 	);
 
-	let total_accounts = unique_accounts.len() + duplicate_count;
+	let last = unique_accounts.len().saturating_sub(1);
+	let layout = (0..unique_accounts.len())
+		.chain(core::iter::repeat_n(last, duplicate_count))
+		.collect::<Vec<_>>();
+
+	unsafe { create_input_with_layout(unique_accounts, &layout, instruction_data) }
+}
+
+/// Serialize an instruction input whose slot `n` holds
+/// `unique_accounts[layout[n]]`.
+///
+/// Like the runtime, the first slot naming an account serializes it and every
+/// later slot naming it is a duplicate marker pointing at that first slot.
+unsafe fn create_input_with_layout(
+	unique_accounts: &[AccountBuilder],
+	layout: &[usize],
+	instruction_data: &[u8],
+) -> AlignedMemory {
+	let duplicate_count = layout.len() - unique_accounts.len();
 	let total_size = compute_input_size(unique_accounts, duplicate_count, instruction_data);
 	let mut input = AlignedMemory::new(total_size);
 
 	unsafe {
-		input.write(&(total_accounts as u64).to_le_bytes(), 0);
+		input.write(&(layout.len() as u64).to_le_bytes(), 0);
 	}
 	let mut offset = size_of::<u64>();
+	let mut first_slots: Vec<Option<usize>> = vec![None; unique_accounts.len()];
 
-	for builder in unique_accounts {
+	for (slot, &unique) in layout.iter().enumerate() {
+		if let Some(first_slot) = first_slots[unique] {
+			let marker = u8::try_from(first_slot).expect("duplicate index fits the marker byte");
+			unsafe {
+				input.write(&[marker, 0, 0, 0, 0, 0, 0, 0], offset);
+			}
+			offset += size_of::<u64>();
+			continue;
+		}
+		first_slots[unique] = Some(slot);
+
+		let builder = &unique_accounts[unique];
 		let data_len = builder.data.len();
 		let account_buf_size = STATIC_ACCOUNT_DATA + size_of::<u64>();
 		let mut account_buf = vec![0u8; account_buf_size];
@@ -270,16 +314,10 @@ unsafe fn create_test_input(
 			offset += padding;
 		}
 	}
-
-	if duplicate_count > 0 {
-		let duplicate_index = (unique_accounts.len() - 1) as u8;
-		for _ in 0..duplicate_count {
-			unsafe {
-				input.write(&[duplicate_index, 0, 0, 0, 0, 0, 0, 0], offset);
-			}
-			offset += size_of::<u64>();
-		}
-	}
+	assert!(
+		first_slots.iter().all(Option::is_some),
+		"every unique account must occupy a slot"
+	);
 
 	unsafe {
 		input.write(&instruction_data.len().to_le_bytes(), offset);
@@ -329,6 +367,34 @@ macro_rules! load_accounts {
 
 		(input, accounts, count)
 	}};
+}
+
+macro_rules! load_layout {
+	($unique_accounts:expr, $layout:expr, $max_accounts:expr) => {{
+		let mut input = unsafe { create_input_with_layout($unique_accounts, $layout, &[]) };
+		let mut accounts = [UNINIT; $max_accounts];
+		let count = {
+			let (account_views, _) =
+				unsafe { deserialize_test_input::<$max_accounts>(&mut input, &mut accounts) };
+			account_views.len()
+		};
+
+		(input, accounts, count)
+	}};
+}
+
+fn writable_account(byte: u8) -> AccountBuilder {
+	AccountBuilder::new()
+		.address(fake_address(byte))
+		.owner(TEST_PROGRAM_ID)
+		.is_writable(true)
+}
+
+fn is_duplicate_mutable_account<T>(result: &Result<T, ProgramError>) -> bool {
+	matches!(
+		result,
+		Err(ProgramError::Custom(error)) if *error == PinaProgramError::DuplicateMutableAccount as u32
+	)
 }
 
 fn find_non_canonical_pda_fixture() -> ([u8; 2], Address, u8, Address, u8) {
@@ -477,6 +543,77 @@ fn mutable_remaining_accounts_reject_duplicate_addresses_by_default() {
 		Err(ProgramError::Custom(error))
 			if error == PinaProgramError::DuplicateMutableAccount as u32
 	));
+}
+
+#[test]
+fn readonly_then_mutable_alias_is_accepted() {
+	// An authority that signs readonly and also pays: the runtime marks both
+	// slots writable because one of them is.
+	let unique_accounts = [writable_account(51)];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 0], 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+
+	let parsed = ReadThenMutate::try_from((&TEST_PROGRAM_ID, account_views))
+		.unwrap_or_else(|error| panic!("an earlier readonly alias should parse: {error:?}"));
+
+	assert_eq!(*parsed.observed, *parsed.mutated);
+}
+
+#[test]
+fn mutable_then_readonly_alias_is_rejected() {
+	let unique_accounts = [writable_account(52)];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 0], 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let mut cursor = AccountsCursor::new(TEST_PROGRAM_ID, account_views);
+
+	assert!(is_duplicate_mutable_account(&cursor.next_mut()));
+}
+
+#[test]
+fn mutable_alias_is_rejected_past_unrelated_slots() {
+	let unique_accounts = [writable_account(53), writable_account(54)];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 1, 0], 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let mut cursor = AccountsCursor::new(TEST_PROGRAM_ID, account_views);
+
+	assert!(is_duplicate_mutable_account(&cursor.next_mut()));
+}
+
+#[test]
+fn optional_mutable_alias_is_rejected() {
+	let unique_accounts = [writable_account(55)];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 0], 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let mut cursor = AccountsCursor::new(TEST_PROGRAM_ID, account_views);
+
+	assert!(is_duplicate_mutable_account(&cursor.next_mut_opt()));
+}
+
+#[test]
+fn readonly_aliases_of_a_writable_account_are_allowed() {
+	let unique_accounts = [writable_account(56)];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 0], 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+
+	let parsed = ReadThenRead::try_from((&TEST_PROGRAM_ID, account_views))
+		.unwrap_or_else(|error| panic!("readonly aliases should parse: {error:?}"));
+
+	assert_eq!(parsed.first, parsed.second);
+}
+
+#[test]
+fn distinct_mutable_remaining_accounts_reject_a_non_adjacent_duplicate() {
+	let unique_accounts = [
+		writable_account(57),
+		writable_account(58),
+		writable_account(59),
+	];
+	let (_input, mut accounts, count) = load_layout!(&unique_accounts, &[0, 1, 2, 1], 6);
+	let account_views = initialized_account_views(&mut accounts, count);
+
+	let result = DefaultDistinctRemaining::try_from((&TEST_PROGRAM_ID, account_views));
+
+	assert!(is_duplicate_mutable_account(&result));
 }
 
 #[test]

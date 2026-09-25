@@ -628,6 +628,7 @@ fn governed_config_change_grows_the_roster_and_invalidates_prior_proposals() {
 						AccountMeta::new(member_a().pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_b().pubkey(), false), // rent-collector filler
 					],
 				),
 				&[&member_c(), &member_a()],
@@ -1062,6 +1063,13 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 		program
 			.fund(&funder.pubkey(), FUND)
 			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+		// Fills the refund slot: no rent collector is configured, so any
+		// writable account works, but it must differ from the rent payer
+		// because duplicate mutable accounts are refused at parse time.
+		let refund_filler = Keypair::new_from_array([0xD0; 32]);
+		program
+			.fund(&refund_filler.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund refund filler: {error:?}"));
 
 		// A controlled multisig: `authority` may act directly, which is exactly
 		// the path that must not be able to mint itself an allowance.
@@ -1135,6 +1143,7 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(refund_filler.pubkey(), false),
 						AccountMeta::new(limit_key, false),
 					],
 				),
@@ -1169,6 +1178,7 @@ fn config_authority_execute_refuses_a_spending_limit_grant() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(refund_filler.pubkey(), false),
 					],
 				),
 				&[&authority, &funder],
@@ -1397,6 +1407,9 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 		}
 		let authority = Keypair::new_from_array([0xEE; 32]);
 		let collector = Pubkey::new_from_array([0xCC; 32]);
+		// The authority path names the collector as its refund slot before
+		// any close does, so the account must exist by then.
+		program.fund(&collector, 0).err();
 		let funder = Keypair::new_from_array([0xF0; 32]);
 		program
 			.fund(&funder.pubkey(), FUND)
@@ -1582,6 +1595,9 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 						AccountMeta::new(funder.pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						// The multisig configures this collector, so the slot
+						// must carry exactly that address.
+						AccountMeta::new(collector, false),
 					],
 				),
 				&[&authority, &funder],
@@ -1608,6 +1624,7 @@ fn config_update_revocation_cancellation_authority_execute_and_close() {
 					AccountMeta::new_readonly(multisig_key, false),
 					AccountMeta::new(draft_key, false),
 					AccountMeta::new(collector, false),
+					AccountMeta::new_readonly(clock(), false),
 				],
 			))
 			.unwrap_or_else(|error| panic!("close the cancelled draft: {error:?}"));
@@ -1674,6 +1691,11 @@ fn execute_config_proposal(
 		AccountMeta::new(member_a().pubkey(), true),
 		AccountMeta::new_readonly(system(), false),
 		AccountMeta::new_readonly(clock(), false),
+		// Rent-collector slot: these multisigs configure none, so the refund
+		// destination aliases the rent payer and the slot is any writable
+		// account. member_b's wallet fills it without duplicating a writable
+		// rent payer.
+		AccountMeta::new(member_b().pubkey(), false),
 	];
 	metas.extend(extra_metas);
 	program
@@ -1837,6 +1859,7 @@ fn config_execute_rejects_an_expired_proposal() {
 						AccountMeta::new(member_a().pubkey(), true),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_b().pubkey(), false), // rent-collector filler
 					],
 				),
 				&[&member_c(), &member_a()],
@@ -2553,6 +2576,693 @@ fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 		pina_test::assert_custom_error(
 			&draw.expect_err("checked above"),
 			MultisigError::Unauthorized as u32,
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
+//
+// Each test below asserts the *secure* behavior from the audit report. It
+// fails on the current tree because the exploit is still live, and must pass
+// once the corresponding fix lands. Run with `pina test --project
+// examples/multisig_program --filter audit_sec_`.
+// ---------------------------------------------------------------------------
+
+use program_under_test::ACTION_REMOVE_SPENDING_LIMIT;
+
+/// Encode a multisig create instruction with an explicit timelock, TTL, and
+/// rent collector, mirroring `create_multisig_ix` above.
+fn audit_create_multisig_ix(
+	bump: u8,
+	member_count: usize,
+	threshold: u16,
+	timelock: u32,
+	ttl: u32,
+	rent_collector: Option<&Pubkey>,
+) -> Vec<u8> {
+	let mut data = vec![0_u8; MultisigCreateIx::SIZE];
+	MultisigCreateIx::initialize(&mut data, |ix| {
+		ix.bump = bump;
+		ix.threshold.set(threshold);
+		ix.timelock.set(timelock);
+		ix.ttl.set(ttl);
+		for slot in ix.member_permissions.iter_mut().take(member_count) {
+			*slot = PERMISSIONS_ALL;
+		}
+		ix.config_authority = Address::default();
+		ix.rent_collector = rent_collector
+			.map(|collector| pina_address(collector))
+			.unwrap_or_default();
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("encode multisig create: {error:?}"));
+	data
+}
+
+/// SEC-11: the global `ProgramConfig` PDA is a singleton and
+/// `ConfigInitialize` stores whichever signer arrives first as its permanent
+/// authority, with no bootstrap binding. An unapproved first caller must not
+/// be able to occupy it.
+///
+/// Current behavior: any funded signer initializes the config and becomes the
+/// authority, so the `expect_err` below fails and the test proves the capture
+/// is live.
+///
+/// Dormant acceptance test for issue #501: the exploit this test proves is
+/// deferred pending the bootstrap-mechanism decision. The `audit-deferred`
+/// feature keeps it out of every default run — plain `cargo test` and
+/// `pina test` alike — while staying one flag away: run it explicitly with
+/// `cargo test -p multisig-program-surfpool-tests --features audit-deferred
+/// -- --include-ignored` once the fix lands.
+#[cfg(feature = "audit-deferred")]
+#[test]
+#[ignore = "deferred: issue #501"]
+fn audit_sec_11_unauthorized_first_initializer_cannot_capture_the_program_config() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let attacker = Keypair::new_from_array([0xA1; 32]);
+		program
+			.fund(&attacker.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
+
+		let (config_key, config_bump) = program_config_pda();
+		let mut config_ix = vec![0_u8; ConfigInitializeIx::SIZE];
+		ConfigInitializeIx::initialize(&mut config_ix, |ix| {
+			ix.bump = config_bump;
+			ix.treasury = pina_address(&attacker.pubkey());
+			ix.creation_fee.set(0);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode config init: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&config_ix,
+					vec![
+						AccountMeta::new(attacker.pubkey(), true),
+						AccountMeta::new(config_key, false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&attacker],
+			)
+			.expect_err("an unapproved signer must not capture the global config");
+
+		assert!(
+			program.account(&config_key).is_err(),
+			"the rejected initialization must not leave config state behind"
+		);
+		assert!(
+			error.message().contains("custom program error")
+				|| error.message().contains("Unauthorized"),
+			"expected an authorization rejection, got: {}",
+			error.message()
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// SEC-21: a nonzero TTL not larger than the timelock expires a proposal
+/// before its execution window can open (expiry starts at creation, the delay
+/// at approval). Creating a multisig in that configuration must be rejected.
+///
+/// Current behavior: the combination is accepted, so the `expect_err` below
+/// fails and the test proves proposals can be born impossible to execute.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let authority = config_authority();
+		program
+			.fund(&authority.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
+		install_program_config(&program, &authority.pubkey());
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let (config_key, _) = program_config_pda();
+
+		// A one-minute TTL under a one-hour timelock: every proposal created by
+		// this multisig dies before it can execute.
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&audit_create_multisig_ix(multisig_bump, members.len(), 2, 3_600, 60, None),
+					vec![
+						AccountMeta::new_readonly(config_key, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.expect_err("a TTL at or below the timelock must be rejected at creation");
+
+		assert!(
+			program.account(&multisig_key).is_err(),
+			"the rejected configuration must not create the multisig"
+		);
+		drop(error);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// SEC-22: `ProposalClose` only accepts terminal proposals, so an expired
+/// active proposal — which can neither progress nor expire into a terminal
+/// status — strands its rent forever. An expired proposal must be
+/// permissionlessly closable with the refund going to the configured rent
+/// collector.
+///
+/// Current behavior: the close is refused with `InvalidProposalStatus`, so
+/// the `expect` below fails and the test proves the stranded rent.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_22_an_expired_proposal_can_be_closed_by_anyone() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let authority = config_authority();
+		program
+			.fund(&authority.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
+		install_program_config(&program, &authority.pubkey());
+
+		let collector = Keypair::new_from_array([0xC0; 32]);
+		program
+			.fund(&collector.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund rent collector: {error:?}"));
+		let collector_before = program
+			.balance(&collector.pubkey())
+			.unwrap_or_else(|error| panic!("collector balance: {error:?}"));
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let (config_key, _) = program_config_pda();
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&audit_create_multisig_ix(
+						multisig_bump,
+						members.len(),
+						2,
+						0,
+						60,
+						Some(&collector.pubkey()),
+					),
+					vec![
+						AccountMeta::new_readonly(config_key, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
+
+		// A draft vault proposal with a sixty-second lifetime.
+		let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, 1);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(
+						&multisig_key,
+						proposal_bump,
+						KIND_VAULT,
+						&[0, 0, 0, 0, 0, 0],
+						&[],
+					),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create vault proposal: {error:?}"));
+
+		// Advance well past the sixty-second TTL so the proposal is expired.
+		program
+			.time_travel_to_timestamp_millis(2_500_000_000_000)
+			.unwrap_or_else(|error| panic!("time travel past expiry: {error:?}"));
+
+		// The expired proposal must now be closable, refunding the collector.
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&bare_ix(MultisigInstruction::ProposalClose as u8),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new(collector.pubkey(), true),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&collector],
+			)
+			.expect("an expired proposal must be closable so its rent is not stranded");
+
+		assert!(
+			program.account(&proposal_key).is_err(),
+			"the closed proposal account must be gone"
+		);
+		let collector_after = program
+			.balance(&collector.pubkey())
+			.unwrap_or_else(|error| panic!("collector balance: {error:?}"));
+		assert!(
+			collector_after > collector_before,
+			"the close refund must reach the configured rent collector"
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// SEC-20: when a config execution prunes a spending-limit roster down to
+/// empty and closes the account, the refund goes to the executor-supplied
+/// `rent_payer` rather than the multisig's configured `rent_collector`. The
+/// executor must not be able to direct that refund to themselves.
+///
+/// Current behavior: the close refunds `rent_payer` (here, the executing
+/// member's own wallet), so the collector-balance assertion below fails and
+/// the test proves the executor-directed refund.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_20_config_execution_refunds_closed_rent_to_the_configured_collector() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let authority = config_authority();
+		program
+			.fund(&authority.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
+		install_program_config(&program, &authority.pubkey());
+
+		let collector = Keypair::new_from_array([0xC0; 32]);
+		program
+			.fund(&collector.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund rent collector: {error:?}"));
+		let collector_before = program
+			.balance(&collector.pubkey())
+			.unwrap_or_else(|error| panic!("collector balance: {error:?}"));
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let (config_key, _) = program_config_pda();
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&audit_create_multisig_ix(
+						multisig_bump,
+						members.len(),
+						2,
+						0,
+						0,
+						Some(&collector.pubkey()),
+					),
+					vec![
+						AccountMeta::new_readonly(config_key, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
+
+		// Governed step one: grant member C a one-time native-SOL spending
+		// limit, so a funded limit account exists to retire.
+		let limit_create_key = Keypair::new_from_array([0x51; 32]).pubkey();
+		let (limit_key, _) = spending_limit_pda(&multisig_key, &limit_create_key);
+		let mut grant = vec![1_u8, ACTION_ADD_SPENDING_LIMIT];
+		grant.extend_from_slice(limit_create_key.as_ref());
+		grant.push(0); // vault index
+		grant.extend_from_slice(Pubkey::default().as_ref()); // native SOL
+		grant.extend_from_slice(&1_000_u64.to_le_bytes());
+		grant.push(PERIOD_ONE_TIME);
+		grant.push(1); // one member on the limit roster
+		grant.extend_from_slice(members[2].as_ref());
+		grant.push(0); // no destinations
+
+		// Governed step two: retire that spending limit explicitly. The
+		// retirement closes the account and refunds the executor-supplied
+		// `rent_payer`, not the multisig's configured rent collector.
+		let mut retirement = vec![1_u8, ACTION_REMOVE_SPENDING_LIMIT];
+		retirement.extend_from_slice(limit_key.as_ref());
+
+		for (index, actions) in [(1_u64, &grant), (2, &retirement)] {
+			let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, index);
+			program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						pid,
+						&proposal_create_ix(
+							&multisig_key,
+							proposal_bump,
+							KIND_CONFIG,
+							&[],
+							actions,
+						),
+						vec![
+							AccountMeta::new(multisig_key, false),
+							AccountMeta::new(proposal_key, false),
+							AccountMeta::new_readonly(member_a().pubkey(), true),
+							AccountMeta::new(member_a().pubkey(), true),
+							AccountMeta::new_readonly(system(), false),
+							AccountMeta::new_readonly(clock(), false),
+						],
+					),
+					&[&member_a()],
+				)
+				.unwrap_or_else(|error| panic!("create config proposal {index}: {error:?}"));
+			for (discriminant, signer) in [
+				(MultisigInstruction::ProposalActivate as u8, &member_a()),
+				(MultisigInstruction::ProposalApprove as u8, &member_a()),
+				(MultisigInstruction::ProposalApprove as u8, &member_b()),
+			] {
+				program
+					.send_with_signers(
+						Instruction::new_with_bytes(
+							pid,
+							&bare_ix(discriminant),
+							vec![
+								AccountMeta::new_readonly(multisig_key, false),
+								AccountMeta::new(proposal_key, false),
+								AccountMeta::new_readonly(signer.pubkey(), true),
+								AccountMeta::new_readonly(clock(), false),
+							],
+						),
+						&[signer],
+					)
+					.unwrap_or_else(|error| panic!("advance proposal {index}: {error:?}"));
+			}
+
+			// member_a executes and names *itself* as rent payer. The limit
+			// account was funded by member_a at creation; its closing refund
+			// must return to the configured collector, not member_a.
+			let executor_before = program
+				.balance(&member_a().pubkey())
+				.unwrap_or_else(|error| panic!("executor balance: {error:?}"));
+			program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						pid,
+						&bare_ix(MultisigInstruction::ConfigExecute as u8),
+						vec![
+							AccountMeta::new(multisig_key, false),
+							AccountMeta::new(proposal_key, false),
+							AccountMeta::new_readonly(member_a().pubkey(), true),
+							AccountMeta::new(member_a().pubkey(), true),
+							AccountMeta::new_readonly(system(), false),
+							AccountMeta::new_readonly(clock(), false),
+							AccountMeta::new(collector.pubkey(), true),
+							AccountMeta::new(limit_key, false),
+						],
+					),
+					&[&member_a(), &collector],
+				)
+				.unwrap_or_else(|error| panic!("execute proposal {index}: {error:?}"));
+			let executor_after = program
+				.balance(&member_a().pubkey())
+				.unwrap_or_else(|error| panic!("executor balance: {error:?}"));
+			let _ = (executor_before, executor_after);
+
+			if index == 2 {
+				// The retirement closed the account: its rent left with the
+				// refund. Where did it land?
+				let closed_lamports = program
+					.account(&limit_key)
+					.map(|account| account.lamports)
+					.unwrap_or(0);
+				assert_eq!(
+					closed_lamports, 0,
+					"the retired spending-limit account must be closed with its rent refunded"
+				);
+				let collector_after = program
+					.balance(&collector.pubkey())
+					.unwrap_or_else(|error| panic!("collector balance: {error:?}"));
+				let executor_final = program
+					.balance(&member_a().pubkey())
+					.unwrap_or_else(|error| panic!("executor balance: {error:?}"));
+				// The secure outcome: the refund reaches the configured
+				// collector and the executor cannot profit from naming
+				// themselves rent payer. Today the collector is unchanged and
+				// the executor keeps the refund, so the first assertion below
+				// fails and proves SEC-20.
+				assert!(
+					collector_after > collector_before,
+					"the close refund must reach the multisig's configured rent collector, not 					 the executor"
+				);
+				assert!(
+					executor_final <= executor_before,
+					"the executor must not profit from directing the rent refund to themselves"
+				);
+			}
+		}
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+	});
+}
+
+/// SEC-09: `ConfigExecute` checks staleness but never `expires_at`, so an
+/// approved configuration proposal can execute after its declared lifetime
+/// and change membership, thresholds, timelocks, or rent collectors. An
+/// expired proposal must be refused exactly like `VaultExecute` refuses it.
+///
+/// Current behavior: the long-expired config proposal executes, so the
+/// `expect_err` below fails and the test proves the posthumous execution.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_sec_09_an_expired_config_proposal_cannot_execute() {
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		let authority = config_authority();
+		program
+			.fund(&authority.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
+		install_program_config(&program, &authority.pubkey());
+
+		let create = create_key();
+		program
+			.fund(&create.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund create key: {error:?}"));
+		let members = sorted_members();
+		for member in &members {
+			program
+				.fund(member, FUND)
+				.unwrap_or_else(|error| panic!("fund member: {error:?}"));
+		}
+		let funder = Keypair::new_from_array([0xF0; 32]);
+		program
+			.fund(&funder.pubkey(), FUND)
+			.unwrap_or_else(|error| panic!("fund funder: {error:?}"));
+
+		// A sixty-second proposal lifetime.
+		let (multisig_key, multisig_bump) = multisig_pda(&create.pubkey());
+		let (config_key, _) = program_config_pda();
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&audit_create_multisig_ix(multisig_bump, members.len(), 2, 0, 60, None),
+					vec![
+						AccountMeta::new_readonly(config_key, false),
+						AccountMeta::new_readonly(create.pubkey(), true),
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(funder.pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(pid, false),
+						AccountMeta::new_readonly(members[0], false),
+						AccountMeta::new_readonly(members[1], false),
+						AccountMeta::new_readonly(members[2], false),
+					],
+				),
+				&[&create, &funder],
+			)
+			.unwrap_or_else(|error| panic!("create multisig: {error:?}"));
+
+		// A config proposal that raises the timelock to one hour.
+		let mut actions = vec![1_u8, ACTION_SET_TIME_LOCK];
+		actions.extend_from_slice(&3_600_u32.to_le_bytes());
+		let (proposal_key, proposal_bump) = proposal_pda(&multisig_key, 1);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(&multisig_key, proposal_bump, KIND_CONFIG, &[], &actions),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create config proposal: {error:?}"));
+		for (discriminant, signer) in [
+			(MultisigInstruction::ProposalActivate as u8, &member_a()),
+			(MultisigInstruction::ProposalApprove as u8, &member_a()),
+			(MultisigInstruction::ProposalApprove as u8, &member_b()),
+		] {
+			program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						pid,
+						&bare_ix(discriminant),
+						vec![
+							AccountMeta::new_readonly(multisig_key, false),
+							AccountMeta::new(proposal_key, false),
+							AccountMeta::new_readonly(signer.pubkey(), true),
+							AccountMeta::new_readonly(clock(), false),
+						],
+					),
+					&[signer],
+				)
+				.unwrap_or_else(|error| panic!("advance config proposal: {error:?}"));
+		}
+
+		// The proposal's sixty-second lifetime is long past.
+		program
+			.time_travel_to_timestamp_millis(2_500_000_000_000)
+			.unwrap_or_else(|error| panic!("time travel past expiry: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&bare_ix(MultisigInstruction::ConfigExecute as u8),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(proposal_key, false),
+						AccountMeta::new_readonly(member_c().pubkey(), true),
+						AccountMeta::new(member_c().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+						AccountMeta::new(member_c().pubkey(), true), // rent-collector filler
+					],
+				),
+				&[&member_c()],
+			)
+			.expect_err("an expired config proposal must not execute");
+
+		// The refused execution must leave the timelock unchanged at zero.
+		let multisig_account = program
+			.account(&multisig_key)
+			.unwrap_or_else(|error| panic!("multisig exists: {error:?}"));
+		let state = Multisig::try_from_bytes(&multisig_account.data)
+			.unwrap_or_else(|error| panic!("decode multisig: {error:?}"));
+		assert_eq!(
+			state.timelock.get(),
+			0,
+			"the expired proposal's config change must not apply: {}",
+			error.message()
 		);
 
 		program

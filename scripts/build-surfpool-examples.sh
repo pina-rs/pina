@@ -41,6 +41,27 @@ fi
 mkdir -p "$OUT_DIR"
 tools_install=--force-tools-install
 
+# On macOS the nix agave package that provides cargo-build-sbf re-seeds the
+# platform-tools cache symlink from its read-only store bundle before every
+# invocation, so a forced install can only download the full asset over that
+# bundle — and a truncated download fails the whole run. When the resolved
+# binary is that bundled wrapper, trust the pinned bundle from the first
+# build on, after confirming its platform-tools version is the one this
+# script pins. Linux keeps the forced first install: its bundled sysroot is
+# incomplete (no liballoc), so the full pinned toolchain must be fetched.
+if [[ "$(uname -s)" != "Linux" ]]; then
+	case "$cargo_build_sbf" in
+	/nix/store/*/bin/cargo-build-sbf)
+		bundled_platform_tools="${cargo_build_sbf%/bin/cargo-build-sbf}/lib/platform-tools"
+		bundled_version="$("${cargo_build_sbf%/bin/cargo-build-sbf}/bin/.cargo-build-sbf-wrapped" --version 2>/dev/null |
+			sed -n 's/^platform-tools //p')"
+		if [[ -d "$bundled_platform_tools" && "$bundled_version" == "$TOOLS_VERSION" ]]; then
+			tools_install=--skip-tools-install
+		fi
+		;;
+	esac
+fi
+
 # Build each example independently. This deliberately does not use a best-effort
 # loop: a missing or non-SBF example is a test failure, not a skipped test.
 while IFS= read -r manifest; do

@@ -171,6 +171,21 @@ in
 
     ${pkgs.git}/bin/git config --local --unset-all core.hooksPath 2>/dev/null || true
 
+    # `git push` opens the SSH connection and completes the ref advertisement
+    # before it runs the pre-push hook, so the connection sits idle for the
+    # whole gate. GitHub closes a connection idle for six minutes, and the
+    # lint:push gate runs longer than that: the push then dies with exit 141
+    # (SIGPIPE) after the gate has already passed, and nothing is pushed.
+    # Keepalives hold the connection open across the gate. Only set this when
+    # the checkout has no ssh command of its own, so a custom identity or
+    # ProxyCommand is never replaced.
+    if [ -z "$(${pkgs.git}/bin/git config --local --get core.sshCommand)" ]; then
+      ${pkgs.git}/bin/git config --local core.sshCommand \
+        "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=30"
+    else
+      echo 1>&2 "NOTE: core.sshCommand is set locally; add -o ServerAliveInterval=15 -o ServerAliveCountMax=30 so the pre-push gate cannot outlive the connection."
+    fi
+
     GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-commit
     GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-push
   '';
@@ -1002,6 +1017,73 @@ in
           --nocapture
       '';
       description = "Build, deploy, and adversarially exercise every SBF example through the Surfpool SDK.";
+      binary = "bash";
+    };
+    "walkthrough:migrations" = {
+      exec = ''
+        set -euo pipefail
+
+        # `cargo-build-sbf` resolves its platform-tools cache through `$HOME`,
+        # which the nix shell does not export on every runner.
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+
+        # The walkthrough runs `cargo run -p pina_cli`, then spends most of its
+        # time in the SBF toolchain, so the platform-tools cache has to be the
+        # pinned v1.54 toolchain the rest of the repository builds with.
+        #
+        # On Linux the nix wrapper seeds that cache with its bundled sysroot,
+        # which is incomplete (no liballoc for the sbpf targets), so the first
+        # build has to reach the unwrapped binary and install the real
+        # toolchain. The walkthrough shells out to `cargo build-sbf` with fixed
+        # arguments, so the unwrapped binary has to be reachable *by name*:
+        # cargo resolves the subcommand from PATH, and the unwrapped file is
+        # dot-prefixed and therefore not name-addressable. Shimming it into a
+        # private directory keeps the fixed arguments untouched.
+        if [ "$(uname -s)" = "Linux" ]; then
+          cargo_build_sbf="$(command -v cargo-build-sbf)"
+          cargo_build_sbf_resolved="$(${pkgs.coreutils}/bin/readlink -f "$cargo_build_sbf")"
+          cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
+          if [ -x "$cargo_build_sbf_real" ]; then
+            sbf_shim="$(mktemp -d)"
+            trap 'rm -rf "$sbf_shim"' EXIT
+            ln -s "$cargo_build_sbf_real" "$sbf_shim/cargo-build-sbf"
+            export PATH="$sbf_shim''${PATH:+:$PATH}"
+          fi
+
+          # A previous wrapper invocation may already have installed its
+          # read-only Nix-store bundle as cargo-build-sbf's cache symlink.
+          # Remove only that exact derived symlink so the real toolchain can be
+          # installed over it; refuse to touch any user-managed target.
+          platform_tools_links=(
+            "''${HOME:?}/.cache/solana/''${SBF_TOOLS_VERSION}/platform-tools"
+            "''${XDG_CACHE_HOME:-$HOME/.cache}/solana/''${SBF_TOOLS_VERSION}/platform-tools"
+          )
+          for platform_tools_link in "''${platform_tools_links[@]}"; do
+            [ -L "$platform_tools_link" ] || continue
+            platform_tools_target="$(readlink "$platform_tools_link")"
+            case "$platform_tools_target" in
+              /nix/store/*/lib/platform-tools) unlink "$platform_tools_link" ;;
+              *)
+                echo "refusing to replace unexpected platform-tools link: $platform_tools_target" >&2
+                exit 1
+                ;;
+            esac
+          done
+        fi
+
+        # The walkthrough regenerates every client through `pina generate`, which
+        # resolves the TypeScript/Dart/CLI renderers from this workspace's
+        # `node_modules`. `dist` is not committed, so the CLI renderer has to be
+        # built before the first `pina generate` runs.
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
+
+        pnpm --dir "$DEVENV_ROOT" exec tsx "$DEVENV_ROOT/scripts/migrations-walkthrough.ts" "$@"
+      '';
+      description = "Run the ten-deployment migration walkthrough end to end.";
       binary = "bash";
     };
     "coverage:all" = {

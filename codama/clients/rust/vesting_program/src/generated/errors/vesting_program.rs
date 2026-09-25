@@ -33,6 +33,11 @@ pub enum VestingProgramError {
 	/// 4 - The vault holds fewer tokens than the claim must release.
 	#[error("The vault holds fewer tokens than the claim must release.")]
 	InsufficientVaultBalance = 0x4,
+	/// The Cancel settlement destination is not a token account for this
+	/// mint owned by the beneficiary.
+	/// 5 - The Cancel settlement destination is not a token account for this
+	#[error("The Cancel settlement destination is not a token account for this")]
+	InvalidBeneficiaryAta = 0x5,
 }
 
 impl From<VestingProgramError> for solana_program_error::ProgramError {
