@@ -863,7 +863,6 @@ fn claim_wrong_beneficiary_fails() {
 // token CPI so we can only test early validation failures)
 // ---------------------------------------------------------------------------
 
-#[test]
 /// SEC-28 binding check: the Cancel settlement must land in a token account
 /// the beneficiary owns for the schedule's mint. An admin-named account they
 /// own themselves is refused, so the entitlement cannot be redirected.

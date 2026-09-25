@@ -572,27 +572,6 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		vesting_state.cancelled.set(true);
 		drop(vesting_state);
 
-		associated_token_account::instructions::CreateIdempotent {
-			funding_account: self.admin,
-			account: self.admin_ata,
-			wallet: self.admin,
-			mint: self.mint,
-			system_program: self.system_program,
-			token_program: self.token_program,
-		}
-		.invoke()?;
-
-		let mint_decimals = {
-			let mint = self
-				.mint
-				.as_token_mint_for_program(self.token_program.address())?
-				.assert_no_extensions()?;
-			mint.decimals()
-		};
-		let vesting_seeds = VestingState::seeds(&admin, &beneficiary, &mint).with_bump(bump);
-		let signer = vesting_seeds.to_signer();
-		let signers = [signer.as_signer()];
-
 		// A revocable cancellation settles the beneficiary's earned
 		// entitlement first: everything the linear curve has released minus
 		// what was already claimed belongs to the beneficiary, and only a
@@ -623,7 +602,8 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			// binds the destination without a canonical ATA derivation. A
 			// token account for the right mint owned by anyone else — or an
 			// account for a different mint — is refused, so the admin cannot
-			// redirect the entitlement.
+			// redirect the entitlement. The check runs before any CPI so a
+			// doomed settlement never spends compute on one.
 			let (is_beneficiary_owned, is_right_mint) = {
 				let destination = self
 					.beneficiary_ata
@@ -637,7 +617,30 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				return Err(VestingError::InvalidBeneficiaryAta.into());
 			}
 			self.beneficiary_ata.assert_writable()?;
+		}
 
+		associated_token_account::instructions::CreateIdempotent {
+			funding_account: self.admin,
+			account: self.admin_ata,
+			wallet: self.admin,
+			mint: self.mint,
+			system_program: self.system_program,
+			token_program: self.token_program,
+		}
+		.invoke()?;
+
+		let mint_decimals = {
+			let mint = self
+				.mint
+				.as_token_mint_for_program(self.token_program.address())?
+				.assert_no_extensions()?;
+			mint.decimals()
+		};
+		let vesting_seeds = VestingState::seeds(&admin, &beneficiary, &mint).with_bump(bump);
+		let signer = vesting_seeds.to_signer();
+		let signers = [signer.as_signer()];
+
+		if owed > 0 {
 			token::instructions::TransferChecked::new(
 				self.vault,
 				self.mint,
