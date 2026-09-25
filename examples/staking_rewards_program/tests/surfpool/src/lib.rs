@@ -1434,10 +1434,11 @@ fn stake_vault_backs_total_staked() {
 /// becomes the stored administrator, so the first `expect_err` below fails
 /// and the test proves the capture is live.
 /// Dormant acceptance test for issue #502: the exploit this test proves is
-/// deferred pending the initialization trust-model decision. `pina test` runs
-/// only `--ignored` tests, so this stays out of the suite; run it explicitly
-/// once the fix lands.
+/// deferred pending the initialization trust-model decision. Enable the
+/// `audit-deferred` feature and run this test explicitly once the fix lands.
+#[cfg(feature = "audit-deferred")]
 #[test]
+#[ignore = "deferred: issue #502"]
 fn audit_sec_26_unapproved_first_initializer_cannot_capture_the_singleton_pool() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
