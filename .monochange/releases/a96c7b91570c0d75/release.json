@@ -1,0 +1,2431 @@
+{
+	"schema_version": "0.6",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-25T07:34:11Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.21.0",
+		"pina_root": "0.0.11"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.21.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.21.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.11",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.11",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.21.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/accounts-cursor-readonly-alias.md",
+		".changeset/assert-stored-bump.md",
+		".changeset/compact-creation-stored-bump.md",
+		".changeset/doctor-lint-toolchain-report.md",
+		".changeset/full-balance-drain-guard-behavior.md",
+		".changeset/pinapod-fixed-reexport.md",
+		".changeset/post-cpi-balance-reload-destinations.md",
+		".changeset/privacy-pool-e2e-required-features.md",
+		".changeset/privacy-pool-vault-pin.md",
+		".changeset/reserved-error-code-range.md",
+		".changeset/resizable-update-envelope.md",
+		".changeset/security-fixes-2026-09-22-audit.md",
+		".changeset/security-fixes-examples-2026-09-22-audit.md",
+		".changeset/surfnet-startup-retry.md",
+		".changeset/zeroed-before-close-real-api.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/accounts-cursor-readonly-alias.md",
+			"summary": "Compare cursor aliases by account identity",
+			"details": "`AccountsCursor` alias checks now compare `AccountView`s instead of addresses. The entrypoint deserializer makes every duplicate slot a copy of the original view, so a single pointer comparison replaces the writable-flag load and 32-byte address comparison that `next_mut`, `next_mut_opt`, and `remaining_mut_distinct` performed for each slot they scanned. Across the example suite, 59 of 100 measured instructions got cheaper and none got more expensive, saving 969 compute units in total. Examples: privacy pool `initialize` went from 49,373 to 49,245, staking `deposit` from 24,927 to 24,874, and escrow `make` from 37,073 to 37,035.\n\nThe cursor documentation now states the alias rules, and tests pin them. Checks look forward: a mutable account must not reappear in a later slot. A readonly slot followed by a mutable slot for the same account is accepted, because an authority that signs readonly and also pays is one account that the runtime marks writable in both slots. When two fields must be distinct accounts, compare their addresses explicitly.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f5cccdba10c3658c5065d06e440b386677fad925",
+						"short_sha": "f5cccdb",
+						"url": "https://github.com/pina-rs/pina/commit/f5cccdba10c3658c5065d06e440b386677fad925",
+						"authored_at": "2026-09-24T12:17:41+01:00",
+						"committed_at": "2026-09-24T12:17:41+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#526",
+						"title": "perf(pina): compare accounts cursor aliases by account identity",
+						"url": "https://github.com/pina-rs/pina/pull/526",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f5cccdba10c3658c5065d06e440b386677fad925",
+						"short_sha": "f5cccdb",
+						"url": "https://github.com/pina-rs/pina/commit/f5cccdba10c3658c5065d06e440b386677fad925",
+						"authored_at": "2026-09-24T12:17:41+01:00",
+						"committed_at": "2026-09-24T12:17:41+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#526",
+						"title": "perf(pina): compare accounts cursor aliases by account identity",
+						"url": "https://github.com/pina-rs/pina/pull/526",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#513",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/513",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/assert-stored-bump.md",
+			"summary": "Add assert_stored_bump for one-parse PDA validation",
+			"details": "`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.\n\nThe provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.\n\nAdopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3f04169a2999fed45a93543a99223939ef93b512",
+						"short_sha": "3f04169",
+						"url": "https://github.com/pina-rs/pina/commit/3f04169a2999fed45a93543a99223939ef93b512",
+						"authored_at": "2026-09-23T21:24:21+01:00",
+						"committed_at": "2026-09-23T21:24:21+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#505",
+						"title": "feat(pda): add assert_stored_bump with a lint-enforced provenance",
+						"url": "https://github.com/pina-rs/pina/pull/505",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3f04169a2999fed45a93543a99223939ef93b512",
+						"short_sha": "3f04169",
+						"url": "https://github.com/pina-rs/pina/commit/3f04169a2999fed45a93543a99223939ef93b512",
+						"authored_at": "2026-09-23T21:24:21+01:00",
+						"committed_at": "2026-09-23T21:24:21+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#505",
+						"title": "feat(pda): add assert_stored_bump with a lint-enforced provenance",
+						"url": "https://github.com/pina-rs/pina/pull/505",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#497",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/497",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#498",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/498",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/compact-creation-stored-bump.md",
+			"summary": "Reject compact creation patches that store a different bump",
+			"details": "`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).\n\nThe builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.\n\n`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "29b91a0ae6f1ca14f2292d0d24bac9afae466a0e",
+						"short_sha": "29b91a0",
+						"url": "https://github.com/pina-rs/pina/commit/29b91a0ae6f1ca14f2292d0d24bac9afae466a0e",
+						"authored_at": "2026-09-23T17:26:50+01:00",
+						"committed_at": "2026-09-23T17:26:50+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#496",
+						"title": "fix(pina)!: reject compact creation patches that store a different bump",
+						"url": "https://github.com/pina-rs/pina/pull/496",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "29b91a0ae6f1ca14f2292d0d24bac9afae466a0e",
+						"short_sha": "29b91a0",
+						"url": "https://github.com/pina-rs/pina/commit/29b91a0ae6f1ca14f2292d0d24bac9afae466a0e",
+						"authored_at": "2026-09-23T17:26:50+01:00",
+						"committed_at": "2026-09-23T17:26:50+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#496",
+						"title": "fix(pina)!: reject compact creation patches that store a different bump",
+						"url": "https://github.com/pina-rs/pina/pull/496",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#418",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/418",
+						"relationship": "closed_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#421",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/421",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/doctor-lint-toolchain-report.md",
+			"summary": "Report the resolved lint driver's own toolchain",
+			"details": "`pina doctor --json` reported `lintDriver.expectedToolchain` as the pinned nightly the shipped lints are developed against, even when a driver had resolved for a different negotiated toolchain. A cached, downloaded, or source-built driver exists for the active compiler revision by construction, so an otherwise healthy diagnostic looked mismatched and sent consumers toward unnecessary toolchain changes (#458).\n\nThe report now emits `lintDriver.resolvedToolchain`, naming the toolchain the resolved driver was actually built for: the active toolchain for a cached, downloaded, or source-built driver, the shipped nightly for a bundled one — which is honest even when it differs from the active compiler, because the load probe already proved the bundle compatible — and nothing for a `PINA_LINT_DRIVER_PATH` override or when no driver resolved. The `expectedToolchain` key keeps its name, value, and meaning.\n\nHuman output renames the `expected toolchain:` line to `shipped-lint toolchain:` so it states what the constant actually means rather than reading like a requirement on the project, and prints `resolved toolchain:` under the resolved driver.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "eaa9486989f414b6cd3b6c147d06adc4cd869f8b",
+						"short_sha": "eaa9486",
+						"url": "https://github.com/pina-rs/pina/commit/eaa9486989f414b6cd3b6c147d06adc4cd869f8b",
+						"authored_at": "2026-09-23T14:42:21+01:00",
+						"committed_at": "2026-09-23T14:42:21+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#497",
+						"title": "fix(cli): report the resolved lint driver's own toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/497",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "eaa9486989f414b6cd3b6c147d06adc4cd869f8b",
+						"short_sha": "eaa9486",
+						"url": "https://github.com/pina-rs/pina/commit/eaa9486989f414b6cd3b6c147d06adc4cd869f8b",
+						"authored_at": "2026-09-23T14:42:21+01:00",
+						"committed_at": "2026-09-23T14:42:21+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#497",
+						"title": "fix(cli): report the resolved lint driver's own toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/497",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#458",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/458",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/full-balance-drain-guard-behavior.md",
+			"summary": "Require full-balance drain guards to behave like guards",
+			"details": "`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:\n\n- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.\n- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.\n- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.\n- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.\n- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.\n\nTrait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.",
+			"targets": [
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0dd4c0e7c8d895f475a07021ef00cfd308052077",
+						"short_sha": "0dd4c0e",
+						"url": "https://github.com/pina-rs/pina/commit/0dd4c0e7c8d895f475a07021ef00cfd308052077",
+						"authored_at": "2026-09-24T15:35:20+01:00",
+						"committed_at": "2026-09-24T15:35:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#522",
+						"title": "fix(pina_lints): require full-balance drain guards to propagate a checked result",
+						"url": "https://github.com/pina-rs/pina/pull/522",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0dd4c0e7c8d895f475a07021ef00cfd308052077",
+						"short_sha": "0dd4c0e",
+						"url": "https://github.com/pina-rs/pina/commit/0dd4c0e7c8d895f475a07021ef00cfd308052077",
+						"authored_at": "2026-09-24T15:35:20+01:00",
+						"committed_at": "2026-09-24T15:35:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#522",
+						"title": "fix(pina_lints): require full-balance drain guards to propagate a checked result",
+						"url": "https://github.com/pina-rs/pina/pull/522",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#515",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/515",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#516",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/516",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#517",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/517",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pinapod-fixed-reexport.md",
+			"summary": "take `fixed` from pinapod's re-export",
+			"details": "The `fixed` feature carried a second exact pin of the `fixed` crate — `=1.30.0`, duplicated from `pinapod`'s workspace table and held in lockstep by hand, because the root manifest's comment warned that mixed `fixed` versions can never be allowed to coexist. Pinapod 0.4.4 made that duplication unnecessary: its `fixed` feature re-exports the pinned crate, and Pina's own `fixed` feature already forwarded to `pinapod/fixed`.\n\n`pina::fixed` now forwards `pinapod::fixed`, and the `fixed`, workspace, and optional-dependency declarations are gone. The resolved crate is identical — the same 1.30.0 instance, so `pina::fixed` names the same types and every existing schema compiles unchanged — but the pin exists in exactly one place instead of two, and a future `fixed` bump is pinapod's change to make rather than a coordinated edit across both repositories.\n\nThe pinapod minimum moves to 0.4.4, the first release carrying the re-export.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "74706ced61e28be0d8d2830fd5502a609c6bcd26",
+						"short_sha": "74706ce",
+						"url": "https://github.com/pina-rs/pina/commit/74706ced61e28be0d8d2830fd5502a609c6bcd26",
+						"authored_at": "2026-09-25T02:43:38+01:00",
+						"committed_at": "2026-09-25T02:43:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#529",
+						"title": "fix(pina): source `fixed` through pinapod's re-export",
+						"url": "https://github.com/pina-rs/pina/pull/529",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "74706ced61e28be0d8d2830fd5502a609c6bcd26",
+						"short_sha": "74706ce",
+						"url": "https://github.com/pina-rs/pina/commit/74706ced61e28be0d8d2830fd5502a609c6bcd26",
+						"authored_at": "2026-09-25T02:43:38+01:00",
+						"committed_at": "2026-09-25T02:43:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#529",
+						"title": "fix(pina): source `fixed` through pinapod's re-export",
+						"url": "https://github.com/pina-rs/pina/pull/529",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/post-cpi-balance-reload-destinations.md",
+			"summary": "Require post-CPI reloads for every token CPI destination",
+			"details": "`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.\n\nAfter the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:\n\n1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);\n2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or\n3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).\n\nThe reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:\n\n- a call argument, a return value, a store, a tuple, a struct field, or an array element;\n- an addition with a bare reload; and\n- arithmetic that cancels the reload out (`before + after * 0`).\n\nUses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.\n\nAccounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:\n\n- `let` aliases, `&`, `*`, and `?`;\n- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;\n- the `.base` field of a loaded Token-2022 view; and\n- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.\n\nCursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.\n\nBuilders are recognised by their constructor's resolved return type and signature:\n\n- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.\n- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.\n- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.\n\nThe system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.\n\nThe static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.\n\n`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.",
+			"targets": [
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3a64c8ed332f5560ba26c792f7fc51b6e2d254a0",
+						"short_sha": "3a64c8e",
+						"url": "https://github.com/pina-rs/pina/commit/3a64c8ed332f5560ba26c792f7fc51b6e2d254a0",
+						"authored_at": "2026-09-24T16:03:47+01:00",
+						"committed_at": "2026-09-24T16:03:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#520",
+						"title": "fix(pina_lints)!: require post-CPI balance reloads for every token CPI destination",
+						"url": "https://github.com/pina-rs/pina/pull/520",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3a64c8ed332f5560ba26c792f7fc51b6e2d254a0",
+						"short_sha": "3a64c8e",
+						"url": "https://github.com/pina-rs/pina/commit/3a64c8ed332f5560ba26c792f7fc51b6e2d254a0",
+						"authored_at": "2026-09-24T16:03:47+01:00",
+						"committed_at": "2026-09-24T16:03:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#520",
+						"title": "fix(pina_lints)!: require post-CPI balance reloads for every token CPI destination",
+						"url": "https://github.com/pina-rs/pina/pull/520",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#515",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/515",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#516",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/516",
+						"relationship": "closed_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#517",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/517",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/privacy-pool-e2e-required-features.md",
+			"summary": "Build privacy pool host tests without the prover feature",
+			"details": "`cargo test -p privacy_pool_program` failed to compile: the SBF end-to-end suite in `tests/e2e.rs` imports the host-only `prover` module and names `ark_groth16` types, and both exist only when the `prover` feature is enabled. The workspace test sweep never saw it, because the privacy pool's Surfpool crate depends on the program with `prover` and feature unification switched it on for every workspace build.\n\nThe `e2e` test target now declares `required-features = [\"prover\"]`, so a plain host run skips the suite and the documented `--features prover --test e2e -- --include-ignored` invocation still builds and runs it. The program's dependencies, SBF artifact, and compute units are unchanged.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4d0e623ae20d51cd9a653fb11f072068abb2bbf2",
+						"short_sha": "4d0e623",
+						"url": "https://github.com/pina-rs/pina/commit/4d0e623ae20d51cd9a653fb11f072068abb2bbf2",
+						"authored_at": "2026-09-24T12:18:53+01:00",
+						"committed_at": "2026-09-24T12:18:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#523",
+						"title": "fix(privacy_pool): let the host e2e suite build without the prover feature",
+						"url": "https://github.com/pina-rs/pina/pull/523",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4d0e623ae20d51cd9a653fb11f072068abb2bbf2",
+						"short_sha": "4d0e623",
+						"url": "https://github.com/pina-rs/pina/commit/4d0e623ae20d51cd9a653fb11f072068abb2bbf2",
+						"authored_at": "2026-09-24T12:18:53+01:00",
+						"committed_at": "2026-09-24T12:18:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#523",
+						"title": "fix(privacy_pool): let the host e2e suite build without the prover feature",
+						"url": "https://github.com/pina-rs/pina/pull/523",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#518",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/518",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/privacy-pool-vault-pin.md",
+			"summary": "Pin the privacy pool vault",
+			"details": "`privacy_pool_program` transferred deposits to, and paid withdrawals from, whatever account the caller passed as `pool_vault` without verifying it. The vault is data-less by design, so no handler parsed it and no check existed: a depositor could name an account they control, keep their lamports, and still have a spendable commitment recorded in the merkle tree — minting notes backed by nothing and draining the honest pool as those notes were withdrawn.\n\nBoth `Deposit` and `Withdraw` now assert the vault is the pool's derived PDA before any value moves. An adversarial Surfpool case proves it: a substituted vault fails against the unpatched program (the deposit succeeds and the note exists) and is rejected with the check. The recorded ABI and the generated clients follow: the vault account now carries a `pda` binding in the manifest and IDL, and the generated `Deposit`/`Withdraw` constructors derive it instead of accepting it, so the client API cannot express the substitution.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"short_sha": "e2fa8b2",
+						"url": "https://github.com/pina-rs/pina/commit/e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"authored_at": "2026-09-23T21:06:35+01:00",
+						"committed_at": "2026-09-23T21:06:35+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#498",
+						"title": "fix(privacy_pool): pin the pool vault and enforce the migration envelope on resize",
+						"url": "https://github.com/pina-rs/pina/pull/498",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"short_sha": "e2fa8b2",
+						"url": "https://github.com/pina-rs/pina/commit/e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"authored_at": "2026-09-23T21:06:35+01:00",
+						"committed_at": "2026-09-23T21:06:35+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#498",
+						"title": "fix(privacy_pool): pin the pool vault and enforce the migration envelope on resize",
+						"url": "https://github.com/pina-rs/pina/pull/498",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/reserved-error-code-range.md",
+			"summary": "Reject reserved-range `#[error]` discriminants",
+			"details": "Pina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:\n\n```text\nerror[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000\n```\n\nThe boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "2bba6b18b205171f31b59c9c1614968d8138a8f5",
+						"short_sha": "2bba6b1",
+						"url": "https://github.com/pina-rs/pina/commit/2bba6b18b205171f31b59c9c1614968d8138a8f5",
+						"authored_at": "2026-09-24T14:17:25+01:00",
+						"committed_at": "2026-09-24T14:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#525",
+						"title": "feat(pina_macros)!: reject error discriminants in the reserved framework range",
+						"url": "https://github.com/pina-rs/pina/pull/525",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "2bba6b18b205171f31b59c9c1614968d8138a8f5",
+						"short_sha": "2bba6b1",
+						"url": "https://github.com/pina-rs/pina/commit/2bba6b18b205171f31b59c9c1614968d8138a8f5",
+						"authored_at": "2026-09-24T14:17:25+01:00",
+						"committed_at": "2026-09-24T14:17:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#525",
+						"title": "feat(pina_macros)!: reject error discriminants in the reserved framework range",
+						"url": "https://github.com/pina-rs/pina/pull/525",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#514",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/514",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/resizable-update-envelope.md",
+			"summary": "Enforce the migration envelope in resizable updates",
+			"details": "`UpdateResizableAccount` applied patches through a raw writer when the `validation` feature was off — the default feature set — so the preflight still checked the discriminator but never `require_current_migration_version` before bytes were written. A compact account holding a stale envelope (version `n`, layout `L_n`) could be patched as if its bytes were the current layout, silently corrupting state and leaving the stale version byte in place for the next read to replay.\n\nBoth the preflight and the write now route through the generated `T::updated_len`/`T::update`, which enforce the storage length, the discriminator, and the migration envelope before any byte changes, and write the current version afterwards. Only the application-level re-validation those methods append is feature-gated, so the check is now identical in every build. Behavior for current-envelope accounts is unchanged; 45 `cpi_helpers` tests pass with and without `validation`.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"short_sha": "e2fa8b2",
+						"url": "https://github.com/pina-rs/pina/commit/e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"authored_at": "2026-09-23T21:06:35+01:00",
+						"committed_at": "2026-09-23T21:06:35+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#498",
+						"title": "fix(privacy_pool): pin the pool vault and enforce the migration envelope on resize",
+						"url": "https://github.com/pina-rs/pina/pull/498",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"short_sha": "e2fa8b2",
+						"url": "https://github.com/pina-rs/pina/commit/e2fa8b24bcec15bdc1a478db0f9a94a93f007385",
+						"authored_at": "2026-09-23T21:06:35+01:00",
+						"committed_at": "2026-09-23T21:06:35+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#498",
+						"title": "fix(privacy_pool): pin the pool vault and enforce the migration envelope on resize",
+						"url": "https://github.com/pina-rs/pina/pull/498",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/security-fixes-2026-09-22-audit.md",
+			"summary": "Close live 2026-09-22 audit findings: runtime and CLI",
+			"details": "`UpdateResizableAccount` now routes every feature combination through the generated account-level update contract, so a compact update on a stale migration envelope is refused — and the envelope advanced — even without the `validation` feature. The preflight-versus-commit length agreement is a release-mode error instead of a compiled-out `debug_assert`. `pinapod` moves to 0.4.4, the first release whose generated layouts fail closed on preflight-versus-commit length disagreement and which re-exports `fixed` itself.\n\n`pina::pinapod` and `pina::fixed` (behind the `fixed` feature) re-export pinapod and its `fixed` carry-through, so consumers derive fixed-point schemas without adding either dependency. `security/regressions/sec33-downstream-reexport` proves the contract by building against `pina` alone.\n\nThe generated Codama node package's client contract test follows the retired example ABIs, so its assertions move with the instruction account lists.\n\n`pina import` redacts URL query credentials and fragments from the echoed source, the persisted provenance README, and the import outcome. The exported verification transaction is no longer accepted by encoding and length alone: the payload must deserialize as a structurally valid Solana transaction (legacy or versioned) with in-range account indices and a non-empty instruction list before a byte is written.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "535c423f97a6155710e765192d314f192870f9b8",
+						"short_sha": "535c423",
+						"url": "https://github.com/pina-rs/pina/commit/535c423f97a6155710e765192d314f192870f9b8",
+						"authored_at": "2026-09-25T06:37:04+01:00",
+						"committed_at": "2026-09-25T06:37:04+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#506",
+						"title": "fix(security)!: close the live 2026-09-22 audit findings and prove them with failing-then-passing regressions",
+						"url": "https://github.com/pina-rs/pina/pull/506",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "535c423f97a6155710e765192d314f192870f9b8",
+						"short_sha": "535c423",
+						"url": "https://github.com/pina-rs/pina/commit/535c423f97a6155710e765192d314f192870f9b8",
+						"authored_at": "2026-09-25T06:37:04+01:00",
+						"committed_at": "2026-09-25T06:37:04+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#506",
+						"title": "fix(security)!: close the live 2026-09-22 audit findings and prove them with failing-then-passing regressions",
+						"url": "https://github.com/pina-rs/pina/pull/506",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#501",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/501",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#502",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/502",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#503",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/503",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#504",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/504",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/security-fixes-examples-2026-09-22-audit.md",
+			"summary": "Close live 2026-09-22 audit example findings",
+			"details": "The examples below ship with the workspace; their IDLs and generated clients are regenerated in the same change, so the release line records the ABI movement alongside the framework fixes.\n\nMultisig: creation and config changes reject a nonzero proposal TTL at or below the timelock (it expires every proposal before its execution window can open); expired and stale proposals are permissionlessly closable with their rent refunded to the configured collector; spending-limit closures during config execution refund the configured rent collector instead of the executor-supplied rent payer; and member-tail shrinkage refunds the collector too — `commit_multisig` selects the resize rent account by direction, growth still charging the executing rent payer, so an executor cannot pocket a governed refund by roster reduction. The authority path (`ConfigAuthorityExecute`) gains the same validated `rent_collector` account the governed path has.\n\nStaking: the pool tracks an `outstanding_rewards` liability counter — advanced by the index increment on `SetRewardIndex`, reduced by each payout on `Claim`, and holding banked pending rewards through withdrawals — and refuses an index update whose outstanding liability exceeds `u64` capacity or the canonical reward vault's balance. The vault now backs what is actually owed, so paid-out rewards stop reserving capacity and banked rewards keep reserving it; equal entitlements no longer depend on claim order. `InitializePool` rejects extended Token-2022 mints so no pool can be born without working exits.\n\nVesting: `Initialize` moves the full allocation from the admin's ATA into the vault in the same instruction (a schedule cannot exist unfunded) and rejects extended Token-2022 mints; `Cancel` settles nothing before the cliff (the beneficiary's pre-cliff entitlement is zero) and after it returns the vested-but-unclaimed entitlement to the beneficiary's ATA before any remainder returns to the administrator, bound to the stored owner and mint.\n\nThe measured cost of the fixes is ratcheted into `scripts/compute-unit-policy.json`: staking `claim` 18,956 (+71), `deposit` 25,224 (+297), `initializePool` 38,188 (+148), and a first `setRewardIndex` entry at 2,432 (the reserve gate's vault binding, derivation, and balance read); vesting `initialize` 27,946 (the funding CPI) and the static `vesting_program` total 6,788 (+693, +11.4%, mostly the atomic funding transfer and the Token-2022 admission checks). Every approved value is the deterministic Surfpool measurement of the final binary, reproduced locally and in CI. The multisig rows rise with the same review round: `configAuthorityExecute` 3,768 (+113, the collector account and its validation on the authority path), `configExecute` 13,772 (+72, shrink-direction selection and the governed refund binding), and `proposalClose` 4,060 (+57, collector address validation).",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "535c423f97a6155710e765192d314f192870f9b8",
+						"short_sha": "535c423",
+						"url": "https://github.com/pina-rs/pina/commit/535c423f97a6155710e765192d314f192870f9b8",
+						"authored_at": "2026-09-25T06:37:04+01:00",
+						"committed_at": "2026-09-25T06:37:04+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#506",
+						"title": "fix(security)!: close the live 2026-09-22 audit findings and prove them with failing-then-passing regressions",
+						"url": "https://github.com/pina-rs/pina/pull/506",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "8a77a3dce3c1b0a23ebd3a5fae6508bc39faf04d",
+						"short_sha": "8a77a3d",
+						"url": "https://github.com/pina-rs/pina/commit/8a77a3dce3c1b0a23ebd3a5fae6508bc39faf04d",
+						"authored_at": "2026-09-25T08:28:42+01:00",
+						"committed_at": "2026-09-25T08:28:42+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#530",
+						"title": "fix(ci): gate the deferred SEC-11 proof and bind the vesting settlement before any CPI",
+						"url": "https://github.com/pina-rs/pina/pull/530",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#501",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/501",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#502",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/502",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#503",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/503",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#504",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/504",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#506",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/506",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/surfnet-startup-retry.md",
+			"summary": "Retry an aborted Surfpool start once with fresh ports",
+			"details": "Surfpool's SDK picks each RPC port by binding `127.0.0.1:0` and releasing the listener before its runloop rebinds it, so an `OfflineSurfnet::start` (and therefore `ProgramTest::start`) could lose that port to another socket and abort with `Failed to start WebSocket RPC server: AddrInUse`. That failed the test that happened to start the instance, even though nothing about the program under test was wrong.\n\n`OfflineSurfnet::start` now retries exactly once when the SDK reports an aborted runloop or a port-allocation failure. Both leave no running instance behind, and the next attempt draws fresh ports. The first failure is printed to stderr so flaky starts stay visible. Every other startup error, a second failure, and everything after startup (program deployment, transactions, assertions) are returned unchanged.",
+			"targets": [
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "33dfc2fd5cfa6190a22e4275c1e9e9e9f6689abf",
+						"short_sha": "33dfc2f",
+						"url": "https://github.com/pina-rs/pina/commit/33dfc2fd5cfa6190a22e4275c1e9e9e9f6689abf",
+						"authored_at": "2026-09-24T12:51:39+01:00",
+						"committed_at": "2026-09-24T12:51:39+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#521",
+						"title": "fix(scripts): tolerate surfpool teardown panics once every case is measured",
+						"url": "https://github.com/pina-rs/pina/pull/521",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "33dfc2fd5cfa6190a22e4275c1e9e9e9f6689abf",
+						"short_sha": "33dfc2f",
+						"url": "https://github.com/pina-rs/pina/commit/33dfc2fd5cfa6190a22e4275c1e9e9e9f6689abf",
+						"authored_at": "2026-09-24T12:51:39+01:00",
+						"committed_at": "2026-09-24T12:51:39+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#521",
+						"title": "fix(scripts): tolerate surfpool teardown panics once every case is measured",
+						"url": "https://github.com/pina-rs/pina/pull/521",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/zeroed-before-close-real-api.md",
+			"summary": "Fix zeroed-before-close help text and aliasing",
+			"details": "The lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).\n\nThe help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.\n\n\"Same account\" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.\n\nThis is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.\n\nA user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.\n\nThe `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.",
+			"targets": [
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "736a2c34d553f1726273799ad742c644f246326f",
+						"short_sha": "736a2c3",
+						"url": "https://github.com/pina-rs/pina/commit/736a2c34d553f1726273799ad742c644f246326f",
+						"authored_at": "2026-09-24T19:35:05+01:00",
+						"committed_at": "2026-09-24T19:35:05+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#524",
+						"title": "fix(pina_lints)!: point zeroed-before-close at the real zeroing API and track aliased receivers",
+						"url": "https://github.com/pina-rs/pina/pull/524",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "736a2c34d553f1726273799ad742c644f246326f",
+						"short_sha": "736a2c3",
+						"url": "https://github.com/pina-rs/pina/commit/736a2c34d553f1726273799ad742c644f246326f",
+						"authored_at": "2026-09-24T19:35:05+01:00",
+						"committed_at": "2026-09-24T19:35:05+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#524",
+						"title": "fix(pina_lints)!: point zeroed-before-close at the real zeroing API and track aliased receivers",
+						"url": "https://github.com/pina-rs/pina/pull/524",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#515",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/515",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.21.0](https://github.com/pina-rs/pina/releases/tag/v0.21.0) (2026-09-25)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Reject compact creation patches that store a different bump\n\n_Packages:_ _pina_\n\n`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).\n\nThe builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.\n\n`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)",
+							"#### Require post-CPI reloads for every token CPI destination\n\n_Packages:_ _pina_lints_\n\n`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.\n\nAfter the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:\n\n1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);\n2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or\n3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).\n\nThe reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:\n\n- a call argument, a return value, a store, a tuple, a struct field, or an array element;\n- an addition with a bare reload; and\n- arithmetic that cancels the reload out (`before + after * 0`).\n\nUses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.\n\nAccounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:\n\n- `let` aliases, `&`, `*`, and `?`;\n- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;\n- the `.base` field of a loaded Token-2022 view; and\n- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.\n\nCursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.\n\nBuilders are recognised by their constructor's resolved return type and signature:\n\n- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.\n- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.\n- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.\n\nThe system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.\n\nThe static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.\n\n`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)",
+							"#### Fix zeroed-before-close help text and aliasing\n\n_Packages:_ _pina_lints_\n\nThe lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).\n\nThe help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.\n\n\"Same account\" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.\n\nThis is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.\n\nA user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.\n\nThe `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)",
+							"#### Reject reserved-range `#[error]` discriminants\n\n_Packages:_ _pina_macros_\n\nPina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:\n\n```text\nerror[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000\n```\n\nThe boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add assert_stored_bump for one-parse PDA validation\n\n_Packages:_ _pina_, _pina_lints_, _pina_macros_\n\n`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.\n\nThe provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.\n\nAdopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)",
+							"#### Reject reserved-range `#[error]` discriminants\n\n_Packages:_ _pina_\n\nPina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:\n\n```text\nerror[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000\n```\n\nThe boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)",
+							"#### Reject compact creation patches that store a different bump\n\n_Packages:_ _pina_macros_\n\n`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).\n\nThe builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.\n\n`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Compare cursor aliases by account identity\n\n_Packages:_ _pina_\n\n`AccountsCursor` alias checks now compare `AccountView`s instead of addresses. The entrypoint deserializer makes every duplicate slot a copy of the original view, so a single pointer comparison replaces the writable-flag load and 32-byte address comparison that `next_mut`, `next_mut_opt`, and `remaining_mut_distinct` performed for each slot they scanned. Across the example suite, 59 of 100 measured instructions got cheaper and none got more expensive, saving 969 compute units in total. Examples: privacy pool `initialize` went from 49,373 to 49,245, staking `deposit` from 24,927 to 24,874, and escrow `make` from 37,073 to 37,035.\n\nThe cursor documentation now states the alias rules, and tests pin them. Checks look forward: a mutable account must not reappear in a later slot. A readonly slot followed by a mutable slot for the same account is accepted, because an authority that signs readonly and also pays is one account that the runtime marks writable in both slots. When two fields must be distinct accounts, compare their addresses explicitly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #526](https://github.com/pina-rs/pina/pull/526) · _Related issues:_ [#513](https://github.com/pina-rs/pina/issues/513)",
+							"#### take `fixed` from pinapod's re-export\n\n_Packages:_ _pina_\n\nThe `fixed` feature carried a second exact pin of the `fixed` crate — `=1.30.0`, duplicated from `pinapod`'s workspace table and held in lockstep by hand, because the root manifest's comment warned that mixed `fixed` versions can never be allowed to coexist. Pinapod 0.4.4 made that duplication unnecessary: its `fixed` feature re-exports the pinned crate, and Pina's own `fixed` feature already forwarded to `pinapod/fixed`.\n\n`pina::fixed` now forwards `pinapod::fixed`, and the `fixed`, workspace, and optional-dependency declarations are gone. The resolved crate is identical — the same 1.30.0 instance, so `pina::fixed` names the same types and every existing schema compiles unchanged — but the pin exists in exactly one place instead of two, and a future `fixed` bump is pinapod's change to make rather than a coordinated edit across both repositories.\n\nThe pinapod minimum moves to 0.4.4, the first release carrying the re-export.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #529](https://github.com/pina-rs/pina/pull/529)",
+							"#### Enforce the migration envelope in resizable updates\n\n_Packages:_ _pina_\n\n`UpdateResizableAccount` applied patches through a raw writer when the `validation` feature was off — the default feature set — so the preflight still checked the discriminator but never `require_current_migration_version` before bytes were written. A compact account holding a stale envelope (version `n`, layout `L_n`) could be patched as if its bytes were the current layout, silently corrupting state and leaving the stale version byte in place for the next read to replay.\n\nBoth the preflight and the write now route through the generated `T::updated_len`/`T::update`, which enforce the storage length, the discriminator, and the migration envelope before any byte changes, and write the current version afterwards. Only the application-level re-validation those methods append is feature-gated, so the check is now identical in every build. Behavior for current-envelope accounts is unchanged; 45 `cpi_helpers` tests pass with and without `validation`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)",
+							"#### Close live 2026-09-22 audit findings: runtime and CLI\n\n_Packages:_ _pina_, _pina_cli_, _pina_codama_nodes_\n\n`UpdateResizableAccount` now routes every feature combination through the generated account-level update contract, so a compact update on a stale migration envelope is refused — and the envelope advanced — even without the `validation` feature. The preflight-versus-commit length agreement is a release-mode error instead of a compiled-out `debug_assert`. `pinapod` moves to 0.4.4, the first release whose generated layouts fail closed on preflight-versus-commit length disagreement and which re-exports `fixed` itself.\n\n`pina::pinapod` and `pina::fixed` (behind the `fixed` feature) re-export pinapod and its `fixed` carry-through, so consumers derive fixed-point schemas without adding either dependency. `security/regressions/sec33-downstream-reexport` proves the contract by building against `pina` alone.\n\nThe generated Codama node package's client contract test follows the retired example ABIs, so its assertions move with the instruction account lists.\n\n`pina import` redacts URL query credentials and fragments from the echoed source, the persisted provenance README, and the import outcome. The exported verification transaction is no longer accepted by encoding and length alone: the payload must deserialize as a structurally valid Solana transaction (legacy or versioned) with in-range account indices and a non-empty instruction list before a byte is written.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504)",
+							"#### Close live 2026-09-22 audit example findings\n\n_Packages:_ _pina_, _pina_cli_\n\nThe examples below ship with the workspace; their IDLs and generated clients are regenerated in the same change, so the release line records the ABI movement alongside the framework fixes.\n\nMultisig: creation and config changes reject a nonzero proposal TTL at or below the timelock (it expires every proposal before its execution window can open); expired and stale proposals are permissionlessly closable with their rent refunded to the configured collector; spending-limit closures during config execution refund the configured rent collector instead of the executor-supplied rent payer; and member-tail shrinkage refunds the collector too — `commit_multisig` selects the resize rent account by direction, growth still charging the executing rent payer, so an executor cannot pocket a governed refund by roster reduction. The authority path (`ConfigAuthorityExecute`) gains the same validated `rent_collector` account the governed path has.\n\nStaking: the pool tracks an `outstanding_rewards` liability counter — advanced by the index increment on `SetRewardIndex`, reduced by each payout on `Claim`, and holding banked pending rewards through withdrawals — and refuses an index update whose outstanding liability exceeds `u64` capacity or the canonical reward vault's balance. The vault now backs what is actually owed, so paid-out rewards stop reserving capacity and banked rewards keep reserving it; equal entitlements no longer depend on claim order. `InitializePool` rejects extended Token-2022 mints so no pool can be born without working exits.\n\nVesting: `Initialize` moves the full allocation from the admin's ATA into the vault in the same instruction (a schedule cannot exist unfunded) and rejects extended Token-2022 mints; `Cancel` settles nothing before the cliff (the beneficiary's pre-cliff entitlement is zero) and after it returns the vested-but-unclaimed entitlement to the beneficiary's ATA before any remainder returns to the administrator, bound to the stored owner and mint.\n\nThe measured cost of the fixes is ratcheted into `scripts/compute-unit-policy.json`: staking `claim` 18,956 (+71), `deposit` 25,224 (+297), `initializePool` 38,188 (+148), and a first `setRewardIndex` entry at 2,432 (the reserve gate's vault binding, derivation, and balance read); vesting `initialize` 27,946 (the funding CPI) and the static `vesting_program` total 6,788 (+693, +11.4%, mostly the atomic funding transfer and the Token-2022 admission checks). Every approved value is the deterministic Surfpool measurement of the final binary, reproduced locally and in CI. The multisig rows rise with the same review round: `configAuthorityExecute` 3,768 (+113, the collector account and its validation on the authority path), `configExecute` 13,772 (+72, shrink-direction selection and the governed refund binding), and `proposalClose` 4,060 (+57, collector address validation).\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504), [#506](https://github.com/pina-rs/pina/issues/506)",
+							"#### Report the resolved lint driver's own toolchain\n\n_Packages:_ _pina_cli_\n\n`pina doctor --json` reported `lintDriver.expectedToolchain` as the pinned nightly the shipped lints are developed against, even when a driver had resolved for a different negotiated toolchain. A cached, downloaded, or source-built driver exists for the active compiler revision by construction, so an otherwise healthy diagnostic looked mismatched and sent consumers toward unnecessary toolchain changes (#458).\n\nThe report now emits `lintDriver.resolvedToolchain`, naming the toolchain the resolved driver was actually built for: the active toolchain for a cached, downloaded, or source-built driver, the shipped nightly for a bundled one — which is honest even when it differs from the active compiler, because the load probe already proved the bundle compatible — and nothing for a `PINA_LINT_DRIVER_PATH` override or when no driver resolved. The `expectedToolchain` key keeps its name, value, and meaning.\n\nHuman output renames the `expected toolchain:` line to `shipped-lint toolchain:` so it states what the constant actually means rather than reading like a requirement on the project, and prints `resolved toolchain:` under the resolved driver.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #497](https://github.com/pina-rs/pina/pull/497) · _Closed issues:_ [#458](https://github.com/pina-rs/pina/issues/458)",
+							"#### Require post-CPI reloads for every token CPI destination\n\n_Packages:_ _pina_cli_\n\n`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.\n\nAfter the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:\n\n1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);\n2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or\n3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).\n\nThe reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:\n\n- a call argument, a return value, a store, a tuple, a struct field, or an array element;\n- an addition with a bare reload; and\n- arithmetic that cancels the reload out (`before + after * 0`).\n\nUses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.\n\nAccounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:\n\n- `let` aliases, `&`, `*`, and `?`;\n- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;\n- the `.base` field of a loaded Token-2022 view; and\n- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.\n\nCursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.\n\nBuilders are recognised by their constructor's resolved return type and signature:\n\n- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.\n- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.\n- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.\n\nThe system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.\n\nThe static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.\n\n`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)",
+							"#### Require full-balance drain guards to behave like guards\n\n_Packages:_ _pina_lints_\n\n`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:\n\n- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.\n- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.\n- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.\n- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.\n- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.\n\nTrait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)",
+							"#### Retry an aborted Surfpool start once with fresh ports\n\n_Packages:_ _pina_test_\n\nSurfpool's SDK picks each RPC port by binding `127.0.0.1:0` and releasing the listener before its runloop rebinds it, so an `OfflineSurfnet::start` (and therefore `ProgramTest::start`) could lose that port to another socket and abort with `Failed to start WebSocket RPC server: AddrInUse`. That failed the test that happened to start the instance, even though nothing about the program under test was wrong.\n\n`OfflineSurfnet::start` now retries exactly once when the SDK reports an aborted runloop or a port-allocation failure. Both leave no running instance behind, and the next attempt draws fresh ports. The first failure is printed to stderr so flaky starts stay visible. Every other startup error, a second failure, and everything after startup (program deployment, transactions, assertions) are returned unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #521](https://github.com/pina-rs/pina/pull/521)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Fix zeroed-before-close help text and aliasing\n\n_Packages:_ _pina_, _pina_cli_\n\nThe lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).\n\nThe help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.\n\n\"Same account\" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.\n\nThis is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.\n\nA user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.\n\nThe `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)",
+							"#### Require full-balance drain guards to behave like guards\n\n_Packages:_ _pina_cli_\n\n`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:\n\n- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.\n- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.\n- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.\n- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.\n- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.\n\nTrait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Build privacy pool host tests without the prover feature\n\n_Packages:_ _pina_\n\n`cargo test -p privacy_pool_program` failed to compile: the SBF end-to-end suite in `tests/e2e.rs` imports the host-only `prover` module and names `ark_groth16` types, and both exist only when the `prover` feature is enabled. The workspace test sweep never saw it, because the privacy pool's Surfpool crate depends on the program with `prover` and feature unification switched it on for every workspace build.\n\nThe `e2e` test target now declares `required-features = [\"prover\"]`, so a plain host run skips the suite and the documented `--features prover --test e2e -- --include-ignored` invocation still builds and runs it. The program's dependencies, SBF artifact, and compute units are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #523](https://github.com/pina-rs/pina/pull/523) · _Closed issues:_ [#518](https://github.com/pina-rs/pina/issues/518)",
+							"#### Pin the privacy pool vault\n\n_Packages:_ _pina_\n\n`privacy_pool_program` transferred deposits to, and paid withdrawals from, whatever account the caller passed as `pool_vault` without verifying it. The vault is data-less by design, so no handler parsed it and no check existed: a depositor could name an account they control, keep their lamports, and still have a spendable commitment recorded in the merkle tree — minting notes backed by nothing and draining the honest pool as those notes were withdrawn.\n\nBoth `Deposit` and `Withdraw` now assert the vault is the pool's derived PDA before any value moves. An adversarial Surfpool case proves it: a substituted vault fails against the unpatched program (the deposit succeeds and the note exists) and is rejected with the check. The recorded ABI and the generated clients follow: the vault account now carries a `pda` binding in the manifest and IDL, and the generated `Deposit`/`Withdraw` constructors derive it instead of accepting it, so the client API cannot express the substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)",
+							"#### Add assert_stored_bump for one-parse PDA validation\n\n_Packages:_ _pina_cli_\n\n`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.\n\nThe provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.\n\nAdopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.21.0](https://github.com/pina-rs/pina/releases/tag/v0.21.0) (2026-09-25)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Reject compact creation patches that store a different bump\n\n_Packages:_ _pina_\n\n`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).\n\nThe builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.\n\n`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)\n\n#### Require post-CPI reloads for every token CPI destination\n\n_Packages:_ _pina_lints_\n\n`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.\n\nAfter the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:\n\n1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);\n2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or\n3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).\n\nThe reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:\n\n- a call argument, a return value, a store, a tuple, a struct field, or an array element;\n- an addition with a bare reload; and\n- arithmetic that cancels the reload out (`before + after * 0`).\n\nUses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.\n\nAccounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:\n\n- `let` aliases, `&`, `*`, and `?`;\n- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;\n- the `.base` field of a loaded Token-2022 view; and\n- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.\n\nCursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.\n\nBuilders are recognised by their constructor's resolved return type and signature:\n\n- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.\n- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.\n- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.\n\nThe system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.\n\nThe static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.\n\n`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)\n\n#### Fix zeroed-before-close help text and aliasing\n\n_Packages:_ _pina_lints_\n\nThe lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).\n\nThe help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.\n\n\"Same account\" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.\n\nThis is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.\n\nA user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.\n\nThe `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)\n\n#### Reject reserved-range `#[error]` discriminants\n\n_Packages:_ _pina_macros_\n\nPina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:\n\n```text\nerror[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000\n```\n\nThe boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)\n\n### Features\n\n#### Add assert_stored_bump for one-parse PDA validation\n\n_Packages:_ _pina_, _pina_lints_, _pina_macros_\n\n`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.\n\nThe provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.\n\nAdopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)\n\n#### Reject reserved-range `#[error]` discriminants\n\n_Packages:_ _pina_\n\nPina reserves the custom error codes `0xFFFF_0000..=0xFFFF_FFFF` for `PinaProgramError`, but nothing enforced it: a user `#[error]` enum could declare `SomethingFailed = 0xFFFF_FFF5` and compile, and clients then decoded that error as the framework's `MigrationBudgetExceeded`. The `#[error]` macro now emits a compile-time assertion for every variant, so a variant whose explicit, constant-expression, or implicit auto-incremented discriminant falls in the reserved range fails to build with an error that points at the variant:\n\n```text\nerror[E0080]: evaluation panicked: error discriminant for `MyError::Boundary` is in the range 0xFFFF_0000..=0xFFFF_FFFF reserved for Pina's framework errors; use a value below 0xFFFF_0000\n```\n\nThe boundary is exported as `pina::RESERVED_ERROR_CODE_START`, which the assertion reads. The check is a `const _` item, so it emits no code: compute units and program size are unchanged. An enum that already used a reserved code no longer compiles; move those variants below `0xFFFF_0000`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #525](https://github.com/pina-rs/pina/pull/525) · _Closed issues:_ [#514](https://github.com/pina-rs/pina/issues/514)\n\n#### Reject compact creation patches that store a different bump\n\n_Packages:_ _pina_macros_\n\n`CreateCompactProgramAccountWithBump` validated its `bump` argument canonically but never checked the patch's own stored bump field, an independent value the patch writes into account state. A caller could pass the canonical bump while the patch stored a different one; the account was created, held rent, and could then only be loaded through the bump it actually stores — the stranded-rent failure mode the canonical loaders exist to prevent (#418).\n\nThe builder now reads the account's declared bump field back out of the committed data and returns `PinaProgramError::StoredBumpMismatch` (0xFFFF_FFF0) when it disagrees, clearing the account data like any other failed initialization. The read is a single byte load at a compile-time offset, not a validation pass: `#[pda(bump = ...)]` emits the new `PinaCompactStoredBump` trait as a const prefix sum of the preceding header fields' pod sizes — the same mapping the compact derive stores inline, and sound because the compact grammar already forbids inline fields after dynamic ones — so the check adds only the load and compare to the creation path. Measured against the base branch, the three multisig creation instructions each consume 5 fewer compute units (the folded check removed a redundant re-borrow), `account_realloc_program/initialize` consumes 5 more, and `compact_accounts_program/initialize` consumes 4 more; those two approved totals are ratcheted in `scripts/compute-unit-policy.json` for the stored-bump invariant.\n\n`CreateCompactProgramAccountWithBump::invoke*` now requires `T: PinaCompactStoredBump`. A compact account without a declared bump field must add the declaration or move to `CreateCompactProgramAccount`, whose `invoke_with_bump` threads the derived bump into the patch by construction and is unaffected.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #496](https://github.com/pina-rs/pina/pull/496) · _Closed issues:_ [#418](https://github.com/pina-rs/pina/issues/418) · _Related issues:_ [#421](https://github.com/pina-rs/pina/issues/421)\n\n### Fixes\n\n#### Compare cursor aliases by account identity\n\n_Packages:_ _pina_\n\n`AccountsCursor` alias checks now compare `AccountView`s instead of addresses. The entrypoint deserializer makes every duplicate slot a copy of the original view, so a single pointer comparison replaces the writable-flag load and 32-byte address comparison that `next_mut`, `next_mut_opt`, and `remaining_mut_distinct` performed for each slot they scanned. Across the example suite, 59 of 100 measured instructions got cheaper and none got more expensive, saving 969 compute units in total. Examples: privacy pool `initialize` went from 49,373 to 49,245, staking `deposit` from 24,927 to 24,874, and escrow `make` from 37,073 to 37,035.\n\nThe cursor documentation now states the alias rules, and tests pin them. Checks look forward: a mutable account must not reappear in a later slot. A readonly slot followed by a mutable slot for the same account is accepted, because an authority that signs readonly and also pays is one account that the runtime marks writable in both slots. When two fields must be distinct accounts, compare their addresses explicitly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #526](https://github.com/pina-rs/pina/pull/526) · _Related issues:_ [#513](https://github.com/pina-rs/pina/issues/513)\n\n#### take `fixed` from pinapod's re-export\n\n_Packages:_ _pina_\n\nThe `fixed` feature carried a second exact pin of the `fixed` crate — `=1.30.0`, duplicated from `pinapod`'s workspace table and held in lockstep by hand, because the root manifest's comment warned that mixed `fixed` versions can never be allowed to coexist. Pinapod 0.4.4 made that duplication unnecessary: its `fixed` feature re-exports the pinned crate, and Pina's own `fixed` feature already forwarded to `pinapod/fixed`.\n\n`pina::fixed` now forwards `pinapod::fixed`, and the `fixed`, workspace, and optional-dependency declarations are gone. The resolved crate is identical — the same 1.30.0 instance, so `pina::fixed` names the same types and every existing schema compiles unchanged — but the pin exists in exactly one place instead of two, and a future `fixed` bump is pinapod's change to make rather than a coordinated edit across both repositories.\n\nThe pinapod minimum moves to 0.4.4, the first release carrying the re-export.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #529](https://github.com/pina-rs/pina/pull/529)\n\n#### Enforce the migration envelope in resizable updates\n\n_Packages:_ _pina_\n\n`UpdateResizableAccount` applied patches through a raw writer when the `validation` feature was off — the default feature set — so the preflight still checked the discriminator but never `require_current_migration_version` before bytes were written. A compact account holding a stale envelope (version `n`, layout `L_n`) could be patched as if its bytes were the current layout, silently corrupting state and leaving the stale version byte in place for the next read to replay.\n\nBoth the preflight and the write now route through the generated `T::updated_len`/`T::update`, which enforce the storage length, the discriminator, and the migration envelope before any byte changes, and write the current version afterwards. Only the application-level re-validation those methods append is feature-gated, so the check is now identical in every build. Behavior for current-envelope accounts is unchanged; 45 `cpi_helpers` tests pass with and without `validation`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)\n\n#### Close live 2026-09-22 audit findings: runtime and CLI\n\n_Packages:_ _pina_, _pina_cli_, _pina_codama_nodes_\n\n`UpdateResizableAccount` now routes every feature combination through the generated account-level update contract, so a compact update on a stale migration envelope is refused — and the envelope advanced — even without the `validation` feature. The preflight-versus-commit length agreement is a release-mode error instead of a compiled-out `debug_assert`. `pinapod` moves to 0.4.4, the first release whose generated layouts fail closed on preflight-versus-commit length disagreement and which re-exports `fixed` itself.\n\n`pina::pinapod` and `pina::fixed` (behind the `fixed` feature) re-export pinapod and its `fixed` carry-through, so consumers derive fixed-point schemas without adding either dependency. `security/regressions/sec33-downstream-reexport` proves the contract by building against `pina` alone.\n\nThe generated Codama node package's client contract test follows the retired example ABIs, so its assertions move with the instruction account lists.\n\n`pina import` redacts URL query credentials and fragments from the echoed source, the persisted provenance README, and the import outcome. The exported verification transaction is no longer accepted by encoding and length alone: the payload must deserialize as a structurally valid Solana transaction (legacy or versioned) with in-range account indices and a non-empty instruction list before a byte is written.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504)\n\n#### Close live 2026-09-22 audit example findings\n\n_Packages:_ _pina_, _pina_cli_\n\nThe examples below ship with the workspace; their IDLs and generated clients are regenerated in the same change, so the release line records the ABI movement alongside the framework fixes.\n\nMultisig: creation and config changes reject a nonzero proposal TTL at or below the timelock (it expires every proposal before its execution window can open); expired and stale proposals are permissionlessly closable with their rent refunded to the configured collector; spending-limit closures during config execution refund the configured rent collector instead of the executor-supplied rent payer; and member-tail shrinkage refunds the collector too — `commit_multisig` selects the resize rent account by direction, growth still charging the executing rent payer, so an executor cannot pocket a governed refund by roster reduction. The authority path (`ConfigAuthorityExecute`) gains the same validated `rent_collector` account the governed path has.\n\nStaking: the pool tracks an `outstanding_rewards` liability counter — advanced by the index increment on `SetRewardIndex`, reduced by each payout on `Claim`, and holding banked pending rewards through withdrawals — and refuses an index update whose outstanding liability exceeds `u64` capacity or the canonical reward vault's balance. The vault now backs what is actually owed, so paid-out rewards stop reserving capacity and banked rewards keep reserving it; equal entitlements no longer depend on claim order. `InitializePool` rejects extended Token-2022 mints so no pool can be born without working exits.\n\nVesting: `Initialize` moves the full allocation from the admin's ATA into the vault in the same instruction (a schedule cannot exist unfunded) and rejects extended Token-2022 mints; `Cancel` settles nothing before the cliff (the beneficiary's pre-cliff entitlement is zero) and after it returns the vested-but-unclaimed entitlement to the beneficiary's ATA before any remainder returns to the administrator, bound to the stored owner and mint.\n\nThe measured cost of the fixes is ratcheted into `scripts/compute-unit-policy.json`: staking `claim` 18,956 (+71), `deposit` 25,224 (+297), `initializePool` 38,188 (+148), and a first `setRewardIndex` entry at 2,432 (the reserve gate's vault binding, derivation, and balance read); vesting `initialize` 27,946 (the funding CPI) and the static `vesting_program` total 6,788 (+693, +11.4%, mostly the atomic funding transfer and the Token-2022 admission checks). Every approved value is the deterministic Surfpool measurement of the final binary, reproduced locally and in CI. The multisig rows rise with the same review round: `configAuthorityExecute` 3,768 (+113, the collector account and its validation on the authority path), `configExecute` 13,772 (+72, shrink-direction selection and the governed refund binding), and `proposalClose` 4,060 (+57, collector address validation).\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #506](https://github.com/pina-rs/pina/pull/506) · _Related issues:_ [#501](https://github.com/pina-rs/pina/issues/501), [#502](https://github.com/pina-rs/pina/issues/502), [#503](https://github.com/pina-rs/pina/issues/503), [#504](https://github.com/pina-rs/pina/issues/504), [#506](https://github.com/pina-rs/pina/issues/506)\n\n#### Report the resolved lint driver's own toolchain\n\n_Packages:_ _pina_cli_\n\n`pina doctor --json` reported `lintDriver.expectedToolchain` as the pinned nightly the shipped lints are developed against, even when a driver had resolved for a different negotiated toolchain. A cached, downloaded, or source-built driver exists for the active compiler revision by construction, so an otherwise healthy diagnostic looked mismatched and sent consumers toward unnecessary toolchain changes (#458).\n\nThe report now emits `lintDriver.resolvedToolchain`, naming the toolchain the resolved driver was actually built for: the active toolchain for a cached, downloaded, or source-built driver, the shipped nightly for a bundled one — which is honest even when it differs from the active compiler, because the load probe already proved the bundle compatible — and nothing for a `PINA_LINT_DRIVER_PATH` override or when no driver resolved. The `expectedToolchain` key keeps its name, value, and meaning.\n\nHuman output renames the `expected toolchain:` line to `shipped-lint toolchain:` so it states what the constant actually means rather than reading like a requirement on the project, and prints `resolved toolchain:` under the resolved driver.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #497](https://github.com/pina-rs/pina/pull/497) · _Closed issues:_ [#458](https://github.com/pina-rs/pina/issues/458)\n\n#### Require post-CPI reloads for every token CPI destination\n\n_Packages:_ _pina_cli_\n\n`require_post_cpi_balance_reload` (deny by default) now checks destinations it used to ignore. It previously inspected only destinations whose name contained `vault`, `custody`, `reserve`, or `pool`. It now also rejects a balance snapshot of any `Transfer`, `TransferChecked`, `MintTo`, or `MintToChecked` destination — `user_stake_ata`, `treasury`, `fee_receiver`, whatever it is called — that is taken before the CPI and trusted after it. Programs that passed before can therefore fail to build. The diagnostic points at the stale use.\n\nAfter the CPI, a _snapshot-derived_ value is a pre-CPI read of the destination, or any local, conversion (`as`, and integer `From`/`Into`/`TryFrom`/`TryInto`), or arithmetic result computed from one. It may appear only as:\n\n1. one side of a comparison whose other side is a post-CPI reload (or a value derived from one) or a constant (`if after != before + 10`, `if prior == 0`);\n2. the subtrahend of a subtraction-like operation (`-`, `checked_sub`, `saturating_sub`, `wrapping_sub`, `overflowing_sub`, in method or `u64::checked_sub(a, b)` form) whose minuend is a reload, or either side of `abs_diff`, which yields a delta; or\n3. an operand of an addition-like operation whose other operand is such a delta (`before + (after - before)`, or `before.checked_add(delta)`).\n\nThe reload must follow the CPI and run on every path to the use. Every other appearance is a stale use:\n\n- a call argument, a return value, a store, a tuple, a struct field, or an array element;\n- an addition with a bare reload; and\n- arithmetic that cancels the reload out (`before + after * 0`).\n\nUses the CPI cannot reach are accepted: the CPI is in a diverging block or a sibling branch.\n\nAccounts are keyed by binding (never by name) plus full field path. Only these steps are looked through:\n\n- `let` aliases, `&`, `*`, and `?`;\n- Pina's token-view methods, and the token crates' `from_account_view`-style loaders;\n- the `.base` field of a loaded Token-2022 view; and\n- `Option`/`Result` pass-through adaptors, and Pina's `assert_*` checks.\n\nCursor methods (`Iterator::{next, nth}`, `DoubleEndedIterator::{next_back, nth_back}`, Pina's `AccountsCursor::next*`) get a key unique to their call site. Every other method with constant arguments, `&mut self` accessors included, is keyed by receiver, resolved method, and arguments. A `let` binding initialized from a non-cursor `&mut self` method call, such as a hand-written cursor's `take()`, is keyed by that call and its binding name, and the custody tier defers to the name-based verdict when such a binding is involved. So wrapper-typed fields, shadowed or pattern-bound locals, and successive iterator or cursor items never collapse together, while `ctx.vault_mut()` names one account on every call. Reads inside closures count for neither tier. Snapshots are followed through tuple destructuring, copies, and assignments.\n\nBuilders are recognised by their constructor's resolved return type and signature:\n\n- The type name ends in the token instruction name (`SplTransfer` counts), and `Result<Builder, _>` is unwrapped.\n- The constructor leads with reference parameters followed by an integer amount, and the decimals argument may be absent. A builder from a token crate needs three leading account parameters. One defined elsewhere needs four for a transfer (`from, mint, to, authority`), so a lamport transfer, which never names a mint, is not treated as a token transfer. Non-token types such as `AuthorityTransfer::new(config, new_authority, signer)` are ignored.\n- The destination is located from the number of leading account parameters. This also brings the four-argument token-crate `Transfer::new` into the custody check.\n\nThe system program's builders are excluded by their defining crate. `invoke_with_unverified_program()` invocations are now associated with their builder. When the typed identity cannot name a custody destination or one of its reads, the custody tier falls back to the name-based check, so code it accepted is not newly rejected for that reason.\n\nThe static-`invoke()` exemption is wider in one respect. It previously matched only the non-generic spelling of the legacy builders, so the real generic `pinocchio_token` 0.7 builders invoked with `invoke()`/`invoke_signed()` into a custody account were flagged in practice. They are now exempt when the call's receiver has the full type of the constructed builder with the `pinocchio_token::TokenProgram` program parameter, because such a call can only target the legacy SPL Token program, which cannot charge a transfer fee. A wrapper's `invoke()`, an expression yielding a Token-2022 builder, and Pina's `token_2022` builder aliases stay covered.\n\n`pina lint --explain require_post_cpi_balance_reload` and the lint reference describe the new contract.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #520](https://github.com/pina-rs/pina/pull/520) · _Closed issues:_ [#516](https://github.com/pina-rs/pina/issues/516) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#517](https://github.com/pina-rs/pina/issues/517)\n\n#### Require full-balance drain guards to behave like guards\n\n_Packages:_ _pina_lints_\n\n`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:\n\n- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.\n- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.\n- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.\n- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.\n- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.\n\nTrait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)\n\n#### Retry an aborted Surfpool start once with fresh ports\n\n_Packages:_ _pina_test_\n\nSurfpool's SDK picks each RPC port by binding `127.0.0.1:0` and releasing the listener before its runloop rebinds it, so an `OfflineSurfnet::start` (and therefore `ProgramTest::start`) could lose that port to another socket and abort with `Failed to start WebSocket RPC server: AddrInUse`. That failed the test that happened to start the instance, even though nothing about the program under test was wrong.\n\n`OfflineSurfnet::start` now retries exactly once when the SDK reports an aborted runloop or a port-allocation failure. Both leave no running instance behind, and the next attempt draws fresh ports. The first failure is printed to stderr so flaky starts stay visible. Every other startup error, a second failure, and everything after startup (program deployment, transactions, assertions) are returned unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #521](https://github.com/pina-rs/pina/pull/521)\n\n### Documentation\n\n#### Fix zeroed-before-close help text and aliasing\n\n_Packages:_ _pina_, _pina_cli_\n\nThe lint told users to call `account.zeroed()?` before closing, but no `zeroed()` method exists in Pina or upstream, so following the lint's own advice produced a compile error. Its only accepted proof was a call to that nonexistent method on a receiver with the same text, so zeroing through an alias (`let a = &mut state; a.zeroed()?; state.close()?`) was flagged even though it names the same account, while unrelated receivers that collapse to the same text were accepted (#515).\n\nThe help text now points at the zeroing APIs Pina actually ships: `close_account_zeroed(&ID, recipient)` or the `CloseAccountZeroed` builder, which zero and close in one step and are never flagged, or — when the close must stay separate — `account.try_borrow_mut()?.fill(0);` before `close_with_recipient()` or `close()`. That separate step is accepted only as a `core` slice `fill(0)` over the whole buffer returned by `try_borrow_mut()?`, chained or through a `let` binding; partial fills, non-zero fills, and same-named methods are not proofs. No runtime API was added and no compute units change.\n\n\"Same account\" is now decided by resolving both receivers to a local binding plus field path instead of comparing text. A `let` alias is followed only when its initializer is a plain place (`x`, `&mut x`, `&mut *x`, `*x`, `x.field`); a binding initialized by a call is its own account. Receivers reached through indexing or a method or function call, and bindings that are assigned, lent as a slot, or captured by a closure, have no identity. Mutably lending the account's place or anything it is reached through before the close voids the proof: a `&mut` borrow, a `ref mut` or default-binding pattern, a `&mut` argument, a `&mut self` method outside the account crates, or a closure capturing it mutably. Lending a sibling field does not. A lend or data borrow the lint cannot place is assumed to reach every account. The zeroing must also run on every path to the close, including past any `break` out of a loop or labeled block and outside a `let ... else` block, and stay the last write before it. Fully qualified closes (`AccountView::close(state)`) are checked like method calls. Every close the lint accepts is therefore preceded by a recognized zero fill of the same place, and every close `main` accepted after a `zeroed()` call is now flagged. Writes after the fill through trusted `pina`/`pinocchio`/`solana_account_view` methods (such as `as_account_mut()`), through a CPI, or through a separately obtained handle to the same account are documented limits.\n\nThis is a breaking change for a deny-by-default lint. Code that passed by calling a user-defined `zeroed()` before `close()` or `close_with_recipient()` now fails. So do the other closes the tightened rules no longer prove, such as a zeroing in one branch, a lend of the account between the zeroing and the close, or a close through an indexed receiver. Close with `close_account_zeroed()`, or clear the whole buffer with `account.try_borrow_mut()?.fill(0);` immediately before the close.\n\nA user function that only shares a close name (`fn close(..)`) is still checked as a close, but it is not trusted: a `&mut` it receives is a lend to every other close.\n\nThe `CloseAccountWithRecipient` docs, the token-escrow tutorial, the close guidance, the `pina docs` overview, and `pina lint --explain require_zeroed_before_close` no longer mention `zeroed()`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #524](https://github.com/pina-rs/pina/pull/524) · _Closed issues:_ [#515](https://github.com/pina-rs/pina/issues/515)\n\n#### Require full-balance drain guards to behave like guards\n\n_Packages:_ _pina_cli_\n\n`require_guarded_full_balance_drain` no longer accepts a drain just because a guard-named call appears before it. A call now counts as the guard only when all of these hold:\n\n- Its failure stops the handler. A `Result`/`Option` guard must be propagated with `?`, extracted with `unwrap()`/`expect()`, returned, or tested by a `match`, `if let`, or `let ... else`. Every arm that can receive the failure must return `Err`/`None`, return the scrutinee's own binding, or panic. Arms are read in order, so `_` after an unguarded `Err(_)` arm only sees success. Failure-preserving adapters are followed: `map_err`, `inspect_err`, `map`, `and_then`, `and`, `ok`, `ok_or`, `or(Err(..))`, a failing `or_else`, `clone()`, and `into()`/`From::from` into a `Result`. A conversion into `Option<Result<..>>` hides the failure and does not count. `guard() == Ok(..)` and `!=` are read with their polarity, and a guard-named unit method that panics on failure (an `assert!`-style guard) counts. Failing branches are recognized by their shape, so a tail `return Err(..)`, a `panic!`, `assert!`, or `return reject()` (a local helper that can only fail) counts.\n- Polarity is checked. `if guard().is_ok() { return Ok(()) }`, `match guard() { Ok(()) => return Ok(()), Err(_) => {} }`, `let Err(()) = guard() else { return Ok(()) }`, and `assert_eq!(guard().is_err(), true)` no longer satisfy the lint. A branch that returns `Ok` is never a failure, including `if state.is_paused() { return Ok(()) }` in a handler.\n- Its receiver or an argument is derived from a handler parameter. Zero-argument calls, literal-only calls, and literals routed through a local are rejected.\n- Its name contains a pause or cap term, or it delegates to a named guard. A differently named local wrapper returning `Result`/`Option` counts when its body enforces a named guard in its outermost scope before any early success `return` or labeled `break`, up to three wrappers deep. Closures, fn pointers, generic callables, and `bool` wrappers never count. A generic wrapper is judged by the concrete impl its caller instantiates it with. Inside a wrapper, an unresolvable trait call or a `return` of a value the lint cannot see into is treated as unknown, never as a guard or a failure.\n- It is not a constant success. A local callee that can only return a literal `Ok(..)`/`Some(..)` or `bool` literal, even through a `let` binding or behind an `if false` error branch, is not a guard.\n\nTrait calls are judged by the implementation that runs, never by a default body the implementation overrides. The right operand of `&&`/`||` is now treated as conditional, so `bypass || { guard()?; true }` no longer gates a later drain. Plain-function guards such as `assert_within_cap(remaining)?` are recognized alongside method-call guards.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #522](https://github.com/pina-rs/pina/pull/522) · _Closed issues:_ [#517](https://github.com/pina-rs/pina/issues/517) · _Related issues:_ [#515](https://github.com/pina-rs/pina/issues/515), [#516](https://github.com/pina-rs/pina/issues/516)\n\n### Notes\n\n#### Build privacy pool host tests without the prover feature\n\n_Packages:_ _pina_\n\n`cargo test -p privacy_pool_program` failed to compile: the SBF end-to-end suite in `tests/e2e.rs` imports the host-only `prover` module and names `ark_groth16` types, and both exist only when the `prover` feature is enabled. The workspace test sweep never saw it, because the privacy pool's Surfpool crate depends on the program with `prover` and feature unification switched it on for every workspace build.\n\nThe `e2e` test target now declares `required-features = [\"prover\"]`, so a plain host run skips the suite and the documented `--features prover --test e2e -- --include-ignored` invocation still builds and runs it. The program's dependencies, SBF artifact, and compute units are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #523](https://github.com/pina-rs/pina/pull/523) · _Closed issues:_ [#518](https://github.com/pina-rs/pina/issues/518)\n\n#### Pin the privacy pool vault\n\n_Packages:_ _pina_\n\n`privacy_pool_program` transferred deposits to, and paid withdrawals from, whatever account the caller passed as `pool_vault` without verifying it. The vault is data-less by design, so no handler parsed it and no check existed: a depositor could name an account they control, keep their lamports, and still have a spendable commitment recorded in the merkle tree — minting notes backed by nothing and draining the honest pool as those notes were withdrawn.\n\nBoth `Deposit` and `Withdraw` now assert the vault is the pool's derived PDA before any value moves. An adversarial Surfpool case proves it: a substituted vault fails against the unpatched program (the deposit succeeds and the note exists) and is rejected with the check. The recorded ABI and the generated clients follow: the vault account now carries a `pda` binding in the manifest and IDL, and the generated `Deposit`/`Withdraw` constructors derive it instead of accepting it, so the client API cannot express the substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #498](https://github.com/pina-rs/pina/pull/498)\n\n#### Add assert_stored_bump for one-parse PDA validation\n\n_Packages:_ _pina_cli_\n\n`#[pda]` accounts gain an `assert_stored_bump` method: the identical single-derivation address check `assert_seeds` performs, but taking a bump value the handler already parsed from the account instead of re-parsing the account to read it again. A handler that captures its state's fields in one `as_account`/`with_compact_account` pass — the shape every value-moving handler uses, since the seeds it validates against come from the same parse — can now validate the PDA without paying for the account a second time.\n\nThe provenance is the contract, and it is enforced rather than assumed: `require_canonical_bump_before_pda_write` blesses `assert_stored_bump` only when the bump argument resolves, through alias chains, to a parse of the same account. A bump taken from instruction data, a literal, or a different account fails the lint, so the method name cannot be used to launder an attacker-chosen bump. Tuple destructures and field reads now keep their alias provenance through the lint's fact collector, so the common capture shape (`let (maker, seed, bump) = { let state = account.as_account()?; ... }`) is recognized.\n\nAdopted in the four handlers whose seeds and bump come from one parse: vesting `Claim` and `Cancel`, escrow `Take` and `Cancel`, saving ~100 compute units per instruction (claim 20,642 to 20,544, cancel 27,722 to 27,624, take 32,354 to 32,254, escrow cancel 13,972 to 13,872) with the identical runtime check — proven by the foreign-vault and noncanonical-account adversarial suites, which still reject every substitution.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #505](https://github.com/pina-rs/pina/pull/505) · _Related issues:_ [#497](https://github.com/pina-rs/pina/issues/497), [#498](https://github.com/pina-rs/pina/issues/498)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
