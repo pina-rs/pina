@@ -180,10 +180,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		claim_ix.accounts[1],
 		AccountMeta::new_readonly(reward_mint, false)
 	);
-	assert_eq!(
-		claim_ix.accounts[2],
-		AccountMeta::new_readonly(pool_state, false)
-	);
+	assert_eq!(claim_ix.accounts[2], AccountMeta::new(pool_state, false));
 	assert_eq!(
 		claim_ix.accounts[4],
 		AccountMeta::new(user_reward_ata, false)

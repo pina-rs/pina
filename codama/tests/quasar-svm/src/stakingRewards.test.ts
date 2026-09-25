@@ -217,12 +217,24 @@ describe("staking_rewards_program quasar e2e", () => {
 		expect(poolAfterDeposit.data.totalStaked).toBe(200n);
 		expect(positionAfterDeposit.data.stakedAmount).toBe(200n);
 
+		// The drip is a promise to pay, so the vault must hold the rewards the
+		// index will owe: fund the pool's canonical reward ATA before the
+		// reserve gate compares the outstanding liability against it.
+		const fundedRewardVault = await createKeyedAssociatedTokenAccount(
+			poolPda as Address,
+			rewardMint.address,
+			1_000n,
+		);
+
 		// One full index unit: the position accrues `staked` rewards, so the
 		// claim has something to release.
 		const dripResult = svm.processInstruction(
 			getSetRewardIndexInstruction({
 				admin,
 				poolState: poolPda,
+				rewardMint: rewardMint.address,
+				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
+				rewardVault,
 				newIndex: 1_000_000_000_000n,
 			}),
 			[
@@ -231,6 +243,8 @@ describe("staking_rewards_program quasar e2e", () => {
 					depositResult.account(poolPda),
 					"pool state should exist before the drip",
 				),
+				rewardMint,
+				fundedRewardVault,
 			],
 		);
 		dripResult.assertSuccess();
@@ -257,10 +271,9 @@ describe("staking_rewards_program quasar e2e", () => {
 					"position state should exist before claim",
 				),
 				userRewardAta,
-				await createKeyedAssociatedTokenAccount(
-					poolPda as Address,
-					rewardMint.address,
-					1_000n,
+				expectSome(
+					dripResult.account(rewardVault),
+					"the reward vault should exist before claim",
 				),
 			],
 		);
