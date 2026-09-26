@@ -1488,8 +1488,10 @@ mod tests {
 			scaffold: true,
 		};
 
-		for range in ["workspace:*", "*"] {
-			let client = temp.path().join(range.replace(':', "_"));
+		// Directory names must stay legal on every platform CI tests; `*`
+		// is a valid macOS filename but not a Windows one.
+		for (name, range) in [("workspace_star", "workspace:*"), ("star", "*")] {
+			let client = temp.path().join(name);
 			write_kit_manifest(&client, range);
 			verify_typescript_scaffold_kit_major(&client, settings)
 				.unwrap_or_else(|error| panic!("range {range} must pass: {error}"));
