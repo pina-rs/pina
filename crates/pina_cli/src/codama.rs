@@ -243,12 +243,12 @@ dependencies:
   args: ^2.7.0
   ${clientPackage}:
     path: ${clientPath}
-  solana_kit_accounts: ^0.8.0
-  solana_kit_address: ^0.8.0
-  solana_kit_keys: ^0.8.0
-  solana_kit_rpc: ^0.8.0
-  solana_kit_transaction_messages: ^0.8.0
-  solana_kit_transactions: ^0.8.0
+  solana_kit_accounts: ">=0.10.0 <1.0.0"
+  solana_kit_address: ">=0.10.0 <1.0.0"
+  solana_kit_keys: ">=0.10.0 <1.0.0"
+  solana_kit_rpc: ">=0.10.0 <1.0.0"
+  solana_kit_transaction_messages: ">=0.10.0 <1.0.0"
+  solana_kit_transactions: ">=0.10.0 <1.0.0"
 
 dev_dependencies:
   test: ^1.25.0
@@ -295,15 +295,15 @@ environment:
 
 dependencies:
   meta: ^1.16.0
-  solana_kit_accounts: ^0.8.0
-  solana_kit_addresses: ^0.8.0
-  solana_kit_codecs_core: ^0.8.0
-  solana_kit_codecs_data_structures: ^0.8.0
-  solana_kit_codecs_numbers: ^0.8.0
-  solana_kit_codecs_strings: ^0.8.0
-  solana_kit_errors: ^0.8.0
-  solana_kit_instructions: ^0.8.0
-  solana_kit_rpc_types: ^0.8.0
+  solana_kit_accounts: ">=0.10.0 <1.0.0"
+  solana_kit_addresses: ">=0.10.0 <1.0.0"
+  solana_kit_codecs_core: ">=0.10.0 <1.0.0"
+  solana_kit_codecs_data_structures: ">=0.10.0 <1.0.0"
+  solana_kit_codecs_numbers: ">=0.10.0 <1.0.0"
+  solana_kit_codecs_strings: ">=0.10.0 <1.0.0"
+  solana_kit_errors: ">=0.10.0 <1.0.0"
+  solana_kit_instructions: ">=0.10.0 <1.0.0"
+  solana_kit_rpc_types: ">=0.10.0 <1.0.0"
 `;
 }
 "#;
@@ -608,6 +608,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	if plan.clients.contains(&ClientLanguage::Dart) {
 		let settings = plan.generation[&ClientLanguage::Dart];
 		validate_generation_target(&plan.dart_out, settings)?;
+		verify_dart_scaffold_kit_range(&plan.dart_out.join("pubspec.yaml"), settings)?;
 
 		for example in &examples {
 			validate_render_target(&plan.dart_out.join("lib/src/generated").join(example))?;
@@ -656,6 +657,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	if plan.clients.contains(&ClientLanguage::CliDart) {
 		let settings = plan.generation[&ClientLanguage::CliDart];
 		validate_generation_target(&plan.cli_dart_out, settings)?;
+		verify_dart_scaffold_kit_range(&plan.cli_dart_out.join("pubspec.yaml"), settings)?;
 		run_client_generation(plan, ClientLanguage::CliDart, &idl_paths)?;
 	}
 
@@ -692,7 +694,7 @@ const fn cli_render_mode(mode: GenerationMode) -> CliRenderMode {
 /// a manifest created by an older renderer keeps its original pin forever.
 /// Rendering new sources against it leaves the client uncompilable with no
 /// diagnostic naming the cause; failing here turns that silent drift into an
-/// actionable error.
+/// actionable error. See [`MINIMUM_GENERATED_KIT_MAJOR`].
 fn verify_typescript_scaffold_kit_major(
 	path: &Path,
 	settings: GenerationSettings,
@@ -730,8 +732,9 @@ fn verify_typescript_scaffold_kit_major(
 	if kit_range_major(range).is_some_and(|major| major < MINIMUM_GENERATED_KIT_MAJOR) {
 		return Err(CodamaError::StaleKitScaffold {
 			path: manifest_path,
-			range: range.to_owned(),
-			minimum: MINIMUM_GENERATED_KIT_MAJOR,
+			ecosystem: "TypeScript",
+			range: format!("`@solana/kit` {range}"),
+			minimum: MINIMUM_GENERATED_KIT_MAJOR.to_string(),
 		});
 	}
 
@@ -748,6 +751,85 @@ fn kit_range_major(range: &str) -> Option<u16> {
 	let digits: &str = &range[..range.chars().take_while(char::is_ascii_digit).count()];
 	digits.parse().ok()
 }
+
+/// Refuse to regenerate a Dart client whose scaffold still pins the Solana
+/// Kit Dart packages below [`MINIMUM_GENERATED_KIT_DART`].
+///
+/// Like the TypeScript guard, this defends the once-created, never-rewritten
+/// `pubspec.yaml`: a manifest from an older release keeps its original
+/// ranges forever, so regeneration would pair fresh sources with
+/// dependencies that cannot resolve them. The Dart floor is a range rather
+/// than a major because the Solana Kit Dart packages are pre-1.0.
+fn verify_dart_scaffold_kit_range(
+	pubspec_path: &Path,
+	settings: GenerationSettings,
+) -> Result<(), CodamaError> {
+	if settings.mode == GenerationMode::Overwrite {
+		return Ok(());
+	}
+
+	let Ok(pubspec) = std::fs::read_to_string(pubspec_path) else {
+		// A missing or unreadable manifest is either a fresh target or a
+		// custom `--no-scaffold` layout; neither has a pin to defend.
+		return Ok(());
+	};
+
+	for line in pubspec.lines() {
+		let Some((name, range)) = line.split_once(':') else {
+			continue;
+		};
+		if !name.trim().starts_with("solana_kit_") {
+			continue;
+		}
+		let range = range.trim().trim_matches(['"', '\'']);
+		if let Some((major, minor)) = dart_range_floor(range)
+			&& (major, minor) < MINIMUM_GENERATED_KIT_DART
+		{
+			return Err(CodamaError::StaleKitScaffold {
+				path: pubspec_path.to_path_buf(),
+				ecosystem: "Dart",
+				range: format!("{name}: {range}"),
+				minimum: format!(
+					"{}.{}",
+					MINIMUM_GENERATED_KIT_DART.0, MINIMUM_GENERATED_KIT_DART.1
+				),
+			});
+		}
+	}
+
+	Ok(())
+}
+
+/// Read the floor version out of a pubspec dependency range
+/// (`^0.8.0`, `>=0.10.0 <1.0.0`, `0.9.0`); ranges that do not name a
+/// version (`any`, `*`) return `None` and are never policed.
+fn dart_range_floor(range: &str) -> Option<(u16, u16)> {
+	let range = range.trim();
+	let range = range
+		.strip_prefix(">=")
+		.unwrap_or(range)
+		.trim_start_matches(['^', '~', '=', 'v', ' ']);
+	let mut parts = range.split('.');
+	let major = parts
+		.next()?
+		.chars()
+		.take_while(char::is_ascii_digit)
+		.collect::<String>()
+		.parse()
+		.ok()?;
+	let minor = parts
+		.next()?
+		.chars()
+		.take_while(char::is_ascii_digit)
+		.collect::<String>()
+		.parse()
+		.ok()?;
+	Some((major, minor))
+}
+
+/// The minimum Solana Kit Dart minor the generated Dart sources compile
+/// against, matching the ranges the `dartManifest` scaffold writes.
+const MINIMUM_GENERATED_KIT_DART: (u16, u16) = (0, 10);
 
 fn validate_generation_target(
 	path: &Path,
@@ -1435,7 +1517,15 @@ mod tests {
 		.expect_err("a Kit 7 scaffold must block regeneration");
 
 		assert!(
-			matches!(error, CodamaError::StaleKitScaffold { ref range, minimum: 8, .. } if range == "^7.0.0"),
+			matches!(
+				error,
+				CodamaError::StaleKitScaffold {
+					ref range,
+					ecosystem: "TypeScript",
+					ref minimum,
+					..
+				} if range == "`@solana/kit` ^7.0.0" && minimum == "8"
+			),
 			"unexpected error: {error}"
 		);
 		assert!(
@@ -1463,6 +1553,12 @@ mod tests {
 		write_kit_manifest(&current, "^8.3.0");
 		verify_typescript_scaffold_kit_major(&current, settings)
 			.unwrap_or_else(|error| panic!("current manifest must pass: {error}"));
+
+		// A user-raised pin is respected, never rewritten or rejected.
+		let raised = temp.path().join("raised");
+		write_kit_manifest(&raised, "^9.0.0");
+		verify_typescript_scaffold_kit_major(&raised, settings)
+			.unwrap_or_else(|error| panic!("raised manifest must pass: {error}"));
 
 		// A dependency-section pin is checked too.
 		let dependency = temp.path().join("dependency");
@@ -1543,6 +1639,136 @@ mod tests {
 		assert_eq!(kit_range_major("workspace:*"), None);
 		assert_eq!(kit_range_major("*"), None);
 		assert_eq!(kit_range_major("latest"), None);
+	}
+
+	fn write_dart_pubspec(dir: &Path, kit_line: &str) {
+		std::fs::create_dir_all(dir).unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		std::fs::write(
+			dir.join("pubspec.yaml"),
+			format!("name: example_client\ndependencies:\n  meta: ^1.16.0\n{kit_line}\n"),
+		)
+		.unwrap_or_else(|error| panic!("failed to write pubspec: {error}"));
+	}
+
+	#[test]
+	fn stale_dart_kit_scaffold_fails_with_the_pubspec_range_named() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let client = temp.path().join("dart");
+		write_dart_pubspec(&client, "  solana_kit_accounts: ^0.8.0");
+
+		let error = verify_dart_scaffold_kit_range(
+			&client.join("pubspec.yaml"),
+			GenerationSettings {
+				mode: GenerationMode::Auto,
+				scaffold: true,
+			},
+		)
+		.expect_err("a Kit Dart 0.8 scaffold must block regeneration");
+
+		assert!(
+			matches!(
+				error,
+				CodamaError::StaleKitScaffold {
+					ecosystem: "Dart",
+					ref range,
+					ref minimum,
+					..
+				} if range == "  solana_kit_accounts: ^0.8.0" && minimum == "0.10"
+			),
+			"unexpected error: {error}"
+		);
+		assert!(
+			error.to_string().contains("Dart"),
+			"the error must name the ecosystem: {error}"
+		);
+	}
+
+	#[test]
+	fn current_dart_kit_ranges_pass_the_guard() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let settings = GenerationSettings {
+			mode: GenerationMode::Auto,
+			scaffold: true,
+		};
+
+		// A missing pubspec is a fresh target or a `--no-scaffold` layout.
+		verify_dart_scaffold_kit_range(&temp.path().join("missing/pubspec.yaml"), settings)
+			.unwrap_or_else(|error| panic!("missing pubspec must pass: {error}"));
+
+		let client = temp.path().join("dart");
+		write_dart_pubspec(&client, "  solana_kit_accounts: \">=0.10.0 <1.0.0\"");
+		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
+			.unwrap_or_else(|error| panic!("current pubspec must pass: {error}"));
+
+		// A user-raised floor is respected, never rewritten or rejected.
+		let raised = temp.path().join("raised_dart");
+		write_dart_pubspec(&raised, "  solana_kit_accounts: \">=0.11.0 <1.0.0\"");
+		verify_dart_scaffold_kit_range(&raised.join("pubspec.yaml"), settings)
+			.unwrap_or_else(|error| panic!("raised pubspec must pass: {error}"));
+	}
+
+	#[test]
+	fn rangeless_and_overwrite_dart_scaffolds_are_not_policed() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let settings = GenerationSettings {
+			mode: GenerationMode::Auto,
+			scaffold: true,
+		};
+
+		for (name, kit_line) in [
+			("any", "  solana_kit_accounts: any"),
+			("star", "  solana_kit_accounts: ^1.0.0"),
+		] {
+			let client = temp.path().join(name);
+			write_dart_pubspec(&client, kit_line);
+			verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
+				.unwrap_or_else(|error| panic!("{kit_line} must pass: {error}"));
+		}
+
+		let client = temp.path().join("no_kit");
+		write_dart_pubspec(&client, "  args: ^2.7.0");
+		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
+			.unwrap_or_else(|error| panic!("kit-less pubspec must pass: {error}"));
+
+		let overwrite = GenerationSettings {
+			mode: GenerationMode::Overwrite,
+			scaffold: true,
+		};
+		let client = temp.path().join("overwrite");
+		write_dart_pubspec(&client, "  solana_kit_accounts: ^0.8.0");
+		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), overwrite)
+			.unwrap_or_else(|error| panic!("overwrite must skip the guard: {error}"));
+	}
+
+	#[test]
+	fn dart_range_floor_reads_the_floor_version_only() {
+		assert_eq!(dart_range_floor("^0.8.0"), Some((0, 8)));
+		assert_eq!(dart_range_floor(">=0.10.0 <1.0.0"), Some((0, 10)));
+		assert_eq!(dart_range_floor(" 0.9.0 "), Some((0, 9)));
+		assert_eq!(dart_range_floor("any"), None);
+		assert_eq!(dart_range_floor("*"), None);
+	}
+
+	#[test]
+	fn quoted_dart_ranges_are_stripped_before_parsing() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let client = temp.path().join("dart");
+		write_dart_pubspec(&client, "  solana_kit_accounts: '^0.8.0'");
+
+		assert!(matches!(
+			verify_dart_scaffold_kit_range(
+				&client.join("pubspec.yaml"),
+				GenerationSettings {
+					mode: GenerationMode::Auto,
+					scaffold: true,
+				},
+			),
+			Err(CodamaError::StaleKitScaffold { .. })
+		));
 	}
 
 	#[cfg(unix)]
