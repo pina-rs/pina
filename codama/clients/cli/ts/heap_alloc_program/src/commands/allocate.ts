@@ -16,7 +16,10 @@ import {
 
 export const allocateCommand = registerGlobals(new Command("allocate"))
 	.description("Instruction data for `Allocate`.")
-	.requiredOption("--value <value>", "value")
+	.requiredOption(
+		"--value <value>",
+		"The value to box. The program boxes it and reads it back.",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

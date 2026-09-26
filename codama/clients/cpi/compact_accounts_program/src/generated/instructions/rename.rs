@@ -42,9 +42,11 @@ pub struct Rename<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct RenameIx {
 	/// Instruction argument `titleLen`.
+	/// Active byte length within `title`.
 	pub title_len: u8,
 
 	/// Instruction argument `title`.
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
 	pub title: [u8; 24],
 }
 

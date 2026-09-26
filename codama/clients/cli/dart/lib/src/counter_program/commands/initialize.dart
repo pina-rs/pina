@@ -12,7 +12,11 @@ import 'package:pina_codama_clients/counter_program.dart';
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
-      ..addOption('bump', mandatory: true, help: "bump")
+      ..addOption(
+        'bump',
+        mandatory: true,
+        help: "The PDA bump seed, computed off-chain.",
+      )
       ..addOption(
         'counter',
         mandatory: false,

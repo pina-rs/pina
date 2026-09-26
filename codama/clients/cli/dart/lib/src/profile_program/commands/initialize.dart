@@ -12,9 +12,13 @@ import 'package:pina_codama_clients/profile_program.dart';
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
-      ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('name', mandatory: true, help: "name")
-      ..addOption('bio', mandatory: true, help: "bio")
+      ..addOption(
+        'bump',
+        mandatory: true,
+        help: "The PDA bump seed, computed off-chain.",
+      )
+      ..addOption('name', mandatory: true, help: "The initial display name.")
+      ..addOption('bio', mandatory: true, help: "The initial bio.")
       ..addOption(
         'profile',
         mandatory: false,

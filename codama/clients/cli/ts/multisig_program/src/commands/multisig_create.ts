@@ -21,13 +21,22 @@ export const multisigCreateCommand = registerGlobals(
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--threshold <threshold>", "threshold")
 	.requiredOption("--timelock <timelock>", "timelock")
-	.requiredOption("--ttl <ttl>", "ttl")
+	.requiredOption(
+		"--ttl <ttl>",
+		"Lifetime for proposals created by this multisig; zero disables.",
+	)
 	.requiredOption(
 		"--member-permissions <memberPermissions>",
-		"memberPermissions",
+		"Permission masks aligned with the trailing member accounts.",
 	)
-	.requiredOption("--config-authority <configAuthority>", "configAuthority")
-	.requiredOption("--rent-collector <rentCollector>", "rentCollector")
+	.requiredOption(
+		"--config-authority <configAuthority>",
+		"The default address makes the multisig autonomous.",
+	)
+	.requiredOption(
+		"--rent-collector <rentCollector>",
+		"The default address disables rent collection.",
+	)
 	.requiredOption(
 		"--program-config <programConfig>",
 		"The `program_config` account",

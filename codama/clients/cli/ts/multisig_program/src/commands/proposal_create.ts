@@ -19,14 +19,23 @@ export const proposalCreateCommand = registerGlobals(
 )
 	.description("proposalCreate")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--kind <kind>", "kind")
+	.requiredOption("--kind <kind>", "[`KIND_VAULT`] or [`KIND_CONFIG`].")
 	.requiredOption("--vault-index <vaultIndex>", "vaultIndex")
-	.requiredOption("--vault-bump <vaultBump>", "vaultBump")
-	.requiredOption("--ephemeral-signers <ephemeralSigners>", "ephemeralSigners")
-	.requiredOption("--ephemeral-bumps <ephemeralBumps>", "ephemeralBumps")
-	.requiredOption("--message-len <messageLen>", "messageLen")
+	.requiredOption(
+		"--vault-bump <vaultBump>",
+		"Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;",
+	)
+	.requiredOption(
+		"--ephemeral-signers <ephemeralSigners>",
+		"Ephemeral signing PDAs the vault message requires.",
+	)
+	.requiredOption(
+		"--ephemeral-bumps <ephemeralBumps>",
+		"One bump per ephemeral signer, for",
+	)
+	.requiredOption("--message-len <messageLen>", "Active length of `message`.")
 	.requiredOption("--message <message>", "message")
-	.requiredOption("--actions-len <actionsLen>", "actionsLen")
+	.requiredOption("--actions-len <actionsLen>", "Active length of `actions`.")
 	.requiredOption("--actions <actions>", "actions")
 	.requiredOption("--multisig <multisig>", "The `multisig` account")
 	.requiredOption("--proposal <proposal>", "The `proposal` account")

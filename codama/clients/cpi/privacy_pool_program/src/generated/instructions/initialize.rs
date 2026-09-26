@@ -86,6 +86,8 @@ pub struct InitializeIx {
 	pub log_bump: u8,
 
 	/// Instruction argument `custodians`.
+	/// Initial three-member disclosure committee as concatenated 32-byte
+	/// addresses.
 	pub custodians: [u8; 96],
 }
 

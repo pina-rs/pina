@@ -18,7 +18,7 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description(
 		"Instruction data for `Initialize`.\n\nContains the PDA bump seed so the client can pass a pre-computed bump\n(avoids the cost of `find_program_address` on-chain).",
 	)
-	.requiredOption("--bump <bump>", "bump")
+	.requiredOption("--bump <bump>", "The PDA bump seed, computed off-chain.")
 	.option(
 		"--counter <counter>",
 		"The counter PDA account (must be empty — not yet created) [default: derived]",

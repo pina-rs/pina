@@ -21,14 +21,18 @@ pub struct RequestDisclosureArgs {
 	bump: u8,
 	#[arg(long)]
 	nonce: u64,
+	/// Tier being invoked; see the `TIER_*` constants.
 	#[arg(long)]
 	tier: u8,
+	/// Target note commitment.
 	#[arg(long)]
 	commitment: String,
+	/// Active length of the encrypted notice.
 	#[arg(long)]
 	notice_len: u8,
 	#[arg(long)]
 	notice: String,
+	/// Hash of the legal basis; nonzero required above tier 0.
 	#[arg(long)]
 	legal_basis_hash: String,
 	/// The `pool_config` account

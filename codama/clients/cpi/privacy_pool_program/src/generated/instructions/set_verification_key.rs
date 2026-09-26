@@ -48,6 +48,7 @@ pub struct SetVerificationKeyIx {
 	pub bump: u8,
 
 	/// Instruction argument `slot`.
+	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
 	pub slot: u8,
 
 	/// Instruction argument `icLen`.

@@ -20,14 +20,18 @@ use crate::context::CliError;
 pub struct MultisigImportArgs {
 	#[arg(long)]
 	bump: u8,
+	/// Program expected to own the legacy account.
 	#[arg(long)]
 	legacy_program: String,
+	/// Anchor account discriminator the legacy data must start with.
 	#[arg(long)]
 	legacy_discriminator: String,
+	/// When set, `config_authority` overrides the legacy value.
 	#[arg(long)]
 	set_config_authority: bool,
 	#[arg(long)]
 	config_authority: String,
+	/// When set, `rent_collector` overrides the legacy value.
 	#[arg(long)]
 	set_rent_collector: bool,
 	#[arg(long)]

@@ -89,5 +89,6 @@ impl InitializeInstructionData {
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The precomputed canonical PDA bump.
 	pub bump: u8,
 }

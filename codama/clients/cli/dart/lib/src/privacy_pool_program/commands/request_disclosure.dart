@@ -12,11 +12,27 @@ final class RequestDisclosureCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('nonce', mandatory: true, help: "nonce")
-      ..addOption('tier', mandatory: true, help: "tier")
-      ..addOption('commitment', mandatory: true, help: "commitment")
-      ..addOption('notice_len', mandatory: true, help: "noticeLen")
+      ..addOption(
+        'tier',
+        mandatory: true,
+        help: "Tier being invoked; see the `TIER_*` constants.",
+      )
+      ..addOption(
+        'commitment',
+        mandatory: true,
+        help: "Target note commitment.",
+      )
+      ..addOption(
+        'notice_len',
+        mandatory: true,
+        help: "Active length of the encrypted notice.",
+      )
       ..addOption('notice', mandatory: true, help: "notice")
-      ..addOption('legal_basis_hash', mandatory: true, help: "legalBasisHash")
+      ..addOption(
+        'legal_basis_hash',
+        mandatory: true,
+        help: "Hash of the legal basis; nonzero required above tier 0.",
+      )
       ..addOption(
         'pool_config',
         mandatory: true,

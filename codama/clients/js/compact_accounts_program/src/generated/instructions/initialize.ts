@@ -86,13 +86,17 @@ export type InitializeInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
+	/** Initial number of active entries. They are filled with `0..entry_count`. */
 	entryCount: number;
+	/** Initial number of active markers. They are filled with `0..marker_count`. */
 	markerCount: number;
 };
 
 export type InitializeInstructionDataArgs = {
 	bump: number;
+	/** Initial number of active entries. They are filled with `0..entry_count`. */
 	entryCount: number;
+	/** Initial number of active markers. They are filled with `0..marker_count`. */
 	markerCount: number;
 };
 

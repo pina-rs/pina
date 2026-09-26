@@ -72,15 +72,19 @@ pub struct MultisigCreateIx<'argument> {
 	pub timelock: u32,
 
 	/// Instruction argument `ttl`.
+	/// Lifetime for proposals created by this multisig; zero disables.
 	pub ttl: u32,
 
 	/// Instruction argument `memberPermissions`.
+	/// Permission masks aligned with the trailing member accounts.
 	pub member_permissions: [u8; 16],
 
 	/// Instruction argument `configAuthority`.
+	/// The default address makes the multisig autonomous.
 	pub config_authority: &'argument Address,
 
 	/// Instruction argument `rentCollector`.
+	/// The default address disables rent collection.
 	pub rent_collector: &'argument Address,
 }
 

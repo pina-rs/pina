@@ -16,7 +16,7 @@ import {
 
 export const initCommand = registerGlobals(new Command("init"))
 	.description("init")
-	.requiredOption("--bump <bump>", "bump")
+	.requiredOption("--bump <bump>", "The PDA bump seed, computed off-chain.")
 	.option(
 		"--store <store>",
 		"The store PDA account (must be empty — not yet created) [default: derived]",

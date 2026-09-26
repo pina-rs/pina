@@ -87,6 +87,8 @@ impl ResizeInstructionData {
 pub struct ResizeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// New logical length. Growth appends each new entry's index as its value.
 	pub entry_count: u8,
+	/// New marker length, independent of `entry_count`.
 	pub marker_count: u8,
 }

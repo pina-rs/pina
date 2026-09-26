@@ -19,6 +19,7 @@ use crate::context::CliError;
 pub struct SetVerificationKeyArgs {
 	#[arg(long)]
 	bump: u8,
+	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
 	#[arg(long)]
 	slot: u8,
 	#[arg(long)]

@@ -10,8 +10,12 @@ import 'package:pina_codama_clients/heap_alloc_program.dart';
 final class FillCommand extends Command<void> {
   FillCommand() {
     argParser
-      ..addOption('bytes', mandatory: true, help: "bytes")
-      ..addOption('fill', mandatory: true, help: "fill");
+      ..addOption('bytes', mandatory: true, help: "Bytes to allocate.")
+      ..addOption(
+        'fill',
+        mandatory: true,
+        help: "The byte written into every element of the buffer.",
+      );
   }
 
   @override

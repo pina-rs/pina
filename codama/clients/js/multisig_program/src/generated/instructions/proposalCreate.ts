@@ -103,26 +103,52 @@ export type ProposalCreateInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
+	/** [`KIND_VAULT`] or [`KIND_CONFIG`]. */
 	kind: number;
 	vaultIndex: number;
+	/**
+	 * Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	 * verified with one derivation instead of an on-chain search.
+	 */
 	vaultBump: number;
+	/** Ephemeral signing PDAs the vault message requires. */
 	ephemeralSigners: number;
+	/**
+	 * One bump per ephemeral signer, for
+	 * `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	 * single derivation.
+	 */
 	ephemeralBumps: ReadonlyUint8Array;
+	/** Active length of `message`. */
 	messageLen: number;
 	message: ReadonlyUint8Array;
+	/** Active length of `actions`. */
 	actionsLen: number;
 	actions: ReadonlyUint8Array;
 };
 
 export type ProposalCreateInstructionDataArgs = {
 	bump: number;
+	/** [`KIND_VAULT`] or [`KIND_CONFIG`]. */
 	kind: number;
 	vaultIndex: number;
+	/**
+	 * Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	 * verified with one derivation instead of an on-chain search.
+	 */
 	vaultBump: number;
+	/** Ephemeral signing PDAs the vault message requires. */
 	ephemeralSigners: number;
+	/**
+	 * One bump per ephemeral signer, for
+	 * `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	 * single derivation.
+	 */
 	ephemeralBumps: ReadonlyUint8Array;
+	/** Active length of `message`. */
 	messageLen: number;
 	message: ReadonlyUint8Array;
+	/** Active length of `actions`. */
 	actionsLen: number;
 	actions: ReadonlyUint8Array;
 };

@@ -43,6 +43,7 @@ pub struct DirectTransfer<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct DirectTransferIx {
 	/// Instruction argument `amount`.
+	/// Amount of lamports to transfer.
 	pub amount: u64,
 }
 

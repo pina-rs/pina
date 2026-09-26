@@ -42,9 +42,11 @@ pub struct Resize<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ResizeIx {
 	/// Instruction argument `entryCount`.
+	/// New logical length. Growth appends each new entry's index as its value.
 	pub entry_count: u8,
 
 	/// Instruction argument `markerCount`.
+	/// New marker length, independent of `entry_count`.
 	pub marker_count: u8,
 }
 

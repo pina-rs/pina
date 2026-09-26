@@ -18,8 +18,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RenameArgs {
+	/// Active byte length within `title`.
 	#[arg(long)]
 	title_len: u8,
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
 	#[arg(long)]
 	title: String,
 	/// The `journal` account [default: derived]

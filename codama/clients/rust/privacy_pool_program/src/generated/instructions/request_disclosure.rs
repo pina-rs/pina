@@ -121,9 +121,13 @@ pub struct RequestDisclosureInstructionWire {
 	pub migration_version: u8,
 	pub bump: u8,
 	pub nonce: u64,
+	/// Tier being invoked; see the `TIER_*` constants.
 	pub tier: u8,
+	/// Target note commitment.
 	pub commitment: [u8; 32],
+	/// Active length of the encrypted notice.
 	pub notice_len: u8,
 	pub notice: [u8; 96],
+	/// Hash of the legal basis; nonzero required above tier 0.
 	pub legal_basis_hash: [u8; 32],
 }

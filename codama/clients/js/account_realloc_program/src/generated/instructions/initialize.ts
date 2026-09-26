@@ -85,10 +85,14 @@ export type InitializeInstruction<
 export type InitializeInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The precomputed canonical PDA bump. */
 	bump: number;
 };
 
-export type InitializeInstructionDataArgs = { bump: number };
+export type InitializeInstructionDataArgs = {
+	/** The precomputed canonical PDA bump. */
+	bump: number;
+};
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	InitializeInstructionDataArgs

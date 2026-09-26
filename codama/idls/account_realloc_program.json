@@ -221,6 +221,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bump",
+						"docs": [
+							"The precomputed canonical PDA bump."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",

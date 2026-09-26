@@ -97,5 +97,6 @@ impl InitializeInstructionData {
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
 }

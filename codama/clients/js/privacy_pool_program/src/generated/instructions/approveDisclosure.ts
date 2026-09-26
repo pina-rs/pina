@@ -93,10 +93,14 @@ export type ApproveDisclosureInstruction<
 export type ApproveDisclosureInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Reserved; must be zero. */
 	reserved: number;
 };
 
-export type ApproveDisclosureInstructionDataArgs = { reserved: number };
+export type ApproveDisclosureInstructionDataArgs = {
+	/** Reserved; must be zero. */
+	reserved: number;
+};
 
 export function getApproveDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	ApproveDisclosureInstructionDataArgs

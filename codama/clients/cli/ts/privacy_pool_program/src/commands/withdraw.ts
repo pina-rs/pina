@@ -16,8 +16,14 @@ import {
 
 export const withdrawCommand = registerGlobals(new Command("withdraw"))
 	.description("withdraw")
-	.requiredOption("--nullifier <nullifier>", "nullifier")
-	.requiredOption("--root <root>", "root")
+	.requiredOption(
+		"--nullifier <nullifier>",
+		"Nullifier derived by the circuit from the spent note's secrets.",
+	)
+	.requiredOption(
+		"--root <root>",
+		"Tree root the proof's membership witness was built against.",
+	)
 	.requiredOption("--proof-a <proofA>", "proofA")
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")

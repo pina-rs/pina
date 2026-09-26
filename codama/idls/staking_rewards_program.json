@@ -1089,6 +1089,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "newIndex",
+						"docs": [
+							"The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`]."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",

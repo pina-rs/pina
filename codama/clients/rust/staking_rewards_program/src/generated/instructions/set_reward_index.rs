@@ -110,5 +110,6 @@ impl SetRewardIndexInstructionData {
 pub struct SetRewardIndexInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].
 	pub new_index: u64,
 }

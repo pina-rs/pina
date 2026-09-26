@@ -18,8 +18,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ResizeArgs {
+	/// New logical length. Growth appends each new entry's index as its value.
 	#[arg(long)]
 	entry_count: u8,
+	/// New marker length, independent of `entry_count`.
 	#[arg(long)]
 	marker_count: u8,
 	/// The `journal` account [default: derived]

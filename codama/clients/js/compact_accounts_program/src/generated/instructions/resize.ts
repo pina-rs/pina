@@ -85,12 +85,16 @@ export type ResizeInstruction<
 export type ResizeInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** New logical length. Growth appends each new entry's index as its value. */
 	entryCount: number;
+	/** New marker length, independent of `entry_count`. */
 	markerCount: number;
 };
 
 export type ResizeInstructionDataArgs = {
+	/** New logical length. Growth appends each new entry's index as its value. */
 	entryCount: number;
+	/** New marker length, independent of `entry_count`. */
 	markerCount: number;
 };
 

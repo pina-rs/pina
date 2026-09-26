@@ -16,8 +16,11 @@ import {
 
 export const fillCommand = registerGlobals(new Command("fill"))
 	.description("Instruction data for `Fill`.")
-	.requiredOption("--bytes <bytes>", "bytes")
-	.requiredOption("--fill <fill>", "fill")
+	.requiredOption("--bytes <bytes>", "Bytes to allocate.")
+	.requiredOption(
+		"--fill <fill>",
+		"The byte written into every element of the buffer.",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {

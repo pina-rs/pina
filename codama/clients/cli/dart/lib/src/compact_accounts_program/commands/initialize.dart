@@ -13,8 +13,18 @@ final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('entry_count', mandatory: true, help: "entryCount")
-      ..addOption('marker_count', mandatory: true, help: "markerCount")
+      ..addOption(
+        'entry_count',
+        mandatory: true,
+        help:
+            "Initial number of active entries. They are filled with `0..entry_count`.",
+      )
+      ..addOption(
+        'marker_count',
+        mandatory: true,
+        help:
+            "Initial number of active markers. They are filled with `0..marker_count`.",
+      )
       ..addOption(
         'journal',
         mandatory: false,

@@ -32,6 +32,8 @@ pub struct InitializeArgs {
 	requesters_bump: u8,
 	#[arg(long)]
 	log_bump: u8,
+	/// Initial three-member disclosure committee as concatenated 32-byte
+	/// addresses.
 	#[arg(long)]
 	custodians: String,
 	/// The `pool_config` account [default: derived]

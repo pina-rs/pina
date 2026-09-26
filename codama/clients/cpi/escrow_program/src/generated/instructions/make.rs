@@ -65,12 +65,15 @@ pub struct Make<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct MakeIx {
 	/// Instruction argument `seed`.
+	/// An ID of the transaction.
 	pub seed: u64,
 
 	/// Instruction argument `amountA`.
+	/// The amount of token A to be sent.
 	pub amount_a: u64,
 
 	/// Instruction argument `amountB`.
+	/// The amount of token B to be received.
 	pub amount_b: u64,
 
 	/// Instruction argument `bump`.

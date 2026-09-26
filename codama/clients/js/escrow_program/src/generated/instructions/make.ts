@@ -106,15 +106,21 @@ export type MakeInstruction<
 export type MakeInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** An ID of the transaction. */
 	seed: bigint;
+	/** The amount of token A to be sent. */
 	amountA: bigint;
+	/** The amount of token B to be received. */
 	amountB: bigint;
 	bump: number;
 };
 
 export type MakeInstructionDataArgs = {
+	/** An ID of the transaction. */
 	seed: number | bigint;
+	/** The amount of token A to be sent. */
 	amountA: number | bigint;
+	/** The amount of token B to be received. */
 	amountB: number | bigint;
 	bump: number;
 };

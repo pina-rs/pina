@@ -10,8 +10,8 @@ import 'package:pina_codama_clients/profile_program.dart';
 final class UpdateProfileCommand extends Command<void> {
   UpdateProfileCommand() {
     argParser
-      ..addOption('name', mandatory: true, help: "name")
-      ..addOption('bio', mandatory: true, help: "bio")
+      ..addOption('name', mandatory: true, help: "The new display name.")
+      ..addOption('bio', mandatory: true, help: "The new bio.")
       ..addOption(
         'profile',
         mandatory: false,

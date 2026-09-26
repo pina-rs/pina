@@ -79,10 +79,14 @@ export type DirectTransferInstruction<
 export type DirectTransferInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Amount of lamports to transfer. */
 	amount: bigint;
 };
 
-export type DirectTransferInstructionDataArgs = { amount: number | bigint };
+export type DirectTransferInstructionDataArgs = {
+	/** Amount of lamports to transfer. */
+	amount: number | bigint;
+};
 
 export function getDirectTransferInstructionDataEncoder(): FixedSizeEncoder<
 	DirectTransferInstructionDataArgs

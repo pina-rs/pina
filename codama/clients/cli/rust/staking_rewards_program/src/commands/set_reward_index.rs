@@ -17,6 +17,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct SetRewardIndexArgs {
+	/// The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].
 	#[arg(long)]
 	new_index: u64,
 	/// The `pool_state` account

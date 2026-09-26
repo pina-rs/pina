@@ -40,9 +40,11 @@ pub struct UpdateProfile<'account, 'argument> {
 #[derive(Clone, Copy, Debug)]
 pub struct UpdateProfileIx<'argument> {
 	/// Instruction argument `name`.
+	/// The new display name.
 	pub name: &'argument str,
 
 	/// Instruction argument `bio`.
+	/// The new bio.
 	pub bio: &'argument str,
 }
 

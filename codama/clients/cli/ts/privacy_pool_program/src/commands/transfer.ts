@@ -19,8 +19,14 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--nullifier <nullifier>", "nullifier")
 	.requiredOption("--root <root>", "root")
-	.requiredOption("--new-commitment <newCommitment>", "newCommitment")
-	.requiredOption("--new-view-pubkey <newViewPubkey>", "newViewPubkey")
+	.requiredOption(
+		"--new-commitment <newCommitment>",
+		"Commitment of the successor note.",
+	)
+	.requiredOption(
+		"--new-view-pubkey <newViewPubkey>",
+		"Successor note's consent key.",
+	)
 	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
 	.requiredOption("--envelope <envelope>", "envelope")
 	.requiredOption("--shares <shares>", "shares")

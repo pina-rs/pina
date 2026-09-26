@@ -18,10 +18,12 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ConfigUpdateArgs {
+	/// When set, `treasury` replaces the configured treasury.
 	#[arg(long)]
 	set_treasury: bool,
 	#[arg(long)]
 	treasury: String,
+	/// When set, `creation_fee` replaces the configured fee.
 	#[arg(long)]
 	set_creation_fee: bool,
 	#[arg(long)]

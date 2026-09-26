@@ -18,6 +18,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct InitializeArgs {
+	/// The precomputed canonical PDA bump.
 	#[arg(long)]
 	bump: u8,
 	/// Empty PDA derived from `[b"sample", authority]` [default: derived]

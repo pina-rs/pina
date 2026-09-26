@@ -12,7 +12,11 @@ import 'package:pina_codama_clients/optional_accounts_program.dart';
 final class InitCommand extends Command<void> {
   InitCommand() {
     argParser
-      ..addOption('bump', mandatory: true, help: "bump")
+      ..addOption(
+        'bump',
+        mandatory: true,
+        help: "The PDA bump seed, computed off-chain.",
+      )
       ..addOption(
         'store',
         mandatory: false,

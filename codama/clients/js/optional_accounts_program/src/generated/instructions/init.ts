@@ -85,10 +85,14 @@ export type InitInstruction<
 export type InitInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The PDA bump seed, computed off-chain. */
 	bump: number;
 };
 
-export type InitInstructionDataArgs = { bump: number };
+export type InitInstructionDataArgs = {
+	/** The PDA bump seed, computed off-chain. */
+	bump: number;
+};
 
 export function getInitInstructionDataEncoder(): FixedSizeEncoder<
 	InitInstructionDataArgs

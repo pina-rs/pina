@@ -86,15 +86,19 @@ export type ConfigUpdateInstruction<
 export type ConfigUpdateInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** When set, `treasury` replaces the configured treasury. */
 	setTreasury: boolean;
 	treasury: Address;
+	/** When set, `creation_fee` replaces the configured fee. */
 	setCreationFee: boolean;
 	creationFee: bigint;
 };
 
 export type ConfigUpdateInstructionDataArgs = {
+	/** When set, `treasury` replaces the configured treasury. */
 	setTreasury: boolean;
 	treasury: Address;
+	/** When set, `creation_fee` replaces the configured fee. */
 	setCreationFee: boolean;
 	creationFee: number | bigint;
 };

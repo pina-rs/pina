@@ -82,5 +82,6 @@ impl DirectTransferInstructionData {
 pub struct DirectTransferInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Amount of lamports to transfer.
 	pub amount: u64,
 }

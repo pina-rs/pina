@@ -37,6 +37,7 @@ pub struct CancelDisclosure<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct CancelDisclosureIx {
 	/// Instruction argument `reserved`.
+	/// Reserved; must be zero.
 	pub reserved: u8,
 }
 

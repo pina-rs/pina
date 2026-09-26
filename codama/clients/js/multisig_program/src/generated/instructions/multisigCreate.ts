@@ -116,9 +116,13 @@ export type MultisigCreateInstructionData = {
 	bump: number;
 	threshold: number;
 	timelock: number;
+	/** Lifetime for proposals created by this multisig; zero disables. */
 	ttl: number;
+	/** Permission masks aligned with the trailing member accounts. */
 	memberPermissions: ReadonlyUint8Array;
+	/** The default address makes the multisig autonomous. */
 	configAuthority: Address;
+	/** The default address disables rent collection. */
 	rentCollector: Address;
 };
 
@@ -126,9 +130,13 @@ export type MultisigCreateInstructionDataArgs = {
 	bump: number;
 	threshold: number;
 	timelock: number;
+	/** Lifetime for proposals created by this multisig; zero disables. */
 	ttl: number;
+	/** Permission masks aligned with the trailing member accounts. */
 	memberPermissions: ReadonlyUint8Array;
+	/** The default address makes the multisig autonomous. */
 	configAuthority: Address;
+	/** The default address disables rent collection. */
 	rentCollector: Address;
 };
 

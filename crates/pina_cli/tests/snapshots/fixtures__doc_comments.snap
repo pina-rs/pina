@@ -126,6 +126,9 @@ expression: idl
           {
             "kind": "instructionArgumentNode",
             "name": "bump",
+            "docs": [
+              "PDA bump for document derivation."
+            ],
             "type": {
               "kind": "numberTypeNode",
               "format": "u8",

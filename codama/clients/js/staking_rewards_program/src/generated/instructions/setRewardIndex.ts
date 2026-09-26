@@ -90,10 +90,14 @@ export type SetRewardIndexInstruction<
 export type SetRewardIndexInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`]. */
 	newIndex: bigint;
 };
 
-export type SetRewardIndexInstructionDataArgs = { newIndex: number | bigint };
+export type SetRewardIndexInstructionDataArgs = {
+	/** The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`]. */
+	newIndex: number | bigint;
+};
 
 export function getSetRewardIndexInstructionDataEncoder(): FixedSizeEncoder<
 	SetRewardIndexInstructionDataArgs

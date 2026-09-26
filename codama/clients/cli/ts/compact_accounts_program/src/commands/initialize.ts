@@ -17,8 +17,14 @@ import {
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--entry-count <entryCount>", "entryCount")
-	.requiredOption("--marker-count <markerCount>", "markerCount")
+	.requiredOption(
+		"--entry-count <entryCount>",
+		"Initial number of active entries. They are filled with `0..entry_count`.",
+	)
+	.requiredOption(
+		"--marker-count <markerCount>",
+		"Initial number of active markers. They are filled with `0..marker_count`.",
+	)
 	.option(
 		"--journal <journal>",
 		"Empty canonical journal PDA [default: derived]",

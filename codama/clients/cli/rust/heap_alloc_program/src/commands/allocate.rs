@@ -17,6 +17,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct AllocateArgs {
+	/// The value to box. The program boxes it and reads it back.
 	#[arg(long)]
 	value: u64,
 }

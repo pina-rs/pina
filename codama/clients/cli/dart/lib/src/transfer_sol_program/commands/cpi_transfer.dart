@@ -12,7 +12,11 @@ import 'package:pina_codama_clients/transfer_sol_program.dart';
 final class CpiTransferCommand extends Command<void> {
   CpiTransferCommand() {
     argParser
-      ..addOption('amount', mandatory: true, help: "amount")
+      ..addOption(
+        'amount',
+        mandatory: true,
+        help: "Amount of lamports to transfer.",
+      )
       ..addOption(
         'recipient',
         mandatory: true,

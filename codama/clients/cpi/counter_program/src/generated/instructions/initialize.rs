@@ -49,6 +49,7 @@ pub struct Initialize<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct InitializeIx {
 	/// Instruction argument `bump`.
+	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
 }
 

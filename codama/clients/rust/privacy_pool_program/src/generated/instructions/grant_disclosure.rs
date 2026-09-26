@@ -95,5 +95,6 @@ impl GrantDisclosureInstructionData {
 pub struct GrantDisclosureInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Reserved; must be zero.
 	pub reserved: u8,
 }

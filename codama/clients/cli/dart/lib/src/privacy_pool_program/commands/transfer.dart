@@ -15,8 +15,16 @@ final class TransferCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('nullifier', mandatory: true, help: "nullifier")
       ..addOption('root', mandatory: true, help: "root")
-      ..addOption('new_commitment', mandatory: true, help: "newCommitment")
-      ..addOption('new_view_pubkey', mandatory: true, help: "newViewPubkey")
+      ..addOption(
+        'new_commitment',
+        mandatory: true,
+        help: "Commitment of the successor note.",
+      )
+      ..addOption(
+        'new_view_pubkey',
+        mandatory: true,
+        help: "Successor note's consent key.",
+      )
       ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('shares', mandatory: true, help: "shares")

@@ -17,6 +17,8 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ResolveChallengeArgs {
+	/// Nonzero resolves in the requester's favor (execution may proceed);
+	/// zero rejects the request outright.
 	#[arg(long)]
 	approve: u8,
 	/// The `pool_config` account

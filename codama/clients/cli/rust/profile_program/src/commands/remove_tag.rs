@@ -18,6 +18,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RemoveTagArgs {
+	/// The zero-based index of the tag to remove.
 	#[arg(long)]
 	index: u64,
 	/// The profile PDA account (must already exist and be writable) [default: derived]

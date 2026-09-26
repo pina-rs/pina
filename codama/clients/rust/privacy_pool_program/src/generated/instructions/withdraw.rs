@@ -116,7 +116,9 @@ impl WithdrawInstructionData {
 pub struct WithdrawInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Nullifier derived by the circuit from the spent note's secrets.
 	pub nullifier: [u8; 32],
+	/// Tree root the proof's membership witness was built against.
 	pub root: [u8; 32],
 	pub proof_a: [u8; 64],
 	pub proof_b: [u8; 128],

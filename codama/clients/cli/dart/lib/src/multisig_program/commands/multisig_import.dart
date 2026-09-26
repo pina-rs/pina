@@ -13,15 +13,25 @@ final class MultisigImportCommand extends Command<void> {
   MultisigImportCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('legacy_program', mandatory: true, help: "legacyProgram")
+      ..addOption(
+        'legacy_program',
+        mandatory: true,
+        help: "Program expected to own the legacy account.",
+      )
       ..addOption(
         'legacy_discriminator',
         mandatory: true,
-        help: "legacyDiscriminator",
+        help: "Anchor account discriminator the legacy data must start with.",
       )
-      ..addFlag('set_config_authority', help: "setConfigAuthority")
+      ..addFlag(
+        'set_config_authority',
+        help: "When set, `config_authority` overrides the legacy value.",
+      )
       ..addOption('config_authority', mandatory: true, help: "configAuthority")
-      ..addFlag('set_rent_collector', help: "setRentCollector")
+      ..addFlag(
+        'set_rent_collector',
+        help: "When set, `rent_collector` overrides the legacy value.",
+      )
       ..addOption('rent_collector', mandatory: true, help: "rentCollector")
       ..addOption(
         'legacy_multisig',

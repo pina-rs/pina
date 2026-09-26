@@ -12,9 +12,17 @@ import 'package:pina_codama_clients/escrow_program.dart';
 final class MakeCommand extends Command<void> {
   MakeCommand() {
     argParser
-      ..addOption('seed', mandatory: true, help: "seed")
-      ..addOption('amount_a', mandatory: true, help: "amountA")
-      ..addOption('amount_b', mandatory: true, help: "amountB")
+      ..addOption('seed', mandatory: true, help: "An ID of the transaction.")
+      ..addOption(
+        'amount_a',
+        mandatory: true,
+        help: "The amount of token A to be sent.",
+      )
+      ..addOption(
+        'amount_b',
+        mandatory: true,
+        help: "The amount of token B to be received.",
+      )
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('mint_a', mandatory: true, help: "The mint_a account")
       ..addOption('mint_b', mandatory: true, help: "The mint_b account")

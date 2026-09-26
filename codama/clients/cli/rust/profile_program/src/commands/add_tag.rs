@@ -18,6 +18,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct AddTagArgs {
+	/// The tag value to append.
 	#[arg(long)]
 	tag: u64,
 	/// The profile PDA account (must already exist and be writable) [default: derived]

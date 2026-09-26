@@ -16,8 +16,14 @@ import {
 
 export const resizeCommand = registerGlobals(new Command("resize"))
 	.description("resize")
-	.requiredOption("--entry-count <entryCount>", "entryCount")
-	.requiredOption("--marker-count <markerCount>", "markerCount")
+	.requiredOption(
+		"--entry-count <entryCount>",
+		"New logical length. Growth appends each new entry's index as its value.",
+	)
+	.requiredOption(
+		"--marker-count <markerCount>",
+		"New marker length, independent of `entry_count`.",
+	)
 	.option("--journal <journal>", "The `journal` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

@@ -24,8 +24,10 @@ pub struct TransferArgs {
 	nullifier: String,
 	#[arg(long)]
 	root: String,
+	/// Commitment of the successor note.
 	#[arg(long)]
 	new_commitment: String,
+	/// Successor note's consent key.
 	#[arg(long)]
 	new_view_pubkey: String,
 	#[arg(long)]

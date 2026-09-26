@@ -46,6 +46,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "value",
+						"docs": [
+							"The value to box. The program boxes it and reads it back."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",
@@ -126,6 +129,13 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bytes",
+						"docs": [
+							"Bytes to allocate.",
+							"",
+							"The runtime grants a 32 KiB heap frame by default, so a larger value",
+							"requires the caller to send the transaction with a matching",
+							"`request_heap_frame` / `with_heap_size` request."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u32",
@@ -135,6 +145,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "fill",
+						"docs": [
+							"The byte written into every element of the buffer."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",

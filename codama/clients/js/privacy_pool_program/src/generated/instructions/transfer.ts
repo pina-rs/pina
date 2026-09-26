@@ -106,7 +106,9 @@ export type TransferInstructionData = {
 	bump: number;
 	nullifier: ReadonlyUint8Array;
 	root: ReadonlyUint8Array;
+	/** Commitment of the successor note. */
 	newCommitment: ReadonlyUint8Array;
+	/** Successor note's consent key. */
 	newViewPubkey: ReadonlyUint8Array;
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;
@@ -120,7 +122,9 @@ export type TransferInstructionDataArgs = {
 	bump: number;
 	nullifier: ReadonlyUint8Array;
 	root: ReadonlyUint8Array;
+	/** Commitment of the successor note. */
 	newCommitment: ReadonlyUint8Array;
+	/** Successor note's consent key. */
 	newViewPubkey: ReadonlyUint8Array;
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;

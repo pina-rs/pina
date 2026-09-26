@@ -10,7 +10,7 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class ApproveDisclosureCommand extends Command<void> {
   ApproveDisclosureCommand() {
     argParser
-      ..addOption('reserved', mandatory: true, help: "reserved")
+      ..addOption('reserved', mandatory: true, help: "Reserved; must be zero.")
       ..addOption(
         'pool_config',
         mandatory: true,

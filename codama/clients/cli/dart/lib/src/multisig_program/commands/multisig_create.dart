@@ -15,14 +15,26 @@ final class MultisigCreateCommand extends Command<void> {
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('threshold', mandatory: true, help: "threshold")
       ..addOption('timelock', mandatory: true, help: "timelock")
-      ..addOption('ttl', mandatory: true, help: "ttl")
+      ..addOption(
+        'ttl',
+        mandatory: true,
+        help: "Lifetime for proposals created by this multisig; zero disables.",
+      )
       ..addOption(
         'member_permissions',
         mandatory: true,
-        help: "memberPermissions",
+        help: "Permission masks aligned with the trailing member accounts.",
       )
-      ..addOption('config_authority', mandatory: true, help: "configAuthority")
-      ..addOption('rent_collector', mandatory: true, help: "rentCollector")
+      ..addOption(
+        'config_authority',
+        mandatory: true,
+        help: "The default address makes the multisig autonomous.",
+      )
+      ..addOption(
+        'rent_collector',
+        mandatory: true,
+        help: "The default address disables rent collection.",
+      )
       ..addOption(
         'program_config',
         mandatory: true,

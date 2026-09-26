@@ -18,10 +18,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct MakeArgs {
+	/// An ID of the transaction.
 	#[arg(long)]
 	seed: u64,
+	/// The amount of token A to be sent.
 	#[arg(long)]
 	amount_a: u64,
+	/// The amount of token B to be received.
 	#[arg(long)]
 	amount_b: u64,
 	#[arg(long)]

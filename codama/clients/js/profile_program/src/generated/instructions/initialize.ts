@@ -93,14 +93,20 @@ export type InitializeInstruction<
 export type InitializeInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The PDA bump seed, computed off-chain. */
 	bump: number;
+	/** The initial display name. */
 	name: string;
+	/** The initial bio. */
 	bio: string;
 };
 
 export type InitializeInstructionDataArgs = {
+	/** The PDA bump seed, computed off-chain. */
 	bump: number;
+	/** The initial display name. */
 	name: string;
+	/** The initial bio. */
 	bio: string;
 };
 

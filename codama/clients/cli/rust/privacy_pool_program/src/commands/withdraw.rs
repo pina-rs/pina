@@ -18,8 +18,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct WithdrawArgs {
+	/// Nullifier derived by the circuit from the spent note's secrets.
 	#[arg(long)]
 	nullifier: String,
+	/// Tree root the proof's membership witness was built against.
 	#[arg(long)]
 	root: String,
 	#[arg(long)]

@@ -81,10 +81,14 @@ export type AddTagInstruction<
 export type AddTagInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The tag value to append. */
 	tag: bigint;
 };
 
-export type AddTagInstructionDataArgs = { tag: number | bigint };
+export type AddTagInstructionDataArgs = {
+	/** The tag value to append. */
+	tag: number | bigint;
+};
 
 export function getAddTagInstructionDataEncoder(): FixedSizeEncoder<
 	AddTagInstructionDataArgs

@@ -16,9 +16,12 @@ import {
 
 export const makeCommand = registerGlobals(new Command("make"))
 	.description("make")
-	.requiredOption("--seed <seed>", "seed")
-	.requiredOption("--amount-a <amountA>", "amountA")
-	.requiredOption("--amount-b <amountB>", "amountB")
+	.requiredOption("--seed <seed>", "An ID of the transaction.")
+	.requiredOption("--amount-a <amountA>", "The amount of token A to be sent.")
+	.requiredOption(
+		"--amount-b <amountB>",
+		"The amount of token B to be received.",
+	)
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--mint-a <mintA>", "The `mint_a` account")
 	.requiredOption("--mint-b <mintB>", "The `mint_b` account")

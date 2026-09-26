@@ -20,8 +20,8 @@ export const updateProfileCommand = registerGlobals(
 	.description(
 		"Instruction data for `UpdateProfile`. Replaces both name and bio.",
 	)
-	.requiredOption("--name <name>", "name")
-	.requiredOption("--bio <bio>", "bio")
+	.requiredOption("--name <name>", "The new display name.")
+	.requiredOption("--bio <bio>", "The new bio.")
 	.option(
 		"--profile <profile>",
 		"The profile PDA account (must already exist and be writable) [default: derived]",

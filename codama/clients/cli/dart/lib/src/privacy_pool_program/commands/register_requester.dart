@@ -11,7 +11,11 @@ final class RegisterRequesterCommand extends Command<void> {
   RegisterRequesterCommand() {
     argParser
       ..addOption('requester', mandatory: true, help: "requester")
-      ..addOption('max_tier', mandatory: true, help: "maxTier")
+      ..addOption(
+        'max_tier',
+        mandatory: true,
+        help: "Highest tier the entity may file at.",
+      )
       ..addOption(
         'pool_config',
         mandatory: true,

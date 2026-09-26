@@ -89,8 +89,10 @@ impl ConfigUpdateInstructionData {
 pub struct ConfigUpdateInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// When set, `treasury` replaces the configured treasury.
 	pub set_treasury: bool,
 	pub treasury: solana_pubkey::Pubkey,
+	/// When set, `creation_fee` replaces the configured fee.
 	pub set_creation_fee: bool,
 	pub creation_fee: u64,
 }

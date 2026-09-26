@@ -1139,6 +1139,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "setTreasury",
+						"docs": [
+							"When set, `treasury` replaces the configured treasury."
+						],
 						"type": {
 							"kind": "booleanTypeNode",
 							"size": {
@@ -1158,6 +1161,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "setCreationFee",
+						"docs": [
+							"When set, `creation_fee` replaces the configured fee."
+						],
 						"type": {
 							"kind": "booleanTypeNode",
 							"size": {
@@ -1355,6 +1361,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "ttl",
+						"docs": [
+							"Lifetime for proposals created by this multisig; zero disables."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u32",
@@ -1364,6 +1373,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "memberPermissions",
+						"docs": [
+							"Permission masks aligned with the trailing member accounts."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 16,
@@ -1375,6 +1387,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "configAuthority",
+						"docs": [
+							"The default address makes the multisig autonomous."
+						],
 						"type": {
 							"kind": "publicKeyTypeNode"
 						}
@@ -1382,6 +1397,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "rentCollector",
+						"docs": [
+							"The default address disables rent collection."
+						],
 						"type": {
 							"kind": "publicKeyTypeNode"
 						}
@@ -1554,6 +1572,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "legacyProgram",
+						"docs": [
+							"Program expected to own the legacy account."
+						],
 						"type": {
 							"kind": "publicKeyTypeNode"
 						}
@@ -1561,6 +1582,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "legacyDiscriminator",
+						"docs": [
+							"Anchor account discriminator the legacy data must start with."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 8,
@@ -1572,6 +1596,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "setConfigAuthority",
+						"docs": [
+							"When set, `config_authority` overrides the legacy value."
+						],
 						"type": {
 							"kind": "booleanTypeNode",
 							"size": {
@@ -1591,6 +1618,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "setRentCollector",
+						"docs": [
+							"When set, `rent_collector` overrides the legacy value."
+						],
 						"type": {
 							"kind": "booleanTypeNode",
 							"size": {
@@ -1735,6 +1765,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "kind",
+						"docs": [
+							"[`KIND_VAULT`] or [`KIND_CONFIG`]."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -1753,6 +1786,10 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "vaultBump",
+						"docs": [
+							"Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;",
+							"verified with one derivation instead of an on-chain search."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -1762,6 +1799,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "ephemeralSigners",
+						"docs": [
+							"Ephemeral signing PDAs the vault message requires."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -1771,6 +1811,11 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "ephemeralBumps",
+						"docs": [
+							"One bump per ephemeral signer, for",
+							"`[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a",
+							"single derivation."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 4,
@@ -1782,6 +1827,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "messageLen",
+						"docs": [
+							"Active length of `message`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u16",
@@ -1802,6 +1850,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "actionsLen",
+						"docs": [
+							"Active length of `actions`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u16",

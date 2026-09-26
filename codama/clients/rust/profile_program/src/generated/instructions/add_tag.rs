@@ -86,5 +86,6 @@ impl AddTagInstructionData {
 pub struct AddTagInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The tag value to append.
 	pub tag: u64,
 }

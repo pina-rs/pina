@@ -18,8 +18,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct UpdateProfileArgs {
+	/// The new display name.
 	#[arg(long)]
 	name: String,
+	/// The new bio.
 	#[arg(long)]
 	bio: String,
 	/// The profile PDA account (must already exist and be writable) [default: derived]

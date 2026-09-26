@@ -20,8 +20,10 @@ use crate::context::CliError;
 pub struct InitializeArgs {
 	#[arg(long)]
 	bump: u8,
+	/// Initial number of active entries. They are filled with `0..entry_count`.
 	#[arg(long)]
 	entry_count: u8,
+	/// Initial number of active markers. They are filled with `0..marker_count`.
 	#[arg(long)]
 	marker_count: u8,
 	/// Empty canonical journal PDA [default: derived]

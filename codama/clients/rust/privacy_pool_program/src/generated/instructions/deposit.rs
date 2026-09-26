@@ -110,9 +110,13 @@ pub struct DepositInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
+	/// Client-computed Poseidon commitment of the new note.
 	pub commitment: [u8; 32],
+	/// Per-note consent/notification public key.
 	pub view_pubkey: [u8; 32],
+	/// Active length of the encrypted note plaintext.
 	pub envelope_len: u8,
 	pub envelope: [u8; 128],
+	/// Encrypted per-custodian key shares.
 	pub shares: [u8; 144],
 }

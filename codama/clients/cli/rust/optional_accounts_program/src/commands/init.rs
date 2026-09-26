@@ -18,6 +18,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct InitArgs {
+	/// The PDA bump seed, computed off-chain.
 	#[arg(long)]
 	bump: u8,
 	/// The store PDA account (must be empty — not yet created) [default: derived]

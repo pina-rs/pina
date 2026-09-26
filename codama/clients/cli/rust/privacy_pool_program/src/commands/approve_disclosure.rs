@@ -17,6 +17,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ApproveDisclosureArgs {
+	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
 	/// The `pool_config` account

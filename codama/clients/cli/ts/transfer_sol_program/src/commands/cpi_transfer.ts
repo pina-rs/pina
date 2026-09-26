@@ -18,7 +18,7 @@ export const cpiTransferCommand = registerGlobals(new Command("cpi_transfer"))
 	.description(
 		"Instruction data for `CpiTransfer`.\n\nLayout:\n```text\n| offset | size | field         |\n|--------|------|---------------|\n| 0      | 1    | discriminator |\n| 1      | 8    | amount (u64)  |\n```",
 	)
-	.requiredOption("--amount <amount>", "amount")
+	.requiredOption("--amount <amount>", "Amount of lamports to transfer.")
 	.requiredOption(
 		"--recipient <recipient>",
 		"The recipient. Must be writable (lamports will be credited)",

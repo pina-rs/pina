@@ -53,6 +53,7 @@ pub struct CpiTransfer<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct CpiTransferIx {
 	/// Instruction argument `amount`.
+	/// Amount of lamports to transfer.
 	pub amount: u64,
 }
 

@@ -17,8 +17,14 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct FillArgs {
+	/// Bytes to allocate.
+	///
+	/// The runtime grants a 32 KiB heap frame by default, so a larger value
+	/// requires the caller to send the transaction with a matching
+	/// `request_heap_frame` / `with_heap_size` request.
 	#[arg(long)]
 	bytes: u32,
+	/// The byte written into every element of the buffer.
 	#[arg(long)]
 	fill: u8,
 }

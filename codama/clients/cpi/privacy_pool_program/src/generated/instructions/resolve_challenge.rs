@@ -41,6 +41,8 @@ pub struct ResolveChallenge<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ResolveChallengeIx {
 	/// Instruction argument `approve`.
+	/// Nonzero resolves in the requester's favor (execution may proceed);
+	/// zero rejects the request outright.
 	pub approve: u8,
 }
 

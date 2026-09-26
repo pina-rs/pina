@@ -12,8 +12,16 @@ import 'package:pina_codama_clients/compact_accounts_program.dart';
 final class RenameCommand extends Command<void> {
   RenameCommand() {
     argParser
-      ..addOption('title_len', mandatory: true, help: "titleLen")
-      ..addOption('title', mandatory: true, help: "title")
+      ..addOption(
+        'title_len',
+        mandatory: true,
+        help: "Active byte length within `title`.",
+      )
+      ..addOption(
+        'title',
+        mandatory: true,
+        help: "UTF-8 title bytes. Bytes after `title_len` are ignored.",
+      )
       ..addOption(
         'journal',
         mandatory: false,

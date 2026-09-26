@@ -86,5 +86,6 @@ impl RemoveTagInstructionData {
 pub struct RemoveTagInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The zero-based index of the tag to remove.
 	pub index: u64,
 }

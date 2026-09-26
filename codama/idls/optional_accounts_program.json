@@ -196,6 +196,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bump",
+						"docs": [
+							"The PDA bump seed, computed off-chain."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",

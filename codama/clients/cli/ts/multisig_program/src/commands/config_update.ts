@@ -16,9 +16,15 @@ import {
 
 export const configUpdateCommand = registerGlobals(new Command("config_update"))
 	.description("configUpdate")
-	.requiredOption("--set-treasury <setTreasury>", "setTreasury")
+	.requiredOption(
+		"--set-treasury <setTreasury>",
+		"When set, `treasury` replaces the configured treasury.",
+	)
 	.requiredOption("--treasury <treasury>", "treasury")
-	.requiredOption("--set-creation-fee <setCreationFee>", "setCreationFee")
+	.requiredOption(
+		"--set-creation-fee <setCreationFee>",
+		"When set, `creation_fee` replaces the configured fee.",
+	)
 	.requiredOption("--creation-fee <creationFee>", "creationFee")
 	.option(
 		"--program-config <programConfig>",

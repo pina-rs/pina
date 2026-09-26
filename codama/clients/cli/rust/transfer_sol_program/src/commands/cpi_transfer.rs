@@ -18,6 +18,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct CpiTransferArgs {
+	/// Amount of lamports to transfer.
 	#[arg(long)]
 	amount: u64,
 	/// The recipient. Must be writable (lamports will be credited)

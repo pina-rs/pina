@@ -19,17 +19,23 @@ export const multisigImportCommand = registerGlobals(
 )
 	.description("multisigImport")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--legacy-program <legacyProgram>", "legacyProgram")
+	.requiredOption(
+		"--legacy-program <legacyProgram>",
+		"Program expected to own the legacy account.",
+	)
 	.requiredOption(
 		"--legacy-discriminator <legacyDiscriminator>",
-		"legacyDiscriminator",
+		"Anchor account discriminator the legacy data must start with.",
 	)
 	.requiredOption(
 		"--set-config-authority <setConfigAuthority>",
-		"setConfigAuthority",
+		"When set, `config_authority` overrides the legacy value.",
 	)
 	.requiredOption("--config-authority <configAuthority>", "configAuthority")
-	.requiredOption("--set-rent-collector <setRentCollector>", "setRentCollector")
+	.requiredOption(
+		"--set-rent-collector <setRentCollector>",
+		"When set, `rent_collector` overrides the legacy value.",
+	)
 	.requiredOption("--rent-collector <rentCollector>", "rentCollector")
 	.requiredOption(
 		"--legacy-multisig <legacyMultisig>",

@@ -17,6 +17,7 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct DirectTransferArgs {
+	/// Amount of lamports to transfer.
 	#[arg(long)]
 	amount: u64,
 	/// The recipient. Must be writable

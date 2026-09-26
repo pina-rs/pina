@@ -40,6 +40,7 @@ pub struct AddTag<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct AddTagIx {
 	/// Instruction argument `tag`.
+	/// The tag value to append.
 	pub tag: u64,
 }
 

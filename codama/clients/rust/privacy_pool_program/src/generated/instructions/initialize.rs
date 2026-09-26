@@ -153,5 +153,7 @@ pub struct InitializeInstructionWire {
 	pub custodians_bump: u8,
 	pub requesters_bump: u8,
 	pub log_bump: u8,
+	/// Initial three-member disclosure committee as concatenated 32-byte
+	/// addresses.
 	pub custodians: [u8; 96],
 }

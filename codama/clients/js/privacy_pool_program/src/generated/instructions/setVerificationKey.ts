@@ -92,6 +92,7 @@ export type SetVerificationKeyInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
+	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
 	slot: number;
 	icLen: number;
 	alphaG1: ReadonlyUint8Array;
@@ -106,6 +107,7 @@ export type SetVerificationKeyInstructionData = {
 
 export type SetVerificationKeyInstructionDataArgs = {
 	bump: number;
+	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
 	slot: number;
 	icLen: number;
 	alphaG1: ReadonlyUint8Array;

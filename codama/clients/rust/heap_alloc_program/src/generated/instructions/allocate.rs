@@ -69,5 +69,6 @@ impl AllocateInstructionData {
 pub struct AllocateInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The value to box. The program boxes it and reads it back.
 	pub value: u64,
 }

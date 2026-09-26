@@ -94,5 +94,6 @@ impl CpiTransferInstructionData {
 pub struct CpiTransferInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Amount of lamports to transfer.
 	pub amount: u64,
 }

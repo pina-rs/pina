@@ -20,7 +20,7 @@ export const directTransferCommand = registerGlobals(
 	.description(
 		"Instruction data for `DirectTransfer`.\n\nSame layout as `CpiTransferInstruction` but with a different discriminator\nbyte.",
 	)
-	.requiredOption("--amount <amount>", "amount")
+	.requiredOption("--amount <amount>", "Amount of lamports to transfer.")
 	.requiredOption("--recipient <recipient>", "The recipient. Must be writable")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
