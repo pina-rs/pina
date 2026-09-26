@@ -1,11 +1,13 @@
 ---
-pina_cli: fix
+pina_cli: breaking
 pina_codama_nodes: fix
 pina_codama_renderer_cpi: fix
 pina_codama_renderer_cli: fix
 ---
 
 # Pin client generation to the Kit 8 Codama toolchain
+
+`CodamaError` gains the `StaleKitScaffold` variant, which is a breaking change for downstream exhaustive matches over the error enum.
 
 The `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to `^8.3.0`.
 
