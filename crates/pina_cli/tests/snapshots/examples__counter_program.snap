@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 70
 expression: idl
 ---
 {
@@ -231,6 +230,9 @@ expression: idl
           {
             "kind": "instructionArgumentNode",
             "name": "bump",
+            "docs": [
+              "The PDA bump seed, computed off-chain."
+            ],
             "type": {
               "kind": "numberTypeNode",
               "format": "u8",
