@@ -1491,13 +1491,23 @@ mod tests {
 		}
 	}
 
-	fn write_kit_manifest(dir: &Path, kit_range: &str) {
+	/// Write a scaffold manifest under `dir`, creating the directory first.
+	///
+	/// Both writes stay single-expression so the panic closures share an
+	/// executed line with their call.
+	fn write_manifest(dir: &Path, name: &str, contents: String) {
 		std::fs::create_dir_all(dir).unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		std::fs::write(
-			dir.join("package.json"),
+		let path = dir.join(name);
+		let written = std::fs::write(path, contents);
+		written.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+	}
+
+	fn write_kit_manifest(dir: &Path, kit_range: &str) {
+		write_manifest(
+			dir,
+			"package.json",
 			format!(r#"{{"peerDependencies": {{"@solana/kit": "{kit_range}"}}}}"#),
-		)
-		.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+		);
 	}
 
 	#[test]
@@ -1546,29 +1556,33 @@ mod tests {
 		};
 
 		// A missing manifest is a fresh scaffold or a `--no-scaffold` target.
-		verify_typescript_scaffold_kit_major(&temp.path().join("missing"), settings)
-			.unwrap_or_else(|error| panic!("missing manifest must pass: {error}"));
+		assert!(
+			verify_typescript_scaffold_kit_major(&temp.path().join("missing"), settings).is_ok(),
+			"missing manifest must pass"
+		);
 
 		let current = temp.path().join("current");
 		write_kit_manifest(&current, "^8.3.0");
-		verify_typescript_scaffold_kit_major(&current, settings)
-			.unwrap_or_else(|error| panic!("current manifest must pass: {error}"));
+		assert!(
+			verify_typescript_scaffold_kit_major(&current, settings).is_ok(),
+			"current manifest must pass"
+		);
 
 		// A user-raised pin is respected, never rewritten or rejected.
 		let raised = temp.path().join("raised");
 		write_kit_manifest(&raised, "^9.0.0");
-		verify_typescript_scaffold_kit_major(&raised, settings)
-			.unwrap_or_else(|error| panic!("raised manifest must pass: {error}"));
+		assert!(
+			verify_typescript_scaffold_kit_major(&raised, settings).is_ok(),
+			"raised manifest must pass"
+		);
 
 		// A dependency-section pin is checked too.
 		let dependency = temp.path().join("dependency");
-		std::fs::create_dir_all(&dependency)
-			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		std::fs::write(
-			dependency.join("package.json"),
-			r#"{"dependencies": {"@solana/kit": "^7.2.0"}}"#,
-		)
-		.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+		write_manifest(
+			&dependency,
+			"package.json",
+			r#"{"dependencies": {"@solana/kit": "^7.2.0"}}"#.to_owned(),
+		);
 		assert!(matches!(
 			verify_typescript_scaffold_kit_major(&dependency, settings),
 			Err(CodamaError::StaleKitScaffold { .. })
@@ -1589,27 +1603,31 @@ mod tests {
 		for (name, range) in [("workspace_star", "workspace:*"), ("star", "*")] {
 			let client = temp.path().join(name);
 			write_kit_manifest(&client, range);
-			verify_typescript_scaffold_kit_major(&client, settings)
-				.unwrap_or_else(|error| panic!("range {range} must pass: {error}"));
+			assert!(
+				verify_typescript_scaffold_kit_major(&client, settings).is_ok(),
+				"range {range} must pass"
+			);
 		}
 
 		// A scaffold that does not pin `@solana/kit` at all has nothing to
 		// police, even though the manifest itself parses.
 		let kit_less = temp.path().join("kit_less");
-		std::fs::create_dir_all(&kit_less)
-			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		std::fs::write(kit_less.join("package.json"), br#"{"name": "js-client"}"#)
-			.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
-		verify_typescript_scaffold_kit_major(&kit_less, settings)
-			.unwrap_or_else(|error| panic!("kit-less manifest must pass: {error}"));
+		write_manifest(
+			&kit_less,
+			"package.json",
+			r#"{"name": "js-client"}"#.to_owned(),
+		);
+		assert!(
+			verify_typescript_scaffold_kit_major(&kit_less, settings).is_ok(),
+			"kit-less manifest must pass"
+		);
 
 		let malformed = temp.path().join("malformed");
-		std::fs::create_dir_all(&malformed)
-			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		std::fs::write(malformed.join("package.json"), b"not json")
-			.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
-		verify_typescript_scaffold_kit_major(&malformed, settings)
-			.unwrap_or_else(|error| panic!("malformed manifest must pass: {error}"));
+		write_manifest(&malformed, "package.json", "not json".to_owned());
+		assert!(
+			verify_typescript_scaffold_kit_major(&malformed, settings).is_ok(),
+			"malformed manifest must pass"
+		);
 	}
 
 	#[test]
@@ -1619,14 +1637,17 @@ mod tests {
 		let client = temp.path().join("counter_program");
 		write_kit_manifest(&client, "^6.10.0");
 
-		verify_typescript_scaffold_kit_major(
-			&client,
-			GenerationSettings {
-				mode: GenerationMode::Overwrite,
-				scaffold: true,
-			},
-		)
-		.unwrap_or_else(|error| panic!("overwrite must skip the guard: {error}"));
+		assert!(
+			verify_typescript_scaffold_kit_major(
+				&client,
+				GenerationSettings {
+					mode: GenerationMode::Overwrite,
+					scaffold: true,
+				},
+			)
+			.is_ok(),
+			"overwrite must skip the guard"
+		);
 	}
 
 	#[test]
@@ -1642,12 +1663,11 @@ mod tests {
 	}
 
 	fn write_dart_pubspec(dir: &Path, kit_line: &str) {
-		std::fs::create_dir_all(dir).unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		std::fs::write(
-			dir.join("pubspec.yaml"),
+		write_manifest(
+			dir,
+			"pubspec.yaml",
 			format!("name: example_client\ndependencies:\n  meta: ^1.16.0\n{kit_line}\n"),
-		)
-		.unwrap_or_else(|error| panic!("failed to write pubspec: {error}"));
+		);
 	}
 
 	#[test]
@@ -1694,19 +1714,26 @@ mod tests {
 		};
 
 		// A missing pubspec is a fresh target or a `--no-scaffold` layout.
-		verify_dart_scaffold_kit_range(&temp.path().join("missing/pubspec.yaml"), settings)
-			.unwrap_or_else(|error| panic!("missing pubspec must pass: {error}"));
+		assert!(
+			verify_dart_scaffold_kit_range(&temp.path().join("missing/pubspec.yaml"), settings)
+				.is_ok(),
+			"missing pubspec must pass"
+		);
 
 		let client = temp.path().join("dart");
 		write_dart_pubspec(&client, "  solana_kit_accounts: \">=0.10.0 <1.0.0\"");
-		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
-			.unwrap_or_else(|error| panic!("current pubspec must pass: {error}"));
+		assert!(
+			verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings).is_ok(),
+			"current pubspec must pass"
+		);
 
 		// A user-raised floor is respected, never rewritten or rejected.
 		let raised = temp.path().join("raised_dart");
 		write_dart_pubspec(&raised, "  solana_kit_accounts: \">=0.11.0 <1.0.0\"");
-		verify_dart_scaffold_kit_range(&raised.join("pubspec.yaml"), settings)
-			.unwrap_or_else(|error| panic!("raised pubspec must pass: {error}"));
+		assert!(
+			verify_dart_scaffold_kit_range(&raised.join("pubspec.yaml"), settings).is_ok(),
+			"raised pubspec must pass"
+		);
 	}
 
 	#[test]
@@ -1724,14 +1751,18 @@ mod tests {
 		] {
 			let client = temp.path().join(name);
 			write_dart_pubspec(&client, kit_line);
-			verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
-				.unwrap_or_else(|error| panic!("{kit_line} must pass: {error}"));
+			assert!(
+				verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings).is_ok(),
+				"{kit_line} must pass"
+			);
 		}
 
 		let client = temp.path().join("no_kit");
 		write_dart_pubspec(&client, "  args: ^2.7.0");
-		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings)
-			.unwrap_or_else(|error| panic!("kit-less pubspec must pass: {error}"));
+		assert!(
+			verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), settings).is_ok(),
+			"kit-less pubspec must pass"
+		);
 
 		let overwrite = GenerationSettings {
 			mode: GenerationMode::Overwrite,
@@ -1739,8 +1770,10 @@ mod tests {
 		};
 		let client = temp.path().join("overwrite");
 		write_dart_pubspec(&client, "  solana_kit_accounts: ^0.8.0");
-		verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), overwrite)
-			.unwrap_or_else(|error| panic!("overwrite must skip the guard: {error}"));
+		assert!(
+			verify_dart_scaffold_kit_range(&client.join("pubspec.yaml"), overwrite).is_ok(),
+			"overwrite must skip the guard"
+		);
 	}
 
 	#[test]
@@ -1750,6 +1783,9 @@ mod tests {
 		assert_eq!(dart_range_floor(" 0.9.0 "), Some((0, 9)));
 		assert_eq!(dart_range_floor("any"), None);
 		assert_eq!(dart_range_floor("*"), None);
+		assert_eq!(dart_range_floor("^"), None);
+		assert_eq!(dart_range_floor("^99999999999999999999.0"), None);
+		assert_eq!(dart_range_floor("^0.99999999999999999999"), None);
 	}
 
 	#[test]
