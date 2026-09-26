@@ -8,8 +8,8 @@ Examples have deliberately narrow scopes. They demonstrate framework APIs, accou
 
 In particular:
 
-- `staking_rewards_program` proves pool and position account creation, authority checks, ATA validation, and checked bookkeeping. Deposit, withdraw, and claim do not transfer stake or reward tokens.
-- `vesting_program` proves schedule-state creation, PDA and ATA validation, and claim/cancel bookkeeping. It does not read the clock, calculate vested entitlement, transfer claimed tokens, or return tokens after cancellation.
+- `staking_rewards_program` proves pool and position account creation, authority checks, ATA validation, and checked bookkeeping. Deposit and withdraw move real stake through the pool's stake vault and credit the observed vault delta; claim releases real reward tokens from the reward vault under the `SetRewardIndex` reserve gate. It still defines no reward emission schedule and nothing refills the reward vault.
+- `vesting_program` proves schedule-state creation, PDA and ATA validation, and claim/cancel bookkeeping. It reads the Clock sysvar, funds the vault atomically at initialization, releases vested tokens through PDA-signed transfers, and settles the vested-but-unclaimed entitlement to the beneficiary on cancellation. It has no amendment path.
 - A passing native test does not prove that an SBF-backed test ran. Some example E2E tests report a skip when the required program binary has not been built.
 
 Use these programs as focused implementation samples. Do not deploy them unchanged or treat their instruction names as evidence that the corresponding economic operation occurred.
@@ -45,26 +45,21 @@ Before a public deployment:
 
 ## Staking completion checklist
 
-Before `staking_rewards_program` can represent a staking product, it needs application-specific decisions and tests for:
+`staking_rewards_program` now implements custody transfers between user accounts and the PDA-controlled stake and reward vaults, validates vault ownership, mint consistency, and canonical ATA derivation, credits the observed vault delta on deposit, enforces a reserve gate before every index increase, banks reward-debt settlement before every stake change, and distinguishes accrued, claimable, and paid rewards. A funded deployment still needs application-specific decisions and tests for:
 
-- custody transfers between user accounts and PDA-controlled stake/reward vaults;
-- vault ownership, mint consistency, funding, solvency, and withdrawal authority;
-- a time-based reward-emission and precision model;
-- reward-debt settlement before every stake change;
-- the difference between accrued, claimable, and paid rewards;
-- pause, unpause, administration, position closure, and pool shutdown;
-- adversarial deposits, withdrawals, claims, duplicate accounts, and depleted reward vaults.
+- a time-based reward-emission and precision model, plus a way to fund the reward vault;
+- pause, unpause, and administration: `PoolState.paused` is read by every value path but no instruction sets it, so the flag is inert as shipped;
+- position closure and pool shutdown, including what happens to banked rewards;
+- a documented initialization trust model: the pool PDA is a singleton per mint pair, so the first caller to `InitializePool` becomes the permanent administrator (tracked as issue #502);
+- adversarial deposits, withdrawals, claims, duplicate accounts, and depleted reward vaults against the funded schedule.
 
 ## Vesting completion checklist
 
-Before `vesting_program` can represent a vesting product, it needs application-specific decisions and tests for:
+`vesting_program` now validates the clock sysvar and implements a precise cliff/linear-unlock formula, funds the vault atomically during initialization with an observed-delta allocation, releases vested tokens through PDA-signed transfers, selects a cancellation policy that pays the beneficiary the vested-but-unclaimed entitlement, and rounds at schedule boundaries with double-claim protection. A funded deployment still needs application-specific decisions and tests for:
 
-- clock-sysvar validation and a precise cliff/linear/unlock formula;
-- escrow funding during initialization and proof that the vault is sufficiently funded;
-- PDA-signed transfers from the vault to the beneficiary;
-- cancellation policy, including who receives unvested tokens and whether vested tokens remain claimable;
-- rounding at schedule boundaries and protection against claiming the same entitlement twice;
-- schedule amendment, closure, and recovery behavior;
+- schedule amendment or beneficiary changes, if the product requires them: the instruction set is `Initialize`, `Claim`, and `Cancel`;
+- revocation policy beyond the linear curve, and whether the administrator may cancel after the schedule ends;
+- recovery behavior when the beneficiary ATA cannot be created;
 - adversarial claims before the cliff, after cancellation, at exact boundaries, and against substituted vaults or mints.
 
 The [Security Model](./security-model.md) documents framework-level invariants. The [CI and Releases](./ci-and-releases.md) page describes the repository's verification layers; an application should adopt equivalent gates for its own program logic.
