@@ -95,5 +95,7 @@ impl ResolveChallengeInstructionData {
 pub struct ResolveChallengeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Nonzero resolves in the requester's favor (execution may proceed);
+	/// zero rejects the request outright.
 	pub approve: u8,
 }

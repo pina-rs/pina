@@ -12,8 +12,17 @@ import 'package:pina_codama_clients/compact_accounts_program.dart';
 final class ResizeCommand extends Command<void> {
   ResizeCommand() {
     argParser
-      ..addOption('entry_count', mandatory: true, help: "entryCount")
-      ..addOption('marker_count', mandatory: true, help: "markerCount")
+      ..addOption(
+        'entry_count',
+        mandatory: true,
+        help:
+            "New logical length. Growth appends each new entry's index as its value.",
+      )
+      ..addOption(
+        'marker_count',
+        mandatory: true,
+        help: "New marker length, independent of `entry_count`.",
+      )
       ..addOption(
         'journal',
         mandatory: false,

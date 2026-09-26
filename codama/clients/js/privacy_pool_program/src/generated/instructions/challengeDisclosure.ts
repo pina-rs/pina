@@ -81,10 +81,14 @@ export type ChallengeDisclosureInstruction<
 export type ChallengeDisclosureInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Reserved; must be zero. */
 	reserved: number;
 };
 
-export type ChallengeDisclosureInstructionDataArgs = { reserved: number };
+export type ChallengeDisclosureInstructionDataArgs = {
+	/** Reserved; must be zero. */
+	reserved: number;
+};
 
 export function getChallengeDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	ChallengeDisclosureInstructionDataArgs

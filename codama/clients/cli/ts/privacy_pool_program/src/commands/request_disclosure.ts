@@ -20,11 +20,20 @@ export const requestDisclosureCommand = registerGlobals(
 	.description("requestDisclosure")
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--nonce <nonce>", "nonce")
-	.requiredOption("--tier <tier>", "tier")
-	.requiredOption("--commitment <commitment>", "commitment")
-	.requiredOption("--notice-len <noticeLen>", "noticeLen")
+	.requiredOption(
+		"--tier <tier>",
+		"Tier being invoked; see the `TIER_*` constants.",
+	)
+	.requiredOption("--commitment <commitment>", "Target note commitment.")
+	.requiredOption(
+		"--notice-len <noticeLen>",
+		"Active length of the encrypted notice.",
+	)
 	.requiredOption("--notice <notice>", "notice")
-	.requiredOption("--legal-basis-hash <legalBasisHash>", "legalBasisHash")
+	.requiredOption(
+		"--legal-basis-hash <legalBasisHash>",
+		"Hash of the legal basis; nonzero required above tier 0.",
+	)
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.requiredOption(
 		"--requester-registry <requesterRegistry>",

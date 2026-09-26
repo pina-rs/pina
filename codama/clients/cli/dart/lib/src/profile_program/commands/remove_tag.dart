@@ -10,7 +10,11 @@ import 'package:pina_codama_clients/profile_program.dart';
 final class RemoveTagCommand extends Command<void> {
   RemoveTagCommand() {
     argParser
-      ..addOption('index', mandatory: true, help: "index")
+      ..addOption(
+        'index',
+        mandatory: true,
+        help: "The zero-based index of the tag to remove.",
+      )
       ..addOption(
         'profile',
         mandatory: false,

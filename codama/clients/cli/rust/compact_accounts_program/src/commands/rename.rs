@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -18,8 +19,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RenameArgs {
+	/// Active byte length within `title`.
 	#[arg(long)]
 	title_len: u8,
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
 	#[arg(long)]
 	title: String,
 	/// The `journal` account [default: derived]

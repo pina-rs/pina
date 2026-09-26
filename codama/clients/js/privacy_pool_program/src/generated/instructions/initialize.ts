@@ -126,6 +126,10 @@ export type InitializeInstructionData = {
 	custodiansBump: number;
 	requestersBump: number;
 	logBump: number;
+	/**
+	 * Initial three-member disclosure committee as concatenated 32-byte
+	 * addresses.
+	 */
 	custodians: ReadonlyUint8Array;
 };
 
@@ -137,6 +141,10 @@ export type InitializeInstructionDataArgs = {
 	custodiansBump: number;
 	requestersBump: number;
 	logBump: number;
+	/**
+	 * Initial three-member disclosure committee as concatenated 32-byte
+	 * addresses.
+	 */
 	custodians: ReadonlyUint8Array;
 };
 

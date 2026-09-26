@@ -378,6 +378,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "entryCount",
+						"docs": [
+							"Initial number of active entries. They are filled with `0..entry_count`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -387,6 +390,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "markerCount",
+						"docs": [
+							"Initial number of active markers. They are filled with `0..marker_count`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -511,6 +517,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "entryCount",
+						"docs": [
+							"New logical length. Growth appends each new entry's index as its value."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -520,6 +529,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "markerCount",
+						"docs": [
+							"New marker length, independent of `entry_count`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -766,6 +778,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "titleLen",
+						"docs": [
+							"Active byte length within `title`."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -775,6 +790,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "title",
+						"docs": [
+							"UTF-8 title bytes. Bytes after `title_len` are ignored."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 24,

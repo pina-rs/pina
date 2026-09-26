@@ -10,7 +10,7 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class ChallengeDisclosureCommand extends Command<void> {
   ChallengeDisclosureCommand() {
     argParser
-      ..addOption('reserved', mandatory: true, help: "reserved")
+      ..addOption('reserved', mandatory: true, help: "Reserved; must be zero.")
       ..addOption(
         'disclosure_request',
         mandatory: true,

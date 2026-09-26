@@ -69,6 +69,12 @@ impl FillInstructionData {
 pub struct FillInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Bytes to allocate.
+	///
+	/// The runtime grants a 32 KiB heap frame by default, so a larger value
+	/// requires the caller to send the transaction with a matching
+	/// `request_heap_frame` / `with_heap_size` request.
 	pub bytes: u32,
+	/// The byte written into every element of the buffer.
 	pub fill: u8,
 }

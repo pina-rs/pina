@@ -56,18 +56,22 @@ pub struct DepositIx {
 	pub bump: u8,
 
 	/// Instruction argument `commitment`.
+	/// Client-computed Poseidon commitment of the new note.
 	pub commitment: [u8; 32],
 
 	/// Instruction argument `viewPubkey`.
+	/// Per-note consent/notification public key.
 	pub view_pubkey: [u8; 32],
 
 	/// Instruction argument `envelopeLen`.
+	/// Active length of the encrypted note plaintext.
 	pub envelope_len: u8,
 
 	/// Instruction argument `envelope`.
 	pub envelope: [u8; 128],
 
 	/// Instruction argument `shares`.
+	/// Encrypted per-custodian key shares.
 	pub shares: [u8; 144],
 }
 

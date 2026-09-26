@@ -19,7 +19,10 @@ export const setVerificationKeyCommand = registerGlobals(
 )
 	.description("setVerificationKey")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--slot <slot>", "slot")
+	.requiredOption(
+		"--slot <slot>",
+		"Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].",
+	)
 	.requiredOption("--ic-len <icLen>", "icLen")
 	.requiredOption("--alpha-g1 <alphaG1>", "alphaG1")
 	.requiredOption("--beta-g2 <betaG2>", "betaG2")

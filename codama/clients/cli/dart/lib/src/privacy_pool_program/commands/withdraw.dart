@@ -12,8 +12,16 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class WithdrawCommand extends Command<void> {
   WithdrawCommand() {
     argParser
-      ..addOption('nullifier', mandatory: true, help: "nullifier")
-      ..addOption('root', mandatory: true, help: "root")
+      ..addOption(
+        'nullifier',
+        mandatory: true,
+        help: "Nullifier derived by the circuit from the spent note's secrets.",
+      )
+      ..addOption(
+        'root',
+        mandatory: true,
+        help: "Tree root the proof's membership witness was built against.",
+      )
       ..addOption('proof_a', mandatory: true, help: "proofA")
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")

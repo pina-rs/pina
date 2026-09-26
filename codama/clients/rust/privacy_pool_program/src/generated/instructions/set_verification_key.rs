@@ -100,6 +100,7 @@ pub struct SetVerificationKeyInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
+	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
 	pub slot: u8,
 	pub ic_len: u8,
 	pub alpha_g1: [u8; 64],

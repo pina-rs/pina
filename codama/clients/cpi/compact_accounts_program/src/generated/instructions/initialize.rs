@@ -46,9 +46,11 @@ pub struct InitializeIx {
 	pub bump: u8,
 
 	/// Instruction argument `entryCount`.
+	/// Initial number of active entries. They are filled with `0..entry_count`.
 	pub entry_count: u8,
 
 	/// Instruction argument `markerCount`.
+	/// Initial number of active markers. They are filled with `0..marker_count`.
 	pub marker_count: u8,
 }
 

@@ -16,7 +16,10 @@ import {
 
 export const removeTagCommand = registerGlobals(new Command("remove_tag"))
 	.description("Instruction data for `RemoveTag`. Removes the tag at `index`.")
-	.requiredOption("--index <index>", "index")
+	.requiredOption(
+		"--index <index>",
+		"The zero-based index of the tag to remove.",
+	)
 	.option(
 		"--profile <profile>",
 		"The profile PDA account (must already exist and be writable) [default: derived]",

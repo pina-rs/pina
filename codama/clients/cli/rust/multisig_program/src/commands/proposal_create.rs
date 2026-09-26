@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -20,20 +21,29 @@ use crate::context::CliError;
 pub struct ProposalCreateArgs {
 	#[arg(long)]
 	bump: u8,
+	/// [`KIND_VAULT`] or [`KIND_CONFIG`].
 	#[arg(long)]
 	kind: u8,
 	#[arg(long)]
 	vault_index: u8,
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	/// verified with one derivation instead of an on-chain search.
 	#[arg(long)]
 	vault_bump: u8,
+	/// Ephemeral signing PDAs the vault message requires.
 	#[arg(long)]
 	ephemeral_signers: u8,
+	/// One bump per ephemeral signer, for
+	/// `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	/// single derivation.
 	#[arg(long)]
 	ephemeral_bumps: String,
+	/// Active length of `message`.
 	#[arg(long)]
 	message_len: u16,
 	#[arg(long)]
 	message: String,
+	/// Active length of `actions`.
 	#[arg(long)]
 	actions_len: u16,
 	#[arg(long)]

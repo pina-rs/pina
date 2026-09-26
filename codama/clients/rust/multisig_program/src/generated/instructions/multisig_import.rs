@@ -134,10 +134,14 @@ pub struct MultisigImportInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
+	/// Program expected to own the legacy account.
 	pub legacy_program: solana_pubkey::Pubkey,
+	/// Anchor account discriminator the legacy data must start with.
 	pub legacy_discriminator: [u8; 8],
+	/// When set, `config_authority` overrides the legacy value.
 	pub set_config_authority: bool,
 	pub config_authority: solana_pubkey::Pubkey,
+	/// When set, `rent_collector` overrides the legacy value.
 	pub set_rent_collector: bool,
 	pub rent_collector: solana_pubkey::Pubkey,
 }

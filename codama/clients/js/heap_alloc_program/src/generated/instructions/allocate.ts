@@ -54,10 +54,14 @@ export type AllocateInstruction<
 export type AllocateInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The value to box. The program boxes it and reads it back. */
 	value: bigint;
 };
 
-export type AllocateInstructionDataArgs = { value: number | bigint };
+export type AllocateInstructionDataArgs = {
+	/** The value to box. The program boxes it and reads it back. */
+	value: number | bigint;
+};
 
 export function getAllocateInstructionDataEncoder(): FixedSizeEncoder<
 	AllocateInstructionDataArgs

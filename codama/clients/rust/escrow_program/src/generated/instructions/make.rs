@@ -125,8 +125,11 @@ impl MakeInstructionData {
 pub struct MakeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// An ID of the transaction.
 	pub seed: u64,
+	/// The amount of token A to be sent.
 	pub amount_a: u64,
+	/// The amount of token B to be received.
 	pub amount_b: u64,
 	pub bump: u8,
 }

@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -18,10 +19,12 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ConfigUpdateArgs {
+	/// When set, `treasury` replaces the configured treasury.
 	#[arg(long)]
 	set_treasury: bool,
 	#[arg(long)]
 	treasury: String,
+	/// When set, `creation_fee` replaces the configured fee.
 	#[arg(long)]
 	set_creation_fee: bool,
 	#[arg(long)]

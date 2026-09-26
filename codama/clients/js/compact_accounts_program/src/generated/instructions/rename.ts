@@ -90,12 +90,16 @@ export type RenameInstruction<
 export type RenameInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Active byte length within `title`. */
 	titleLen: number;
+	/** UTF-8 title bytes. Bytes after `title_len` are ignored. */
 	title: ReadonlyUint8Array;
 };
 
 export type RenameInstructionDataArgs = {
+	/** Active byte length within `title`. */
 	titleLen: number;
+	/** UTF-8 title bytes. Bytes after `title_len` are ignored. */
 	title: ReadonlyUint8Array;
 };
 

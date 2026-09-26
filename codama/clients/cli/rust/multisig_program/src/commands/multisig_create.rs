@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -24,12 +25,16 @@ pub struct MultisigCreateArgs {
 	threshold: u16,
 	#[arg(long)]
 	timelock: u32,
+	/// Lifetime for proposals created by this multisig; zero disables.
 	#[arg(long)]
 	ttl: u32,
+	/// Permission masks aligned with the trailing member accounts.
 	#[arg(long)]
 	member_permissions: String,
+	/// The default address makes the multisig autonomous.
 	#[arg(long)]
 	config_authority: String,
+	/// The default address disables rent collection.
 	#[arg(long)]
 	rent_collector: String,
 	/// The `program_config` account

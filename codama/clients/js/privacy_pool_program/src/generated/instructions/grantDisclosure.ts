@@ -78,10 +78,14 @@ export type GrantDisclosureInstruction<
 export type GrantDisclosureInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Reserved; must be zero. */
 	reserved: number;
 };
 
-export type GrantDisclosureInstructionDataArgs = { reserved: number };
+export type GrantDisclosureInstructionDataArgs = {
+	/** Reserved; must be zero. */
+	reserved: number;
+};
 
 export function getGrantDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	GrantDisclosureInstructionDataArgs

@@ -10,7 +10,7 @@ import 'package:pina_codama_clients/profile_program.dart';
 final class AddTagCommand extends Command<void> {
   AddTagCommand() {
     argParser
-      ..addOption('tag', mandatory: true, help: "tag")
+      ..addOption('tag', mandatory: true, help: "The tag value to append.")
       ..addOption(
         'profile',
         mandatory: false,

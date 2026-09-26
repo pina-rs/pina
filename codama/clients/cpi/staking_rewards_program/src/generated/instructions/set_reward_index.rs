@@ -54,6 +54,7 @@ pub struct SetRewardIndex<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct SetRewardIndexIx {
 	/// Instruction argument `newIndex`.
+	/// The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].
 	pub new_index: u64,
 }
 

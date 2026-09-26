@@ -17,11 +17,20 @@ import {
 export const depositCommand = registerGlobals(new Command("deposit"))
 	.description("deposit")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--commitment <commitment>", "commitment")
-	.requiredOption("--view-pubkey <viewPubkey>", "viewPubkey")
-	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
+	.requiredOption(
+		"--commitment <commitment>",
+		"Client-computed Poseidon commitment of the new note.",
+	)
+	.requiredOption(
+		"--view-pubkey <viewPubkey>",
+		"Per-note consent/notification public key.",
+	)
+	.requiredOption(
+		"--envelope-len <envelopeLen>",
+		"Active length of the encrypted note plaintext.",
+	)
 	.requiredOption("--envelope <envelope>", "envelope")
-	.requiredOption("--shares <shares>", "shares")
+	.requiredOption("--shares <shares>", "Encrypted per-custodian key shares.")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
 	.option(
 		"--pool-vault <poolVault>",

@@ -93,7 +93,10 @@ impl InitializeInstructionData {
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
+	/// The initial display name.
 	pub name: pina::String<32>,
+	/// The initial bio.
 	pub bio: pina::String<128>,
 }

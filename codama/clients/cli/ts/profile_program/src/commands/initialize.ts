@@ -18,9 +18,9 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description(
 		"Instruction data for `Initialize`.\n\nContains the PDA bump seed and bounded initial name and bio.",
 	)
-	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--name <name>", "name")
-	.requiredOption("--bio <bio>", "bio")
+	.requiredOption("--bump <bump>", "The PDA bump seed, computed off-chain.")
+	.requiredOption("--name <name>", "The initial display name.")
+	.requiredOption("--bio <bio>", "The initial bio.")
 	.option(
 		"--profile <profile>",
 		"The profile PDA account (must be empty — not yet created) [default: derived]",

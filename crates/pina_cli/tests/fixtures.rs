@@ -39,3 +39,30 @@ fn fixture_programs_idl() {
 		insta::assert_json_snapshot!(fixture_name, idl);
 	}
 }
+
+#[test]
+fn instruction_argument_docs_reach_the_idl() {
+	let fixture = fixture_dir().join("doc_comments.rs");
+	let source = fs::read_to_string(&fixture)
+		.unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", fixture.display()));
+	let file = syn::parse_file(&source)
+		.unwrap_or_else(|e| panic!("failed to parse fixture {}: {e}", fixture.display()));
+	let ir = assemble_program_ir(&file, "doc_comments")
+		.unwrap_or_else(|e| panic!("failed to assemble IR for {}: {e}", fixture.display()));
+	let idl = ir_to_root_node(&ir)
+		.unwrap_or_else(|e| panic!("failed to generate IDL for {}: {e}", fixture.display()));
+	let json = serde_json::to_value(idl).unwrap_or_else(|e| panic!("serialize IDL: {e}"));
+
+	// Argument 0 is the synthesized discriminator, which carries no docs.
+	let arguments = json
+		.pointer("/program/instructions/0/arguments")
+		.and_then(serde_json::Value::as_array)
+		.unwrap_or_else(|| panic!("instruction arguments missing: {json}"));
+	assert_eq!(arguments[0]["name"], "discriminator");
+	assert!(arguments[0].get("docs").is_none());
+	assert_eq!(arguments[1]["name"], "bump");
+	assert_eq!(
+		arguments[1]["docs"],
+		serde_json::json!(["PDA bump for document derivation."]),
+	);
+}

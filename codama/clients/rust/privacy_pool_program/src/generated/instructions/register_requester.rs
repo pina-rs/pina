@@ -96,5 +96,6 @@ pub struct RegisterRequesterInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub requester: solana_pubkey::Pubkey,
+	/// Highest tier the entity may file at.
 	pub max_tier: u8,
 }

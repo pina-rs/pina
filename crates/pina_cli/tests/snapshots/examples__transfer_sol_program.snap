@@ -94,6 +94,9 @@ expression: idl
           {
             "kind": "instructionArgumentNode",
             "name": "amount",
+            "docs": [
+              "Amount of lamports to transfer."
+            ],
             "type": {
               "kind": "numberTypeNode",
               "format": "u64",
@@ -199,6 +202,9 @@ expression: idl
           {
             "kind": "instructionArgumentNode",
             "name": "amount",
+            "docs": [
+              "Amount of lamports to transfer."
+            ],
             "type": {
               "kind": "numberTypeNode",
               "format": "u64",

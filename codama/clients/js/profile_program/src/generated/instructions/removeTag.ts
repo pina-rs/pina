@@ -81,10 +81,14 @@ export type RemoveTagInstruction<
 export type RemoveTagInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The zero-based index of the tag to remove. */
 	index: bigint;
 };
 
-export type RemoveTagInstructionDataArgs = { index: number | bigint };
+export type RemoveTagInstructionDataArgs = {
+	/** The zero-based index of the tag to remove. */
+	index: number | bigint;
+};
 
 export function getRemoveTagInstructionDataEncoder(): FixedSizeEncoder<
 	RemoveTagInstructionDataArgs

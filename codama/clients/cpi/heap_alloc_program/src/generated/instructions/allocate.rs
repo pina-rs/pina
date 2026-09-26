@@ -29,6 +29,7 @@ pub struct Allocate {
 #[derive(Clone, Copy, Debug)]
 pub struct AllocateIx {
 	/// Instruction argument `value`.
+	/// The value to box. The program boxes it and reads it back.
 	pub value: u64,
 }
 

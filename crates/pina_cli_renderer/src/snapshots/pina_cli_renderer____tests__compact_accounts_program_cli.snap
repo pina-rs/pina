@@ -54,7 +54,8 @@ Global flags:
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -69,8 +70,10 @@ use solana_sdk::pubkey::Pubkey;
 pub struct InitializeArgs {
 	#[arg(long)]
 	bump: u8,
+	/// Initial number of active entries. They are filled with `0..entry_count`.
 	#[arg(long)]
 	entry_count: u8,
+	/// Initial number of active markers. They are filled with `0..marker_count`.
 	#[arg(long)]
 	marker_count: u8,
 	/// Empty canonical journal PDA [default: derived]
@@ -114,7 +117,8 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 pub mod initialize;
@@ -135,7 +139,8 @@ pub use rename::RenameArgs;
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -148,8 +153,10 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct RenameArgs {
+	/// Active byte length within `title`.
 	#[arg(long)]
 	title_len: u8,
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
 	#[arg(long)]
 	title: String,
 	/// The `journal` account [default: derived]
@@ -193,7 +200,8 @@ pub(crate) fn run(context: &CliContext, args: RenameArgs) -> Result<(), CliError
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -206,8 +214,10 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct ResizeArgs {
+	/// New logical length. Growth appends each new entry's index as its value.
 	#[arg(long)]
 	entry_count: u8,
+	/// New marker length, independent of `entry_count`.
 	#[arg(long)]
 	marker_count: u8,
 	/// The `journal` account [default: derived]
@@ -250,7 +260,8 @@ pub(crate) fn run(context: &CliContext, args: ResizeArgs) -> Result<(), CliError
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -306,7 +317,8 @@ pub(crate) fn run(context: &CliContext, args: WriteArgs) -> Result<(), CliError>
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Shared runtime for the generated CLI: endpoint resolution, keypair loading,
@@ -689,7 +701,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -787,7 +800,8 @@ fn print_value(json_output: bool, name: &str, address: &Pubkey, value: &Value) {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Generated CLI for the `compactAccountsProgram` program.

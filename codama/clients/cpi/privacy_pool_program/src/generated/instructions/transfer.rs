@@ -70,9 +70,11 @@ pub struct TransferIx {
 	pub root: [u8; 32],
 
 	/// Instruction argument `newCommitment`.
+	/// Commitment of the successor note.
 	pub new_commitment: [u8; 32],
 
 	/// Instruction argument `newViewPubkey`.
+	/// Successor note's consent key.
 	pub new_view_pubkey: [u8; 32],
 
 	/// Instruction argument `envelopeLen`.

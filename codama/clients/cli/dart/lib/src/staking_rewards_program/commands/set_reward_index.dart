@@ -10,7 +10,12 @@ import 'package:pina_codama_clients/staking_rewards_program.dart';
 final class SetRewardIndexCommand extends Command<void> {
   SetRewardIndexCommand() {
     argParser
-      ..addOption('new_index', mandatory: true, help: "newIndex")
+      ..addOption(
+        'new_index',
+        mandatory: true,
+        help:
+            "The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].",
+      )
       ..addOption('pool_state', mandatory: true, help: "The pool_state account")
       ..addOption(
         'reward_mint',

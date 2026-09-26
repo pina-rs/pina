@@ -87,6 +87,8 @@ impl RenameInstructionData {
 pub struct RenameInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// Active byte length within `title`.
 	pub title_len: u8,
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
 	pub title: [u8; 24],
 }

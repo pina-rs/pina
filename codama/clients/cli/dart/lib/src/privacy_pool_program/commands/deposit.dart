@@ -13,11 +13,27 @@ final class DepositCommand extends Command<void> {
   DepositCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('commitment', mandatory: true, help: "commitment")
-      ..addOption('view_pubkey', mandatory: true, help: "viewPubkey")
-      ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
+      ..addOption(
+        'commitment',
+        mandatory: true,
+        help: "Client-computed Poseidon commitment of the new note.",
+      )
+      ..addOption(
+        'view_pubkey',
+        mandatory: true,
+        help: "Per-note consent/notification public key.",
+      )
+      ..addOption(
+        'envelope_len',
+        mandatory: true,
+        help: "Active length of the encrypted note plaintext.",
+      )
       ..addOption('envelope', mandatory: true, help: "envelope")
-      ..addOption('shares', mandatory: true, help: "shares")
+      ..addOption(
+        'shares',
+        mandatory: true,
+        help: "Encrypted per-custodian key shares.",
+      )
       ..addOption(
         'pool_config',
         mandatory: true,

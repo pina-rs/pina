@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -24,8 +25,10 @@ pub struct TransferArgs {
 	nullifier: String,
 	#[arg(long)]
 	root: String,
+	/// Commitment of the successor note.
 	#[arg(long)]
 	new_commitment: String,
+	/// Successor note's consent key.
 	#[arg(long)]
 	new_view_pubkey: String,
 	#[arg(long)]

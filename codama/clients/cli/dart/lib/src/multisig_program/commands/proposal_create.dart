@@ -13,18 +13,39 @@ final class ProposalCreateCommand extends Command<void> {
   ProposalCreateCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('kind', mandatory: true, help: "kind")
+      ..addOption(
+        'kind',
+        mandatory: true,
+        help: "[`KIND_VAULT`] or [`KIND_CONFIG`].",
+      )
       ..addOption('vault_index', mandatory: true, help: "vaultIndex")
-      ..addOption('vault_bump', mandatory: true, help: "vaultBump")
+      ..addOption(
+        'vault_bump',
+        mandatory: true,
+        help:
+            "Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;",
+      )
       ..addOption(
         'ephemeral_signers',
         mandatory: true,
-        help: "ephemeralSigners",
+        help: "Ephemeral signing PDAs the vault message requires.",
       )
-      ..addOption('ephemeral_bumps', mandatory: true, help: "ephemeralBumps")
-      ..addOption('message_len', mandatory: true, help: "messageLen")
+      ..addOption(
+        'ephemeral_bumps',
+        mandatory: true,
+        help: "One bump per ephemeral signer, for",
+      )
+      ..addOption(
+        'message_len',
+        mandatory: true,
+        help: "Active length of `message`.",
+      )
       ..addOption('message', mandatory: true, help: "message")
-      ..addOption('actions_len', mandatory: true, help: "actionsLen")
+      ..addOption(
+        'actions_len',
+        mandatory: true,
+        help: "Active length of `actions`.",
+      )
       ..addOption('actions', mandatory: true, help: "actions")
       ..addOption('multisig', mandatory: true, help: "The multisig account")
       ..addOption('proposal', mandatory: true, help: "The proposal account")

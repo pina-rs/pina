@@ -45,6 +45,7 @@ pub struct RegisterRequesterIx<'argument> {
 	pub requester: &'argument Address,
 
 	/// Instruction argument `maxTier`.
+	/// Highest tier the entity may file at.
 	pub max_tier: u8,
 }
 

@@ -16,7 +16,7 @@ import {
 
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("Creates the per-authority sample PDA.")
-	.requiredOption("--bump <bump>", "bump")
+	.requiredOption("--bump <bump>", "The precomputed canonical PDA bump.")
 	.option(
 		"--sample <sample>",
 		'Empty PDA derived from `[b"sample", authority]` [default: derived]',

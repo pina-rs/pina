@@ -1669,6 +1669,10 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "custodians",
+						"docs": [
+							"Initial three-member disclosure committee as concatenated 32-byte",
+							"addresses."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 96,
@@ -1787,6 +1791,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "slot",
+						"docs": [
+							"Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -2093,6 +2100,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "maxTier",
+						"docs": [
+							"Highest tier the entity may file at."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -2234,6 +2244,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "commitment",
+						"docs": [
+							"Client-computed Poseidon commitment of the new note."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2245,6 +2258,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "viewPubkey",
+						"docs": [
+							"Per-note consent/notification public key."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2256,6 +2272,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "envelopeLen",
+						"docs": [
+							"Active length of the encrypted note plaintext."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -2276,6 +2295,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "shares",
+						"docs": [
+							"Encrypted per-custodian key shares."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 144,
@@ -2417,6 +2439,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "nullifier",
+						"docs": [
+							"Nullifier derived by the circuit from the spent note's secrets."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2428,6 +2453,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "root",
+						"docs": [
+							"Tree root the proof's membership witness was built against."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2632,6 +2660,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "newCommitment",
+						"docs": [
+							"Commitment of the successor note."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2643,6 +2674,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "newViewPubkey",
+						"docs": [
+							"Successor note's consent key."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2855,6 +2889,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "tier",
+						"docs": [
+							"Tier being invoked; see the `TIER_*` constants."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -2864,6 +2901,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "commitment",
+						"docs": [
+							"Target note commitment."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2875,6 +2915,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "noticeLen",
+						"docs": [
+							"Active length of the encrypted notice."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -2895,6 +2938,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "legalBasisHash",
+						"docs": [
+							"Hash of the legal basis; nonzero required above tier 0."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 32,
@@ -2997,6 +3043,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "reserved",
+						"docs": [
+							"Reserved; must be zero."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -3104,6 +3153,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "reserved",
+						"docs": [
+							"Reserved; must be zero."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -3204,6 +3256,10 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "approve",
+						"docs": [
+							"Nonzero resolves in the requester's favor (execution may proceed);",
+							"zero rejects the request outright."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -3325,6 +3381,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "reserved",
+						"docs": [
+							"Reserved; must be zero."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -3418,6 +3477,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "reserved",
+						"docs": [
+							"Reserved; must be zero."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",

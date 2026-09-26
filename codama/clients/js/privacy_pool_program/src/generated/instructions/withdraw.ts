@@ -98,7 +98,9 @@ export type WithdrawInstruction<
 export type WithdrawInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Nullifier derived by the circuit from the spent note's secrets. */
 	nullifier: ReadonlyUint8Array;
+	/** Tree root the proof's membership witness was built against. */
 	root: ReadonlyUint8Array;
 	proofA: ReadonlyUint8Array;
 	proofB: ReadonlyUint8Array;
@@ -106,7 +108,9 @@ export type WithdrawInstructionData = {
 };
 
 export type WithdrawInstructionDataArgs = {
+	/** Nullifier derived by the circuit from the spent note's secrets. */
 	nullifier: ReadonlyUint8Array;
+	/** Tree root the proof's membership witness was built against. */
 	root: ReadonlyUint8Array;
 	proofA: ReadonlyUint8Array;
 	proofB: ReadonlyUint8Array;

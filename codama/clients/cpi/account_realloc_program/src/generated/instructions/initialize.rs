@@ -44,6 +44,7 @@ pub struct Initialize<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct InitializeIx {
 	/// Instruction argument `bump`.
+	/// The precomputed canonical PDA bump.
 	pub bump: u8,
 }
 

@@ -11,7 +11,11 @@ final class SetVerificationKeyCommand extends Command<void> {
   SetVerificationKeyCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption('slot', mandatory: true, help: "slot")
+      ..addOption(
+        'slot',
+        mandatory: true,
+        help: "Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].",
+      )
       ..addOption('ic_len', mandatory: true, help: "icLen")
       ..addOption('alpha_g1', mandatory: true, help: "alphaG1")
       ..addOption('beta_g2', mandatory: true, help: "betaG2")

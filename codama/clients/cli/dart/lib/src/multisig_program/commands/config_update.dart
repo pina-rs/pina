@@ -10,9 +10,15 @@ import 'package:pina_codama_clients/multisig_program.dart';
 final class ConfigUpdateCommand extends Command<void> {
   ConfigUpdateCommand() {
     argParser
-      ..addFlag('set_treasury', help: "setTreasury")
+      ..addFlag(
+        'set_treasury',
+        help: "When set, `treasury` replaces the configured treasury.",
+      )
       ..addOption('treasury', mandatory: true, help: "treasury")
-      ..addFlag('set_creation_fee', help: "setCreationFee")
+      ..addFlag(
+        'set_creation_fee',
+        help: "When set, `creation_fee` replaces the configured fee.",
+      )
       ..addOption('creation_fee', mandatory: true, help: "creationFee")
       ..addOption(
         'program_config',

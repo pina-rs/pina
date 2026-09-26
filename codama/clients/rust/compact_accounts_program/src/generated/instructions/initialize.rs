@@ -89,6 +89,8 @@ pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
+	/// Initial number of active entries. They are filled with `0..entry_count`.
 	pub entry_count: u8,
+	/// Initial number of active markers. They are filled with `0..marker_count`.
 	pub marker_count: u8,
 }

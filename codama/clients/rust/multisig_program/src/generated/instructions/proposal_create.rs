@@ -106,13 +106,22 @@ pub struct ProposalCreateInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
+	/// [`KIND_VAULT`] or [`KIND_CONFIG`].
 	pub kind: u8,
 	pub vault_index: u8,
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	/// verified with one derivation instead of an on-chain search.
 	pub vault_bump: u8,
+	/// Ephemeral signing PDAs the vault message requires.
 	pub ephemeral_signers: u8,
+	/// One bump per ephemeral signer, for
+	/// `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	/// single derivation.
 	pub ephemeral_bumps: [u8; 4],
+	/// Active length of `message`.
 	pub message_len: u16,
 	pub message: [u8; 640],
+	/// Active length of `actions`.
 	pub actions_len: u16,
 	pub actions: [u8; 128],
 }

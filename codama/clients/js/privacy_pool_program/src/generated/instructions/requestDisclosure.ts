@@ -106,20 +106,28 @@ export type RequestDisclosureInstructionData = {
 	migrationVersion: number;
 	bump: number;
 	nonce: bigint;
+	/** Tier being invoked; see the `TIER_*` constants. */
 	tier: number;
+	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
+	/** Active length of the encrypted notice. */
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
+	/** Hash of the legal basis; nonzero required above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
 };
 
 export type RequestDisclosureInstructionDataArgs = {
 	bump: number;
 	nonce: number | bigint;
+	/** Tier being invoked; see the `TIER_*` constants. */
 	tier: number;
+	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
+	/** Active length of the encrypted notice. */
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
+	/** Hash of the legal basis; nonzero required above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
 };
 

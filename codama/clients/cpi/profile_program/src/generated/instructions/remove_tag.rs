@@ -40,6 +40,7 @@ pub struct RemoveTag<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct RemoveTagIx {
 	/// Instruction argument `index`.
+	/// The zero-based index of the tag to remove.
 	pub index: u64,
 }
 

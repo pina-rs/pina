@@ -19,7 +19,12 @@ final class InitializeCommand extends Command<void> {
       ..addOption('custodians_bump', mandatory: true, help: "custodiansBump")
       ..addOption('requesters_bump', mandatory: true, help: "requestersBump")
       ..addOption('log_bump', mandatory: true, help: "logBump")
-      ..addOption('custodians', mandatory: true, help: "custodians")
+      ..addOption(
+        'custodians',
+        mandatory: true,
+        help:
+            "Initial three-member disclosure committee as concatenated 32-byte",
+      )
       ..addOption(
         'pool_config',
         mandatory: false,

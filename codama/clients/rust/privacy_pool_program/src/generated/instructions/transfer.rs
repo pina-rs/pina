@@ -123,7 +123,9 @@ pub struct TransferInstructionWire {
 	pub bump: u8,
 	pub nullifier: [u8; 32],
 	pub root: [u8; 32],
+	/// Commitment of the successor note.
 	pub new_commitment: [u8; 32],
+	/// Successor note's consent key.
 	pub new_view_pubkey: [u8; 32],
 	pub envelope_len: u8,
 	pub envelope: [u8; 128],

@@ -256,6 +256,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "seed",
+						"docs": [
+							"An ID of the transaction."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",
@@ -265,6 +268,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "amountA",
+						"docs": [
+							"The amount of token A to be sent."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",
@@ -274,6 +280,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "amountB",
+						"docs": [
+							"The amount of token B to be received."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",

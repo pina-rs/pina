@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -18,10 +19,13 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct MakeArgs {
+	/// An ID of the transaction.
 	#[arg(long)]
 	seed: u64,
+	/// The amount of token A to be sent.
 	#[arg(long)]
 	amount_a: u64,
+	/// The amount of token B to be received.
 	#[arg(long)]
 	amount_b: u64,
 	#[arg(long)]

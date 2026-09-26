@@ -18,7 +18,10 @@ export const setRewardIndexCommand = registerGlobals(
 	new Command("set_reward_index"),
 )
 	.description("setRewardIndex")
-	.requiredOption("--new-index <newIndex>", "newIndex")
+	.requiredOption(
+		"--new-index <newIndex>",
+		"The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`].",
+	)
 	.requiredOption("--pool-state <poolState>", "The `pool_state` account")
 	.requiredOption(
 		"--reward-mint <rewardMint>",

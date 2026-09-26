@@ -87,11 +87,18 @@ export type UpdateProfileInstruction<
 export type UpdateProfileInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** The new display name. */
 	name: string;
+	/** The new bio. */
 	bio: string;
 };
 
-export type UpdateProfileInstructionDataArgs = { name: string; bio: string };
+export type UpdateProfileInstructionDataArgs = {
+	/** The new display name. */
+	name: string;
+	/** The new bio. */
+	bio: string;
+};
 
 export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateProfileInstructionDataArgs

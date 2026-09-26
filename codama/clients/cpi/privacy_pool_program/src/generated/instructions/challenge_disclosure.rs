@@ -45,6 +45,7 @@ pub struct ChallengeDisclosure<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ChallengeDisclosureIx {
 	/// Instruction argument `reserved`.
+	/// Reserved; must be zero.
 	pub reserved: u8,
 }
 

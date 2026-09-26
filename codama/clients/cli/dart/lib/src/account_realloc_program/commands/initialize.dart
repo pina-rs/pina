@@ -12,7 +12,11 @@ import 'package:pina_codama_clients/account_realloc_program.dart';
 final class InitializeCommand extends Command<void> {
   InitializeCommand() {
     argParser
-      ..addOption('bump', mandatory: true, help: "bump")
+      ..addOption(
+        'bump',
+        mandatory: true,
+        help: "The precomputed canonical PDA bump.",
+      )
       ..addOption(
         'sample',
         mandatory: false,

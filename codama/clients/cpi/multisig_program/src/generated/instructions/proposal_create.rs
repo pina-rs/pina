@@ -56,27 +56,36 @@ pub struct ProposalCreateIx {
 	pub bump: u8,
 
 	/// Instruction argument `kind`.
+	/// [`KIND_VAULT`] or [`KIND_CONFIG`].
 	pub kind: u8,
 
 	/// Instruction argument `vaultIndex`.
 	pub vault_index: u8,
 
 	/// Instruction argument `vaultBump`.
+	/// Bump of the vault PDA for `[SEED_VAULT, multisig, vault_index]`;
+	/// verified with one derivation instead of an on-chain search.
 	pub vault_bump: u8,
 
 	/// Instruction argument `ephemeralSigners`.
+	/// Ephemeral signing PDAs the vault message requires.
 	pub ephemeral_signers: u8,
 
 	/// Instruction argument `ephemeralBumps`.
+	/// One bump per ephemeral signer, for
+	/// `[SEED_EPHEMERAL_SIGNER, proposal, position]`; each is verified with a
+	/// single derivation.
 	pub ephemeral_bumps: [u8; 4],
 
 	/// Instruction argument `messageLen`.
+	/// Active length of `message`.
 	pub message_len: u16,
 
 	/// Instruction argument `message`.
 	pub message: [u8; 640],
 
 	/// Instruction argument `actionsLen`.
+	/// Active length of `actions`.
 	pub actions_len: u16,
 
 	/// Instruction argument `actions`.

@@ -70,18 +70,22 @@ pub struct MultisigImportIx<'argument> {
 	pub bump: u8,
 
 	/// Instruction argument `legacyProgram`.
+	/// Program expected to own the legacy account.
 	pub legacy_program: &'argument Address,
 
 	/// Instruction argument `legacyDiscriminator`.
+	/// Anchor account discriminator the legacy data must start with.
 	pub legacy_discriminator: [u8; 8],
 
 	/// Instruction argument `setConfigAuthority`.
+	/// When set, `config_authority` overrides the legacy value.
 	pub set_config_authority: bool,
 
 	/// Instruction argument `configAuthority`.
 	pub config_authority: &'argument Address,
 
 	/// Instruction argument `setRentCollector`.
+	/// When set, `rent_collector` overrides the legacy value.
 	pub set_rent_collector: bool,
 
 	/// Instruction argument `rentCollector`.

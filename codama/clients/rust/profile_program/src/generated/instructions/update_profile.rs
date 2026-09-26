@@ -89,6 +89,8 @@ impl UpdateProfileInstructionData {
 pub struct UpdateProfileInstructionWire {
 	pub discriminator: u8,
 	pub migration_version: u8,
+	/// The new display name.
 	pub name: pina::String<32>,
+	/// The new bio.
 	pub bio: pina::String<128>,
 }

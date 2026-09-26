@@ -85,11 +85,13 @@ export type RegisterRequesterInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	requester: Address;
+	/** Highest tier the entity may file at. */
 	maxTier: number;
 };
 
 export type RegisterRequesterInstructionDataArgs = {
 	requester: Address;
+	/** Highest tier the entity may file at. */
 	maxTier: number;
 };
 

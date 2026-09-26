@@ -325,6 +325,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bump",
+						"docs": [
+							"The PDA bump seed, computed off-chain."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",
@@ -334,6 +337,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "name",
+						"docs": [
+							"The initial display name."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
@@ -354,6 +360,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bio",
+						"docs": [
+							"The initial bio."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
@@ -484,6 +493,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "name",
+						"docs": [
+							"The new display name."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
@@ -504,6 +516,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bio",
+						"docs": [
+							"The new bio."
+						],
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
@@ -634,6 +649,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "tag",
+						"docs": [
+							"The tag value to append."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",
@@ -753,6 +771,9 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "index",
+						"docs": [
+							"The zero-based index of the tag to remove."
+						],
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u64",

@@ -29,9 +29,15 @@ pub struct Fill {
 #[derive(Clone, Copy, Debug)]
 pub struct FillIx {
 	/// Instruction argument `bytes`.
+	/// Bytes to allocate.
+	///
+	/// The runtime grants a 32 KiB heap frame by default, so a larger value
+	/// requires the caller to send the transaction with a matching
+	/// `request_heap_frame` / `with_heap_size` request.
 	pub bytes: u32,
 
 	/// Instruction argument `fill`.
+	/// The byte written into every element of the buffer.
 	pub fill: u8,
 }
 

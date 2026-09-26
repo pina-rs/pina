@@ -100,19 +100,27 @@ export type DepositInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
+	/** Client-computed Poseidon commitment of the new note. */
 	commitment: ReadonlyUint8Array;
+	/** Per-note consent/notification public key. */
 	viewPubkey: ReadonlyUint8Array;
+	/** Active length of the encrypted note plaintext. */
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;
+	/** Encrypted per-custodian key shares. */
 	shares: ReadonlyUint8Array;
 };
 
 export type DepositInstructionDataArgs = {
 	bump: number;
+	/** Client-computed Poseidon commitment of the new note. */
 	commitment: ReadonlyUint8Array;
+	/** Per-note consent/notification public key. */
 	viewPubkey: ReadonlyUint8Array;
+	/** Active length of the encrypted note plaintext. */
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;
+	/** Encrypted per-custodian key shares. */
 	shares: ReadonlyUint8Array;
 };
 

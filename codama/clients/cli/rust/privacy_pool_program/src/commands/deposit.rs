@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -20,14 +21,18 @@ use crate::context::CliError;
 pub struct DepositArgs {
 	#[arg(long)]
 	bump: u8,
+	/// Client-computed Poseidon commitment of the new note.
 	#[arg(long)]
 	commitment: String,
+	/// Per-note consent/notification public key.
 	#[arg(long)]
 	view_pubkey: String,
+	/// Active length of the encrypted note plaintext.
 	#[arg(long)]
 	envelope_len: u8,
 	#[arg(long)]
 	envelope: String,
+	/// Encrypted per-custodian key shares.
 	#[arg(long)]
 	shares: String,
 	/// The `pool_config` account

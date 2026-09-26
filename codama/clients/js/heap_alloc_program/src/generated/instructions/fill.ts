@@ -54,11 +54,30 @@ export type FillInstruction<
 export type FillInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/**
+	 * Bytes to allocate.
+	 *
+	 * The runtime grants a 32 KiB heap frame by default, so a larger value
+	 * requires the caller to send the transaction with a matching
+	 * `request_heap_frame` / `with_heap_size` request.
+	 */
 	bytes: number;
+	/** The byte written into every element of the buffer. */
 	fill: number;
 };
 
-export type FillInstructionDataArgs = { bytes: number; fill: number };
+export type FillInstructionDataArgs = {
+	/**
+	 * Bytes to allocate.
+	 *
+	 * The runtime grants a 32 KiB heap frame by default, so a larger value
+	 * requires the caller to send the transaction with a matching
+	 * `request_heap_frame` / `with_heap_size` request.
+	 */
+	bytes: number;
+	/** The byte written into every element of the buffer. */
+	fill: number;
+};
 
 export function getFillInstructionDataEncoder(): FixedSizeEncoder<
 	FillInstructionDataArgs

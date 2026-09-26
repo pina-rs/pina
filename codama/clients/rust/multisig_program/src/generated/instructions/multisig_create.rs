@@ -129,8 +129,12 @@ pub struct MultisigCreateInstructionWire {
 	pub bump: u8,
 	pub threshold: u16,
 	pub timelock: u32,
+	/// Lifetime for proposals created by this multisig; zero disables.
 	pub ttl: u32,
+	/// Permission masks aligned with the trailing member accounts.
 	pub member_permissions: [u8; 16],
+	/// The default address makes the multisig autonomous.
 	pub config_authority: solana_pubkey::Pubkey,
+	/// The default address disables rent collection.
 	pub rent_collector: solana_pubkey::Pubkey,
 }

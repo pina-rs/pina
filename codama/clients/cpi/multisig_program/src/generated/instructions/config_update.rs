@@ -38,12 +38,14 @@ pub struct ConfigUpdate<'account, 'argument> {
 #[derive(Clone, Copy, Debug)]
 pub struct ConfigUpdateIx<'argument> {
 	/// Instruction argument `setTreasury`.
+	/// When set, `treasury` replaces the configured treasury.
 	pub set_treasury: bool,
 
 	/// Instruction argument `treasury`.
 	pub treasury: &'argument Address,
 
 	/// Instruction argument `setCreationFee`.
+	/// When set, `creation_fee` replaces the configured fee.
 	pub set_creation_fee: bool,
 
 	/// Instruction argument `creationFee`.

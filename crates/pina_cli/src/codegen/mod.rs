@@ -412,7 +412,11 @@ fn build_instruction_node(
 			format!("instruction `{}.{}`", instruction.name, argument.name),
 			pinapod_enums,
 		)?;
-		arguments.push(InstructionArgumentNode::new(argument.name.as_str(), r#type));
+		let mut node = InstructionArgumentNode::new(argument.name.as_str(), r#type);
+		if !argument.docs.is_empty() {
+			node.docs = argument.docs.clone().into();
+		}
+		arguments.push(node);
 	}
 
 	let mut discriminators = vec![build_discriminator_node(&instruction.discriminator)];

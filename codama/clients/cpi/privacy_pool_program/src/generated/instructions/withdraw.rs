@@ -57,9 +57,11 @@ pub struct Withdraw<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct WithdrawIx {
 	/// Instruction argument `nullifier`.
+	/// Nullifier derived by the circuit from the spent note's secrets.
 	pub nullifier: [u8; 32],
 
 	/// Instruction argument `root`.
+	/// Tree root the proof's membership witness was built against.
 	pub root: [u8; 32],
 
 	/// Instruction argument `proofA`.

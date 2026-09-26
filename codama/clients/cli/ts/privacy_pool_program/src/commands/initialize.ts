@@ -23,7 +23,10 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--custodians-bump <custodiansBump>", "custodiansBump")
 	.requiredOption("--requesters-bump <requestersBump>", "requestersBump")
 	.requiredOption("--log-bump <logBump>", "logBump")
-	.requiredOption("--custodians <custodians>", "custodians")
+	.requiredOption(
+		"--custodians <custodians>",
+		"Initial three-member disclosure committee as concatenated 32-byte",
+	)
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",

@@ -16,8 +16,14 @@ import {
 
 export const renameCommand = registerGlobals(new Command("rename"))
 	.description("rename")
-	.requiredOption("--title-len <titleLen>", "titleLen")
-	.requiredOption("--title <title>", "title")
+	.requiredOption(
+		"--title-len <titleLen>",
+		"Active byte length within `title`.",
+	)
+	.requiredOption(
+		"--title <title>",
+		"UTF-8 title bytes. Bytes after `title_len` are ignored.",
+	)
 	.option("--journal <journal>", "The `journal` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);

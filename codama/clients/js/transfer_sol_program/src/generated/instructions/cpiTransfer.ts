@@ -85,10 +85,14 @@ export type CpiTransferInstruction<
 export type CpiTransferInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
+	/** Amount of lamports to transfer. */
 	amount: bigint;
 };
 
-export type CpiTransferInstructionDataArgs = { amount: number | bigint };
+export type CpiTransferInstructionDataArgs = {
+	/** Amount of lamports to transfer. */
+	amount: number | bigint;
+};
 
 export function getCpiTransferInstructionDataEncoder(): FixedSizeEncoder<
 	CpiTransferInstructionDataArgs

@@ -5,7 +5,8 @@
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -18,8 +19,10 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ResizeArgs {
+	/// New logical length. Growth appends each new entry's index as its value.
 	#[arg(long)]
 	entry_count: u8,
+	/// New marker length, independent of `entry_count`.
 	#[arg(long)]
 	marker_count: u8,
 	/// The `journal` account [default: derived]

@@ -118,20 +118,28 @@ export type MultisigImportInstructionData = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
+	/** Program expected to own the legacy account. */
 	legacyProgram: Address;
+	/** Anchor account discriminator the legacy data must start with. */
 	legacyDiscriminator: ReadonlyUint8Array;
+	/** When set, `config_authority` overrides the legacy value. */
 	setConfigAuthority: boolean;
 	configAuthority: Address;
+	/** When set, `rent_collector` overrides the legacy value. */
 	setRentCollector: boolean;
 	rentCollector: Address;
 };
 
 export type MultisigImportInstructionDataArgs = {
 	bump: number;
+	/** Program expected to own the legacy account. */
 	legacyProgram: Address;
+	/** Anchor account discriminator the legacy data must start with. */
 	legacyDiscriminator: ReadonlyUint8Array;
+	/** When set, `config_authority` overrides the legacy value. */
 	setConfigAuthority: boolean;
 	configAuthority: Address;
+	/** When set, `rent_collector` overrides the legacy value. */
 	setRentCollector: boolean;
 	rentCollector: Address;
 };
