@@ -1497,6 +1497,16 @@ mod tests {
 				.unwrap_or_else(|error| panic!("range {range} must pass: {error}"));
 		}
 
+		// A scaffold that does not pin `@solana/kit` at all has nothing to
+		// police, even though the manifest itself parses.
+		let kit_less = temp.path().join("kit_less");
+		std::fs::create_dir_all(&kit_less)
+			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		std::fs::write(kit_less.join("package.json"), br#"{"name": "js-client"}"#)
+			.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+		verify_typescript_scaffold_kit_major(&kit_less, settings)
+			.unwrap_or_else(|error| panic!("kit-less manifest must pass: {error}"));
+
 		let malformed = temp.path().join("malformed");
 		std::fs::create_dir_all(&malformed)
 			.unwrap_or_else(|error| panic!("temp dir failed: {error}"));
