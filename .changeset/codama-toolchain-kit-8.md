@@ -9,7 +9,7 @@ pina_codama_renderer_cli: fix
 
 `CodamaError` gains the `StaleKitScaffold` variant (now carrying an `ecosystem` label and a string `minimum`), which is a breaking change for downstream exhaustive matches over the error enum.
 
-The Dart scaffolds move the Solana Kit Dart packages to `">=0.10.0 <1.0.0"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and the fail-closed scaffold guard now also covers a Dart `pubspec.yaml` whose `solana_kit_*` ranges floor below what the generated sources compile against.
+The Dart scaffolds move the Solana Kit Dart packages to `">=0.10.0 <1.0.0"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and raise their SDK floor to Dart 3.13, which the Kit 0.10 line requires. The fail-closed scaffold guard covers both ecosystems: it rejects a `@solana/kit` range or a `solana_kit_*` pubspec range (inline or nested `version:`) that provably cannot resolve what the generated sources compile against, judging ranges by what they can resolve so bounded and union ranges that reach the floor still pass.
 
 The `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to the current ranges.
 
