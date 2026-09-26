@@ -89,6 +89,28 @@ const SEED_REQUEST: &[u8] = b"privacy-pool-request";
 const SEED_LOG: &[u8] = b"privacy-pool-log";
 const SEED_VKEY: &[u8] = b"privacy-pool-vkey";
 
+/// The only key that may initialize the pool.
+///
+/// Every pool account is a singleton PDA over a fixed seed, so
+/// `Initialize` is a one-time, winner-takes-all instruction: whoever runs it
+/// becomes the permanent `PoolConfig.authority`, and that authority installs
+/// Groth16 verifying keys, rotates the custodian committee, and registers
+/// compelled-disclosure requesters. Without a bootstrap binding the first
+/// funded signer to arrive — front-running the deployer — captures the
+/// pool and every honest deposit's escrow and disclosure policy with it.
+///
+/// This example therefore pins the initializer to one committed public key,
+/// the same shape the `prop_amm_program` fixture uses for its updater key:
+/// the seed is the 32 ASCII bytes of `b"pina-pool-bootstrap-2026-09-26!!"`,
+/// deterministic for the test suites but outside the repeated-single-byte
+/// brute-force space. A real deployment must instead follow the production
+/// pattern: generate the bootstrap authority off-circuit, commit only its
+/// public key, and initialize in the same ceremony that deploys the program.
+pub const BOOTSTRAP_AUTHORITY: Address = Address::new_from_array([
+	4, 5, 103, 14, 185, 216, 77, 249, 127, 54, 139, 75, 24, 56, 109, 200, 228, 79, 11, 15, 164, 93,
+	251, 141, 218, 100, 201, 67, 220, 208, 120, 205,
+]);
+
 /// Merkle tree depth. 128 leaves keeps the full node store under the
 /// 10,240-byte ceiling the runtime places on accounts created inside inner
 /// instructions; production trees shard levels across ≤10 KB child accounts
@@ -678,6 +700,20 @@ fn clock_timestamp(clock: &AccountView) -> Result<u64, ProgramError> {
 	)
 }
 
+/// The challenge deadline for a tier-1 request filed at `now`.
+///
+/// The addition is checked like every other value path: a wrapped deadline
+/// lands in the past and silently collapses the challenge window the tier
+/// exists to provide. The shipped window makes overflow unreachable, but the
+/// field is a configuration value and release builds do not wrap loudly.
+fn challenge_deadline(now: u64, window: u64, tier: u8) -> Result<u64, ProgramError> {
+	if tier != TIER_VERIFIED {
+		return Ok(now);
+	}
+	now.checked_add(window)
+		.ok_or(PrivacyPoolError::ArithmeticOverflow.into())
+}
+
 /// A custodian set is valid when every slot holds a real, distinct key.
 fn validate_custodian_set(custodians: &[u8; 96]) -> Result<(), ProgramError> {
 	for slot in custodians.as_chunks::<32>().0 {
@@ -966,6 +1002,15 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let args = InitializeIx::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?.assert_writable()?;
+		// The pool is a set of singleton PDAs, so initialization is a
+		// one-time capture of the governance root. Only the committed
+		// bootstrap key may run it; an unapproved first signer must be
+		// refused before any account or lamport moves. This is a single
+		// 32-byte comparison against a constant — no derivation, no extra
+		// CPI, no measurable compute cost on any later instruction.
+		if self.authority.address() != &BOOTSTRAP_AUTHORITY {
+			return Err(PrivacyPoolError::InvalidAuthority.into());
+		}
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_custodian_set(&args.custodians)?;
@@ -1555,11 +1600,7 @@ impl<'a> ProcessAccountInfos<'a> for RequestDisclosureAccounts<'a> {
 			u64::from(config.challenge_window_secs.get())
 		};
 		let now = clock_timestamp(self.clock)?;
-		let deadline = if args.tier == TIER_VERIFIED {
-			now + window
-		} else {
-			now
-		};
+		let deadline = challenge_deadline(now, window, args.tier)?;
 
 		CreateProgramAccountWithBump {
 			account: self.disclosure_request,
@@ -2603,5 +2644,29 @@ mod tests {
 		let mut zeroed = distinct;
 		zeroed[32..64].fill(0);
 		assert!(validate_custodian_set(&zeroed).is_err());
+	}
+
+	#[test]
+	fn challenge_deadline_is_checked_and_tier_scoped() {
+		// A tier-1 window is added to the filing time.
+		assert_eq!(
+			challenge_deadline(1_700, DEFAULT_CHALLENGE_WINDOW_SECS as u64, TIER_VERIFIED).unwrap(),
+			2_300
+		);
+		// Consent and compelled requests carry no window: the deadline is the
+		// filing time, so the window arithmetic never runs for them.
+		assert_eq!(challenge_deadline(1_700, 0, TIER_CONSENT).unwrap(), 1_700);
+		assert_eq!(challenge_deadline(1_700, 0, TIER_COMPELLED).unwrap(), 1_700);
+		// The exact boundary is representable.
+		assert_eq!(
+			challenge_deadline(u64::MAX - 1, 1, TIER_VERIFIED).unwrap(),
+			u64::MAX
+		);
+		// One second past it is refused rather than wrapping into the past,
+		// which would collapse the challenge window the tier provides.
+		assert_eq!(
+			challenge_deadline(u64::MAX, 1, TIER_VERIFIED),
+			Err(PrivacyPoolError::ArithmeticOverflow.into())
+		);
 	}
 }

@@ -57,8 +57,11 @@ fn pina_address(pubkey: &Pubkey) -> Address {
 	Address::new_from_array(pubkey.to_bytes())
 }
 
-fn authority() -> Keypair {
-	Keypair::new_from_array([0xCA; 32])
+/// The committed bootstrap authority: the only key `Initialize` accepts.
+/// The seed is the documented fixture seed behind
+/// [`program_under_test::BOOTSTRAP_AUTHORITY`].
+fn bootstrap_authority() -> Keypair {
+	Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!")
 }
 
 fn custodian_a() -> Keypair {
@@ -176,7 +179,9 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		.await
 		.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
-	let auth = authority();
+	// Initialize as the committed bootstrap authority — the only key the
+	// program accepts — and let it double as the pool's operating authority.
+	let auth = bootstrap_authority();
 	program
 		.fund(&auth.pubkey(), 3_000_000_000)
 		.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
@@ -565,12 +570,12 @@ fn every_instruction_discriminator_is_exercised() {
 					pid,
 					&register,
 					vec![
-						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new(requesters_pda().0, false),
 					],
 				),
-				&[&authority()],
+				&[&bootstrap_authority()],
 			)
 			.unwrap_or_else(|error| panic!("register requester: {error:?}"));
 
@@ -596,12 +601,12 @@ fn every_instruction_discriminator_is_exercised() {
 					pid,
 					&rotate,
 					vec![
-						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new(custodians_pda().0, false),
 					],
 				),
-				&[&authority()],
+				&[&bootstrap_authority()],
 			)
 			.unwrap_or_else(|error| panic!("set custodians: {error:?}"));
 
@@ -740,12 +745,12 @@ fn every_instruction_discriminator_is_exercised() {
 					pid,
 					&resolve,
 					vec![
-						AccountMeta::new_readonly(authority().pubkey(), true),
+						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new(challenge_request_key, false),
 					],
 				),
-				&[&authority()],
+				&[&bootstrap_authority()],
 			)
 			.unwrap_or_else(|error| panic!("resolve challenge: {error:?}"));
 	});
@@ -884,5 +889,131 @@ fn deposit_rejects_a_substituted_vault() {
 		);
 
 		program.stop().expect("stop isolated program test");
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Audit regression (2026-09-26 deep audit)
+//
+// This test asserts the *secure* behavior. It fails on the current tree
+// because the exploit is live, and must pass once the fix lands: run with
+// `pina test --project examples/privacy_pool_program --filter audit_init_`.
+// ---------------------------------------------------------------------------
+
+/// Audit 2026-09-26, finding 1: `Initialize` has no bootstrap binding. The
+/// config, vault, tree, registries, and log are singleton PDAs derived from
+/// fixed seeds, and the first funded signer to call `Initialize` becomes the
+/// permanent, irrevocable `PoolConfig.authority` — the key that installs
+/// Groth16 verifying keys (`SetVerificationKey`), rotates the disclosure
+/// committee (`SetCustodians`), and registers compelled-disclosure requesters
+/// (`RegisterRequester`). There is no transfer or renounce path.
+///
+/// An attacker watching the deployment mempool front-runs the deployer's
+/// first `Initialize` and captures the pool. Every honest depositor's escrow
+/// and disclosure policy is then governed by the attacker:
+///
+/// 1. The attacker installs *their own* verifying keys. Because a real spend
+///    must verify against the installed key, a key the attacker generated
+///    lets them prove spends on notes they never deposited (a spend can be
+///    proven directly against the attacker's key without holding any note),
+///    or simply marks the pool unspendable for honest users.
+/// 2. The attacker registers themselves at `TIER_COMPELLED` and rotates the
+///    custodian committee to their own keys, so every tier-2 disclosure
+///    executes on their signature and the "governed, logged disclosure"
+///    guarantee becomes attacker-controlled surveillance.
+///
+/// Current behavior: the attacker's `Initialize` succeeds and the
+/// `expect_err` below fails, proving the capture is live.
+#[test]
+#[ignore = "run with pina test"]
+fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() {
+	let _guard = journey_guard();
+	pina_test::run(async {
+		let pid = program_id();
+		let mut program = ProgramTest::start(pid)
+			.await
+			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+
+		// The attacker races the intended deployer to the singleton PDAs.
+		let attacker = Keypair::new_from_array([0xA1; 32]);
+		program
+			.fund(&attacker.pubkey(), 3_000_000_000)
+			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
+
+		let (config_key, config_bump) = config_pda();
+		let (vault_key, vault_bump) = vault_pda();
+		let (tree_key, tree_bump) = tree_pda();
+		let (nullifiers_key, nullifiers_bump) = nullifiers_pda();
+		let (custodians_key, custodians_bump) = custodians_pda();
+		let (requesters_key, requesters_bump) = requesters_pda();
+		let (log_key, log_bump) = log_pda();
+
+		let mut init = vec![0_u8; InitializeIx::SIZE];
+		InitializeIx::initialize(&mut init, |ix| {
+			ix.config_bump = config_bump;
+			ix.vault_bump = vault_bump;
+			ix.tree_bump = tree_bump;
+			ix.nullifiers_bump = nullifiers_bump;
+			ix.custodians_bump = custodians_bump;
+			ix.requesters_bump = requesters_bump;
+			ix.log_bump = log_bump;
+			// The attacker names their own keys as the disclosure committee.
+			let mut committee = [0_u8; 96];
+			for (slot, _seed) in [[0xE1; 32], [0xE2; 32], [0xE3; 32]].iter().enumerate() {
+				committee[slot * 32..(slot + 1) * 32].copy_from_slice(_seed);
+			}
+			ix.custodians = committee;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("encode initialize: {error:?}"));
+
+		let error = program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&init,
+					vec![
+						AccountMeta::new(attacker.pubkey(), true),
+						AccountMeta::new(config_key, false),
+						AccountMeta::new(vault_key, false),
+						AccountMeta::new(tree_key, false),
+						AccountMeta::new(nullifiers_key, false),
+						AccountMeta::new(custodians_key, false),
+						AccountMeta::new(requesters_key, false),
+						AccountMeta::new(log_key, false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&attacker],
+			)
+			.expect_err("an unapproved signer must not capture the pool");
+
+		// The rejection must not leave any state behind: no config, no vault,
+		// no tree. A captured config with a refunded tree would leave the
+		// deployer locked out of their own pool.
+		assert!(
+			program.account(&config_key).is_err(),
+			"a rejected initialization must not create pool config state"
+		);
+		assert!(
+			program.account(&vault_key).is_err(),
+			"a rejected initialization must not create the pool vault"
+		);
+		assert!(
+			program.account(&tree_key).is_err(),
+			"a rejected initialization must not create the merkle tree"
+		);
+		assert!(
+			matches!(
+				error.transaction_error(),
+				Some(pina_test::TransactionError::InstructionError(0, _))
+			),
+			"expected an authorization rejection, got: {:?}",
+			error.transaction_error()
+		);
+
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
 	});
 }

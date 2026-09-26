@@ -72,6 +72,21 @@ fn key(seed: u8) -> Pubkey {
 	Pubkey::new_from_array(bytes)
 }
 
+/// The committed bootstrap authority, the only key `Initialize` accepts.
+///
+/// This is the ed25519 public key derived from the documented fixture seed
+/// `b"pina-pool-bootstrap-2026-09-26!!"` behind
+/// [`privacy_pool_program::BOOTSTRAP_AUTHORITY`] — the raw seed is the
+/// signing key, never the address.
+fn bootstrap_authority() -> Pubkey {
+	Pubkey::new_from_array(
+		privacy_pool_program::BOOTSTRAP_AUTHORITY
+			.as_ref()
+			.try_into()
+			.unwrap_or_else(|_| panic!("bootstrap authority must be 32 bytes")),
+	)
+}
+
 fn create_mollusk() -> Mollusk {
 	let so_name = "privacy_pool_program.so";
 	let search_dirs: Vec<std::path::PathBuf> = [
@@ -241,7 +256,7 @@ fn initialize_ix(custodians: [Pubkey; 3]) -> Instruction {
 	})
 	.unwrap_or_else(|error| panic!("initialize ix: {error:?}"));
 
-	let authority = key(1);
+	let authority = bootstrap_authority();
 	Instruction::new_with_bytes(
 		program_id(),
 		&data,
@@ -263,7 +278,7 @@ fn initialize_ix(custodians: [Pubkey; 3]) -> Instruction {
 }
 
 fn set_vkey_ix(slot: u8, wire: &prover::WireVerifyingKey) -> Instruction {
-	let authority = key(1);
+	let authority = bootstrap_authority();
 	let (config_key, _) = config_pda();
 	let (vkey_key, bump) = vkey_pda(slot);
 
@@ -314,7 +329,7 @@ fn setup_pool() -> Pool {
 	let mut mollusk = create_mollusk();
 	let mut world = World::new();
 
-	let authority = key(1);
+	let authority = bootstrap_authority();
 	world.add(
 		authority,
 		Account::new(FUND, 0, &solana_sdk_ids::system_program::id()),
@@ -631,7 +646,7 @@ fn initialize_creates_the_pool_accounts() {
 fn initialize_rejects_a_duplicate_custodian() {
 	let mut mollusk = create_mollusk();
 	let mut world = World::new();
-	let authority = key(1);
+	let authority = bootstrap_authority();
 	world.add(
 		authority,
 		Account::new(FUND, 0, &solana_sdk_ids::system_program::id()),

@@ -73,6 +73,8 @@
 		"optional_accounts_program/note": 285,
 		"optional_accounts_program/touch": 1948,
 		"privacy_pool_program/deposit": 16801,
+		"privacy_pool_program/initialize": 49265,
+		"privacy_pool_program/requestDisclosure": 11605,
 		"privacy_pool_program/withdraw": 87633,
 		"prop_amm_program/initialize": 1716,
 		"prop_amm_program/update": 313,
