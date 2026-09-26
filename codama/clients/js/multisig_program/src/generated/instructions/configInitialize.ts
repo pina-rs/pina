@@ -29,14 +29,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProgramConfigPda } from "../pdas";
 import {
@@ -141,22 +144,24 @@ export function getConfigInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ConfigInitializeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProgramConfig extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	programConfig?: Address<TAccountProgramConfig>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	programConfig?: TAccountProgramConfig;
+	systemProgram?: TAccountSystemProgram;
 	bump: ConfigInitializeInstructionDataArgs["bump"];
 	treasury: ConfigInitializeInstructionDataArgs["treasury"];
 	creationFee: ConfigInitializeInstructionDataArgs["creationFee"];
 };
 
 export async function getConfigInitializeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProgramConfig extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigInitializeAsyncInput<
@@ -168,20 +173,44 @@ export async function getConfigInitializeInstructionAsync<
 ): Promise<
 	ConfigInitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		programConfig: { value: input.programConfig ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -204,7 +233,6 @@ export async function getConfigInitializeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -217,29 +245,40 @@ export async function getConfigInitializeInstructionAsync<
 		programAddress,
 	} as ConfigInitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type ConfigInitializeInput<
-	TAccountAuthority extends string = string,
-	TAccountProgramConfig extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	programConfig: Address<TAccountProgramConfig>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	programConfig: TAccountProgramConfig;
+	systemProgram?: TAccountSystemProgram;
 	bump: ConfigInitializeInstructionDataArgs["bump"];
 	treasury: ConfigInitializeInstructionDataArgs["treasury"];
 	creationFee: ConfigInitializeInstructionDataArgs["creationFee"];
 };
 
 export function getConfigInitializeInstruction<
-	TAccountAuthority extends string,
-	TAccountProgramConfig extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigInitializeInput<
@@ -250,19 +289,43 @@ export function getConfigInitializeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ConfigInitializeInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountProgramConfig,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProgramConfig,
+		InstructionAccountInputAddress<TAccountProgramConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		programConfig: { value: input.programConfig ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -280,7 +343,6 @@ export function getConfigInitializeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -293,9 +355,18 @@ export function getConfigInitializeInstruction<
 		programAddress,
 	} as ConfigInitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProgramConfig,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

@@ -26,7 +26,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -34,7 +33,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findJournalPda } from "../pdas";
 import {
@@ -126,35 +129,56 @@ export function getWriteInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type WriteAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountJournal extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** Funds growth if a future write patch changes the encoded length. */
-	authority: TransactionSigner<TAccountAuthority>;
-	journal?: Address<TAccountJournal>;
+	authority: TAccountAuthority;
+	journal?: TAccountJournal;
 	index: WriteInstructionDataArgs["index"];
 	value: WriteInstructionDataArgs["value"];
 };
 
 export async function getWriteInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountJournal extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: WriteAsyncInput<TAccountAuthority, TAccountJournal>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal>
+	WriteInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		journal: { value: input.journal ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		journal: {
+			value: input.journal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -174,7 +198,6 @@ export async function getWriteInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -184,37 +207,68 @@ export async function getWriteInstructionAsync<
 			args as WriteInstructionDataArgs,
 		),
 		programAddress,
-	} as WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal>);
+	} as WriteInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>
+	>);
 }
 
 export type WriteInput<
-	TAccountAuthority extends string = string,
-	TAccountJournal extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** Funds growth if a future write patch changes the encoded length. */
-	authority: TransactionSigner<TAccountAuthority>;
-	journal: Address<TAccountJournal>;
+	authority: TAccountAuthority;
+	journal: TAccountJournal;
 	index: WriteInstructionDataArgs["index"];
 	value: WriteInstructionDataArgs["value"];
 };
 
 export function getWriteInstruction<
-	TAccountAuthority extends string,
-	TAccountJournal extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: WriteInput<TAccountAuthority, TAccountJournal>,
 	config?: { programAddress?: TProgramAddress },
-): WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal> {
+): WriteInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountJournal,
+		InstructionAccountInputAddress<TAccountJournal>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		journal: { value: input.journal ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		journal: {
+			value: input.journal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -224,7 +278,6 @@ export function getWriteInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -234,7 +287,17 @@ export function getWriteInstruction<
 			args as WriteInstructionDataArgs,
 		),
 		programAddress,
-	} as WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal>);
+	} as WriteInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>
+	>);
 }
 
 export type ParsedWriteInstruction<

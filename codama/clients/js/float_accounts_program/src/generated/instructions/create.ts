@@ -30,13 +30,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -132,21 +135,22 @@ export function getCreateInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CreateInput<
-	TAccountAccount extends string = string,
-	TAccountAuthority extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAccount extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	account: Address<TAccountAccount>;
-	authority: TransactionSigner<TAccountAuthority>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	account: TAccountAccount;
+	authority: TAccountAuthority;
+	systemProgram?: TAccountSystemProgram;
 	dataF32: CreateInstructionDataArgs["dataF32"];
 	dataF64: CreateInstructionDataArgs["dataF64"];
 };
 
 export function getCreateInstruction<
-	TAccountAccount extends string,
-	TAccountAuthority extends string,
-	TAccountSystemProgram extends string,
+	TAccountAccount extends InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -154,19 +158,43 @@ export function getCreateInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): CreateInstruction<
 	TProgramAddress,
-	TAccountAccount,
-	TAccountAuthority,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAccount,
+		InstructionAccountInputAddress<TAccountAccount>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		account: { value: input.account ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		account: {
+			value: input.account ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -184,7 +212,6 @@ export function getCreateInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("account", accounts.account),
@@ -197,9 +224,18 @@ export function getCreateInstruction<
 		programAddress,
 	} as CreateInstruction<
 		TProgramAddress,
-		TAccountAccount,
-		TAccountAuthority,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAccount,
+			InstructionAccountInputAddress<TAccountAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

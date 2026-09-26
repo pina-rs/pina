@@ -28,13 +28,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -132,21 +135,22 @@ export function getRegisterRequesterInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RegisterRequesterInput<
-	TAccountAuthority extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountRequesterRegistry extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	poolConfig: Address<TAccountPoolConfig>;
-	requesterRegistry: Address<TAccountRequesterRegistry>;
+	authority: TAccountAuthority;
+	poolConfig: TAccountPoolConfig;
+	requesterRegistry: TAccountRequesterRegistry;
 	requester: RegisterRequesterInstructionDataArgs["requester"];
 	maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
 };
 
 export function getRegisterRequesterInstruction<
-	TAccountAuthority extends string,
-	TAccountPoolConfig extends string,
-	TAccountRequesterRegistry extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RegisterRequesterInput<
@@ -157,20 +161,41 @@ export function getRegisterRequesterInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): RegisterRequesterInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountPoolConfig,
-	TAccountRequesterRegistry
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRequesterRegistry,
+		InstructionAccountInputAddress<TAccountRequesterRegistry>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 		requesterRegistry: {
 			value: input.requesterRegistry ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
 	};
@@ -182,7 +207,6 @@ export function getRegisterRequesterInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -195,9 +219,18 @@ export function getRegisterRequesterInstruction<
 		programAddress,
 	} as RegisterRequesterInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountRequesterRegistry
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
 	>);
 }
 

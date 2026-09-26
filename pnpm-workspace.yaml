@@ -17,7 +17,6 @@ audit:
   level: moderate
 
 minimumReleaseAgeExclude:
-  - codama-renderers-dart@0.5.5
   - "@pina-rs/cli-darwin-arm64@0.13.0 || 0.14.0"
   - "@pina-rs/cli-darwin-x64@0.13.0 || 0.14.0"
   - "@pina-rs/cli-freebsd-x64@0.13.0 || 0.14.0"
@@ -28,6 +27,10 @@ minimumReleaseAgeExclude:
   - "@pina-rs/cli-win32-arm64-msvc@0.13.0 || 0.14.0"
   - "@pina-rs/cli-win32-x64-msvc@0.13.0 || 0.14.0"
   - "@pina-rs/cli@0.13.0 || 0.14.0"
+  - "@solana/surfpool-darwin-arm64@1.6.0"
+  - "@solana/surfpool-darwin-x64@1.6.0"
+  - "@solana/surfpool-linux-x64-gnu@1.6.0"
+  - "@solana/surfpool@1.6.0"
 
 onlyBuiltDependencies:
   - esbuild

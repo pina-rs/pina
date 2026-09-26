@@ -38,14 +38,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findPolicyPda } from "../pdas";
 import {
@@ -172,26 +175,27 @@ export function getCheckPolicyInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CheckPolicyAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountPolicy extends string = string,
-	TAccountAudit extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAudit extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	policy?: Address<TAccountPolicy>;
+	authority: TAccountAuthority;
+	policy?: TAccountPolicy;
 	/** A shared account may still require the transaction's writable flag. */
-	audit: Address<TAccountAudit>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	audit: TAccountAudit;
+	systemProgram?: TAccountSystemProgram;
 	amount: CheckPolicyInstructionDataArgs["amount"];
 	memo: CheckPolicyInstructionDataArgs["memo"];
 	approvals: CheckPolicyInstructionDataArgs["approvals"];
 };
 
 export async function getCheckPolicyInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountPolicy extends string,
-	TAccountAudit extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPolicy extends InstructionAccountInput,
+	TAccountAudit extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CheckPolicyAsyncInput<
@@ -204,22 +208,45 @@ export async function getCheckPolicyInstructionAsync<
 ): Promise<
 	CheckPolicyInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPolicy,
-		TAccountAudit,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPolicy,
+			InstructionAccountInputAddress<TAccountPolicy>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAudit,
+			InstructionAccountInputAddress<TAccountAudit>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		policy: { value: input.policy ?? null, isWritable: false },
-		audit: { value: input.audit ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
+		audit: { value: input.audit ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -245,7 +272,6 @@ export async function getCheckPolicyInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -259,34 +285,47 @@ export async function getCheckPolicyInstructionAsync<
 		programAddress,
 	} as CheckPolicyInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPolicy,
-		TAccountAudit,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPolicy,
+			InstructionAccountInputAddress<TAccountPolicy>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAudit,
+			InstructionAccountInputAddress<TAccountAudit>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type CheckPolicyInput<
-	TAccountAuthority extends string = string,
-	TAccountPolicy extends string = string,
-	TAccountAudit extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAudit extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	policy: Address<TAccountPolicy>;
+	authority: TAccountAuthority;
+	policy: TAccountPolicy;
 	/** A shared account may still require the transaction's writable flag. */
-	audit: Address<TAccountAudit>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	audit: TAccountAudit;
+	systemProgram?: TAccountSystemProgram;
 	amount: CheckPolicyInstructionDataArgs["amount"];
 	memo: CheckPolicyInstructionDataArgs["memo"];
 	approvals: CheckPolicyInstructionDataArgs["approvals"];
 };
 
 export function getCheckPolicyInstruction<
-	TAccountAuthority extends string,
-	TAccountPolicy extends string,
-	TAccountAudit extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPolicy extends InstructionAccountInput,
+	TAccountAudit extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof VALIDATION_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CheckPolicyInput<
@@ -298,21 +337,44 @@ export function getCheckPolicyInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): CheckPolicyInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountPolicy,
-	TAccountAudit,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPolicy,
+		InstructionAccountInputAddress<TAccountPolicy>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAudit,
+		InstructionAccountInputAddress<TAccountAudit>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		VALIDATION_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		policy: { value: input.policy ?? null, isWritable: false },
-		audit: { value: input.audit ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
+		audit: { value: input.audit ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -330,7 +392,6 @@ export function getCheckPolicyInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -344,10 +405,22 @@ export function getCheckPolicyInstruction<
 		programAddress,
 	} as CheckPolicyInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPolicy,
-		TAccountAudit,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPolicy,
+			InstructionAccountInputAddress<TAccountPolicy>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAudit,
+			InstructionAccountInputAddress<TAccountAudit>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

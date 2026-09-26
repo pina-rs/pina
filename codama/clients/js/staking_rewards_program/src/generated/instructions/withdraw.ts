@@ -28,13 +28,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -140,35 +143,39 @@ export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type WithdrawInput<
-	TAccountUser extends string = string,
-	TAccountStakeMint extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountPositionState extends string = string,
-	TAccountUserStakeAta extends string = string,
-	TAccountStakeVault extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPositionState extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountUserStakeAta extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	user: TransactionSigner<TAccountUser>;
-	stakeMint: Address<TAccountStakeMint>;
-	poolState: Address<TAccountPoolState>;
-	positionState: Address<TAccountPositionState>;
-	userStakeAta: Address<TAccountUserStakeAta>;
-	stakeVault: Address<TAccountStakeVault>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	user: TAccountUser;
+	stakeMint: TAccountStakeMint;
+	poolState: TAccountPoolState;
+	positionState: TAccountPositionState;
+	userStakeAta: TAccountUserStakeAta;
+	stakeVault: TAccountStakeVault;
+	tokenProgram: TAccountTokenProgram;
+	systemProgram?: TAccountSystemProgram;
 	amount: WithdrawInstructionDataArgs["amount"];
 };
 
 export function getWithdrawInstruction<
-	TAccountUser extends string,
-	TAccountStakeMint extends string,
-	TAccountPoolState extends string,
-	TAccountPositionState extends string,
-	TAccountUserStakeAta extends string,
-	TAccountStakeVault extends string,
-	TAccountTokenProgram extends string,
-	TAccountSystemProgram extends string,
+	TAccountUser extends InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput,
+	TAccountPositionState extends InstructionAccountInput,
+	TAccountUserStakeAta extends InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -185,29 +192,84 @@ export function getWithdrawInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): WithdrawInstruction<
 	TProgramAddress,
-	TAccountUser,
-	TAccountStakeMint,
-	TAccountPoolState,
-	TAccountPositionState,
-	TAccountUserStakeAta,
-	TAccountStakeVault,
-	TAccountTokenProgram,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountUser,
+		InstructionAccountInputAddress<TAccountUser>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStakeMint,
+		InstructionAccountInputAddress<TAccountStakeMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolState,
+		InstructionAccountInputAddress<TAccountPoolState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPositionState,
+		InstructionAccountInputAddress<TAccountPositionState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountUserStakeAta,
+		InstructionAccountInputAddress<TAccountUserStakeAta>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStakeVault,
+		InstructionAccountInputAddress<TAccountStakeVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
-		stakeMint: { value: input.stakeMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
-		positionState: { value: input.positionState ?? null, isWritable: true },
-		userStakeAta: { value: input.userStakeAta ?? null, isWritable: true },
-		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		user: { value: input.user ?? null, isSigner: true, isWritable: false },
+		stakeMint: {
+			value: input.stakeMint ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		poolState: {
+			value: input.poolState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		positionState: {
+			value: input.positionState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		userStakeAta: {
+			value: input.userStakeAta ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		stakeVault: {
+			value: input.stakeVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -225,7 +287,6 @@ export function getWithdrawInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("user", accounts.user),
@@ -243,14 +304,38 @@ export function getWithdrawInstruction<
 		programAddress,
 	} as WithdrawInstruction<
 		TProgramAddress,
-		TAccountUser,
-		TAccountStakeMint,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountUserStakeAta,
-		TAccountStakeVault,
-		TAccountTokenProgram,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountUser,
+			InstructionAccountInputAddress<TAccountUser>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeMint,
+			InstructionAccountInputAddress<TAccountStakeMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPositionState,
+			InstructionAccountInputAddress<TAccountPositionState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountUserStakeAta,
+			InstructionAccountInputAddress<TAccountUserStakeAta>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeVault,
+			InstructionAccountInputAddress<TAccountStakeVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

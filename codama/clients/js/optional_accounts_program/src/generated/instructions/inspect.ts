@@ -26,12 +26,15 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -118,22 +121,22 @@ export function getInspectInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InspectInput<
-	TAccountAuthority extends string = string,
-	TAccountStore extends string = string,
-	TAccountWitness extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountStore extends InstructionAccountInput = InstructionAccountInput,
+	TAccountWitness extends InstructionSignerInput = InstructionSignerInput,
 > = {
 	/** The transaction fee payer; always required. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** When present, must be the caller's store PDA. */
-	store?: Address<TAccountStore>;
+	store?: TAccountStore;
 	/** When present, must have signed the transaction. */
-	witness?: TransactionSigner<TAccountWitness>;
+	witness?: TAccountWitness;
 };
 
 export function getInspectInstruction<
-	TAccountAuthority extends string,
-	TAccountStore extends string,
-	TAccountWitness extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountStore extends InstructionAccountInput,
+	TAccountWitness extends InstructionSignerInput,
 	TProgramAddress extends Address =
 		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -141,26 +144,45 @@ export function getInspectInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): InspectInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountStore,
-	TAccountWitness
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStore,
+		InstructionAccountInputAddress<TAccountStore>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountWitness,
+		InstructionAccountInputAddress<TAccountWitness>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		store: { value: input.store ?? null, isWritable: false },
-		witness: { value: input.witness ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		store: { value: input.store ?? null, isSigner: false, isWritable: false },
+		witness: {
+			value: input.witness ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -171,9 +193,18 @@ export function getInspectInstruction<
 		programAddress,
 	} as InspectInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountStore,
-		TAccountWitness
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStore,
+			InstructionAccountInputAddress<TAccountStore>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountWitness,
+			InstructionAccountInputAddress<TAccountWitness>
+		>
 	>);
 }
 

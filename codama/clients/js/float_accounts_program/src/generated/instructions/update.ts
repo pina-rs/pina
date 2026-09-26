@@ -29,13 +29,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -126,32 +129,53 @@ export function getUpdateInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type UpdateInput<
-	TAccountAccount extends string = string,
-	TAccountAuthority extends string = string,
+	TAccountAccount extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
-	account: Address<TAccountAccount>;
-	authority: TransactionSigner<TAccountAuthority>;
+	account: TAccountAccount;
+	authority: TAccountAuthority;
 	dataF32: UpdateInstructionDataArgs["dataF32"];
 	dataF64: UpdateInstructionDataArgs["dataF64"];
 };
 
 export function getUpdateInstruction<
-	TAccountAccount extends string,
-	TAccountAuthority extends string,
+	TAccountAccount extends InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput,
 	TProgramAddress extends Address =
 		typeof FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateInput<TAccountAccount, TAccountAuthority>,
 	config?: { programAddress?: TProgramAddress },
-): UpdateInstruction<TProgramAddress, TAccountAccount, TAccountAuthority> {
+): UpdateInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAccount,
+		InstructionAccountInputAddress<TAccountAccount>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		FLOAT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		account: { value: input.account ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
+		account: {
+			value: input.account ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -161,7 +185,6 @@ export function getUpdateInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("account", accounts.account),
@@ -171,7 +194,17 @@ export function getUpdateInstruction<
 			args as UpdateInstructionDataArgs,
 		),
 		programAddress,
-	} as UpdateInstruction<TProgramAddress, TAccountAccount, TAccountAuthority>);
+	} as UpdateInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAccount,
+			InstructionAccountInputAddress<TAccountAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>
+	>);
 }
 
 export type ParsedUpdateInstruction<

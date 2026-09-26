@@ -25,12 +25,14 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -107,41 +109,57 @@ export function getHelloInstructionDataCodec(): FixedSizeCodec<
 	);
 }
 
-export type HelloInput<TAccountUser extends string = string> = {
+export type HelloInput<
+	TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+> = {
 	/**
 	 * The user invoking the program. Must be a signer so we can trust the
 	 * address is authentic.
 	 */
-	user: TransactionSigner<TAccountUser>;
+	user: TAccountUser;
 };
 
 export function getHelloInstruction<
-	TAccountUser extends string,
+	TAccountUser extends InstructionSignerInput,
 	TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: HelloInput<TAccountUser>,
 	config?: { programAddress?: TProgramAddress },
-): HelloInstruction<TProgramAddress, TAccountUser> {
+): HelloInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountUser,
+		InstructionAccountInputAddress<TAccountUser>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
+		user: { value: input.user ?? null, isSigner: true, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze(
 		{
 			accounts: [getAccountMeta("user", accounts.user)],
 			data: getHelloInstructionDataEncoder().encode({}),
 			programAddress,
-		} as HelloInstruction<TProgramAddress, TAccountUser>,
+		} as HelloInstruction<
+			TProgramAddress,
+			ResolvedInstructionAccountMeta<
+				TAccountUser,
+				InstructionAccountInputAddress<TAccountUser>
+			>
+		>,
 	);
 }
 

@@ -31,7 +31,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -39,7 +38,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import {
@@ -154,28 +157,29 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/**
 	 * The wallet creating the profile. Pays for account creation and becomes
 	 * the authority whose address seeds the PDA.
 	 */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must be empty — not yet created). */
-	profile?: Address<TAccountProfile>;
+	profile?: TAccountProfile;
 	/** The system program, required for `CreateAccount` CPI. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 	name: InitializeInstructionDataArgs["name"];
 	bio: InitializeInstructionDataArgs["bio"];
 };
 
 export async function getInitializeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeAsyncInput<
@@ -187,20 +191,44 @@ export async function getInitializeInstructionAsync<
 ): Promise<
 	InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		profile: { value: input.profile ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -226,7 +254,6 @@ export async function getInitializeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -239,35 +266,45 @@ export async function getInitializeInstructionAsync<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type InitializeInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/**
 	 * The wallet creating the profile. Pays for account creation and becomes
 	 * the authority whose address seeds the PDA.
 	 */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must be empty — not yet created). */
-	profile: Address<TAccountProfile>;
+	profile: TAccountProfile;
 	/** The system program, required for `CreateAccount` CPI. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 	name: InitializeInstructionDataArgs["name"];
 	bio: InitializeInstructionDataArgs["bio"];
 };
 
 export function getInitializeInstruction<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<
@@ -278,19 +315,43 @@ export function getInitializeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountProfile,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProfile,
+		InstructionAccountInputAddress<TAccountProfile>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		profile: { value: input.profile ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -308,7 +369,6 @@ export function getInitializeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -321,9 +381,18 @@ export function getInitializeInstruction<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

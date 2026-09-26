@@ -26,14 +26,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findCounterPda } from "../pdas";
 import {
@@ -123,26 +126,27 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountCounter extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/**
 	 * The wallet creating the counter. Pays for account creation and becomes
 	 * the authority whose address seeds the PDA.
 	 */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The counter PDA account (must be empty — not yet created). */
-	counter?: Address<TAccountCounter>;
+	counter?: TAccountCounter;
 	/** The system program, required for `CreateAccount` CPI. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 };
 
 export async function getInitializeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountCounter extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeAsyncInput<
@@ -154,20 +158,44 @@ export async function getInitializeInstructionAsync<
 ): Promise<
 	InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountCounter,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		counter: { value: input.counter ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		counter: {
+			value: input.counter ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -193,7 +221,6 @@ export async function getInitializeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -206,33 +233,43 @@ export async function getInitializeInstructionAsync<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountCounter,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type InitializeInput<
-	TAccountAuthority extends string = string,
-	TAccountCounter extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/**
 	 * The wallet creating the counter. Pays for account creation and becomes
 	 * the authority whose address seeds the PDA.
 	 */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The counter PDA account (must be empty — not yet created). */
-	counter: Address<TAccountCounter>;
+	counter: TAccountCounter;
 	/** The system program, required for `CreateAccount` CPI. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 };
 
 export function getInitializeInstruction<
-	TAccountAuthority extends string,
-	TAccountCounter extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<
@@ -243,19 +280,43 @@ export function getInitializeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountCounter,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCounter,
+		InstructionAccountInputAddress<TAccountCounter>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		counter: { value: input.counter ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		counter: {
+			value: input.counter ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -273,7 +334,6 @@ export function getInitializeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -286,9 +346,18 @@ export function getInitializeInstruction<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountCounter,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

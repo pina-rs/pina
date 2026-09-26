@@ -28,13 +28,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -127,20 +130,21 @@ export function getForwardRotateWithSignerInstructionDataCodec(): FixedSizeCodec
 }
 
 export type ForwardRotateWithSignerInput<
-	TAccountOracle extends string = string,
-	TAccountAuthority extends string = string,
-	TAccountPropAmmProgram extends string = string,
+	TAccountOracle extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPropAmmProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	oracle: Address<TAccountOracle>;
-	authority: TransactionSigner<TAccountAuthority>;
-	propAmmProgram: Address<TAccountPropAmmProgram>;
+	oracle: TAccountOracle;
+	authority: TAccountAuthority;
+	propAmmProgram: TAccountPropAmmProgram;
 	newAuthority: ForwardRotateWithSignerInstructionDataArgs["newAuthority"];
 };
 
 export function getForwardRotateWithSignerInstruction<
-	TAccountOracle extends string,
-	TAccountAuthority extends string,
-	TAccountPropAmmProgram extends string,
+	TAccountOracle extends InstructionAccountInput,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPropAmmProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ForwardRotateWithSignerInput<
@@ -151,19 +155,39 @@ export function getForwardRotateWithSignerInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ForwardRotateWithSignerInstruction<
 	TProgramAddress,
-	TAccountOracle,
-	TAccountAuthority,
-	TAccountPropAmmProgram
+	ResolvedInstructionAccountMeta<
+		TAccountOracle,
+		InstructionAccountInputAddress<TAccountOracle>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPropAmmProgram,
+		InstructionAccountInputAddress<TAccountPropAmmProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		oracle: { value: input.oracle ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
-		propAmmProgram: { value: input.propAmmProgram ?? null, isWritable: false },
+		oracle: { value: input.oracle ?? null, isSigner: false, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		propAmmProgram: {
+			value: input.propAmmProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -173,7 +197,6 @@ export function getForwardRotateWithSignerInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("oracle", accounts.oracle),
@@ -186,9 +209,18 @@ export function getForwardRotateWithSignerInstruction<
 		programAddress,
 	} as ForwardRotateWithSignerInstruction<
 		TProgramAddress,
-		TAccountOracle,
-		TAccountAuthority,
-		TAccountPropAmmProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOracle,
+			InstructionAccountInputAddress<TAccountOracle>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPropAmmProgram,
+			InstructionAccountInputAddress<TAccountPropAmmProgram>
+		>
 	>);
 }
 

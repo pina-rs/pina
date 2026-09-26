@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import {
@@ -119,34 +122,55 @@ export function getRemoveTagInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RemoveTagAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile?: Address<TAccountProfile>;
+	profile?: TAccountProfile;
 	index: RemoveTagInstructionDataArgs["index"];
 };
 
 export async function getRemoveTagInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RemoveTagAsyncInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	RemoveTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>
+	RemoveTagInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -166,7 +190,6 @@ export async function getRemoveTagInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -178,38 +201,65 @@ export async function getRemoveTagInstructionAsync<
 		programAddress,
 	} as RemoveTagInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
 	>);
 }
 
 export type RemoveTagInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile: Address<TAccountProfile>;
+	profile: TAccountProfile;
 	index: RemoveTagInstructionDataArgs["index"];
 };
 
 export function getRemoveTagInstruction<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RemoveTagInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
-): RemoveTagInstruction<TProgramAddress, TAccountAuthority, TAccountProfile> {
+): RemoveTagInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProfile,
+		InstructionAccountInputAddress<TAccountProfile>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -219,7 +269,6 @@ export function getRemoveTagInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -231,8 +280,14 @@ export function getRemoveTagInstruction<
 		programAddress,
 	} as RemoveTagInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
 	>);
 }
 

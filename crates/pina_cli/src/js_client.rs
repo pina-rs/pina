@@ -13,7 +13,18 @@ use crate::compact_capacity::CompactCapacityKind;
 use crate::error::CodamaError;
 use crate::js_events::emit_js_event_log_module;
 
-const HELPER_IMPORT_PREFIX: &str = "import { ";
+/// The opening of the first import statement, as rendered by `@codama/renderers-js`.
+///
+/// The renderer emits either a single-line `import { a, b } from "..."` or a
+/// multi-line `import {\n...` block depending on how many names it lists, so
+/// both shapes have to be recognisable. [`helper_import_offset`] finds the
+/// start of the first import either way.
+const HELPER_IMPORT_PREFIX: &str = "import {";
+
+/// Index at which a `../pinaPodCodecs` helper import can be inserted.
+fn helper_import_offset(source: &str) -> Option<usize> {
+	source.find(HELPER_IMPORT_PREFIX)
+}
 const HELPER_MODULE: &str = r#"/**
  * Runtime validation for Pina's PinaPod wire types.
  *
@@ -621,13 +632,30 @@ fn harden_codec_source_with_capacities(
 		"import {{ {} }} from \"../pinaPodCodecs\";\n",
 		helpers.join(", ")
 	);
-	if !hardened.contains("from \"../pinaPodCodecs\"")
-		&& let Some(offset) = hardened.find(HELPER_IMPORT_PREFIX)
-	{
+	// A file may already carry an import from an earlier render, and the
+	// helper set can differ between renders. Replace it rather than trusting
+	// it, so the emitted import always matches the calls the file makes.
+	if let Some(existing) = pina_pod_codecs_import(&hardened) {
+		hardened.replace_range(existing, &import);
+	} else if let Some(offset) = helper_import_offset(&hardened) {
 		hardened.insert_str(offset, &import);
 	}
 
 	hardened
+}
+
+/// The byte range of an existing `../pinaPodCodecs` import statement,
+/// including its trailing newline so a replacement leaves no blank line.
+fn pina_pod_codecs_import(source: &str) -> Option<std::ops::Range<usize>> {
+	let module = "from \"../pinaPodCodecs\"";
+	let module_end = source.find(module)?;
+	let start = source[..module_end].rfind("import {")?;
+
+	let line_end = source[module_end..]
+		.find('\n')
+		.map_or(source.len(), |offset| module_end + offset + 1);
+
+	Some(start..line_end)
 }
 
 fn harden_dynamic_option_prefix_call(
@@ -973,11 +1001,11 @@ fn ensure_kit_import(source: &str, name: &str) -> String {
 		return source.to_owned();
 	}
 
-	let Some(offset) = source.find(HELPER_IMPORT_PREFIX) else {
+	let Some(offset) = source.find("import { ") else {
 		return source.to_owned();
 	};
 	let mut output = source.to_owned();
-	output.insert_str(offset + HELPER_IMPORT_PREFIX.len(), &format!("{name}, "));
+	output.insert_str(offset + "import { ".len(), &format!("{name}, "));
 	output
 }
 
@@ -1140,6 +1168,60 @@ const decoder = getStructDecoder([["discriminator", getU8Decoder()], ["name", fi
 			"getPinaPodDiscriminatorDecoder(PROFILE_STATE_DISCRIMINATOR, getU8Decoder())"
 		));
 		assert!(hardened.contains("from \"../pinaPodCodecs\""));
+	}
+
+	/// `@codama/renderers-js` emits a multi-line import block once it lists
+	/// several names, and the hardening pass used to look for the single-line
+	/// `import { ` form only. Its helper import was then never inserted,
+	/// leaving calls to undefined decoders in the generated client.
+	#[test]
+	fn helper_imports_reach_a_multiline_import_block() {
+		let source = r#"/** generated */
+import {
+	type ReadonlyUint8Array,
+	getU8Decoder,
+	getU8Encoder,
+} from "@solana/kit";
+export const STATE_DISCRIMINATOR = 1;
+const decoder = getStructDecoder([["discriminator", getU8Decoder()]]);
+"#;
+
+		let hardened = harden_codec_source(source);
+
+		assert!(
+			hardened
+				.contains("import { getPinaPodDiscriminatorDecoder } from \"../pinaPodCodecs\";"),
+			"the helper import must be inserted into a multi-line import block:\n{hardened}"
+		);
+		assert!(hardened.contains("from \"../pinaPodCodecs\";"));
+	}
+
+	/// A regenerated file can carry an import from the previous render, whose
+	/// helper set may no longer match the calls the new sources make.
+	#[test]
+	fn stale_helper_imports_are_replaced() {
+		let source = r#"/** generated */
+import { getU8Decoder } from "@solana/kit";
+import { getPinaPodBooleanDecoder } from "../pinaPodCodecs";
+export const STATE_DISCRIMINATOR = 1;
+const decoder = getStructDecoder([["discriminator", getU8Decoder()]]);
+"#;
+
+		let hardened = harden_codec_source(source);
+		let imports = hardened.matches("from \"../pinaPodCodecs\"").count();
+
+		assert_eq!(
+			imports, 1,
+			"exactly one helper import must remain:\n{hardened}"
+		);
+		assert!(
+			hardened.contains("getPinaPodDiscriminatorDecoder"),
+			"the replacement must list the helpers the file now uses:\n{hardened}"
+		);
+		assert!(
+			!hardened.contains("getPinaPodBooleanDecoder"),
+			"a helper the file no longer uses must not be imported:\n{hardened}"
+		);
 	}
 
 	#[test]

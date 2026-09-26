@@ -26,13 +26,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -118,19 +121,20 @@ export function getRotateAdminInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RotateAdminInput<
-	TAccountAdmin extends string = string,
-	TAccountNewAdmin extends string = string,
-	TAccountRegistryConfig extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountNewAdmin extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRegistryConfig extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	newAdmin: Address<TAccountNewAdmin>;
-	registryConfig: Address<TAccountRegistryConfig>;
+	admin: TAccountAdmin;
+	newAdmin: TAccountNewAdmin;
+	registryConfig: TAccountRegistryConfig;
 };
 
 export function getRotateAdminInstruction<
-	TAccountAdmin extends string,
-	TAccountNewAdmin extends string,
-	TAccountRegistryConfig extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountNewAdmin extends InstructionAccountInput,
+	TAccountRegistryConfig extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -142,26 +146,45 @@ export function getRotateAdminInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): RotateAdminInstruction<
 	TProgramAddress,
-	TAccountAdmin,
-	TAccountNewAdmin,
-	TAccountRegistryConfig
+	ResolvedInstructionAccountMeta<
+		TAccountAdmin,
+		InstructionAccountInputAddress<TAccountAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNewAdmin,
+		InstructionAccountInputAddress<TAccountNewAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRegistryConfig,
+		InstructionAccountInputAddress<TAccountRegistryConfig>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
-		newAdmin: { value: input.newAdmin ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+		newAdmin: {
+			value: input.newAdmin ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		registryConfig: {
+			value: input.registryConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -172,9 +195,18 @@ export function getRotateAdminInstruction<
 		programAddress,
 	} as RotateAdminInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountNewAdmin,
-		TAccountRegistryConfig
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNewAdmin,
+			InstructionAccountInputAddress<TAccountNewAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRegistryConfig,
+			InstructionAccountInputAddress<TAccountRegistryConfig>
+		>
 	>);
 }
 

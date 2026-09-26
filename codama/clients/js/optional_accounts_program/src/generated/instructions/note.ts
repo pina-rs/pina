@@ -26,12 +26,15 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -113,39 +116,55 @@ export function getNoteInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type NoteInput<
-	TAccountAuthority extends string = string,
-	TAccountNote extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountNote extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The transaction fee payer; always required. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** An arbitrary readonly account attached as context. */
-	note?: Address<TAccountNote>;
+	note?: TAccountNote;
 };
 
 export function getNoteInstruction<
-	TAccountAuthority extends string,
-	TAccountNote extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountNote extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: NoteInput<TAccountAuthority, TAccountNote>,
 	config?: { programAddress?: TProgramAddress },
-): NoteInstruction<TProgramAddress, TAccountAuthority, TAccountNote> {
+): NoteInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNote,
+		InstructionAccountInputAddress<TAccountNote>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		note: { value: input.note ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		note: { value: input.note ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze(
 		{
 			accounts: [
@@ -154,7 +173,17 @@ export function getNoteInstruction<
 			],
 			data: getNoteInstructionDataEncoder().encode({}),
 			programAddress,
-		} as NoteInstruction<TProgramAddress, TAccountAuthority, TAccountNote>,
+		} as NoteInstruction<
+			TProgramAddress,
+			ResolvedInstructionAccountMeta<
+				TAccountAuthority,
+				InstructionAccountInputAddress<TAccountAuthority>
+			>,
+			ResolvedInstructionAccountMeta<
+				TAccountNote,
+				InstructionAccountInputAddress<TAccountNote>
+			>
+		>,
 	);
 }
 

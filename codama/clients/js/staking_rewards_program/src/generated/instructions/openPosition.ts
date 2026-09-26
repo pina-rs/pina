@@ -25,14 +25,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -127,23 +130,25 @@ export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type OpenPositionInput<
-	TAccountUser extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountPositionState extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPositionState extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	user: TransactionSigner<TAccountUser>;
-	poolState: Address<TAccountPoolState>;
-	positionState: Address<TAccountPositionState>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	user: TAccountUser;
+	poolState: TAccountPoolState;
+	positionState: TAccountPositionState;
+	systemProgram?: TAccountSystemProgram;
 	bump: OpenPositionInstructionDataArgs["bump"];
 };
 
 export function getOpenPositionInstruction<
-	TAccountUser extends string,
-	TAccountPoolState extends string,
-	TAccountPositionState extends string,
-	TAccountSystemProgram extends string,
+	TAccountUser extends InstructionSignerInput,
+	TAccountPoolState extends InstructionAccountInput,
+	TAccountPositionState extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -156,21 +161,48 @@ export function getOpenPositionInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): OpenPositionInstruction<
 	TProgramAddress,
-	TAccountUser,
-	TAccountPoolState,
-	TAccountPositionState,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountUser,
+		InstructionAccountInputAddress<TAccountUser>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolState,
+		InstructionAccountInputAddress<TAccountPoolState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPositionState,
+		InstructionAccountInputAddress<TAccountPositionState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: true },
-		poolState: { value: input.poolState ?? null, isWritable: false },
-		positionState: { value: input.positionState ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		user: { value: input.user ?? null, isSigner: true, isWritable: true },
+		poolState: {
+			value: input.poolState ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		positionState: {
+			value: input.positionState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -188,7 +220,6 @@ export function getOpenPositionInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("user", accounts.user),
@@ -202,10 +233,22 @@ export function getOpenPositionInstruction<
 		programAddress,
 	} as OpenPositionInstruction<
 		TProgramAddress,
-		TAccountUser,
-		TAccountPoolState,
-		TAccountPositionState,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountUser,
+			InstructionAccountInputAddress<TAccountUser>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPositionState,
+			InstructionAccountInputAddress<TAccountPositionState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

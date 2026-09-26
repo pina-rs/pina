@@ -25,7 +25,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -33,7 +32,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findJournalPda } from "../pdas";
 import {
@@ -130,22 +133,23 @@ export function getResizeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ResizeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountJournal extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/** Funds growth and receives the rent refund from shrinking. */
-	authority: TransactionSigner<TAccountAuthority>;
-	journal?: Address<TAccountJournal>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	journal?: TAccountJournal;
+	systemProgram?: TAccountSystemProgram;
 	entryCount: ResizeInstructionDataArgs["entryCount"];
 	markerCount: ResizeInstructionDataArgs["markerCount"];
 };
 
 export async function getResizeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountJournal extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -158,20 +162,44 @@ export async function getResizeInstructionAsync<
 ): Promise<
 	ResizeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		journal: { value: input.journal ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		journal: {
+			value: input.journal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -197,7 +225,6 @@ export async function getResizeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -210,29 +237,39 @@ export async function getResizeInstructionAsync<
 		programAddress,
 	} as ResizeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type ResizeInput<
-	TAccountAuthority extends string = string,
-	TAccountJournal extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/** Funds growth and receives the rent refund from shrinking. */
-	authority: TransactionSigner<TAccountAuthority>;
-	journal: Address<TAccountJournal>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	journal: TAccountJournal;
+	systemProgram?: TAccountSystemProgram;
 	entryCount: ResizeInstructionDataArgs["entryCount"];
 	markerCount: ResizeInstructionDataArgs["markerCount"];
 };
 
 export function getResizeInstruction<
-	TAccountAuthority extends string,
-	TAccountJournal extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountJournal extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -240,19 +277,43 @@ export function getResizeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ResizeInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountJournal,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountJournal,
+		InstructionAccountInputAddress<TAccountJournal>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		journal: { value: input.journal ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		journal: {
+			value: input.journal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -270,7 +331,6 @@ export function getResizeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -283,9 +343,18 @@ export function getResizeInstruction<
 		programAddress,
 	} as ResizeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountJournal,
+			InstructionAccountInputAddress<TAccountJournal>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

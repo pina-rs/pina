@@ -28,7 +28,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -112,19 +115,20 @@ export function getSysvarsInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type SysvarsInput<
-	TAccountClock extends string = string,
-	TAccountRent extends string = string,
-	TAccountStakeHistory extends string = string,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRent extends InstructionAccountInput = InstructionAccountInput,
+	TAccountStakeHistory extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	clock: Address<TAccountClock>;
-	rent: Address<TAccountRent>;
-	stakeHistory: Address<TAccountStakeHistory>;
+	clock: TAccountClock;
+	rent: TAccountRent;
+	stakeHistory: TAccountStakeHistory;
 };
 
 export function getSysvarsInstruction<
-	TAccountClock extends string,
-	TAccountRent extends string,
-	TAccountStakeHistory extends string,
+	TAccountClock extends InstructionAccountInput,
+	TAccountRent extends InstructionAccountInput,
+	TAccountStakeHistory extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -132,26 +136,41 @@ export function getSysvarsInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): SysvarsInstruction<
 	TProgramAddress,
-	TAccountClock,
-	TAccountRent,
-	TAccountStakeHistory
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRent,
+		InstructionAccountInputAddress<TAccountRent>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStakeHistory,
+		InstructionAccountInputAddress<TAccountStakeHistory>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		clock: { value: input.clock ?? null, isWritable: false },
-		rent: { value: input.rent ?? null, isWritable: false },
-		stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+		rent: { value: input.rent ?? null, isSigner: false, isWritable: false },
+		stakeHistory: {
+			value: input.stakeHistory ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("clock", accounts.clock),
@@ -162,9 +181,18 @@ export function getSysvarsInstruction<
 		programAddress,
 	} as SysvarsInstruction<
 		TProgramAddress,
-		TAccountClock,
-		TAccountRent,
-		TAccountStakeHistory
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRent,
+			InstructionAccountInputAddress<TAccountRent>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeHistory,
+			InstructionAccountInputAddress<TAccountStakeHistory>
+		>
 	>);
 }
 

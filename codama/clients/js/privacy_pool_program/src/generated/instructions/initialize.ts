@@ -29,14 +29,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	findCustodianRegistryPda,
@@ -188,25 +191,30 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountPoolVault extends string = string,
-	TAccountMerkleTree extends string = string,
-	TAccountNullifierSet extends string = string,
-	TAccountCustodianRegistry extends string = string,
-	TAccountRequesterRegistry extends string = string,
-	TAccountDisclosureLog extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	poolConfig?: Address<TAccountPoolConfig>;
-	poolVault?: Address<TAccountPoolVault>;
-	merkleTree?: Address<TAccountMerkleTree>;
-	nullifierSet?: Address<TAccountNullifierSet>;
-	custodianRegistry?: Address<TAccountCustodianRegistry>;
-	requesterRegistry?: Address<TAccountRequesterRegistry>;
-	disclosureLog?: Address<TAccountDisclosureLog>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	poolConfig?: TAccountPoolConfig;
+	poolVault?: TAccountPoolVault;
+	merkleTree?: TAccountMerkleTree;
+	nullifierSet?: TAccountNullifierSet;
+	custodianRegistry?: TAccountCustodianRegistry;
+	requesterRegistry?: TAccountRequesterRegistry;
+	disclosureLog?: TAccountDisclosureLog;
+	systemProgram?: TAccountSystemProgram;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
@@ -218,15 +226,15 @@ export type InitializeAsyncInput<
 };
 
 export async function getInitializeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountPoolConfig extends string,
-	TAccountPoolVault extends string,
-	TAccountMerkleTree extends string,
-	TAccountNullifierSet extends string,
-	TAccountCustodianRegistry extends string,
-	TAccountRequesterRegistry extends string,
-	TAccountDisclosureLog extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeAsyncInput<
@@ -244,38 +252,98 @@ export async function getInitializeInstructionAsync<
 ): Promise<
 	InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNullifierSet,
-		TAccountCustodianRegistry,
-		TAccountRequesterRegistry,
-		TAccountDisclosureLog,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: true },
-		poolVault: { value: input.poolVault ?? null, isWritable: true },
-		merkleTree: { value: input.merkleTree ?? null, isWritable: true },
-		nullifierSet: { value: input.nullifierSet ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		poolVault: {
+			value: input.poolVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierSet: {
+			value: input.nullifierSet ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		custodianRegistry: {
 			value: input.custodianRegistry ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
 		requesterRegistry: {
 			value: input.requesterRegistry ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		disclosureLog: { value: input.disclosureLog ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		disclosureLog: {
+			value: input.disclosureLog ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -320,7 +388,6 @@ export async function getInitializeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -339,38 +406,70 @@ export async function getInitializeInstructionAsync<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNullifierSet,
-		TAccountCustodianRegistry,
-		TAccountRequesterRegistry,
-		TAccountDisclosureLog,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type InitializeInput<
-	TAccountAuthority extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountPoolVault extends string = string,
-	TAccountMerkleTree extends string = string,
-	TAccountNullifierSet extends string = string,
-	TAccountCustodianRegistry extends string = string,
-	TAccountRequesterRegistry extends string = string,
-	TAccountDisclosureLog extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	poolConfig: Address<TAccountPoolConfig>;
-	poolVault: Address<TAccountPoolVault>;
-	merkleTree: Address<TAccountMerkleTree>;
-	nullifierSet: Address<TAccountNullifierSet>;
-	custodianRegistry: Address<TAccountCustodianRegistry>;
-	requesterRegistry: Address<TAccountRequesterRegistry>;
-	disclosureLog: Address<TAccountDisclosureLog>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	poolConfig: TAccountPoolConfig;
+	poolVault: TAccountPoolVault;
+	merkleTree: TAccountMerkleTree;
+	nullifierSet: TAccountNullifierSet;
+	custodianRegistry: TAccountCustodianRegistry;
+	requesterRegistry: TAccountRequesterRegistry;
+	disclosureLog: TAccountDisclosureLog;
+	systemProgram?: TAccountSystemProgram;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
@@ -382,15 +481,15 @@ export type InitializeInput<
 };
 
 export function getInitializeInstruction<
-	TAccountAuthority extends string,
-	TAccountPoolConfig extends string,
-	TAccountPoolVault extends string,
-	TAccountMerkleTree extends string,
-	TAccountNullifierSet extends string,
-	TAccountCustodianRegistry extends string,
-	TAccountRequesterRegistry extends string,
-	TAccountDisclosureLog extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<
@@ -407,37 +506,97 @@ export function getInitializeInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountPoolConfig,
-	TAccountPoolVault,
-	TAccountMerkleTree,
-	TAccountNullifierSet,
-	TAccountCustodianRegistry,
-	TAccountRequesterRegistry,
-	TAccountDisclosureLog,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolVault,
+		InstructionAccountInputAddress<TAccountPoolVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMerkleTree,
+		InstructionAccountInputAddress<TAccountMerkleTree>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNullifierSet,
+		InstructionAccountInputAddress<TAccountNullifierSet>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCustodianRegistry,
+		InstructionAccountInputAddress<TAccountCustodianRegistry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRequesterRegistry,
+		InstructionAccountInputAddress<TAccountRequesterRegistry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureLog,
+		InstructionAccountInputAddress<TAccountDisclosureLog>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: true },
-		poolVault: { value: input.poolVault ?? null, isWritable: true },
-		merkleTree: { value: input.merkleTree ?? null, isWritable: true },
-		nullifierSet: { value: input.nullifierSet ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		poolVault: {
+			value: input.poolVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierSet: {
+			value: input.nullifierSet ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		custodianRegistry: {
 			value: input.custodianRegistry ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
 		requesterRegistry: {
 			value: input.requesterRegistry ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		disclosureLog: { value: input.disclosureLog ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		disclosureLog: {
+			value: input.disclosureLog ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -455,7 +614,6 @@ export function getInitializeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -474,15 +632,42 @@ export function getInitializeInstruction<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNullifierSet,
-		TAccountCustodianRegistry,
-		TAccountRequesterRegistry,
-		TAccountDisclosureLog,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

@@ -29,7 +29,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -119,27 +122,28 @@ export function getProposalCloseInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ProposalCloseInput<
-	TAccountMultisig extends string = string,
-	TAccountProposal extends string = string,
-	TAccountRentCollector extends string = string,
-	TAccountClock extends string = string,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountProposal extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentCollector extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	multisig: Address<TAccountMultisig>;
-	proposal: Address<TAccountProposal>;
-	rentCollector: Address<TAccountRentCollector>;
+	multisig: TAccountMultisig;
+	proposal: TAccountProposal;
+	rentCollector: TAccountRentCollector;
 	/**
 	 * Clock for the expiry test: an expired active proposal can neither
 	 * progress nor reach a terminal status on its own, so expiry itself is a
 	 * permissionless close condition. Stale proposals close the same way.
 	 */
-	clock: Address<TAccountClock>;
+	clock: TAccountClock;
 };
 
 export function getProposalCloseInstruction<
-	TAccountMultisig extends string,
-	TAccountProposal extends string,
-	TAccountRentCollector extends string,
-	TAccountClock extends string,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountProposal extends InstructionAccountInput,
+	TAccountRentCollector extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ProposalCloseInput<
@@ -151,28 +155,54 @@ export function getProposalCloseInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ProposalCloseInstruction<
 	TProgramAddress,
-	TAccountMultisig,
-	TAccountProposal,
-	TAccountRentCollector,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProposal,
+		InstructionAccountInputAddress<TAccountProposal>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentCollector,
+		InstructionAccountInputAddress<TAccountRentCollector>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		multisig: { value: input.multisig ?? null, isWritable: false },
-		proposal: { value: input.proposal ?? null, isWritable: true },
-		rentCollector: { value: input.rentCollector ?? null, isWritable: true },
-		clock: { value: input.clock ?? null, isWritable: false },
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		proposal: {
+			value: input.proposal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rentCollector: {
+			value: input.rentCollector ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("multisig", accounts.multisig),
@@ -184,10 +214,22 @@ export function getProposalCloseInstruction<
 		programAddress,
 	} as ProposalCloseInstruction<
 		TProgramAddress,
-		TAccountMultisig,
-		TAccountProposal,
-		TAccountRentCollector,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProposal,
+			InstructionAccountInputAddress<TAccountProposal>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentCollector,
+			InstructionAccountInputAddress<TAccountRentCollector>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

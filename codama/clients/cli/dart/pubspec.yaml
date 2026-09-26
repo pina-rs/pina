@@ -35,12 +35,12 @@ dependencies:
   args: ^2.7.0
   pina_codama_clients:
     path: ../../dart
-  solana_kit_accounts: ^0.8.0
-  solana_kit_address: ^0.8.0
-  solana_kit_keys: ^0.8.0
-  solana_kit_rpc: ^0.8.0
-  solana_kit_transaction_messages: ^0.8.0
-  solana_kit_transactions: ^0.8.0
+  solana_kit_accounts: ">=0.10.0 <1.0.0"
+  solana_kit_address: ">=0.10.0 <1.0.0"
+  solana_kit_keys: ">=0.10.0 <1.0.0"
+  solana_kit_rpc: ">=0.10.0 <1.0.0"
+  solana_kit_transaction_messages: ">=0.10.0 <1.0.0"
+  solana_kit_transactions: ">=0.10.0 <1.0.0"
 
 dev_dependencies:
   test: ^1.25.0

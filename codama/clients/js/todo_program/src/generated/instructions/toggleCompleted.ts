@@ -25,14 +25,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import {
@@ -118,30 +121,43 @@ export function getToggleCompletedInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ToggleCompletedAsyncInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo?: Address<TAccountTodo>;
+	owner: TAccountOwner;
+	todo?: TAccountTodo;
 };
 
 export async function getToggleCompletedInstructionAsync<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ToggleCompletedAsyncInput<TAccountOwner, TAccountTodo>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	ToggleCompletedInstruction<TProgramAddress, TAccountOwner, TAccountTodo>
+	ToggleCompletedInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -158,7 +174,6 @@ export async function getToggleCompletedInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -168,41 +183,59 @@ export async function getToggleCompletedInstructionAsync<
 		programAddress,
 	} as ToggleCompletedInstruction<
 		TProgramAddress,
-		TAccountOwner,
-		TAccountTodo
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
 	>);
 }
 
 export type ToggleCompletedInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo: Address<TAccountTodo>;
+	owner: TAccountOwner;
+	todo: TAccountTodo;
 };
 
 export function getToggleCompletedInstruction<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ToggleCompletedInput<TAccountOwner, TAccountTodo>,
 	config?: { programAddress?: TProgramAddress },
-): ToggleCompletedInstruction<TProgramAddress, TAccountOwner, TAccountTodo> {
+): ToggleCompletedInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountOwner,
+		InstructionAccountInputAddress<TAccountOwner>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTodo,
+		InstructionAccountInputAddress<TAccountTodo>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -212,8 +245,14 @@ export function getToggleCompletedInstruction<
 		programAddress,
 	} as ToggleCompletedInstruction<
 		TProgramAddress,
-		TAccountOwner,
-		TAccountTodo
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>
 	>);
 }
 

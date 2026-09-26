@@ -34,7 +34,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -42,7 +41,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findMultisigPda } from "../pdas";
 import {
@@ -185,29 +188,33 @@ export function getMultisigImportInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MultisigImportAsyncInput<
-	TAccountLegacyMultisig extends string = string,
-	TAccountLegacyCreateKey extends string = string,
-	TAccountProgramConfig extends string = string,
-	TAccountCreateKey extends string = string,
-	TAccountMultisig extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTreasury extends string = string,
+	TAccountLegacyMultisig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountLegacyCreateKey extends InstructionSignerInput =
+		InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	legacyMultisig: Address<TAccountLegacyMultisig>;
+	legacyMultisig: TAccountLegacyMultisig;
 	/**
 	 * The legacy multisig's `create_key`: its holder authorizes the import,
 	 * which is what stops a fabricated legacy account from adopting a roster
 	 * of keys that never consented.
 	 */
-	legacyCreateKey: TransactionSigner<TAccountLegacyCreateKey>;
-	programConfig: Address<TAccountProgramConfig>;
-	createKey: TransactionSigner<TAccountCreateKey>;
-	multisig?: Address<TAccountMultisig>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	legacyCreateKey: TAccountLegacyCreateKey;
+	programConfig: TAccountProgramConfig;
+	createKey: TAccountCreateKey;
+	multisig?: TAccountMultisig;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
 	/** Treasury that collects the creation fee; absent when the fee is zero. */
-	treasury?: Address<TAccountTreasury>;
+	treasury?: TAccountTreasury;
 	bump: MultisigImportInstructionDataArgs["bump"];
 	legacyProgram: MultisigImportInstructionDataArgs["legacyProgram"];
 	legacyDiscriminator: MultisigImportInstructionDataArgs["legacyDiscriminator"];
@@ -218,14 +225,14 @@ export type MultisigImportAsyncInput<
 };
 
 export async function getMultisigImportInstructionAsync<
-	TAccountLegacyMultisig extends string,
-	TAccountLegacyCreateKey extends string,
-	TAccountProgramConfig extends string,
-	TAccountCreateKey extends string,
-	TAccountMultisig extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountTreasury extends string,
+	TAccountLegacyMultisig extends InstructionAccountInput,
+	TAccountLegacyCreateKey extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: MultisigImportAsyncInput<
@@ -242,33 +249,89 @@ export async function getMultisigImportInstructionAsync<
 ): Promise<
 	MultisigImportInstruction<
 		TProgramAddress,
-		TAccountLegacyMultisig,
-		TAccountLegacyCreateKey,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyMultisig,
+			InstructionAccountInputAddress<TAccountLegacyMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyCreateKey,
+			InstructionAccountInputAddress<TAccountLegacyCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		legacyMultisig: { value: input.legacyMultisig ?? null, isWritable: false },
-		legacyCreateKey: {
-			value: input.legacyCreateKey ?? null,
+		legacyMultisig: {
+			value: input.legacyMultisig ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		programConfig: { value: input.programConfig ?? null, isWritable: false },
-		createKey: { value: input.createKey ?? null, isWritable: false },
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		treasury: { value: input.treasury ?? null, isWritable: true },
+		legacyCreateKey: {
+			value: input.legacyCreateKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		createKey: {
+			value: input.createKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		treasury: {
+			value: input.treasury ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -294,7 +357,6 @@ export async function getMultisigImportInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("legacyMultisig", accounts.legacyMultisig),
@@ -312,41 +374,69 @@ export async function getMultisigImportInstructionAsync<
 		programAddress,
 	} as MultisigImportInstruction<
 		TProgramAddress,
-		TAccountLegacyMultisig,
-		TAccountLegacyCreateKey,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyMultisig,
+			InstructionAccountInputAddress<TAccountLegacyMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyCreateKey,
+			InstructionAccountInputAddress<TAccountLegacyCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>
 	>);
 }
 
 export type MultisigImportInput<
-	TAccountLegacyMultisig extends string = string,
-	TAccountLegacyCreateKey extends string = string,
-	TAccountProgramConfig extends string = string,
-	TAccountCreateKey extends string = string,
-	TAccountMultisig extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTreasury extends string = string,
+	TAccountLegacyMultisig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountLegacyCreateKey extends InstructionSignerInput =
+		InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	legacyMultisig: Address<TAccountLegacyMultisig>;
+	legacyMultisig: TAccountLegacyMultisig;
 	/**
 	 * The legacy multisig's `create_key`: its holder authorizes the import,
 	 * which is what stops a fabricated legacy account from adopting a roster
 	 * of keys that never consented.
 	 */
-	legacyCreateKey: TransactionSigner<TAccountLegacyCreateKey>;
-	programConfig: Address<TAccountProgramConfig>;
-	createKey: TransactionSigner<TAccountCreateKey>;
-	multisig: Address<TAccountMultisig>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	legacyCreateKey: TAccountLegacyCreateKey;
+	programConfig: TAccountProgramConfig;
+	createKey: TAccountCreateKey;
+	multisig: TAccountMultisig;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
 	/** Treasury that collects the creation fee; absent when the fee is zero. */
-	treasury?: Address<TAccountTreasury>;
+	treasury?: TAccountTreasury;
 	bump: MultisigImportInstructionDataArgs["bump"];
 	legacyProgram: MultisigImportInstructionDataArgs["legacyProgram"];
 	legacyDiscriminator: MultisigImportInstructionDataArgs["legacyDiscriminator"];
@@ -357,14 +447,14 @@ export type MultisigImportInput<
 };
 
 export function getMultisigImportInstruction<
-	TAccountLegacyMultisig extends string,
-	TAccountLegacyCreateKey extends string,
-	TAccountProgramConfig extends string,
-	TAccountCreateKey extends string,
-	TAccountMultisig extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountTreasury extends string,
+	TAccountLegacyMultisig extends InstructionAccountInput,
+	TAccountLegacyCreateKey extends InstructionSignerInput,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: MultisigImportInput<
@@ -380,32 +470,88 @@ export function getMultisigImportInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): MultisigImportInstruction<
 	TProgramAddress,
-	TAccountLegacyMultisig,
-	TAccountLegacyCreateKey,
-	TAccountProgramConfig,
-	TAccountCreateKey,
-	TAccountMultisig,
-	TAccountRentPayer,
-	TAccountSystemProgram,
-	TAccountTreasury
+	ResolvedInstructionAccountMeta<
+		TAccountLegacyMultisig,
+		InstructionAccountInputAddress<TAccountLegacyMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountLegacyCreateKey,
+		InstructionAccountInputAddress<TAccountLegacyCreateKey>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProgramConfig,
+		InstructionAccountInputAddress<TAccountProgramConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCreateKey,
+		InstructionAccountInputAddress<TAccountCreateKey>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentPayer,
+		InstructionAccountInputAddress<TAccountRentPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTreasury,
+		InstructionAccountInputAddress<TAccountTreasury>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		legacyMultisig: { value: input.legacyMultisig ?? null, isWritable: false },
-		legacyCreateKey: {
-			value: input.legacyCreateKey ?? null,
+		legacyMultisig: {
+			value: input.legacyMultisig ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		programConfig: { value: input.programConfig ?? null, isWritable: false },
-		createKey: { value: input.createKey ?? null, isWritable: false },
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		treasury: { value: input.treasury ?? null, isWritable: true },
+		legacyCreateKey: {
+			value: input.legacyCreateKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		createKey: {
+			value: input.createKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		treasury: {
+			value: input.treasury ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -423,7 +569,6 @@ export function getMultisigImportInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("legacyMultisig", accounts.legacyMultisig),
@@ -441,14 +586,38 @@ export function getMultisigImportInstruction<
 		programAddress,
 	} as MultisigImportInstruction<
 		TProgramAddress,
-		TAccountLegacyMultisig,
-		TAccountLegacyCreateKey,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyMultisig,
+			InstructionAccountInputAddress<TAccountLegacyMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountLegacyCreateKey,
+			InstructionAccountInputAddress<TAccountLegacyCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>
 	>);
 }
 

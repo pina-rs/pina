@@ -36,7 +36,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -44,7 +43,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findMultisigPda } from "../pdas";
 import {
@@ -181,29 +184,32 @@ export function getMultisigCreateInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MultisigCreateAsyncInput<
-	TAccountProgramConfig extends string = string,
-	TAccountCreateKey extends string = string,
-	TAccountMultisig extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTreasury extends string = string,
-	TAccountMemberAccounts extends string = string,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMemberAccounts extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	programConfig: Address<TAccountProgramConfig>;
-	createKey: TransactionSigner<TAccountCreateKey>;
-	multisig?: Address<TAccountMultisig>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	programConfig: TAccountProgramConfig;
+	createKey: TAccountCreateKey;
+	multisig?: TAccountMultisig;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
 	/**
 	 * Treasury that collects the creation fee; pass the program's own
 	 * address as a filler when the fee is zero.
 	 */
-	treasury?: Address<TAccountTreasury>;
+	treasury?: TAccountTreasury;
 	/**
 	 * The founding members, sorted by address; `member_permissions` indexes
 	 * into this list positionally.
 	 */
-	memberAccounts: Address<TAccountMemberAccounts>;
+	memberAccounts: TAccountMemberAccounts;
 	bump: MultisigCreateInstructionDataArgs["bump"];
 	threshold: MultisigCreateInstructionDataArgs["threshold"];
 	timelock: MultisigCreateInstructionDataArgs["timelock"];
@@ -214,13 +220,13 @@ export type MultisigCreateAsyncInput<
 };
 
 export async function getMultisigCreateInstructionAsync<
-	TAccountProgramConfig extends string,
-	TAccountCreateKey extends string,
-	TAccountMultisig extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountTreasury extends string,
-	TAccountMemberAccounts extends string,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput,
+	TAccountMemberAccounts extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: MultisigCreateAsyncInput<
@@ -236,28 +242,80 @@ export async function getMultisigCreateInstructionAsync<
 ): Promise<
 	MultisigCreateInstruction<
 		TProgramAddress,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury,
-		TAccountMemberAccounts
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMemberAccounts,
+			InstructionAccountInputAddress<TAccountMemberAccounts>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		programConfig: { value: input.programConfig ?? null, isWritable: false },
-		createKey: { value: input.createKey ?? null, isWritable: false },
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		treasury: { value: input.treasury ?? null, isWritable: true },
-		memberAccounts: { value: input.memberAccounts ?? null, isWritable: false },
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		createKey: {
+			value: input.createKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		treasury: {
+			value: input.treasury ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		memberAccounts: {
+			value: input.memberAccounts ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -283,7 +341,6 @@ export async function getMultisigCreateInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("programConfig", accounts.programConfig),
@@ -300,40 +357,64 @@ export async function getMultisigCreateInstructionAsync<
 		programAddress,
 	} as MultisigCreateInstruction<
 		TProgramAddress,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury,
-		TAccountMemberAccounts
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMemberAccounts,
+			InstructionAccountInputAddress<TAccountMemberAccounts>
+		>
 	>);
 }
 
 export type MultisigCreateInput<
-	TAccountProgramConfig extends string = string,
-	TAccountCreateKey extends string = string,
-	TAccountMultisig extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTreasury extends string = string,
-	TAccountMemberAccounts extends string = string,
+	TAccountProgramConfig extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMemberAccounts extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	programConfig: Address<TAccountProgramConfig>;
-	createKey: TransactionSigner<TAccountCreateKey>;
-	multisig: Address<TAccountMultisig>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	programConfig: TAccountProgramConfig;
+	createKey: TAccountCreateKey;
+	multisig: TAccountMultisig;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
 	/**
 	 * Treasury that collects the creation fee; pass the program's own
 	 * address as a filler when the fee is zero.
 	 */
-	treasury?: Address<TAccountTreasury>;
+	treasury?: TAccountTreasury;
 	/**
 	 * The founding members, sorted by address; `member_permissions` indexes
 	 * into this list positionally.
 	 */
-	memberAccounts: Address<TAccountMemberAccounts>;
+	memberAccounts: TAccountMemberAccounts;
 	bump: MultisigCreateInstructionDataArgs["bump"];
 	threshold: MultisigCreateInstructionDataArgs["threshold"];
 	timelock: MultisigCreateInstructionDataArgs["timelock"];
@@ -344,13 +425,13 @@ export type MultisigCreateInput<
 };
 
 export function getMultisigCreateInstruction<
-	TAccountProgramConfig extends string,
-	TAccountCreateKey extends string,
-	TAccountMultisig extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountTreasury extends string,
-	TAccountMemberAccounts extends string,
+	TAccountProgramConfig extends InstructionAccountInput,
+	TAccountCreateKey extends InstructionSignerInput,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTreasury extends InstructionAccountInput,
+	TAccountMemberAccounts extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: MultisigCreateInput<
@@ -365,27 +446,79 @@ export function getMultisigCreateInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): MultisigCreateInstruction<
 	TProgramAddress,
-	TAccountProgramConfig,
-	TAccountCreateKey,
-	TAccountMultisig,
-	TAccountRentPayer,
-	TAccountSystemProgram,
-	TAccountTreasury,
-	TAccountMemberAccounts
+	ResolvedInstructionAccountMeta<
+		TAccountProgramConfig,
+		InstructionAccountInputAddress<TAccountProgramConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCreateKey,
+		InstructionAccountInputAddress<TAccountCreateKey>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentPayer,
+		InstructionAccountInputAddress<TAccountRentPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTreasury,
+		InstructionAccountInputAddress<TAccountTreasury>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMemberAccounts,
+		InstructionAccountInputAddress<TAccountMemberAccounts>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		programConfig: { value: input.programConfig ?? null, isWritable: false },
-		createKey: { value: input.createKey ?? null, isWritable: false },
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		treasury: { value: input.treasury ?? null, isWritable: true },
-		memberAccounts: { value: input.memberAccounts ?? null, isWritable: false },
+		programConfig: {
+			value: input.programConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		createKey: {
+			value: input.createKey ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		treasury: {
+			value: input.treasury ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		memberAccounts: {
+			value: input.memberAccounts ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -403,7 +536,6 @@ export function getMultisigCreateInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("programConfig", accounts.programConfig),
@@ -420,13 +552,34 @@ export function getMultisigCreateInstruction<
 		programAddress,
 	} as MultisigCreateInstruction<
 		TProgramAddress,
-		TAccountProgramConfig,
-		TAccountCreateKey,
-		TAccountMultisig,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountTreasury,
-		TAccountMemberAccounts
+		ResolvedInstructionAccountMeta<
+			TAccountProgramConfig,
+			InstructionAccountInputAddress<TAccountProgramConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreateKey,
+			InstructionAccountInputAddress<TAccountCreateKey>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTreasury,
+			InstructionAccountInputAddress<TAccountTreasury>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMemberAccounts,
+			InstructionAccountInputAddress<TAccountMemberAccounts>
+		>
 	>);
 }
 

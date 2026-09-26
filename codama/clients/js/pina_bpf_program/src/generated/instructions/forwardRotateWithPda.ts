@@ -31,7 +31,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findAuthorityPda } from "../pdas";
 import {
@@ -128,21 +131,22 @@ export function getForwardRotateWithPdaInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ForwardRotateWithPdaAsyncInput<
-	TAccountOracle extends string = string,
-	TAccountAuthority extends string = string,
-	TAccountPropAmmProgram extends string = string,
+	TAccountOracle extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPropAmmProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	oracle: Address<TAccountOracle>;
-	authority?: Address<TAccountAuthority>;
-	propAmmProgram: Address<TAccountPropAmmProgram>;
+	oracle: TAccountOracle;
+	authority?: TAccountAuthority;
+	propAmmProgram: TAccountPropAmmProgram;
 	bump: ForwardRotateWithPdaInstructionDataArgs["bump"];
 	newAuthority: ForwardRotateWithPdaInstructionDataArgs["newAuthority"];
 };
 
 export async function getForwardRotateWithPdaInstructionAsync<
-	TAccountOracle extends string,
-	TAccountAuthority extends string,
-	TAccountPropAmmProgram extends string,
+	TAccountOracle extends InstructionAccountInput,
+	TAccountAuthority extends InstructionAccountInput,
+	TAccountPropAmmProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ForwardRotateWithPdaAsyncInput<
@@ -154,20 +158,40 @@ export async function getForwardRotateWithPdaInstructionAsync<
 ): Promise<
 	ForwardRotateWithPdaInstruction<
 		TProgramAddress,
-		TAccountOracle,
-		TAccountAuthority,
-		TAccountPropAmmProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOracle,
+			InstructionAccountInputAddress<TAccountOracle>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPropAmmProgram,
+			InstructionAccountInputAddress<TAccountPropAmmProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		oracle: { value: input.oracle ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
-		propAmmProgram: { value: input.propAmmProgram ?? null, isWritable: false },
+		oracle: { value: input.oracle ?? null, isSigner: false, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		propAmmProgram: {
+			value: input.propAmmProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -182,7 +206,6 @@ export async function getForwardRotateWithPdaInstructionAsync<
 		accounts.authority.value = await findAuthorityPda({ programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("oracle", accounts.oracle),
@@ -195,28 +218,38 @@ export async function getForwardRotateWithPdaInstructionAsync<
 		programAddress,
 	} as ForwardRotateWithPdaInstruction<
 		TProgramAddress,
-		TAccountOracle,
-		TAccountAuthority,
-		TAccountPropAmmProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOracle,
+			InstructionAccountInputAddress<TAccountOracle>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPropAmmProgram,
+			InstructionAccountInputAddress<TAccountPropAmmProgram>
+		>
 	>);
 }
 
 export type ForwardRotateWithPdaInput<
-	TAccountOracle extends string = string,
-	TAccountAuthority extends string = string,
-	TAccountPropAmmProgram extends string = string,
+	TAccountOracle extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAuthority extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPropAmmProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	oracle: Address<TAccountOracle>;
-	authority: Address<TAccountAuthority>;
-	propAmmProgram: Address<TAccountPropAmmProgram>;
+	oracle: TAccountOracle;
+	authority: TAccountAuthority;
+	propAmmProgram: TAccountPropAmmProgram;
 	bump: ForwardRotateWithPdaInstructionDataArgs["bump"];
 	newAuthority: ForwardRotateWithPdaInstructionDataArgs["newAuthority"];
 };
 
 export function getForwardRotateWithPdaInstruction<
-	TAccountOracle extends string,
-	TAccountAuthority extends string,
-	TAccountPropAmmProgram extends string,
+	TAccountOracle extends InstructionAccountInput,
+	TAccountAuthority extends InstructionAccountInput,
+	TAccountPropAmmProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ForwardRotateWithPdaInput<
@@ -227,19 +260,39 @@ export function getForwardRotateWithPdaInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ForwardRotateWithPdaInstruction<
 	TProgramAddress,
-	TAccountOracle,
-	TAccountAuthority,
-	TAccountPropAmmProgram
+	ResolvedInstructionAccountMeta<
+		TAccountOracle,
+		InstructionAccountInputAddress<TAccountOracle>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPropAmmProgram,
+		InstructionAccountInputAddress<TAccountPropAmmProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		oracle: { value: input.oracle ?? null, isWritable: true },
-		authority: { value: input.authority ?? null, isWritable: false },
-		propAmmProgram: { value: input.propAmmProgram ?? null, isWritable: false },
+		oracle: { value: input.oracle ?? null, isSigner: false, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		propAmmProgram: {
+			value: input.propAmmProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -249,7 +302,6 @@ export function getForwardRotateWithPdaInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("oracle", accounts.oracle),
@@ -262,9 +314,18 @@ export function getForwardRotateWithPdaInstruction<
 		programAddress,
 	} as ForwardRotateWithPdaInstruction<
 		TProgramAddress,
-		TAccountOracle,
-		TAccountAuthority,
-		TAccountPropAmmProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOracle,
+			InstructionAccountInputAddress<TAccountOracle>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPropAmmProgram,
+			InstructionAccountInputAddress<TAccountPropAmmProgram>
+		>
 	>);
 }
 
