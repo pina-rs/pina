@@ -54,7 +54,8 @@ Global flags:
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -67,6 +68,7 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct AddTagArgs {
+	/// The tag value to append.
 	#[arg(long)]
 	tag: u64,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
@@ -107,7 +109,8 @@ pub(crate) fn run(context: &CliContext, args: AddTagArgs) -> Result<(), CliError
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -120,10 +123,13 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct InitializeArgs {
+	/// The PDA bump seed, computed off-chain.
 	#[arg(long)]
 	bump: u8,
+	/// The initial display name.
 	#[arg(long)]
 	name: String,
+	/// The initial bio.
 	#[arg(long)]
 	bio: String,
 	/// The profile PDA account (must be empty — not yet created) [default: derived]
@@ -175,7 +181,8 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 pub mod initialize;
@@ -196,7 +203,8 @@ pub use remove_tag::RemoveTagArgs;
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -209,6 +217,7 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct RemoveTagArgs {
+	/// The zero-based index of the tag to remove.
 	#[arg(long)]
 	index: u64,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
@@ -249,7 +258,8 @@ pub(crate) fn run(context: &CliContext, args: RemoveTagArgs) -> Result<(), CliEr
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -262,8 +272,10 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct UpdateProfileArgs {
+	/// The new display name.
 	#[arg(long)]
 	name: String,
+	/// The new bio.
 	#[arg(long)]
 	bio: String,
 	/// The profile PDA account (must already exist and be writable) [default: derived]
@@ -313,7 +325,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateProfileArgs) -> Result<(), C
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Shared runtime for the generated CLI: endpoint resolution, keypair loading,
@@ -695,7 +708,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -808,7 +822,8 @@ fn print_value(json_output: bool, name: &str, address: &Pubkey, value: &Value) {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Generated CLI for the `profileProgram` program.

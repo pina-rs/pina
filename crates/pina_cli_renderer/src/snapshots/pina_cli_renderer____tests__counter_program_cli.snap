@@ -54,7 +54,8 @@ Global flags:
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -103,7 +104,8 @@ pub(crate) fn run(context: &CliContext, args: IncrementArgs) -> Result<(), CliEr
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -116,6 +118,7 @@ use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct InitializeArgs {
+	/// The PDA bump seed, computed off-chain.
 	#[arg(long)]
 	bump: u8,
 	/// The counter PDA account (must be empty — not yet created) [default: derived]
@@ -157,7 +160,8 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 pub mod initialize;
@@ -174,7 +178,8 @@ pub use increment::IncrementArgs;
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Shared runtime for the generated CLI: endpoint resolution, keypair loading,
@@ -547,7 +552,8 @@ fn expand_home(path: &str) -> String {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 use clap::Args;
@@ -653,7 +659,8 @@ fn print_value(json_output: bool, name: &str, address: &Pubkey, value: &Value) {
 	dead_code,
 	clippy::doc_lazy_continuation,
 	clippy::empty_line_after_doc_comments,
-	clippy::too_many_arguments
+	clippy::too_many_arguments,
+	rustdoc::broken_intra_doc_links
 )]
 
 //! Generated CLI for the `counterProgram` program.
