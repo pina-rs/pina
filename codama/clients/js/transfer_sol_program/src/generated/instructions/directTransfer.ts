@@ -26,14 +26,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -120,36 +123,49 @@ export function getDirectTransferInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type DirectTransferInput<
-	TAccountSender extends string = string,
-	TAccountRecipient extends string = string,
+	TAccountSender extends InstructionSignerInput = InstructionSignerInput,
+	TAccountRecipient extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The sender. Must be owned by this program, writable, and a signer. */
-	sender: TransactionSigner<TAccountSender>;
+	sender: TAccountSender;
 	/** The recipient. Must be writable. */
-	recipient: Address<TAccountRecipient>;
+	recipient: TAccountRecipient;
 	amount: DirectTransferInstructionDataArgs["amount"];
 };
 
 export function getDirectTransferInstruction<
-	TAccountSender extends string,
-	TAccountRecipient extends string,
+	TAccountSender extends InstructionSignerInput,
+	TAccountRecipient extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: DirectTransferInput<TAccountSender, TAccountRecipient>,
 	config?: { programAddress?: TProgramAddress },
 ): DirectTransferInstruction<
 	TProgramAddress,
-	TAccountSender,
-	TAccountRecipient
+	ResolvedInstructionAccountMeta<
+		TAccountSender,
+		InstructionAccountInputAddress<TAccountSender>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRecipient,
+		InstructionAccountInputAddress<TAccountRecipient>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		sender: { value: input.sender ?? null, isWritable: true },
-		recipient: { value: input.recipient ?? null, isWritable: true },
+		sender: { value: input.sender ?? null, isSigner: true, isWritable: true },
+		recipient: {
+			value: input.recipient ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -159,7 +175,6 @@ export function getDirectTransferInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("sender", accounts.sender),
@@ -171,8 +186,14 @@ export function getDirectTransferInstruction<
 		programAddress,
 	} as DirectTransferInstruction<
 		TProgramAddress,
-		TAccountSender,
-		TAccountRecipient
+		ResolvedInstructionAccountMeta<
+			TAccountSender,
+			InstructionAccountInputAddress<TAccountSender>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRecipient,
+			InstructionAccountInputAddress<TAccountRecipient>
+		>
 	>);
 }
 

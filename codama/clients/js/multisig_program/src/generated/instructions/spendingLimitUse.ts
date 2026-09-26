@@ -28,13 +28,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -156,48 +159,52 @@ export function getSpendingLimitUseInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type SpendingLimitUseInput<
-	TAccountMultisig extends string = string,
-	TAccountSpendingLimit extends string = string,
-	TAccountMember extends string = string,
-	TAccountVault extends string = string,
-	TAccountDestination extends string = string,
-	TAccountClock extends string = string,
-	TAccountVaultTokenAccount extends string = string,
-	TAccountMint extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSpendingLimit extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountMember extends InstructionSignerInput = InstructionSignerInput,
+	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountDestination extends InstructionAccountInput = InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+	TAccountVaultTokenAccount extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	multisig: Address<TAccountMultisig>;
-	spendingLimit: Address<TAccountSpendingLimit>;
-	member: TransactionSigner<TAccountMember>;
+	multisig: TAccountMultisig;
+	spendingLimit: TAccountSpendingLimit;
+	member: TAccountMember;
 	/** The vault PDA: SOL source or SPL transfer authority. */
-	vault: Address<TAccountVault>;
+	vault: TAccountVault;
 	/** SOL destination, or the destination token account for SPL. */
-	destination: Address<TAccountDestination>;
-	clock: Address<TAccountClock>;
+	destination: TAccountDestination;
+	clock: TAccountClock;
 	/** SPL source token account; absent for SOL. */
-	vaultTokenAccount?: Address<TAccountVaultTokenAccount>;
+	vaultTokenAccount?: TAccountVaultTokenAccount;
 	/** SPL mint; absent for SOL. */
-	mint?: Address<TAccountMint>;
+	mint?: TAccountMint;
 	/** SPL token program; absent for SOL. */
-	tokenProgram?: Address<TAccountTokenProgram>;
+	tokenProgram?: TAccountTokenProgram;
 	/** System program; absent for SPL. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	amount: SpendingLimitUseInstructionDataArgs["amount"];
 	decimals: SpendingLimitUseInstructionDataArgs["decimals"];
 };
 
 export function getSpendingLimitUseInstruction<
-	TAccountMultisig extends string,
-	TAccountSpendingLimit extends string,
-	TAccountMember extends string,
-	TAccountVault extends string,
-	TAccountDestination extends string,
-	TAccountClock extends string,
-	TAccountVaultTokenAccount extends string,
-	TAccountMint extends string,
-	TAccountTokenProgram extends string,
-	TAccountSystemProgram extends string,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountSpendingLimit extends InstructionAccountInput,
+	TAccountMember extends InstructionSignerInput,
+	TAccountVault extends InstructionAccountInput,
+	TAccountDestination extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TAccountVaultTokenAccount extends InstructionAccountInput,
+	TAccountMint extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: SpendingLimitUseInput<
@@ -215,36 +222,90 @@ export function getSpendingLimitUseInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): SpendingLimitUseInstruction<
 	TProgramAddress,
-	TAccountMultisig,
-	TAccountSpendingLimit,
-	TAccountMember,
-	TAccountVault,
-	TAccountDestination,
-	TAccountClock,
-	TAccountVaultTokenAccount,
-	TAccountMint,
-	TAccountTokenProgram,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSpendingLimit,
+		InstructionAccountInputAddress<TAccountSpendingLimit>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMember,
+		InstructionAccountInputAddress<TAccountMember>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVault,
+		InstructionAccountInputAddress<TAccountVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDestination,
+		InstructionAccountInputAddress<TAccountDestination>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVaultTokenAccount,
+		InstructionAccountInputAddress<TAccountVaultTokenAccount>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMint,
+		InstructionAccountInputAddress<TAccountMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		multisig: { value: input.multisig ?? null, isWritable: false },
-		spendingLimit: { value: input.spendingLimit ?? null, isWritable: true },
-		member: { value: input.member ?? null, isWritable: false },
-		vault: { value: input.vault ?? null, isWritable: true },
-		destination: { value: input.destination ?? null, isWritable: true },
-		clock: { value: input.clock ?? null, isWritable: false },
-		vaultTokenAccount: {
-			value: input.vaultTokenAccount ?? null,
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		spendingLimit: {
+			value: input.spendingLimit ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		mint: { value: input.mint ?? null, isWritable: false },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		member: { value: input.member ?? null, isSigner: true, isWritable: false },
+		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
+		destination: {
+			value: input.destination ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+		vaultTokenAccount: {
+			value: input.vaultTokenAccount ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -254,7 +315,6 @@ export function getSpendingLimitUseInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("multisig", accounts.multisig),
@@ -274,16 +334,46 @@ export function getSpendingLimitUseInstruction<
 		programAddress,
 	} as SpendingLimitUseInstruction<
 		TProgramAddress,
-		TAccountMultisig,
-		TAccountSpendingLimit,
-		TAccountMember,
-		TAccountVault,
-		TAccountDestination,
-		TAccountClock,
-		TAccountVaultTokenAccount,
-		TAccountMint,
-		TAccountTokenProgram,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSpendingLimit,
+			InstructionAccountInputAddress<TAccountSpendingLimit>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMember,
+			InstructionAccountInputAddress<TAccountMember>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVault,
+			InstructionAccountInputAddress<TAccountVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDestination,
+			InstructionAccountInputAddress<TAccountDestination>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVaultTokenAccount,
+			InstructionAccountInputAddress<TAccountVaultTokenAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMint,
+			InstructionAccountInputAddress<TAccountMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

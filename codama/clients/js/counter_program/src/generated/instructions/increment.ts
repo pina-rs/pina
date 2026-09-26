@@ -25,14 +25,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findCounterPda } from "../pdas";
 import {
@@ -115,33 +118,54 @@ export function getIncrementInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type IncrementAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountCounter extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The counter's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The counter PDA account (must already exist and be writable). */
-	counter?: Address<TAccountCounter>;
+	counter?: TAccountCounter;
 };
 
 export async function getIncrementInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountCounter extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: IncrementAsyncInput<TAccountAuthority, TAccountCounter>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>
+	IncrementInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		counter: { value: input.counter ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		counter: {
+			value: input.counter ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -158,7 +182,6 @@ export async function getIncrementInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -168,44 +191,70 @@ export async function getIncrementInstructionAsync<
 		programAddress,
 	} as IncrementInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountCounter
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>
 	>);
 }
 
 export type IncrementInput<
-	TAccountAuthority extends string = string,
-	TAccountCounter extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The counter's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The counter PDA account (must already exist and be writable). */
-	counter: Address<TAccountCounter>;
+	counter: TAccountCounter;
 };
 
 export function getIncrementInstruction<
-	TAccountAuthority extends string,
-	TAccountCounter extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountCounter extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: IncrementInput<TAccountAuthority, TAccountCounter>,
 	config?: { programAddress?: TProgramAddress },
-): IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter> {
+): IncrementInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCounter,
+		InstructionAccountInputAddress<TAccountCounter>
+	>
+> {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		counter: { value: input.counter ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		counter: {
+			value: input.counter ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -215,8 +264,14 @@ export function getIncrementInstruction<
 		programAddress,
 	} as IncrementInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountCounter
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCounter,
+			InstructionAccountInputAddress<TAccountCounter>
+		>
 	>);
 }
 

@@ -29,7 +29,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -122,23 +125,25 @@ export function getChallengeDisclosureInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ChallengeDisclosureInput<
-	TAccountDisclosureRequest extends string = string,
-	TAccountNoteCommitment extends string = string,
-	TAccountViewer extends string = string,
-	TAccountClock extends string = string,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountViewer extends InstructionAccountInput = InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	disclosureRequest: Address<TAccountDisclosureRequest>;
-	noteCommitment: Address<TAccountNoteCommitment>;
-	viewer: Address<TAccountViewer>;
-	clock: Address<TAccountClock>;
+	disclosureRequest: TAccountDisclosureRequest;
+	noteCommitment: TAccountNoteCommitment;
+	viewer: TAccountViewer;
+	clock: TAccountClock;
 	reserved: ChallengeDisclosureInstructionDataArgs["reserved"];
 };
 
 export function getChallengeDisclosureInstruction<
-	TAccountDisclosureRequest extends string,
-	TAccountNoteCommitment extends string,
-	TAccountViewer extends string,
-	TAccountClock extends string,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountViewer extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ChallengeDisclosureInput<
@@ -150,24 +155,44 @@ export function getChallengeDisclosureInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ChallengeDisclosureInstruction<
 	TProgramAddress,
-	TAccountDisclosureRequest,
-	TAccountNoteCommitment,
-	TAccountViewer,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNoteCommitment,
+		InstructionAccountInputAddress<TAccountNoteCommitment>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountViewer,
+		InstructionAccountInputAddress<TAccountViewer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
 		disclosureRequest: {
 			value: input.disclosureRequest ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		noteCommitment: { value: input.noteCommitment ?? null, isWritable: false },
-		viewer: { value: input.viewer ?? null, isWritable: false },
-		clock: { value: input.clock ?? null, isWritable: false },
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		viewer: { value: input.viewer ?? null, isSigner: false, isWritable: false },
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -177,7 +202,6 @@ export function getChallengeDisclosureInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
@@ -191,10 +215,22 @@ export function getChallengeDisclosureInstruction<
 		programAddress,
 	} as ChallengeDisclosureInstruction<
 		TProgramAddress,
-		TAccountDisclosureRequest,
-		TAccountNoteCommitment,
-		TAccountViewer,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountViewer,
+			InstructionAccountInputAddress<TAccountViewer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

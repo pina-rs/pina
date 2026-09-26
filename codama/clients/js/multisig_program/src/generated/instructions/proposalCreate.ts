@@ -32,14 +32,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	fixPinaPodEncoderSize,
@@ -182,19 +185,20 @@ export function getProposalCreateInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ProposalCreateInput<
-	TAccountMultisig extends string = string,
-	TAccountProposal extends string = string,
-	TAccountCreator extends string = string,
-	TAccountRentPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountClock extends string = string,
+	TAccountMultisig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountProposal extends InstructionAccountInput = InstructionAccountInput,
+	TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
+	TAccountRentPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	multisig: Address<TAccountMultisig>;
-	proposal: Address<TAccountProposal>;
-	creator: TransactionSigner<TAccountCreator>;
-	rentPayer: TransactionSigner<TAccountRentPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	clock: Address<TAccountClock>;
+	multisig: TAccountMultisig;
+	proposal: TAccountProposal;
+	creator: TAccountCreator;
+	rentPayer: TAccountRentPayer;
+	systemProgram?: TAccountSystemProgram;
+	clock: TAccountClock;
 	bump: ProposalCreateInstructionDataArgs["bump"];
 	kind: ProposalCreateInstructionDataArgs["kind"];
 	vaultIndex: ProposalCreateInstructionDataArgs["vaultIndex"];
@@ -208,12 +212,12 @@ export type ProposalCreateInput<
 };
 
 export function getProposalCreateInstruction<
-	TAccountMultisig extends string,
-	TAccountProposal extends string,
-	TAccountCreator extends string,
-	TAccountRentPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountClock extends string,
+	TAccountMultisig extends InstructionAccountInput,
+	TAccountProposal extends InstructionAccountInput,
+	TAccountCreator extends InstructionSignerInput,
+	TAccountRentPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ProposalCreateInput<
@@ -227,25 +231,66 @@ export function getProposalCreateInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ProposalCreateInstruction<
 	TProgramAddress,
-	TAccountMultisig,
-	TAccountProposal,
-	TAccountCreator,
-	TAccountRentPayer,
-	TAccountSystemProgram,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountMultisig,
+		InstructionAccountInputAddress<TAccountMultisig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProposal,
+		InstructionAccountInputAddress<TAccountProposal>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCreator,
+		InstructionAccountInputAddress<TAccountCreator>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRentPayer,
+		InstructionAccountInputAddress<TAccountRentPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		multisig: { value: input.multisig ?? null, isWritable: true },
-		proposal: { value: input.proposal ?? null, isWritable: true },
-		creator: { value: input.creator ?? null, isWritable: false },
-		rentPayer: { value: input.rentPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		clock: { value: input.clock ?? null, isWritable: false },
+		multisig: {
+			value: input.multisig ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		proposal: {
+			value: input.proposal ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		creator: {
+			value: input.creator ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		rentPayer: {
+			value: input.rentPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -263,7 +308,6 @@ export function getProposalCreateInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("multisig", accounts.multisig),
@@ -279,12 +323,30 @@ export function getProposalCreateInstruction<
 		programAddress,
 	} as ProposalCreateInstruction<
 		TProgramAddress,
-		TAccountMultisig,
-		TAccountProposal,
-		TAccountCreator,
-		TAccountRentPayer,
-		TAccountSystemProgram,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountMultisig,
+			InstructionAccountInputAddress<TAccountMultisig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProposal,
+			InstructionAccountInputAddress<TAccountProposal>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCreator,
+			InstructionAccountInputAddress<TAccountCreator>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRentPayer,
+			InstructionAccountInputAddress<TAccountRentPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

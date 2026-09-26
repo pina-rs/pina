@@ -25,14 +25,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findStatePda } from "../pdas";
 import {
@@ -122,20 +125,21 @@ export function getCreatePdaInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CreatePdaAsyncInput<
-	TAccountPayer extends string = string,
-	TAccountState extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	payer: TransactionSigner<TAccountPayer>;
-	state?: Address<TAccountState>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	payer: TAccountPayer;
+	state?: TAccountState;
+	systemProgram?: TAccountSystemProgram;
 	bump: CreatePdaInstructionDataArgs["bump"];
 };
 
 export async function getCreatePdaInstructionAsync<
-	TAccountPayer extends string,
-	TAccountState extends string,
-	TAccountSystemProgram extends string,
+	TAccountPayer extends InstructionSignerInput,
+	TAccountState extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CreatePdaAsyncInput<
@@ -147,20 +151,36 @@ export async function getCreatePdaInstructionAsync<
 ): Promise<
 	CreatePdaInstruction<
 		TProgramAddress,
-		TAccountPayer,
-		TAccountState,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountState,
+			InstructionAccountInputAddress<TAccountState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		payer: { value: input.payer ?? null, isWritable: true },
-		state: { value: input.state ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		state: { value: input.state ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -181,7 +201,6 @@ export async function getCreatePdaInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("payer", accounts.payer),
@@ -194,46 +213,72 @@ export async function getCreatePdaInstructionAsync<
 		programAddress,
 	} as CreatePdaInstruction<
 		TProgramAddress,
-		TAccountPayer,
-		TAccountState,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountState,
+			InstructionAccountInputAddress<TAccountState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type CreatePdaInput<
-	TAccountPayer extends string = string,
-	TAccountState extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	payer: TransactionSigner<TAccountPayer>;
-	state: Address<TAccountState>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	payer: TAccountPayer;
+	state: TAccountState;
+	systemProgram?: TAccountSystemProgram;
 	bump: CreatePdaInstructionDataArgs["bump"];
 };
 
 export function getCreatePdaInstruction<
-	TAccountPayer extends string,
-	TAccountState extends string,
-	TAccountSystemProgram extends string,
+	TAccountPayer extends InstructionSignerInput,
+	TAccountState extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CreatePdaInput<TAccountPayer, TAccountState, TAccountSystemProgram>,
 	config?: { programAddress?: TProgramAddress },
 ): CreatePdaInstruction<
 	TProgramAddress,
-	TAccountPayer,
-	TAccountState,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountPayer,
+		InstructionAccountInputAddress<TAccountPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountState,
+		InstructionAccountInputAddress<TAccountState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		payer: { value: input.payer ?? null, isWritable: true },
-		state: { value: input.state ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		state: { value: input.state ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -251,7 +296,6 @@ export function getCreatePdaInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("payer", accounts.payer),
@@ -264,9 +308,18 @@ export function getCreatePdaInstruction<
 		programAddress,
 	} as CreatePdaInstruction<
 		TProgramAddress,
-		TAccountPayer,
-		TAccountState,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountState,
+			InstructionAccountInputAddress<TAccountState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

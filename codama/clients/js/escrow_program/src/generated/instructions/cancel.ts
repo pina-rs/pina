@@ -25,14 +25,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -137,34 +140,37 @@ export function getCancelInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CancelInput<
-	TAccountMaker extends string = string,
-	TAccountMintA extends string = string,
-	TAccountMakerAtaA extends string = string,
-	TAccountEscrow extends string = string,
-	TAccountVault extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountMaker extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMintA extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMakerAtaA extends InstructionAccountInput = InstructionAccountInput,
+	TAccountEscrow extends InstructionAccountInput = InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	maker: TransactionSigner<TAccountMaker>;
-	mintA: Address<TAccountMintA>;
-	makerAtaA: Address<TAccountMakerAtaA>;
-	escrow: Address<TAccountEscrow>;
-	vault: Address<TAccountVault>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	maker: TAccountMaker;
+	mintA: TAccountMintA;
+	makerAtaA: TAccountMakerAtaA;
+	escrow: TAccountEscrow;
+	vault: TAccountVault;
+	tokenProgram: TAccountTokenProgram;
+	associatedTokenProgram?: TAccountAssociatedTokenProgram;
+	systemProgram?: TAccountSystemProgram;
 };
 
 export function getCancelInstruction<
-	TAccountMaker extends string,
-	TAccountMintA extends string,
-	TAccountMakerAtaA extends string,
-	TAccountEscrow extends string,
-	TAccountVault extends string,
-	TAccountTokenProgram extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountSystemProgram extends string,
+	TAccountMaker extends InstructionSignerInput,
+	TAccountMintA extends InstructionAccountInput,
+	TAccountMakerAtaA extends InstructionAccountInput,
+	TAccountEscrow extends InstructionAccountInput,
+	TAccountVault extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CancelInput<
@@ -180,32 +186,72 @@ export function getCancelInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): CancelInstruction<
 	TProgramAddress,
-	TAccountMaker,
-	TAccountMintA,
-	TAccountMakerAtaA,
-	TAccountEscrow,
-	TAccountVault,
-	TAccountTokenProgram,
-	TAccountAssociatedTokenProgram,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountMaker,
+		InstructionAccountInputAddress<TAccountMaker>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMintA,
+		InstructionAccountInputAddress<TAccountMintA>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMakerAtaA,
+		InstructionAccountInputAddress<TAccountMakerAtaA>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountEscrow,
+		InstructionAccountInputAddress<TAccountEscrow>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVault,
+		InstructionAccountInputAddress<TAccountVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAssociatedTokenProgram,
+		InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ESCROW_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		maker: { value: input.maker ?? null, isWritable: true },
-		mintA: { value: input.mintA ?? null, isWritable: false },
-		makerAtaA: { value: input.makerAtaA ?? null, isWritable: true },
-		escrow: { value: input.escrow ?? null, isWritable: true },
-		vault: { value: input.vault ?? null, isWritable: true },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		associatedTokenProgram: {
-			value: input.associatedTokenProgram ?? null,
+		maker: { value: input.maker ?? null, isSigner: true, isWritable: true },
+		mintA: { value: input.mintA ?? null, isSigner: false, isWritable: false },
+		makerAtaA: {
+			value: input.makerAtaA ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true },
+		vault: { value: input.vault ?? null, isSigner: false, isWritable: true },
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -226,7 +272,6 @@ export function getCancelInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("maker", accounts.maker),
@@ -242,14 +287,38 @@ export function getCancelInstruction<
 		programAddress,
 	} as CancelInstruction<
 		TProgramAddress,
-		TAccountMaker,
-		TAccountMintA,
-		TAccountMakerAtaA,
-		TAccountEscrow,
-		TAccountVault,
-		TAccountTokenProgram,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountMaker,
+			InstructionAccountInputAddress<TAccountMaker>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMintA,
+			InstructionAccountInputAddress<TAccountMintA>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMakerAtaA,
+			InstructionAccountInputAddress<TAccountMakerAtaA>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountEscrow,
+			InstructionAccountInputAddress<TAccountEscrow>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVault,
+			InstructionAccountInputAddress<TAccountVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

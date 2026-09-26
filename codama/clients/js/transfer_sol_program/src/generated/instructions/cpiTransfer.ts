@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -126,23 +129,24 @@ export function getCpiTransferInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CpiTransferInput<
-	TAccountSender extends string = string,
-	TAccountRecipient extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountSender extends InstructionSignerInput = InstructionSignerInput,
+	TAccountRecipient extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
 	/** The sender. Must be a signer and writable (lamports will be debited). */
-	sender: TransactionSigner<TAccountSender>;
+	sender: TAccountSender;
 	/** The recipient. Must be writable (lamports will be credited). */
-	recipient: Address<TAccountRecipient>;
+	recipient: TAccountRecipient;
 	/** The system program. */
-	systemProgram?: Address<TAccountSystemProgram>;
+	systemProgram?: TAccountSystemProgram;
 	amount: CpiTransferInstructionDataArgs["amount"];
 };
 
 export function getCpiTransferInstruction<
-	TAccountSender extends string,
-	TAccountRecipient extends string,
-	TAccountSystemProgram extends string,
+	TAccountSender extends InstructionSignerInput,
+	TAccountRecipient extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CpiTransferInput<
@@ -153,19 +157,39 @@ export function getCpiTransferInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): CpiTransferInstruction<
 	TProgramAddress,
-	TAccountSender,
-	TAccountRecipient,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountSender,
+		InstructionAccountInputAddress<TAccountSender>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRecipient,
+		InstructionAccountInputAddress<TAccountRecipient>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		TRANSFER_SOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		sender: { value: input.sender ?? null, isWritable: true },
-		recipient: { value: input.recipient ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		sender: { value: input.sender ?? null, isSigner: true, isWritable: true },
+		recipient: {
+			value: input.recipient ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -183,7 +207,6 @@ export function getCpiTransferInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("sender", accounts.sender),
@@ -196,9 +219,18 @@ export function getCpiTransferInstruction<
 		programAddress,
 	} as CpiTransferInstruction<
 		TProgramAddress,
-		TAccountSender,
-		TAccountRecipient,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountSender,
+			InstructionAccountInputAddress<TAccountSender>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRecipient,
+			InstructionAccountInputAddress<TAccountRecipient>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

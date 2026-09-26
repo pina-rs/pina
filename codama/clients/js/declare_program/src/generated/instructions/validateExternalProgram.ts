@@ -26,12 +26,15 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -117,16 +120,17 @@ export function getValidateExternalProgramInstructionDataCodec(): FixedSizeCodec
 }
 
 export type ValidateExternalProgramInput<
-	TAccountAuthority extends string = string,
-	TAccountExternalProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountExternalProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	externalProgram: Address<TAccountExternalProgram>;
+	authority: TAccountAuthority;
+	externalProgram: TAccountExternalProgram;
 };
 
 export function getValidateExternalProgramInstruction<
-	TAccountAuthority extends string,
-	TAccountExternalProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountExternalProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof DECLARE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ValidateExternalProgramInput<
@@ -136,18 +140,32 @@ export function getValidateExternalProgramInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ValidateExternalProgramInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountExternalProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountExternalProgram,
+		InstructionAccountInputAddress<TAccountExternalProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		DECLARE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
 		externalProgram: {
 			value: input.externalProgram ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
 	};
@@ -156,7 +174,6 @@ export function getValidateExternalProgramInstruction<
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -166,8 +183,14 @@ export function getValidateExternalProgramInstruction<
 		programAddress,
 	} as ValidateExternalProgramInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountExternalProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountExternalProgram,
+			InstructionAccountInputAddress<TAccountExternalProgram>
+		>
 	>);
 }
 

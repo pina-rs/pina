@@ -31,14 +31,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import {
@@ -142,35 +145,56 @@ export function getUpdateProfileInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type UpdateProfileAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile?: Address<TAccountProfile>;
+	profile?: TAccountProfile;
 	name: UpdateProfileInstructionDataArgs["name"];
 	bio: UpdateProfileInstructionDataArgs["bio"];
 };
 
 export async function getUpdateProfileInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateProfileAsyncInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
-	UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>
+	UpdateProfileInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -190,7 +214,6 @@ export async function getUpdateProfileInstructionAsync<
 		}, { programAddress });
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -202,43 +225,66 @@ export async function getUpdateProfileInstructionAsync<
 		programAddress,
 	} as UpdateProfileInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
 	>);
 }
 
 export type UpdateProfileInput<
-	TAccountAuthority extends string = string,
-	TAccountProfile extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	/** The profile's authority. Must sign to prove ownership. */
-	authority: TransactionSigner<TAccountAuthority>;
+	authority: TAccountAuthority;
 	/** The profile PDA account (must already exist and be writable). */
-	profile: Address<TAccountProfile>;
+	profile: TAccountProfile;
 	name: UpdateProfileInstructionDataArgs["name"];
 	bio: UpdateProfileInstructionDataArgs["bio"];
 };
 
 export function getUpdateProfileInstruction<
-	TAccountAuthority extends string,
-	TAccountProfile extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountProfile extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateProfileInput<TAccountAuthority, TAccountProfile>,
 	config?: { programAddress?: TProgramAddress },
 ): UpdateProfileInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountProfile
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProfile,
+		InstructionAccountInputAddress<TAccountProfile>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		profile: { value: input.profile ?? null, isWritable: true },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		profile: {
+			value: input.profile ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -248,7 +294,6 @@ export function getUpdateProfileInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -260,8 +305,14 @@ export function getUpdateProfileInstruction<
 		programAddress,
 	} as UpdateProfileInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountProfile
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProfile,
+			InstructionAccountInputAddress<TAccountProfile>
+		>
 	>);
 }
 

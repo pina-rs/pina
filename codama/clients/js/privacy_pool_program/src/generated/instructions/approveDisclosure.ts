@@ -26,13 +26,16 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -134,29 +137,32 @@ export function getApproveDisclosureInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type ApproveDisclosureInput<
-	TAccountCustodian extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountCustodianRegistry extends string = string,
-	TAccountDisclosureRequest extends string = string,
-	TAccountDisclosureLog extends string = string,
-	TAccountClock extends string = string,
+	TAccountCustodian extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	custodian: TransactionSigner<TAccountCustodian>;
-	poolConfig: Address<TAccountPoolConfig>;
-	custodianRegistry: Address<TAccountCustodianRegistry>;
-	disclosureRequest: Address<TAccountDisclosureRequest>;
-	disclosureLog: Address<TAccountDisclosureLog>;
-	clock: Address<TAccountClock>;
+	custodian: TAccountCustodian;
+	poolConfig: TAccountPoolConfig;
+	custodianRegistry: TAccountCustodianRegistry;
+	disclosureRequest: TAccountDisclosureRequest;
+	disclosureLog: TAccountDisclosureLog;
+	clock: TAccountClock;
 	reserved: ApproveDisclosureInstructionDataArgs["reserved"];
 };
 
 export function getApproveDisclosureInstruction<
-	TAccountCustodian extends string,
-	TAccountPoolConfig extends string,
-	TAccountCustodianRegistry extends string,
-	TAccountDisclosureRequest extends string,
-	TAccountDisclosureLog extends string,
-	TAccountClock extends string,
+	TAccountCustodian extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ApproveDisclosureInput<
@@ -170,31 +176,66 @@ export function getApproveDisclosureInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): ApproveDisclosureInstruction<
 	TProgramAddress,
-	TAccountCustodian,
-	TAccountPoolConfig,
-	TAccountCustodianRegistry,
-	TAccountDisclosureRequest,
-	TAccountDisclosureLog,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountCustodian,
+		InstructionAccountInputAddress<TAccountCustodian>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountCustodianRegistry,
+		InstructionAccountInputAddress<TAccountCustodianRegistry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureLog,
+		InstructionAccountInputAddress<TAccountDisclosureLog>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		custodian: { value: input.custodian ?? null, isWritable: false },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: false },
+		custodian: {
+			value: input.custodian ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 		custodianRegistry: {
 			value: input.custodianRegistry ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
 		disclosureRequest: {
 			value: input.disclosureRequest ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		disclosureLog: { value: input.disclosureLog ?? null, isWritable: true },
-		clock: { value: input.clock ?? null, isWritable: false },
+		disclosureLog: {
+			value: input.disclosureLog ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -204,7 +245,6 @@ export function getApproveDisclosureInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("custodian", accounts.custodian),
@@ -220,12 +260,30 @@ export function getApproveDisclosureInstruction<
 		programAddress,
 	} as ApproveDisclosureInstruction<
 		TProgramAddress,
-		TAccountCustodian,
-		TAccountPoolConfig,
-		TAccountCustodianRegistry,
-		TAccountDisclosureRequest,
-		TAccountDisclosureLog,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountCustodian,
+			InstructionAccountInputAddress<TAccountCustodian>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

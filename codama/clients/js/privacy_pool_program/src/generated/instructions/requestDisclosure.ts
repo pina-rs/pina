@@ -31,14 +31,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	fixPinaPodEncoderSize,
@@ -172,21 +175,25 @@ export function getRequestDisclosureInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RequestDisclosureInput<
-	TAccountRequester extends string = string,
-	TAccountPoolConfig extends string = string,
-	TAccountRequesterRegistry extends string = string,
-	TAccountNoteCommitment extends string = string,
-	TAccountDisclosureRequest extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountClock extends string = string,
+	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	requester: TransactionSigner<TAccountRequester>;
-	poolConfig: Address<TAccountPoolConfig>;
-	requesterRegistry: Address<TAccountRequesterRegistry>;
-	noteCommitment: Address<TAccountNoteCommitment>;
-	disclosureRequest: Address<TAccountDisclosureRequest>;
-	systemProgram: Address<TAccountSystemProgram>;
-	clock: Address<TAccountClock>;
+	requester: TAccountRequester;
+	poolConfig: TAccountPoolConfig;
+	requesterRegistry: TAccountRequesterRegistry;
+	noteCommitment: TAccountNoteCommitment;
+	disclosureRequest: TAccountDisclosureRequest;
+	systemProgram: TAccountSystemProgram;
+	clock: TAccountClock;
 	bump: RequestDisclosureInstructionDataArgs["bump"];
 	nonce: RequestDisclosureInstructionDataArgs["nonce"];
 	tier: RequestDisclosureInstructionDataArgs["tier"];
@@ -197,13 +204,13 @@ export type RequestDisclosureInput<
 };
 
 export function getRequestDisclosureInstruction<
-	TAccountRequester extends string,
-	TAccountPoolConfig extends string,
-	TAccountRequesterRegistry extends string,
-	TAccountNoteCommitment extends string,
-	TAccountDisclosureRequest extends string,
-	TAccountSystemProgram extends string,
-	TAccountClock extends string,
+	TAccountRequester extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RequestDisclosureInput<
@@ -218,33 +225,75 @@ export function getRequestDisclosureInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): RequestDisclosureInstruction<
 	TProgramAddress,
-	TAccountRequester,
-	TAccountPoolConfig,
-	TAccountRequesterRegistry,
-	TAccountNoteCommitment,
-	TAccountDisclosureRequest,
-	TAccountSystemProgram,
-	TAccountClock
+	ResolvedInstructionAccountMeta<
+		TAccountRequester,
+		InstructionAccountInputAddress<TAccountRequester>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRequesterRegistry,
+		InstructionAccountInputAddress<TAccountRequesterRegistry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNoteCommitment,
+		InstructionAccountInputAddress<TAccountNoteCommitment>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		requester: { value: input.requester ?? null, isWritable: true },
-		poolConfig: { value: input.poolConfig ?? null, isWritable: false },
-		requesterRegistry: {
-			value: input.requesterRegistry ?? null,
-			isWritable: false,
-		},
-		noteCommitment: { value: input.noteCommitment ?? null, isWritable: false },
-		disclosureRequest: {
-			value: input.disclosureRequest ?? null,
+		requester: {
+			value: input.requester ?? null,
+			isSigner: true,
 			isWritable: true,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		clock: { value: input.clock ?? null, isWritable: false },
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -254,7 +303,6 @@ export function getRequestDisclosureInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("requester", accounts.requester),
@@ -271,13 +319,34 @@ export function getRequestDisclosureInstruction<
 		programAddress,
 	} as RequestDisclosureInstruction<
 		TProgramAddress,
-		TAccountRequester,
-		TAccountPoolConfig,
-		TAccountRequesterRegistry,
-		TAccountNoteCommitment,
-		TAccountDisclosureRequest,
-		TAccountSystemProgram,
-		TAccountClock
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
 	>);
 }
 

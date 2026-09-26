@@ -28,7 +28,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -112,16 +115,16 @@ export function getAllowsDuplicateReadonlyInstructionDataCodec(): FixedSizeCodec
 }
 
 export type AllowsDuplicateReadonlyInput<
-	TAccountAccount1 extends string = string,
-	TAccountAccount2 extends string = string,
+	TAccountAccount1 extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAccount2 extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	account1: Address<TAccountAccount1>;
-	account2: Address<TAccountAccount2>;
+	account1: TAccountAccount1;
+	account2: TAccountAccount2;
 };
 
 export function getAllowsDuplicateReadonlyInstruction<
-	TAccountAccount1 extends string,
-	TAccountAccount2 extends string,
+	TAccountAccount1 extends InstructionAccountInput,
+	TAccountAccount2 extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -129,24 +132,40 @@ export function getAllowsDuplicateReadonlyInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): AllowsDuplicateReadonlyInstruction<
 	TProgramAddress,
-	TAccountAccount1,
-	TAccountAccount2
+	ResolvedInstructionAccountMeta<
+		TAccountAccount1,
+		InstructionAccountInputAddress<TAccountAccount1>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAccount2,
+		InstructionAccountInputAddress<TAccountAccount2>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		account1: { value: input.account1 ?? null, isWritable: false },
-		account2: { value: input.account2 ?? null, isWritable: false },
+		account1: {
+			value: input.account1 ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		account2: {
+			value: input.account2 ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
 		ResolvedInstructionAccount
 	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("account1", accounts.account1),
@@ -156,8 +175,14 @@ export function getAllowsDuplicateReadonlyInstruction<
 		programAddress,
 	} as AllowsDuplicateReadonlyInstruction<
 		TProgramAddress,
-		TAccountAccount1,
-		TAccountAccount2
+		ResolvedInstructionAccountMeta<
+			TAccountAccount1,
+			InstructionAccountInputAddress<TAccountAccount1>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAccount2,
+			InstructionAccountInputAddress<TAccountAccount2>
+		>
 	>);
 }
 

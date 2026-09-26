@@ -30,14 +30,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import {
@@ -135,21 +138,22 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeAsyncInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo?: Address<TAccountTodo>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	owner: TAccountOwner;
+	todo?: TAccountTodo;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 	digest: InitializeInstructionDataArgs["digest"];
 };
 
 export async function getInitializeInstructionAsync<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
-	TAccountSystemProgram extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeAsyncInput<
@@ -161,19 +165,35 @@ export async function getInitializeInstructionAsync<
 ): Promise<
 	InitializeInstruction<
 		TProgramAddress,
-		TAccountOwner,
-		TAccountTodo,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -199,7 +219,6 @@ export async function getInitializeInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -212,46 +231,72 @@ export async function getInitializeInstructionAsync<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountOwner,
-		TAccountTodo,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
 export type InitializeInput<
-	TAccountOwner extends string = string,
-	TAccountTodo extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	owner: TransactionSigner<TAccountOwner>;
-	todo: Address<TAccountTodo>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	owner: TAccountOwner;
+	todo: TAccountTodo;
+	systemProgram?: TAccountSystemProgram;
 	bump: InitializeInstructionDataArgs["bump"];
 	digest: InitializeInstructionDataArgs["digest"];
 };
 
 export function getInitializeInstruction<
-	TAccountOwner extends string,
-	TAccountTodo extends string,
-	TAccountSystemProgram extends string,
+	TAccountOwner extends InstructionSignerInput,
+	TAccountTodo extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<TAccountOwner, TAccountTodo, TAccountSystemProgram>,
 	config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
 	TProgramAddress,
-	TAccountOwner,
-	TAccountTodo,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountOwner,
+		InstructionAccountInputAddress<TAccountOwner>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTodo,
+		InstructionAccountInputAddress<TAccountTodo>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isWritable: false },
-		todo: { value: input.todo ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -269,7 +314,6 @@ export function getInitializeInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("owner", accounts.owner),
@@ -282,9 +326,18 @@ export function getInitializeInstruction<
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
-		TAccountOwner,
-		TAccountTodo,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountOwner,
+			InstructionAccountInputAddress<TAccountOwner>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTodo,
+			InstructionAccountInputAddress<TAccountTodo>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

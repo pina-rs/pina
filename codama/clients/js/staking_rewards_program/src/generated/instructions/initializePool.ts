@@ -25,7 +25,6 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
@@ -33,7 +32,11 @@ import {
 import {
 	getAccountMetaFactory,
 	getAddressFromResolvedInstructionAccount,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findPoolPda } from "../pdas";
 import {
@@ -147,38 +150,41 @@ export function getInitializePoolInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializePoolAsyncInput<
-	TAccountAdmin extends string = string,
-	TAccountStakeMint extends string = string,
-	TAccountRewardMint extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountStakeVault extends string = string,
-	TAccountRewardVault extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTokenProgram extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	stakeMint: Address<TAccountStakeMint>;
-	rewardMint: Address<TAccountRewardMint>;
-	poolState?: Address<TAccountPoolState>;
-	stakeVault: Address<TAccountStakeVault>;
-	rewardVault: Address<TAccountRewardVault>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
+	admin: TAccountAdmin;
+	stakeMint: TAccountStakeMint;
+	rewardMint: TAccountRewardMint;
+	poolState?: TAccountPoolState;
+	stakeVault: TAccountStakeVault;
+	rewardVault: TAccountRewardVault;
+	associatedTokenProgram?: TAccountAssociatedTokenProgram;
+	systemProgram?: TAccountSystemProgram;
+	tokenProgram: TAccountTokenProgram;
 	bump: InitializePoolInstructionDataArgs["bump"];
 };
 
 export async function getInitializePoolInstructionAsync<
-	TAccountAdmin extends string,
-	TAccountStakeMint extends string,
-	TAccountRewardMint extends string,
-	TAccountPoolState extends string,
-	TAccountStakeVault extends string,
-	TAccountRewardVault extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TAccountTokenProgram extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -197,35 +203,94 @@ export async function getInitializePoolInstructionAsync<
 ): Promise<
 	InitializePoolInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountStakeMint,
-		TAccountRewardMint,
-		TAccountPoolState,
-		TAccountStakeVault,
-		TAccountRewardVault,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram,
-		TAccountTokenProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeMint,
+			InstructionAccountInputAddress<TAccountStakeMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardMint,
+			InstructionAccountInputAddress<TAccountRewardMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeVault,
+			InstructionAccountInputAddress<TAccountStakeVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardVault,
+			InstructionAccountInputAddress<TAccountRewardVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>
 	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: true },
-		stakeMint: { value: input.stakeMint ?? null, isWritable: false },
-		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
-		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
-		rewardVault: { value: input.rewardVault ?? null, isWritable: true },
-		associatedTokenProgram: {
-			value: input.associatedTokenProgram ?? null,
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: true },
+		stakeMint: {
+			value: input.stakeMint ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		rewardMint: {
+			value: input.rewardMint ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		poolState: {
+			value: input.poolState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		stakeVault: {
+			value: input.stakeVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rewardVault: {
+			value: input.rewardVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -261,7 +326,6 @@ export async function getInitializePoolInstructionAsync<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -280,51 +344,81 @@ export async function getInitializePoolInstructionAsync<
 		programAddress,
 	} as InitializePoolInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountStakeMint,
-		TAccountRewardMint,
-		TAccountPoolState,
-		TAccountStakeVault,
-		TAccountRewardVault,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram,
-		TAccountTokenProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeMint,
+			InstructionAccountInputAddress<TAccountStakeMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardMint,
+			InstructionAccountInputAddress<TAccountRewardMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeVault,
+			InstructionAccountInputAddress<TAccountStakeVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardVault,
+			InstructionAccountInputAddress<TAccountRewardVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>
 	>);
 }
 
 export type InitializePoolInput<
-	TAccountAdmin extends string = string,
-	TAccountStakeMint extends string = string,
-	TAccountRewardMint extends string = string,
-	TAccountPoolState extends string = string,
-	TAccountStakeVault extends string = string,
-	TAccountRewardVault extends string = string,
-	TAccountAssociatedTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountTokenProgram extends string = string,
+	TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput = InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	admin: TransactionSigner<TAccountAdmin>;
-	stakeMint: Address<TAccountStakeMint>;
-	rewardMint: Address<TAccountRewardMint>;
-	poolState: Address<TAccountPoolState>;
-	stakeVault: Address<TAccountStakeVault>;
-	rewardVault: Address<TAccountRewardVault>;
-	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	tokenProgram: Address<TAccountTokenProgram>;
+	admin: TAccountAdmin;
+	stakeMint: TAccountStakeMint;
+	rewardMint: TAccountRewardMint;
+	poolState: TAccountPoolState;
+	stakeVault: TAccountStakeVault;
+	rewardVault: TAccountRewardVault;
+	associatedTokenProgram?: TAccountAssociatedTokenProgram;
+	systemProgram?: TAccountSystemProgram;
+	tokenProgram: TAccountTokenProgram;
 	bump: InitializePoolInstructionDataArgs["bump"];
 };
 
 export function getInitializePoolInstruction<
-	TAccountAdmin extends string,
-	TAccountStakeMint extends string,
-	TAccountRewardMint extends string,
-	TAccountPoolState extends string,
-	TAccountStakeVault extends string,
-	TAccountRewardVault extends string,
-	TAccountAssociatedTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TAccountTokenProgram extends string,
+	TAccountAdmin extends InstructionSignerInput,
+	TAccountStakeMint extends InstructionAccountInput,
+	TAccountRewardMint extends InstructionAccountInput,
+	TAccountPoolState extends InstructionAccountInput,
+	TAccountStakeVault extends InstructionAccountInput,
+	TAccountRewardVault extends InstructionAccountInput,
+	TAccountAssociatedTokenProgram extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountTokenProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -342,34 +436,93 @@ export function getInitializePoolInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): InitializePoolInstruction<
 	TProgramAddress,
-	TAccountAdmin,
-	TAccountStakeMint,
-	TAccountRewardMint,
-	TAccountPoolState,
-	TAccountStakeVault,
-	TAccountRewardVault,
-	TAccountAssociatedTokenProgram,
-	TAccountSystemProgram,
-	TAccountTokenProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAdmin,
+		InstructionAccountInputAddress<TAccountAdmin>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStakeMint,
+		InstructionAccountInputAddress<TAccountStakeMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRewardMint,
+		InstructionAccountInputAddress<TAccountRewardMint>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolState,
+		InstructionAccountInputAddress<TAccountPoolState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountStakeVault,
+		InstructionAccountInputAddress<TAccountStakeVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRewardVault,
+		InstructionAccountInputAddress<TAccountRewardVault>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountAssociatedTokenProgram,
+		InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountTokenProgram,
+		InstructionAccountInputAddress<TAccountTokenProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: true },
-		stakeMint: { value: input.stakeMint ?? null, isWritable: false },
-		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
-		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
-		rewardVault: { value: input.rewardVault ?? null, isWritable: true },
-		associatedTokenProgram: {
-			value: input.associatedTokenProgram ?? null,
+		admin: { value: input.admin ?? null, isSigner: true, isWritable: true },
+		stakeMint: {
+			value: input.stakeMint ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		rewardMint: {
+			value: input.rewardMint ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		poolState: {
+			value: input.poolState ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		stakeVault: {
+			value: input.stakeVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		rewardVault: {
+			value: input.rewardVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		tokenProgram: {
+			value: input.tokenProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -393,7 +546,6 @@ export function getInitializePoolInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("admin", accounts.admin),
@@ -412,15 +564,42 @@ export function getInitializePoolInstruction<
 		programAddress,
 	} as InitializePoolInstruction<
 		TProgramAddress,
-		TAccountAdmin,
-		TAccountStakeMint,
-		TAccountRewardMint,
-		TAccountPoolState,
-		TAccountStakeVault,
-		TAccountRewardVault,
-		TAccountAssociatedTokenProgram,
-		TAccountSystemProgram,
-		TAccountTokenProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAdmin,
+			InstructionAccountInputAddress<TAccountAdmin>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeMint,
+			InstructionAccountInputAddress<TAccountStakeMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardMint,
+			InstructionAccountInputAddress<TAccountRewardMint>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolState,
+			InstructionAccountInputAddress<TAccountPoolState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountStakeVault,
+			InstructionAccountInputAddress<TAccountStakeVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRewardVault,
+			InstructionAccountInputAddress<TAccountRewardVault>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountAssociatedTokenProgram,
+			InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountTokenProgram,
+			InstructionAccountInputAddress<TAccountTokenProgram>
+		>
 	>);
 }
 

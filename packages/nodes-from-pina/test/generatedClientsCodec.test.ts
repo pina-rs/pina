@@ -4,7 +4,12 @@
  * back, and verify every field survives the trip.
  */
 
+import { type Address, createNoopSigner } from "@solana/kit";
 import { describe, expect, test } from "vitest";
+
+// Kit 8 resolves signer accounts only from `TransactionSigner` inputs; the
+// test fixtures keep plain string addresses, so wrap them into no-op signers.
+const noopSigner = (address: string) => createNoopSigner(address as Address);
 
 // ---------------------------------------------------------------------------
 // Role-registry client
@@ -208,7 +213,7 @@ describe("role-registry codec roundtrips", () => {
 
 	test("Initialize instruction build → parse roundtrip", () => {
 		const ix = getRoleInitializeInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			registryConfig: ADDR_B,
 			bump: 8,
 		} as any);
@@ -221,7 +226,7 @@ describe("role-registry codec roundtrips", () => {
 
 	test("AddRole instruction build → parse roundtrip", () => {
 		const ix = getAddRoleInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			grantee: ADDR_C,
 			registryConfig: ADDR_B,
 			roleEntry: ADDR_A,
@@ -238,7 +243,7 @@ describe("role-registry codec roundtrips", () => {
 
 	test("UpdateRole instruction build → parse roundtrip", () => {
 		const ix = getUpdateRoleInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			registryConfig: ADDR_B,
 			roleEntry: ADDR_C,
 			permissions: 63n,
@@ -329,7 +334,7 @@ describe("vesting codec roundtrips", () => {
 
 	test("Initialize instruction build → parse roundtrip", () => {
 		const ix = getVestingInitializeInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			beneficiary: ADDR_B,
 			mint: ADDR_C,
 			vestingState: ADDR_A,
@@ -351,7 +356,7 @@ describe("vesting codec roundtrips", () => {
 
 	test("Claim instruction build → parse roundtrip", () => {
 		const ix = getClaimInstruction({
-			beneficiary: ADDR_B,
+			beneficiary: noopSigner(ADDR_B),
 			mint: ADDR_C,
 			vestingState: ADDR_A,
 			beneficiaryAta: ADDR_B,
@@ -366,7 +371,7 @@ describe("vesting codec roundtrips", () => {
 
 	test("Cancel instruction build → parse (no data)", () => {
 		const ix = getCancelInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			mint: ADDR_C,
 			vestingState: ADDR_B,
 			vault: ADDR_A,
@@ -487,7 +492,7 @@ describe("staking codec roundtrips", () => {
 
 	test("InitializePool instruction build → parse roundtrip", () => {
 		const ix = getInitializePoolInstruction({
-			admin: ADDR_A,
+			admin: noopSigner(ADDR_A),
 			stakeMint: ADDR_B,
 			rewardMint: ADDR_C,
 			poolState: ADDR_A,
@@ -504,7 +509,7 @@ describe("staking codec roundtrips", () => {
 
 	test("OpenPosition instruction build → parse roundtrip", () => {
 		const ix = getOpenPositionInstruction({
-			user: ADDR_A,
+			user: noopSigner(ADDR_A),
 			poolState: ADDR_B,
 			positionState: ADDR_C,
 			bump: 4,
@@ -517,7 +522,7 @@ describe("staking codec roundtrips", () => {
 
 	test("Deposit instruction build → parse roundtrip", () => {
 		const ix = getDepositInstruction({
-			user: ADDR_A,
+			user: noopSigner(ADDR_A),
 			stakeMint: ADDR_B,
 			poolState: ADDR_C,
 			positionState: ADDR_A,
@@ -532,7 +537,7 @@ describe("staking codec roundtrips", () => {
 
 	test("Withdraw instruction build → parse roundtrip", () => {
 		const ix = getWithdrawInstruction({
-			user: ADDR_A,
+			user: noopSigner(ADDR_A),
 			stakeMint: ADDR_B,
 			poolState: ADDR_C,
 			positionState: ADDR_A,

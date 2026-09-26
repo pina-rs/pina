@@ -29,7 +29,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -119,20 +122,22 @@ export function getGrantDisclosureInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type GrantDisclosureInput<
-	TAccountDisclosureRequest extends string = string,
-	TAccountNoteCommitment extends string = string,
-	TAccountViewer extends string = string,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountViewer extends InstructionAccountInput = InstructionAccountInput,
 > = {
-	disclosureRequest: Address<TAccountDisclosureRequest>;
-	noteCommitment: Address<TAccountNoteCommitment>;
-	viewer: Address<TAccountViewer>;
+	disclosureRequest: TAccountDisclosureRequest;
+	noteCommitment: TAccountNoteCommitment;
+	viewer: TAccountViewer;
 	reserved: GrantDisclosureInstructionDataArgs["reserved"];
 };
 
 export function getGrantDisclosureInstruction<
-	TAccountDisclosureRequest extends string,
-	TAccountNoteCommitment extends string,
-	TAccountViewer extends string,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountViewer extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: GrantDisclosureInput<
@@ -143,22 +148,39 @@ export function getGrantDisclosureInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): GrantDisclosureInstruction<
 	TProgramAddress,
-	TAccountDisclosureRequest,
-	TAccountNoteCommitment,
-	TAccountViewer
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNoteCommitment,
+		InstructionAccountInputAddress<TAccountNoteCommitment>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountViewer,
+		InstructionAccountInputAddress<TAccountViewer>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
 		disclosureRequest: {
 			value: input.disclosureRequest ?? null,
+			isSigner: false,
 			isWritable: true,
 		},
-		noteCommitment: { value: input.noteCommitment ?? null, isWritable: false },
-		viewer: { value: input.viewer ?? null, isWritable: false },
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		viewer: { value: input.viewer ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -168,7 +190,6 @@ export function getGrantDisclosureInstruction<
 	// Original args.
 	const args = { ...input };
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
@@ -181,9 +202,18 @@ export function getGrantDisclosureInstruction<
 		programAddress,
 	} as GrantDisclosureInstruction<
 		TProgramAddress,
-		TAccountDisclosureRequest,
-		TAccountNoteCommitment,
-		TAccountViewer
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountViewer,
+			InstructionAccountInputAddress<TAccountViewer>
+		>
 	>);
 }
 

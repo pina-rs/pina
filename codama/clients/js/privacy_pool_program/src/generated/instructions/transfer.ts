@@ -29,14 +29,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	fixPinaPodEncoderSize,
@@ -184,27 +187,31 @@ export function getTransferInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type TransferInput<
-	TAccountPoolConfig extends string = string,
-	TAccountPayer extends string = string,
-	TAccountMerkleTree extends string = string,
-	TAccountNullifierSet extends string = string,
-	TAccountVerifyingKeyAccount extends string = string,
-	TAccountNoteCommitment extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountVerifyingKeyAccount extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	poolConfig: Address<TAccountPoolConfig>;
+	poolConfig: TAccountPoolConfig;
 	/**
 	 * Funds the successor note's rent. Transfers are anonymous with respect
 	 * to the spent note, not to fees: this example has no relayer, so the
 	 * submitting wallet signs and pays. Production routes this through a
 	 * relayer so even this linkage disappears.
 	 */
-	payer: TransactionSigner<TAccountPayer>;
-	merkleTree: Address<TAccountMerkleTree>;
-	nullifierSet: Address<TAccountNullifierSet>;
-	verifyingKeyAccount: Address<TAccountVerifyingKeyAccount>;
-	noteCommitment: Address<TAccountNoteCommitment>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	payer: TAccountPayer;
+	merkleTree: TAccountMerkleTree;
+	nullifierSet: TAccountNullifierSet;
+	verifyingKeyAccount: TAccountVerifyingKeyAccount;
+	noteCommitment: TAccountNoteCommitment;
+	systemProgram?: TAccountSystemProgram;
 	bump: TransferInstructionDataArgs["bump"];
 	nullifier: TransferInstructionDataArgs["nullifier"];
 	root: TransferInstructionDataArgs["root"];
@@ -219,13 +226,13 @@ export type TransferInput<
 };
 
 export function getTransferInstruction<
-	TAccountPoolConfig extends string,
-	TAccountPayer extends string,
-	TAccountMerkleTree extends string,
-	TAccountNullifierSet extends string,
-	TAccountVerifyingKeyAccount extends string,
-	TAccountNoteCommitment extends string,
-	TAccountSystemProgram extends string,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPayer extends InstructionSignerInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountVerifyingKeyAccount extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: TransferInput<
@@ -240,30 +247,75 @@ export function getTransferInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): TransferInstruction<
 	TProgramAddress,
-	TAccountPoolConfig,
-	TAccountPayer,
-	TAccountMerkleTree,
-	TAccountNullifierSet,
-	TAccountVerifyingKeyAccount,
-	TAccountNoteCommitment,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPayer,
+		InstructionAccountInputAddress<TAccountPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMerkleTree,
+		InstructionAccountInputAddress<TAccountMerkleTree>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNullifierSet,
+		InstructionAccountInputAddress<TAccountNullifierSet>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountVerifyingKeyAccount,
+		InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNoteCommitment,
+		InstructionAccountInputAddress<TAccountNoteCommitment>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		poolConfig: { value: input.poolConfig ?? null, isWritable: false },
-		payer: { value: input.payer ?? null, isWritable: true },
-		merkleTree: { value: input.merkleTree ?? null, isWritable: true },
-		nullifierSet: { value: input.nullifierSet ?? null, isWritable: true },
-		verifyingKeyAccount: {
-			value: input.verifyingKeyAccount ?? null,
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
-		noteCommitment: { value: input.noteCommitment ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierSet: {
+			value: input.nullifierSet ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		verifyingKeyAccount: {
+			value: input.verifyingKeyAccount ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -281,7 +333,6 @@ export function getTransferInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("poolConfig", accounts.poolConfig),
@@ -298,13 +349,34 @@ export function getTransferInstruction<
 		programAddress,
 	} as TransferInstruction<
 		TProgramAddress,
-		TAccountPoolConfig,
-		TAccountPayer,
-		TAccountMerkleTree,
-		TAccountNullifierSet,
-		TAccountVerifyingKeyAccount,
-		TAccountNoteCommitment,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVerifyingKeyAccount,
+			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 

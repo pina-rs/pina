@@ -28,14 +28,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MIGRATIONS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
@@ -119,29 +122,32 @@ export function getRelayInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type RelayInput<
-	TAccountAuthority extends string = string,
-	TAccountReferrer extends string = string,
-	TAccountState extends string = string,
-	TAccountMigrationPayer extends string = string,
-	TAccountSystemProgram extends string = string,
-	TAccountMigrationProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountReferrer extends InstructionAccountInput = InstructionAccountInput,
+	TAccountState extends InstructionAccountInput = InstructionAccountInput,
+	TAccountMigrationPayer extends InstructionSignerInput =
+		InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountMigrationProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	referrer: Address<TAccountReferrer>;
-	state: Address<TAccountState>;
-	migrationPayer: TransactionSigner<TAccountMigrationPayer>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	migrationProgram: Address<TAccountMigrationProgram>;
+	authority: TAccountAuthority;
+	referrer: TAccountReferrer;
+	state: TAccountState;
+	migrationPayer: TAccountMigrationPayer;
+	systemProgram?: TAccountSystemProgram;
+	migrationProgram: TAccountMigrationProgram;
 	value: RelayInstructionDataArgs["value"];
 };
 
 export function getRelayInstruction<
-	TAccountAuthority extends string,
-	TAccountReferrer extends string,
-	TAccountState extends string,
-	TAccountMigrationPayer extends string,
-	TAccountSystemProgram extends string,
-	TAccountMigrationProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountReferrer extends InstructionAccountInput,
+	TAccountState extends InstructionAccountInput,
+	TAccountMigrationPayer extends InstructionSignerInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountMigrationProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MIGRATIONS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RelayInput<
@@ -155,26 +161,64 @@ export function getRelayInstruction<
 	config?: { programAddress?: TProgramAddress },
 ): RelayInstruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountReferrer,
-	TAccountState,
-	TAccountMigrationPayer,
-	TAccountSystemProgram,
-	TAccountMigrationProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountReferrer,
+		InstructionAccountInputAddress<TAccountReferrer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountState,
+		InstructionAccountInputAddress<TAccountState>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMigrationPayer,
+		InstructionAccountInputAddress<TAccountMigrationPayer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMigrationProgram,
+		InstructionAccountInputAddress<TAccountMigrationProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		MIGRATIONS_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
-		referrer: { value: input.referrer ?? null, isWritable: false },
-		state: { value: input.state ?? null, isWritable: true },
-		migrationPayer: { value: input.migrationPayer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		referrer: {
+			value: input.referrer ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		state: { value: input.state ?? null, isSigner: false, isWritable: true },
+		migrationPayer: {
+			value: input.migrationPayer ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 		migrationProgram: {
 			value: input.migrationProgram ?? null,
+			isSigner: false,
 			isWritable: false,
 		},
 	};
@@ -194,7 +238,6 @@ export function getRelayInstruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -210,12 +253,30 @@ export function getRelayInstruction<
 		programAddress,
 	} as RelayInstruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountReferrer,
-		TAccountState,
-		TAccountMigrationPayer,
-		TAccountSystemProgram,
-		TAccountMigrationProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountReferrer,
+			InstructionAccountInputAddress<TAccountReferrer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountState,
+			InstructionAccountInputAddress<TAccountState>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMigrationPayer,
+			InstructionAccountInputAddress<TAccountMigrationPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMigrationProgram,
+			InstructionAccountInputAddress<TAccountMigrationProgram>
+		>
 	>);
 }
 

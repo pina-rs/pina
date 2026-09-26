@@ -36,7 +36,7 @@
 	},
 	"dependencies": {
 		"@pina-rs/cli": "^0.21.0",
-		"codama": "^1.10.2"
+		"codama": "^1.11.0"
 	},
 	"devDependencies": {
 		"@types/node": "^26.5.1",

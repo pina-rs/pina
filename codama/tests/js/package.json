@@ -6,6 +6,6 @@
 		"test": "node validate-idls.mjs && tsx --test migration-helpers.test.ts"
 	},
 	"devDependencies": {
-		"codama": "^1.10.2"
+		"codama": "^1.11.0"
 	}
 }

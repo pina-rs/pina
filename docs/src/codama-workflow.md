@@ -49,7 +49,7 @@ For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`
 
 ### Solana Kit dependencies
 
-Pina pins `codama-renderers-dart@0.5.5`, which includes upstream support for pre/post-offset collection length codecs, and uses Solana Kit Dart packages at `^0.8.0`. This preserves shared compact headers with multiple dynamic tails in addition to schema normalization, package exports, discriminator enforcement, exact instruction decoding, capacity-aware account decoding, fixed-capacity overflow rejection, canonical boolean, option, and UTF-8 codecs, and wide-enum support. No renderer patch or renderer-specific dependency override is required.
+Pina pins `codama-renderers-dart@0.5.6`, which includes upstream support for pre/post-offset collection length codecs, and uses Solana Kit Dart packages at `">=0.10.0 <1.0.0"` — the range the generated sources are verified against. This preserves shared compact headers with multiple dynamic tails in addition to schema normalization, package exports, discriminator enforcement, exact instruction decoding, capacity-aware account decoding, fixed-capacity overflow rejection, canonical boolean, option, and UTF-8 codecs, and wide-enum support. No renderer patch or renderer-specific dependency override is required.
 
 The generated-client contract suite verifies those behaviors directly. Dependency upgrades must continue to pass the same byte-level contracts without patches, Git overrides, or generated-source rewrites.
 

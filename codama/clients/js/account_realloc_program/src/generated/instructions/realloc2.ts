@@ -27,14 +27,17 @@ import {
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
-	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import {
 	getPinaPodDiscriminatorDecoder,
@@ -126,23 +129,24 @@ export function getRealloc2InstructionDataCodec(): FixedSizeCodec<
 }
 
 export type Realloc2Input<
-	TAccountAuthority extends string = string,
-	TAccountSample1 extends string = string,
-	TAccountSample2 extends string = string,
-	TAccountSystemProgram extends string = string,
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSample1 extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSample2 extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
 > = {
-	authority: TransactionSigner<TAccountAuthority>;
-	sample1: Address<TAccountSample1>;
-	sample2: Address<TAccountSample2>;
-	systemProgram?: Address<TAccountSystemProgram>;
+	authority: TAccountAuthority;
+	sample1: TAccountSample1;
+	sample2: TAccountSample2;
+	systemProgram?: TAccountSystemProgram;
 	len: Realloc2InstructionDataArgs["len"];
 };
 
 export function getRealloc2Instruction<
-	TAccountAuthority extends string,
-	TAccountSample1 extends string,
-	TAccountSample2 extends string,
-	TAccountSystemProgram extends string,
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountSample1 extends InstructionAccountInput,
+	TAccountSample2 extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address =
 		typeof ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -155,21 +159,52 @@ export function getRealloc2Instruction<
 	config?: { programAddress?: TProgramAddress },
 ): Realloc2Instruction<
 	TProgramAddress,
-	TAccountAuthority,
-	TAccountSample1,
-	TAccountSample2,
-	TAccountSystemProgram
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSample1,
+		InstructionAccountInputAddress<TAccountSample1>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSample2,
+		InstructionAccountInputAddress<TAccountSample2>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
 		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
 
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		sample1: { value: input.sample1 ?? null, isWritable: true },
-		sample2: { value: input.sample2 ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		sample1: {
+			value: input.sample1 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		sample2: {
+			value: input.sample2 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -187,7 +222,6 @@ export function getRealloc2Instruction<
 			>;
 	}
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("authority", accounts.authority),
@@ -201,10 +235,22 @@ export function getRealloc2Instruction<
 		programAddress,
 	} as Realloc2Instruction<
 		TProgramAddress,
-		TAccountAuthority,
-		TAccountSample1,
-		TAccountSample2,
-		TAccountSystemProgram
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample1,
+			InstructionAccountInputAddress<TAccountSample1>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample2,
+			InstructionAccountInputAddress<TAccountSample2>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
 	>);
 }
 
