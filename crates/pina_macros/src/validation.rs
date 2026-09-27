@@ -166,21 +166,35 @@ impl ComparisonOperator {
 	}
 }
 
-/// One side of a comparison: the receiver, an operator, or a bound.
-#[derive(Debug)]
+/// One side of a comparison: the field, or a literal bound.
+#[derive(Clone, Debug)]
 #[cfg_attr(not(feature = "validation"), allow(dead_code))]
-enum ComparisonPart {
+enum Operand {
 	Receiver,
-	Operator(ComparisonOperator),
 	Bound(TokenStream),
 }
 
-/// A comparison over the field's `value` or `len`.
+/// One `left op right` comparison.
+#[derive(Debug)]
+#[cfg_attr(not(feature = "validation"), allow(dead_code))]
+struct ComparisonCheck {
+	left: Operand,
+	operator: ComparisonOperator,
+	right: Operand,
+}
+
+/// A comparison over the field's `value` or `len`, held as the checks that
+/// must all hold.
+///
+/// A single bound is one check; a chain is two, because Rust has no chained
+/// comparison to generate. `100 < value <= u64::MAX` is `100 < value` and
+/// `value <= u64::MAX`, which is what `rustc` suggests when handed the chain
+/// verbatim.
 #[derive(Debug)]
 #[cfg_attr(not(feature = "validation"), allow(dead_code))]
 struct ComparisonRule {
 	receiver: ValueReceiver,
-	parts: Vec<ComparisonPart>,
+	checks: Vec<ComparisonCheck>,
 	span: Span,
 }
 
@@ -233,6 +247,23 @@ impl LegacyParam {
 	}
 }
 
+/// A named parameter a value rule accepts: a deprecated bound or the `error`
+/// override. Comparisons name a receiver instead, and never reach here.
+enum NamedParameter {
+	Bound(LegacyParam),
+	Error,
+}
+
+impl NamedParameter {
+	fn from_ident(ident: &Ident) -> Option<Self> {
+		if ident == "error" {
+			return Some(Self::Error);
+		}
+
+		LegacyParam::from_ident(ident).map(Self::Bound)
+	}
+}
+
 /// A deprecated parameter, with the diagnostic the author sees.
 #[derive(Debug)]
 pub(crate) struct Deprecation {
@@ -269,9 +300,11 @@ pub(crate) fn take_value_validations(item: &mut ItemStruct) -> syn::Result<Schem
 	let mut parse_error = None;
 
 	for field in &mut fields.named {
-		let ident = field.ident.clone().ok_or_else(|| {
-			syn::Error::new_spanned(&*field, "validation annotations require a named field")
-		})?;
+		// `Fields::Named` guarantees an identifier on every field.
+		let ident = field
+			.ident
+			.clone()
+			.expect("internal error: named field without an ident");
 
 		let mut groups = Vec::new();
 		field.attrs.retain_mut(|attribute| {
@@ -393,44 +426,31 @@ impl Parse for FieldValidations {
 fn parse_value_item(input: ParseStream) -> syn::Result<(ValueItem, Option<Deprecation>)> {
 	// A named parameter is an identifier followed by a lone `=`. A `==` starts
 	// a comparison instead, so the spacing has to disambiguate.
-	if input.peek(Ident) && lone_parameter_equals(input)? {
+	if let Some(parameter) = peek_named_parameter(input)? {
 		let ident: Ident = input.parse()?;
 		input.parse::<Token![=]>()?;
 		let bound: Expr = input.parse()?;
 		let span = ident.span();
 
-		return match ident.to_string().as_str() {
-			"error" => Ok((ValueItem::Error(bound, span), None)),
-			"min" => Ok(deprecated_bound(span, LegacyParam::Min, bound)),
-			"max" => Ok(deprecated_bound(span, LegacyParam::Max, bound)),
-			"min_len" => Ok(deprecated_bound(span, LegacyParam::MinLen, bound)),
-			"max_len" => Ok(deprecated_bound(span, LegacyParam::MaxLen, bound)),
-			"exact_len" => Ok(deprecated_bound(span, LegacyParam::ExactLen, bound)),
-			name => {
-				Err(syn::Error::new(
-					span,
-					format!(
-						"unknown validation parameter `{name}`; rules compare the field's `value` \
-						 or its `len`, as in `value >= 1`"
-					),
-				))
-			}
-		};
+		return Ok(match parameter {
+			NamedParameter::Error => (ValueItem::Error(bound, span), None),
+			NamedParameter::Bound(param) => deprecated_bound(span, param, bound),
+		});
 	}
 
 	Ok((ValueItem::Comparison(parse_comparison(input)?), None))
 }
 
-/// Whether an identifier at the front of `input` is followed by a single `=`
-/// rather than the `==` of a comparison.
-fn lone_parameter_equals(input: ParseStream<'_>) -> syn::Result<bool> {
+/// The named parameter at the front of `input`, when the `=` that follows is a
+/// single token rather than half of a comparison's `==`.
+fn peek_named_parameter(input: ParseStream<'_>) -> syn::Result<Option<NamedParameter>> {
 	let fork = input.fork();
 	let Ok(ident) = fork.parse::<Ident>() else {
-		return Ok(false);
+		return Ok(None);
 	};
-	if LegacyParam::from_ident(&ident).is_none() && ident != "error" {
-		return Ok(false);
-	}
+	let Some(parameter) = NamedParameter::from_ident(&ident) else {
+		return Ok(None);
+	};
 
 	fork.step(|cursor| {
 		let lone = matches!(
@@ -439,6 +459,7 @@ fn lone_parameter_equals(input: ParseStream<'_>) -> syn::Result<bool> {
 		);
 		Ok((lone, *cursor))
 	})
+	.map(|lone| lone.then_some(parameter))
 }
 
 fn deprecated_bound(
@@ -484,61 +505,56 @@ fn parse_comparison(input: ParseStream) -> syn::Result<ComparisonRule> {
 impl ComparisonRule {
 	/// Build a rule from the tokens of one comparison, splitting at operators.
 	fn from_tokens(span: Span, trees: &[TokenTree]) -> syn::Result<Self> {
-		let mut parts = vec![ComparisonPart::Bound(TokenStream::new())];
-		let mut operators = Vec::new();
-		let mut index = 0;
+		// The tokens split into operands and the operators between them, so
+		// `n` operators require exactly `n + 1` operands.
+		let mut operands: Vec<TokenStream> = Vec::new();
+		let mut operators: Vec<ComparisonOperator> = Vec::new();
+		let mut current = TokenStream::new();
 
+		let mut index = 0;
 		while index < trees.len() {
 			if let Some(operator) = ComparisonOperator::at(trees, index)? {
 				index += operator.width();
-				operators.push(operator.kind);
-				parts.push(ComparisonPart::Operator(operator));
-				parts.push(ComparisonPart::Bound(TokenStream::new()));
+				operands.push(core::mem::take(&mut current));
+				operators.push(operator);
 			} else {
-				let ComparisonPart::Bound(bound) = parts.last_mut().unwrap() else {
-					unreachable!("chunks alternate bounds and operators");
-				};
-				bound.extend([trees[index].clone()]);
+				current.extend([trees[index].clone()]);
 				index += 1;
 			}
 		}
+		operands.push(current);
 
-		if parts.len() == 1 {
+		if operators.is_empty() {
 			return Err(syn::Error::new(
 				span,
 				"expected a comparison operator (`==`, `!=`, `<`, `<=`, `>`, `>=`) in the rule; \
 				 rules look like `value >= 1` or `len == 4`",
 			));
 		}
-		if parts.len() > 5 {
+		// One operator is a single bound; two are one range, written either as
+		// `1 <= value <= 10` or with the operator on one side.
+		if operators.len() > 2 {
 			return Err(syn::Error::new(
 				span,
 				"a comparison rule checks at most one range; separate extra comparisons with `,`",
 			));
 		}
-		for part in &parts {
-			let ComparisonPart::Bound(bound) = part else {
-				continue;
-			};
-			if bound.is_empty() {
-				return Err(syn::Error::new(
-					span,
-					"expected a bound on the other side of the comparison operator",
-				));
-			}
+		if operands.iter().any(TokenStream::is_empty) {
+			return Err(syn::Error::new(
+				span,
+				"expected a bound on the other side of the comparison operator",
+			));
 		}
 
-		// Exactly one side of the chain names the receiver.
+		// Exactly one operand names the field, and a chain puts it in the
+		// middle: `4 < len <= 100`.
 		let mut receiver = None;
 		let mut receiver_index = None;
-		for (index, part) in parts.iter().enumerate() {
-			let ComparisonPart::Bound(bound) = part else {
+		for (index, operand) in operands.iter().enumerate() {
+			let Some(found) = receiver_from_tokens(operand) else {
 				continue;
 			};
-			let Some(chunk_receiver) = receiver_from_tokens(bound) else {
-				continue;
-			};
-			if receiver.replace(chunk_receiver).is_some() {
+			if receiver.replace(found).is_some() {
 				return Err(syn::Error::new(
 					span,
 					"compare `value` or `len` against a bound, not against each other",
@@ -552,19 +568,19 @@ impl ComparisonRule {
 				"every comparison must mention the field's `value` or its `len`",
 			));
 		};
-
-		// A chain puts the receiver in the middle: `4 < len <= 100`.
-		if parts.len() == 5 && receiver_index != Some(2) {
+		let receiver_index =
+			receiver_index.unwrap_or_else(|| unreachable!("recorded with the receiver"));
+		if operators.len() == 2 && receiver_index != 1 {
 			return Err(syn::Error::new(
 				span,
 				"the middle of a chained comparison must be the field's `value` or its `len`",
 			));
 		}
 		// An equality is a single fact, not a range to chain.
-		if parts.len() == 5
+		if operators.len() == 2
 			&& operators
 				.iter()
-				.any(|operator| matches!(*operator, ComparisonKind::Eq | ComparisonKind::Ne))
+				.any(|operator| matches!(operator.kind, ComparisonKind::Eq | ComparisonKind::Ne))
 		{
 			return Err(syn::Error::new(
 				span,
@@ -572,11 +588,28 @@ impl ComparisonRule {
 			));
 		}
 
-		parts[receiver_index.expect("a receiver was found above")] = ComparisonPart::Receiver;
+		// Every operand carries tokens (checked above), and the one naming the
+		// field is replaced by the receiver.
+		let mut operands: Vec<Operand> = operands.into_iter().map(Operand::Bound).collect();
+		operands[receiver_index] = Operand::Receiver;
+
+		// Each operator pairs the operand before it with the one after it. A
+		// chained range therefore becomes two checks that share the field.
+		let checks = operators
+			.into_iter()
+			.enumerate()
+			.map(|(index, operator)| {
+				ComparisonCheck {
+					left: operands[index].clone(),
+					operator,
+					right: operands[index + 1].clone(),
+				}
+			})
+			.collect();
 
 		Ok(Self {
 			receiver,
-			parts,
+			checks,
 			span,
 		})
 	}
@@ -850,6 +883,12 @@ fn generate_legacy(
 }
 
 /// Generate one comparison, negated so a violation raises the group's error.
+///
+/// A chain is emitted as `&&`-joined pairs rather than as the single
+/// `100 < value <= u64::MAX` the author wrote: Rust has no chained comparison,
+/// so `(100) < (value) <= (u64::MAX)` is `comparison operators cannot be
+/// chained`. Each operator re-states the receiver, which the generated code
+/// reads once per pair.
 #[cfg(feature = "validation")]
 fn generate_comparison(
 	field: &Ident,
@@ -863,13 +902,24 @@ fn generate_comparison(
 		ValueReceiver::Len => length_expression(field, target),
 	};
 
+	// Each check stands alone, joined with `&&`: Rust has no chained
+	// comparison, so a range renders as its two pairwise checks.
 	let mut condition = TokenStream::new();
-	for part in &rule.parts {
-		match part {
-			ComparisonPart::Receiver => condition.extend(quote!((#receiver))),
-			ComparisonPart::Operator(operator) => condition.extend(operator.tokens.clone()),
-			ComparisonPart::Bound(bound) => condition.extend(quote!((#bound))),
+	for (index, check) in rule.checks.iter().enumerate() {
+		let left = match &check.left {
+			Operand::Receiver => quote!((#receiver)),
+			Operand::Bound(bound) => quote!((#bound)),
+		};
+		let right = match &check.right {
+			Operand::Receiver => quote!((#receiver)),
+			Operand::Bound(bound) => quote!((#bound)),
+		};
+		let tokens = &check.operator.tokens;
+
+		if index > 0 {
+			condition.extend(quote!(&&));
 		}
+		condition.extend(quote!((#left #tokens #right)));
 	}
 
 	quote! {
@@ -1015,7 +1065,7 @@ mod tests {
 
 	/// Parse the inside of one `validate(...)` group.
 	fn group(source: &str) -> ValueGroup {
-		syn::parse_str(source).unwrap_or_else(|error| panic!("parse `{source}`: {error}"))
+		syn::parse_str(source).unwrap()
 	}
 
 	/// Render a group's rules compactly so structure is assertable.
@@ -1026,28 +1076,31 @@ mod tests {
 			.map(|item| {
 				match item {
 					ValueItem::Comparison(rule) => {
-						let parts = rule
-							.parts
+						let receiver = match rule.receiver {
+							ValueReceiver::Value => "value",
+							ValueReceiver::Len => "len",
+						};
+						let operand = |operand: &Operand| {
+							match operand {
+								Operand::Receiver => receiver.to_owned(),
+								Operand::Bound(bound) => bound.to_string().replace(' ', ""),
+							}
+						};
+						let checks = rule
+							.checks
 							.iter()
-							.map(|part| {
-								match part {
-									ComparisonPart::Receiver => {
-										match rule.receiver {
-											ValueReceiver::Value => "value".to_owned(),
-											ValueReceiver::Len => "len".to_owned(),
-										}
-									}
-									ComparisonPart::Operator(operator) => {
-										format!("{:?}", operator.kind)
-									}
-									ComparisonPart::Bound(bound) => {
-										bound.to_string().replace(' ', "")
-									}
-								}
+							.map(|check| {
+								format!(
+									"{} {:?} {}",
+									operand(&check.left),
+									check.operator.kind,
+									operand(&check.right),
+								)
 							})
 							.collect::<Vec<_>>()
-							.join(" ");
-						format!("{:?}[{parts}]", rule.receiver)
+							.join(" && ");
+
+						format!("{:?}[{checks}]", rule.receiver)
 					}
 					ValueItem::Legacy(rule) => {
 						format!("legacy{:?}[{}]", rule.param, rule.bound.to_token_stream())
@@ -1080,7 +1133,11 @@ mod tests {
 		let parsed = group("100 < value <= u64::MAX");
 
 		assert_eq!(parsed.items.len(), 1);
-		assert_eq!(summarize(&parsed), "Value[100 Lt value Le u64::MAX]");
+		// The range is held as two checks, because Rust cannot chain them.
+		assert_eq!(
+			summarize(&parsed),
+			"Value[100 Lt value && value Le u64::MAX]"
+		);
 	}
 
 	#[test]
@@ -1274,5 +1331,642 @@ mod tests {
 				.contains("cannot be combined with `min_len` or `max_len`"),
 			"{error}"
 		);
+	}
+
+	/// Every diagnostic the parser can raise, asserted on its own text so a
+	/// rewrite that changes one is caught here rather than in a UI fixture.
+	#[test]
+	fn every_parse_error_names_its_fix() {
+		for (source, expected) in [
+			("", "empty `validate(...)` annotation"),
+			("value", "expected a comparison operator"),
+			// A separator is required between two named parameters.
+			("min = 1 2", "expected `,` or `&&`"),
+			(
+				"count == 2",
+				"must mention the field's `value` or its `len`",
+			),
+			("value >= 1 < 2", "the middle of a chained comparison"),
+			("value >= len", "not against each other"),
+			("4 == len == 4", "takes a single bound"),
+			("value = 2", "comparison rules use `==`"),
+			("1 < value < 2 < len < 3", "checks at most one range"),
+			("value >= ", "expected a bound on the other side"),
+			// A generic bound splits at `<`, so it reads as an over-long chain.
+			("value >= Vec<u8>", "checks at most one range"),
+			("value >= 1 << 2", "wrap a bound containing generics"),
+			("value >= 1 >> 2", "wrap a bound containing shifts"),
+		] {
+			// Each of these must fail; `.err()` keeps the panic in `core`
+			// rather than adding an uncoverable branch here.
+			let error = syn::parse_str::<ValueGroup>(source).err().unwrap();
+
+			assert!(
+				error.to_string().contains(expected),
+				"`{source}` should report `{expected}`: {error}"
+			);
+		}
+	}
+
+	/// A name that is neither a receiver nor a named parameter reaches the
+	/// comparison parser, whose hint names the operator that is missing.
+	#[test]
+	fn a_misspelled_parameter_is_reported_as_a_comparison_rule() {
+		let error = syn::parse_str::<ValueGroup>("minimum = 1").expect_err("unknown parameter");
+
+		assert!(
+			error.to_string().contains("comparison rules use `==`"),
+			"`minimum = 1` must fall through to the comparison parser: {error}"
+		);
+	}
+
+	/// The generated check, rendered compactly, for one rule on one field.
+	#[cfg(feature = "validation")]
+	fn generated(source: &str, field: &str, ty: &str) -> String {
+		let target = syn::parse_quote!(ExampleZc);
+		let fields = vec![(
+			Ident::new(field, Span::call_site()),
+			syn::parse_str::<Type>(ty).unwrap(),
+			vec![syn::parse_str::<ValueGroup>(source).unwrap()],
+		)];
+
+		generate_value_validation(
+			&syn::parse_quote!(::pina),
+			ValueTarget::Fixed(&target),
+			&fields,
+			None,
+			&quote!(::pina::ProgramError::InvalidAccountData),
+		)
+		.to_string()
+		.replace(' ', "")
+	}
+
+	/// The generated check reads the field through the accessor the view
+	/// exposes, and the `Pod*` wrappers through `.get()`.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn comparisons_read_the_view_accessor() {
+		let plain = generated("value >= 1", "amount", "u64");
+		let pod = generated("value >= 1", "amount", "PodU64");
+
+		assert!(plain.contains("((self.amount())>=(1))"), "{plain}");
+		assert!(pod.contains("((self.amount().get())>=(1))"), "{pod}");
+		assert!(
+			plain.contains("impl::pina::PinaValidateforExampleZc"),
+			"{plain}"
+		);
+	}
+
+	#[cfg(feature = "validation")]
+	#[test]
+	fn length_comparisons_call_len() {
+		let generated = generated("len <= 64", "memo", "String<64>");
+
+		assert!(
+			generated.contains("((self.memo().len())<=(64))"),
+			"{generated}"
+		);
+	}
+
+	/// A comparison is negated, so the group's error is raised on violation.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn a_violated_comparison_raises_the_group_error() {
+		let generated = generated("value >= 1, error = MyError::TooSmall", "amount", "u64");
+
+		assert!(
+			generated.contains("returnErr((MyError::TooSmall).into());"),
+			"{generated}"
+		);
+	}
+
+	/// The default error applies when the group declares no override.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn a_group_without_an_override_uses_the_default_error() {
+		let generated = generated("value >= 1", "amount", "u64");
+
+		assert!(
+			generated.contains("returnErr(::pina::ProgramError::InvalidAccountData);"),
+			"{generated}"
+		);
+	}
+
+	/// A chain renders every operator in the order the author wrote it.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn a_chain_renders_each_operator_in_place() {
+		let chained = generated("100 < value <= u64::MAX", "amount", "u64");
+
+		assert!(
+			chained.contains("((100)<(self.amount()))&&((self.amount())<=(u64::MAX))"),
+			"{chained}"
+		);
+	}
+
+	/// Every deprecated spelling keeps the exact check shape it has always had.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn legacy_bounds_generate_their_original_shapes() {
+		for (source, expected) in [
+			("min = 1", "ifself.amount()<(1){returnErr("),
+			("max = 10", "ifself.amount()>(10){returnErr("),
+		] {
+			let generated = generated(source, "amount", "u64");
+
+			assert!(generated.contains(expected), "`{source}`: {generated}");
+		}
+
+		for (source, expected) in [
+			("min_len = 2", "ifself.memo().len()<(2){returnErr("),
+			("max_len = 64", "ifself.memo().len()>(64){returnErr("),
+			("exact_len = 4", "ifself.memo().len()!=(4){returnErr("),
+		] {
+			let generated = generated(source, "memo", "String<64>");
+
+			assert!(generated.contains(expected), "`{source}`: {generated}");
+		}
+	}
+
+	/// A compact view reads through the tail accessor, and the short integer
+	/// forms dereference directly.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn compact_targets_read_through_the_generated_accessors() {
+		let target = syn::parse_quote!(ExampleRef);
+		let tails = vec![crate::schema::CompactTail {
+			name: Ident::new("memo", Span::call_site()),
+			pod: quote!(PodString),
+			capacity: quote!(64),
+			optional: false,
+		}];
+		let amount: Type = syn::parse_quote!(u64);
+		let memo: Type = syn::parse_quote!(String<64>);
+		let fields = vec![
+			(
+				Ident::new("amount", Span::call_site()),
+				amount,
+				vec![syn::parse_str::<ValueGroup>("value >= 1").unwrap()],
+			),
+			(
+				Ident::new("memo", Span::call_site()),
+				memo,
+				vec![syn::parse_str::<ValueGroup>("len <= 64").unwrap()],
+			),
+		];
+		let generated = generate_value_validation(
+			&syn::parse_quote!(::pina),
+			ValueTarget::Compact {
+				target: &target,
+				tails: &tails,
+			},
+			&fields,
+			None,
+			&quote!(::pina::ProgramError::InvalidAccountData),
+		)
+		.to_string()
+		.replace(' ', "");
+
+		assert!(
+			generated.contains("((self.amount.get())>=(1))"),
+			"{generated}"
+		);
+		assert!(
+			generated.contains("((self.memo().len())<=(64))"),
+			"{generated}"
+		);
+		assert!(
+			generated.contains("impl<'__pina_validation>::pina::PinaValidate"),
+			"{generated}"
+		);
+	}
+
+	/// A `u8` compact field is stored inline, so it is read directly rather
+	/// than through `.get()`.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn a_compact_byte_field_is_read_directly() {
+		let target = syn::parse_quote!(ExampleRef);
+		let bump: Type = syn::parse_quote!(u8);
+		let fields = vec![(
+			Ident::new("bump", Span::call_site()),
+			bump,
+			vec![syn::parse_str::<ValueGroup>("value >= 1").unwrap()],
+		)];
+		let generated = generate_value_validation(
+			&syn::parse_quote!(::pina),
+			ValueTarget::Compact {
+				target: &target,
+				tails: &[],
+			},
+			&fields,
+			None,
+			&quote!(::pina::ProgramError::InvalidAccountData),
+		)
+		.to_string()
+		.replace(' ', "");
+
+		assert!(generated.contains("((self.bump)>=(1))"), "{generated}");
+	}
+
+	/// A compact field with no tail reads its length directly, and an array
+	/// field is recognized as sized without naming a wrapper type.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn compact_plain_fields_and_arrays_report_their_length() {
+		let target = syn::parse_quote!(ExampleRef);
+		let tags: Type = syn::parse_quote!([u8; 4]);
+		let fields = vec![
+			(
+				Ident::new("plain", Span::call_site()),
+				syn::parse_quote!(String<8>),
+				vec![syn::parse_str::<ValueGroup>("len <= 8").unwrap()],
+			),
+			(
+				Ident::new("tags", Span::call_site()),
+				tags.clone(),
+				vec![syn::parse_str::<ValueGroup>("len == 4").unwrap()],
+			),
+		];
+		let generated = generate_value_validation(
+			&syn::parse_quote!(::pina),
+			ValueTarget::Compact {
+				target: &target,
+				tails: &[],
+			},
+			&fields,
+			None,
+			&quote!(::pina::ProgramError::InvalidAccountData),
+		)
+		.to_string()
+		.replace(' ', "");
+
+		// A compact tail reads through its accessor; an array is a plain field
+		// and reads `.len` directly.
+		assert!(
+			generated.contains("((self.plain.len())<=(8))"),
+			"{generated}"
+		);
+		assert!(
+			generated.contains("((self.tags.len())==(4))"),
+			"{generated}"
+		);
+		assert!(has_length(&tags), "an array is sized");
+	}
+
+	/// A type that is not a path has no name to compare against, so both gates
+	/// decline it rather than guessing.
+	#[test]
+	fn an_unnamed_type_is_neither_integer_nor_sized() {
+		let tuple: Type = syn::parse_quote!((u64, u64));
+		let reference: Type = syn::parse_quote!(&'static str);
+
+		for ty in [&tuple, &reference] {
+			assert!(last_type_name(ty).is_none(), "{ty:?}");
+			assert!(!is_integer(ty), "{ty:?}");
+			assert!(!has_length(ty), "{ty:?}");
+		}
+	}
+
+	/// Every integer spelling the gate accepts, and one it does not.
+	#[test]
+	fn the_integer_gate_names_every_supported_type() {
+		for name in [
+			"u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "PodU16",
+			"PodU32", "PodU64", "PodU128", "PodI16", "PodI32", "PodI64", "PodI128",
+		] {
+			let ty: Type = syn::parse_str(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+
+			assert!(is_integer(&ty), "`{name}` must be accepted");
+		}
+
+		for name in ["bool", "Address", "PodBool", "String<8>"] {
+			let ty: Type = syn::parse_str(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+
+			assert!(!is_integer(&ty), "`{name}` must be rejected");
+		}
+	}
+
+	/// Every wrapper the length gate accepts, and one it does not.
+	#[test]
+	fn the_length_gate_names_every_supported_type() {
+		for name in [
+			"String<8>",
+			"PodString<8, 1>",
+			"Vec<u8, 8>",
+			"PodVec<u8, 8, 1>",
+			"[u8; 8]",
+		] {
+			let ty: Type = syn::parse_str(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+
+			assert!(has_length(&ty), "`{name}` must be accepted");
+		}
+
+		for name in ["u64", "bool", "Address"] {
+			let ty: Type = syn::parse_str(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+
+			assert!(!has_length(&ty), "`{name}` must be rejected");
+		}
+	}
+
+	/// A field that is not named cannot carry a rule, and a non-`pina`
+	/// attribute is left for the rest of the expansion.
+	#[test]
+	fn only_named_fields_and_pina_attributes_are_considered() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[doc = "kept"]
+				value: u64,
+			}
+		};
+		let validations = take_value_validations(&mut item).unwrap();
+
+		assert_eq!(validations.fields.len(), 1);
+		assert!(
+			item.fields
+				.iter()
+				.any(|field| field.attrs.iter().any(|a| a.path().is_ident("doc"))),
+			"a non-`pina` attribute is retained"
+		);
+
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(validate(value >= 1))]
+				value: u64,
+				#[pina(validate(value >= 2))]
+				count: u32,
+			}
+		};
+		let validations = take_value_validations(&mut item).unwrap();
+
+		assert_eq!(validations.fields.len(), 2);
+		assert!(
+			item.fields.iter().all(|field| field.attrs.is_empty()),
+			"every `pina` attribute is consumed: {:?}",
+			item.fields
+		);
+	}
+
+	/// A parse failure in any field's attributes surfaces once, with the
+	/// grammar hint, rather than being swallowed.
+	#[test]
+	fn a_malformed_group_fails_the_whole_struct() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(validate(value >= 1))]
+				good: u64,
+				#[pina(validate(value = 2))]
+				bad: u64,
+			}
+		};
+		let error = take_value_validations(&mut item).expect_err("`value = 2` is not valid");
+
+		assert!(
+			error.to_string().contains("comparison rules use `==`")
+				&& error.to_string().contains("Rules compare the field's"),
+			"{error}"
+		);
+	}
+
+	/// A separator is consumed between rules; a trailing one is accepted so a
+	/// vertically formatted annotation can keep its final comma.
+	#[test]
+	fn a_trailing_separator_is_accepted() {
+		for source in ["value >= 1,", "value >= 1 &&", "value >= 1, len == 4,"] {
+			let parsed = group(source);
+
+			assert!(!parsed.items.is_empty(), "`{source}` parses");
+		}
+	}
+
+	/// The struct-level hook runs after every field check.
+	#[cfg(feature = "validation")]
+	#[test]
+	fn the_hook_runs_after_the_field_checks() {
+		let target = syn::parse_quote!(ExampleZc);
+		let fields = vec![(
+			Ident::new("amount", Span::call_site()),
+			syn::parse_quote!(u64),
+			vec![syn::parse_str::<ValueGroup>("value >= 1").unwrap()],
+		)];
+		let hook = ValidationHook {
+			with: syn::parse_quote!(check_domain),
+		};
+		let generated = generate_value_validation(
+			&syn::parse_quote!(::pina),
+			ValueTarget::Fixed(&target),
+			&fields,
+			Some(&hook),
+			&quote!(::pina::ProgramError::InvalidAccountData),
+		)
+		.to_string()
+		.replace(' ', "");
+
+		let check = generated.find("self.amount()").unwrap();
+		let call = generated.find("check_domain(self)?;").unwrap();
+
+		assert!(check < call, "the hook follows the checks: {generated}");
+	}
+
+	#[test]
+	fn field_attributes_reject_a_foreign_option() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(len = 4)]
+				value: u64,
+			}
+		};
+		let error = take_value_validations(&mut item).expect_err("`len = 4` is not an option");
+
+		assert!(
+			error.to_string().contains("unknown `#[pina]` option"),
+			"{error}"
+		);
+	}
+
+	#[test]
+	fn a_tuple_struct_carries_no_field_rules() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example(u64);
+		};
+		let validations = take_value_validations(&mut item).unwrap();
+
+		assert!(validations.fields.is_empty());
+		assert!(validations.deprecations.is_empty());
+	}
+
+	#[test]
+	fn a_legacy_length_bound_on_an_unsized_field_is_rejected() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(validate(max_len = 8))]
+				value: u64,
+			}
+		};
+		let error = take_value_validations(&mut item).expect_err("u64 has no length");
+
+		assert!(
+			error.to_string().contains("length validation on field"),
+			"{error}"
+		);
+	}
+
+	#[test]
+	fn a_duplicate_legacy_bound_is_rejected() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(validate(min = 1))]
+				#[pina(validate(min = 2))]
+				value: u64,
+			}
+		};
+		let error = take_value_validations(&mut item).expect_err("two `min` bounds");
+
+		assert!(
+			error.to_string().contains("duplicate `min` validation"),
+			"{error}"
+		);
+	}
+
+	#[test]
+	fn every_legacy_parameter_names_itself_and_its_receiver() {
+		for (ident, name, receiver) in [
+			("min", "min", ValueReceiver::Value),
+			("max", "max", ValueReceiver::Value),
+			("min_len", "min_len", ValueReceiver::Len),
+			("max_len", "max_len", ValueReceiver::Len),
+			("exact_len", "exact_len", ValueReceiver::Len),
+		] {
+			let parameter = LegacyParam::from_ident(&Ident::new(ident, Span::call_site())).unwrap();
+
+			assert_eq!(parameter.name(), name);
+			assert_eq!(parameter.receiver(), receiver);
+		}
+		assert!(LegacyParam::from_ident(&Ident::new("value", Span::call_site())).is_none());
+	}
+
+	#[test]
+	fn a_named_parameter_classifies_error_and_bounds() {
+		let span = Span::call_site();
+		let error = NamedParameter::from_ident(&Ident::new("error", span));
+
+		assert!(matches!(error, Some(NamedParameter::Error)));
+		assert!(matches!(
+			NamedParameter::from_ident(&Ident::new("min", span)),
+			Some(NamedParameter::Bound(LegacyParam::Min))
+		));
+		assert!(NamedParameter::from_ident(&Ident::new("value", span)).is_none());
+	}
+
+	#[test]
+	fn a_foreign_option_message_names_the_supported_grammar() {
+		let error = attribute_error(&DarlingError::custom("unexpected argument"), "instruction")
+			.to_string();
+
+		assert!(
+			error.contains("`discriminator = path`") && error.contains("value >= MIN"),
+			"the hint carries the whole vocabulary: {error}"
+		);
+	}
+
+	#[test]
+	fn the_account_vocabulary_adds_compact_and_the_others_do_not() {
+		let account = attribute_error(&DarlingError::custom("bad"), "account").to_string();
+		let instruction = attribute_error(&DarlingError::custom("bad"), "instruction").to_string();
+
+		assert!(account.contains("`compact`"), "{account}");
+		assert!(!instruction.contains("`compact`"), "{instruction}");
+	}
+
+	#[test]
+	fn darling_reasons_end_in_one_sentence() {
+		assert_eq!(
+			darling_reason(&DarlingError::custom("bad input")),
+			"bad input."
+		);
+		assert_eq!(darling_reason(&DarlingError::custom("why?")), "why?");
+		assert_eq!(darling_reason(&DarlingError::custom("stop!")), "stop!");
+	}
+
+	#[test]
+	fn a_parse_error_is_wrapped_in_the_grammar_hint() {
+		let inner = syn::Error::new(Span::call_site(), "stray token");
+		let wrapped = invalid_annotation(&inner).to_string();
+
+		assert!(
+			wrapped.starts_with("invalid Pina validation annotation: stray token")
+				&& wrapped.contains("100 < value <= u64::MAX"),
+			"{wrapped}"
+		);
+	}
+
+	/// One `#[pina(...)]` attribute may carry several `validate(...)` groups,
+	/// which is what the comma between them distinguishes.
+	#[test]
+	fn one_attribute_may_carry_several_groups() {
+		let mut item: ItemStruct = syn::parse_quote! {
+			struct Example {
+				#[pina(validate(value >= 1), validate(value <= 10))]
+				value: u64,
+			}
+		};
+		let validations = take_value_validations(&mut item).unwrap();
+
+		assert_eq!(validations.fields.len(), 1);
+		assert_eq!(validations.fields[0].2.len(), 2, "both groups are kept");
+	}
+
+	/// Every legacy bound records itself as deprecated on a field its gate
+	/// accepts, which is what makes the warning fire per spelling.
+	#[test]
+	fn every_legacy_bound_is_recorded_as_deprecated() {
+		for (source, ty, attribute) in [
+			(
+				"min = 1",
+				"u64",
+				syn::parse_quote!(#[pina(validate(min = 1))]),
+			),
+			(
+				"max = 2",
+				"u64",
+				syn::parse_quote!(#[pina(validate(max = 2))]),
+			),
+			(
+				"min_len = 3",
+				"String<8>",
+				syn::parse_quote!(#[pina(validate(min_len = 3))]),
+			),
+			(
+				"max_len = 4",
+				"String<8>",
+				syn::parse_quote!(#[pina(validate(max_len = 4))]),
+			),
+			(
+				"exact_len = 5",
+				"String<8>",
+				syn::parse_quote!(#[pina(validate(exact_len = 5))]),
+			),
+		] {
+			let ty: Type = syn::parse_str(ty).unwrap_or_else(|e| panic!("type `{ty}`: {e}"));
+			let mut item: ItemStruct = syn::parse_quote! {
+				struct Example {
+					value: #ty,
+				}
+			};
+			item.fields.iter_mut().next().unwrap().attrs.push(attribute);
+
+			let validations =
+				take_value_validations(&mut item).unwrap_or_else(|e| panic!("`{source}`: {e}"));
+
+			assert_eq!(validations.deprecations.len(), 1, "`{source}` warns");
+		}
+	}
+
+	/// The `error` arm of the summary renders distinctly from the rules.
+	#[test]
+	fn the_summary_marks_an_error_override() {
+		let parsed = group("value >= 1, error = E");
+
+		assert!(summarize(&parsed).ends_with("|error"), "{parsed:?}");
 	}
 }

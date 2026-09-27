@@ -74,7 +74,7 @@ Use `#[pina(validate(...))]` on fields of `#[account]`, `#[instruction]`, and `#
 | `len >= EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Inclusive minimum byte or element count     |
 | `error = ERROR` | One validation group                                | Replaces the macro's default `ProgramError` |
 
-String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. Chain bounds on the same receiver with `&&` (`value >= 1 && value <= 10`, `len == 4`) and separate rules with `,`. A rule that must fail in different ways takes `error = ERROR` in the same group.
+String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. Chain bounds on the same receiver with `&&` (`value >= 1 && value <= 10`, `len == 4`) and separate rules with `,`. A range can also be written as one rule — `100 < value <= u64::MAX` — which generates the same two checks joined by `&&`. A rule that must fail in different ways takes `error = ERROR` in the same group.
 
 The `min`, `max`, `min_len`, `max_len`, and `exact_len` parameter spellings predate comparisons. They still parse and generate the identical checks, but they are deprecated and warn at the parameter.
 
