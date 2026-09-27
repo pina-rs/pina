@@ -1,0 +1,19 @@
+[package]
+name = "counter_program"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Detach the fixture from any parent workspace: it is copied into a throwaway
+# run directory at evaluation time and must resolve its dependencies by path.
+[workspace]
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+pina = { path = "${PINA_ROOT}/crates/pina", features = [
+	"account-resize",
+	"derive",
+	"validation",
+] }

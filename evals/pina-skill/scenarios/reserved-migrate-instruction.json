@@ -1,0 +1,46 @@
+{
+	"id": "reserved-migrate-instruction",
+	"title": "Reason about migrating a stale account from the client side",
+	"fixture": "base-counter-published",
+	"prompt": "A user has an account that was created before our most recent upgrade, so its stored schema version is behind the program's current version. They are calling `Increment` and the transaction fails. Explain what is happening and what has to change on chain for their call to succeed — then make the program handle this situation itself so the user does not have to send a separate migration transaction. Keep the program building and the migration history consistent.",
+	"expectation": "A stale account fails the current-only loaders with `MigrationRequired`. The program-owned fix is to call `MigrateAccount::invoke::<T>()` inside the instruction that touches the account (which the fixture already does) or to rely on the reserved `Migrate` route wired by `#[discriminator(entrypoint)]`. The agent should recognize the existing `MigrateAccount` call and the reserved route rather than inventing a new instruction or asking the client to send extra transactions.",
+	"checks": [
+		{
+			"id": "recognizes-migration-required",
+			"kind": "transcript",
+			"pattern": "MigrationRequired|stale",
+			"why": "The symptom must be traced to the stale-account version gate."
+		},
+		{
+			"id": "uses-migrate-account",
+			"kind": "transcript",
+			"pattern": "MigrateAccount",
+			"why": "Program-owned migration is the documented mechanism for an instruction that touches a stale account."
+		},
+		{
+			"id": "mentions-reserved-route",
+			"kind": "transcript",
+			"pattern": "Migrate|reserved|entrypoint",
+			"why": "The reserved framework route is the out-of-band path and should be named."
+		},
+		{
+			"id": "no-new-instruction-invented",
+			"kind": "transcript",
+			"pattern": "AddInstruction|new instruction discriminator to migrate",
+			"absent": true,
+			"why": "Inventing a bespoke migration instruction duplicates the reserved route."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "Any schema change must leave the migration history consistent."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The program must still build."
+		}
+	]
+}

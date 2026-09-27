@@ -1,0 +1,72 @@
+{
+	"id": "add-optional-field",
+	"title": "Add a field to a live migration-aware account",
+	"fixture": "base-counter-published",
+	"prompt": "This counter program is already deployed to devnet. Add a new field to the `Counter` account so it records the revision number of the last write. The revision should start at 0 for existing accounts. Update the program logic so `Increment` and `Reset` both bump the revision. Keep the program building and make sure the migration history stays consistent.",
+	"expectation": "The agent edits the account schema, realizes the schema is snapshot-checked, runs `pina migrations create` to snapshot the change, lets the CLI generate the automatic transition, and leaves `pina migrations check` passing. Because the new field is appended and unambiguous, the transition is automatic: no manual TODO should remain. Growing the account by 8 bytes also needs a higher `max_lamports` budget than the fixture's 20,000, so the agent must raise the constant rather than leave a budget that fails at runtime.",
+	"checks": [
+		{
+			"id": "schema-has-revision",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+revision\\s*:\\s*u(8|16|32|64)",
+			"why": "The requested field must actually exist in the account schema."
+		},
+		{
+			"id": "create-recorded-version",
+			"kind": "command",
+			"command": "pina migrations check --json",
+			"expectOutput": [
+				"\"currentVersion\": 1"
+			],
+			"why": "Adding a field to a published contract advances it to a new version."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "`check` is the drift gate; a correct change leaves it passing."
+		},
+		{
+			"id": "transition-file-exists",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"why": "The version bump needs an adjacent transition for stale accounts."
+		},
+		{
+			"id": "transition-is-automatic",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "^pub\\(crate\\) fn migrate",
+			"why": "An appended field is unambiguous, so the transition must be generated rather than manual."
+		},
+		{
+			"id": "no-unfinished-manual",
+			"kind": "file",
+			"absent": true,
+			"why": "An appended field is unambiguous, so the transition must be generated rather than left as an unfinished manual stub.",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "TODO\\(pina-manual-migration\\)"
+		},
+		{
+			"id": "lamport-budget-raised",
+			"kind": "command",
+			"command": "python3 -c \"import re,subprocess,sys; src=open('src/lib.rs').read(); attr=re.search(r'migrations_max_lamports\\s*=\\s*([0-9_]+|[A-Za-z_][A-Za-z0-9_]*)', src); value=None\nif attr:\n    token=attr.group(1)\n    if token[0].isdigit(): value=int(token.replace('_',''))\n    else:\n        c=re.search(r'const\\s+'+re.escape(token)+r'\\s*:\\s*u64\\s*=\\s*([0-9_]+)', src)\n        if c: value=int(c.group(1).replace('_',''))\nout=subprocess.run(['pina','migrations','status'],capture_output=True,text=True).stdout\nquotes=[int(q) for q in re.findall(r'funds ~(\\d+) lamports', out)]\nneed=max(quotes) if quotes else None\nprint('budget', value, 'needed', need); raise SystemExit(0 if value is not None and need is not None and value >= need else 1)\"",
+			"expectOutput": ["budget"],
+			"why": "Growing the account needs the rent the CLI quotes for the stale ladder. The fixture's 20,000 budget is below that, so the declared budget must cover it. The requirement is read from `pina migrations status` rather than hardcoded, because the growth depends on the shape the agent chose."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The macros re-expand against the manifest; a stale manifest or edited generated file breaks the build."
+		},
+		{
+			"id": "no-manifest-hand-edit",
+			"kind": "transcript",
+			"pattern": "(Write|Edit)[^\\n]*migrations/manifest\\.json",
+			"absent": true,
+			"why": "The manifest is generated and hash-chained; hand-editing it is always wrong."
+		}
+	]
+}

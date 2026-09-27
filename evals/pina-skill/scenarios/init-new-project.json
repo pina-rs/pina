@@ -1,0 +1,73 @@
+{
+	"id": "init-new-project",
+	"title": "Scaffold a brand-new Pina program",
+	"fixture": "empty-project",
+	"prompt": "Start a new Solana program called `escrow_program` in this directory using the Pina toolkit's own scaffolding. I want the standard layout, migrations enabled the way new projects are meant to be set up, and a program identity I can deploy with. Don't deploy anything. Afterwards, tell me exactly what I still have to do before my first real deployment.",
+	"expectation": "The agent uses `pina init` rather than hand-rolling a crate, keeps the scaffolded `[migrations]` defaults (`version_type = \"u8\"`, `auto = true`), the `build.rs` rerun directive, and the `account-resize` feature, and settles the program identity before snapshotting: `init` deliberately does not scaffold `migrations/` because history binds to the declared address, so the correct flow is `pina keys new` (or an explicit address), then `pina migrations create` once \u2014 leaving the manifest bound to the declared identity, not the placeholder.",
+	"checks": [
+		{
+			"id": "used-pina-init",
+			"kind": "transcript",
+			"pattern": "pina init",
+			"why": "The scaffold keeps generated versions, features, and layout aligned; hand-rolling a crate is what the skill says to avoid."
+		},
+		{
+			"id": "scaffold-exists",
+			"kind": "file",
+			"paths": [
+				"escrow_program/Cargo.toml",
+				"Cargo.toml"
+			],
+			"why": "The program must be scaffolded as a crate. `pina init escrow_program` creates the subdirectory while `pina init escrow_program --path .` makes the current directory the crate, which is an equally correct reading of \"in this directory\"."
+		},
+		{
+			"id": "migrations-defaults-kept",
+			"kind": "file",
+			"paths": [
+				"escrow_program/pina.toml",
+				"pina.toml"
+			],
+			"match": "version_type\\s*=\\s*\"u8\"",
+			"why": "`init` scaffolds the recommended defaults; changing them without a reason is scope creep."
+		},
+		{
+			"id": "auto-opt-in-kept",
+			"kind": "file",
+			"paths": [
+				"escrow_program/pina.toml",
+				"pina.toml"
+			],
+			"match": "auto\\s*=\\s*true",
+			"why": "Migrations are on by default for new projects and the request asked for that setup."
+		},
+		{
+			"id": "history-bound-to-declared-identity",
+			"kind": "command",
+			"why": "History binds to the declared program address. The agent may establish a fresh identity with `pina keys new` and snapshot immediately, but a manifest still holding the placeholder address (or a mismatch) means the baseline is wrong.",
+			"command": "python3 -c \"import json,re,os; root='escrow_program' if os.path.exists('escrow_program/migrations/manifest.json') else '.'; m=json.load(open(root+'/migrations/manifest.json')); src=open(root+'/src/lib.rs').read(); declared=re.search(r'declare_id!\\(\\\"([^\\\"]+)\\\"\\)', src).group(1); print('declared', declared, 'manifest', m['programId']); raise SystemExit(0 if m['programId']==declared else 1)\"",
+			"expectOutput": ["declared"]
+		},
+		{
+			"id": "build-script-scaffolded",
+			"kind": "file",
+			"paths": [
+				"escrow_program/build.rs",
+				"build.rs"
+			],
+			"match": "rerun-if-changed=migrations/manifest.json",
+			"why": "A recorded auto policy needs the rerun directive for macro re-expansion."
+		},
+		{
+			"id": "scaffold-compiles",
+			"kind": "command",
+			"command": "if [ -d escrow_program ]; then cd escrow_program; fi && cargo check --quiet",
+			"why": "The scaffold must build as generated."
+		},
+		{
+			"id": "names-the-next-steps",
+			"kind": "transcript",
+			"pattern": "(program address|declare_id|pina migrations create)",
+			"why": "The agent must hand off the real prerequisite: finalize the address, then snapshot the version-0 baseline."
+		}
+	]
+}

@@ -15,6 +15,7 @@
 		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
 		"test:codama-renderer-cli": "pnpm --filter @pina-rs/codama-renderer-cli test",
 		"test:compute-units": "node --test scripts/tests/*.test.ts",
+		"eval:skill": "tsx evals/pina-skill/run.ts",
 		"walkthrough:migrations": "tsx scripts/migrations-walkthrough.ts",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
 		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",

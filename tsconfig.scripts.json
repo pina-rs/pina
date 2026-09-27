@@ -7,5 +7,5 @@
 		"target": "es2024",
 		"types": ["node"]
 	},
-	"include": ["scripts/**/*.ts"]
+	"include": ["scripts/**/*.ts", "evals/**/*.ts"]
 }

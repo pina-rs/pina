@@ -39,8 +39,10 @@ use pina_cli::GenerationMode;
 	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
 	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
 	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
-	              topics.\n  For deployment verification, run 'pina verify --help' and then \
-	              inspect the selected leaf command."
+	              topics.\n  Run 'pina skill read pina' to read the bundled agent skill, or 'pina \
+	              skill install --dir <directory>' to install it for an agent runtime.\n  For \
+	              deployment verification, run 'pina verify --help' and then inspect the selected \
+	              leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -389,6 +391,23 @@ pub(crate) enum Commands {
 		/// Topic to render. Omit to list bundled topics.
 		#[arg(value_name = "TOPIC")]
 		topic: Option<String>,
+	},
+
+	/// Read or install the bundled Pina agent skill.
+	///
+	/// The skill ships inside this binary: `pina skill read` prints a topic as
+	/// raw Markdown for an agent to consume, and `pina skill install --dir`
+	/// writes the whole skill into an agent runtime's skill directory. Bare
+	/// `pina skill` lists what is bundled.
+	#[command(
+		after_help = "Examples:\n  pina skill\n  pina skill read pina\n  pina skill read \
+		              migrations\n  pina skill install --dir ./.claude/skills/pina\n  pina skill \
+		              install --dir ~/.claude/skills/pina --force"
+	)]
+	Skill {
+		/// What to do with the bundled skill.
+		#[command(subcommand)]
+		command: Option<SkillCommands>,
 	},
 
 	/// Print a normalized JSON snapshot of the CLI surface.
@@ -856,6 +875,42 @@ pub(crate) struct IdlGenerateArgs {
 	/// Preserve compatibility with the former explicit pretty-print flag.
 	#[arg(long, hide = true, conflicts_with = "compact")]
 	pub(crate) pretty: bool,
+}
+
+/// Agent-skill operations over the bundled skill.
+#[derive(Subcommand, Debug)]
+pub(crate) enum SkillCommands {
+	/// Print a bundled skill topic as raw Markdown.
+	///
+	/// Omit TOPIC to list every bundled topic. The output is the document
+	/// itself with no terminal rendering, so an agent can read it directly.
+	#[command(
+		after_help = "Examples:\n  pina skill read pina\n  pina skill read migrations\n  pina \
+		              skill read program-authoring"
+	)]
+	Read {
+		/// Topic to print. Omit to list bundled topics.
+		#[arg(value_name = "TOPIC")]
+		topic: Option<String>,
+	},
+
+	/// Write the bundled skill into an agent runtime's skill directory.
+	///
+	/// The destination is a directory named `pina` inside the runtime's skills
+	/// folder. An existing skill is never replaced unless `--force` is passed.
+	#[command(
+		after_help = "Examples:\n  pina skill install --dir ./.claude/skills/pina\n  pina skill \
+		              install --dir ~/.claude/skills/pina --force"
+	)]
+	Install {
+		/// Skill directory to write, for example `~/.claude/skills/pina`.
+		#[arg(long, value_name = "DIR")]
+		dir: Option<PathBuf>,
+
+		/// Replace an existing skill in the destination.
+		#[arg(long, default_value_t = false)]
+		force: bool,
+	},
 }
 
 /// IDL generation and Program Metadata workflows.

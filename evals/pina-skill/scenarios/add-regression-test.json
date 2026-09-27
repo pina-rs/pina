@@ -1,0 +1,50 @@
+{
+	"id": "add-regression-test",
+	"title": "Test a validation rule at the fastest layer",
+	"fixture": "base-counter",
+	"prompt": "Cap the stored counter at 1,000,000 with a declarative validation rule, and back it with a test so the cap can't silently disappear. I run the fast native loop locally, not the SBF suite, so the test has to run there. Both the accepted value and the rejected value should be covered. Keep the program building.",
+	"expectation": "The agent adds a declarative bound to the account field and writes a native `#[test]` in the crate that exercises the generated validation on a value inside the bound and one outside it. The test must live in the program crate's native test surface (`src/lib.rs` `#[cfg(test)]` or `tests/`), not an SBF/Surfpool suite, so `cargo test` runs it.",
+	"checks": [
+		{
+			"id": "declarative-bound",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "#\\[pina\\(validate\\([\\s\\S]{0,120}?(value\\s*<=|max\\s*=)[\\s\\S]*?\\)\\][\\s\\S]{0,200}?pub\\s+count\\s*:\\s*u64",
+			"why": "The cap belongs on the account field as a declarative rule."
+		},
+		{
+			"id": "native-test-added",
+			"kind": "transcript",
+			"pattern": "#\\[test\\]|#\\[cfg\\(test\\)\\]",
+			"why": "A regression test is the deliverable, not just the rule."
+		},
+		{
+			"id": "tests-both-sides",
+			"kind": "command",
+			"command": "python3 -c \"import pathlib,re; roots=[pathlib.Path('src'),pathlib.Path('tests')]; texts=[p.read_text(errors='ignore') for r in roots if r.exists() for p in r.rglob('*.rs')]; ok=any('#[test]' in t and re.search(r'1_000_000|MAX_COUNT|COUNT_CAP', t) and re.search(r'assert', t) for t in texts); print('cap regression test found' if ok else 'no cap regression test in src/ or tests/'); raise SystemExit(0 if ok else 1)\"",
+			"expectOutput": ["cap regression test found"],
+			"why": "The cap boundary must be exercised, not merely named. The native test surface is either the crate's own `#[cfg(test)]` module or any `tests/*.rs` integration test, so both placements are accepted."
+		},
+		{
+			"id": "test-runs-natively",
+			"kind": "command",
+			"command": "cargo test --quiet",
+			"expectOutput": [
+				"test result: ok"
+			],
+			"why": "The fast native loop must run the new test to green. Plain `cargo test` compiles and runs both the crate's unit tests and any `tests/*.rs` integration test the agent wrote; `--lib` alone would print `0 passed` for a tests/ placement and grade nothing."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "Validation rules are part of the schema snapshot."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "Rules are type-checked against the field type."
+		}
+	]
+}

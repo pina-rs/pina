@@ -25,6 +25,7 @@ pub mod parse;
 mod path_security;
 pub mod profile;
 pub mod project;
+pub mod skill;
 pub mod verification;
 pub mod workflow;
 

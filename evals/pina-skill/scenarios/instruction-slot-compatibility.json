@@ -1,0 +1,42 @@
+{
+	"id": "instruction-slot-compatibility",
+	"title": "Add an account slot to a live instruction without breaking clients",
+	"fixture": "base-counter-published",
+	"prompt": "We need the `Increment` instruction to also emit a small event, which means it needs the program's logging account passed in. Add a new account slot to the `Increment` accounts struct for that. The instruction is already live and old clients are still sending transactions against it, so nothing they send should start failing. Keep the program building and the migration history consistent.",
+	"expectation": "An instruction process contract stays compatible only when the existing slots form an identical prefix and every new slot is appended at the end and is optional. Appending an optional slot preserves old clients. Inserting a slot or adding a required one is a breaking change that needs a new discriminator. The agent must append an `Option<&AccountView>` (or equivalent) rather than a required field.",
+	"checks": [
+		{
+			"id": "new-slot-appended-optional",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"name\": \"system_program\"[\\s\\S]*?\"name\": \"\\w+\",\\s*\"writable\": false,\\s*\"signer\": false,\\s*\"optional\": true",
+			"why": "The appended slot, whatever it is named, must be recorded as optional so old clients keep parsing."
+		},
+		{
+			"id": "slot-is-optional-in-manifest",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"optional\": true",
+			"why": "The recorded process contract must show the appended slot as optional."
+		},
+		{
+			"id": "old-slots-not-reordered",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"name\": \"authority\"[\\s\\S]*?\"name\": \"counter\"",
+			"why": "Existing slots must keep their order; only an appended tail is compatible."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "The process contract is checked for compatibility on every run."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "A process-contract break fails macro expansion with an explicit error."
+		}
+	]
+}

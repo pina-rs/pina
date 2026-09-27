@@ -1,0 +1,2 @@
+# Runtime lock file created by every `pina migrations` invocation.
+**/migrations/.lock

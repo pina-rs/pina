@@ -1,0 +1,42 @@
+{
+	"id": "declarative-validation",
+	"title": "Add declarative account validation",
+	"fixture": "base-counter",
+	"prompt": "Tighten the counter program's boundary checks. The `Increment` instruction should reject an `amount` of zero and should cap an individual increment at 1,000. The stored counter should never exceed 1,000,000. Write these as Pina's declarative validation annotations rather than manual if-chains, and keep the program building.",
+	"expectation": "Pina's declarative validation lives in `#[pina(validate(...))]` attributes, spelled as the comparison the rule performs (`value >= 1`, `value <= 1_000`). Field bounds on the instruction and the account cover all three rules. The agent must not hand-roll the checks.",
+	"checks": [
+		{
+			"id": "instruction-lower-bound",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "#\\[pina\\(validate\\([\\s\\S]{0,120}?(value\\s*(>=|!=|>)|min\\s*=)[\\s\\S]*?\\)\\][\\s\\S]{0,200}?pub\\s+amount\\s*:\\s*u64",
+			"why": "The amount needs a declarative lower bound; `value >= 1` and `value != 0` state it equally well, and the deprecated `min =` spelling still satisfies the requirement."
+		},
+		{
+			"id": "account-upper-bound",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "#\\[pina\\(validate\\([\\s\\S]{0,120}?(value\\s*<=|max\\s*=)[\\s\\S]*?\\)\\][\\s\\S]{0,200}?pub\\s+count\\s*:\\s*u64",
+			"why": "The stored counter needs a declarative upper bound on the field itself."
+		},
+		{
+			"id": "no-manual-if-chain",
+			"kind": "transcript",
+			"pattern": "if instruction\\.amount\\.get\\(\\) == 0",
+			"absent": true,
+			"why": "The request asks for declarative annotations, not ad hoc imperative checks."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "Validation rules are part of the schema, so the snapshot must be refreshed."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "Rules are type-checked; a wrong field type or unknown rule fails the build."
+		}
+	]
+}

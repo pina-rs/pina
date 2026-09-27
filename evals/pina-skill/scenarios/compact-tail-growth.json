@@ -1,0 +1,60 @@
+{
+	"id": "compact-tail-growth",
+	"title": "Widen a compact account's string capacity",
+	"fixture": "compact-counter-published",
+	"prompt": "The `Counter` account is a compact account with a short `label` tail, and we are already shipping it. Support needs longer labels, so raise the label capacity from 8 to 32 characters. Accounts that already hold a shorter label must keep it exactly, and accounts created before this change must still load. Keep the program building and the migration history consistent.",
+	"expectation": "A compact contract's transition is not a plain fixed-length body: `create` emits `target_size`, `working_size`, and `migrate`, and it cannot generate the conversion because compact layout depends on the stored bytes. The agent must fill in a `target_size` that computes the destination length from the decoded historical label, and a `migrate` that copies the existing label bytes into the wider tail, leaving the new capacity unused.",
+	"checks": [
+		{
+			"id": "capacity-widened",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "label\\s*:\\s*String<32>",
+			"why": "The declared capacity must actually change."
+		},
+		{
+			"id": "version-advanced",
+			"kind": "command",
+			"command": "pina migrations check --json",
+			"expectOutput": [
+				"\"currentVersion\": 1"
+			],
+			"why": "The published compact contract advances to version 1."
+		},
+		{
+			"id": "transition-is-compact-shaped",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "fn target_size",
+			"why": "A compact transition sizes its destination from the stored bytes, so it must define `target_size`."
+		},
+		{
+			"id": "target-size-computed-not-capacity",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "^\\s*None\\s*$",
+			"absent": true,
+			"why": "The generated `target_size` returns `None`; leaving it means every stale account fails to plan a migration."
+		},
+		{
+			"id": "no-unfinished-todo",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "TODO\\(pina-manual-migration\\)",
+			"absent": true,
+			"why": "The generated stub must be completed."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "A completed compact transition must satisfy the drift gate."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The macros reject an unfinished body or a stale hash."
+		}
+	]
+}

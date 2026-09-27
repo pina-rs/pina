@@ -1,0 +1,59 @@
+{
+	"id": "manual-transition-offsets",
+	"title": "Merge two fields into one in a hand-written transition",
+	"fixture": "base-counter-published",
+	"prompt": "We want to record the count together with a small tag in a single field, so replace `count` with a `u64` called `packed` whose high 16 bits hold the tag and whose low 48 bits hold the old count. Existing accounts have no tag, so their count must survive the change and the tag should read as zero. Keep the program building and the migration history consistent.",
+	"expectation": "Merging fields needs a manual transition: the change reads as `count` disappearing while `packed` appears, so `create` also treats it as a rename and stops for an explicit answer. The agent must combine the two \u2014 `--rename count:packed` to say the stored bytes feed the new field, and `--manual packed` to make the conversion hand-written rather than an automatic copy \u2014 then write the body. The stored `count` sits at payload offset 32, and `data` includes the discriminator and version header, so the real index is `data[34..42]`. A body that ignores the header reads the wrong bytes.",
+	"checks": [
+		{
+			"id": "field-replaced",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+packed\\s*:\\s*u64",
+			"why": "The merged field must replace the two originals."
+		},
+		{
+			"id": "old-field-gone",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+count\\s*:\\s*u",
+			"absent": true,
+			"why": "Keeping `count` would mean the merge never happened."
+		},
+		{
+			"id": "manual-mode-recorded",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"mode\": \"manual\"",
+			"why": "A merge cannot be a byte copy, so it must be recorded as a manual transition."
+		},
+		{
+			"id": "no-unfinished-todo",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "TODO\\(pina-manual-migration\\)",
+			"absent": true,
+			"why": "The generated stub must be completed by hand."
+		},
+		{
+			"id": "not-header-blind",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "data\\[32",
+			"why": "`data` includes the discriminator and version header, so a body that indexes the payload-relative offset 32 directly reads authority bytes and misses the top of the count.",
+			"absent": true
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "A completed manual transition must still satisfy the drift gate."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The macros reject a stale hash or an unfinished body."
+		}
+	]
+}
