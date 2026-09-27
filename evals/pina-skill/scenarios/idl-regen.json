@@ -1,0 +1,48 @@
+{
+	"id": "idl-regen",
+	"title": "Regenerate and validate the IDL after a surface change",
+	"fixture": "base-counter-published",
+	"prompt": "I just added a `ResetInstruction` field and I'm not sure the IDL reflects the current program. Generate the Codama IDL for this program, write it to `target/idl.json`, and prove to me that the JSON actually describes today's instruction set \u2014 show me the instruction names it contains. If anything in the IDL looks inconsistent with the source, tell me what.",
+	"expectation": "The agent uses `pina idl generate` (or bare `pina idl`) rather than hand-writing JSON, writes the document, and inspects it for the declared instructions (`IncrementInstruction`, `ResetInstruction`). `pina abi schema` validates the document against the ABI contract.",
+	"checks": [
+		{
+			"id": "idl-written",
+			"kind": "file",
+			"path": "target/idl.json",
+			"why": "The IDL must land where the request asked."
+		},
+		{
+			"id": "idl-has-instructions",
+			"kind": "file",
+			"path": "target/idl.json",
+			"match": "(IncrementInstruction|increment)[\\s\\S]*(ResetInstruction|reset)|(ResetInstruction|reset)[\\s\\S]*(IncrementInstruction|increment)",
+			"why": "The document must describe the current instruction set; Codama renders instruction names in lower case."
+		},
+		{
+			"id": "idl-is-codama-root",
+			"kind": "file",
+			"path": "target/idl.json",
+			"match": "\"kind\":\\s*\"rootNode\"",
+			"why": "The CLI emits a Codama root-node document; a hand-rolled shape would not validate."
+		},
+		{
+			"id": "used-cli-not-handwritten",
+			"kind": "transcript",
+			"pattern": "pina (idl|abi|generate)",
+			"why": "Generated IDLs are derived files; the CLI owns their canonical form."
+		},
+		{
+			"id": "did-not-edit-generated-idl",
+			"kind": "transcript",
+			"pattern": "(Edit|Write)[^\\n]*idl\\.json",
+			"absent": true,
+			"why": "Hand-editing the generated document would be overwritten on the next generation."
+		},
+		{
+			"id": "schema-validates",
+			"kind": "command",
+			"command": "pina abi schema --document manifest >/dev/null && echo ok",
+			"why": "The ABI contract tooling must accept the workspace's documents."
+		}
+	]
+}

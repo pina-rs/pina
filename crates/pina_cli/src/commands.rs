@@ -10,6 +10,7 @@ use clap_complete::generate;
 use comfy_table::Table;
 use owo_colors::OwoColorize;
 use pina_cli::abi;
+use pina_cli::skill::SkillAction;
 
 use crate::cli::AbiCommands;
 use crate::cli::Cli;
@@ -19,6 +20,7 @@ use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
 use crate::cli::MigrationCommands;
 use crate::cli::ProfileCommands;
+use crate::cli::SkillCommands;
 use crate::cli::SnapshotViewArg;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
@@ -106,6 +108,7 @@ pub(crate) fn run(cli: Cli) {
 		}
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
+		Commands::Skill { command } => run_skill_command(command),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
 		Commands::Keys {
 			path,
@@ -1385,6 +1388,24 @@ fn capture_cli_snapshot(
 	save_cli_snapshot(&json, directory).map(SnapshotOutcome::Saved)
 }
 
+/// Runs a `pina skill` subcommand.
+///
+/// `read` writes the document itself to stdout with no extra framing, so an
+/// agent captures exactly the bytes a skill installation would carry.
+fn run_skill_command(command: Option<SkillCommands>) {
+	let action = match command {
+		None => SkillAction::List,
+		Some(SkillCommands::Read { topic }) => SkillAction::Read { topic },
+		Some(SkillCommands::Install { dir, force }) => {
+			SkillAction::Install {
+				destination: dir,
+				force,
+			}
+		}
+	};
+	pina_cli::skill::report(pina_cli::skill::run(action));
+}
+
 fn run_docs(topic: Option<&str>) {
 	let Some(topic) = topic else {
 		println!("Bundled documentation topics:");
@@ -1395,6 +1416,7 @@ fn run_docs(topic: Option<&str>) {
 
 		println!("\nRun `pina docs <topic>` to open a topic.");
 		println!("Set PINA_TEMPLATES_DIR to load additional `<topic>.t.md` files.");
+		println!("For the agent skill, including installing it, run `pina skill`.");
 
 		return;
 	};

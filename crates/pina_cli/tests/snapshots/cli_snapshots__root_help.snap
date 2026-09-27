@@ -34,6 +34,8 @@ Commands:
           Generate, inspect, and publish canonical Codama IDLs
   docs
           Read bundled Pina reference documentation in the terminal
+  skill
+          Read or install the bundled Pina agent skill
   snapshot
           Print a normalized JSON snapshot of the CLI surface
   init
@@ -83,6 +85,7 @@ Examples:
 Agent discovery:
   Run 'pina <command> --help' for command-specific inputs, outputs, and examples.
   Run 'pina docs' to list the bundled architecture and IDL reference topics.
+  Run 'pina skill read pina' to read the bundled agent skill, or 'pina skill install --dir <directory>' to install it for an agent runtime.
   For deployment verification, run 'pina verify --help' and then inspect the selected leaf command.
 
 ----- stderr -----

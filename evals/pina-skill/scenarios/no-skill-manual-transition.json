@@ -1,0 +1,59 @@
+{
+	"id": "no-skill-manual-transition",
+	"title": "Complete a manual migration with no skill installed",
+	"fixture": "base-counter-published",
+	"skillSource": "cli",
+	"prompt": "Shrink the Counter account's `count` field from `u64` to `u32` in this deployed program. Existing accounts hold their real count and whatever fits must keep working. Keep the program building and the migration history consistent.",
+	"expectation": "No skill is installed for this run: the agent starts with only the toolkit. This grades the outcome, not the discovery channel — a strong model may finish from its own knowledge plus the CLI's error messages, which name the remedy on every failure. Whether the guidance is reachable through the CLI alone is pinned deterministically by `cli-self-sufficiency`. The work matches `manual-transition`: complete the emitted stub, re-record its hash with a second `create`, leave `pina migrations check` passing.",
+	"checks": [
+		{
+			"id": "source-type-changed",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+count\\s*:\\s*u32",
+			"why": "The field type must actually change."
+		},
+		{
+			"id": "version-advanced",
+			"kind": "command",
+			"command": "pina migrations check --json",
+			"expectOutput": ["\"currentVersion\": 1"],
+			"why": "A type change on a published contract advances it to a new version."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "`check` is the drift gate; a correct change leaves it passing."
+		},
+		{
+			"id": "manual-completed",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "TODO\\(pina-manual-migration\\)",
+			"absent": true,
+			"why": "A type change cannot be a byte copy; the generated stub must be completed by hand."
+		},
+		{
+			"id": "not-header-blind",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "data\\[32",
+			"absent": true,
+			"why": "`data` includes the discriminator and version header, so indexing the payload-relative offset 32 directly reads authority bytes and misses the top of the count."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The macros reject a stale hash or an unfinished body."
+		},
+		{
+			"id": "no-manifest-hand-edit",
+			"kind": "transcript",
+			"pattern": "(Write|Edit)[^\\n]*migrations/manifest\\.json",
+			"absent": true,
+			"why": "The manifest is generated and hash-chained; hand-editing it is always wrong."
+		}
+	]
+}

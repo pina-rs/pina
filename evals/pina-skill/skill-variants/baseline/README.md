@@ -1,0 +1,33 @@
+# @pina-rs/skill
+
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
+Agent guidance for creating, auditing, and maintaining Pina Solana programs.
+
+<!-- {=npmReadmeBadgeRow:"@pina-rs/skill"} -->
+
+[![npm](https://img.shields.io/npm/v/@pina-rs/skill?logo=npm&label=npm)](https://www.npmjs.com/package/@pina-rs/skill) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/npmReadmeBadgeRow} -->
+
+The skill covers project setup, discriminator-first data layouts, account validation, PDA design, schema migrations and versioned wire formats, IDL and client generation, SBF profiling, and proportionate verification. Its instructions preserve `no_std` compatibility and treat the checked-in project configuration as authoritative.
+
+## Install
+
+```sh
+npm install --global @pina-rs/skill
+pina-skill --install
+```
+
+The default destination is `$CODEX_HOME/skills/pina` when `CODEX_HOME` is set, otherwise `~/.codex/skills/pina`. Installation refuses to replace an existing skill directory.
+
+Inspect the source path or print manual installation instructions with:
+
+```sh
+pina-skill --print-path
+pina-skill --print-install
+```
+
+At runtime, agents begin with [SKILL.md](./SKILL.md) and load a focused file under [references](./references) only when the task needs it.

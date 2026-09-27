@@ -1,0 +1,50 @@
+{
+	"id": "doctor-diagnostics",
+	"title": "Diagnose a build failure with the CLI's own tooling",
+	"fixture": "base-counter-published",
+	"prompt": "This program stopped building and I don't understand the error \u2014 something about a migration manifest and a build script? I didn't touch anything on purpose. Figure out exactly what the toolkit is complaining about and fix it properly. Please use the toolkit's own diagnostics rather than guessing, and show me the output you based your conclusion on.",
+	"expectation": "The fixture's `build.rs` has lost its rerun directive, so macro re-expansion can no longer be triggered by manifest changes and the drift gate refuses. The agent should reproduce the failure, run the CLI's diagnostic (`pina doctor --json` and/or `pina migrations check`) to read the typed cause, and restore the directive \u2014 not delete the migrations directory or disable migrations to make the error go away.",
+	"setupFiles": {
+		"build.rs": "fn main() {\n\tprintln!(\"cargo:rerun-if-changed=Cargo.toml\");\n}\n"
+	},
+	"checks": [
+		{
+			"id": "used-cli-diagnostics",
+			"kind": "transcript",
+			"pattern": "pina (doctor|migrations check)",
+			"why": "The request asks for the toolkit's own diagnosis; `doctor --json` and `migrations check` are the typed surfaces."
+		},
+		{
+			"id": "build-rs-restored",
+			"kind": "file",
+			"path": "build.rs",
+			"match": "rerun-if-changed=migrations/manifest.json",
+			"why": "The fix is the missing rerun directive, which re-expands macros when the manifest changes."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "The gate that was failing must pass afterwards."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The original symptom must be gone."
+		},
+		{
+			"id": "migrations-dir-intact",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"why": "Removing the migration history would silence the error while destroying the contract."
+		},
+		{
+			"id": "envelope-not-stripped",
+			"kind": "transcript",
+			"pattern": "migrations\\s*=\\s*false",
+			"absent": true,
+			"why": "Opting the contract out would remove an envelope the manifest records; the CLI refuses it and the skill forbids it."
+		}
+	]
+}

@@ -1,0 +1,91 @@
+{
+	"id": "cli-self-sufficiency",
+	"title": "The CLI alone teaches the toolkit (no agent, no skill installed)",
+	"fixture": "base-counter-published",
+	"agent": false,
+	"prompt": "",
+	"expectation": "An agent that has only the binary — no skill installed, no repository, no network — must be able to find the guidance from the CLI alone: `pina --help` advertises the skill, `pina docs` cross-references it, `pina skill` lists the topics, `pina skill read` serves the same documents the npm package ships, and `pina skill install` writes a usable tree that it refuses to clobber. These checks are deterministic; the facts they grep for are the ones the evaluations showed agents actually need.",
+	"checks": [
+		{
+			"id": "root-help-advertises-skill",
+			"kind": "command",
+			"command": "pina --help",
+			"expectOutput": ["pina skill read pina", "pina skill install"],
+			"why": "Discovery has to start at `pina --help`, the first thing the skill itself tells an agent to inspect."
+		},
+		{
+			"id": "docs-cross-references-skill",
+			"kind": "command",
+			"command": "pina docs",
+			"expectOutput": ["pina skill"],
+			"why": "An agent that found the docs surface first must be pointed at the skill surface."
+		},
+		{
+			"id": "bare-skill-lists-topics",
+			"kind": "command",
+			"command": "pina skill",
+			"expectOutput": [
+				"pina",
+				"migrations",
+				"program-authoring",
+				"project-setup",
+				"testing",
+				"cli-and-codegen"
+			],
+			"why": "The listing is the index an agent scans before choosing what to read."
+		},
+		{
+			"id": "entrypoint-read-serves-skill-md",
+			"kind": "command",
+			"command": "pina skill read pina",
+			"expectOutput": ["name: pina", "Task routing", "pina migrations create"],
+			"why": "The entrypoint must carry the routing table and the migration loop, byte for byte as shipped."
+		},
+		{
+			"id": "migrations-reference-carries-the-hard-won-facts",
+			"kind": "command",
+			"command": "pina skill read migrations",
+			"expectOutput": [
+				"relative to the version envelope header",
+				"--rename",
+				"--assume-removed",
+				"--envelope-ack",
+				"abiVersion",
+				"tests/abi_layout.rs",
+				"pina migrations check"
+			],
+			"why": "These are exactly the facts the evaluations showed agents need: the transition ABI, the disambiguation flags, the envelope gate, the document version, and the layout drift gate."
+		},
+		{
+			"id": "read-is-raw-markdown",
+			"kind": "command",
+			"command": "pina skill read pina | head -1",
+			"expectOutput": ["---"],
+			"why": "Agents parse the document itself; terminal rendering would corrupt frontmatter and code blocks."
+		},
+		{
+			"id": "install-writes-usable-tree",
+			"kind": "command",
+			"command": "rm -rf .work-install && pina skill install --dir .work-install/pina && python3 -c \"import os; assert os.path.exists('.work-install/pina/references/migrations.md'); assert open('.work-install/pina/SKILL.md').read().startswith('---')\"",
+			"why": "An install must produce the whole skill tree with the entrypoint intact."
+		},
+		{
+			"id": "install-refuses-clobber",
+			"kind": "command",
+			"command": "pina skill install --dir .work-install/pina; test $? -eq 1",
+			"why": "Replacing a curated skill is not a side effect an install may have without --force."
+		},
+		{
+			"id": "install-force-replaces",
+			"kind": "command",
+			"command": "pina skill install --dir .work-install/pina --force && rm -rf .work-install",
+			"why": "The explicit override must exist and work."
+		},
+		{
+			"id": "unknown-topic-exits-nonzero",
+			"kind": "command",
+			"command": "pina skill read anchor; test $? -eq 1",
+			"why": "A scripting agent relies on exit status, not prose, to notice a misspelled topic."
+		}
+	]
+}

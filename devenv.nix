@@ -1571,6 +1571,9 @@ in
         ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
         ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
         node ${lib.escapeShellArg "${currentDir}/scripts/check-migration-docs.mjs"}
+        # The agent skill ships inside the CLI binary (`pina skill read`), so a
+        # skill edit without a matching committed copy would serve stale text.
+        node ${lib.escapeShellArg "${currentDir}/scripts/docs/sync-skill.mjs"} --check
         # The lint reference page is generated from the CLI's lint table, so a
         # lint added or reworded without regenerating the page fails here rather
         # than shipping docs that contradict `pina lint --explain`.

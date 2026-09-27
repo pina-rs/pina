@@ -86,6 +86,11 @@ crates/pina_fuzz/fuzz/artifacts/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Pina skill evaluation scratch space: throwaway run workdirs, each with
+# its own `target/`, plus generated reports and transcripts.
+/evals/pina-skill/.work/
+/evals/pina-skill/results/
 .ant-colony/
 .mdt/
 **/.cache/

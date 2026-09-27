@@ -1,0 +1,50 @@
+{
+	"id": "manual-transition",
+	"title": "Change a field's type, requiring a hand-written transition",
+	"fixture": "base-counter-published",
+	"prompt": "Storage is tight and a u64 for the counter is overkill — shrink the `count` field to `u64` → `u32`. Existing accounts hold counts in a u64, so whatever the new field ends up holding has to be the same number where it fits. Please keep the program building and the migration history consistent.",
+	"expectation": "A type change cannot be expressed as a byte copy, so `pina migrations create` emits a manual transition containing `TODO(pina-manual-migration)`. The agent must fill in the body itself, then re-run `create` so the implementation hash is recorded. Leaving the TODO in place fails the build.",
+	"checks": [
+		{
+			"id": "source-type-changed",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+count\\s*:\\s*u32",
+			"why": "The field type must actually change."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "A filled-in manual transition still has to satisfy the drift gate."
+		},
+		{
+			"id": "no-unfinished-todo",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "TODO\\(pina-manual-migration\\)",
+			"absent": true,
+			"why": "The stub TODO must be replaced with a real conversion body."
+		},
+		{
+			"id": "transition-is-manual",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"mode\": \"manual\"",
+			"why": "A type change must be recorded as a manual transition, not an automatic one."
+		},
+		{
+			"id": "transition-hash-recorded",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "implementationSha256",
+			"why": "Re-running `create` after filling the body records the implementation hash."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "An unfinished or hash-stale transition blocks macro expansion."
+		}
+	]
+}

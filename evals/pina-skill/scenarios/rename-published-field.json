@@ -1,0 +1,57 @@
+{
+	"id": "rename-published-field",
+	"title": "Rename a field on a published contract (ambiguous change)",
+	"fixture": "base-counter-published",
+	"prompt": "We shipped the counter to mainnet last week. The team has decided `count` is a bad name — rename that field to `total` everywhere in the program. It is the same number and it must keep its value for accounts that are already out there; nobody should lose their count. Keep the migration history consistent and the program building.",
+	"expectation": "A rename makes one field disappear while a same-typed field appears, which the CLI treats as ambiguous and refuses to guess. The agent must run `pina migrations create` with an explicit answer (`--rename count:total`) or answer the interactive prompt, preserving the stored bytes. Guessing `--assume-removed` would silently discard the value and fail the requirement.",
+	"checks": [
+		{
+			"id": "source-renamed",
+			"kind": "file",
+			"path": "src/lib.rs",
+			"match": "pub\\s+total\\s*:\\s*u64",
+			"why": "The rename must be applied to the schema."
+		},
+		{
+			"id": "history-consistent",
+			"kind": "command",
+			"command": "pina migrations check",
+			"why": "The migration history must be left in a consistent, checkable state."
+		},
+		{
+			"id": "version-advanced",
+			"kind": "command",
+			"command": "pina migrations check --json",
+			"expectOutput": ["\"currentVersion\": 1"],
+			"why": "The change advances the published account contract to version 1."
+		},
+		{
+			"id": "rename-recorded-in-manifest",
+			"kind": "file",
+			"path": "migrations/manifest.json",
+			"match": "\"from\": \"count\"",
+			"why": "The rename answer is recorded in the manifest so future runs and CI replay it."
+		},
+		{
+			"id": "transition-preserves-bytes",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "copy_within",
+			"why": "Preserving the stored value is the explicit requirement, so the transition must copy rather than zero the field."
+		},
+		{
+			"id": "no-zero-fill",
+			"kind": "file",
+			"path": "migrations/transitions/account_1_01/v0_to_v1.rs",
+			"match": "fill\\(0\\)",
+			"absent": true,
+			"why": "A zero-fill for the renamed field would discard the user's data."
+		},
+		{
+			"id": "program-compiles",
+			"kind": "command",
+			"command": "cargo check --quiet",
+			"why": "The renamed accessors must compile against the regenerated schema."
+		}
+	]
+}
