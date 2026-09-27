@@ -6368,6 +6368,7 @@ name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
  "pina",
+ "pina_test",
  "prop_amm_program_cpi",
 ]
 

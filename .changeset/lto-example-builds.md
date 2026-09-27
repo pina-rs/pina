@@ -1,6 +1,7 @@
 ---
 pina: none
 pina_macros: none
+pina_test: none
 ---
 
 # Build every example program with fat link-time optimization
@@ -36,6 +37,8 @@ The host-only `prover` module is gated on the `prover` cargo feature, which a so
 ## Program self-tests moved beside the programs they pin
 
 Converting the programs to cdylib-only left the workspace compute-unit harness (`tests/compute_units.rs`) linking against programs that no longer produce rlibs, so it now source-includes them with `#[path]` like the Surfpool harnesses. That exposed a rule the embedded `#[cfg(test)]` modules had been silently exempt from: their assertions pin enveloped codegen (envelope geometry, version bytes), and migration-aware codegen only expands when `migrations/manifest.json` is discoverable by walking up from the expanding crate — true for any crate inside the program's tree, false for a workspace-root harness. The programs' self-tests moved to `tests/` beside each program (migration-aware assertions to `tests/generated_views.rs` / `tests/self_checks.rs`, where the walk still finds the manifest); the account-realloc program's private-helper tests stayed in-crate because only the crate itself can reach those functions. The migrations program's exact runtime-CU snapshot moved to its own `tests/compute_units.rs` for the same reason, and the workspace harness now measures the four non-migration-aware programs. Every suite count is preserved: 18 migration-view tests, 13 counter, 22 profile, 11 realloc all run in their own packages.
+
+Source-including the `pina_bpf_program` also pulled its artifact-inspection tests (`sbf_build_produces_artifact`, `sbf_build_artifact_is_elf`) into the Surfpool harness, where the performance workflow sweeps them with `--ignored` and places ELFs through the compute-unit manifest instead of `target/deploy`. `pina_test::benchmark_artifact` now resolves a program's recorded artifact from `PINA_CU_MANIFEST` — the same manifest `ProgramTest::start` already reads — and the tests consult it before the `pina test` pin and the conventional `target/deploy` walk.
 
 The fuzz targets had the same dependency shape: `crates/pina_fuzz` depended on `counter_program`, `role_registry_program`, and `migrations_program` as rlibs, which cdylib-only programs no longer produce. Each program now carries a `fuzz/` re-export crate inside its own tree — the source include expands the migration-aware macros with the manifest found by the walk, and the rlib the wrapper produces carries the already-expanded codegen — and the fuzz targets depend on those (`migrations_program_fuzz` re-exports the program's `fuzzing` feature through its own, since an include resolves features against the including crate). The corpus and target set are unchanged; the smoke tier replays and fuzzes all three targets green.
 

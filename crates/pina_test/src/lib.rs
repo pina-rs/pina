@@ -1602,6 +1602,34 @@ fn system_program_id() -> Pubkey {
 	Pubkey::default()
 }
 
+/// Resolve the SBF artifact the performance harness recorded for a program.
+///
+/// The compute-unit workflow builds every program's ELF into its own
+/// `--sbf-out-dir` and hands tests a manifest (`PINA_CU_MANIFEST`) that maps
+/// program ids to artifact paths, so a test that only wants to inspect the
+/// artifact — rather than run it through [`ProgramTest`] — can resolve the
+/// same path without knowing where the workflow chose to place it. Returns
+/// `None` when the manifest is unset or has no entry for `program_id`, leaving
+/// the caller free to fall back to its own lookup.
+#[must_use]
+pub fn benchmark_artifact(program_id: &Pubkey) -> Option<PathBuf> {
+	let manifest_path = std::env::var_os("PINA_CU_MANIFEST")?;
+	let manifest = std::fs::read_to_string(manifest_path).ok()?;
+	benchmark_artifact_from_manifest(&manifest, program_id)
+}
+
+/// The manifest-parsing half of [`benchmark_artifact`], split out so the
+/// lookup's failure modes (missing entry, malformed JSON) stay testable
+/// without mutating the process environment.
+fn benchmark_artifact_from_manifest(manifest: &str, program_id: &Pubkey) -> Option<PathBuf> {
+	let manifest: serde_json::Value = serde_json::from_str(manifest).ok()?;
+	let artifact = manifest
+		.get(program_id.to_string())?
+		.get("artifact")?
+		.as_str()?;
+	Some(PathBuf::from(artifact))
+}
+
 fn artifact_from_env(program_id: &Pubkey) -> Result<(PathBuf, Option<String>), TestError> {
 	if let Some(manifest_path) = std::env::var_os("PINA_CU_MANIFEST") {
 		let manifest = std::fs::read_to_string(manifest_path)
@@ -2000,5 +2028,47 @@ mod tests {
 
 		assert!(matches!(result, Err(SurfnetError::Startup(_))));
 		assert_eq!(attempts, 1);
+	}
+
+	/// A recorded benchmark entry resolves to the artifact path.
+	#[test]
+	fn a_recorded_benchmark_entry_resolves_to_the_artifact() {
+		let program_id = Pubkey::new_from_array([1; 32]);
+		let manifest = serde_json::json!({
+			program_id.to_string(): {
+				"artifact": "/artifacts/program.so",
+				"program": "example_program",
+			},
+			Pubkey::new_from_array([2; 32]).to_string(): {
+				"artifact": "/artifacts/other.so",
+				"program": "other_program",
+			},
+		})
+		.to_string();
+
+		let resolved = benchmark_artifact_from_manifest(&manifest, &program_id);
+
+		assert_eq!(
+			resolved.as_deref(),
+			Some(std::path::Path::new("/artifacts/program.so"))
+		);
+	}
+
+	/// A manifest with no entry for the program resolves to `None`, and so
+	/// does malformed JSON, leaving the caller free to fall back to its own
+	/// lookup instead of failing.
+	#[test]
+	fn a_missing_entry_or_malformed_manifest_resolves_to_none() {
+		let program_id = Pubkey::new_from_array([1; 32]);
+		let manifest = serde_json::json!({
+			Pubkey::new_from_array([2; 32]).to_string(): {
+				"artifact": "/artifacts/other.so",
+				"program": "other_program",
+			},
+		})
+		.to_string();
+
+		assert!(benchmark_artifact_from_manifest(&manifest, &program_id).is_none());
+		assert!(benchmark_artifact_from_manifest("{ not json", &program_id).is_none());
 	}
 }

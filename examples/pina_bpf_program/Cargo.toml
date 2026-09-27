@@ -24,5 +24,11 @@ cpi-runtime-tests = ["dep:prop_amm_program_cpi"]
 pina = { workspace = true, features = ["logs", "derive"] }
 prop_amm_program_cpi = { path = "../../codama/clients/cpi/prop_amm_program", optional = true }
 
+[dev-dependencies]
+# The `sbf_build_*` tests resolve the deployed artifact, and the performance
+# workflow hands them the compute-unit manifest that `pina_test` reads
+# (`PINA_CU_MANIFEST`); host-only, never linked into the SBF artifact.
+pina_test = { workspace = true }
+
 [lints]
 workspace = true
