@@ -85,7 +85,7 @@ function parseArgs(argv: string[]): Options {
 		skillSource: argv.includes("--skill-source") &&
 				process.argv[process.argv.indexOf("--skill-source") + 1] === "cli"
 			? "cli"
-			: "installed",
+			: "installed", // the flag is the last token, so indexOf(+1) cannot cross into another flag
 	};
 }
 

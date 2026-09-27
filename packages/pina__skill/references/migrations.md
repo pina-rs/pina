@@ -227,7 +227,7 @@ Each account climbs its own ladder one adjacent step at a time: plan from the ex
 
 ### Fund growth before you need it
 
-`create` prints a growth warning for every transition that increases an account's size, quoting the rent a stale account will need — roughly 6,960 lamports per grown byte, charged to the instruction's migration payer. Size the program's budget constant for the **whole ladder a stale account will climb**, not one step, because the executor checks the cumulative deficit before the first mutation and a budget that covers only step one fails the second step after the first has already landed:
+`create` prints a growth warning for every transition that increases an account's size, quoting the rent a stale account will need — roughly 6,960 lamports per grown byte, charged to the instruction's migration payer. Size the program's budget constant for the **whole ladder a stale account will climb**, not one step, because the executor checks the cumulative deficit before each step mutates, so a budget that covers only the first step fails the second after the first has landed in memory:
 
 ```rust
 /// Covers the full v0 → v3 ladder, not one step.
