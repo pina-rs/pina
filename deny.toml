@@ -101,6 +101,28 @@ ignore = [
 	# surfpool-core → jsonrpc-http-server → hyper 0.14 → h2 0.3.27. Host/test
 	# stack only (via surfpool/litesvm, not in any shipped crate graph).
 	"RUSTSEC-2026-0258",
+	# RUSTSEC-2025-0055: tracing-subscriber logs user input without escaping
+	# ANSI sequences. Reached via ark-relations → ark-groth16 → the privacy
+	# pool's Surfpool harness. Host/test stack only (the proving stack never
+	# compiles into an on-chain program; `not(target_os = "solana")` gates
+	# the module).
+	"RUSTSEC-2025-0055",
+	# RUSTSEC-2021-0145: atty performs an unaligned read. Reached via
+	# surfpool-core → hiro-system-kit → atty 0.2.14 — the same chain as the
+	# ignored RUSTSEC-2024-0375 (atty unmaintained). Host/test stack only
+	# (via surfpool/litesvm, not in any shipped crate graph).
+	"RUSTSEC-2021-0145",
+	# RUSTSEC-2026-0186: memmap2 takes an unchecked pointer offset. Reached
+	# via solana-runtime → agave-snapshots → solana-genesis-config →
+	# memmap2 0.5.10. Host/test stack only (via pina_test, not in any shipped
+	# crate graph).
+	"RUSTSEC-2026-0186",
+	# RUSTSEC-2026-0097: rand is unsound with a custom logger using
+	# `rand::rng()`. Reached via litesvm → agave-precompiles →
+	# ed25519-dalek 1.0.1 → rand 0.7.3. Host/test stack only (via
+	# surfpool/litesvm, not in any shipped crate graph). The workspace's own
+	# rand is 0.9.5 and its own ed25519-dalek is 3.0.0.
+	"RUSTSEC-2026-0097",
 ]
 
 [licenses]
