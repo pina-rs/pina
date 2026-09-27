@@ -1,5 +1,6 @@
 ---
 pina: none
+pina_macros: none
 ---
 
 # Build every example program with fat link-time optimization
