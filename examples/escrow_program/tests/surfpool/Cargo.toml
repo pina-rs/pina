@@ -5,5 +5,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
+# The program is a cdylib only (see ../../Cargo.toml), so its types are
+# included with `#[path = "../../../src/lib.rs"]` in src/lib.rs instead of
+# through an rlib dependency. The program's own `pina` features must be
+# mirrored here so the included source compiles identically.
+pina = { workspace = true, features = ["account-resize", "logs", "token", "derive"] }
 pina_test = { workspace = true }
-program_under_test = { package = "escrow_program", path = "../.." }

@@ -1,9 +1,13 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::ErrorsInstruction;
-use program_under_test::ID;
+use program::ErrorsInstruction;
+use program::ID;
 
 /// Every instruction in this example returns a custom error with an exact
 /// code. The runtime must surface the numeric code so clients can match it.

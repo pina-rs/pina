@@ -13,13 +13,17 @@
 //! instruction to change it, which tests the caller's plumbing rather than the
 //! allocator.
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::AllocateInstruction;
-use program_under_test::FillInstruction;
-use program_under_test::HeapInstruction;
-use program_under_test::ID;
+use program::AllocateInstruction;
+use program::FillInstruction;
+use program::HeapInstruction;
+use program::ID;
 
 /// Bytes in the runtime's default heap frame.
 const DEFAULT_HEAP_FRAME: u32 = 32 * 1024;

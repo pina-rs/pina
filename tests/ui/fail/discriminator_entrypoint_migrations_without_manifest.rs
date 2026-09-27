@@ -1,7 +1,9 @@
 //! A migration ladder must resolve against the checked-in manifest. The
-//! dispatch macro reads the same policy source as `#[account]`, so a program
-//! with no manifest fails with the `pina migrations create` remedy instead of an
-//! unsatisfied `MigratableAccount` bound at the `run_optional` call.
+//! dispatch macro walks up from the expanding crate to find the program
+//! directory, so this fixture — compiled from a harness crate with no
+//! `migrations/manifest.json` anywhere above it — fails with the
+//! unlocatable-manifest error instead of an unsatisfied `MigratableAccount`
+//! bound at the `run_optional` call.
 
 use pina::*;
 

@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pina = { workspace = true, features = ["logs", "derive"] }
 pina_test = { workspace = true }
-program_under_test = { package = "pina_bpf_program", path = "../.." }

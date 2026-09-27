@@ -48,6 +48,7 @@
   - [ADR 0007: Make ABI migrations first-class](./adrs/0007-first-class-versioned-abi.md)
   - [ADR 0008: Migration ergonomics, client-driven migration, and legacy adoption](./adrs/0008-migration-ux-and-legacy-adoption.md)
   - [ADR 0009: Version the ABI document on `pina_abi`'s own release line](./adrs/0009-abi-document-versioning.md)
+  - [ADR 0010: Lean entrypoint strategy for deployed-size parity](./adrs/0010-lean-entrypoint-strategy.md)
 - [Crates and Features](./crates-and-features.md)
 - [Codama Workflow](./codama-workflow.md)
 - [Examples](./examples.md)

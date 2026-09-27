@@ -16,7 +16,7 @@ dependencies = [
 name = "account-realloc-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "account_realloc_program",
+ "pina",
  "pina_test",
 ]
 
@@ -549,6 +549,7 @@ dependencies = [
  "digest 0.10.7",
  "fnv",
  "merlin",
+ "rayon",
  "sha2 0.10.9",
 ]
 
@@ -598,6 +599,7 @@ dependencies = [
  "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
+ "rayon",
  "zeroize",
 ]
 
@@ -638,6 +640,7 @@ dependencies = [
  "num-bigint 0.4.8",
  "num-traits",
  "paste",
+ "rayon",
  "zeroize",
 ]
 
@@ -700,6 +703,7 @@ dependencies = [
  "ark-relations",
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
+ "rayon",
 ]
 
 [[package]]
@@ -728,6 +732,7 @@ dependencies = [
  "educe",
  "fnv",
  "hashbrown 0.15.5",
+ "rayon",
 ]
 
 [[package]]
@@ -756,6 +761,7 @@ dependencies = [
  "ark-ff 0.5.0",
  "ark-std 0.5.0",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -781,6 +787,7 @@ dependencies = [
  "arrayvec",
  "digest 0.10.7",
  "num-bigint 0.4.8",
+ "rayon",
 ]
 
 [[package]]
@@ -835,6 +842,7 @@ checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
  "rand 0.8.8",
+ "rayon",
 ]
 
 [[package]]
@@ -1780,7 +1788,7 @@ dependencies = [
 name = "compact-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "compact_accounts_program",
+ "pina",
  "pina_test",
 ]
 
@@ -2013,7 +2021,7 @@ dependencies = [
 name = "counter-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "counter_program",
+ "pina",
  "pina_test",
 ]
 
@@ -2314,7 +2322,7 @@ dependencies = [
 name = "custom-errors-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "custom_errors_program",
+ "pina",
  "pina_test",
 ]
 
@@ -2485,7 +2493,7 @@ checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 name = "declare-id-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "declare_id_program",
+ "pina",
  "pina_test",
 ]
 
@@ -2493,7 +2501,7 @@ dependencies = [
 name = "declare-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "declare_program",
+ "pina",
  "pina_test",
 ]
 
@@ -2873,7 +2881,7 @@ dependencies = [
 name = "duplicate-mutable-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "duplicate_mutable_accounts_program",
+ "pina",
  "pina_test",
 ]
 
@@ -3180,7 +3188,7 @@ dependencies = [
 name = "escrow-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "escrow_program",
+ "pina",
  "pina_test",
 ]
 
@@ -3260,8 +3268,8 @@ name = "events_program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "base64 0.23.1",
- "events_program",
  "events_program-client",
+ "pina",
  "pina_test",
 ]
 
@@ -3444,7 +3452,7 @@ dependencies = [
 name = "float-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "float_accounts_program",
+ "pina",
  "pina_test",
 ]
 
@@ -3901,7 +3909,7 @@ dependencies = [
 name = "heap-alloc-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "heap_alloc_program",
+ "pina",
  "pina_test",
 ]
 
@@ -3954,7 +3962,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-solana-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "hello_solana_program",
+ "pina",
  "pina_test",
 ]
 
@@ -5411,7 +5419,7 @@ name = "migrations-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "migrations-program-client",
- "migrations_program",
+ "pina",
  "pina_test",
 ]
 
@@ -5421,6 +5429,8 @@ version = "0.0.0"
 dependencies = [
  "mollusk-svm",
  "pina",
+ "serde_json",
+ "sha2 0.11.0",
  "solana-account 4.3.2",
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
@@ -5676,7 +5686,7 @@ dependencies = [
 name = "multisig-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "multisig_program",
+ "pina",
  "pina_test",
 ]
 
@@ -6056,7 +6066,7 @@ dependencies = [
 name = "optional-accounts-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "optional_accounts_program",
+ "pina",
  "pina_test",
 ]
 
@@ -6335,7 +6345,7 @@ dependencies = [
 name = "pina-bpf-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "pina_bpf_program",
+ "pina",
  "pina_test",
 ]
 
@@ -6358,6 +6368,7 @@ name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
  "pina",
+ "pina_test",
  "prop_amm_program_cpi",
 ]
 
@@ -6524,16 +6535,12 @@ dependencies = [
 name = "pina_root"
 version = "0.0.11"
 dependencies = [
- "account_realloc_program",
- "counter_program",
  "insta",
  "macrotest",
- "migrations_program",
  "mollusk-svm",
  "pina",
  "pina_macros",
  "prettyplease 0.3.0",
- "profile_program",
  "quote",
  "serde_json",
  "sha2 0.11.0",
@@ -6828,8 +6835,19 @@ dependencies = [
 name = "privacy-pool-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize 0.5.0",
+ "ark-snark",
+ "ark-std 0.5.0",
+ "light-poseidon 0.4.0",
+ "pina",
  "pina_test",
- "privacy_pool_program",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -6954,8 +6972,8 @@ dependencies = [
 name = "profile-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "profile_program",
 ]
 
 [[package]]
@@ -7009,8 +7027,8 @@ dependencies = [
 name = "prop-amm-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "prop_amm_program",
 ]
 
 [[package]]
@@ -7587,8 +7605,8 @@ dependencies = [
 name = "role-registry-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "role_registry_program",
 ]
 
 [[package]]
@@ -12700,8 +12718,8 @@ dependencies = [
 name = "staking-rewards-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "staking_rewards_program",
 ]
 
 [[package]]
@@ -13065,8 +13083,8 @@ dependencies = [
 name = "system-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "system_accounts_program",
 ]
 
 [[package]]
@@ -13133,8 +13151,8 @@ version = "0.0.0"
 name = "sysvar-checks-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "sysvar_checks_program",
 ]
 
 [[package]]
@@ -13385,8 +13403,8 @@ dependencies = [
 name = "todo-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "todo_program",
 ]
 
 [[package]]
@@ -13701,14 +13719,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+ "valuable",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
+dependencies = [
+ "tracing-core",
 ]
 
 [[package]]
 name = "transfer-sol-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "transfer_sol_program",
 ]
 
 [[package]]
@@ -14134,8 +14162,8 @@ dependencies = [
 name = "validation-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "validation_program",
 ]
 
 [[package]]
@@ -14164,6 +14192,12 @@ version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "valuable"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vcpkg"
@@ -14202,8 +14236,8 @@ dependencies = [
 name = "vesting-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "pina",
  "pina_test",
- "vesting_program",
 ]
 
 [[package]]

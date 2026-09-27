@@ -2,16 +2,20 @@
 
 use core::mem::size_of;
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Rent;
 use pina_test::Signer;
-use program_under_test::CompactInstruction;
-use program_under_test::DEFAULT_TITLE;
-use program_under_test::ID;
-use program_under_test::Journal;
+use program::CompactInstruction;
+use program::DEFAULT_TITLE;
+use program::ID;
+use program::Journal;
 
 const SEED_JOURNAL: &[u8] = b"compact-journal";
 

@@ -1,13 +1,17 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::CheckPolicyInstruction;
-use program_under_test::ID;
-use program_under_test::InitializePolicyInstruction;
-use program_under_test::PolicyState;
-use program_under_test::ValidationInstruction;
+use program::CheckPolicyInstruction;
+use program::ID;
+use program::InitializePolicyInstruction;
+use program::PolicyState;
+use program::ValidationInstruction;
 
 const POLICY_SEED: &[u8] = b"validation-policy";
 

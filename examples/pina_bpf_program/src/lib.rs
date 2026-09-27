@@ -237,11 +237,41 @@ mod tests {
 
 	use super::*;
 
+	/// Where the built SBF artifact lives.
+	///
+	/// The program is a cdylib only, so these tests compile from more than one
+	/// crate: the Surfpool harness that source-includes this file (four levels
+	/// below the workspace root) and the program crate itself (two levels).
+	/// `CARGO_MANIFEST_DIR` therefore differs between the two, so the lookup
+	/// tries, in order: the artifact the performance workflow recorded for this
+	/// program in its compute-unit manifest (`pina_test::benchmark_artifact`,
+	/// which reads `PINA_CU_MANIFEST`), the artifact `pina test` pinned
+	/// (`PINA_SBF_ARTIFACT`), and a walk of the known ancestor depths to the
+	/// conventional `target/deploy` location.
 	fn sbf_binary_path() -> String {
-		format!(
-			"{}/../../target/deploy/pina_bpf_program.so",
-			env!("CARGO_MANIFEST_DIR")
-		)
+		if let Some(artifact) =
+			pina_test::benchmark_artifact(&pina_test::Pubkey::new_from_array(ID.to_bytes()))
+		{
+			return artifact.to_string_lossy().into_owned();
+		}
+
+		if let Ok(artifact) = std::env::var("PINA_SBF_ARTIFACT") {
+			return artifact;
+		}
+
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		for ancestors_up in 2..=4 {
+			let candidate = format!(
+				"{}/{}target/deploy/pina_bpf_program.so",
+				manifest,
+				"../".repeat(ancestors_up)
+			);
+			if Path::new(&candidate).is_file() {
+				return candidate;
+			}
+		}
+
+		format!("{}/../../target/deploy/pina_bpf_program.so", manifest)
 	}
 
 	#[test]

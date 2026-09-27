@@ -11,18 +11,10 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use account_realloc_program::InitializeIx as ReallocInitializeIx;
-use account_realloc_program::ReallocIx;
-use account_realloc_program::Sample;
-use counter_program::CounterInstruction;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::program::loader_keys::LOADER_V3;
 use mollusk_svm::result::InstructionResult;
-use profile_program::AddTagInstruction;
-use profile_program::InitializeInstruction as ProfileInitializeInstruction;
-use profile_program::RemoveTagInstruction;
-use profile_program::UpdateProfileInstruction;
 use serde_json::json;
 use sha2::Digest;
 use sha2::Sha256;
@@ -30,6 +22,33 @@ use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
+
+// The example programs are cdylib-only, so they cannot be linked in as rlibs.
+// Include the real sources instead: the modules compile exactly as their
+// crates do (each program's `not(test)` std gate and `bpf-entrypoint` feature
+// gate behave the same in a test target), and the fixtures below keep using
+// the same instruction types and account layouts.
+//
+// The migrations program is deliberately absent: its migration-aware macros
+// resolve `migrations/manifest.json` by walking up from the expanding crate,
+// which finds the program's manifest from any harness inside its directory
+// tree but not from this workspace-root crate. Its exact CU snapshot lives
+// with the program, in `examples/migrations_program/tests/compute_units.rs`.
+#[path = "../examples/account_realloc_program/src/lib.rs"]
+mod account_realloc_program;
+#[path = "../examples/counter_program/src/lib.rs"]
+mod counter_program;
+#[path = "../examples/profile_program/src/lib.rs"]
+mod profile_program;
+
+use account_realloc_program::InitializeIx as ReallocInitializeIx;
+use account_realloc_program::ReallocIx;
+use account_realloc_program::Sample;
+use counter_program::CounterInstruction;
+use profile_program::AddTagInstruction;
+use profile_program::InitializeInstruction as ProfileInitializeInstruction;
+use profile_program::RemoveTagInstruction;
+use profile_program::UpdateProfileInstruction;
 
 const MOLLUSK_VERSION: &str = "0.14.0";
 
@@ -572,112 +591,12 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	])
 }
 
-fn migration_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
-	use migrations_program::MigrationAccount;
-	use migrations_program::MigrationInstruction;
-
-	let program_id = as_pubkey(migrations_program::ID);
-	let mollusk = load_program(elf_dir, "migrations_program", &program_id);
-	let authority = Pubkey::new_from_array([2; 32]);
-	let referrer = Pubkey::new_from_array([3; 32]);
-	let state = Pubkey::new_from_array([4; 32]);
-	let payer = Pubkey::new_from_array([5; 32]);
-
-	let mut current_state = vec![0_u8; migrations_program::State::SIZE];
-	current_state[0] = MigrationAccount::State as u8;
-	current_state[1] = 2;
-	current_state[2..34].copy_from_slice(authority.as_ref());
-	current_state[34..42].copy_from_slice(&7_u64.to_le_bytes());
-	current_state[42] = 1;
-	let mut current_data = [0_u8; 12];
-	current_data[0] = MigrationInstruction::Update as u8;
-	current_data[1] = 2;
-	current_data[2..10].copy_from_slice(&42_u64.to_le_bytes());
-	let update_metas = |state: Pubkey, payer: Pubkey| {
-		vec![
-			AccountMeta::new_readonly(authority, true),
-			AccountMeta::new_readonly(referrer, false),
-			AccountMeta::new(state, false),
-			AccountMeta::new(payer, true),
-			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
-		]
-	};
-	let current_update =
-		Instruction::new_with_bytes(program_id, &current_data, update_metas(state, payer));
-	let current_result = process_success(
-		&mollusk,
-		"migrations_program/update_current",
-		&current_update,
-		&[
-			(authority, system_account(1_000_000_000)),
-			(referrer, system_account(1)),
-			(
-				state,
-				Account {
-					lamports: 1_000_000,
-					data: current_state.clone(),
-					owner: program_id,
-					executable: false,
-					rent_epoch: 0,
-				},
-			),
-			(payer, system_account(1_000_000_000)),
-			keyed_account_for_system_program(),
-		],
-	);
-
-	let mut historical_state = vec![0_u8; 42];
-	historical_state[0] = MigrationAccount::State as u8;
-	historical_state[1] = 0;
-	historical_state[2..34].copy_from_slice(authority.as_ref());
-	historical_state[34..42].copy_from_slice(&7_u64.to_le_bytes());
-	let mut historical_data = [0_u8; 10];
-	historical_data[0] = MigrationInstruction::Update as u8;
-	historical_data[1] = 0;
-	historical_data[2..].copy_from_slice(&42_u64.to_le_bytes());
-	let migrating_update =
-		Instruction::new_with_bytes(program_id, &historical_data, update_metas(state, payer));
-	let migrating_result = process_success(
-		&mollusk,
-		"migrations_program/update_historical_migration",
-		&migrating_update,
-		&[
-			(authority, system_account(1_000_000_000)),
-			(referrer, system_account(1)),
-			(
-				state,
-				Account {
-					lamports: 1_000_000,
-					data: historical_state,
-					owner: program_id,
-					executable: false,
-					rent_epoch: 0,
-				},
-			),
-			(payer, system_account(1_000_000_000)),
-			keyed_account_for_system_program(),
-		],
-	);
-
-	BTreeMap::from([
-		(
-			"migrations_program/update_current".to_owned(),
-			Measurement::success(&current_result),
-		),
-		(
-			"migrations_program/update_historical_migration".to_owned(),
-			Measurement::success(&migrating_result),
-		),
-	])
-}
-
 fn measure_all(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	let mut measurements = BTreeMap::new();
 	measurements.extend(counter_measurements(elf_dir));
 	measurements.extend(profile_measurements(elf_dir));
 	measurements.extend(realloc_measurements(elf_dir));
 	measurements.extend(token_loader_measurements(elf_dir));
-	measurements.extend(migration_measurements(elf_dir));
 	measurements
 }
 
@@ -766,7 +685,6 @@ fn measure_runtime_compute_units() {
 		&[
 			"account_realloc_program",
 			"counter_program",
-			"migrations_program",
 			"profile_program",
 			"token_loader_cu_program",
 		],

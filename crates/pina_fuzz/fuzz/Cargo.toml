@@ -8,14 +8,18 @@ publish = false
 cargo-fuzz = true
 
 [workspace]
-
+# The example programs are cdylib-only, so the fuzz targets depend on the
+# re-export crates each program carries under its own `fuzz/` directory:
+# migration-aware macros only expand when `migrations/manifest.json` is
+# discoverable, which holds inside the program's tree, and the wrapper's
+# rlib carries the already-expanded codegen.
 [dependencies]
-counter_program = { path = "../../../examples/counter_program" }
+counter_program_fuzz = { path = "../../../examples/counter_program/fuzz" }
 libfuzzer-sys = "0.4"
-migrations_program = { path = "../../../examples/migrations_program", features = ["fuzzing"] }
+migrations_program_fuzz = { path = "../../../examples/migrations_program/fuzz", features = ["fuzzing"] }
 pina = { path = "../../pina" }
 pina_fuzz = { path = ".." }
-role_registry_program = { path = "../../../examples/role_registry_program" }
+role_registry_program_fuzz = { path = "../../../examples/role_registry_program/fuzz" }
 
 [[bin]]
 name = "account_deserialize"

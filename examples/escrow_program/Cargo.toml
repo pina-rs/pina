@@ -10,7 +10,10 @@ readme.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["cdylib", "lib"]
+# cdylib only: a `lib` output in the same invocation blocks `-C lto`, which
+# costs roughly 20-30% of the deployed size (37% for this program). Tests
+# reach the real source through `#[path]` includes in `tests/surfpool`.
+crate-type = ["cdylib"]
 
 [features]
 bpf-entrypoint = []

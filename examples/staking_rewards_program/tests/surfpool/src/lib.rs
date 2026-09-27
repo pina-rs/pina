@@ -12,10 +12,16 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use pina_test::TestError;
-use program_under_test::ID;
-use program_under_test::REWARD_INDEX_SCALE;
-use program_under_test::StakingError;
-use program_under_test::StakingInstruction;
+
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+use program::ID;
+use program::REWARD_INDEX_SCALE;
+use program::StakingError;
+use program::StakingInstruction;
 
 /// SPL Token (Tokenkeg…), one of the example's allowlisted programs.
 const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";

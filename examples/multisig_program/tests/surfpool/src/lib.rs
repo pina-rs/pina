@@ -16,37 +16,43 @@ use pina_test::Pubkey;
 use pina_test::Rent;
 use pina_test::Signer;
 use pina_test::TransactionError;
-use program_under_test::ACTION_ADD_MEMBER;
-use program_under_test::ACTION_ADD_SPENDING_LIMIT;
-use program_under_test::ACTION_REMOVE_MEMBER;
-use program_under_test::ACTION_SET_TIME_LOCK;
-use program_under_test::Address;
-use program_under_test::ConfigAuthorityExecuteIx;
-use program_under_test::ConfigInitializeIx;
-use program_under_test::ConfigUpdateIx;
-use program_under_test::KIND_CONFIG;
-use program_under_test::KIND_VAULT;
-use program_under_test::MAX_MESSAGE_BYTES;
-use program_under_test::Multisig;
-use program_under_test::MultisigCreateIx;
-use program_under_test::MultisigError;
-use program_under_test::MultisigImportIx;
-use program_under_test::MultisigInstruction;
-use program_under_test::PERIOD_DAY;
-use program_under_test::PERIOD_ONE_TIME;
-use program_under_test::PERMISSIONS_ALL;
-use program_under_test::ProgramConfig;
-use program_under_test::Proposal;
-use program_under_test::ProposalCreateIx;
-use program_under_test::STATUS_ACTIVE;
-use program_under_test::STATUS_APPROVED;
-use program_under_test::STATUS_CANCELLED;
-use program_under_test::STATUS_DRAFT;
-use program_under_test::STATUS_EXECUTED;
-use program_under_test::STATUS_REJECTED;
-use program_under_test::SpendingLimit;
-use program_under_test::SpendingLimitPatch;
-use program_under_test::SpendingLimitUseIx;
+
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+use program::ACTION_ADD_MEMBER;
+use program::ACTION_ADD_SPENDING_LIMIT;
+use program::ACTION_REMOVE_MEMBER;
+use program::ACTION_SET_TIME_LOCK;
+use program::Address;
+use program::ConfigAuthorityExecuteIx;
+use program::ConfigInitializeIx;
+use program::ConfigUpdateIx;
+use program::KIND_CONFIG;
+use program::KIND_VAULT;
+use program::MAX_MESSAGE_BYTES;
+use program::Multisig;
+use program::MultisigCreateIx;
+use program::MultisigError;
+use program::MultisigImportIx;
+use program::MultisigInstruction;
+use program::PERIOD_DAY;
+use program::PERIOD_ONE_TIME;
+use program::PERMISSIONS_ALL;
+use program::ProgramConfig;
+use program::Proposal;
+use program::ProposalCreateIx;
+use program::STATUS_ACTIVE;
+use program::STATUS_APPROVED;
+use program::STATUS_CANCELLED;
+use program::STATUS_DRAFT;
+use program::STATUS_EXECUTED;
+use program::STATUS_REJECTED;
+use program::SpendingLimit;
+use program::SpendingLimitPatch;
+use program::SpendingLimitUseIx;
 
 const FUND: u64 = 1_000_000_000;
 const VAULT_FUND: u64 = 2_000_000_000;
@@ -88,7 +94,7 @@ fn destination() -> Pubkey {
 }
 
 fn program_id() -> Pubkey {
-	let bytes: &[u8] = program_under_test::ID.as_ref();
+	let bytes: &[u8] = program::ID.as_ref();
 	Pubkey::new_from_array(bytes.try_into().unwrap())
 }
 
@@ -173,7 +179,7 @@ fn sorted_members() -> [Pubkey; 3] {
 fn encode_message_fixture(keys: &[Pubkey], instructions: &[(usize, &[u8], &[u8])]) -> Vec<u8> {
 	let mut buffer = [0_u8; MAX_MESSAGE_BYTES];
 	let addresses: Vec<Address> = keys.iter().map(pina_address).collect();
-	let length = program_under_test::encode_message(
+	let length = program::encode_message(
 		1,
 		1,
 		keys.len().saturating_sub(2),
@@ -2593,7 +2599,7 @@ fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 // examples/multisig_program --filter audit_sec_`.
 // ---------------------------------------------------------------------------
 
-use program_under_test::ACTION_REMOVE_SPENDING_LIMIT;
+use program::ACTION_REMOVE_SPENDING_LIMIT;
 
 /// Encode a multisig create instruction with an explicit timelock, TTL, and
 /// rent collector, mirroring `create_multisig_ix` above.

@@ -1,11 +1,15 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::ID;
-use program_under_test::RegistryError;
-use program_under_test::RegistryInstruction;
+use program::ID;
+use program::RegistryError;
+use program::RegistryInstruction;
 
 /// Seed prefixes, mirroring the program's constants.
 const SEED_REGISTRY: &[u8] = b"registry";

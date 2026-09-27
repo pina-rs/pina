@@ -24,18 +24,22 @@
 //!     cargo test -p counter_program --test cu_benchmarks -- --nocapture
 //! ```
 
-use counter_program::CounterInstruction;
-use counter_program::CounterState;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
+use program::CounterInstruction;
+use program::CounterState;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 fn program_id() -> Pubkey {
-	let id = counter_program::ID;
+	let id = program::ID;
 	let bytes: &[u8] = id.as_ref();
 	let array: [u8; 32] = bytes
 		.try_into()

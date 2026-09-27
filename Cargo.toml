@@ -195,14 +195,15 @@ pina = { workspace = true, features = ["alloc", "compact", "derive", "token"] }
 pina_macros = { workspace = true, features = ["compact"] }
 
 [dev-dependencies]
-account_realloc_program = { path = "examples/account_realloc_program", version = "0.0.0" }
-counter_program = { path = "examples/counter_program", version = "0.0.0" }
+# The example programs the compute-unit harness measures are cdylib-only and
+# cannot be dev-dependencies, so `tests/compute_units.rs` includes their
+# sources with `#[path]` instead. The features those sources expand with must
+# stay visible here: mirror the union of each program's own `pina` features.
 insta = { workspace = true }
 macrotest = { workspace = true }
-migrations_program = { path = "examples/migrations_program", version = "0.0.0" }
 mollusk-svm = { workspace = true, default-features = true }
+pina = { workspace = true, features = ["account-resize", "compact", "logs", "derive", "validation"] }
 prettyplease = { workspace = true }
-profile_program = { path = "examples/profile_program", version = "0.0.0" }
 quote = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

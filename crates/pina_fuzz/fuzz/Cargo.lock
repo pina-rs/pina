@@ -60,7 +60,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
-name = "counter_program"
+name = "counter_program_fuzz"
 version = "0.0.0"
 dependencies = [
  "pina",
@@ -331,7 +331,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
-name = "migrations_program"
+name = "migrations_program_fuzz"
 version = "0.0.0"
 dependencies = [
  "pina",
@@ -374,22 +374,20 @@ dependencies = [
 name = "pina_fuzz"
 version = "0.0.0"
 dependencies = [
- "counter_program",
  "libfuzzer-sys",
  "pina",
- "role_registry_program",
 ]
 
 [[package]]
 name = "pina_fuzz_targets"
 version = "0.0.0"
 dependencies = [
- "counter_program",
+ "counter_program_fuzz",
  "libfuzzer-sys",
- "migrations_program",
+ "migrations_program_fuzz",
  "pina",
  "pina_fuzz",
- "role_registry_program",
+ "role_registry_program_fuzz",
 ]
 
 [[package]]
@@ -539,7 +537,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "role_registry_program"
+name = "role_registry_program_fuzz"
 version = "0.0.0"
 dependencies = [
  "pina",

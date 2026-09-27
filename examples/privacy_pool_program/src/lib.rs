@@ -1889,6 +1889,15 @@ pub mod entrypoint {
 /// encoding the on-chain verifier expects. Host-only: never compiled into
 /// the SBF artifact. A wallet embeds this module; the tests use it to put
 /// real Groth16 proofs through the program's syscall-backed verifier.
+///
+/// The gate stays on the feature rather than admitting every `cfg(test)`
+/// build: the program's own lib-test target compiles under default features,
+/// where the optional `ark-*` dependencies are absent and the module would
+/// not link. The Surfpool harness that source-includes this crate enables
+/// `prover` on itself instead — a feature a `#[path]` include resolves
+/// against the including crate — and carries the `ark-*` crates as plain
+/// dependencies, so the module's imports resolve there exactly as they do
+/// under the program's own feature.
 #[cfg(all(feature = "prover", not(target_os = "solana")))]
 pub mod prover {
 	extern crate alloc;

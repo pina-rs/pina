@@ -21,10 +21,14 @@
 //!
 //! Then set `SBF_OUT_DIR`, or place the `.so` in `tests/fixtures/`.
 
-use heap_alloc_program::FillInstruction;
-use heap_alloc_program::HeapInstruction;
-use heap_alloc_program::ID;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
+use program::FillInstruction;
+use program::HeapInstruction;
+use program::ID;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 

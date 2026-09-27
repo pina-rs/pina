@@ -299,38 +299,12 @@ pub mod entrypoint {
 }
 
 #[cfg(test)]
-mod tests {
+mod internal_helpers {
+	// Tests for the crate-private validation helpers. They stay in-crate
+	// (see tests/self_checks.rs for why the public-API tests moved out): they
+	// are the only consumers of these functions, and an integration test
+	// cannot reach them.
 	use super::*;
-
-	#[test]
-	fn parse_instruction_rejects_program_id_mismatch() {
-		let wrong_program_id: Address = [5u8; 32].into();
-		let data = [ReallocInstruction::Realloc as u8, 0];
-		let result = parse_instruction::<ReallocInstruction>(&wrong_program_id, &ID, &data);
-		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
-	}
-
-	#[test]
-	fn realloc_instruction_roundtrip() {
-		let mut bytes = [0u8; ReallocIx::SIZE];
-		ReallocIx::initialize(&mut bytes, |ix| {
-			ix.len.set(Sample::MIN_SIZE as u16);
-			Ok(())
-		})
-		.unwrap_or_else(|e| panic!("encode: {e:?}"));
-		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
-		assert_eq!(usize::from(parsed.len.get()), Sample::MIN_SIZE);
-	}
-
-	#[test]
-	fn sample_pda_is_authority_bound() {
-		let authority: Address = [1u8; 32].into();
-		let attacker: Address = [2u8; 32].into();
-		let (authority_sample, _) = Sample::find_pda(&authority, &ID);
-		let (attacker_sample, _) = Sample::find_pda(&attacker, &ID);
-
-		assert_ne!(authority_sample, attacker_sample);
-	}
 
 	#[test]
 	fn validate_realloc_delta_allows_small_growth() {
@@ -352,11 +326,6 @@ mod tests {
 	/// security invariant #5 and this guard must be re-reviewed against the
 	/// runtime instead of silently drifting (issue #277 reported a phantom
 	/// 1 KiB cap caused by misreading `1_024 * 10`).
-	#[test]
-	fn growth_limit_is_the_runtime_ten_kib_cap() {
-		assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10 * 1024);
-	}
-
 	#[test]
 	fn target_values_count_rejects_truncating_the_sample_header() {
 		let result = target_values_count(Sample::MIN_SIZE - 1);
@@ -381,31 +350,6 @@ mod tests {
 					if code == ReallocError::AccountDataTooSmall as u32
 			));
 		}
-	}
-
-	#[test]
-	fn sample_compact_codec_roundtrips_active_values() {
-		let target_size =
-			Sample::projected_bytes(3).unwrap_or_else(|error| panic!("project size: {error:?}"));
-		let mut backing = [0u8; Sample::MAX_SIZE];
-		let data = &mut backing[..target_size];
-		let values = [PodU64::from(3), PodU64::from(5), PodU64::from(8)];
-		let encoded_size = Sample::initialize(
-			&mut *data,
-			&SamplePatch::new()
-				.bump(7)
-				.authority(Address::new_from_array([9; 32]))
-				.replace_values(&values),
-		)
-		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-
-		assert_eq!(encoded_size, target_size);
-		let sample =
-			Sample::try_from_bytes(&*data).unwrap_or_else(|error| panic!("decode: {error:?}"));
-		assert_eq!(sample.encoded_len(), target_size);
-		assert_eq!(sample.bump, 7);
-		assert_eq!(sample.authority, Address::new_from_array([9; 32]));
-		assert_eq!(sample.values(), values);
 	}
 
 	#[test]

@@ -4,11 +4,11 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use migrations_program::CompactState;
-use migrations_program::ManualState;
-use migrations_program::State;
-use migrations_program::UpdateInstruction;
-use migrations_program::ValueChangedEvent;
+use migrations_program_fuzz::CompactState;
+use migrations_program_fuzz::ManualState;
+use migrations_program_fuzz::State;
+use migrations_program_fuzz::UpdateInstruction;
+use migrations_program_fuzz::ValueChangedEvent;
 use pina::HasDiscriminator;
 use pina::HasMigrationVersion;
 use pina::MigratableAccount;

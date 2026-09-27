@@ -10,7 +10,11 @@ readme = "readme.md"
 repository.workspace = true
 
 [lib]
-crate-type = ["cdylib", "lib"]
+# cdylib only: a `lib` output in the same rustc invocation blocks `-C lto`,
+# which costs 20-30% of the deployed size. Tests include the real source
+# with `#[path = "../../../src/lib.rs"]` from `tests/surfpool` instead of
+# depending on an rlib.
+crate-type = ["cdylib"]
 
 [features]
 bpf-entrypoint = []
@@ -19,6 +23,12 @@ cpi-runtime-tests = ["dep:prop_amm_program_cpi"]
 [dependencies]
 pina = { workspace = true, features = ["logs", "derive"] }
 prop_amm_program_cpi = { path = "../../codama/clients/cpi/prop_amm_program", optional = true }
+
+[dev-dependencies]
+# The `sbf_build_*` tests resolve the deployed artifact, and the performance
+# workflow hands them the compute-unit manifest that `pina_test` reads
+# (`PINA_CU_MANIFEST`); host-only, never linked into the SBF artifact.
+pina_test = { workspace = true }
 
 [lints]
 workspace = true

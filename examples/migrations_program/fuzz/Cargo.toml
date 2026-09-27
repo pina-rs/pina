@@ -1,0 +1,24 @@
+[package]
+name = "migrations_program_fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+# Re-export crate for the fuzz targets (see crates/pina_fuzz/fuzz): the
+# program is a cdylib only, so its migration-aware macros cannot expand from
+# a crate outside its directory tree. This crate sits inside it, where the
+# manifest walk succeeds.
+#
+# The `fuzzing` feature mirrors the program's own cargo feature of the same
+# name: the included source reads `cfg(feature = "fuzzing")` against the
+# including crate, so enabling it here reproduces the fuzzing build the
+# program's manifest used to provide through its dependency edge. The pina
+# features mirror the program's own manifest; this crate is standalone
+# (cargo-fuzz builds it outside the workspace), so the dependency is a
+# plain path.
+[features]
+fuzzing = []
+
+[dependencies]
+pina = { path = "../../../crates/pina", default-features = false, features = ["account-resize", "compact", "derive", "validation"] }

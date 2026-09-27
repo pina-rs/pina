@@ -1,10 +1,14 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::ID;
-use program_under_test::SystemAccountsInstruction;
+use program::ID;
+use program::SystemAccountsInstruction;
 
 #[test]
 #[ignore = "run with pina test"]

@@ -1,11 +1,15 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::DeclareProgramInstruction;
-use program_under_test::ID;
-use program_under_test::external;
+use program::DeclareProgramInstruction;
+use program::ID;
+use program::external;
 
 /// The declared external program is a placeholder that never exists on a live
 /// cluster: validating against it fails the executable assertion inside the

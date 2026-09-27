@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pina = { workspace = true, features = ["derive"] }
 pina_test = { workspace = true }
-program_under_test = { package = "duplicate_mutable_accounts_program", path = "../.." }

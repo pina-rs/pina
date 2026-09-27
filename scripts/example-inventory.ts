@@ -29,6 +29,13 @@ export interface CargoMetadata {
 export interface ExampleProgram {
 	artifactName: string;
 	directory: string;
+	/**
+	 * Whether `cargo build-sbf --lto` accepts the program. Fat LTO shrinks the
+	 * ELF 20-37%, but the driver rejects the flag unless `[lib] crate-type` is
+	 * `["cdylib"]` alone: a second rlib/lib output in the same rustc invocation
+	 * turns `-C lto` into a hard error.
+	 */
+	ltoEligible: boolean;
 	manifest: string;
 	name: string;
 	package: CargoPackage;
@@ -106,9 +113,15 @@ export function discoverExamplePrograms(
 			throw new Error(`${package_.name} has no cdylib Cargo target`);
 		}
 
+		const libTarget = package_.targets.find((target) =>
+			target.kind.includes("lib") && !target.kind.includes("proc-macro")
+		);
+
 		programs.push({
 			artifactName: cdylibTarget.name,
 			directory: manifestParts[1] ?? package_.name,
+			ltoEligible: libTarget === undefined ||
+				libTarget.crate_types.every((crateType) => crateType === "cdylib"),
 			manifest: package_.manifest_path,
 			name: package_.name,
 			package: package_,

@@ -25,20 +25,24 @@
 //!     cargo test -p profile_program --test e2e -- --include-ignored --nocapture
 //! ```
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
 use pina::ProgramError;
-use profile_program::AddTagInstruction;
-use profile_program::ID;
-use profile_program::InitializeInstruction;
-use profile_program::ProfileError;
-use profile_program::ProfileInstruction;
-use profile_program::ProfileState;
-use profile_program::ProfileStateZc;
-use profile_program::RemoveTagInstruction;
-use profile_program::UpdateProfileInstruction;
+use program::AddTagInstruction;
+use program::ID;
+use program::InitializeInstruction;
+use program::ProfileError;
+use program::ProfileInstruction;
+use program::ProfileState;
+use program::ProfileStateZc;
+use program::RemoveTagInstruction;
+use program::UpdateProfileInstruction;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;

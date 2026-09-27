@@ -7,12 +7,12 @@
 #![allow(clippy::all)]
 #![no_main]
 
-use counter_program::CounterInstruction;
+use counter_program_fuzz::CounterInstruction;
 use libfuzzer_sys::fuzz_target;
 use pina::Address;
 use pina::ProgramError;
 use pina::parse_instruction;
-use role_registry_program::RegistryInstruction;
+use role_registry_program_fuzz::RegistryInstruction;
 
 // Use fixed, distinct IDs so every input exercises both the discriminator and
 // incorrect-program-ID paths, including empty input and a leading 0xff byte.

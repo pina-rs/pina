@@ -1,11 +1,15 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
-use program_under_test::ID;
-use program_under_test::TransferInstruction;
+use program::ID;
+use program::TransferInstruction;
 
 const TRANSFER: u8 = TransferInstruction::CpiTransfer as u8;
 const DIRECT: u8 = TransferInstruction::DirectTransfer as u8;

@@ -9,11 +9,10 @@
 //!     cargo test -p migrations_program --test e2e -- --include-ignored
 //! ```
 
-use migrations_program::ID;
-use migrations_program::MigrationAccount;
-use migrations_program::MigrationInstruction;
-use migrations_program::RelayInstruction;
-use migrations_program::State;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::create_program_account_loader_v3;
 use mollusk_svm::program::keyed_account_for_system_program;
@@ -22,6 +21,11 @@ use mollusk_svm::result::InstructionResult;
 use pina::MigratableAccount;
 use pina::PinaProgramError;
 use pina::ProgramError;
+use program::ID;
+use program::MigrationAccount;
+use program::MigrationInstruction;
+use program::RelayInstruction;
+use program::State;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -598,8 +602,8 @@ fn migration_paths_stay_within_compute_budgets() {
 #[test]
 #[ignore = "requires the migrations_program SBF binary"]
 fn mixed_version_sets_migrate_every_contract_independently() {
-	use migrations_program::CompactState;
-	use migrations_program::ManualState;
+	use program::CompactState;
+	use program::ManualState;
 
 	let mollusk = create_mollusk();
 	let authority = Pubkey::new_unique();

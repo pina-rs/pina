@@ -9,18 +9,22 @@
 //!     cargo test -p account_realloc_program --test e2e -- --include-ignored
 //! ```
 
-use account_realloc_program::ID;
-use account_realloc_program::InitializeIx;
-use account_realloc_program::Realloc2Ix;
-use account_realloc_program::ReallocError;
-use account_realloc_program::ReallocIx;
-use account_realloc_program::Sample;
-use account_realloc_program::SamplePatch;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
 use pina::ProgramError;
+use program::ID;
+use program::InitializeIx;
+use program::Realloc2Ix;
+use program::ReallocError;
+use program::ReallocIx;
+use program::Sample;
+use program::SamplePatch;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;

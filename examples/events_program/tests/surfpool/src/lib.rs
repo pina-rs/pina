@@ -1,11 +1,15 @@
 #![cfg(test)]
 
 use base64::Engine as _;
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::EventDiscriminator;
-use program_under_test::EventsInstruction;
-use program_under_test::ID;
+use program::EventDiscriminator;
+use program::EventsInstruction;
+use program::ID;
 
 /// The transport prefix the generated Rust, TypeScript, and Dart event decoders
 /// all parse.

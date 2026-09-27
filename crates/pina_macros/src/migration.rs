@@ -1545,7 +1545,12 @@ pub(crate) fn verify_migration_contracts(
 	enum_name: &syn::Ident,
 	ladder: &[syn::Path],
 ) -> syn::Result<()> {
-	let program_dir = std::env::var_os("CARGO_MANIFEST_DIR").map(PathBuf::from);
+	// Discover rather than trusting `CARGO_MANIFEST_DIR`: a Surfpool harness
+	// that source-includes a cdylib-only program expands this macro with the
+	// harness's manifest directory, so the raw environment value misses the
+	// program's own manifest and reports a ladder the program does declare as
+	// missing.
+	let program_dir = discover_program_dir().map(|(dir, _)| dir);
 
 	verify_ladder(enum_name, ladder, program_dir.as_deref())
 }

@@ -24,21 +24,25 @@
 //!     cargo test -p role_registry_program --test e2e -- --nocapture
 //! ```
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::ProgramError;
-use role_registry_program::AddRoleInstruction;
-use role_registry_program::DeactivateRoleInstruction;
-use role_registry_program::ID;
-use role_registry_program::InitializeInstruction;
-use role_registry_program::RegistryConfig;
-use role_registry_program::RegistryConfigZc;
-use role_registry_program::RegistryError;
-use role_registry_program::RoleEntry;
-use role_registry_program::RoleEntryZc;
-use role_registry_program::RotateAdminInstruction;
-use role_registry_program::UpdateRoleInstruction;
+use program::AddRoleInstruction;
+use program::DeactivateRoleInstruction;
+use program::ID;
+use program::InitializeInstruction;
+use program::RegistryConfig;
+use program::RegistryConfigZc;
+use program::RegistryError;
+use program::RoleEntry;
+use program::RoleEntryZc;
+use program::RotateAdminInstruction;
+use program::UpdateRoleInstruction;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;

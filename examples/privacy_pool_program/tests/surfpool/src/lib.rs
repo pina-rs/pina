@@ -18,25 +18,35 @@ use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
-use program_under_test::Address;
-use program_under_test::ApproveDisclosureIx;
-use program_under_test::CancelDisclosureIx;
-use program_under_test::ChallengeDisclosureIx;
-use program_under_test::DEPOSIT_LAMPORTS;
-use program_under_test::DepositIx;
-use program_under_test::GrantDisclosureIx;
-use program_under_test::InitializeIx;
-use program_under_test::RegisterRequesterIx;
-use program_under_test::RequestDisclosureIx;
-use program_under_test::ResolveChallengeIx;
-use program_under_test::SetCustodiansIx;
-use program_under_test::SetVerificationKeyIx;
-use program_under_test::TREE_NODES;
-use program_under_test::TransferIx;
-use program_under_test::VK_SLOT_TRANSFER;
-use program_under_test::VK_SLOT_WITHDRAW;
-use program_under_test::WithdrawIx;
-use program_under_test::prover;
+
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+// Re-export the program root so its submodules (`crypto`, `syscalls`) resolve
+// their `crate::` paths against this crate root, exactly as they do when the
+// program compiles as its own crate.
+use program::Address;
+use program::ApproveDisclosureIx;
+use program::CancelDisclosureIx;
+use program::ChallengeDisclosureIx;
+use program::DEPOSIT_LAMPORTS;
+use program::DepositIx;
+use program::GrantDisclosureIx;
+use program::InitializeIx;
+use program::RegisterRequesterIx;
+use program::RequestDisclosureIx;
+use program::ResolveChallengeIx;
+use program::SetCustodiansIx;
+use program::SetVerificationKeyIx;
+use program::TREE_NODES;
+use program::TransferIx;
+use program::VK_SLOT_TRANSFER;
+use program::VK_SLOT_WITHDRAW;
+use program::WithdrawIx;
+use program::prover;
+pub use program::*;
 
 const SYSTEM_BYTES: [u8; 32] = [0; 32];
 
@@ -49,7 +59,7 @@ fn system() -> Pubkey {
 }
 
 fn program_id() -> Pubkey {
-	let bytes: &[u8] = program_under_test::ID.as_ref();
+	let bytes: &[u8] = program::ID.as_ref();
 	Pubkey::new_from_array(bytes.try_into().unwrap())
 }
 
@@ -59,7 +69,7 @@ fn pina_address(pubkey: &Pubkey) -> Address {
 
 /// The committed bootstrap authority: the only key `Initialize` accepts.
 /// The seed is the documented fixture seed behind
-/// [`program_under_test::BOOTSTRAP_AUTHORITY`].
+/// [`program::BOOTSTRAP_AUTHORITY`].
 fn bootstrap_authority() -> Keypair {
 	Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!")
 }
@@ -142,20 +152,19 @@ fn vkey_pda(slot: u8) -> (Pubkey, u8) {
 
 /// Host-side commitment: `poseidon(poseidon(secret, seed), amount)`.
 fn commitment_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	let inner = program_under_test::poseidon2(
+	let inner = program::poseidon2(
 		&prover::fr_to_le(&secrets.secret),
 		&prover::fr_to_le(&secrets.nullifier_seed),
 	)
 	.unwrap_or_else(|error| panic!("host commitment: {error:?}"));
 	let mut amount = [0_u8; 32];
 	amount[..8].copy_from_slice(&DEPOSIT_LAMPORTS.to_le_bytes());
-	program_under_test::poseidon2(&inner, &amount)
-		.unwrap_or_else(|error| panic!("host commitment: {error:?}"))
+	program::poseidon2(&inner, &amount).unwrap_or_else(|error| panic!("host commitment: {error:?}"))
 }
 
 /// Host-side nullifier: `poseidon(seed, secret)`.
 fn nullifier_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	program_under_test::poseidon2(
+	program::poseidon2(
 		&prover::fr_to_le(&secrets.nullifier_seed),
 		&prover::fr_to_le(&secrets.secret),
 	)
@@ -335,12 +344,11 @@ fn deposit_root_matches_the_host_prediction() {
 		let nodes = &account.data[TREE_NODES_AT..TREE_NODES_AT + TREE_NODES * 32];
 		assert_eq!(&nodes[..32], &commitment[..]);
 
-		let zeros = program_under_test::zero_hashes()
-			.unwrap_or_else(|error| panic!("zero hashes: {error:?}"));
-		let mut expected = program_under_test::poseidon2(&commitment, &zeros[0])
+		let zeros = program::zero_hashes().unwrap_or_else(|error| panic!("zero hashes: {error:?}"));
+		let mut expected = program::poseidon2(&commitment, &zeros[0])
 			.unwrap_or_else(|error| panic!("host fold: {error:?}"));
-		for level in 2..=program_under_test::TREE_DEPTH {
-			expected = program_under_test::poseidon2(&expected, &zeros[level - 1])
+		for level in 2..=program::TREE_DEPTH {
+			expected = program::poseidon2(&expected, &zeros[level - 1])
 				.unwrap_or_else(|error| panic!("host fold: {error:?}"));
 		}
 		assert_eq!(&nodes[(TREE_NODES - 1) * 32..], &expected[..]);
@@ -450,7 +458,7 @@ fn tier_zero_disclosure_requires_consent_and_logs_execution() {
 		RequestDisclosureIx::initialize(&mut request_data, |ix| {
 			ix.bump = request_bump;
 			ix.nonce.set(1);
-			ix.tier = program_under_test::TIER_CONSENT;
+			ix.tier = program::TIER_CONSENT;
 			ix.commitment = commitment;
 			ix.notice_len = 96;
 			ix.notice = core::array::from_fn(|index| 0xC0 ^ index as u8);
@@ -500,8 +508,8 @@ fn tier_zero_disclosure_requires_consent_and_logs_execution() {
 		// Two custodian approvals execute the request and append the log
 		// entry in the same instruction.
 		for custodian in [custodian_a(), custodian_b()] {
-			let mut approval = vec![0_u8; program_under_test::ApproveDisclosureIx::SIZE];
-			program_under_test::ApproveDisclosureIx::initialize(&mut approval, |_| Ok(()))
+			let mut approval = vec![0_u8; program::ApproveDisclosureIx::SIZE];
+			program::ApproveDisclosureIx::initialize(&mut approval, |_| Ok(()))
 				.unwrap_or_else(|error| panic!("encode approval: {error:?}"));
 			program
 				.send_with_signers(
@@ -536,7 +544,7 @@ fn tier_zero_disclosure_requires_consent_and_logs_execution() {
 		assert_eq!(count, 1);
 		assert_eq!(&account.data[11..43], req.pubkey().as_ref());
 		assert_eq!(&account.data[43..75], &commitment[..]);
-		assert_eq!(account.data[75], program_under_test::TIER_CONSENT);
+		assert_eq!(account.data[75], program::TIER_CONSENT);
 	});
 }
 
@@ -560,7 +568,7 @@ fn every_instruction_discriminator_is_exercised() {
 		let mut register = vec![0_u8; RegisterRequesterIx::SIZE];
 		RegisterRequesterIx::initialize(&mut register, |ix| {
 			ix.requester = pina_address(&requester.pubkey());
-			ix.max_tier = program_under_test::TIER_COMPELLED;
+			ix.max_tier = program::TIER_COMPELLED;
 			Ok(())
 		})
 		.unwrap_or_else(|error| panic!("encode register: {error:?}"));
@@ -682,7 +690,7 @@ fn every_instruction_discriminator_is_exercised() {
 			&requester,
 			cancel_bump,
 			5,
-			program_under_test::TIER_COMPELLED,
+			program::TIER_COMPELLED,
 		)
 		.await;
 		let mut cancel = vec![0_u8; CancelDisclosureIx::SIZE];
@@ -710,7 +718,7 @@ fn every_instruction_discriminator_is_exercised() {
 			&requester,
 			challenge_bump,
 			6,
-			program_under_test::TIER_VERIFIED,
+			program::TIER_VERIFIED,
 		)
 		.await;
 		let viewer = view_key();
