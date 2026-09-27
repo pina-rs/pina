@@ -33,10 +33,11 @@ pub(crate) fn expand(
 		Ok(value) => value,
 		Err(error) => return error.to_compile_error(),
 	};
-	let field_validations = match validation::take_value_validations(&mut item_struct) {
+	let schema_validations = match validation::take_value_validations(&mut item_struct) {
 		Ok(value) => value,
 		Err(error) => return error.to_compile_error(),
 	};
+	let deprecation_warnings = validation::deprecation_warnings(&schema_validations.deprecations);
 	let capacity_proofs = schema::resolve_capacities(&mut item_struct);
 
 	let struct_name = item_struct.ident.clone();
@@ -49,7 +50,7 @@ pub(crate) fn expand(
 		validate,
 	} = args;
 	#[cfg(not(feature = "validation"))]
-	if validation::validation_requested(&field_validations, validate.as_ref()) {
+	if validation::validation_requested(&schema_validations.fields, validate.as_ref()) {
 		return validation::feature_error(&item_struct);
 	}
 	let (discriminator, variant) =
@@ -112,7 +113,7 @@ pub(crate) fn expand(
 	let value_validation_impl = validation::generate_value_validation(
 		&crate_path,
 		ValueTarget::Fixed(&zc_name),
-		&field_validations,
+		&schema_validations.fields,
 		validate.as_ref(),
 		&quote!(#crate_path::ProgramError::InvalidInstructionData),
 	);
@@ -166,6 +167,7 @@ pub(crate) fn expand(
 	};
 
 	quote! {
+		#deprecation_warnings
 		#item_struct
 		#capacity_proofs
 		#schema_proofs

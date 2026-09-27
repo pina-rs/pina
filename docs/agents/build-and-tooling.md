@@ -112,4 +112,6 @@ When using `devenv`, `pina ...` is available as a shortcut for:
 cargo run -p pina_cli -- ...
 ```
 
-Reusable docs providers live in `templates/*.t.md`.
+Reusable docs providers live in `templates/*.t.md`. They are consumed by `docs/src/**`, readmes, and CLI scaffold templates through `{=blockName}` / `{/blockName}` markers.
+
+`mdt.toml` configures the `[[formatters]]` integration, which runs each consumer through `dprint fmt --stdin`. Consumers are therefore stored dprint-canonical, while producers stay hand-formatted because dprint excludes `**/*.t.md`. Without the integration, a table in a provider and its consumer disagree on padding, and `mdt update` and `dprint fmt` overwrite each other until `docs:check` fails on a file that is already correctly formatted. Edit the provider with ordinary markdown and run `docs:sync`; there is no need to hand-copy a padded table out of a consumer.

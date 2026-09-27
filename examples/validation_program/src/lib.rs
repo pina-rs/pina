@@ -68,13 +68,13 @@ pub enum ValidationError {
 pub struct PolicyState {
 	pub bump: u8,
 
-	#[pina(validate(min = 1, max = MAX_POLICY_AMOUNT))]
+	#[pina(validate(value >= 1 && value <= MAX_POLICY_AMOUNT))]
 	pub minimum: u64,
 
-	#[pina(validate(min = 1, max = MAX_POLICY_AMOUNT))]
+	#[pina(validate(value >= 1 && value <= MAX_POLICY_AMOUNT))]
 	pub maximum: u64,
 
-	#[pina(validate(min = 1, max = 4))]
+	#[pina(validate(value >= 1 && value <= 4))]
 	pub required_approvals: u8,
 }
 
@@ -94,20 +94,20 @@ pub struct InitializePolicyInstruction {
 	pub bump: u8,
 
 	#[pina(validate(
-		min = 1,
-		max = MAX_POLICY_AMOUNT,
+		value >= 1,
+		value <= MAX_POLICY_AMOUNT,
 		error = ValidationError::InvalidAmount
 	))]
 	pub minimum: u64,
 
 	#[pina(validate(
-		min = 1,
-		max = MAX_POLICY_AMOUNT,
+		value >= 1,
+		value <= MAX_POLICY_AMOUNT,
 		error = ValidationError::InvalidAmount
 	))]
 	pub maximum: u64,
 
-	#[pina(validate(min = 1, max = 4, error = ValidationError::InvalidApprovals))]
+	#[pina(validate(value >= 1 && value <= 4, error = ValidationError::InvalidApprovals))]
 	pub required_approvals: u8,
 }
 
@@ -125,20 +125,20 @@ fn validate_initialize_policy(value: &InitializePolicyInstructionZc) -> ProgramR
 )]
 pub struct CheckPolicyInstruction {
 	#[pina(validate(
-		min = 1,
-		max = MAX_POLICY_AMOUNT,
+		value >= 1,
+		value <= MAX_POLICY_AMOUNT,
 		error = ValidationError::InvalidAmount
 	))]
 	pub amount: u64,
 
 	#[pina(validate(
-		min_len = 3,
-		max_len = 64,
+		len >= 3,
+		len <= 64,
 		error = ValidationError::InvalidMemo
 	))]
 	pub memo: String<64>,
 
-	#[pina(validate(exact_len = 2, error = ValidationError::InvalidApprovals))]
+	#[pina(validate(len == 2, error = ValidationError::InvalidApprovals))]
 	pub approvals: Vec<u8, 4>,
 }
 
@@ -158,23 +158,23 @@ fn validate_check_policy(value: &CheckPolicyInstructionZc) -> ProgramResult {
 #[derive(Debug)]
 pub struct PolicyChecked {
 	#[pina(validate(
-		min = 1,
-		max = MAX_POLICY_AMOUNT,
+		value >= 1,
+		value <= MAX_POLICY_AMOUNT,
 		error = ValidationError::InvalidEvent
 	))]
 	pub amount: u64,
 
 	#[pina(validate(
-		min_len = 3,
-		max_len = 64,
+		len >= 3,
+		len <= 64,
 		error = ValidationError::InvalidEvent
 	))]
 	pub memo: String<64>,
 
-	#[pina(validate(exact_len = 2, error = ValidationError::InvalidEvent))]
+	#[pina(validate(len == 2, error = ValidationError::InvalidEvent))]
 	pub approvals: Vec<u8, 4>,
 
-	#[pina(validate(min = 1, max = 4, error = ValidationError::InvalidEvent))]
+	#[pina(validate(value >= 1 && value <= 4, error = ValidationError::InvalidEvent))]
 	pub required_approvals: u8,
 }
 

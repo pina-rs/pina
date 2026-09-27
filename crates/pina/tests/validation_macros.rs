@@ -21,11 +21,11 @@ enum ValidationKind {
 	validate(with = validate_instruction)
 )]
 struct ValidatedInstruction {
-	#[pina(validate(min = 1, max = 10, error = ProgramError::Custom(41)))]
+	#[pina(validate(value >= 1, value <= 10, error = ProgramError::Custom(41)))]
 	amount: u16,
-	#[pina(validate(min_len = 2, max_len = 5))]
+	#[pina(validate(len >= 2 && len <= 5))]
 	memo: String<8>,
-	#[pina(validate(exact_len = 2))]
+	#[pina(validate(len == 2))]
 	tags: Vec<u8, 4>,
 }
 
@@ -39,9 +39,9 @@ fn validate_instruction(value: &ValidatedInstructionZc) -> ProgramResult {
 
 #[event(crate = ::pina, discriminator = ValidationKind, variant = Event)]
 struct ValidatedEvent {
-	#[pina(validate(max = 3))]
+	#[pina(validate(value <= 3))]
 	level: u8,
-	#[pina(validate(min = -3, max = 3))]
+	#[pina(validate(value >= -3 && value <= 3))]
 	score: PodI16,
 }
 
@@ -51,7 +51,7 @@ struct ValidatedEvent {
 	variant = Account
 )]
 struct ValidatedAccount {
-	#[pina(validate(min = 1, max = 5))]
+	#[pina(validate(value >= 1 && value <= 5))]
 	version: u8,
 	enabled: bool,
 }

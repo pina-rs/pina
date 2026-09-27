@@ -1,3 +1,14 @@
+# Format block content through the repository formatter, so a block written
+# into a consumer and then re-padded by dprint is not reported stale. Without
+# this, `docs:sync` and `dprint fmt` fight over table padding: mdt writes the
+# template's spacing, dprint re-pads it, and `docs:check` then fails on the
+# dprint-canonical file. Templates stay hand-formatted because dprint excludes
+# `**/*.t.md`.
+[[formatters]]
+command = "dprint fmt --stdin \"{{ filePath }}\""
+patterns = ["**/*.md", "**/*.rs"]
+ignore = ["**/*.t.md"]
+
 [padding]
 before = 0
 after = false

@@ -92,9 +92,9 @@ struct CompactPdaState {
 	validate(with = validate_compact_state)
 )]
 struct ValidatedCompactState {
-	#[pina(validate(min = 1, max = 3))]
+	#[pina(validate(value >= 1 && value <= 3))]
 	pub level: u16,
-	#[pina(validate(min_len = 2, max_len = 4))]
+	#[pina(validate(len >= 2 && len <= 4))]
 	pub values: Vec<u16, 4>,
 }
 
