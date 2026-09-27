@@ -8,10 +8,10 @@
 #![allow(clippy::all)]
 #![no_main]
 
-use counter_program::CounterState;
+use counter_program_fuzz::CounterState;
 use libfuzzer_sys::fuzz_target;
-use role_registry_program::RegistryConfig;
-use role_registry_program::RoleEntry;
+use role_registry_program_fuzz::RegistryConfig;
+use role_registry_program_fuzz::RoleEntry;
 
 const _: [(); 11] = [(); CounterState::SIZE];
 const _: [(); 43] = [(); RegistryConfig::SIZE];

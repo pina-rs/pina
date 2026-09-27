@@ -16,30 +16,39 @@
 //! syscall verification inside the SBF artifact — through the same
 //! little-endian wire encoding a wallet would produce.
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
+
+// Re-export the program root so its submodules (`crypto`, `syscalls`) resolve
+// their `crate::` paths against this crate root, exactly as they do when the
+// program compiles as its own crate.
 use mollusk_svm::Mollusk;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
-use privacy_pool_program::Address;
-use privacy_pool_program::ApproveDisclosureIx;
-use privacy_pool_program::CancelDisclosureIx;
-use privacy_pool_program::ChallengeDisclosureIx;
-use privacy_pool_program::DEPOSIT_LAMPORTS;
-use privacy_pool_program::DepositIx;
-use privacy_pool_program::GrantDisclosureIx;
-use privacy_pool_program::InitializeIx;
-use privacy_pool_program::PrivacyPoolError;
-use privacy_pool_program::RegisterRequesterIx;
-use privacy_pool_program::RequestDisclosureIx;
-use privacy_pool_program::ResolveChallengeIx;
-use privacy_pool_program::SetVerificationKeyIx;
-use privacy_pool_program::TREE_DEPTH;
-use privacy_pool_program::TREE_NODES;
-use privacy_pool_program::TransferIx;
-use privacy_pool_program::VK_SLOT_TRANSFER;
-use privacy_pool_program::VK_SLOT_WITHDRAW;
-use privacy_pool_program::WithdrawIx;
-use privacy_pool_program::prover;
-use privacy_pool_program::zero_hashes;
+use program::Address;
+use program::ApproveDisclosureIx;
+use program::CancelDisclosureIx;
+use program::ChallengeDisclosureIx;
+use program::DEPOSIT_LAMPORTS;
+use program::DepositIx;
+use program::GrantDisclosureIx;
+use program::InitializeIx;
+use program::PrivacyPoolError;
+use program::RegisterRequesterIx;
+use program::RequestDisclosureIx;
+use program::ResolveChallengeIx;
+use program::SetVerificationKeyIx;
+use program::TREE_DEPTH;
+use program::TREE_NODES;
+use program::TransferIx;
+use program::VK_SLOT_TRANSFER;
+use program::VK_SLOT_WITHDRAW;
+use program::WithdrawIx;
+use program::prover;
+use program::zero_hashes;
+pub use program::*;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -56,7 +65,7 @@ const TREE_NEXT_LEAF: usize = HEADER + 1;
 const TREE_NODES_AT: usize = TREE_NEXT_LEAF + 8;
 
 fn program_id() -> Pubkey {
-	let bytes: &[u8] = privacy_pool_program::ID.as_ref();
+	let bytes: &[u8] = program::ID.as_ref();
 	let array: [u8; 32] = bytes.try_into().unwrap_or_else(|_| panic!("id"));
 	Pubkey::new_from_array(array)
 }
@@ -76,11 +85,11 @@ fn key(seed: u8) -> Pubkey {
 ///
 /// This is the ed25519 public key derived from the documented fixture seed
 /// `b"pina-pool-bootstrap-2026-09-26!!"` behind
-/// [`privacy_pool_program::BOOTSTRAP_AUTHORITY`] — the raw seed is the
+/// [`program::BOOTSTRAP_AUTHORITY`] — the raw seed is the
 /// signing key, never the address.
 fn bootstrap_authority() -> Pubkey {
 	Pubkey::new_from_array(
-		privacy_pool_program::BOOTSTRAP_AUTHORITY
+		program::BOOTSTRAP_AUTHORITY
 			.as_ref()
 			.try_into()
 			.unwrap_or_else(|_| panic!("bootstrap authority must be 32 bytes")),
@@ -381,20 +390,19 @@ fn setup_pool() -> Pool {
 
 /// Host-side commitment for a note: `poseidon(poseidon(secret, seed), amount)`.
 fn commitment_bytes(secrets: &prover::NoteSecrets, amount_lamports: u64) -> [u8; 32] {
-	let inner = privacy_pool_program::poseidon2(
+	let inner = program::poseidon2(
 		&prover::fr_to_le(&secrets.secret),
 		&prover::fr_to_le(&secrets.nullifier_seed),
 	)
 	.unwrap_or_else(|e| panic!("host commitment: {e:?}"));
 	let mut amount = [0_u8; 32];
 	amount[..8].copy_from_slice(&amount_lamports.to_le_bytes());
-	privacy_pool_program::poseidon2(&inner, &amount)
-		.unwrap_or_else(|e| panic!("host commitment: {e:?}"))
+	program::poseidon2(&inner, &amount).unwrap_or_else(|e| panic!("host commitment: {e:?}"))
 }
 
 /// Host-side nullifier: `poseidon(seed, secret)`.
 fn nullifier_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	privacy_pool_program::poseidon2(
+	program::poseidon2(
 		&prover::fr_to_le(&secrets.nullifier_seed),
 		&prover::fr_to_le(&secrets.secret),
 	)
@@ -694,10 +702,10 @@ fn deposit_matches_the_host_predicted_root() {
 	// Fold the single leaf up the zero chain on the host; the on-chain root
 	// (written through the syscall) must agree byte for byte.
 	let zeros = zero_hashes().unwrap_or_else(|e| panic!("zeros: {e:?}"));
-	let mut expected = privacy_pool_program::poseidon2(&commitment, &zeros[0])
-		.unwrap_or_else(|e| panic!("host fold: {e:?}"));
+	let mut expected =
+		program::poseidon2(&commitment, &zeros[0]).unwrap_or_else(|e| panic!("host fold: {e:?}"));
 	for level in 2..=TREE_DEPTH {
-		expected = privacy_pool_program::poseidon2(&expected, &zeros[level - 1])
+		expected = program::poseidon2(&expected, &zeros[level - 1])
 			.unwrap_or_else(|e| panic!("host fold: {e:?}"));
 	}
 	assert_eq!(current_root(&pool.world), expected);
@@ -1214,7 +1222,7 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 	let mut world = disclosure_world(None);
 
 	// Anyone may file at tier 0, but execution needs the view key's grant.
-	world.request(1, privacy_pool_program::TIER_CONSENT, [0; 32]);
+	world.request(1, program::TIER_CONSENT, [0; 32]);
 	world.approve(1, 21, Some(PrivacyPoolError::ConsentRequired));
 
 	// A key other than the note's view key cannot grant.
@@ -1240,10 +1248,7 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 		&log.data[HEADER + 9 + 32..HEADER + 9 + 64],
 		&world.note_commitment[..]
 	);
-	assert_eq!(
-		log.data[HEADER + 9 + 64],
-		privacy_pool_program::TIER_CONSENT
-	);
+	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_CONSENT);
 
 	// A third approval on the executed request is a status error, and a
 	// repeat approval by an approving custodian is rejected.
@@ -1253,17 +1258,17 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_one_holds_a_challenge_window_then_executes() {
-	let mut world = disclosure_world(Some(privacy_pool_program::TIER_VERIFIED));
+	let mut world = disclosure_world(Some(program::TIER_VERIFIED));
 
 	// Filing above tier 0 requires a registered requester and a legal basis.
-	world.request(1, privacy_pool_program::TIER_VERIFIED, [0x77; 32]);
+	world.request(1, program::TIER_VERIFIED, [0x77; 32]);
 
 	// Inside the window the committee cannot execute.
 	world.approve(1, 21, Some(PrivacyPoolError::ChallengeWindowOpen));
 
 	// Advance the clock past the window, then execute with two approvals.
 	world.pool.mollusk.sysvars.clock.unix_timestamp =
-		1_000_000 + privacy_pool_program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
+		1_000_000 + program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1272,17 +1277,14 @@ fn tier_one_holds_a_challenge_window_then_executes() {
 	let mut count = [0_u8; 8];
 	count.copy_from_slice(&log.data[HEADER + 1..HEADER + 9]);
 	assert_eq!(u64::from_le_bytes(count), 1);
-	assert_eq!(
-		log.data[HEADER + 9 + 64],
-		privacy_pool_program::TIER_VERIFIED
-	);
+	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_VERIFIED);
 }
 
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_one_challenge_freezes_and_the_authority_resolves() {
-	let mut world = disclosure_world(Some(privacy_pool_program::TIER_VERIFIED));
-	world.request(1, privacy_pool_program::TIER_VERIFIED, [0x77; 32]);
+	let mut world = disclosure_world(Some(program::TIER_VERIFIED));
+	world.request(1, program::TIER_VERIFIED, [0x77; 32]);
 
 	// Before the window closes, the subject challenges.
 	world.challenge_window(1, 1_000_001, None);
@@ -1293,7 +1295,7 @@ fn tier_one_challenge_freezes_and_the_authority_resolves() {
 	// The authority resolves in the requester's favor; execution proceeds.
 	world.resolve(1, 1, None);
 	world.pool.mollusk.sysvars.clock.unix_timestamp =
-		1_000_000 + privacy_pool_program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
+		1_000_000 + program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1307,14 +1309,14 @@ fn tier_one_challenge_freezes_and_the_authority_resolves() {
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_two_executes_immediately() {
-	let mut world = disclosure_world(Some(privacy_pool_program::TIER_COMPELLED));
+	let mut world = disclosure_world(Some(program::TIER_COMPELLED));
 
 	// An unregistered tier cannot file, and neither can a tier-1 registrant.
-	world.request(9, privacy_pool_program::TIER_COMPELLED, [0x77; 32]);
+	world.request(9, program::TIER_COMPELLED, [0x77; 32]);
 
 	// The registered tier-2 requester files with a legal basis and the
 	// committee executes without a window or consent.
-	world.request(1, privacy_pool_program::TIER_COMPELLED, [0x55; 32]);
+	world.request(1, program::TIER_COMPELLED, [0x55; 32]);
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1323,10 +1325,7 @@ fn tier_two_executes_immediately() {
 	let mut count = [0_u8; 8];
 	count.copy_from_slice(&log.data[HEADER + 1..HEADER + 9]);
 	assert_eq!(u64::from_le_bytes(count), 1);
-	assert_eq!(
-		log.data[HEADER + 9 + 64],
-		privacy_pool_program::TIER_COMPELLED
-	);
+	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_COMPELLED);
 }
 
 #[test]
@@ -1336,25 +1335,25 @@ fn unregistered_requesters_cannot_file_tiered_requests() {
 	// No registry entry: tier 1 and tier 2 both fail at filing time.
 	world.request_expect_error(
 		1,
-		privacy_pool_program::TIER_VERIFIED,
+		program::TIER_VERIFIED,
 		[1; 32],
 		PrivacyPoolError::RequesterNotEntitled,
 	);
 	world.request_expect_error(
 		2,
-		privacy_pool_program::TIER_COMPELLED,
+		program::TIER_COMPELLED,
 		[1; 32],
 		PrivacyPoolError::RequesterNotEntitled,
 	);
 	// Tier 0 remains open to anyone.
-	world.request(3, privacy_pool_program::TIER_CONSENT, [0; 32]);
+	world.request(3, program::TIER_CONSENT, [0; 32]);
 }
 
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn non_custodians_cannot_approve() {
 	let mut world = disclosure_world(None);
-	world.request(1, privacy_pool_program::TIER_CONSENT, [0; 32]);
+	world.request(1, program::TIER_CONSENT, [0; 32]);
 	world.grant(1, None, None);
 	world.approve(1, 21, None);
 	// A non-custodian signing key is rejected outright.
@@ -1367,7 +1366,7 @@ fn non_custodians_cannot_approve() {
 #[ignore = "requires the SBF artifact"]
 fn cancel_closes_a_pending_request() {
 	let mut world = disclosure_world(None);
-	world.request(1, privacy_pool_program::TIER_CONSENT, [0; 32]);
+	world.request(1, program::TIER_CONSENT, [0; 32]);
 	world.cancel(1, None);
 	// A cancelled request can no longer execute.
 	world.grant(1, None, Some(PrivacyPoolError::InvalidRequestStatus));

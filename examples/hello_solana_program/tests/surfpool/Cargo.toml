@@ -5,5 +5,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
+# The program is a cdylib only (see ../../Cargo.toml), so its types are
+# included with #[path = "../../../src/lib.rs"] in src/lib.rs rather than
+# through an rlib. The program's `pina` features must be mirrored here so
+# the included source compiles identically.
+pina = { workspace = true, features = ["logs", "derive"] }
 pina_test = { workspace = true }
-program_under_test = { package = "hello_solana_program", path = "../.." }

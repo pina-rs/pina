@@ -1,13 +1,17 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
-use program_under_test::FloatError;
-use program_under_test::FloatInstruction;
-use program_under_test::ID;
+use program::FloatError;
+use program::FloatInstruction;
+use program::ID;
 
 fn create_instruction(
 	program: &ProgramTest,

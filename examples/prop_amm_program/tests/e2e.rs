@@ -20,18 +20,22 @@
 //! Then set `SBF_OUT_DIR` to the directory containing the `.so` file, or place
 //! it in `tests/fixtures/`.
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::ProgramError;
-use prop_amm_program::ID;
-use prop_amm_program::InitializeInstruction;
-use prop_amm_program::OracleState;
-use prop_amm_program::OracleStateZc;
-use prop_amm_program::PropAmmError;
-use prop_amm_program::RotateAuthorityInstruction;
-use prop_amm_program::UPDATE_AUTHORITY;
-use prop_amm_program::UpdateInstruction;
+use program::ID;
+use program::InitializeInstruction;
+use program::OracleState;
+use program::OracleStateZc;
+use program::PropAmmError;
+use program::RotateAuthorityInstruction;
+use program::UPDATE_AUTHORITY;
+use program::UpdateInstruction;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;

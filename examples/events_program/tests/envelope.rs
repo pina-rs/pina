@@ -7,13 +7,17 @@
 //! rejects a missing or unknown version byte at parse time, exactly like an
 //! instruction with a payload.
 
-use events_program::EventsInstruction;
-use events_program::ID;
-use events_program::InitializeInstruction;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use pina::IntoDiscriminator as _;
 use pina::PinaProgramError;
 use pina::ProgramError;
 use pina::parse_instruction;
+use program::EventsInstruction;
+use program::ID;
+use program::InitializeInstruction;
 
 /// Every declared event instruction, for exhaustive envelope probes.
 fn all_instructions() -> [EventsInstruction; 3] {

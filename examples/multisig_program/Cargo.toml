@@ -10,7 +10,18 @@ readme.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["cdylib", "lib"]
+# cdylib only: a `lib` output in the same rustc invocation blocks `-C lto`,
+# which costs 20-30% of the deployed size. Tests include the real source
+# with `#[path = "../../../src/lib.rs"]` from `tests/surfpool` instead of
+# depending on an rlib.
+#
+# The LTO entrypoint frame sits at exactly 4,096 bytes — the SBF stack
+# ceiling — with no offset beyond it and the full e2e + Surfpool suites
+# passing against the LTO ELF. Adding an instruction can push it over:
+# re-check the frame (objdump the deepest `r10 - 0x…` offset) whenever this
+# program's dispatch grows, and either split work out of the entrypoint or
+# consciously raise `--sbf-stack-size`. See docs/src/program-size.md.
+crate-type = ["cdylib"]
 
 [features]
 bpf-entrypoint = []

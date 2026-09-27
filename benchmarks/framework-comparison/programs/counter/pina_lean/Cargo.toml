@@ -1,0 +1,15 @@
+[package]
+name = "counter_pina_lean"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Same published pina as the `pina` fixture, so the comparison isolates the
+# entrypoint strategy, not a different framework revision.
+pina = { path = "../../../../../crates/pina", features = ["logs", "derive"] }

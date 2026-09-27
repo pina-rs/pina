@@ -1,0 +1,17 @@
+[package]
+name = "counter_program_fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+# Re-export crate for the fuzz targets (see crates/pina_fuzz/fuzz): the
+# program is a cdylib only, so its migration-aware macros cannot expand from
+# a crate outside its directory tree — `migrations/manifest.json` is only
+# discoverable by walking up from inside the tree. This crate sits inside
+# it: the source include below expands with the manifest found, and the
+# rlib it produces carries the already-expanded codegen. The pina features
+# mirror the program's own manifest; this crate is standalone (cargo-fuzz
+# builds it outside the workspace), so the dependency is a plain path.
+[dependencies]
+pina = { path = "../../../crates/pina", default-features = false, features = ["account-resize", "logs", "derive"] }

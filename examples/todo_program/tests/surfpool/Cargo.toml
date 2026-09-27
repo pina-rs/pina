@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pina = { workspace = true, features = ["compact", "logs"] }
 pina_test = { workspace = true }
-program_under_test = { package = "todo_program", path = "../.." }

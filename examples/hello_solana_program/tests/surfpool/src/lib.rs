@@ -5,8 +5,14 @@ use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
-use program_under_test::HelloInstruction;
-use program_under_test::ID;
+
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+use program::HelloInstruction;
+use program::ID;
 
 /// The program requires the `user` account to have signed the transaction.
 #[test]

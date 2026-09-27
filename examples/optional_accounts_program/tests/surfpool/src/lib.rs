@@ -1,10 +1,14 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::ID;
-use program_under_test::OptionalInstruction;
+use program::ID;
+use program::OptionalInstruction;
 
 /// Seed prefix for store PDAs, mirroring `SEED_STORE` in the program.
 const SEED_STORE: &[u8] = b"store";

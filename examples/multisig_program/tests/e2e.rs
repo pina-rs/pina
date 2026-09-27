@@ -15,28 +15,35 @@ use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
-use multisig_program::ConfigInitializeIx;
-use multisig_program::KIND_CONFIG;
-use multisig_program::KIND_VAULT;
-use multisig_program::MAX_MESSAGE_BYTES;
-use multisig_program::Multisig;
-use multisig_program::MultisigAccountType;
-use multisig_program::MultisigError;
-use multisig_program::MultisigInstruction;
-use multisig_program::MultisigPatch;
-use multisig_program::PERIOD_DAY;
-use multisig_program::PERMISSIONS_ALL;
-use multisig_program::ProgramConfig;
-use multisig_program::Proposal;
-use multisig_program::ProposalPatch;
-use multisig_program::STATUS_ACTIVE;
-use multisig_program::STATUS_APPROVED;
-use multisig_program::STATUS_DRAFT;
-use multisig_program::STATUS_EXECUTED;
-use multisig_program::SpendingLimit;
-use multisig_program::SpendingLimitPatch;
-use multisig_program::SpendingLimitUseIx;
+
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency. The `pina`
+// features mirror the program's own `[dependencies]` so the included
+// source compiles identically.
+#[path = "../src/lib.rs"]
+mod program;
 use pina::Address;
+use program::ConfigInitializeIx;
+use program::KIND_CONFIG;
+use program::KIND_VAULT;
+use program::MAX_MESSAGE_BYTES;
+use program::Multisig;
+use program::MultisigAccountType;
+use program::MultisigError;
+use program::MultisigInstruction;
+use program::MultisigPatch;
+use program::PERIOD_DAY;
+use program::PERMISSIONS_ALL;
+use program::ProgramConfig;
+use program::Proposal;
+use program::ProposalPatch;
+use program::STATUS_ACTIVE;
+use program::STATUS_APPROVED;
+use program::STATUS_DRAFT;
+use program::STATUS_EXECUTED;
+use program::SpendingLimit;
+use program::SpendingLimitPatch;
+use program::SpendingLimitUseIx;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -46,7 +53,7 @@ const RENT_LAMPORTS: u64 = 100_000_000;
 const VAULT_LAMPORTS: u64 = 500_000_000;
 
 fn program_id() -> Pubkey {
-	let bytes: &[u8] = multisig_program::ID.as_ref();
+	let bytes: &[u8] = program::ID.as_ref();
 	let array: [u8; 32] = bytes
 		.try_into()
 		.unwrap_or_else(|_| panic!("program address must be 32 bytes"));
@@ -341,7 +348,7 @@ fn system_transfer_data(lamports: u64) -> Vec<u8> {
 fn encode_message_fixture(keys: &[Pubkey], instructions: &[(usize, &[u8], &[u8])]) -> Vec<u8> {
 	let mut buffer = [0_u8; MAX_MESSAGE_BYTES];
 	let addresses: Vec<Address> = keys.iter().map(pina_address).collect();
-	let length = multisig_program::encode_message(
+	let length = program::encode_message(
 		1,
 		1,
 		keys.len().saturating_sub(2),
@@ -420,8 +427,8 @@ fn multisig_create_initializes_the_compact_roster() {
 	let (config_key, config_bump) = program_config_pda();
 	let members = sorted_member_keys();
 
-	let mut data = vec![0_u8; multisig_program::MultisigCreateIx::SIZE];
-	multisig_program::MultisigCreateIx::initialize(&mut data, |ix| {
+	let mut data = vec![0_u8; program::MultisigCreateIx::SIZE];
+	program::MultisigCreateIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.threshold.set(2);
 		ix.timelock.set(0);
@@ -488,8 +495,8 @@ fn multisig_create_rejects_duplicate_members() {
 	let (config_key, config_bump) = program_config_pda();
 
 	let duplicate = key(1);
-	let mut data = vec![0_u8; multisig_program::MultisigCreateIx::SIZE];
-	multisig_program::MultisigCreateIx::initialize(&mut data, |ix| {
+	let mut data = vec![0_u8; program::MultisigCreateIx::SIZE];
+	program::MultisigCreateIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.threshold.set(1);
 		ix.timelock.set(0);
@@ -570,8 +577,8 @@ fn multisig_import_reads_a_legacy_anchor_account() {
 		legacy.push(PERMISSIONS_ALL);
 	}
 
-	let mut data = vec![0_u8; multisig_program::MultisigImportIx::SIZE];
-	multisig_program::MultisigImportIx::initialize(&mut data, |ix| {
+	let mut data = vec![0_u8; program::MultisigImportIx::SIZE];
+	program::MultisigImportIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.legacy_program = pina_address(&legacy_program_id());
 		ix.legacy_discriminator = legacy_discriminator();
@@ -673,8 +680,8 @@ fn import_world(
 		legacy.push(PERMISSIONS_ALL);
 	}
 
-	let mut data = vec![0_u8; multisig_program::MultisigImportIx::SIZE];
-	multisig_program::MultisigImportIx::initialize(&mut data, |ix| {
+	let mut data = vec![0_u8; program::MultisigImportIx::SIZE];
+	program::MultisigImportIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.legacy_program = pina_address(&legacy_program_id());
 		ix.legacy_discriminator = legacy_discriminator();
@@ -1122,7 +1129,7 @@ fn config_execute_adds_a_member_and_invalidates_prior_proposals() {
 	let new_member = key(40);
 
 	// One add-member action.
-	let mut actions = vec![1_u8, multisig_program::ACTION_ADD_MEMBER];
+	let mut actions = vec![1_u8, program::ACTION_ADD_MEMBER];
 	actions.extend_from_slice(new_member.as_ref());
 	actions.push(PERMISSIONS_ALL);
 
@@ -1369,7 +1376,7 @@ fn config_authority_execute_rejects_add_spending_limit() {
 	// A fully-formed AddSpendingLimit action: the rejection must come from the
 	// action kind, not from a malformed stream.
 	let limit_create_key = key(82);
-	let mut actions = vec![1_u8, multisig_program::ACTION_ADD_SPENDING_LIMIT];
+	let mut actions = vec![1_u8, program::ACTION_ADD_SPENDING_LIMIT];
 	actions.extend_from_slice(limit_create_key.as_ref());
 	actions.push(0_u8); // vault index
 	actions.extend_from_slice(Address::default().as_ref()); // SOL
@@ -1386,8 +1393,8 @@ fn config_authority_execute_rejects_add_spending_limit() {
 	)
 	.unwrap_or_else(|error| panic!("install the config authority: {error:?}"));
 
-	let mut data = vec![0_u8; multisig_program::ConfigAuthorityExecuteIx::SIZE];
-	multisig_program::ConfigAuthorityExecuteIx::initialize(&mut data, |ix| {
+	let mut data = vec![0_u8; program::ConfigAuthorityExecuteIx::SIZE];
+	program::ConfigAuthorityExecuteIx::initialize(&mut data, |ix| {
 		ix.actions_len.set(actions.len() as u16);
 		ix.actions[..actions.len()].copy_from_slice(&actions);
 		Ok(())
@@ -1427,10 +1434,10 @@ fn config_authority_execute_rejects_add_spending_limit() {
 
 	// The same authority still executes the configuration actions it owns, so
 	// the refusal is scoped to custody rather than to the instruction.
-	let mut timelock_actions = vec![1_u8, multisig_program::ACTION_SET_TIME_LOCK];
+	let mut timelock_actions = vec![1_u8, program::ACTION_SET_TIME_LOCK];
 	timelock_actions.extend_from_slice(&3600_u32.to_le_bytes());
-	let mut allowed = vec![0_u8; multisig_program::ConfigAuthorityExecuteIx::SIZE];
-	multisig_program::ConfigAuthorityExecuteIx::initialize(&mut allowed, |ix| {
+	let mut allowed = vec![0_u8; program::ConfigAuthorityExecuteIx::SIZE];
+	program::ConfigAuthorityExecuteIx::initialize(&mut allowed, |ix| {
 		ix.actions_len.set(timelock_actions.len() as u16);
 		ix.actions[..timelock_actions.len()].copy_from_slice(&timelock_actions);
 		Ok(())

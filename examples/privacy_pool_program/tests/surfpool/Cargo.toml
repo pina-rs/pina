@@ -5,5 +5,29 @@ edition = "2024"
 publish = false
 
 [dependencies]
+ark-bn254 = { workspace = true, default-features = true }
+ark-ec = { workspace = true, default-features = true }
+ark-ff = { workspace = true, default-features = true }
+ark-groth16 = { workspace = true, default-features = true }
+ark-r1cs-std = { workspace = true, default-features = true }
+ark-relations = { workspace = true, default-features = true }
+ark-serialize = { workspace = true, default-features = true }
+ark-snark = { workspace = true, default-features = true }
+ark-std = { workspace = true, default-features = true }
+light-poseidon = { workspace = true, default-features = true }
+# The program is a cdylib only (see ../../Cargo.toml), so its types are
+# included with #[path = "../../../src/lib.rs"] in src/lib.rs rather than
+# through an rlib. The program features mirror its own [dependencies];
+# the arkworks stack the `prover` module and host-side crypto need is
+# declared directly because the included source compiles against it. The
+# `prover` feature below is this harness's own, not the program's: the
+# included source resolves `cfg(feature = ...)` against the including
+# crate, so this is how the harness opens the program's host-only `prover`
+# module without enabling anything on a dependency (there is none).
+pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs"] }
 pina_test = { workspace = true }
-program_under_test = { package = "privacy_pool_program", path = "../..", features = ["prover"] }
+rand = { workspace = true, default-features = true }
+
+[features]
+default = ["prover"]
+prover = []

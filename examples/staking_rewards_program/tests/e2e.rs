@@ -25,24 +25,28 @@
 //!     cargo test -p staking_rewards_program --test e2e -- --nocapture
 //! ```
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::ProgramError;
+use program::ClaimInstruction;
+use program::DepositInstruction;
+use program::OpenPositionInstruction;
+use program::PoolState;
+use program::PoolStateZc;
+use program::PositionState;
+use program::PositionStateZc;
+use program::REWARD_INDEX_SCALE;
+use program::StakingError;
+use program::WithdrawInstruction;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
-use staking_rewards_program::ClaimInstruction;
-use staking_rewards_program::DepositInstruction;
-use staking_rewards_program::OpenPositionInstruction;
-use staking_rewards_program::PoolState;
-use staking_rewards_program::PoolStateZc;
-use staking_rewards_program::PositionState;
-use staking_rewards_program::PositionStateZc;
-use staking_rewards_program::REWARD_INDEX_SCALE;
-use staking_rewards_program::StakingError;
-use staking_rewards_program::WithdrawInstruction;
 
 // ---------------------------------------------------------------------------
 // Well-known program IDs
@@ -70,7 +74,7 @@ fn spl_ata_program_id() -> Pubkey {
 
 /// Convert the staking program's on-chain `Address` to a `Pubkey`.
 fn program_id() -> Pubkey {
-	let id = staking_rewards_program::ID;
+	let id = program::ID;
 	let bytes: &[u8] = id.as_ref();
 	let array: [u8; 32] = bytes
 		.try_into()

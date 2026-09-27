@@ -237,11 +237,32 @@ mod tests {
 
 	use super::*;
 
+	/// Where the built SBF artifact lives.
+	///
+	/// The program is a cdylib only, so these tests compile from more than one
+	/// crate: the Surfpool harness that source-includes this file (four levels
+	/// below the workspace root) and the program crate itself (two levels).
+	/// `CARGO_MANIFEST_DIR` therefore differs between the two, so the lookup
+	/// walks the known depths instead of hard-coding one, mirroring how the
+	/// harness locates the artifact at runtime.
 	fn sbf_binary_path() -> String {
-		format!(
-			"{}/../../target/deploy/pina_bpf_program.so",
-			env!("CARGO_MANIFEST_DIR")
-		)
+		if let Ok(artifact) = std::env::var("PINA_SBF_ARTIFACT") {
+			return artifact;
+		}
+
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		for ancestors_up in 2..=4 {
+			let candidate = format!(
+				"{}/{}target/deploy/pina_bpf_program.so",
+				manifest,
+				"../".repeat(ancestors_up)
+			);
+			if Path::new(&candidate).is_file() {
+				return candidate;
+			}
+		}
+
+		format!("{}/../../target/deploy/pina_bpf_program.so", manifest)
 	}
 
 	#[test]

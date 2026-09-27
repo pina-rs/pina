@@ -1,11 +1,15 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use program_under_test::ID;
-use program_under_test::PinaBpfInstruction;
-use program_under_test::SEED_STATE_PREFIX;
+use program::ID;
+use program::PinaBpfInstruction;
+use program::SEED_STATE_PREFIX;
 
 fn state_pda(program_id: &Pubkey) -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[SEED_STATE_PREFIX], program_id)
@@ -100,10 +104,8 @@ fn gated_instructions_report_invalid_instructions_without_the_feature() {
 			.expect_err("forwarded CPI is feature-gated off");
 		assert_eq!(error.operation(), "execute program instruction");
 
-		let (_, authority_bump) = Pubkey::find_program_address(
-			&[program_under_test::SEED_CPI_AUTHORITY_PREFIX],
-			&program_id,
-		);
+		let (_, authority_bump) =
+			Pubkey::find_program_address(&[program::SEED_CPI_AUTHORITY_PREFIX], &program_id);
 		let mut data = vec![
 			PinaBpfInstruction::ForwardRotateWithPda as u8,
 			0u8,

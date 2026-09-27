@@ -12,9 +12,16 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use pina_test::TestError;
-use program_under_test::EscrowError;
-use program_under_test::EscrowInstruction;
-use program_under_test::ID;
+
+// The program builds as a cdylib only (the `lib` target would block
+// link-time optimization, which costs ~20-30% of deployed size), so the
+// real types come in through a source include rather than an rlib.
+#[path = "../../../src/lib.rs"]
+mod program;
+
+use program::EscrowError;
+use program::EscrowInstruction;
+use program::ID;
 
 /// SPL Token (Tokenkeg…), accepted by the example's SPL allowlist.
 const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";

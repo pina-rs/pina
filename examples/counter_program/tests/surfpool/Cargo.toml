@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pina = { workspace = true, features = ["account-resize", "logs", "derive"] }
 pina_test = { workspace = true }
-program_under_test = { package = "counter_program", path = "../.." }

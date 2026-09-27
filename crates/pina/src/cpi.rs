@@ -103,6 +103,27 @@ impl CompactCreationTarget<'_, '_, '_, '_> {
 	where
 		T: PinaCompactAccount,
 	{
+		self.allocate_zeroed(signers, rent)?;
+		let mut data = self.account.try_borrow_mut()?;
+		let encoded_len = T::initialize(&mut data, patch).inspect_err(|_| {
+			data.fill(0);
+		})?;
+		debug_assert!(encoded_len <= data.len());
+
+		verify(&data).inspect_err(|_| {
+			data.fill(0);
+		})
+	}
+
+	/// Rejects a target that already holds data, then runs the allocate CPI.
+	///
+	/// Split from [`Self::allocate_and_initialize`] because this half depends
+	/// only on runtime values — the account, seeds, bump, and space — so every
+	/// monomorphized creation builder shares one copy of it instead of
+	/// duplicating the seed marshalling, signer assembly, and rent computation
+	/// per account type. The generic half above stays small: patch commit and
+	/// verification only.
+	fn allocate_zeroed(&mut self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
 		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
 		{
 			return Err(ProgramError::AccountAlreadyInitialized);
@@ -116,17 +137,7 @@ impl CompactCreationTarget<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.invoke_signed_inner_validated(signers, rent)?;
-
-		let mut data = self.account.try_borrow_mut()?;
-		let encoded_len = T::initialize(&mut data, patch).inspect_err(|_| {
-			data.fill(0);
-		})?;
-		debug_assert!(encoded_len <= data.len());
-
-		verify(&data).inspect_err(|_| {
-			data.fill(0);
-		})
+		.invoke_signed_inner_validated(signers, rent)
 	}
 }
 
@@ -715,6 +726,36 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
+		self.allocate(verification, size_of::<T::Zc>() as u64, signers, rent)?;
+
+		let mut data = self.account.try_borrow_mut()?;
+		<T as PinaAccount>::initialize(&mut data, initialize)?;
+
+		Ok(())
+	}
+
+	/// Rejects a target that already holds data, then runs the allocate CPI.
+	///
+	/// Split from [`Self::allocate_and_initialize`] for the same reason as
+	/// `CompactCreationTarget::allocate_zeroed`: this half depends only on
+	/// runtime values, so every monomorphized creation builder shares one
+	/// copy of the seed marshalling, signer assembly, and rent computation
+	/// instead of duplicating them per account type. Only the byte length —
+	/// `size_of::<T::Zc>()` — crosses the boundary, computed by the generic
+	/// half above.
+	///
+	/// `inline(always)` keeps this textually shared but call-site-inlined:
+	/// outlining it as a real call measured +80 CU on the counter benchmark's
+	/// `initialize`, and single-instantiation programs have no duplicate to
+	/// collapse, so the call boundary only costs.
+	#[inline(always)]
+	fn allocate(
+		&mut self,
+		verification: BumpVerification,
+		space: u64,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
 		if !self.account.is_data_empty() && self.account.try_borrow()?.iter().any(|byte| *byte != 0)
 		{
 			return Err(ProgramError::AccountAlreadyInitialized);
@@ -723,7 +764,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 		let allocate = AllocateAccountWithNonCanonicalBump {
 			account: self.account,
 			payer: self.payer,
-			space: size_of::<T::Zc>() as u64,
+			space,
 			owner: self.owner,
 			seeds: self.seeds,
 			bump: self.bump,
@@ -736,9 +777,6 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 				allocate.invoke_signed_inner(signers, rent)?;
 			}
 		}
-
-		let mut data = self.account.try_borrow_mut()?;
-		<T as PinaAccount>::initialize(&mut data, initialize)?;
 
 		Ok(())
 	}

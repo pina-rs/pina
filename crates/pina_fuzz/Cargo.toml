@@ -6,9 +6,10 @@ license = "Apache-2.0"
 publish = false
 
 [workspace]
-
+# The example programs are cdylib-only, so nothing can depend on their
+# rlibs; the fuzz targets reach them through each program's `fuzz/`
+# re-export crate instead. This crate keeps only the shared harness doc
+# module.
 [dependencies]
-counter_program = { path = "../../examples/counter_program" }
 libfuzzer-sys = "0.4"
 pina = { path = "../../crates/pina", features = ["logs", "derive"] }
-role_registry_program = { path = "../../examples/role_registry_program" }

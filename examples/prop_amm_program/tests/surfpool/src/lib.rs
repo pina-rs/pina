@@ -1,12 +1,16 @@
 #![cfg(test)]
 
+// The program is a cdylib only (see ../../Cargo.toml), so its real types
+// come in through a source include rather than an rlib dependency.
+#[path = "../../../src/lib.rs"]
+mod program;
 use pina_test::AccountMeta;
 use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
-use program_under_test::ID;
-use program_under_test::UPDATE_AUTHORITY;
+use program::ID;
+use program::UPDATE_AUTHORITY;
 
 /// The committed fixture seed: the 32 ASCII bytes of a descriptive phrase,
 /// documented on `UPDATE_AUTHORITY` in `src/lib.rs`. Deterministic, and
@@ -23,7 +27,7 @@ fn fixture_update_authority() -> Keypair {
 	);
 	keypair
 }
-use program_under_test::PropAmmInstruction;
+use program::PropAmmInstruction;
 
 fn initialize_instruction(
 	program: &ProgramTest,
@@ -170,7 +174,7 @@ fn update_requires_the_recorded_or_the_static_authority() {
 			.expect_err("a stranger may not update");
 		pina_test::assert_custom_error(
 			&error,
-			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
+			program::PropAmmError::UnauthorizedUpdateAuthority as u32,
 		);
 		// The refused update wrote nothing.
 		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
@@ -265,7 +269,7 @@ fn rotate_hands_over_the_oracle_authority() {
 			.expect_err("the rotated-away authority may no longer update");
 		pina_test::assert_custom_error(
 			&error,
-			program_under_test::PropAmmError::UnauthorizedUpdateAuthority as u32,
+			program::PropAmmError::UnauthorizedUpdateAuthority as u32,
 		);
 		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
 		assert_eq!(

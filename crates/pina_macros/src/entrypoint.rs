@@ -697,9 +697,11 @@ mod tests {
 	#[test]
 	fn an_explicit_ladder_without_a_budget_still_requires_a_manifest() {
 		// Dropping the budget made it optional, not the history: naming
-		// contracts still demands a checked-in snapshot, so the unit-test
-		// environment (no manifest) reports the `create` remedy rather than
-		// expanding a ladder it cannot verify.
+		// contracts still demands a checked-in snapshot. The unit-test
+		// environment sits in a crate with no manifest anywhere above it, so
+		// `discover_program_dir` finds nothing and the ladder reports the
+		// unlocatable-manifest error rather than the missing-file remedy a
+		// real program directory would produce.
 		let args = args(quote!(entrypoint, migrations(State)));
 		let mut item_enum = enum_of(quote!(
 			pub enum Instruction {
@@ -709,7 +711,9 @@ mod tests {
 		let error = expand(&args, &mut item_enum).unwrap_err();
 
 		assert!(
-			error.to_string().contains("pina migrations create"),
+			error
+				.to_string()
+				.contains("could not locate Cargo manifest for migration-aware dispatch"),
 			"unexpected message: {error}"
 		);
 	}
@@ -835,8 +839,10 @@ mod tests {
 
 	#[test]
 	fn ladder_resolved_under_this_crate_reports_the_missing_manifest() {
-		// The unit-test environment has no checked-in manifest, so the resolved
-		// path reports the same remedy a program without one would see.
+		// The unit-test environment has no manifest in this crate or any
+		// ancestor, so `discover_program_dir` finds nothing and the ladder
+		// reports the unlocatable-manifest error — the same failure a program
+		// whose manifest was deleted entirely would see.
 		let args = args(quote!(
 			entrypoint,
 			migrations(State),
@@ -851,7 +857,7 @@ mod tests {
 
 		let message = error.to_string();
 		assert!(
-			message.contains("pina migrations create"),
+			message.contains("could not locate Cargo manifest for migration-aware dispatch"),
 			"message: {message}"
 		);
 	}

@@ -13,17 +13,23 @@ rustflags = [
 ]
 
 [alias]
-build-pina-bpf-program = "build-sbf --manifest-path examples/pina_bpf_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint,cpi-runtime-tests"
-build-escrow-program = "build-sbf --manifest-path examples/escrow_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-heap-alloc-program = "build-sbf --manifest-path examples/heap_alloc_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-migrations-program = "build-sbf --manifest-path examples/migrations_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-multisig-program = "build-sbf --manifest-path examples/multisig_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-optional-accounts-program = "build-sbf --manifest-path examples/optional_accounts_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-privacy-pool-program = "build-sbf --manifest-path examples/privacy_pool_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-profile-program = "build-sbf --manifest-path examples/profile_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-role-registry-program = "build-sbf --manifest-path examples/role_registry_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-staking-rewards-program = "build-sbf --manifest-path examples/staking_rewards_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
-build-vesting-program = "build-sbf --manifest-path examples/vesting_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
+# `--lto` requests fat link-time optimization. cargo-build-sbf only accepts it
+# when the program's `[lib] crate-type` is `["cdylib"]` alone — a second
+# rlib/lib output in the same rustc invocation turns `-C lto` into an error —
+# so the flag is carried only by aliases for programs that qualify
+# (escrow today; see docs/src/program-size.md). Fat LTO cut the escrow
+# example from 73,976 to 46,680 bytes (-37%) and its static CU by 34%.
+build-pina-bpf-program = "build-sbf --manifest-path examples/pina_bpf_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint,cpi-runtime-tests --lto"
+build-escrow-program = "build-sbf --manifest-path examples/escrow_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-heap-alloc-program = "build-sbf --manifest-path examples/heap_alloc_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-migrations-program = "build-sbf --manifest-path examples/migrations_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-multisig-program = "build-sbf --manifest-path examples/multisig_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-optional-accounts-program = "build-sbf --manifest-path examples/optional_accounts_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-privacy-pool-program = "build-sbf --manifest-path examples/privacy_pool_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-profile-program = "build-sbf --manifest-path examples/profile_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-role-registry-program = "build-sbf --manifest-path examples/role_registry_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-staking-rewards-program = "build-sbf --manifest-path examples/staking_rewards_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
+build-vesting-program = "build-sbf --manifest-path examples/vesting_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint --lto"
 semver-checks = ["bin", "cargo-semver-checks"]
 workspaces = ["bin", "cargo-workspaces"]
 kani = ["bin", "cargo-kani"]

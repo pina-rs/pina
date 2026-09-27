@@ -28,19 +28,23 @@
 //!     cargo test -p vesting_program --test e2e -- --nocapture
 //! ```
 
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::result::Check;
 use pina::ProgramError;
+use program::CancelInstruction;
+use program::ClaimInstruction;
+use program::InitializeInstruction;
+use program::VestingError;
+use program::VestingState;
+use program::VestingStateZc;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
-use vesting_program::CancelInstruction;
-use vesting_program::ClaimInstruction;
-use vesting_program::InitializeInstruction;
-use vesting_program::VestingError;
-use vesting_program::VestingState;
-use vesting_program::VestingStateZc;
 
 // ---------------------------------------------------------------------------
 // Well-known program IDs
@@ -70,7 +74,7 @@ fn spl_ata_program_id() -> Pubkey {
 // ---------------------------------------------------------------------------
 
 fn program_id() -> Pubkey {
-	let id = vesting_program::ID;
+	let id = program::ID;
 	let bytes: &[u8] = id.as_ref();
 	let array: [u8; 32] = bytes
 		.try_into()

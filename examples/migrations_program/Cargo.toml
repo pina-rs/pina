@@ -10,7 +10,11 @@ readme.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["cdylib", "lib"]
+# cdylib only: a `lib` output in the same rustc invocation blocks `-C lto`,
+# which costs 20-30% of the deployed size. Tests include the real source
+# with `#[path = "../../../src/lib.rs"]` from `tests/surfpool` instead of
+# depending on an rlib.
+crate-type = ["cdylib"]
 
 [features]
 default = ["bpf-entrypoint"]
@@ -21,7 +25,13 @@ fuzzing = []
 pina = { workspace = true, features = ["account-resize", "compact", "derive", "validation"] }
 
 [dev-dependencies]
+# The tests/ integration tests include src/lib.rs with #[path] (the program
+# is a cdylib only), so the pina features the included source needs must be
+# visible to the test targets too.
 mollusk-svm = { workspace = true, default-features = true }
+pina = { workspace = true, features = ["account-resize", "compact", "derive", "validation"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 solana-account.workspace = true
 solana-instruction.workspace = true
 solana-pubkey.workspace = true

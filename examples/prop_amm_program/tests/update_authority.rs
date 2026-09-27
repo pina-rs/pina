@@ -8,7 +8,11 @@
 //! guesses (security sweep finding D1). These tests pin the exploit class
 //! closed while keeping the fixture deterministic.
 
-use prop_amm_program::UPDATE_AUTHORITY;
+// The program is a cdylib only (see Cargo.toml), so its real types come
+// in through a source include rather than an rlib dependency.
+#[path = "../src/lib.rs"]
+mod program;
+use program::UPDATE_AUTHORITY;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
