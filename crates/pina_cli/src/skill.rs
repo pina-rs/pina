@@ -233,11 +233,14 @@ fn install(destination: Option<PathBuf>, force: bool) -> Result<SkillOutcome, Sk
 /// Write every bundled document under `directory`, returning the file count.
 fn write_tree(directory: &Path) -> std::io::Result<usize> {
 	// The install paths come from the static table, never from input, so these
-	// joins cannot escape the destination.
+	// joins cannot escape the destination. The entrypoint goes last: a failed
+	// partial install leaves no `SKILL.md`, so the next install is not mistaken
+	// for a clobber of an existing skill.
 	std::fs::create_dir_all(directory.join("references"))?;
-	for topic in TOPICS {
+	for topic in TOPICS.iter().skip(1) {
 		std::fs::write(directory.join(topic.file), topic.content)?;
 	}
+	std::fs::write(directory.join("SKILL.md"), SKILL_ENTRY)?;
 	Ok(TOPICS.len())
 }
 

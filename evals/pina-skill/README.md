@@ -56,7 +56,7 @@ Useful flags: `--model`, `--timeout`, `--repeats`, `--instruction-variant`, `--s
 
 ## How isolation works
 
-Each run copies a fixture into `.work/runs/<scenario>__<variant>__<n>` and installs the chosen skill as `<workdir>/.claude/skills/pina`. Because the run uses `--setting-sources project`, that copy is the only `pina` skill the agent sees — a globally installed skill of the same name cannot leak in.
+Each run copies a fixture into `.work/runs/<scenario>__<variant>__<n>`; for `installed` runs it also installs the chosen skill as `<workdir>/.claude/skills/pina` (cli runs install nothing). Because the run uses `--setting-sources project`, that copy is the only `pina` skill the agent sees — a globally installed skill of the same name cannot leak in.
 
 The workspace `pina` binary is prepended to `PATH` so `pina migrations ...` inside the fixture resolves to the build under test.
 
