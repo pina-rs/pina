@@ -67,7 +67,7 @@ enum ValidationAccountType {
 	variant = ValidatedState
 )]
 struct MiriValidatedState {
-	#[pina(validate(min = 1))]
+	#[pina(validate(value >= 1))]
 	pub value: u64,
 }
 

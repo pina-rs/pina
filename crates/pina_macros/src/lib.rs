@@ -157,13 +157,13 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `Vec<T, N>` fields whose active contents, rather than their full capacities,
 /// occupy account data. Compact accounts require the `compact` crate feature.
 ///
-/// With the `validation` feature, schema fields accept inclusive `min` and
-/// `max` rules for integers, plus `min_len`, `max_len`, and `exact_len` for
-/// bounded strings, vectors, and arrays. Add `error = ERROR` to override
-/// `ProgramError::InvalidAccountData`, or add `validate(with = function)` to
-/// the outer macro for a final application hook. Generated read and initialize
-/// helpers validate automatically; the zero-copy view also implements
-/// `PinaValidate` for explicit checks.
+/// With the `validation` feature, schema fields accept comparisons over the
+/// field's `value` and its `len`, so the annotation reads as the check it
+/// generates: `#[pina(validate(value >= 1 && value <= 10, len <= 64))]`. Add
+/// `error = ERROR` to override `ProgramError::InvalidAccountData`, or add
+/// `validate(with = function)` to the outer macro for a final application
+/// hook. Generated read and initialize helpers validate automatically; the
+/// zero-copy view also implements `PinaValidate` for explicit checks.
 ///
 /// # Example
 ///
@@ -218,11 +218,11 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Generated helpers enforce exact length, discriminator, and `PinaPod` field
 /// validation at the instruction boundary.
 ///
-/// Enable `validation` for field-level `min`, `max`, `min_len`, `max_len`,
-/// `exact_len`, and `error` rules. A `validate(with = function)` macro
-/// argument adds cross-field validation. Generated helpers return
-/// `ProgramError::InvalidInstructionData` by default and call validation
-/// automatically after structural decoding.
+/// Enable `validation` for field-level comparisons over the field's `value`
+/// and its `len`, plus an `error = ERROR` override. A `validate(with =
+/// function)` macro argument adds cross-field validation. Generated helpers
+/// return `ProgramError::InvalidInstructionData` by default and call
+/// validation automatically after structural decoding.
 ///
 /// # Example
 ///
@@ -242,8 +242,8 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Event payloads use the same checked schema and byte-view helpers as
 /// instruction payloads.
 ///
-/// Enable `validation` for field-level `min`, `max`, `min_len`, `max_len`,
-/// `exact_len`, and `error` rules, plus a type-level
+/// Enable `validation` for field-level comparisons over the field's `value`
+/// and its `len`, an `error = ERROR` override, and a type-level
 /// `validate(with = function)` hook. Event views implement `PinaValidate` and
 /// generated read/initialize helpers validate automatically.
 ///

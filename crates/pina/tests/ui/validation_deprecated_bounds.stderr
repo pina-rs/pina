@@ -1,0 +1,35 @@
+error: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min` is deprecated; write the bound as a comparison, as in `value >= 1`
+  --> tests/ui/validation_deprecated_bounds.rs:19:18
+   |
+19 |     #[pina(validate(min = 1, max = 10))]
+   |                     ^^^
+   |
+note: the lint level is defined here
+  --> tests/ui/validation_deprecated_bounds.rs:8:9
+   |
+ 8 | #![deny(deprecated)]
+   |         ^^^^^^^^^^
+
+error: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `max` is deprecated; write the bound as a comparison, as in `value <= 10`
+  --> tests/ui/validation_deprecated_bounds.rs:19:27
+   |
+19 |     #[pina(validate(min = 1, max = 10))]
+   |                              ^^^
+
+error: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `exact_len` is deprecated; write the bound as a comparison, as in `len == 4`
+  --> tests/ui/validation_deprecated_bounds.rs:21:18
+   |
+21 |     #[pina(validate(exact_len = 4))]
+   |                     ^^^^^^^^^
+
+error: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min_len` is deprecated; write the bound as a comparison, as in `len >= 2`
+  --> tests/ui/validation_deprecated_bounds.rs:32:18
+   |
+32 |     #[pina(validate(min_len = 2, max_len = 8))]
+   |                     ^^^^^^^
+
+error: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `max_len` is deprecated; write the bound as a comparison, as in `len <= 64`
+  --> tests/ui/validation_deprecated_bounds.rs:32:31
+   |
+32 |     #[pina(validate(min_len = 2, max_len = 8))]
+   |                                  ^^^^^^^

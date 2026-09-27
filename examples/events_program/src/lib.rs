@@ -47,10 +47,10 @@ pub enum EventDiscriminator {
 )]
 #[derive(Debug)]
 pub struct MyEvent {
-	#[pina(validate(min = 1, max = 5))]
+	#[pina(validate(value >= 1 && value <= 5))]
 	pub data: u64,
 
-	#[pina(validate(exact_len = 8))]
+	#[pina(validate(len == 8))]
 	pub label: [u8; 8],
 }
 
@@ -68,10 +68,10 @@ fn validate_my_event(event: &MyEventZc) -> ProgramResult {
 )]
 #[derive(Debug)]
 pub struct MyOtherEvent {
-	#[pina(validate(min = 6, max = 7))]
+	#[pina(validate(value >= 6 && value <= 7))]
 	pub data: u64,
 
-	#[pina(validate(exact_len = 8))]
+	#[pina(validate(len == 8))]
 	pub label: [u8; 8],
 }
 

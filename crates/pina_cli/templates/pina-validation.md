@@ -21,20 +21,29 @@ Mutating a fixed view can invalidate a previously checked rule, so validate agai
 
 <!-- {=pinaValueValidationRules} -->
 
-Use `#[pina(validate(...))]` on fields of `#[account]`, `#[instruction]`, and `#[event]` structs:
+Use `#[pina(validate(...))]` on fields of `#[account]`, `#[instruction]`, and `#[event]` structs. Each rule is a comparison over the field's `value` or its `len`, so the annotation reads as the check it generates:
 
-| Rule               | Accepted fields                                     | Meaning                                     |
-| ------------------ | --------------------------------------------------- | ------------------------------------------- |
-| `min = EXPR`       | Fixed-width integers and Pina `Pod*` integer fields | Inclusive numeric lower bound               |
-| `max = EXPR`       | Fixed-width integers and Pina `Pod*` integer fields | Inclusive numeric upper bound               |
-| `min_len = EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Inclusive minimum byte or element count     |
-| `max_len = EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Inclusive maximum byte or element count     |
-| `exact_len = EXPR` | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Exact byte or element count                 |
-| `error = ERROR`    | One validation group                                | Replaces the macro's default `ProgramError` |
+| Rule            | Accepted fields                                     | Meaning                                     |
+| --------------- | --------------------------------------------------- | ------------------------------------------- |
+| `value == EXPR` | Fixed-width integers and Pina `Pod*` integer fields | Numeric equality                            |
+| `value != EXPR` | Fixed-width integers and Pina `Pod*` integer fields | Numeric inequality (for example, non-zero)  |
+| `value < EXPR`  | Fixed-width integers and Pina `Pod*` integer fields | Exclusive numeric upper bound               |
+| `value <= EXPR` | Fixed-width integers and Pina `Pod*` integer fields | Inclusive numeric upper bound               |
+| `value > EXPR`  | Fixed-width integers and Pina `Pod*` integer fields | Exclusive numeric lower bound               |
+| `value >= EXPR` | Fixed-width integers and Pina `Pod*` integer fields | Inclusive numeric lower bound               |
+| `len == EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Exact byte or element count                 |
+| `len != EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Any other byte or element count             |
+| `len < EXPR`    | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Exclusive maximum byte or element count     |
+| `len <= EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Inclusive maximum byte or element count     |
+| `len > EXPR`    | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Exclusive minimum byte or element count     |
+| `len >= EXPR`   | `String`, `PodString`, `Vec`, `PodVec`, and arrays  | Inclusive minimum byte or element count     |
+| `error = ERROR` | One validation group                                | Replaces the macro's default `ProgramError` |
 
-String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. `exact_len` cannot share a group with `min_len` or `max_len`.
+String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. Chain bounds on the same receiver with `&&` (`value >= 1 && value <= 10`, `len == 4`) and separate rules with `,`. A range can also be written as one rule — `100 < value <= u64::MAX` — which generates the same two checks joined by `&&`. A rule that must fail in different ways takes `error = ERROR` in the same group.
 
-Use `validate(with = function)` in the outer macro for cross-field or domain validation. Fixed schemas pass their generated `*Zc` view; compact accounts pass their generated `*Ref<'_>` view. The function must return `ProgramResult`.
+The `min`, `max`, `min_len`, `max_len`, and `exact_len` parameter spellings predate comparisons. They still parse and generate the identical checks, but they are deprecated and warn at the parameter.
+
+Use `validate(with = function)` in the outer macro for cross-field or domain validation. The hook is a named parameter, not a comparison: it keeps `=`. Fixed schemas pass their generated `*Zc` view; compact accounts pass their generated `*Ref<'_>` view. The function must return `ProgramResult`.
 
 ```rust
 #[instruction(
@@ -42,10 +51,10 @@ Use `validate(with = function)` in the outer macro for cross-field or domain val
 	validate(with = validate_transfer)
 )]
 pub struct TransferInstruction {
-	#[pina(validate(min = 1, max = 1_000_000, error = TransferError::InvalidAmount))]
+	#[pina(validate(value >= 1 && value <= 1_000_000, error = TransferError::InvalidAmount))]
 	pub amount: u64,
 
-	#[pina(validate(max_len = 64))]
+	#[pina(validate(len <= 64))]
 	pub memo: String<64>,
 }
 
