@@ -1,7 +1,7 @@
 # ADR 0010: Lean entrypoint strategy for deployed-size parity
 
-- Status: Proposed
-- Date: 2026-09-27
+- Status: Accepted (decisions 1–2 shipped or measured; the dispatcher is decided against)
+- Date: 2026-09-27 (lean-dispatcher measurement added 2026-09-28)
 - Deciders: Pina maintainers
 - Related: [Framework comparison](../framework-comparison.md), [Program size](../program-size.md)
 
@@ -69,14 +69,14 @@ A second measurement isolated the router lever: outlining the router with `#[inl
 ## Decision
 
 1. **Adopt the account budget now** (no framework change): document the second argument of `nostd_entrypoint!` in the program-size guide, and have `pina init` emit a program-specific bound — the program's widest instruction's account count plus headroom — instead of the 255 default.
-2. **Build the lean dispatcher as an opt-in macro** (`lean_entrypoint!`) that replaces pinocchio's eager entrypoint deserialization with a stub-plus-per-arm dispatcher: per-instruction `COUNT` parsing, one loop-based account walk with pinocchio's duplicate-marker semantics, and shared outlined error paths. Keep pinocchio as a _library_ (CPI, sysvars, `AccountView`); stop using it as the eager 255-account entrypoint deserializer on the lean path.
-3. **Gate the default flip on equivalence**: lean entrypoint becomes the `pina init` default only after Surfpool equivalence suites and the CU ratchet record both paths on every example program, with multisig — whose entrypoint frame sits exactly at the 4 KB stack limit — measured first.
+2. **Do not build the lean dispatcher — it was prototyped and measured out.** A working prototype dispatching through pinocchio's public `InstructionContext` (lazy walk, duplicate mapping, exact-count views) measured **10,360 bytes against the budget lever's 9,976** on the counter fixture: `.text` 7,936 vs 7,736 plus 48 more relocations. Two architectural facts close the question. First, the instruction data sits _after_ the account region in the loader's input, so any dispatcher must walk every account before it can read the discriminator — "parse only the matched arm's accounts" is unreachable under the entrypoint ABI. Second, pinocchio's compile-time-unrolled `deserialize::<N>` for a small bound is tighter than any general loop with duplicate handling; the lazy walk duplicates that work in a less specialized shape. The dispatcher layer was never the remaining gap: after the budget and slicing levers, the counter's ~1,030 bytes of `.text` over Anchor v2 sit in pina's semantic surface — the seed-and-signer assembly, the outlined address-comparison asserts, and the envelope plumbing — each individually load-bearing and each CU-cheaper than Anchor's runtime equivalent.
+3. **Stop here and keep the CU lead.** The counter at 9,976 bytes (−21.6% from stock) with `initialize` at 3,203 CU versus Anchor v2's 8,696 bytes at 3,458 CU is the measured optimum for pina's feature set. Going below Anchor's byte count requires removing checks (an opt-out envelope mode, weaker derivation verification), which is a product decision with security trade-offs, not an engineering lever; this ADR records the measurement so the dispatcher is not re-attempted without new constraints.
 
-The comparison fixtures keep publishing stock numbers; the `pina_lean` fixtures remain as the measurement bed for the next phase.
+The comparison fixtures keep publishing stock numbers; the `pina_lean` fixture remains as the measurement bed documenting the budget and slicing levers.
 
 ## Consequences
 
-- **Deployed sizes approach Quasar's class without losing checks.** Measured: hello −41.5% (to 2,736, near Quasar's 2,520); counter −21.6% from stock (12,720 → 9,976 with the budget and slicing levers shipped here). The remaining 1,280 bytes to Anchor v2's 8,696 sit almost entirely in the 6.4 KB inlined `entrypoint`, which is the lean dispatcher's addressable envelope — projected to land the counter at ≈ 8.2–8.6 KB, at or under Anchor v2, with every validation pina performs today still performed.
+- **Deployed sizes landed at Quasar's class neighborhood without losing checks.** Measured: hello −41.5% (to 2,736, near Quasar's 2,520); counter −21.6% from stock (12,720 → 9,976 with the budget and slicing levers shipped here). The remaining 1,280 bytes to Anchor v2's 8,696 are the feature surface itemized in decision 2; the dispatcher prototype proved they are not recoverable by entrypoint architecture.
 - **The CU lead is retained.** The budget lever costs +6 CU on hello and +1/+4 CU on the counter; pina's `initialize` stays under Anchor v2's 3,458 and Quasar's 3,488. Per-arm exact parsing can reduce CU further by skipping 255-slot framing entirely.
 - **Two entrypoint paths exist until the default flips.** Both must stay feature-complete; the migration-aware discriminator envelope checks keep their ordering (envelope → program ID → accounts) on both paths.
 - **Programs with many remaining-accounts instructions** (for example account-array sweeps) must keep the unrolled path or pass a large budget — the lean dispatcher's per-arm walking must be measured on such a program before the flip (multisig first).
@@ -88,3 +88,5 @@ The comparison fixtures keep publishing stock numbers; the `pina_lean` fixtures 
 - **Lower the default budget for everyone.** Rejected: the budget is a program-level contract (more accounts than the bound are ignored, not rejected), so a global default would silently change behavior for programs that accept many remaining accounts. The bound must be chosen per program.
 - **Only outline the router (`#[inline(never)]`), keep the 255-slot deserializer.** Measured and rejected: it grew the counter fixture by 120 bytes; the budget and per-arm parsing are where the bytes are.
 - **`opt-level = "z"`/`"s"` for size.** Previously measured in the program-size guide: shrank `.text` slightly but grew deployed ELFs (alignment and section-layout side effects) and regressed CU; LTO with `opt-level = 3` dominates.
+- **Lazy dispatch through pinocchio's `InstructionContext` (the lean dispatcher of decision 2's first draft).** Prototyped and measured: +384 bytes over the budget lever on the counter fixture. The data-after-accounts input layout forces a full account walk before the discriminator is readable, and the specialized unrolled walk beats a general loop. Also measured alongside it: the `#[inline]` hint on the router changes nothing (9,976 either way; LLVM already picks the same layout), and a shared cold `ProgramError → u64` converter is table stakes — the exhaustive switch costs 864 bytes in every formulation and Anchor v2 carries the identical 864.
+- **Unifying the seed-and-signer assemblies in the PDA-creation spine.** Estimated at ~100–150 bytes across two private function variants; the double assembly is real but small, recorded here as the largest known remaining purely-mechanical lever if the trade ever becomes worth it.
