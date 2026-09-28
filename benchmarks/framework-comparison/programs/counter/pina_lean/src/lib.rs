@@ -11,7 +11,7 @@
 //! (−8.2%) at +1/+4 compute units.
 //!
 //! This fixture is the measurement bed for the lean-entrypoint exploration
-//! (`docs/adrs/0000-lean-entrypoint-exploration.md`); it is not part of the
+//! (`docs/src/adrs/0010-lean-entrypoint-strategy.md`); it is not part of the
 //! published comparison table, which shows the stock default.
 #![no_std]
 
@@ -114,7 +114,10 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 // code to a small constant.
 nostd_entrypoint!(process_instruction, 4);
 
-/// The top-level instruction router, outlined from the entrypoint frame.
+/// The top-level instruction router, kept inlined into the entrypoint frame
+/// exactly like the stock fixture: outlining it with `#[inline(never)]`
+/// measured 120 bytes larger (11,800 vs 11,680), because the single inlined
+/// frame lets LLVM merge duplicate validation paths across the arms.
 #[inline(always)]
 pub fn process_instruction(
 	program_id: &Address,
