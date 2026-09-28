@@ -1645,11 +1645,21 @@ mod tests {
 	fn command_capture_bounds_pipes_held_by_descendants() {
 		const PROBE: &str = "PINA_DOCTOR_OUTPUT_PROBE";
 		const HOLDER: &str = "PINA_DOCTOR_OUTPUT_HOLDER";
+		// The descendant holds the inherited pipes open well past the capture
+		// deadline, so the deadline is what ends the capture rather than the
+		// holder exiting on its own. `BOUNDED_BY` only has to separate a bounded
+		// capture from one that waited the holder out, which leaves room for the
+		// process spawn the capture also pays for: a Windows runner can take
+		// hundreds of milliseconds to start this test binary, and a 400 ms
+		// ceiling against a 500 ms holder left too little margin to absorb it.
+		const HOLDER_SLEEP: Duration = Duration::from_millis(2_000);
+		const CAPTURE_DEADLINE: Duration = Duration::from_millis(100);
+		const BOUNDED_BY: Duration = Duration::from_millis(1_000);
 		let executable = std::env::current_exe()
 			.unwrap_or_else(|error| panic!("test executable discovery failed: {error}"));
 
 		if std::env::var_os(HOLDER).is_some() {
-			std::thread::sleep(Duration::from_millis(500));
+			std::thread::sleep(HOLDER_SLEEP);
 			return;
 		}
 
@@ -1675,11 +1685,16 @@ mod tests {
 			])
 			.env(PROBE, "1");
 		let started = Instant::now();
-		let error = capture_command_with_timeout(&mut command, Duration::from_millis(100))
+		let error = capture_command_with_timeout(&mut command, CAPTURE_DEADLINE)
 			.expect_err("inherited output pipe must hit the capture deadline");
 
 		assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
-		assert!(started.elapsed() < Duration::from_millis(400));
+		assert!(
+			started.elapsed() < BOUNDED_BY,
+			"capture must return without waiting out the descendant holding the pipes: took {:?}, \
+			 ceiling {BOUNDED_BY:?}, holder sleeps {HOLDER_SLEEP:?}",
+			started.elapsed()
+		);
 	}
 
 	struct FakeManagedChild {
