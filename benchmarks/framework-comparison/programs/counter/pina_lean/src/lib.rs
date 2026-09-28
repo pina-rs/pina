@@ -2,13 +2,14 @@
 //!
 //! Identical program semantics to `counter/pina` — same account model, same
 //! validation, same `pina` — with exactly one difference: the entrypoint's
-//! account budget. `nostd_entrypoint!` accepts the maximum number of
-//! accounts the program accepts (pinocchio's `process_entrypoint::<MAX_ACCOUNTS>`
+//! account budget. `nostd_entrypoint!` accepts the maximum number of accounts
+//! the program accepts (pinocchio's `process_entrypoint::<MAX_ACCOUNTS>`
 //! generic), and the stock fixture uses the default 255, so its entrypoint
 //! carries unrolled account-walking code for 255 accounts. This program
-//! accepts at most 4 — both its instructions fit inside that — and the
-//! deserializer code shrinks with the constant: 12,720 → 11,680 bytes
-//! (−8.2%) at +1/+4 compute units.
+//! accepts at most 3 — both its instructions fit inside that — and the
+//! deserializer code shrinks with the constant: 12,720 → 9,976 bytes
+//! (−21.6%, measured with the exclusive-range CPI slicing in the same
+//! `pina` revision) at −93/+4 compute units.
 //!
 //! This fixture is the measurement bed for the lean-entrypoint exploration
 //! (`docs/src/adrs/0010-lean-entrypoint-strategy.md`); it is not part of the
@@ -109,10 +110,10 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 	}
 }
 
-// The widest instruction uses 3 accounts; 4 leaves one slot of headroom for a
+// The widest instruction uses 3 accounts; 3 leaves no headroom for a
 // future instruction and still bounds the deserializer's unrolled walking
 // code to a small constant.
-nostd_entrypoint!(process_instruction, 4);
+nostd_entrypoint!(process_instruction, 3);
 
 /// The top-level instruction router, kept inlined into the entrypoint frame
 /// exactly like the stock fixture: outlining it with `#[inline(never)]`
