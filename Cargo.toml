@@ -245,7 +245,7 @@ cap-std = { default-features = false, version = "^4.0" }
 cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 clap_complete = { default-features = false, version = "^4" }
-codama-nodes = { default-features = false, version = "0.13.1" }
+codama-nodes = { default-features = false, version = "0.13.2" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
@@ -261,7 +261,7 @@ light-poseidon = { default-features = false, version = "0.4.0" }
 macrotest = { default-features = false, version = "^1.2" }
 mollusk-svm = { default-features = false, version = "0.15.1" }
 # Emits the normalized CLI-surface snapshot release automation diffs.
-monochange_snapshot = { default-features = false, version = "0.1.0" }
+monochange_snapshot = { default-features = false, version = "0.1.1" }
 num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
 object = { default-features = false, version = "^0.40.0" }
@@ -283,6 +283,10 @@ prettyplease = { default-features = false, version = "^0.3" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
+# Held on 0.8 because the privacy pool's prover seeds its circuit setup with a
+# `StdRng` and passes it to `ark-groth16`, which takes `ark_std::rand::RngCore`
+# — ark-std 0.5 re-exports rand 0.8, so a 0.10 `StdRng` implements a different
+# `rand_core` and does not satisfy the bound. Move this with ark-std, not alone.
 rand = { default-features = false, version = "0.8.5" }
 rayon = { default-features = false, version = "^1.10" }
 same-file = { default-features = false, version = "^1" }
@@ -303,6 +307,10 @@ solana-program-error = { version = "^3", default-features = false }
 solana-program-log = { default-features = false, version = "^1.1" }
 solana-pubkey = { version = "^4", default-features = false }
 solana-rpc-client = { version = "^4", default-features = false }
+# Held on the Agave 4.x train: `pina_test` anchors the Surfpool 1.6 dependency
+# set, which resolves `solana-pubkey ~4.2`, while `solana-sdk` 5.0.0 requires
+# `solana-pubkey ^4.3`. The two cannot resolve together, so this crate moves
+# when Surfpool's train does rather than on its own.
 solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
@@ -335,7 +343,7 @@ pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version
 # with the project-local install path.
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
-hyperfine = { version = "1.19.0" }
+hyperfine = { version = "1.20.0" }
 
 [workspace.lints.rust]
 # Docstring coverage: every public item reachable from a crate root must be

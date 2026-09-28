@@ -9,7 +9,12 @@ let
   currentDir = builtins.dirOf __curPos.file;
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
-  kaniToolchain = pkgs.rust-bin.nightly."2025-11-21".minimal;
+  # Must match the toolchain the Kani release bundle was built against: the
+  # nixpkgs package fetches kani's prebuilt binaries, and `kani-compiler` links
+  # `librustc_driver` from `$out/toolchain` at runtime. Kani 0.68.0 requires
+  # nightly-2026-08-21 (its `rust-toolchain-version` file); linking any other
+  # nightly aborts every harness with "Library not loaded: librustc_driver".
+  kaniToolchain = pkgs.rust-bin.nightly."2026-08-21".minimal;
   kani = custom.kani.overrideAttrs (old: {
     buildInputs = (old.buildInputs or [ ]) ++ lib.optionals pkgs.stdenv.isLinux [ kaniToolchain ];
     postInstall = (old.postInstall or "") + ''
