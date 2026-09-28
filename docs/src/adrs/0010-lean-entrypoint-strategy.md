@@ -33,7 +33,11 @@ Symbol-level breakdown of the counter fixture's `.text`:
 
 The 7,736-byte `entrypoint` decomposes further. Pinocchio's deserializer walks the account region with a **compile-time-unrolled** `process_n_accounts!` macro — five accounts per macro expansion, remainder handled by match arms — so a program that declares `MAX_TX_ACCOUNTS` (the default, 255) carries unrolled walking code for 255 accounts even when every instruction uses two. Quasar's hello-world `entrypoint` is 1,096 bytes; pina's is 2,560. Anchor v2's is **32 bytes**: a stub that forwards to an `#[inline(never)]` dispatcher.
 
-**The budget is the cheapest lever and it already exists.** `nostd_entrypoint!` has always accepted a second argument for the account budget; the fixtures never passed one. The prototype (`benchmarks/framework-comparison/programs/*/pina_lean`, built with the exact comparison profile and proven by the comparison verifier) measured it: hello 4,680 → 2,736 bytes (−41.5%) with `budget = 1`, counter 12,720 → 11,680 (−8.2%) with `budget = 4`, at +6 CU and +1/+4 CU respectively. Any program can take this today with no framework change.
+**The budget is the cheapest lever and it already exists.** `nostd_entrypoint!` has always accepted a second argument for the account budget; the fixtures never passed one. The prototype (`benchmarks/framework-comparison/programs/*/pina_lean`, built with the exact comparison profile and proven by the comparison verifier) measured it: hello 4,680 → 2,736 bytes (−41.5%) with `budget = 1`, counter 11,400 → 9,976 (−12.5%) with `budget = 3`, at +6 CU and −93/+4 CU respectively. Any program can take this today with no framework change.
+
+**The seed-and-signer slicing fix shipped alongside it.** The PDA-creation CPI spine sliced its seed and signer arrays with inclusive ranges (`[a..=len]`), monomorphizing a 216-byte `RangeInclusive<usize>::index` copy per element type — three copies, ~1.3 KB, in every PDA-creating program. Exclusive bounds (`[a..len + 1]`, guarded by the `len < MAX` checks that already ran) measured −1,320 bytes and −92 CU on the counter's `initialize` with byte-identical behavior, and now live in the shipped crate.
+
+**Two candidate levers measured out and were dropped.** A compact cold error converter: the exhaustive `ProgramError → u64` switch costs 864 bytes, a small-immediate-plus-shared-shift reformulation costs 832, and Anchor v2 pays the same 864 — the conversion is table stakes for the ABI, not a differentiator. Unifying `assert_owner`/`assert_address` instantiations: their bulk is the inlined 32-byte address comparison on the success path, which cannot be outlined without adding compute units to every check; the shareable log tails are ~24 bytes each.
 
 ### What Quasar and Anchor v2 do differently
 
@@ -56,7 +60,7 @@ The prototype fixtures measured the budget lever in isolation — everything els
 | Fixture                                               | Stock (default 255) | Lean (bounded budget) | Δ          | CU stock → lean              |
 | ----------------------------------------------------- | ------------------: | --------------------: | ---------- | ---------------------------- |
 | hello (`nostd_entrypoint!(process_instruction, 1)`)   |               4,680 |             **2,736** | **−41.5%** | 145 → 151                    |
-| counter (`nostd_entrypoint!(process_instruction, 4)`) |              12,720 |            **11,680** | **−8.2%**  | 3,295 → 3,296; 1,753 → 1,757 |
+| counter (`nostd_entrypoint!(process_instruction, 3)`) |              11,400 |             **9,976** | **−12.5%** | 3,203 → 3,202; 1,753 → 1,757 |
 
 The bounded budget alone brings hello to within 216 bytes of Quasar's 2,520 — with zero unsafe code, zero new macros, only the documented second argument of `nostd_entrypoint!`. The counter gains less because its `.text` is dominated by derive-generated dispatch and the `RangeInclusive` envelope triplication, not the deserializer; the symbol table shows its `entrypoint` fell 7,736 → ~1,256 bytes, but the freed budget re-surfaced as extra arms in the inlined router.
 
@@ -72,7 +76,7 @@ The comparison fixtures keep publishing stock numbers; the `pina_lean` fixtures 
 
 ## Consequences
 
-- **Deployed sizes approach Quasar's class without losing checks.** Measured: hello −41.5% (to 2,736, near Quasar's 2,520); projected for the full lean dispatcher: hello ≈ 2.3–2.6 KB, counter ≈ 7.8–8.4 KB — between Quasar (7,808) and Anchor v2 (8,696), with every validation pina performs today still performed.
+- **Deployed sizes approach Quasar's class without losing checks.** Measured: hello −41.5% (to 2,736, near Quasar's 2,520); counter −21.6% from stock (12,720 → 9,976 with the budget and slicing levers shipped here). The remaining 1,280 bytes to Anchor v2's 8,696 sit almost entirely in the 6.4 KB inlined `entrypoint`, which is the lean dispatcher's addressable envelope — projected to land the counter at ≈ 8.2–8.6 KB, at or under Anchor v2, with every validation pina performs today still performed.
 - **The CU lead is retained.** The budget lever costs +6 CU on hello and +1/+4 CU on the counter; pina's `initialize` stays under Anchor v2's 3,458 and Quasar's 3,488. Per-arm exact parsing can reduce CU further by skipping 255-slot framing entirely.
 - **Two entrypoint paths exist until the default flips.** Both must stay feature-complete; the migration-aware discriminator envelope checks keep their ordering (envelope → program ID → accounts) on both paths.
 - **Programs with many remaining-accounts instructions** (for example account-array sweeps) must keep the unrolled path or pass a large budget — the lean dispatcher's per-arm walking must be measured on such a program before the flip (multisig first).

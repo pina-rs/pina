@@ -196,11 +196,15 @@ The PDA-creation builders share one allocation spine (`CompactCreationTarget::al
 
 `nostd_entrypoint!` accepts a second argument: the maximum number of accounts the entrypoint deserializes (the default is `pinocchio::MAX_TX_ACCOUNTS`, 255). Pinocchio's deserializer unrolls the account walk at compile time, so a program compiled with the default carries walking code for 255 accounts even when every instruction uses two. Passing the program's real bound — its widest instruction's account count plus headroom — removes that code:
 
-| Fixture                                               | Default budget | Bounded budget | Δ size | Δ CU      |
-| ----------------------------------------------------- | -------------: | -------------: | ------ | --------- |
-| hello (`nostd_entrypoint!(process_instruction, 1)`)   |          4,680 |          2,736 | −41.5% | 145 → 151 |
-| counter (`nostd_entrypoint!(process_instruction, 4)`) |         12,720 |         11,680 | −8.2%  | +1 / +4   |
+| Fixture                                               | Default budget | Bounded budget | Δ size | Δ CU               |
+| ----------------------------------------------------- | -------------: | -------------: | ------ | ------------------ |
+| hello (`nostd_entrypoint!(process_instruction, 1)`)   |          4,680 |          2,736 | −41.5% | 145 → 151          |
+| counter (`nostd_entrypoint!(process_instruction, 3)`) |         11,400 |          9,976 | −12.5% | 3,203 → 3,202 / +4 |
 
 The budget is a program-level contract: accounts beyond the bound are ignored rather than rejected, so a program that accepts unbounded remaining accounts must not lower it. [ADR 0010](./adrs/0010-lean-entrypoint-strategy.md) measures this lever and builds the case for the lean dispatcher on top of it.
+
+## Prefer exclusive slice bounds in seed and signer assembly
+
+Every `[..=len]` slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing; the equivalent exclusive `[..len + 1]` inlines to a few instructions. Pina's PDA-creation CPI spine carried three of them — the derivation-seed slice, the combined-seed signer slice, and the signer-list slice — so every program that creates a PDA paid ~1.3 KB of deployed size for them. They now use exclusive bounds (each guarded by the `len < MAX` check that already ran), which measured −1,320 bytes and −92 compute units on the counter fixture's `initialize` with byte-identical behavior. Generated code and user code should follow the same shape: exclusive ranges over arrays whose filled prefix is `len + 1`.
 
 [`DETAIL_POINTER_MESSAGE`]: https://docs.rs/pina/latest/pina/constant.DETAIL_POINTER_MESSAGE.html

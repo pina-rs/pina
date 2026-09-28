@@ -516,6 +516,8 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 	}
 
 	#[inline(always)]
+	// Same `[..len + 1]` rationale as `invoke_signed_inner` above.
+	#[allow(clippy::range_plus_one)]
 	fn invoke_signed_inner_validated<T: PinaAccount, F>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
@@ -1338,6 +1340,12 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	}
 
 	#[inline(always)]
+	// The seed and signer slices below use `[..len + 1]` rather than the
+	// more readable `[..=len]` clippy prefers: the inclusive form
+	// monomorphizes a 216-byte `RangeInclusive<usize>::index` copy per
+	// element type (three across this spine, ~1.3 KB per PDA-creating
+	// program) while the exclusive form inlines.
+	#[allow(clippy::range_plus_one)]
 	fn invoke_signed_inner(&self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
 		if signers.len() >= MAX_CPI_SIGNERS {
 			return Err(ProgramError::InvalidArgument);
@@ -1351,8 +1359,12 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
 		derivation_seeds[..self.seeds.len()].copy_from_slice(self.seeds);
 		derivation_seeds[self.seeds.len()] = bump_array.as_slice();
+		// Exclusive bound: `[..=len]` would monomorphize a 216-byte
+		// `RangeInclusive<usize>::index` per element type across the seed and
+		// signer assemblies below, while `[..len + 1]` inlines; `len + 1`
+		// cannot overflow because the `len < MAX_SEEDS` check above ran.
 		let expected_address =
-			crate::create_program_address(&derivation_seeds[..=self.seeds.len()], self.owner)?;
+			crate::create_program_address(&derivation_seeds[..self.seeds.len() + 1], self.owner)?;
 
 		if self.account.address() != &expected_address {
 			return Err(ProgramError::InvalidSeeds);
@@ -1362,6 +1374,8 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	}
 
 	#[inline(always)]
+	// Same `[..len + 1]` rationale as `invoke_signed_inner` above.
+	#[allow(clippy::range_plus_one)]
 	fn invoke_signed_inner_validated(
 		&self,
 		signers: &[Signer<'_, '_>],
@@ -1374,7 +1388,9 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		let bump_array = [self.bump];
 		let combined_seeds = combine_seeds_with_bump(self.seeds, &bump_array)?;
 
-		let target_signer = Signer::from(&combined_seeds[..=self.seeds.len()]);
+		// Same exclusive-bound rationale as `invoke_signed_inner`: the
+		// `len < MAX_SEEDS` check in the caller guards the `+ 1`.
+		let target_signer = Signer::from(&combined_seeds[..self.seeds.len() + 1]);
 		let empty_seeds: [Seed<'_>; 0] = [];
 		let empty_signer = Signer::from(&empty_seeds);
 		let mut all_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
@@ -1383,7 +1399,10 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		for (destination, signer) in all_signers[1..].iter_mut().zip(signers) {
 			*destination = signer.clone();
 		}
-		let all_signers = &all_signers[..=signers.len()];
+		// Exclusive bound for the same reason as the seed slices above; the
+		// `len < MAX_CPI_SIGNERS` check at the top of this function guards
+		// the `+ 1`.
+		let all_signers = &all_signers[..signers.len() + 1];
 
 		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
 		let rent = if let Some(rent) = rent {
