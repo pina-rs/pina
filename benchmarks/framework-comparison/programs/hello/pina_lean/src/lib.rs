@@ -7,7 +7,7 @@
 //! account — and measures 4,680 → 2,736 bytes (−41.5%) at +6 compute units.
 //!
 //! This fixture is the measurement bed for the lean-entrypoint exploration
-//! (`docs/adrs/0000-lean-entrypoint-exploration.md`); it is not part of the
+//! (`docs/src/adrs/0010-lean-entrypoint-strategy.md`); it is not part of the
 //! published comparison table, which shows the stock default.
 #![no_std]
 
